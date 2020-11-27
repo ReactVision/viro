@@ -1,4 +1,4 @@
-platform :ios, '9.3'
+platform :ios, '10.0'*
 target 'VIRO_PROJECT_NAME' do
   use_frameworks!
   pod 'ViroReact', :path => '../node_modules/react-viro/ios/'

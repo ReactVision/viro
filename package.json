@@ -1,7 +1,7 @@
 {
   "name": "@viro-community/react-viro",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "2.19.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"

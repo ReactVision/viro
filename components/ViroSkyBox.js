@@ -57,11 +57,11 @@ var ViroSkybox = createReactClass({
     onLoadEnd: PropTypes.func,
   },
 
-  _onLoadStart: function(event: Event) {
+  _onLoadStart: function(event/*: Event*/) {
     this.props.onLoadStart && this.props.onLoadStart(event);
   },
 
-  _onLoadEnd: function(event: Event) {
+  _onLoadEnd: function(event/*: Event*/) {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
   },
 

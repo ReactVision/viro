@@ -31,7 +31,7 @@ var ARTrackingTargetsPropTypes = {
 
 class ViroARTrackingTargets {
 
-  static createTargets(targets:{[key:string]: any}){
+  static createTargets(targets/*:{[key: string]: any}*/){
     for(var key in targets) {
       var target = targets[key]
      

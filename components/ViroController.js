@@ -35,11 +35,11 @@ var ViroController = createReactClass({
     controllerVisibility: PropTypes.bool,
   },
 
-  _onClick: function(event: Event) {
+  _onClick: function(event/*: Event*/) {
     this.props.onClick && this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClickState: function(event: Event) {
+  _onClickState: function(event/*: Event*/) {
     this.props.onClickState && this.props.onClickState(event.nativeEvent.clickState, event.nativeEvent.position, event.nativeEvent.source);
     let CLICKED = 3; // Value representation of Clicked ClickState within EventDelegateJni.
     if (event.nativeEvent.clickState == CLICKED){
@@ -47,31 +47,31 @@ var ViroController = createReactClass({
     }
   },
 
-  _onTouch: function(event: Event) {
+  _onTouch: function(event/*: Event*/) {
     this.props.onTouch && this.props.onTouch(event.nativeEvent.touchState, event.nativeEvent.touchPos, event.nativeEvent.source);
   },
 
-  _onScroll: function(event: Event) {
+  _onScroll: function(event/*: Event*/) {
     this.props.onScroll && this.props.onScroll(event.nativeEvent.scrollPos, event.nativeEvent.source);
   },
 
-  _onSwipe: function(event: Event) {
+  _onSwipe: function(event/*: Event*/) {
     this.props.onSwipe && this.props.onSwipe(event.nativeEvent.swipeState, event.nativeEvent.source);
   },
 
-  _onControllerStatus: function(event: Event) {
+  _onControllerStatus: function(event/*: Event*/) {
     this.props.onControllerStatus && this.props.onControllerStatus(event.nativeEvent.controllerStatus, event.nativeEvent.source);
   },
 
-  _onFuse: function(event: Event){
+  _onFuse: function(event/*: Event*/){
     this.props.onFuse && this.props.onFuse(event.nativeEvent.source);
   },
 
-  _onPinch: function(event: Event) {
+  _onPinch: function(event/*: Event*/) {
     this.props.onPinch && this.props.onPinch(event.nativeEvent.pinchState, event.nativeEvent.scaleFactor, event.nativeEvent.source);
   },
 
-  _onRotate: function(event: Event) {
+  _onRotate: function(event/*: Event*/) {
     this.props.onRotate && this.props.onRotate(event.nativeEvent.rotateState, event.nativeEvent.rotationFactor, event.nativeEvent.source);
   },
 

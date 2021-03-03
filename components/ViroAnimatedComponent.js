@@ -31,11 +31,11 @@ var ViroAnimatedComponent = createReactClass({
     run: PropTypes.bool,
   },
 
-  _onStart: function(event: Event) {
+  _onStart: function(event/*: Event*/) {
     this.props.onStart && this.props.onStart();
   },
 
-  _onFinish: function(event: Event) {
+  _onFinish: function(event/*: Event*/) {
     this.props.onFinish && this.props.onFinish();
   },
 

@@ -160,7 +160,7 @@ var ViroParticleEmitter = createReactClass({
 
   // Called from native on the event a positional change has occured
   // for the underlying control within the renderer.
-  _onNativeTransformUpdate: function(event: Event){
+  _onNativeTransformUpdate: function(event/*: Event*/){
     var position =  event.nativeEvent.position;
     this.setState({
       nativePositionState:position

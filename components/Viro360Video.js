@@ -82,11 +82,11 @@ var Viro360Video = createReactClass({
     stereoMode:PropTypes.oneOf(['LeftRight', 'RightLeft', 'TopBottom', 'BottomTop', 'None']),
   },
 
-  _onBufferStart: function(event: Event) {
+  _onBufferStart: function(event/*: Event*/) {
     this.props.onBufferStart && this.props.onBufferStart(event);
   },
 
-  _onBufferEnd: function(event: Event) {
+  _onBufferEnd: function(event/*: Event*/) {
     this.props.onBufferEnd && this.props.onBufferEnd(event);
   },
 
@@ -94,11 +94,11 @@ var Viro360Video = createReactClass({
     this.props.onFinish && this.props.onFinish();
   },
 
-  _onError: function(event: Event) {
+  _onError: function(event/*: Event*/) {
     this.props.onError && this.props.onError(event);
   },
 
-  _onUpdateTime: function(event: Event) {
+  _onUpdateTime: function(event/*: Event*/) {
     this.props.onUpdateTime && this.props.onUpdateTime(event.nativeEvent.currentTime, event.nativeEvent.totalTime);
   },
 

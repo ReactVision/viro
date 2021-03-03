@@ -88,7 +88,7 @@ class ViroAnimationValidation {
   }
 }
 
-var animationError = function(message1, animation, caller?, message2?) {
+var animationError = function(message1, animation, caller/*?*/, message2/*?*/) {
   invariant(
     false,
     message1 + '\n' + (caller || '<<unknown>>') + ': ' +

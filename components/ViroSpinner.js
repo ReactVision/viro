@@ -132,11 +132,11 @@ var ViroSpinner = createReactClass({
     this._component.setVelocity(findNodeHandle(this), velocity);
   },
 
-  _onAnimationStart: function(event: Event) {
+  _onAnimationStart: function(event/*: Event*/) {
     this.props.animation && this.props.animation.onStart && this.props.animation.onStart();
   },
 
-  _onAnimationFinish: function(event: Event) {
+  _onAnimationFinish: function(event/*: Event*/) {
     this.props.animation && this.props.animation.onFinish && this.props.animation.onFinish();
   },
 

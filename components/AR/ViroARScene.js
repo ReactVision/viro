@@ -90,15 +90,15 @@ var ViroARScene = createReactClass({
     onTrackingInitialized: PropTypes.func,
   },
 
-  _onHover: function(event: Event) {
+  _onHover: function(event/*: Event*/) {
     this.props.onHover && this.props.onHover(event.nativeEvent.isHovering, event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClick: function(event: Event) {
+  _onClick: function(event/*: Event*/) {
     this.props.onClick && this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClickState: function(event: Event) {
+  _onClickState: function(event/*: Event*/) {
     this.props.onClickState && this.props.onClickState(event.nativeEvent.clickState, event.nativeEvent.position, event.nativeEvent.source);
     let CLICKED = 3; // Value representation of Clicked ClickState within EventDelegateJni.
     if (event.nativeEvent.clickState == CLICKED){
@@ -106,27 +106,27 @@ var ViroARScene = createReactClass({
     }
   },
 
-  _onTouch: function(event: Event) {
+  _onTouch: function(event/*: Event*/) {
     this.props.onTouch && this.props.onTouch(event.nativeEvent.touchState, event.nativeEvent.touchPos, event.nativeEvent.source);
   },
 
-  _onScroll: function(event: Event) {
+  _onScroll: function(event/*: Event*/) {
     this.props.onScroll && this.props.onScroll(event.nativeEvent.scrollPos, event.nativeEvent.source);
   },
 
-  _onSwipe: function(event: Event) {
+  _onSwipe: function(event/*: Event*/) {
     this.props.onSwipe && this.props.onSwipe(event.nativeEvent.swipeState, event.nativeEvent.source);
   },
 
-  _onPinch: function(event: Event) {
+  _onPinch: function(event/*: Event*/) {
     this.props.onPinch && this.props.onPinch(event.nativeEvent.pinchState, event.nativeEvent.scaleFactor, event.nativeEvent.source);
   },
 
-  _onRotate: function(event: Event) {
+  _onRotate: function(event/*: Event*/) {
     this.props.onRotate && this.props.onRotate(event.nativeEvent.rotateState, event.nativeEvent.rotationFactor, event.nativeEvent.source);
   },
 
-  _onCameraARHitTest: function(event: Event) {
+  _onCameraARHitTest: function(event/*: Event*/) {
     var hitTestEventObj = {
       hitTestResults: event.nativeEvent.hitTestResults,
       cameraOrientation: {
@@ -139,11 +139,11 @@ var ViroARScene = createReactClass({
     this.props.onCameraARHitTest && this.props.onCameraARHitTest(hitTestEventObj);
   },
 
-  _onARPointCloudUpdate: function(event: Event) {
+  _onARPointCloudUpdate: function(event/*: Event*/) {
     this.props.onARPointCloudUpdate && this.props.onARPointCloudUpdate(event.nativeEvent.pointCloud);
   },
 
-  _onCameraTransformUpdate: function(event: Event) {
+  _onCameraTransformUpdate: function(event/*: Event*/) {
     var cameraTransform = {
       // ** DEPRECATION WARNING ** The cameraTransform key will be deprecated in a future release, 
       cameraTransform: {
@@ -160,11 +160,11 @@ var ViroARScene = createReactClass({
     this.props.onCameraTransformUpdate && this.props.onCameraTransformUpdate(cameraTransform);
   },
 
-  _onDrag: function(event: Event) {
+  _onDrag: function(event/*: Event*/) {
       this.props.onDrag && this.props.onDrag(event.nativeEvent.dragToPos, event.nativeEvent.source);
   },
 
-  _onFuse: function(event: Event){
+  _onFuse: function(event/*: Event*/){
     if (this.props.onFuse){
       if (typeof this.props.onFuse === 'function'){
         this.props.onFuse(event.nativeEvent.source);
@@ -174,7 +174,7 @@ var ViroARScene = createReactClass({
     }
   },
 
-  _onPlatformUpdate: function(event: Event) {
+  _onPlatformUpdate: function(event/*: Event*/) {
     this.props.onPlatformUpdate && this.props.onPlatformUpdate(event.nativeEvent.platformInfoViro);
   },
 
@@ -183,7 +183,7 @@ var ViroARScene = createReactClass({
     this.onTrackingFirstInitialized = false;
   },
 
-  _onTrackingUpdated: function(event: Event){
+  _onTrackingUpdated: function(event/*: Event*/){
     if (this.props.onTrackingUpdated){
       this.props.onTrackingUpdated(event.nativeEvent.state, event.nativeEvent.reason);
     }
@@ -202,7 +202,7 @@ var ViroARScene = createReactClass({
   /**
    * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
    */
-  _onTrackingInitialized: function(event: Event) {
+  _onTrackingInitialized: function(event/*: Event*/) {
     this.props.onTrackingInitialized && this.props.onTrackingInitialized();
   },
 
@@ -211,19 +211,19 @@ var ViroARScene = createReactClass({
 
    Returns object w/ "intensity" and "color" keys
    */
-  _onAmbientLightUpdate: function(event: Event) {
+  _onAmbientLightUpdate: function(event/*: Event*/) {
     this.props.onAmbientLightUpdate && this.props.onAmbientLightUpdate(event.nativeEvent.ambientLightInfo)
   },
 
-  _onAnchorFound: function(event: Event) {
+  _onAnchorFound: function(event/*: Event*/) {
     this.props.onAnchorFound && this.props.onAnchorFound(event.nativeEvent.anchor);
   },
 
-  _onAnchorUpdated: function(event: Event) {
+  _onAnchorUpdated: function(event/*: Event*/) {
     this.props.onAnchorUpdated && this.props.onAnchorUpdated(event.nativeEvent.anchor);
   },
 
-  _onAnchorRemoved: function(event: Event) {
+  _onAnchorRemoved: function(event/*: Event*/) {
     this.props.onAnchorRemoved && this.props.onAnchorRemoved(event.nativeEvent.anchor);
   },
 

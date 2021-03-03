@@ -60,15 +60,15 @@ var ViroScene = createReactClass({
     postProcessEffects: PropTypes.arrayOf(PropTypes.string),
   },
 
-  _onHover: function(event: Event) {
+  _onHover: function(event/*: Event*/) {
     this.props.onHover && this.props.onHover(event.nativeEvent.isHovering, event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClick: function(event: Event) {
+  _onClick: function(event/*: Event*/) {
     this.props.onClick && this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClickState: function(event: Event) {
+  _onClickState: function(event/*: Event*/) {
     this.props.onClickState && this.props.onClickState(event.nativeEvent.clickState, event.nativeEvent.position, event.nativeEvent.source);
     let CLICKED = 3; // Value representation of Clicked ClickState within EventDelegateJni.
     if (event.nativeEvent.clickState == CLICKED){
@@ -76,19 +76,19 @@ var ViroScene = createReactClass({
     }
   },
 
-  _onTouch: function(event: Event) {
+  _onTouch: function(event/*: Event*/) {
     this.props.onTouch && this.props.onTouch(event.nativeEvent.touchState, event.nativeEvent.touchPos, event.nativeEvent.source);
   },
 
-  _onScroll: function(event: Event) {
+  _onScroll: function(event/*: Event*/) {
     this.props.onScroll && this.props.onScroll(event.nativeEvent.scrollPos, event.nativeEvent.source);
   },
 
-  _onSwipe: function(event: Event) {
+  _onSwipe: function(event/*: Event*/) {
     this.props.onSwipe && this.props.onSwipe(event.nativeEvent.swipeState, event.nativeEvent.source);
   },
 
-  _onFuse: function(event: Event){
+  _onFuse: function(event/*: Event*/){
     if (this.props.onFuse){
       if (typeof this.props.onFuse === 'function'){
         this.props.onFuse(event.nativeEvent.source);
@@ -98,19 +98,19 @@ var ViroScene = createReactClass({
     }
   },
 
-  _onPinch: function(event: Event) {
+  _onPinch: function(event/*: Event*/) {
     this.props.onPinch && this.props.onPinch(event.nativeEvent.pinchState, event.nativeEvent.scaleFactor, event.nativeEvent.source);
   },
 
-  _onRotate: function(event: Event) {
+  _onRotate: function(event/*: Event*/) {
     this.props.onRotate && this.props.onRotate(event.nativeEvent.rotateState, event.nativeEvent.rotationFactor, event.nativeEvent.source);
   },
 
-  _onDrag: function(event: Event) {
+  _onDrag: function(event/*: Event*/) {
       this.props.onDrag && this.props.onDrag(event.nativeEvent.dragToPos, event.nativeEvent.source);
   },
 
-  _onPlatformUpdate: function(event: Event) {
+  _onPlatformUpdate: function(event/*: Event*/) {
     /**
      * ##### DEPRECATION WARNING - 'vrPlatform' is deprecated in favor of 'platform'! Support
      * for 'vrPlatform' may be removed in the future.
@@ -119,7 +119,7 @@ var ViroScene = createReactClass({
     this.props.onPlatformUpdate && this.props.onPlatformUpdate(event.nativeEvent.platformInfoViro);
   },
 
-  _onCameraTransformUpdate: function(event: Event) {
+  _onCameraTransformUpdate: function(event/*: Event*/) {
     var cameraTransform = {
       // ** DEPRECATION WARNING ** The cameraTransform key will be deprecated in a future release, 
       cameraTransform: {

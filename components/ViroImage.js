@@ -181,27 +181,27 @@ var ViroImage = createReactClass({
     onCollision: PropTypes.func,
   },
 
-  _onLoadStart: function(event: Event) {
+  _onLoadStart: function(event/*: Event*/) {
     this.props.onLoadStart && this.props.onLoadStart(event);
   },
 
-  _onLoadEnd: function(event: Event) {
+  _onLoadEnd: function(event/*: Event*/) {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
   },
 
-  _onError: function(event: Event) {
+  _onError: function(event/*: Event*/) {
     this.props.onError && this.props.onError(event);
   },
 
-  _onHover: function(event: Event) {
+  _onHover: function(event/*: Event*/) {
     this.props.onHover && this.props.onHover(event.nativeEvent.isHovering, event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClick: function(event: Event) {
+  _onClick: function(event/*: Event*/) {
     this.props.onClick && this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
   },
 
-  _onClickState: function(event: Event) {
+  _onClickState: function(event/*: Event*/) {
     this.props.onClickState && this.props.onClickState(event.nativeEvent.clickState, event.nativeEvent.position, event.nativeEvent.source);
     let CLICKED = 3; // Value representation of Clicked ClickState within EventDelegateJni.
     if (event.nativeEvent.clickState == CLICKED){
@@ -209,32 +209,32 @@ var ViroImage = createReactClass({
     }
   },
 
-  _onTouch: function(event: Event) {
+  _onTouch: function(event/*: Event*/) {
     this.props.onTouch && this.props.onTouch(event.nativeEvent.touchState, event.nativeEvent.touchPos, event.nativeEvent.source);
   },
 
-  _onScroll: function(event: Event) {
+  _onScroll: function(event/*: Event*/) {
       this.props.onScroll && this.props.onScroll(event.nativeEvent.scrollPos, event.nativeEvent.source);
   },
 
-  _onSwipe: function(event: Event) {
+  _onSwipe: function(event/*: Event*/) {
       this.props.onSwipe && this.props.onSwipe(event.nativeEvent.swipeState, event.nativeEvent.source);
   },
 
-  _onDrag: function(event: Event) {
+  _onDrag: function(event/*: Event*/) {
       this.props.onDrag
         && this.props.onDrag(event.nativeEvent.dragToPos, event.nativeEvent.source);
   },
 
-  _onPinch: function(event: Event) {
+  _onPinch: function(event/*: Event*/) {
     this.props.onPinch && this.props.onPinch(event.nativeEvent.pinchState, event.nativeEvent.scaleFactor, event.nativeEvent.source);
   },
 
-  _onRotate: function(event: Event) {
+  _onRotate: function(event/*: Event*/) {
     this.props.onRotate && this.props.onRotate(event.nativeEvent.rotateState, event.nativeEvent.rotationFactor, event.nativeEvent.source);
   },
 
-  _onFuse: function(event: Event){
+  _onFuse: function(event/*: Event*/){
     if (this.props.onFuse){
       if (typeof this.props.onFuse === 'function'){
         this.props.onFuse(event.nativeEvent.source);
@@ -244,11 +244,11 @@ var ViroImage = createReactClass({
     }
   },
 
-  _onAnimationStart: function(event: Event) {
+  _onAnimationStart: function(event/*: Event*/) {
     this.props.animation && this.props.animation.onStart && this.props.animation.onStart();
   },
 
-  _onAnimationFinish: function(event: Event) {
+  _onAnimationFinish: function(event/*: Event*/) {
     this.props.animation && this.props.animation.onFinish && this.props.animation.onFinish();
   },
 
@@ -272,7 +272,7 @@ var ViroImage = createReactClass({
     NativeModules.VRTNodeModule.setVelocity(findNodeHandle(this), velocity);
   },
 
-  _onCollision: function(event: Event){
+  _onCollision: function(event/*: Event*/){
     if (this.props.onCollision){
       this.props.onCollision(event.nativeEvent.viroTag, event.nativeEvent.collidedPoint,
                                                            event.nativeEvent.collidedNormal);
@@ -281,7 +281,7 @@ var ViroImage = createReactClass({
 
   // Called from native on the event a positional change has occured
   // for the underlying control within the renderer.
-  _onNativeTransformUpdate: function(event: Event){
+  _onNativeTransformUpdate: function(event/*: Event*/){
     var position =  event.nativeEvent.position;
     if (this.props.onTransformUpdate){
       this.props.onTransformUpdate(position);

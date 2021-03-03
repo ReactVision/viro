@@ -44,11 +44,11 @@ var ViroSoundField = createReactClass({
     onError: PropTypes.func,
   },
 
-  _onFinish: function(event: Event) {
+  _onFinish: function(event/*: Event*/) {
     this.props.onFinish && this.props.onFinish(event);
   },
 
-  _onError: function(event: Event) {
+  _onError: function(event/*: Event*/) {
     this.props.onError && this.props.onError(event);
   },
 

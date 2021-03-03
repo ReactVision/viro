@@ -21,7 +21,7 @@ var processColor = require('react-native').processColor;
 
 class ViroMaterials {
 
-  static createMaterials(materials:{[key:string]: any}){
+  static createMaterials(materials/*:{[key: string]: any}*/){
     var result = {};
     for(var key in materials){
       MaterialValidation.validateMaterial(key, materials);

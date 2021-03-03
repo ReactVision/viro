@@ -53,11 +53,11 @@ var ViroCamera = createReactClass({
     this._component.setNativeProps(nativeProps);
   },
 
-  _onAnimationStart: function(event: Event) {
+  _onAnimationStart: function(event/*: Event*/) {
     this.props.animation && this.props.animation.onStart && this.props.animation.onStart();
   },
 
-  _onAnimationFinish: function(event: Event) {
+  _onAnimationFinish: function(event/*: Event*/) {
     this.props.animation && this.props.animation.onFinish && this.props.animation.onFinish();
   },
 

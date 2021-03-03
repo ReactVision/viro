@@ -14,7 +14,7 @@ var AnimationManager = require('react-native').NativeModules.VRTAnimationManager
 var AnimationValidation = require('./ViroAnimationValidation');
 
 class ViroAnimations {
-    static registerAnimations(animations:{[key:string]: any}) {
+    static registerAnimations(animations/*:{[key: string]: any}*/) {
       var result = {};
       for(var key in animations) {
           if (animations[key].constructor===Array){

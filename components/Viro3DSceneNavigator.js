@@ -19,10 +19,10 @@ import { requireNativeComponent, View, StyleSheet, findNodeHandle } from 'react-
 import React, { Component } from 'react';
 import { checkMisnamedProps } from './Utilities/ViroProps';
 
-type Scene = {
-  scene: Function;
-  passProps?: Object,
-};
+// type Scene = {
+//   scene: Function;
+//   passProps?: Object,
+// };
 
 var mathRandomOffset = 0;
 
@@ -67,7 +67,7 @@ var Viro3DSceneNavigator = createReactClass({
      multisamplingEnabled: PropTypes.bool,
   },
 
-  sceneNavigator: (undefined: ?Object),
+  sceneNavigator: (undef/*: ?Object*/),
 
   getDefaultProps: function() {
     return {
@@ -96,11 +96,11 @@ var Viro3DSceneNavigator = createReactClass({
    * Called from native when either the user physically decides to exit vr (hits
    * the "X" buton).
    */
-  _onExitViro: function(event: Event) {
+  _onExitViro: function(event/*: Event*/) {
     this.props.onExitViro && this.props.onExitViro();
   },
 
-  getInitialState: function(): State {
+  getInitialState: function()/*: State*/ {
     var initialSceneTag = this.props.initialSceneKey;
     if (initialSceneTag == null){
         initialSceneTag = this.getRandomTag();
@@ -245,7 +245,7 @@ var Viro3DSceneNavigator = createReactClass({
     this.popN(1);
   },
 
-  popN: function(n: number) {
+  popN: function(n/*: number*/) {
     if (n === 0) {
         return;
     }
@@ -265,7 +265,7 @@ var Viro3DSceneNavigator = createReactClass({
    * one, initialize it with a reference count of 1, and store it within the
    * sceneDictionary for future reference.
    */
-  incrementSceneReference: function(scene:Scene, scenekey:String, limitOne:Boolean){
+  incrementSceneReference: function(scene/*: Scene*/, scenekey/*: String*/, limitOne/*: Boolean*/){
     var currentSceneDictionary = this.state.sceneDictionary;
     if (!(scenekey in currentSceneDictionary)){
       var newScene = {
@@ -328,7 +328,7 @@ var Viro3DSceneNavigator = createReactClass({
    * Adds the given sceneKey to the sceneHistory and updates the currentSceneIndex to point
    * to the scene on the top of the history stack (the most recent scene).
    */
-  addToHistory: function(sceneKey:String){
+  addToHistory: function(sceneKey/*: String*/){
     var updatedHistory = this.state.sceneHistory.concat([sceneKey]);
     var currentIndex = this.getSceneIndex(sceneKey);
     this.setState({
@@ -343,7 +343,7 @@ var Viro3DSceneNavigator = createReactClass({
    * currentSceneIndex to point to the scene on the top of the history stack
    * (the most recent scene).
    */
-  reorderHistory: function(sceneKey:String){
+  reorderHistory: function(sceneKey/*: String*/){
     // Find the last sceneKey within sceneHistory and remove it.
     var sceneHistory = this.state.sceneHistory;
     for (var i = sceneHistory.length-1; i >= 0; i --){

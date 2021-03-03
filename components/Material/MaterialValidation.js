@@ -68,7 +68,7 @@ class MaterialValidation {
   }
 }
 
-var materialError = function(message1, material, caller?, message2?) {
+var materialError = function(message1, material, caller/*?*/, message2/*?*/) {
   invariant(
     false,
     message1 + '\n' + (caller || '<<unknown>>') + ': ' +

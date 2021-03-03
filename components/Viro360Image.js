@@ -68,15 +68,15 @@ var Viro360Image = createReactClass({
     isHdr: PropTypes.bool,
   },
 
-  _onLoadStart: function(event: Event) {
+  _onLoadStart: function(event/*: Event*/) {
     this.props.onLoadStart && this.props.onLoadStart(event);
   },
 
-  _onLoadEnd: function(event: Event) {
+  _onLoadEnd: function(event/*: Event*/) {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
   },
 
-  _onError: function(event: Event) {
+  _onError: function(event/*: Event*/) {
     this.props.onError && this.props.onError(event);
   },
 

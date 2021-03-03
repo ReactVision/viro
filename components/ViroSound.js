@@ -23,7 +23,7 @@ var SoundModule = NativeModules.VRTSoundModule;
 
 var ViroSound = createReactClass({
   statics: {
-    preloadSounds: async function(soundMap:{[key:string]: string}) {
+    preloadSounds: async function(soundMap/*:{[key: string]: string}*/) {
       var results = {};
       for (var index in soundMap) {
         const response = await SoundModule.preloadSounds({[index]:soundMap[index]});
@@ -33,7 +33,7 @@ var ViroSound = createReactClass({
       return results;
     },
 
-    unloadSounds: function(soundKeys: [string]) {
+    unloadSounds: function(soundKeys/*: [string]*/) {
       SoundModule.unloadSounds(soundKeys);
     }
   },
@@ -59,11 +59,11 @@ var ViroSound = createReactClass({
     onError: PropTypes.func,
   },
 
-  _onFinish: function(event: Event) {
+  _onFinish: function(event/*: Event*/) {
     this.props.onFinish && this.props.onFinish(event);
   },
 
-  _onError: function(event: Event) {
+  _onError: function(event/*: Event*/) {
     this.props.onError && this.props.onError(event);
   },
 

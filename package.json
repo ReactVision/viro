@@ -1,7 +1,7 @@
 {
   "name": "@viro-community/react-viro",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "index.js",
+  "types": "index.d.ts",
   "version": "2.19.0",
   "license": "MIT",
   "publishConfig": {
@@ -30,8 +30,7 @@
     "ios/dist",
     "ios/ViroReact.podspec",
     "bin",
-    "LICENSE",
-    "dist"
+    "LICENSE"
   ],
   "dependencies": {
     "create-react-class": "^15.7.0",

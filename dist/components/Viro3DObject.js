@@ -194,6 +194,7 @@ var Viro3DObject = /** @class */ (function (_super) {
     return Viro3DObject;
 }(react_1.Component));
 exports.default = Viro3DObject;
+// We can probably give a better type for this, but it's not exposed ouside this file so not urgent
 var VRT3DObject = react_native_1.requireNativeComponent("VRT3DObject", 
 // @ts-ignore type signnature incorrect, or extra arguments are ignored?
 Viro3DObject, {

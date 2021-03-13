@@ -1,6 +1,7 @@
 {
   "name": "@viro-community/react-viro",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "version": "2.19.0",
   "license": "MIT",
   "publishConfig": {

@@ -30,7 +30,8 @@
     "ios/dist",
     "ios/ViroReact.podspec",
     "bin",
-    "LICENSE"
+    "LICENSE",
+    "dist"
   ],
   "dependencies": {
     "create-react-class": "^15.7.0",

@@ -18,7 +18,6 @@ Viro React is a library for developers to rapidly build augmented reality (AR) a
     </td>
   </tr>
 </table>
-<br/>
 
 # [Installing](readmes/INSTALL.md)
 

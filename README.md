@@ -8,9 +8,21 @@
 
 Viro React is a library for developers to rapidly build augmented reality (AR) and virtual reality (VR) experiences. Developers write in React Native, and Viro runs their code natively across all mobile VR (including Google Daydream, Samsung Gear VR, and Google Cardboard for iOS and Android) and AR (iOS ARKit and Android ARCore) platforms.
 
+<table>
+  <tr>
+    <td align="center">
+      <img height="200" src="https://raw.githubusercontent.com/viromedia/viro/master/code-samples/js/ARCarDemo/viro_car_marker_demo.gif">
+    </td>
+    <td align="center">
+      <img height="200" src="https://raw.githubusercontent.com/viromedia/viro/master/code-samples/js/ARPosterDemo/viro_black_panther_marker_demo.gif">
+    </td>
+  </tr>
+</table>
+<br/>
+
 # [Installing](readmes/INSTALL.md)
 
-If you are integrating Viro React into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md).
+If you are integrating Viro React into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md). Please note that this does _not_ work with Expo. Sorry!
 
 If you are starting a fresh project with Viro React, consider cloning our [starter kit](https://github.com/ViroCommunity/starter-kit) repo instead.
 

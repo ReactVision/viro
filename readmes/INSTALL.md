@@ -20,14 +20,18 @@ $ npm install --save fbjs
 
 If you're unsure about which file to edit or where to put specified the lines, we have added links to how this is done in our [starter-kit](https://github.com/ViroCommunity/starter-kit) repo.
 
-## [iOS linking](./INSTALL_IOS.md)
+## - [iOS linking](./INSTALL_IOS.md)
 
-## [Android linking](./INSTALL_ANDROID.md)
+## - [Android linking](./INSTALL_ANDROID.md)
 
 # **Troubleshooting**
 
 - **It doesn't work on my iOS simulator!**
 
-  AR _does not work on iOS simulators_. If you are getting an error that looks like <span style="background-color: red; color: white">ARWorldTrackingConfiguration setAutoFocusEnabled: unrecognised</span> that is expected. Sorry!
+  AR _does not work on iOS simulators_. If you are getting an error that looks like:
+
+  `ARWorldTrackingConfiguration setAutoFocusEnabled: unrecognised`
+
+  that is expected. Sorry!
 
   See [running-on-device](https://reactnative.dev/docs/running-on-device) in the official react-native docs.

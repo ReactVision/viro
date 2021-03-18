@@ -90,12 +90,6 @@
 
    **For AR**
 
-   - Add the camera permission to the `<manifest>` node below other permissions:
-
-     ```xml
-     <uses-permission android:name="android.permission.CAMERA" />
-     ```
-
    - Add the following line to the `<application>` node, this enables ARCore:
 
      ```xml
@@ -103,6 +97,28 @@
      ```
 
      _Note_: If you want to restrict your app to ARCore-only devices, set the `android:value` to `"required"`
+
+   - Add the camera permission to the `<manifest>` node below other permissions:
+
+     ```xml
+     <uses-permission android:name="android.permission.CAMERA" />
+     ```
+
+     There are quite a few other camera-related permissions and features you might also want to specify, depending on your app:
+
+     ```xml
+     <!-- You may need these if doing any screen recording from within the app -->
+     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+     <!-- Other camera related features -->
+     <uses-feature android:name="android.hardware.camera" />
+     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" tools:replace="required"/>
+     <!-- Specifying OpenGL verison or requirements -->
+     <uses-feature android:glEsVersion="0x00030000" android:required="false" tools:node="remove" tools:replace="required" />
+     <!-- Usage of accelerometer and gyroscope -->
+     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" tools:replace="required" />
+     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" tools:replace="required" />
+     ```
 
    **For VR**
 

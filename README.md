@@ -8,9 +8,9 @@
 [![downloads](https://img.shields.io/npm/dm/@viro-community/react-viro?color=purple)](https://www.npmjs.com/package/@viro-community/react-viro)
 [![Discord](https://img.shields.io/discord/774471080713781259?label=Discord)](https://discord.gg/YfxDBGTxvG)
 
-# Viro React
+# ViroReact
 
-Viro React is a library for developers to rapidly build augmented reality (AR) and virtual reality (VR) experiences. Developers write in React Native, and Viro runs their code natively across all mobile VR (including Google Daydream, Samsung Gear VR, and Google Cardboard for iOS and Android) and AR (iOS ARKit and Android ARCore) platforms.
+ViroReact is a library for developers to rapidly build augmented reality (AR) and virtual reality (VR) experiences. Developers write in React Native, and Viro runs their code natively across all mobile VR (including Google Daydream, Samsung Gear VR, and Google Cardboard for iOS and Android) and AR (iOS ARKit and Android ARCore) platforms.
 
 <table>
   <tr>
@@ -25,9 +25,9 @@ Viro React is a library for developers to rapidly build augmented reality (AR) a
 
 # [Installing](readmes/INSTALL.md)
 
-If you are integrating Viro React into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md). Please note that this does _not_ work with Expo Managed Workflows. Sorry!
+If you are integrating ViroReact into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md). Please note that this does _not_ work with Expo Managed Workflows. Sorry!
 
-If you are starting a fresh project with Viro React, consider cloning our [starter kit](https://github.com/ViroCommunity/starter-kit) repo instead.
+If you are starting a fresh project with ViroReact, consider cloning our [starter kit](https://github.com/ViroCommunity/starter-kit) repo instead.
 
 # Documentation
 
@@ -51,6 +51,6 @@ See our [Example projects](readmes/EXAMPLES.md) page. These are a little old (~2
 
 # A little history...
 
-Viro React was originaly developed by the [Viro Media](http://www.viromedia.com/) company, but was open sourced in 2019. In late 2020 the [Viro Community](https://virocommunity.github.io/) was formed to help maintain and move the project onwards, updating it so it could run with modern versions of react native, and start to add in new features.
+ViroReact was originaly developed by the [Viro Media](http://www.viromedia.com/) company, but was open sourced in 2019. In late 2020 the [Viro Community](https://virocommunity.github.io/) was formed to help maintain and move the project onwards, updating it so it could run with modern versions of react native, and start to add in new features.
 
 We, as a community, owe a great debt to Viro Media and the people who developed this library originally. We hope to make them proud as it continues to develop and grow in the Viro Community.

@@ -31,9 +31,15 @@ If you are starting a fresh project with Viro React, consider cloning our [start
 
 Currently all documentation is hosted on the old [Viro Media](http://docs.viromedia.com/) website. If you'd like to help us with migrating here to the Viro Community github, please [get in touch](https://discord.gg/YfxDBGTxvG)!
 
-## Examples
+# FAQ
 
-[Example projects](readmes/EXAMPLES.md)
+- _Older versions couldn't be submitted to Apple's app store due to use of `UIWebView`. Is this still a problem?_
+
+  Reliance on `UIWebView` has been removed from the project, so you should not have this problem if using the `@viro-community/react-viro` package.
+
+# Examples
+
+See our [Example projects](readmes/EXAMPLES.md) page. These are a little old (~2019) but are a great reference point for how to use bits of the library.
 
 # Need help? Or want to contribute?
 

@@ -90,6 +90,12 @@
 
    **For AR**
 
+   - Ensure the `<manifest>` has the `tools` namespace schema:
+
+     ```xml
+     <manifest ... xmlns:tools="http://schemas.android.com/tools" ...>
+     ```
+
    - Add the following line to the `<application>` node, this enables ARCore:
 
      ```xml

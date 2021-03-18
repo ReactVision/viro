@@ -20,9 +20,9 @@ $ npm install --save fbjs
 
 If you're unsure about which file to edit or where to put specified the lines, we have added links to how this is done in our [starter-kit](https://github.com/ViroCommunity/starter-kit) repo.
 
-## - [iOS linking](./INSTALL_IOS.md)
+## » [iOS linking](./INSTALL_IOS.md)
 
-## - [Android linking](./INSTALL_ANDROID.md)
+## » [Android linking](./INSTALL_ANDROID.md)
 
 # **Troubleshooting**
 

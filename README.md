@@ -4,7 +4,9 @@
   </a>
 </p>
 
-[![npm version](https://badge.fury.io/js/%40viro-community%2Freact-viro.svg)](https://badge.fury.io/js/%40viro-community%2Freact-viro)
+[![npm version](https://img.shields.io/npm/v/@viro-community/react-viro)](https://www.npmjs.com/package/@viro-community/react-viro)
+[![downloads](https://img.shields.io/npm/dm/@viro-community/react-viro?color=purple)](https://www.npmjs.com/package/@viro-community/react-viro)
+[![Discord](https://img.shields.io/discord/774471080713781259?label=Discord)](https://discord.gg/YfxDBGTxvG)
 
 # Viro React
 
@@ -43,7 +45,9 @@ See our [Example projects](readmes/EXAMPLES.md) page. These are a little old (~2
 
 # Need help? Or want to contribute?
 
-We have an active [discord](https://discord.gg/YfxDBGTxvG) where you are most likely to get a response.
+<a href="https://discord.gg/YfxDBGTxvG">
+   <img src="https://discordapp.com/api/guilds/774471080713781259/widget.png?style=banner2" alt="Discord Banner 2"/>
+</a>
 
 # A little history...
 

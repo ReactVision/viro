@@ -124,6 +124,8 @@ _Please note that these examples are a bit old, the code targets an older versio
 
 # Tutorials
 
+_Please note that these tutorials are also a bit old, the code targets an older version of viro before the community took over the project._
+
 <table>
   <tr>
     <td>

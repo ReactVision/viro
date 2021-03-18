@@ -7,7 +7,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "repository": "git@github.com:virocommunity/viro.git",
-  "description": "Fork of Viro complaint with new Apple conditions. Removes UIWebView",
+  "description": "Fork of Viro compliant with new Apple conditions. Removes UIWebView",
   "scripts": {
     "start": "echo 'I dont think you meant to run npm start here.'",
     "test": "jest"

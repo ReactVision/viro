@@ -10,12 +10,6 @@ The steps below are for manually installing and linking the library to an existi
 $ npm install --save @viro-community/react-viro
 ```
 
-You will also need `fbjs`, which is currently an un-declared dependency of react-viro (we will look to remove this in future releases).
-
-```console
-$ npm install --save fbjs
-```
-
 ## Linking (You _must_ do this - we do not support auto-linking)
 
 If you're unsure about which file to edit or where to put specified the lines, we have added links to how this is done in our [starter-kit](https://github.com/ViroCommunity/starter-kit) repo.

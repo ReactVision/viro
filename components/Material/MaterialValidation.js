@@ -15,7 +15,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 var MaterialPropTypes = require('./MaterialPropTypes');
-var invariant = require('fbjs/lib/invariant');
 
 class MaterialValidation {
 
@@ -69,11 +68,15 @@ class MaterialValidation {
 }
 
 var materialError = function(message1, material, caller?, message2?) {
-  invariant(
-    false,
-    message1 + '\n' + (caller || '<<unknown>>') + ': ' +
-    JSON.stringify(material, null, '  ') + (message2 || '')
-  );
+  const format = 
+    `${message1}\n` + 
+    `${caller || '<<unknown>>'}: ` + 
+    JSON.stringify(material, null, '  ') + 
+    (message2 || '');
+  const error = new Error(format);
+  error.name = 'Invariant Violation';
+  error.framesToPop = 1; // Skip invariant error's own stack frame.
+  throw error;
 };
 
 var allMaterialTypes = {};

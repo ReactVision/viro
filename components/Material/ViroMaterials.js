@@ -14,9 +14,7 @@ import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource"
 import assetRegistry from "react-native/Libraries/Image/AssetRegistry"
 
 var MaterialManager = require('react-native').NativeModules.VRTMaterialManager;
-var MaterialPropTypes = require('./MaterialPropTypes');
 var MaterialValidation = require('./MaterialValidation');
-var invariant = require('fbjs/lib/invariant');
 var processColor = require('react-native').processColor;
 
 class ViroMaterials {

@@ -15,7 +15,6 @@ import React from 'react';
 import PropTypes from 'prop-types'
 
 var AnimationPropTypes = require('./ViroAnimationPropTypes');
-var invariant = require('fbjs/lib/invariant');
 
 class ViroAnimationValidation {
   static validateAnimationProp(prop, animationName, animation, caller) {
@@ -89,11 +88,15 @@ class ViroAnimationValidation {
 }
 
 var animationError = function(message1, animation, caller?, message2?) {
-  invariant(
-    false,
-    message1 + '\n' + (caller || '<<unknown>>') + ': ' +
-    JSON.stringify(animation, null, '  ') + (message2 || '')
-  );
+  const format = 
+    `${message1}\n` + 
+    `${caller || '<<unknown>>'}: ` + 
+    JSON.stringify(animation, null, '  ') + 
+    (message2 || '');
+  const error = new Error(format);
+  error.name = 'Invariant Violation';
+  error.framesToPop = 1; // Skip invariant error's own stack frame.
+  throw error;
 };
 
 var allAnimationTypes = {};

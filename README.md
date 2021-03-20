@@ -6,7 +6,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@viro-community/react-viro)](https://www.npmjs.com/package/@viro-community/react-viro)
 [![downloads](https://img.shields.io/npm/dm/@viro-community/react-viro?color=purple)](https://www.npmjs.com/package/@viro-community/react-viro)
-[![Discord](https://img.shields.io/discord/774471080713781259?label=Discord)](https://discord.gg/YfxDBGTxvG)
+[![Discord](https://img.shields.io/discord/774471080713781259?label=Discord)](https://discord.gg/H3ksm5NhzT)
 
 # ViroReact
 
@@ -31,7 +31,7 @@ If you are starting a fresh project with ViroReact, consider cloning our [starte
 
 # Documentation
 
-Currently all documentation is hosted on the old [Viro Media](http://docs.viromedia.com/) website. If you'd like to help us with migrating here to the Viro Community github, please [get in touch](https://discord.gg/YfxDBGTxvG)!
+Currently all documentation is hosted on the old [Viro Media](http://docs.viromedia.com/) website. If you'd like to help us with migrating here to the Viro Community github, please [get in touch](https://discord.gg/H3ksm5NhzT)!
 
 # FAQ
 
@@ -45,7 +45,7 @@ See our [Example projects](readmes/EXAMPLES.md) page. These are a little old (~2
 
 # Need help? Or want to contribute?
 
-<a href="https://discord.gg/YfxDBGTxvG">
+<a href="https://discord.gg/H3ksm5NhzT">
    <img src="https://discordapp.com/api/guilds/774471080713781259/widget.png?style=banner2" alt="Discord Banner 2"/>
 </a>
 

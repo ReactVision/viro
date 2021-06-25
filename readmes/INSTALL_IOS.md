@@ -30,7 +30,7 @@
 
    The `string` can be more appropriate to the needs of your app.
 
-   See an [exmple](https://github.com/ViroCommunity/starter-kit/blob/master/ios/myviroapp/Info.plist#L40) here.
+   See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/ios/myviroapp/Info.plist#L40) here.
 
 4. You're done! You can now run `npx react-native ios`.
 

@@ -1,7 +1,8 @@
-<!-- Requirements: please go through this checklist before opening a new issue -->
-  - [ ] Review the documentation: https://docs.viromedia.com/
-  - [ ] Search for existing issues: https://github.com/viromedia/viro
-  - [ ] Use the latest ViroReact release: https://docs.viromedia.com/docs/releases
+# Requirements: 
+Please go through this checklist before opening a new issue
+  - [ ] Review the [documentation](https://docs.viromedia.com/)
+  - [ ] Search for existing issues in: [viromedia/viro](https://github.com/viromedia/viro/issues) & [ViroCommunity/viro](https://github.com/ViroCommunity/viro/issues)
+  - [ ] Use the latest [ViroReact release](https://docs.viromedia.com/docs/releases)
 
 ## Environment
 Please provide the following information about your environment:

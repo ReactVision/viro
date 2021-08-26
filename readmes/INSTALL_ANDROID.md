@@ -147,6 +147,15 @@
      <meta-data android:name="com.samsung.android.vr.application.mode" android:value="vr_only"/>
      ```
 
+   **For API level 30 or above**
+
+     If you are targetting API Level 30 or above, make sure to add the following lines to the `<manifest>`:
+     ```xml
+     <queries>
+         <package android:name="com.google.ar.core" />
+     </queries>
+     ```
+
    **Optional - when debugging**
 
    Add the following line as an attribute on the `<application>` node. This should only used when debugging and is not recommended for production (you may want to inject the value using [manifestPlaceholders](https://developer.android.com/studio/build/manifest-build-variables) set for specific [build types](https://developer.android.com/studio/build/build-variants)).

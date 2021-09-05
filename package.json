@@ -1,7 +1,7 @@
 {
   "name": "@viro-community/react-viro",
   "main": "index.js",
-  "version": "2.20.2",
+  "version": "2.23.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -16,8 +16,8 @@
     "preset": "react-native"
   },
   "peerDependencies": {
-    "react": "^16.13.1",
-    "react-native": "^0.63.2"
+    "react": "17.0.2",
+    "react-native": "0.65.1"
   },
   "files": [
     "components",

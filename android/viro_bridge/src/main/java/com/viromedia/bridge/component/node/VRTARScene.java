@@ -26,6 +26,7 @@ import android.os.Handler;
 import android.os.Looper;
 
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
@@ -36,6 +37,8 @@ import com.viro.core.internal.ARDeclarativeNode;
 
 import com.viro.core.ARNode;
 import com.viro.core.ARScene;
+import com.viro.core.ARScene.CloudAnchorHostListener;
+import com.viro.core.ARScene.CloudAnchorResolveListener;
 import com.viro.core.internal.Image;
 import com.viro.core.Scene;
 import com.viro.core.EventDelegate;
@@ -193,6 +196,50 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
                 getId(),
                 ViroEvents.ON_AMBIENT_LIGHT_UPDATE,
                 event);
+    }
+
+    public void hostCloudAnchor(ARAnchor anchor, final Promise promise){
+        ((ARScene) mNativeScene).hostCloudAnchor(anchor, new CloudAnchorHostListener(){
+
+            @Override
+            public void onSuccess(ARAnchor arAnchor, ARNode arNode) {
+                String cloudId = arAnchor.getCloudAnchorId();
+                WritableMap returnMap = Arguments.createMap();
+                returnMap.putBoolean("success", true);
+                returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
+                promise.resolve(returnMap);
+            }
+
+            @Override
+            public void onFailure(String s) {
+                WritableMap returnMap = Arguments.createMap();
+                returnMap.putBoolean("success", false);
+                returnMap.putString("anchor", null);
+                returnMap.putString("message", s);
+                promise.resolve(returnMap);
+            }
+        });
+    }
+
+    public void resolveCloudAnchor(String cloudAnchorId, final Promise promise){
+        ((ARScene) mNativeScene).resolveCloudAnchor(cloudAnchorId, new CloudAnchorResolveListener(){
+
+            @Override
+            public void onSuccess(ARAnchor arAnchor, ARNode arNode) {
+                WritableMap returnMap = Arguments.createMap();
+                returnMap.putBoolean("success", true);
+                returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
+                promise.resolve(returnMap);
+            }
+
+            @Override
+            public void onFailure(String s) {
+                WritableMap returnMap = Arguments.createMap();
+                returnMap.putBoolean("success", false);
+                returnMap.putString("message", s);
+                promise.resolve(returnMap);
+            }
+        });
     }
 
     @Override

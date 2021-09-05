@@ -35,6 +35,7 @@ public class ARUtils {
 
     public static WritableMap mapFromARAnchor(ARAnchor anchor) {
         WritableMap returnMap = Arguments.createMap();
+        returnMap.putString("cloudAnchorId", anchor.getCloudAnchorId());
         returnMap.putString("anchorId", anchor.getAnchorId());
         returnMap.putArray("position", Arguments.makeNativeArray(anchor.getPosition().toArray()));
         returnMap.putArray("scale", Arguments.makeNativeArray(anchor.getScale().toArray()));

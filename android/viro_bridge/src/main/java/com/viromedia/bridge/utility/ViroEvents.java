@@ -54,6 +54,8 @@ public class ViroEvents {
     public static final String ON_TRACKING_UPDATED = "onTrackingUpdatedViro";
     public static final String ON_AMBIENT_LIGHT_UPDATE = "onAmbientLightUpdateViro";
     public static final String ON_ANCHOR_FOUND = "onAnchorFoundViro";
+    public static final String ON_HOST_CLOUD_ANCHOR = "onHostCloudAnchorViro";
+    public static final String ON_RESOLVE_CLOUD_ANCHOR = "onResolveCloudAnchorViro";
     public static final String ON_ANCHOR_UPDATED = "onAnchorUpdatedViro";
     public static final String ON_ANCHOR_REMOVED = "onAnchorRemovedViro";
     public static final String ON_PORTAL_ENTER = "onPortalEnterViro";

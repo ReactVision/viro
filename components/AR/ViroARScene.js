@@ -227,6 +227,14 @@ var ViroARScene = createReactClass({
     this.props.onAnchorRemoved && this.props.onAnchorRemoved(event.nativeEvent.anchor);
   },
 
+  async hostCloudAnchor(anchor){
+    return await NativeModules.VRTARSceneModule.hostCloudAnchor(findNodeHandle(this), anchor.anchorId, anchor.type);
+  },
+
+  async resolveCloudAnchor(cloudAnchorId){
+    return await NativeModules.VRTARSceneModule.resolveCloudAnchor(findNodeHandle(this), cloudAnchorId);
+  },
+
   async findCollisionsWithRayAsync(from, to, closest, viroTag) {
     return await NativeModules.VRTSceneModule.findCollisionsWithRayAsync(findNodeHandle(this), from, to, closest, viroTag);
   },

@@ -24,6 +24,7 @@ package com.viromedia.bridge.component.node;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
@@ -203,20 +204,17 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
 
             @Override
             public void onSuccess(ARAnchor arAnchor, ARNode arNode) {
-                String cloudId = arAnchor.getCloudAnchorId();
                 WritableMap returnMap = Arguments.createMap();
                 returnMap.putBoolean("success", true);
                 returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
+                Log.e("Cloud Anchor", arAnchor.getCloudAnchorId());
                 promise.resolve(returnMap);
             }
 
             @Override
             public void onFailure(String s) {
-                WritableMap returnMap = Arguments.createMap();
-                returnMap.putBoolean("success", false);
-                returnMap.putString("anchor", null);
-                returnMap.putString("message", s);
-                promise.resolve(returnMap);
+                Log.e("Cloud Anchor", s);
+                promise.reject(s);
             }
         });
     }
@@ -229,15 +227,14 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
                 WritableMap returnMap = Arguments.createMap();
                 returnMap.putBoolean("success", true);
                 returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
+                Log.e("Resolve Cloud Anchor", arAnchor.getCloudAnchorId());
                 promise.resolve(returnMap);
             }
 
             @Override
             public void onFailure(String s) {
-                WritableMap returnMap = Arguments.createMap();
-                returnMap.putBoolean("success", false);
-                returnMap.putString("message", s);
-                promise.resolve(returnMap);
+                Log.e("Resolve Cloud Anchor", s);
+                promise.reject(s);
             }
         });
     }

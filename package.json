@@ -33,5 +33,8 @@
   "dependencies": {
     "create-react-class": "^15.7.0",
     "prop-types": "^15.5.10"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.2"
   }
 }

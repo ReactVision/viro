@@ -29,7 +29,8 @@ def common_pods
  pod 'DoubleConversion', :podspec => '../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec'
   pod 'glog', :podspec => '../node_modules/react-native/third-party-podspecs/glog.podspec'
   pod 'RCT-Folly', :podspec => '../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec'
-
+  pod 'React-perflogger', :path=>'../node_modules/react-native/ReactCommon/reactperflogger'
+  pod 'React-runtimeexecutor', :path=> '../node_modules/react-native/ReactCommon/runtimeexecutor'
 end
 
 target 'ViroReact' do

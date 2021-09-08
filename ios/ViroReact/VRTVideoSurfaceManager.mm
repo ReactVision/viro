@@ -27,7 +27,7 @@
 
 #import <React/RCTUIManager.h>
 #import "VRTVideoSurfaceManager.h"
-//#import "VRTVideoSurface.h"
+#import "./Views/VRTVideoSurface.h"
 
 @implementation VRTVideoSurfaceManager
 RCT_EXPORT_MODULE()
@@ -83,7 +83,7 @@ RCT_EXPORT_VIEW_PROPERTY(shadowCastingBitMask, int)
 RCT_EXPORT_VIEW_PROPERTY(ignoreEventHandling, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(dragType, NSString)
 RCT_EXPORT_VIEW_PROPERTY(dragPlane, NSDictionary)
-/* - (VRTVideoSurface *)view
+- (VRTVideoSurface *)view
 {
     return [[VRTVideoSurface alloc] initWithBridge:self.bridge];
 }
@@ -100,6 +100,6 @@ RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
         }
     }];
 }
-*/
+
 @end
 

@@ -4,7 +4,7 @@
 
    ```yaml
    pod 'ViroReact', :path => '../node_modules/@viro-community/react-viro/ios/'
-   pod 'ViroKit_static_lib', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/static_lib'
+   pod 'ViroKit', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/'
    ```
 
    See this [example](https://github.com/ViroCommunity/starter-kit/blob/master/ios/Podfile)

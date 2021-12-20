@@ -48,13 +48,16 @@
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
     self = [super initWithBridge:bridge];
+    NSLog( @"VRTVRSceneNavigator.initWithBridge");
     if (self) {
+        NSLog( @"VRTVRSceneNavigator.initWithBridge (self is defined)");
         _hdrEnabled = YES;
         _pbrEnabled = YES;
         _bloomEnabled = YES;
         _shadowsEnabled = YES;
         _multisamplingEnabled = NO;
     }
+    NSLog( @"VRTVRSceneNavigator.initWithBridge return self");
     return self;
 }
 
@@ -69,9 +72,11 @@
  one already exists and the method was a no-op.
  */
 - (BOOL)initVRView {
+    NSLog( @"VRTVRSceneNavigator.initVRView");
     if (_vroView != nil) {
         return NO;
     }
+    NSLog( @"VRTVRSceneNavigator.initVRView (configure VR view)");
     VRORendererConfiguration config;
     config.enableHDR = _hdrEnabled;
     config.enablePBR = _pbrEnabled;
@@ -83,21 +88,24 @@
     // _gvrController.forceLandscape = _vrModeEnabled;
     // _vroView = (id<VROView>) _gvrController.view;
     
+    NSLog( @"VRTVRSceneNavigator.initVRView (load materials)");
     // Load materials; must be done each time we have a new context (e.g. after
     // the EGL context is created by the VROViewGVR
     VRTMaterialManager *materialManager = [self.bridge materialManager];
     [materialManager reloadMaterials];
     // VROViewGVR *viewCardboard = (VROViewGVR *) _gvrController.view;
     // [viewCardboard setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+    NSLog( @"VRTVRSceneNavigator.initVRView (set render delegate)");
     _vroView.renderDelegate = self;
-    
     [self setFrame:[UIScreen mainScreen].bounds];
     [self setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
     
+    NSLog( @"VRTVRSceneNavigator.initVRView (above addSubview:viewCardboard)");
     // [self addSubview:viewCardboard];
     self.currentViews = [[NSMutableArray alloc] init];
     [self.bridge.perfMonitor setView:_vroView];
     
+    NSLog( @"VRTVRSceneNavigator.initVRView (return YES)");
     return YES;
 }
 

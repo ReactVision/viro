@@ -55,7 +55,7 @@ Figment/ios/ngrokendpoint.txt
 # Node
 node_modules
 npm-debug.log
-yarn.lock
+package-lock.lock
 
 .DS_Store
 local.properties

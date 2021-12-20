@@ -9,13 +9,12 @@
  * @providesModule ViroAnimationValidation
  * @flow
  */
-'use strict';
+"use strict";
 
-import React from 'react';
-import PropTypes from 'prop-types'
+import React from "react";
+import PropTypes from "prop-types";
 
-var AnimationPropTypes = require('./ViroAnimationPropTypes');
-var invariant = require('fbjs/lib/invariant');
+var AnimationPropTypes = require("./ViroAnimationPropTypes");
 
 class ViroAnimationValidation {
   static validateAnimationProp(prop, animationName, animation, caller) {
@@ -24,19 +23,30 @@ class ViroAnimationValidation {
     }
     if (allAnimationTypes[prop] === undefined) {
       var message1 = '"' + prop + '" is not a valid animation property.';
-      var message2 = '\nValid animation props: ' +
-        JSON.stringify(Object.keys(allAnimationTypes).sort(), null, '  ');
+      var message2 =
+        "\nValid animation props: " +
+        JSON.stringify(Object.keys(allAnimationTypes).sort(), null, "  ");
       animationError(message1, animation, caller, message2);
     }
 
-    var errorCallback = ()=>{
-      animationError('"' + prop + '" of animation "' + animationName + '" is not valid.', animation, caller);
+    var errorCallback = () => {
+      animationError(
+        '"' + prop + '" of animation "' + animationName + '" is not valid.',
+        animation,
+        caller
+      );
     };
     let validationDict = {};
     validationDict[prop] = AnimationPropTypes[prop];
     let valueDict = {};
     valueDict[prop] = animation[prop];
-    PropTypes.checkPropTypes(validationDict, valueDict, 'prop', caller, errorCallback);
+    PropTypes.checkPropTypes(
+      validationDict,
+      valueDict,
+      "prop",
+      caller,
+      errorCallback
+    );
   }
 
   static validateAnimation(name, animations) {
@@ -44,7 +54,12 @@ class ViroAnimationValidation {
       return;
     }
     for (var prop in animations[name]) {
-      ViroAnimationValidation.validateAnimationProp(prop, name, animations[name], 'AnimationValidation ' + name);
+      ViroAnimationValidation.validateAnimationProp(
+        prop,
+        name,
+        animations[name],
+        "AnimationValidation " + name
+      );
     }
 
     // If we don't want to "loop", then we can use the below commented out code to simply
@@ -53,7 +68,6 @@ class ViroAnimationValidation {
     //   animationError("Error validating Animation: [" + name + "]", animations[name], 'AnimationValidation ' + name);
     // };
     // PropTypes.checkPropTypes(AnimationPropTypes, name, animations[name], 'prop', 'AnimationValidation ' + name, errorCallback);
-
   }
 
   /**
@@ -66,16 +80,25 @@ class ViroAnimationValidation {
     }
 
     var arrayChains = animations[name];
-    if (!(arrayChains.constructor===Array) || arrayChains.length <= 0){
-      animationError("Invalid chains: Array of Animation chains must be a non empty array!",
-          animations[name], 'AnimationValidation ' + name);
+    if (!(arrayChains.constructor === Array) || arrayChains.length <= 0) {
+      animationError(
+        "Invalid chains: Array of Animation chains must be a non empty array!",
+        animations[name],
+        "AnimationValidation " + name
+      );
       return;
     }
 
-    for (var chainIndex = 0; chainIndex < arrayChains.length; chainIndex ++){
-      if (!(arrayChains[chainIndex].constructor===Array) || arrayChains[chainIndex].length <=0) {
-        animationError("Invalid chain: individual Animation chain must be a non empty array!",
-            animations[name], 'AnimationValidation ' + name);
+    for (var chainIndex = 0; chainIndex < arrayChains.length; chainIndex++) {
+      if (
+        !(arrayChains[chainIndex].constructor === Array) ||
+        arrayChains[chainIndex].length <= 0
+      ) {
+        animationError(
+          "Invalid chain: individual Animation chain must be a non empty array!",
+          animations[name],
+          "AnimationValidation " + name
+        );
         return;
       }
     }
@@ -88,12 +111,21 @@ class ViroAnimationValidation {
   }
 }
 
-var animationError = function(message1, animation, caller/*?*/, message2/*?*/) {
-  invariant(
-    false,
-    message1 + '\n' + (caller || '<<unknown>>') + ': ' +
-    JSON.stringify(animation, null, '  ') + (message2 || '')
-  );
+var animationError = function (
+  message1,
+  animation,
+  caller /*?*/,
+  message2 /*?*/
+) {
+  const format =
+    `${message1}\n` +
+    `${caller || "<<unknown>>"}: ` +
+    JSON.stringify(animation, null, "  ") +
+    (message2 || "");
+  const error = new Error(format);
+  error.name = "Invariant Violation";
+  error.framesToPop = 1; // Skip invariant error's own stack frame.
+  throw error;
 };
 
 var allAnimationTypes = {};

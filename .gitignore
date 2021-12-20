@@ -61,7 +61,7 @@ package-lock.lock
 local.properties
 build/
 react-viro*.tgz
-
+yarn.lock
 
 # Fastlane
 ios/fastlane/report.xml

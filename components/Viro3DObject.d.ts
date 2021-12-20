@@ -93,7 +93,7 @@ declare type Props = ViewProps & {
     onCollision?: (...args: any) => any;
 };
 declare class Viro3DObject extends Component<Props> {
-    render(): JSX.Element;
+    render(): any;
     _viro3dobj?: NativeRef;
     setNativeProps: (nativeProps: any) => void;
     _onHover: (event: any) => void;

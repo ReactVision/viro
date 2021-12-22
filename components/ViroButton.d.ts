@@ -16,25 +16,25 @@ export declare type Props = ViroCommonProps & ViroObjectProps & {
     /**
      * The image file, to be displayed when the user is hovering over it
      */
-    hoverSource: ViroSource;
+    hoverSource?: ViroSource;
     /**
      * The image file, to be displayed when the user clicks the button
      */
-    clickSource: ViroSource;
+    clickSource?: ViroSource;
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
      * The image file, to be displayed when the user taps the button
      *
      * @deprecated
      */
-    tapSource: ViroSource;
+    tapSource?: ViroSource;
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
      * The image file, to be displayed when the user is gazing over it
      *
      * @deprecated
      */
-    gazeSource: ViroSource;
+    gazeSource?: ViroSource;
 };
 declare type State = {
     buttonType: ViroButtonState;

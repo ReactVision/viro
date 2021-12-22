@@ -8,7 +8,6 @@ import {
   requireNativeComponent,
 } from "react-native";
 import {
-  ViroClickStateTypes,
   ViroErrorEvent,
   ViroLoadEndEvent,
   ViroLoadStartEvent,
@@ -38,9 +37,9 @@ type Props = {
     weight?: number;
   }>;
 
-  onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
-  onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
-  onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+  onLoadStart?: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+  onLoadEnd?: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+  onError?: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
 };
 
 /**

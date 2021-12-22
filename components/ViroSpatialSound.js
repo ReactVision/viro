@@ -22,10 +22,7 @@ const react_1 = __importDefault(require("react"));
 const ViroProps_1 = require("./Utilities/ViroProps");
 var NativeModules = require("react-native").NativeModules;
 class ViroSpatialSound extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onFinish(event) {
         this.props.onFinish && this.props.onFinish(event);
     }
@@ -36,10 +33,10 @@ class ViroSpatialSound extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroSpatialSound", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroSpatialSound", this.props);
         var soundSrc = this.props.source;
         if (typeof soundSrc === "number") {
-            soundSrc = resolveAssetSource_1.default(soundSrc);
+            soundSrc = (0, resolveAssetSource_1.default)(soundSrc);
         }
         else if (typeof soundSrc === "string") {
             /**
@@ -66,24 +63,24 @@ class ViroSpatialSound extends react_1.default.Component {
         return <VRTSpatialSound {...nativeProps}/>;
     }
     async getTransformAsync() {
-        return await NativeModules.VRTNodeModule.getNodeTransform(react_native_1.findNodeHandle(this));
+        return await NativeModules.VRTNodeModule.getNodeTransform((0, react_native_1.findNodeHandle)(this));
     }
     async getBoundingBoxAsync() {
-        return await NativeModules.VRTNodeModule.getBoundingBox(react_native_1.findNodeHandle(this));
+        return await NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
     }
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                NativeModules.VRTSpatialSoundManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                NativeModules.VRTSpatialSoundManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime, [timeInSeconds]);
+                NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }
 }
 exports.ViroSpatialSound = ViroSpatialSound;
-var VRTSpatialSound = react_native_1.requireNativeComponent("VRTSpatialSound", 
+var VRTSpatialSound = (0, react_native_1.requireNativeComponent)("VRTSpatialSound", 
 // @ts-ignore
 ViroSpatialSound, {
     nativeOnly: {

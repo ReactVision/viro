@@ -26,20 +26,29 @@ var mathRandomOffset = 0;
  * @deprecated
  */
 class ViroSceneNavigator extends react_1.default.Component {
+    // TODO: type of this component (native component)
+    _component;
+    sceneNavigator = {
+        push: this.push,
+        pop: this.pop,
+        popN: this.popN,
+        jump: this.jump,
+        replace: this.replace,
+        // exitViro: this.exitViro, TODO: this was unused
+        recenterTracking: this._recenterTracking,
+        project: this._project,
+        unproject: this._unproject,
+        viroAppProps: this.props.viroAppProps || {},
+    };
+    /**
+     * Called from native when either the user physically decides to exit vr (hits
+     * the "X" buton).
+     */
+    _onExitViro(_event) {
+        this.props.onExitViro && this.props.onExitViro();
+    }
     constructor(props) {
         super(props);
-        this.sceneNavigator = {
-            push: this.push,
-            pop: this.pop,
-            popN: this.popN,
-            jump: this.jump,
-            replace: this.replace,
-            // exitViro: this.exitViro, TODO: this was unused
-            recenterTracking: this._recenterTracking,
-            project: this._project,
-            unproject: this._unproject,
-            viroAppProps: this.props.viroAppProps || {},
-        };
         var initialSceneTag = this.props.initialSceneKey;
         if (initialSceneTag == null) {
             initialSceneTag = this.getRandomTag();
@@ -56,13 +65,6 @@ class ViroSceneNavigator extends react_1.default.Component {
             sceneHistory: [scene.tag],
             currentSceneIndex: 0,
         };
-    }
-    /**
-     * Called from native when either the user physically decides to exit vr (hits
-     * the "X" buton).
-     */
-    _onExitViro(_event) {
-        this.props.onExitViro && this.props.onExitViro();
     }
     getRandomTag() {
         var randomTag = Math.random() + mathRandomOffset;
@@ -318,13 +320,13 @@ class ViroSceneNavigator extends react_1.default.Component {
         return -1;
     }
     async _project(point) {
-        return await ViroSceneNavigatorModule.project(react_native_1.findNodeHandle(this), point);
+        return await ViroSceneNavigatorModule.project((0, react_native_1.findNodeHandle)(this), point);
     }
     async _unproject(point) {
-        return await ViroSceneNavigatorModule.unproject(react_native_1.findNodeHandle(this), point);
+        return await ViroSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     }
     _recenterTracking() {
-        ViroSceneNavigatorModule.recenterTracking(react_native_1.findNodeHandle(this));
+        ViroSceneNavigatorModule.recenterTracking((0, react_native_1.findNodeHandle)(this));
     }
     _renderSceneStackItems() {
         let views = [];
@@ -367,7 +369,7 @@ var styles = react_native_1.StyleSheet.create({
         alignItems: "center",
     },
 });
-var VRTSceneNavigator = react_native_1.requireNativeComponent("VRTSceneNavigator", 
+var VRTSceneNavigator = (0, react_native_1.requireNativeComponent)("VRTSceneNavigator", 
 // @ts-ignore
 ViroSceneNavigator, {
     nativeOnly: {

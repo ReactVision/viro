@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARObjectMarker = void 0;
-const ViroBase_1 = require("@components/ViroBase");
+const ViroBase_1 = require("../ViroBase");
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 /**
@@ -54,7 +54,7 @@ class ViroARObjectMarker extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroARObjectMarker = ViroARObjectMarker;
-var VRTARObjectMarker = react_native_1.requireNativeComponent("VRTARObjectMarker", 
+var VRTARObjectMarker = (0, react_native_1.requireNativeComponent)("VRTARObjectMarker", 
 // @ts-ignore
 ViroARObjectMarker, {
     nativeOnly: {

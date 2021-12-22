@@ -22,10 +22,7 @@ const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Ima
 const ViroProps_1 = require("./Utilities/ViroProps");
 var createReactClass = require("create-react-class");
 class Viro360Image extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onLoadStart(event) {
         this.props.onLoadStart && this.props.onLoadStart(event);
     }
@@ -39,8 +36,8 @@ class Viro360Image extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("Viro360Image", this.props);
-        var imgsrc = resolveAssetSource_1.default(this.props.source);
+        (0, ViroProps_1.checkMisnamedProps)("Viro360Image", this.props);
+        var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);
         // Create native props object.
         let nativeProps = Object.assign({}, this.props);
         nativeProps.source = imgsrc;
@@ -54,7 +51,7 @@ class Viro360Image extends react_1.default.Component {
     }
 }
 exports.Viro360Image = Viro360Image;
-var VRT360Image = react_native_1.requireNativeComponent("VRT360Image", 
+var VRT360Image = (0, react_native_1.requireNativeComponent)("VRT360Image", 
 // @ts-ignore
 Viro360Image, {
     nativeOnly: {

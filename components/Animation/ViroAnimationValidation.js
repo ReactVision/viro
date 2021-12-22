@@ -16,6 +16,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroAnimationValidation = void 0;
 const prop_types_1 = __importDefault(require("prop-types"));
 var AnimationPropTypes = require("./ViroAnimationPropTypes");
 class ViroAnimationValidation {
@@ -38,6 +39,28 @@ class ViroAnimationValidation {
         valueDict[prop] = animation[prop];
         prop_types_1.default.checkPropTypes(validationDict, valueDict, "prop", caller, errorCallback);
     }
+    /**
+     * Iterate through array to determine if there are empty chains (invalid)
+     * or if there are any empty elements within a given chain (invalid)
+     */
+    static validateAnimationChain(name, animations) {
+        if (!__DEV__) {
+            return;
+        }
+        var arrayChains = animations[name];
+        if (!(arrayChains.constructor === Array) || arrayChains.length <= 0) {
+            animationError("Invalid chains: Array of Animation chains must be a non empty array!", animations[name], "AnimationValidation " + name);
+            return;
+        }
+        for (var chainIndex = 0; chainIndex < arrayChains.length; chainIndex++) {
+            if (!(arrayChains[chainIndex].constructor === Array) ||
+                // @ts-ignore for now... :)
+                arrayChains[chainIndex].length <= 0) {
+                animationError("Invalid chain: individual Animation chain must be a non empty array!", animations[name], "AnimationValidation " + name);
+                return;
+            }
+        }
+    }
     static validateAnimation(name, animations) {
         if (!__DEV__) {
             return;
@@ -58,6 +81,7 @@ class ViroAnimationValidation {
         }
     }
 }
+exports.ViroAnimationValidation = ViroAnimationValidation;
 var animationError = function (message1, animation, caller, message2) {
     const format = `${message1}\n` +
         `${caller || "<<unknown>>"}: ` +
@@ -71,4 +95,3 @@ var animationError = function (message1, animation, caller, message2) {
 };
 var allAnimationTypes = {};
 ViroAnimationValidation.addValidAnimationPropTypes(AnimationPropTypes);
-module.exports = ViroAnimationValidation;

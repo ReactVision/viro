@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARPlane = void 0;
-const ViroBase_1 = require("@components/ViroBase");
+const ViroBase_1 = require("../ViroBase");
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 /**
@@ -51,7 +51,7 @@ class ViroARPlane extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroARPlane = ViroARPlane;
-var VRTARPlane = react_native_1.requireNativeComponent("VRTARPlane", 
+var VRTARPlane = (0, react_native_1.requireNativeComponent)("VRTARPlane", 
 // @ts-ignore
 ViroARPlane, {
     nativeOnly: {

@@ -18,20 +18,7 @@ const react_native_2 = require("react-native");
 const ViroEvents_1 = require("./Types/ViroEvents");
 const ViroControllerModule = react_native_2.NativeModules.VRTControllerModule;
 class ViroController extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-        this._onFuse = (event) => {
-            if (this.props.onFuse) {
-                if (typeof this.props.onFuse === "function") {
-                    this.props.onFuse(event.nativeEvent.source);
-                }
-                else if (this.props.onFuse?.callback) {
-                    this.props.onFuse.callback(event.nativeEvent.source);
-                }
-            }
-        };
-    }
+    _component = null;
     _onClick(event) {
         this.props.onClick &&
             this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
@@ -60,6 +47,16 @@ class ViroController extends react_1.default.Component {
         this.props.onControllerStatus &&
             this.props.onControllerStatus(event.nativeEvent.controllerStatus, event.nativeEvent.source);
     }
+    _onFuse = (event) => {
+        if (this.props.onFuse) {
+            if (typeof this.props.onFuse === "function") {
+                this.props.onFuse(event.nativeEvent.source);
+            }
+            else if (this.props.onFuse?.callback) {
+                this.props.onFuse.callback(event.nativeEvent.source);
+            }
+        }
+    };
     _onPinch(event) {
         this.props.onPinch &&
             this.props.onPinch(event.nativeEvent.pinchState, event.nativeEvent.scaleFactor, event.nativeEvent.source);
@@ -69,7 +66,7 @@ class ViroController extends react_1.default.Component {
             this.props.onRotate(event.nativeEvent.rotateState, event.nativeEvent.rotationFactor, event.nativeEvent.source);
     }
     async getControllerForwardAsync() {
-        return await ViroControllerModule.getForwardVectorAsync(react_native_1.findNodeHandle(this));
+        return await ViroControllerModule.getForwardVectorAsync((0, react_native_1.findNodeHandle)(this));
     }
     setNativeProps(nativeProps) {
         this._component?.setNativeProps(nativeProps);
@@ -88,7 +85,7 @@ class ViroController extends react_1.default.Component {
     }
 }
 exports.ViroController = ViroController;
-var VRTController = react_native_1.requireNativeComponent("VRTController", 
+var VRTController = (0, react_native_1.requireNativeComponent)("VRTController", 
 // @ts-ignore
 ViroController, {
     nativeOnly: {

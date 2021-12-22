@@ -21,10 +21,7 @@ var NativeModules = require("react-native").NativeModules;
 var createReactClass = require("create-react-class");
 const ViroBase_1 = require("./ViroBase");
 class ViroAnimatedImage extends ViroBase_1.ViroBase {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onLoadStart(event) {
         this.props.onLoadStart && this.props.onLoadStart(event);
     }
@@ -32,12 +29,12 @@ class ViroAnimatedImage extends ViroBase_1.ViroBase {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroAnimatedImage", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroAnimatedImage", this.props);
         var defaultPlaceholder = require("./Resources/viro_blank.png");
-        var imgsrc = resolveAssetSource_1.default(this.props.source);
+        var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);
         var placeholderSrc;
         if (this.props.placeholderSource) {
-            placeholderSrc = resolveAssetSource_1.default(this.props.placeholderSource);
+            placeholderSrc = (0, resolveAssetSource_1.default)(this.props.placeholderSource);
         }
         else {
             switch (react_native_1.Platform.OS) {
@@ -48,7 +45,7 @@ class ViroAnimatedImage extends ViroBase_1.ViroBase {
                     */
                     break;
                 case "android":
-                    placeholderSrc = resolveAssetSource_1.default(defaultPlaceholder);
+                    placeholderSrc = (0, resolveAssetSource_1.default)(defaultPlaceholder);
                     break;
             }
         }
@@ -111,7 +108,7 @@ class ViroAnimatedImage extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroAnimatedImage = ViroAnimatedImage;
-var VRTAnimatedImage = react_native_1.requireNativeComponent("VRTAnimatedImage", 
+var VRTAnimatedImage = (0, react_native_1.requireNativeComponent)("VRTAnimatedImage", 
 // @ts-ignore
 ViroAnimatedImage, {
     nativeOnly: {

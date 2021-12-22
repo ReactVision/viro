@@ -24,10 +24,7 @@ const ViroProps_1 = require("./Utilities/ViroProps");
  * Used to render a skybox as a scene background.
  */
 class ViroSkyBox extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onLoadStart(event) {
         this.props.onLoadStart && this.props.onLoadStart(event);
     }
@@ -38,13 +35,13 @@ class ViroSkyBox extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroSkyBox", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroSkyBox", this.props);
         // Create and set the native props.
         var skyboxDict = {};
         let nativeProps = Object.assign({}, this.props);
         if (this.props.source !== undefined) {
             for (var key in this.props.source) {
-                var s = resolveAssetSource_1.default(this.props.source[key]);
+                var s = (0, resolveAssetSource_1.default)(this.props.source[key]);
                 skyboxDict[key] = s;
             }
             nativeProps.source = skyboxDict;
@@ -59,7 +56,7 @@ class ViroSkyBox extends react_1.default.Component {
     }
 }
 exports.ViroSkyBox = ViroSkyBox;
-var VRTSkybox = react_native_1.requireNativeComponent("VRTSkybox", 
+var VRTSkybox = (0, react_native_1.requireNativeComponent)("VRTSkybox", 
 // @ts-ignore
 ViroSkybox, {
     nativeOnly: { onViroSkyBoxLoadStart: true, onViroSkyBoxLoadEnd: true },

@@ -27,15 +27,12 @@ var _planePrefix = "ViroARPlaneSelector_Plane_";
  * but could easily be modified to allow for more planes.
  */
 class ViroARPlaneSelector extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-        this.state = {
-            selectedSurface: -1,
-            foundARPlanes: [],
-            arPlaneSizes: [],
-        };
-    }
+    _component = null;
+    state = {
+        selectedSurface: -1,
+        foundARPlanes: [],
+        arPlaneSizes: [],
+    };
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroARPlaneSelector", this.props);

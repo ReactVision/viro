@@ -29,7 +29,7 @@ class ViroPortalScene extends ViroBase_1.ViroBase {
         this.props.onPortalExit && this.props.onPortalExit(event);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroPortalScene", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroPortalScene", this.props);
         // Since transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let transformBehaviors = typeof this.props.transformBehaviors === "string"
             ? new Array(this.props.transformBehaviors)
@@ -49,7 +49,7 @@ class ViroPortalScene extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroPortalScene = ViroPortalScene;
-var VRTPortalScene = react_native_1.requireNativeComponent("VRTPortalScene", 
+var VRTPortalScene = (0, react_native_1.requireNativeComponent)("VRTPortalScene", 
 // @ts-ignore
 ViroPortalScene, {
     nativeOnly: {

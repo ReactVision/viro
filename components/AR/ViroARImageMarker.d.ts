@@ -9,8 +9,8 @@
  * @providesModule ViroARImageMarker
  */
 /// <reference types="react" />
-import { ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent } from "@components/Types/ViroEvents";
-import { ViroBase } from "@components/ViroBase";
+import { ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent } from "../Types/ViroEvents";
+import { ViroBase } from "../ViroBase";
 import { NativeSyntheticEvent } from "react-native";
 /**
  * Container for Viro Components anchored to a detected image.

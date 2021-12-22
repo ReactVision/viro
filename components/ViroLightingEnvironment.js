@@ -21,10 +21,7 @@ const react_native_1 = require("react-native");
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroLightingEnvironment extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onLoadStart(event) {
         this.props.onLoadStart && this.props.onLoadStart(event);
     }
@@ -38,8 +35,8 @@ class ViroLightingEnvironment extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroLightingEnvironment", this.props);
-        var imgsrc = resolveAssetSource_1.default(this.props.source);
+        (0, ViroProps_1.checkMisnamedProps)("ViroLightingEnvironment", this.props);
+        var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);
         // Create native props object.
         let nativeProps = Object.assign({}, this.props);
         nativeProps.source = imgsrc;
@@ -53,7 +50,7 @@ class ViroLightingEnvironment extends react_1.default.Component {
     }
 }
 exports.ViroLightingEnvironment = ViroLightingEnvironment;
-var VRTLightingEnvironment = react_native_1.requireNativeComponent("VRTLightingEnvironment", 
+var VRTLightingEnvironment = (0, react_native_1.requireNativeComponent)("VRTLightingEnvironment", 
 // @ts-ignore
 ViroLightingEnvironment, {
     nativeOnly: {

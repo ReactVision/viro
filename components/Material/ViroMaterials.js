@@ -38,13 +38,13 @@ class ViroMaterials {
                         materialProperty === "reflectiveTexture") {
                         var reflectiveShape = {};
                         for (var cubeMapTexture in materialDict[materialProperty]) {
-                            var cubeMapSource = resolveAssetSource_1.resolveAssetSource(materialDict[materialProperty][cubeMapTexture]);
+                            var cubeMapSource = (0, resolveAssetSource_1.resolveAssetSource)(materialDict[materialProperty][cubeMapTexture]);
                             reflectiveShape[cubeMapTexture] = cubeMapSource;
                         }
                         resultMaterial[materialProperty] = reflectiveShape;
                     }
                     else if (materialDict[materialProperty].hasOwnProperty("source")) {
-                        var source = resolveAssetSource_1.resolveAssetSource(materialDict[materialProperty]["source"]);
+                        var source = (0, resolveAssetSource_1.resolveAssetSource)(materialDict[materialProperty]["source"]);
                         resultMaterial[materialProperty] = materialDict[materialProperty];
                         resultMaterial[materialProperty]["source"] = source;
                     }
@@ -56,14 +56,14 @@ class ViroMaterials {
                                 assetType = asset.type;
                             }
                         }
-                        var source = resolveAssetSource_1.resolveAssetSource(materialDict[materialProperty]);
+                        var source = (0, resolveAssetSource_1.resolveAssetSource)(materialDict[materialProperty]);
                         source["type"] = assetType;
                         resultMaterial[materialProperty] = source;
                     }
                 }
                 else if (materialProperty.endsWith("color") ||
                     materialProperty.endsWith("Color")) {
-                    var color = react_native_1.processColor(materialDict[materialProperty]);
+                    var color = (0, react_native_1.processColor)(materialDict[materialProperty]);
                     resultMaterial[materialProperty] = color;
                 }
                 else {

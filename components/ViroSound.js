@@ -25,10 +25,17 @@ const SoundModule = react_native_1.NativeModules.VRTSoundModule;
  * ViroSound is a component that plays a sound file.
  */
 class ViroSound extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
+    static preloadSounds = async (soundMap) => {
+        var results = {};
+        for (var index in soundMap) {
+            const response = await SoundModule.preloadSounds({
+                [index]: soundMap[index],
+            });
+            results[response.key] = { result: response.result, msg: response.msg };
+        }
+        return results;
+    };
     static unloadSounds(soundKeys) {
         SoundModule.unloadSounds(soundKeys);
     }
@@ -42,10 +49,10 @@ class ViroSound extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroSound", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroSound", this.props);
         var soundSrc = this.props.source;
         if (typeof soundSrc === "number") {
-            soundSrc = resolveAssetSource_1.default(soundSrc);
+            soundSrc = (0, resolveAssetSource_1.default)(soundSrc);
         }
         else if (typeof soundSrc === "string") {
             /**
@@ -74,26 +81,16 @@ class ViroSound extends react_1.default.Component {
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                react_native_1.NativeModules.VRTSoundManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                react_native_1.NativeModules.VRTSoundManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), react_native_1.NativeModules.UIManager.VRTSound.Commands.seekToTime, [timeInSeconds]);
+                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTSound.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }
 }
 exports.ViroSound = ViroSound;
-ViroSound.preloadSounds = async (soundMap) => {
-    var results = {};
-    for (var index in soundMap) {
-        const response = await SoundModule.preloadSounds({
-            [index]: soundMap[index],
-        });
-        results[response.key] = { result: response.result, msg: response.msg };
-    }
-    return results;
-};
-var VRTSound = react_native_1.requireNativeComponent("VRTSound", 
+var VRTSound = (0, react_native_1.requireNativeComponent)("VRTSound", 
 // @ts-ignore
 ViroSound, {
     nativeOnly: {

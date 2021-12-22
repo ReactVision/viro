@@ -23,7 +23,7 @@ const ViroBase_1 = require("./ViroBase");
  */
 class ViroPortal extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroPortal", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroPortal", this.props);
         // Since transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let transformBehaviors = typeof this.props.transformBehaviors === "string"
             ? new Array(this.props.transformBehaviors)
@@ -43,7 +43,7 @@ class ViroPortal extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroPortal = ViroPortal;
-var VRTPortal = react_native_1.requireNativeComponent("VRTPortal", 
+var VRTPortal = (0, react_native_1.requireNativeComponent)("VRTPortal", 
 // @ts-ignore
 ViroPortal, {
     nativeOnly: {

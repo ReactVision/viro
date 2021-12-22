@@ -1,23 +1,15 @@
 /// <reference types="react" />
-/**
- * Copyright (c) 2017-present, Viro Media, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- */
-import { ViroAmbientLightInfo, ViroAmbientLightUpdateEvent, ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent, ViroARPointCloud, ViroARPointCloudUpdateEvent, ViroCameraARHitTest, ViroCameraARHitTestEvent, ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformInfo, ViroPlatformUpdateEvent, ViroTrackingReason, ViroTrackingState, ViroTrackingUpdatedEvent } from "@components/Types/ViroEvents";
-import { ViroPhysicsWorld, Viro3DPoint, ViroRay, ViroScale, ViroSoundRoom, ViroSource } from "@components/Types/ViroUtils";
-import { ViroBase } from "@components/ViroBase";
-import { ViroCamera } from "@components/ViroCamera";
 import { NativeSyntheticEvent } from "react-native";
+import { ViroAmbientLightInfo, ViroAmbientLightUpdateEvent, ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent, ViroARPointCloud, ViroARPointCloudUpdateEvent, ViroCameraARHitTest, ViroCameraARHitTestEvent, ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformInfo, ViroPlatformUpdateEvent, ViroTrackingReason, ViroTrackingState, ViroTrackingUpdatedEvent } from "../Types/ViroEvents";
+import { Viro3DPoint, ViroPhysicsWorld, ViroRay, ViroScale, ViroSoundRoom, ViroSource } from "../Types/ViroUtils";
+import { ViroBase } from "../ViroBase";
+import { ViroCamera } from "../ViroCamera";
 import { ViroCommonProps } from "./ViroCommonProps";
 declare type Props = ViroCommonProps & {
-    displayPointCloud: {
-        imageSource: ViroSource;
-        imageScale: ViroScale;
-        maxPoints: number;
+    displayPointCloud?: {
+        imageSource?: ViroSource;
+        imageScale?: ViroScale;
+        maxPoints?: number;
     };
     anchorDetectionTypes?: string[] | string;
     onCameraARHitTest?: (event: ViroCameraARHitTest) => void;
@@ -31,7 +23,7 @@ declare type Props = ViroCommonProps & {
      */
     soundRoom?: ViroSoundRoom;
     physicsWorld?: ViroPhysicsWorld;
-    postProcessEffects: string[];
+    postProcessEffects?: string[];
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
      * @deprecated

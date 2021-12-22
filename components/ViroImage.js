@@ -39,12 +39,12 @@ class ViroImage extends ViroBase_1.ViroBase {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroImage", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroImage", this.props);
         var defaultPlaceholder = require("./Resources/viro_blank.png");
-        var imgsrc = resolveAssetSource_1.default(this.props.source);
+        var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);
         var placeholderSrc;
         if (this.props.placeholderSource) {
-            placeholderSrc = resolveAssetSource_1.default(this.props.placeholderSource);
+            placeholderSrc = (0, resolveAssetSource_1.default)(this.props.placeholderSource);
         }
         else {
             switch (react_native_1.Platform.OS) {
@@ -55,7 +55,7 @@ class ViroImage extends ViroBase_1.ViroBase {
                     */
                     break;
                 case "android":
-                    placeholderSrc = resolveAssetSource_1.default(defaultPlaceholder);
+                    placeholderSrc = (0, resolveAssetSource_1.default)(defaultPlaceholder);
                     break;
             }
         }
@@ -117,19 +117,19 @@ class ViroImage extends ViroBase_1.ViroBase {
         };
         return <VRTImage {...nativeProps}/>;
     }
+    // Used to evict a given imageSource from the cache. This is Android-only
+    // because the Fresco (RN's Image caching library) caches images by their
+    // uri's. If you replace 1 image with another, then the first image will
+    // be cached if they have the same imageSource.
+    static evictFromCache = (imageSource) => {
+        if (react_native_1.Platform.OS == "android") {
+            var image = (0, resolveAssetSource_1.default)(imageSource);
+            ViroImageModule.evictFromCache(image);
+        }
+    };
 }
 exports.ViroImage = ViroImage;
-// Used to evict a given imageSource from the cache. This is Android-only
-// because the Fresco (RN's Image caching library) caches images by their
-// uri's. If you replace 1 image with another, then the first image will
-// be cached if they have the same imageSource.
-ViroImage.evictFromCache = (imageSource) => {
-    if (react_native_1.Platform.OS == "android") {
-        var image = resolveAssetSource_1.default(imageSource);
-        ViroImageModule.evictFromCache(image);
-    }
-};
-var VRTImage = react_native_1.requireNativeComponent("VRTImage", 
+var VRTImage = (0, react_native_1.requireNativeComponent)("VRTImage", 
 // @ts-ignore
 ViroImage, {
     nativeOnly: {

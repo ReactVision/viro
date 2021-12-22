@@ -8,10 +8,7 @@ const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 const ViroEvents_1 = require("./Types/ViroEvents");
 class ViroBase extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onHover(event) {
         this.props.onHover &&
             this.props.onHover(event.nativeEvent.isHovering, event.nativeEvent.position, event.nativeEvent.source);
@@ -77,19 +74,19 @@ class ViroBase extends react_1.default.Component {
         this.props.onError && this.props.onError(event);
     }
     async getTransformAsync() {
-        return await react_native_1.NativeModules.VRTNodeModule.getNodeTransform(react_native_1.findNodeHandle(this));
+        return await react_native_1.NativeModules.VRTNodeModule.getNodeTransform((0, react_native_1.findNodeHandle)(this));
     }
     async getBoundingBoxAsync() {
-        return await react_native_1.NativeModules.VRTNodeModule.getBoundingBox(react_native_1.findNodeHandle(this));
+        return await react_native_1.NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
     }
     applyImpulse(force, position) {
-        react_native_1.NativeModules.VRTNodeModule.applyImpulse(react_native_1.findNodeHandle(this), force, position);
+        react_native_1.NativeModules.VRTNodeModule.applyImpulse((0, react_native_1.findNodeHandle)(this), force, position);
     }
     applyTorqueImpulse(torque) {
-        react_native_1.NativeModules.VRTNodeModule.applyTorqueImpulse(react_native_1.findNodeHandle(this), torque);
+        react_native_1.NativeModules.VRTNodeModule.applyTorqueImpulse((0, react_native_1.findNodeHandle)(this), torque);
     }
     setVelocity(velocity) {
-        react_native_1.NativeModules.VRTNodeModule.setVelocity(react_native_1.findNodeHandle(this), velocity);
+        react_native_1.NativeModules.VRTNodeModule.setVelocity((0, react_native_1.findNodeHandle)(this), velocity);
     }
     _onCollision(event) {
         if (this.props.onCollision) {

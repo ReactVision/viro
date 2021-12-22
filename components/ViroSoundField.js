@@ -21,10 +21,7 @@ const react_native_1 = require("react-native");
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroSoundField extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onFinish(event) {
         this.props.onFinish && this.props.onFinish(event);
     }
@@ -35,10 +32,10 @@ class ViroSoundField extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroSoundField", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroSoundField", this.props);
         var soundSrc = this.props.source;
         if (typeof soundSrc === "number") {
-            soundSrc = resolveAssetSource_1.default(soundSrc);
+            soundSrc = (0, resolveAssetSource_1.default)(soundSrc);
         }
         else if (typeof soundSrc === "string") {
             /**
@@ -67,16 +64,16 @@ class ViroSoundField extends react_1.default.Component {
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                react_native_1.NativeModules.VRTSoundFieldManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                react_native_1.NativeModules.VRTSoundFieldManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), react_native_1.NativeModules.UIManager.VRTSoundField.Commands.seekToTime, [timeInSeconds]);
+                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTSoundField.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }
 }
 exports.ViroSoundField = ViroSoundField;
-var VRTSoundField = react_native_1.requireNativeComponent("VRTSoundField", 
+var VRTSoundField = (0, react_native_1.requireNativeComponent)("VRTSoundField", 
 // @ts-ignore
 ViroSoundField, {
     nativeOnly: {

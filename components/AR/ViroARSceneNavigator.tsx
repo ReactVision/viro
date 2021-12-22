@@ -12,31 +12,23 @@
 
 "use strict";
 
-import { ViroWorldOrigin } from "@components/Types/ViroEvents";
-import {
-  ViroNativeRef,
-  Viro3DPoint,
-  ViroScene,
-  ViroSceneDictionary,
-} from "@components/Types/ViroUtils";
-import PropTypes from "prop-types";
 import React from "react";
 import {
   findNodeHandle,
+  NativeModules,
   requireNativeComponent,
   StyleSheet,
-  View,
   ViewProps,
 } from "react-native";
+import { ViroWorldOrigin } from "../Types/ViroEvents";
+import {
+  Viro3DPoint,
+  ViroNativeRef,
+  ViroScene,
+  ViroSceneDictionary,
+} from "../Types/ViroUtils";
 
-var NativeModules = require("react-native").NativeModules;
-var ViroARSceneNavigatorModule =
-  require("react-native").NativeModules.VRTARSceneNavigatorModule;
-
-// type Scene = {
-//   scene: Function;
-//   passProps?: Object,
-// };
+const ViroARSceneNavigatorModule = NativeModules.VRTARSceneNavigatorModule;
 
 var mathRandomOffset = 0;
 
@@ -49,7 +41,7 @@ type Props = ViewProps & {
     /**
      * The React Class to render for this scene.
      */
-    scene: ViroScene;
+    scene: () => JSX.Element;
   };
   initialSceneKey?: string;
 

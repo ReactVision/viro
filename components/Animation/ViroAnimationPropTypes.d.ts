@@ -9,4 +9,10 @@
  * @providesModule ViroAnimationPropTypes
  * @flow
  */
-export {};
+import PropTypes from "prop-types";
+export declare const ViroAnimationPropTypes: {
+    duration: PropTypes.Validator<number>;
+    delay: PropTypes.Requireable<number>;
+    easing: PropTypes.Requireable<string>;
+    properties: any;
+};

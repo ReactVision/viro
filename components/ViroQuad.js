@@ -24,7 +24,7 @@ const ViroBase_1 = require("./ViroBase");
  */
 class ViroQuad extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroQuad", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroQuad", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -79,7 +79,7 @@ class ViroQuad extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroQuad = ViroQuad;
-var VRTQuad = react_native_1.requireNativeComponent("VRTQuad", 
+var VRTQuad = (0, react_native_1.requireNativeComponent)("VRTQuad", 
 // @ts-ignore
 ViroQuad, {
     nativeOnly: {

@@ -18,10 +18,7 @@ exports.ViroARCamera = void 0;
 const react_1 = __importDefault(require("react"));
 const ViroCamera_1 = require("../ViroCamera");
 class ViroARCamera extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     render() {
         // Uncomment this to check props
         return (<ViroCamera_1.ViroCamera ref={(component) => {

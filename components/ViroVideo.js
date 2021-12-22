@@ -36,8 +36,8 @@ class ViroVideo extends ViroBase_1.ViroBase {
             this.props.onUpdateTime(event.nativeEvent.currentTime, event.nativeEvent.totalTime);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroVideo", this.props);
-        var source = resolveAssetSource_1.default(this.props.source);
+        (0, ViroProps_1.checkMisnamedProps)("ViroVideo", this.props);
+        var source = (0, resolveAssetSource_1.default)(this.props.source);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -98,16 +98,16 @@ class ViroVideo extends ViroBase_1.ViroBase {
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                react_native_1.NativeModules.VRTVideoSurfaceManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                react_native_1.NativeModules.VRTVideoSurfaceManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), react_native_1.NativeModules.UIManager.VRTVideoSurface.Commands.seekToTime, [timeInSeconds]);
+                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTVideoSurface.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }
 }
 exports.ViroVideo = ViroVideo;
-var VRTVideoSurface = react_native_1.requireNativeComponent("VRTVideoSurface", 
+var VRTVideoSurface = (0, react_native_1.requireNativeComponent)("VRTVideoSurface", 
 // @ts-ignore
 ViroVideo, {
     nativeOnly: {

@@ -26,7 +26,7 @@ class ViroARTrackingTargets {
             // Check for required props
             ViroARTrackingTargets.checkForRequiredProps(key, target);
             // resolve asset source if applicable and update the object
-            var resultSource = resolveAssetSource_1.default(target.source);
+            var resultSource = (0, resolveAssetSource_1.default)(target.source);
             target.source = resultSource;
         }
         // call the createTargets function in the native module

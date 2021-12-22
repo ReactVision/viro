@@ -16,10 +16,10 @@ import { ColorValue, requireNativeComponent, ViewProps } from "react-native";
 import { ViroNativeRef } from "./Types/ViroUtils";
 
 type Props = ViewProps & {
-  color: ColorValue;
-  intensity: number;
-  temperature: number;
-  influenceBitMask: number;
+  color?: ColorValue;
+  intensity?: number;
+  temperature?: number;
+  influenceBitMask?: number;
 };
 
 /**

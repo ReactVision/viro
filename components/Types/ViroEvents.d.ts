@@ -10,6 +10,7 @@
  * - source types
  * - clickState types
  */
+import { ViroARTrackingReasonConstants, ViroTrackingStateConstants } from "../ViroConstants";
 import { Viro3DPoint, ViroRotation, ViroSource } from "./ViroUtils";
 export declare type ViroHoverEvent = {
     isHovering: boolean;
@@ -211,8 +212,8 @@ export declare type ViroTrackingUpdatedEvent = {
     state: ViroTrackingState;
     reason: ViroTrackingReason;
 };
-export declare type ViroTrackingState = any;
-export declare type ViroTrackingReason = any;
+export declare type ViroTrackingState = ViroTrackingStateConstants.TRACKING_NORMAL | ViroTrackingStateConstants.TRACKING_LIMITED | ViroTrackingStateConstants.TRACKING_UNAVAILABLE;
+export declare type ViroTrackingReason = ViroARTrackingReasonConstants.TRACKING_REASON_NONE | ViroARTrackingReasonConstants.TRACKING_REASON_EXCESSIVE_MOTION | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES;
 export declare type ViroAmbientLightUpdateEvent = {
     ambientLightInfo: ViroAmbientLightInfo;
 };

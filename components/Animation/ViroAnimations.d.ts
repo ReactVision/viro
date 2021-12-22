@@ -1,6 +1,9 @@
 export declare type ViroAnimationDict = {
     [key: string]: ViroAnimation;
 };
+export declare type ViroAnimationChainDict = {
+    [key: string]: ViroAnimation | ViroAnimation[];
+};
 export declare type ViroAnimation = {
     name?: string;
     delay?: number;

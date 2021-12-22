@@ -11,7 +11,7 @@
  */
 "use strict";
 
-import { ViroSource } from "@components/Types/ViroUtils";
+import { ViroSource } from "../Types/ViroUtils";
 import PropTypes from "prop-types";
 import { ImageResolvedAssetSource } from "react-native";
 

@@ -23,21 +23,28 @@ var mathRandomOffset = 0;
  * ViroVRSceneNavigator is used to transition between multiple scenes.
  */
 class ViroVRSceneNavigator extends react_1.default.Component {
+    sceneNavigator = {
+        push: this.push,
+        pop: this.pop,
+        popN: this.popN,
+        jump: this.jump,
+        replace: this.replace,
+        // exitViro: this.exitViro, // not defined?
+        project: this._project,
+        unproject: this._unproject,
+        recenterTracking: this._recenterTracking,
+        viroAppProps: {},
+    };
+    _component = null;
+    /**
+     * Called from native when either the user physically decides to exit vr (hits
+     * the "X" buton).
+     */
+    _onExitViro(_event) {
+        this.props.onExitViro && this.props.onExitViro();
+    }
     constructor(props) {
         super(props);
-        this.sceneNavigator = {
-            push: this.push,
-            pop: this.pop,
-            popN: this.popN,
-            jump: this.jump,
-            replace: this.replace,
-            // exitViro: this.exitViro, // not defined?
-            project: this._project,
-            unproject: this._unproject,
-            recenterTracking: this._recenterTracking,
-            viroAppProps: {},
-        };
-        this._component = null;
         var initialSceneTag = this.props.initialSceneKey;
         if (initialSceneTag == null) {
             initialSceneTag = this.getRandomTag();
@@ -54,13 +61,6 @@ class ViroVRSceneNavigator extends react_1.default.Component {
             sceneHistory: [scene.tag],
             currentSceneIndex: 0,
         };
-    }
-    /**
-     * Called from native when either the user physically decides to exit vr (hits
-     * the "X" buton).
-     */
-    _onExitViro(_event) {
-        this.props.onExitViro && this.props.onExitViro();
     }
     getRandomTag() {
         var randomTag = Math.random() + mathRandomOffset;
@@ -318,13 +318,13 @@ class ViroVRSceneNavigator extends react_1.default.Component {
         return -1;
     }
     _recenterTracking() {
-        ViroSceneNavigatorModule.recenterTracking(react_native_1.findNodeHandle(this));
+        ViroSceneNavigatorModule.recenterTracking((0, react_native_1.findNodeHandle)(this));
     }
     async _project(point) {
-        return await ViroSceneNavigatorModule.project(react_native_1.findNodeHandle(this), point);
+        return await ViroSceneNavigatorModule.project((0, react_native_1.findNodeHandle)(this), point);
     }
     async _unproject(point) {
-        return await ViroSceneNavigatorModule.unproject(react_native_1.findNodeHandle(this), point);
+        return await ViroSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     }
     _renderSceneStackItems() {
         let views = [];
@@ -364,7 +364,7 @@ var styles = react_native_1.StyleSheet.create({
         alignItems: "center",
     },
 });
-var VRTVRSceneNavigator = react_native_1.requireNativeComponent("VRTVRSceneNavigator", 
+var VRTVRSceneNavigator = (0, react_native_1.requireNativeComponent)("VRTVRSceneNavigator", 
 // @ts-ignore
 ViroVRSceneNavigator, {
     nativeOnly: {

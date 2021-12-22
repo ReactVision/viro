@@ -14,10 +14,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroAnimationPropTypes = void 0;
 const prop_types_1 = __importDefault(require("prop-types"));
 var createStrictShapeTypeChecker = require("react-native/Libraries/DeprecatedPropTypes/deprecatedCreateStrictShapeTypeChecker");
 var ColorPropType = require("react-native/Libraries/DeprecatedPropTypes/DeprecatedColorPropType");
-var ViroAnimationPropTypes = {
+exports.ViroAnimationPropTypes = {
     duration: prop_types_1.default.number.isRequired,
     delay: prop_types_1.default.number,
     easing: prop_types_1.default.string,
@@ -39,4 +40,3 @@ var ViroAnimationPropTypes = {
         material: prop_types_1.default.string,
     }).isRequired,
 };
-module.exports = ViroAnimationPropTypes;

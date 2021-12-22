@@ -24,7 +24,7 @@ const ViroBase_1 = require("./ViroBase");
  */
 class ViroPolygon extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroPolygon", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroPolygon", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -79,7 +79,7 @@ class ViroPolygon extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroPolygon = ViroPolygon;
-var VRTPolygon = react_native_1.requireNativeComponent("VRTPolygon", 
+var VRTPolygon = (0, react_native_1.requireNativeComponent)("VRTPolygon", 
 // @ts-ignore
 ViroPolygon, {
     nativeOnly: {

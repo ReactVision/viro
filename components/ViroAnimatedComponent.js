@@ -22,10 +22,7 @@ var createReactClass = require("create-react-class");
  * Used to render a ViroAnimatedComponent
  */
 class ViroAnimatedComponent extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onStart(_event) {
         this.props.onStart && this.props.onStart();
     }
@@ -49,7 +46,7 @@ class ViroAnimatedComponent extends react_1.default.Component {
     }
 }
 exports.ViroAnimatedComponent = ViroAnimatedComponent;
-var VRTAnimatedComponent = react_native_1.requireNativeComponent("VRTAnimatedComponent", 
+var VRTAnimatedComponent = (0, react_native_1.requireNativeComponent)("VRTAnimatedComponent", 
 // @ts-ignore
 ViroAnimatedComponent, {
     nativeOnly: { onAnimationStartViro: true, onAnimationFinishViro: true },

@@ -9,14 +9,11 @@ const react_native_1 = require("react-native");
 var NativeModules = require("react-native").NativeModules;
 var createReactClass = require("create-react-class");
 class ViroMaterialVideo extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     componentWillUnmount() {
         // pause the current video texture on Android since java gc will release when it feels like it.
         if (react_native_1.Platform.OS == "android") {
-            NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), NativeModules.UIManager.VRTMaterialVideo.Commands.pause, [0]);
+            NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), NativeModules.UIManager.VRTMaterialVideo.Commands.pause, [0]);
         }
     }
     _onBufferStart(event) {
@@ -56,16 +53,16 @@ class ViroMaterialVideo extends react_1.default.Component {
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                NativeModules.VRTMaterialVideoManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                NativeModules.VRTMaterialVideoManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), NativeModules.UIManager.VRTMaterialVideo.Commands.seekToTime, [timeInSeconds]);
+                NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), NativeModules.UIManager.VRTMaterialVideo.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }
 }
 exports.ViroMaterialVideo = ViroMaterialVideo;
-var VRTMaterialVideo = react_native_1.requireNativeComponent("VRTMaterialVideo", 
+var VRTMaterialVideo = (0, react_native_1.requireNativeComponent)("VRTMaterialVideo", 
 // @ts-ignore
 ViroMaterialVideo, {
     nativeOnly: {

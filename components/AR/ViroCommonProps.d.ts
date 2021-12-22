@@ -1,6 +1,6 @@
-import { ViroAnimation } from "@components/Animation/ViroAnimations";
-import { ViroAnchor, ViroAnchorFoundMap, ViroAnchorUpdatedMap, ViroClickState, ViroErrorEvent, ViroPinchState, ViroRotateState } from "@components/Types/ViroEvents";
-import { ViroPhysicsBody, Viro3DPoint, ViroRotation, ViroScale, ViroSource } from "@components/Types/ViroUtils";
+import { ViroAnimation } from "../Animation/ViroAnimations";
+import { ViroAnchor, ViroAnchorFoundMap, ViroAnchorUpdatedMap, ViroClickState, ViroErrorEvent, ViroPinchState, ViroRotateState } from "../Types/ViroEvents";
+import { ViroPhysicsBody, Viro3DPoint, ViroRotation, ViroScale, ViroSource } from "../Types/ViroUtils";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 export declare type ViroCommonProps = ViewProps & {
     target?: string;

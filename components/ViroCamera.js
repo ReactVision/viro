@@ -18,6 +18,7 @@ exports.ViroCamera = void 0;
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 class ViroCamera extends react_1.default.Component {
+    _component;
     componentDidMount() {
         this.context.cameraDidMount(this);
     }
@@ -51,7 +52,7 @@ class ViroCamera extends react_1.default.Component {
     }
 }
 exports.ViroCamera = ViroCamera;
-var VRTCamera = react_native_1.requireNativeComponent("VRTCamera", 
+var VRTCamera = (0, react_native_1.requireNativeComponent)("VRTCamera", 
 // @ts-ignore
 ViroCamera, {
     nativeOnly: {

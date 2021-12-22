@@ -6,31 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-import {
-  ViroCameraTransform,
-  ViroCameraTransformEvent,
-  ViroClickEvent,
-  ViroClickStateEvent,
-  ViroClickStateTypes,
-  ViroDragEvent,
-  ViroFuseEvent,
-  ViroHoverEvent,
-  ViroPinchEvent,
-  ViroPlatformEvent,
-  ViroPlatformInfo,
-  ViroRotateEvent,
-  ViroScrollEvent,
-  ViroSwipeEvent,
-  ViroTouchEvent,
-} from "@components/Types/ViroEvents";
-import {
-  ViroNativeRef,
-  ViroPhysicsWorld,
-  Viro3DPoint,
-  ViroRotation,
-  ViroSoundRoom,
-} from "@components/Types/ViroUtils";
-import React, { Component } from "react";
+import React from "react";
 import {
   findNodeHandle,
   NativeModules,
@@ -38,13 +14,30 @@ import {
   requireNativeComponent,
 } from "react-native";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
+import {
+  ViroCameraTransform,
+  ViroCameraTransformEvent,
+  ViroPlatformEvent,
+  ViroPlatformInfo,
+  ViroTrackingReason,
+  ViroTrackingState,
+} from "./Types/ViroEvents";
+import {
+  Viro3DPoint,
+  ViroPhysicsWorld,
+  ViroRotation,
+  ViroSoundRoom,
+} from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 import { ViroCamera } from "./ViroCamera";
 
 type Props = ViroCommonProps & {
   onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
   onCameraTransformUpdate?: (cameraTransform: ViroCameraTransform) => void;
-
+  onTrackingUpdated?: (
+    state: ViroTrackingState,
+    reason: ViroTrackingReason
+  ) => void;
   /**
    * Describes the acoustic properties of the room around the user
    */

@@ -21,10 +21,7 @@ const react_native_1 = require("react-native");
  * Used to render a ViroOmniLight
  */
 class ViroOmniLight extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     setNativeProps(nativeProps) {
         this._component?.setNativeProps(nativeProps);
     }
@@ -41,6 +38,6 @@ class ViroOmniLight extends react_1.default.Component {
     }
 }
 exports.ViroOmniLight = ViroOmniLight;
-var VRTOmniLight = react_native_1.requireNativeComponent("VRTOmniLight", 
+var VRTOmniLight = (0, react_native_1.requireNativeComponent)("VRTOmniLight", 
 // @ts-ignore
 ViroOmniLight);

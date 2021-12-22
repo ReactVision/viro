@@ -9,13 +9,15 @@
  * @providesModule ViroAnimations
  * @flow
  */
-import { processColor } from "react-native";
-var AnimationManager =
-  require("react-native").NativeModules.VRTAnimationManager;
-var AnimationValidation = require("./ViroAnimationValidation");
+import { NativeModules, processColor } from "react-native";
+const AnimationManager = NativeModules.VRTAnimationManager;
+import { ViroAnimationValidation } from "./ViroAnimationValidation";
 
 export type ViroAnimationDict = {
   [key: string]: ViroAnimation;
+};
+export type ViroAnimationChainDict = {
+  [key: string]: ViroAnimation | ViroAnimation[];
 };
 
 export type ViroAnimation = {
@@ -46,10 +48,10 @@ export class ViroAnimations {
     for (var key in animations) {
       if (animations[key].constructor === Array) {
         // Validate a given animation chain.
-        AnimationValidation.validateAnimationChain(key, animations);
+        ViroAnimationValidation.validateAnimationChain(key, animations);
       } else {
         // Validate single animation.
-        AnimationValidation.validateAnimation(key, animations);
+        ViroAnimationValidation.validateAnimation(key, animations);
         if (animations[key].properties && animations[key].properties.color) {
           var newColor = processColor(animations[key].properties.color);
           animations[key].properties.color = newColor;

@@ -4,6 +4,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroScene = void 0;
+/**
+ * Copyright (c) 2015-present, Viro Media, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 const ViroBase_1 = require("./ViroBase");
@@ -69,10 +77,10 @@ class ViroScene extends ViroBase_1.ViroBase {
     }
     // TODO: types for closest
     async findCollisionsWithRayAsync(from, to, closest, viroTag) {
-        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithRayAsync(react_native_1.findNodeHandle(this), from, to, closest, viroTag);
+        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithRayAsync((0, react_native_1.findNodeHandle)(this), from, to, closest, viroTag);
     }
     async findCollisionsWithShapeAsync(from, to, shapeString, shapeParam, viroTag) {
-        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithShapeAsync(react_native_1.findNodeHandle(this), from, to, shapeString, shapeParam, viroTag);
+        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithShapeAsync((0, react_native_1.findNodeHandle)(this), from, to, shapeString, shapeParam, viroTag);
     }
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
@@ -80,12 +88,12 @@ class ViroScene extends ViroBase_1.ViroBase {
      */
     async getCameraPositionAsync() {
         console.warn("[Viro] ViroScene.getCameraPositionAsync has been DEPRECATED. Please use getCameraOrientationAsync instead.");
-        var orientation = await react_native_1.NativeModules.VRTCameraModule.getCameraOrientation(react_native_1.findNodeHandle(this));
+        var orientation = await react_native_1.NativeModules.VRTCameraModule.getCameraOrientation((0, react_native_1.findNodeHandle)(this));
         var position = [orientation[0], orientation[1], orientation[2]];
         return position;
     }
     async getCameraOrientationAsync() {
-        var orientation = await react_native_1.NativeModules.VRTCameraModule.getCameraOrientation(react_native_1.findNodeHandle(this));
+        var orientation = await react_native_1.NativeModules.VRTCameraModule.getCameraOrientation((0, react_native_1.findNodeHandle)(this));
         return {
             position: [orientation[0], orientation[1], orientation[2]],
             rotation: [orientation[3], orientation[4], orientation[5]],
@@ -97,20 +105,20 @@ class ViroScene extends ViroBase_1.ViroBase {
         return {
             cameraDidMount: (camera) => {
                 if (camera.props.active) {
-                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
             },
             cameraWillUnmount: (camera) => {
                 if (camera.props.active) {
-                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
             },
             cameraDidUpdate: (camera, active) => {
                 if (active) {
-                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
                 else {
-                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
             },
         };
@@ -130,7 +138,7 @@ class ViroScene extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroScene = ViroScene;
-var VRTScene = react_native_1.requireNativeComponent("VRTScene", 
+var VRTScene = (0, react_native_1.requireNativeComponent)("VRTScene", 
 // @ts-ignore
 ViroScene, {
     nativeOnly: {

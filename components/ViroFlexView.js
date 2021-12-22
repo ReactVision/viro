@@ -24,7 +24,7 @@ const ViroBase_1 = require("./ViroBase");
  */
 class ViroFlexView extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroFlexView", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroFlexView", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -77,7 +77,7 @@ class ViroFlexView extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroFlexView = ViroFlexView;
-var VROFlexView = react_native_1.requireNativeComponent("VRTFlexView", 
+var VROFlexView = (0, react_native_1.requireNativeComponent)("VRTFlexView", 
 // @ts-ignore
 ViroFlexView, {
     nativeOnly: {

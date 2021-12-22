@@ -30,13 +30,10 @@ var ViroButtonStateTypes;
  * Composite controle for 2D button
  */
 class ViroButton extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-        this.state = {
-            buttonType: ViroButtonStateTypes.BTN_TYPE_NORMAL,
-        };
-    }
+    _component = null;
+    state = {
+        buttonType: ViroButtonStateTypes.BTN_TYPE_NORMAL,
+    };
     applyImpulse(force, atPosition) {
         this._component?.applyImpulse(force, atPosition);
     }
@@ -63,7 +60,7 @@ class ViroButton extends react_1.default.Component {
         return await this._component?.getBoundingBoxAsync();
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroButton", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroButton", this.props);
         // We default to showing the button if it's undefined
         const { visible = true } = this.props;
         var normalSrcVisible;

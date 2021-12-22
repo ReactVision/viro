@@ -9,10 +9,10 @@
  * @providesModule ViroARSceneNavigator
  * @flow
  */
-import { ViroWorldOrigin } from "@components/Types/ViroEvents";
-import { ViroNativeRef, Viro3DPoint, ViroScene, ViroSceneDictionary } from "@components/Types/ViroUtils";
 import React from "react";
 import { ViewProps } from "react-native";
+import { ViroWorldOrigin } from "../Types/ViroEvents";
+import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 declare type Props = ViewProps & {
     /**
      * ViroARSceneNavigator uses "scene" objects like the following to
@@ -22,7 +22,7 @@ declare type Props = ViewProps & {
         /**
          * The React Class to render for this scene.
          */
-        scene: ViroScene;
+        scene: () => JSX.Element;
     };
     initialSceneKey?: string;
     autofocus?: boolean;

@@ -1,21 +1,14 @@
 /// <reference types="react" />
-/**
- * Copyright (c) 2015-present, Viro Media, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- */
-import { ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformEvent, ViroPlatformInfo } from "@components/Types/ViroEvents";
-import { ViroPhysicsWorld, Viro3DPoint, ViroSoundRoom } from "@components/Types/ViroUtils";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
+import { ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformEvent, ViroPlatformInfo, ViroTrackingReason, ViroTrackingState } from "./Types/ViroEvents";
+import { Viro3DPoint, ViroPhysicsWorld, ViroSoundRoom } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 import { ViroCamera } from "./ViroCamera";
 declare type Props = ViroCommonProps & {
     onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
     onCameraTransformUpdate?: (cameraTransform: ViroCameraTransform) => void;
+    onTrackingUpdated?: (state: ViroTrackingState, reason: ViroTrackingReason) => void;
     /**
      * Describes the acoustic properties of the room around the user
      */

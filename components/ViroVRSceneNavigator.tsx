@@ -48,6 +48,8 @@ type Props = ViewProps & {
 
   initialSceneKey?: string;
 
+  autofocus?: boolean;
+
   /**
    * A flag to enable/disable some debug features
    */
@@ -57,7 +59,9 @@ type Props = ViewProps & {
    * ViroSceneNavigator uses "scene" objects like the following to
    * describe a scene.
    */
-  initialScene?: ViroScene;
+  initialScene?: {
+    scene: () => JSX.Element;
+  };
 
   /**
    * Called when either the user physically decides to exit vr (hits

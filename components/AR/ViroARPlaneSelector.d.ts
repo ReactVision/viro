@@ -8,8 +8,8 @@
  *
  * @providesModule ViroARPlaneSelector
  */
-import { ViroARPlaneSizes, ViroPlaneUpdatedMap } from "@components/Types/ViroEvents";
-import { ViroARPlaneType, ViroNativeRef } from "@components/Types/ViroUtils";
+import { ViroARPlaneSizes, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
+import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
 import React from "react";
 import { ViroCommonProps, ViroObjectProps } from "./ViroCommonProps";
 declare type Props = ViroCommonProps & ViroObjectProps & {

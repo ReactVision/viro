@@ -11,26 +11,14 @@
 
 "use strict";
 
+import { ViroBase } from "../ViroBase";
+import React from "react";
+import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 import {
   ViroARAnchorFoundEvent,
   ViroARAnchorRemovedEvent,
   ViroARAnchorUpdatedEvent,
-  ViroClickEvent,
-  ViroClickStateEvent,
-  ViroCollisionEvent,
-  ViroDragEvent,
-  ViroFuseEvent,
-  ViroHoverEvent,
-  ViroPinchEvent,
-  ViroRotateEvent,
-  ViroScrollEvent,
-  ViroSwipeEvent,
-  ViroTouchEvent,
-} from "@components/Types/ViroEvents";
-import { ViroNativeRef } from "@components/Types/ViroUtils";
-import { ViroBase } from "@components/ViroBase";
-import React from "react";
-import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
+} from "../Types/ViroEvents";
 
 type Props = {};
 

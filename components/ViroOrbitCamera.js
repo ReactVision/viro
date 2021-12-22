@@ -19,10 +19,7 @@ const prop_types_1 = __importDefault(require("prop-types"));
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 class ViroOrbitCamera extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     componentDidMount() {
         this.context.cameraDidMount(this);
     }
@@ -44,14 +41,14 @@ class ViroOrbitCamera extends react_1.default.Component {
                 this._component = component;
             }} {...this.props}/>);
     }
+    static contextTypes = {
+        cameraDidMount: prop_types_1.default.func,
+        cameraWillUnmount: prop_types_1.default.func,
+        cameraDidUpdate: prop_types_1.default.func,
+    };
 }
 exports.ViroOrbitCamera = ViroOrbitCamera;
-ViroOrbitCamera.contextTypes = {
-    cameraDidMount: prop_types_1.default.func,
-    cameraWillUnmount: prop_types_1.default.func,
-    cameraDidUpdate: prop_types_1.default.func,
-};
-var VRTOrbitCamera = react_native_1.requireNativeComponent("VRTOrbitCamera", 
+var VRTOrbitCamera = (0, react_native_1.requireNativeComponent)("VRTOrbitCamera", 
 // @ts-ignore
 ViroOrbitCamera, {
     nativeOnly: {

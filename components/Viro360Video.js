@@ -25,10 +25,7 @@ var NativeModules = require("react-native").NativeModules;
  * Used to render a 360 video on the background sphere.
  */
 class Viro360Video extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     _onBufferStart(event) {
         this.props.onBufferStart && this.props.onBufferStart(event);
     }
@@ -49,8 +46,8 @@ class Viro360Video extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("Viro360Video", this.props);
-        var vidsrc = resolveAssetSource_1.default(this.props.source);
+        (0, ViroProps_1.checkMisnamedProps)("Viro360Video", this.props);
+        var vidsrc = (0, resolveAssetSource_1.default)(this.props.source);
         let nativeProps = Object.assign({}, this.props);
         nativeProps.source = vidsrc;
         nativeProps.onBufferStartViro = this._onBufferStart;
@@ -66,16 +63,16 @@ class Viro360Video extends react_1.default.Component {
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                NativeModules.VRT360VideoManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                NativeModules.VRT360VideoManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), NativeModules.UIManager.VRT360Video.Commands.seekToTime, [timeInSeconds]);
+                NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), NativeModules.UIManager.VRT360Video.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }
 }
 exports.Viro360Video = Viro360Video;
-var VRO360Video = react_native_1.requireNativeComponent("VRT360Video", 
+var VRO360Video = (0, react_native_1.requireNativeComponent)("VRT360Video", 
 // @ts-ignore
 Viro360Video, {
     nativeOnly: {

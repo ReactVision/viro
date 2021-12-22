@@ -31,7 +31,7 @@ const ViroSpinner_1a_w = require("./Resources/viro_spinner_1a_w.png");
  */
 class ViroSpinner extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroSpinner", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroSpinner", this.props);
         // Since transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let transformBehaviors = typeof this.props.transformBehaviors === "string"
             ? new Array(this.props.transformBehaviors)

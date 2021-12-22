@@ -1,6 +1,8 @@
 {
   "name": "@viro-community/react-viro",
   "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
   "version": "2.21.0",
   "license": "MIT",
   "publishConfig": {
@@ -21,6 +23,9 @@
     "react-native": "0.65.1"
   },
   "files": [
+    "index.d.ts",
+    "index.js",
+    "index.ts",
     "components",
     "android/react_viro",
     "android/viro_renderer",

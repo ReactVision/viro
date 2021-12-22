@@ -17,7 +17,7 @@ import PropTypes from "prop-types";
 var createStrictShapeTypeChecker = require("react-native/Libraries/DeprecatedPropTypes/deprecatedCreateStrictShapeTypeChecker");
 var ColorPropType = require("react-native/Libraries/DeprecatedPropTypes/DeprecatedColorPropType");
 
-var ViroAnimationPropTypes = {
+export const ViroAnimationPropTypes = {
   duration: PropTypes.number.isRequired,
   delay: PropTypes.number,
   easing: PropTypes.string,
@@ -50,5 +50,3 @@ var ViroAnimationPropTypes = {
     material: PropTypes.string,
   }).isRequired,
 };
-
-module.exports = ViroAnimationPropTypes;

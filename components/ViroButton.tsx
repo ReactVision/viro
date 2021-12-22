@@ -45,12 +45,12 @@ export type Props = ViroCommonProps &
     /**
      * The image file, to be displayed when the user is hovering over it
      */
-    hoverSource: ViroSource;
+    hoverSource?: ViroSource;
 
     /**
      * The image file, to be displayed when the user clicks the button
      */
-    clickSource: ViroSource;
+    clickSource?: ViroSource;
 
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
@@ -58,7 +58,7 @@ export type Props = ViroCommonProps &
      *
      * @deprecated
      */
-    tapSource: ViroSource;
+    tapSource?: ViroSource;
 
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
@@ -66,7 +66,7 @@ export type Props = ViroCommonProps &
      *
      * @deprecated
      */
-    gazeSource: ViroSource;
+    gazeSource?: ViroSource;
   };
 
 type State = {

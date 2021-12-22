@@ -19,9 +19,9 @@ declare type Props = {
         target?: string;
         weight?: number;
     }>;
-    onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
-    onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
-    onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+    onLoadStart?: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+    onLoadEnd?: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+    onError?: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
 };
 /**
  * Viro3DObject is a component that is used to render 3D models in the scene.

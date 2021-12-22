@@ -6,20 +6,26 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ViroConstants
+ * @providesModule ViroRecordingErrorConstants
+ * @providesModule ViroRecordingErrorConstants
+ * @providesModule ViroARTrackingReasonConstants
  */
-export declare const ViroConstants: {
-    RECORD_ERROR_NONE: number;
-    RECORD_ERROR_UNKNOWN: number;
-    RECORD_ERROR_NO_PERMISSION: number;
-    RECORD_ERROR_INITIALIZATION: number;
-    RECORD_ERROR_WRITE_TO_FILE: number;
-    RECORD_ERROR_ALREADY_RUNNING: number;
-    RECORD_ERROR_ALREADY_STOPPED: number;
-    TRACKING_UNAVAILABLE: number;
-    TRACKING_LIMITED: number;
-    TRACKING_NORMAL: number;
-    TRACKING_REASON_NONE: number;
-    TRACKING_REASON_EXCESSIVE_MOTION: number;
-    TRACKING_REASON_INSUFFICIENT_FEATURES: number;
-};
+export declare enum ViroRecordingErrorConstants {
+    RECORD_ERROR_NONE = -1,
+    RECORD_ERROR_UNKNOWN = 0,
+    RECORD_ERROR_NO_PERMISSION = 1,
+    RECORD_ERROR_INITIALIZATION = 2,
+    RECORD_ERROR_WRITE_TO_FILE = 3,
+    RECORD_ERROR_ALREADY_RUNNING = 4,
+    RECORD_ERROR_ALREADY_STOPPED = 5
+}
+export declare enum ViroTrackingStateConstants {
+    TRACKING_UNAVAILABLE = 1,
+    TRACKING_LIMITED = 2,
+    TRACKING_NORMAL = 3
+}
+export declare enum ViroARTrackingReasonConstants {
+    TRACKING_REASON_NONE = 1,
+    TRACKING_REASON_EXCESSIVE_MOTION = 2,
+    TRACKING_REASON_INSUFFICIENT_FEATURES = 3
+}

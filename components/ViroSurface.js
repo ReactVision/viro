@@ -25,7 +25,7 @@ const ViroBase_1 = require("./ViroBase");
 class ViroSurface extends ViroBase_1.ViroBase {
     render() {
         console.warn("<ViroSurface> has been DEPRECATED. Please use <ViroQuad> instead.");
-        ViroProps_1.checkMisnamedProps("ViroSurface", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroSurface", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -80,7 +80,7 @@ class ViroSurface extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroSurface = ViroSurface;
-var VRTSurface = react_native_1.requireNativeComponent("VRTQuad", 
+var VRTSurface = (0, react_native_1.requireNativeComponent)("VRTQuad", 
 // @ts-ignore
 ViroSurface, {
     nativeOnly: {

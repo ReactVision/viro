@@ -24,7 +24,7 @@ const ViroBase_1 = require("./ViroBase");
  */
 class ViroText extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroText", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroText", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -40,7 +40,7 @@ class ViroText extends ViroBase_1.ViroBase {
         let outerStroke = undefined;
         if (this.props.outerStroke) {
             let outerStrokeColor = this.props.outerStroke.color;
-            let processedColor = react_native_1.processColor(outerStrokeColor);
+            let processedColor = (0, react_native_1.processColor)(outerStrokeColor);
             outerStroke = {
                 type: this.props.outerStroke.type,
                 width: this.props.outerStroke.width,
@@ -57,7 +57,7 @@ class ViroText extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroText = ViroText;
-var VRTText = react_native_1.requireNativeComponent("VRTText", 
+var VRTText = (0, react_native_1.requireNativeComponent)("VRTText", 
 // @ts-ignore
 ViroText, {
     nativeOnly: {

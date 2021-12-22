@@ -35,7 +35,7 @@ type Props = ViewProps & {
    * The image file, which is required
    */
   source: ImageSourcePropType;
-  rotation: ViroRotation;
+  rotation?: ViroRotation;
   format?: "RGBA8" | "RGB565";
   steroMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
   isHdr?: boolean;

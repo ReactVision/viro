@@ -18,7 +18,7 @@ const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
 class ViroPolyline extends ViroBase_1.ViroBase {
     render() {
-        ViroProps_1.checkMisnamedProps("ViroPolyline", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroPolyline", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"
             ? new Array(this.props.materials)
@@ -47,7 +47,7 @@ class ViroPolyline extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroPolyline = ViroPolyline;
-var VRTPolyline = react_native_1.requireNativeComponent("VRTPolyline", 
+var VRTPolyline = (0, react_native_1.requireNativeComponent)("VRTPolyline", 
 // @ts-ignore
 ViroPolyline, {
     nativeOnly: {

@@ -13,6 +13,7 @@
 
 import React from "react";
 import { ColorValue, processColor, requireNativeComponent } from "react-native";
+import { ViroTextStyle } from "./Styles/ViroTextStyle";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 
@@ -20,6 +21,7 @@ type Props = {
   text: string;
   color?: ColorValue;
   extrusionDepth?: number;
+  style?: ViroTextStyle;
   outerStroke?: {
     type?: "None" | "Outline" | "DropShadow";
     width?: number;

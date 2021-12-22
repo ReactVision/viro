@@ -6,6 +6,16 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
+import { ViroTrackingStateConstants } from "../ViroConstants";
+import React from "react";
+import {
+  findNodeHandle,
+  NativeModules,
+  NativeSyntheticEvent,
+  requireNativeComponent,
+} from "react-native";
+// @ts-ignore
+import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
 import {
   ViroAmbientLightInfo,
   ViroAmbientLightUpdateEvent,
@@ -23,37 +33,27 @@ import {
   ViroTrackingReason,
   ViroTrackingState,
   ViroTrackingUpdatedEvent,
-} from "@components/Types/ViroEvents";
+} from "../Types/ViroEvents";
 import {
-  ViroPhysicsWorld,
   Viro3DPoint,
+  ViroPhysicsWorld,
   ViroRay,
   ViroRotation,
   ViroScale,
   ViroSoundRoom,
   ViroSource,
-} from "@components/Types/ViroUtils";
-import { ViroBase } from "@components/ViroBase";
-import { ViroCamera } from "@components/ViroCamera";
-import React from "react";
-import {
-  findNodeHandle,
-  NativeModules,
-  NativeSyntheticEvent,
-  requireNativeComponent,
-} from "react-native";
-// @ts-ignore
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import { ViroConstants } from "../ViroConstants";
+} from "../Types/ViroUtils";
+import { ViroBase } from "../ViroBase";
+import { ViroCamera } from "../ViroCamera";
 import { ViroCommonProps } from "./ViroCommonProps";
 
 const ViroCameraModule = NativeModules.ViroCameraModule;
 
 type Props = ViroCommonProps & {
-  displayPointCloud: {
-    imageSource: ViroSource;
-    imageScale: ViroScale;
-    maxPoints: number;
+  displayPointCloud?: {
+    imageSource?: ViroSource;
+    imageScale?: ViroScale;
+    maxPoints?: number;
   };
 
   anchorDetectionTypes?: string[] | string;
@@ -72,7 +72,7 @@ type Props = ViroCommonProps & {
    */
   soundRoom?: ViroSoundRoom;
   physicsWorld?: ViroPhysicsWorld;
-  postProcessEffects: string[];
+  postProcessEffects?: string[];
 
   /**
    * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
@@ -193,8 +193,9 @@ export class ViroARScene extends ViroBase<Props> {
 
     // TODO VIRO-3172: Remove in favor of deprecating onTrackingInitialized
     if (
-      (event.nativeEvent.state == ViroConstants.TRACKING_LIMITED ||
-        event.nativeEvent.state == ViroConstants.TRACKING_NORMAL) &&
+      (event.nativeEvent.state == ViroTrackingStateConstants.TRACKING_LIMITED ||
+        event.nativeEvent.state ==
+          ViroTrackingStateConstants.TRACKING_NORMAL) &&
       !this.onTrackingFirstInitialized
     ) {
       this.onTrackingFirstInitialized = true;

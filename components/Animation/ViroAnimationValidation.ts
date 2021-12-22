@@ -14,11 +14,15 @@
 "use strict";
 
 import PropTypes from "prop-types";
-import { ViroAnimation, ViroAnimationDict } from "./ViroAnimations";
+import {
+  ViroAnimation,
+  ViroAnimationChainDict,
+  ViroAnimationDict,
+} from "./ViroAnimations";
 
 var AnimationPropTypes = require("./ViroAnimationPropTypes");
 
-class ViroAnimationValidation {
+export class ViroAnimationValidation {
   static validateAnimationProp(
     prop: string,
     animationName: string,
@@ -54,6 +58,44 @@ class ViroAnimationValidation {
       caller,
       errorCallback
     );
+  }
+
+  /**
+   * Iterate through array to determine if there are empty chains (invalid)
+   * or if there are any empty elements within a given chain (invalid)
+   */
+  static validateAnimationChain(
+    name: string,
+    animations: ViroAnimationChainDict
+  ) {
+    if (!__DEV__) {
+      return;
+    }
+
+    var arrayChains = animations[name];
+    if (!(arrayChains.constructor === Array) || arrayChains.length <= 0) {
+      animationError(
+        "Invalid chains: Array of Animation chains must be a non empty array!",
+        animations[name] as ViroAnimation,
+        "AnimationValidation " + name
+      );
+      return;
+    }
+
+    for (var chainIndex = 0; chainIndex < arrayChains.length; chainIndex++) {
+      if (
+        !(arrayChains[chainIndex].constructor === Array) ||
+        // @ts-ignore for now... :)
+        arrayChains[chainIndex].length <= 0
+      ) {
+        animationError(
+          "Invalid chain: individual Animation chain must be a non empty array!",
+          animations[name] as ViroAnimation,
+          "AnimationValidation " + name
+        );
+        return;
+      }
+    }
   }
 
   static validateAnimation(name: string, animations: ViroAnimationDict) {
@@ -105,5 +147,3 @@ var animationError = function (
 var allAnimationTypes: any = {};
 
 ViroAnimationValidation.addValidAnimationPropTypes(AnimationPropTypes);
-
-module.exports = ViroAnimationValidation;

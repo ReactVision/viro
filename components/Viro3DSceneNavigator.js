@@ -23,21 +23,28 @@ var mathRandomOffset = 0;
  * Viro3DSceneNavigator is used to transition between multiple scenes.
  */
 class Viro3DSceneNavigator extends react_1.default.Component {
+    _component = null;
+    sceneNavigator = {
+        push: this.push,
+        pop: this.pop,
+        popN: this.popN,
+        jump: this.jump,
+        replace: this.replace,
+        // exitViro: this.exitViro, TODO: this was unused
+        recenterTracking: this._recenterTracking,
+        project: this._project,
+        unproject: this._unproject,
+        viroAppProps: {},
+    };
+    /**
+     * Called from native when either the user physically decides to exit vr (hits
+     * the "X" buton).
+     */
+    _onExitViro(_event) {
+        this.props.onExitViro && this.props.onExitViro();
+    }
     constructor(props) {
         super(props);
-        this._component = null;
-        this.sceneNavigator = {
-            push: this.push,
-            pop: this.pop,
-            popN: this.popN,
-            jump: this.jump,
-            replace: this.replace,
-            // exitViro: this.exitViro, TODO: this was unused
-            recenterTracking: this._recenterTracking,
-            project: this._project,
-            unproject: this._unproject,
-            viroAppProps: {},
-        };
         var initialSceneTag = this.props.initialSceneKey;
         if (initialSceneTag == null) {
             initialSceneTag = this.getRandomTag();
@@ -54,13 +61,6 @@ class Viro3DSceneNavigator extends react_1.default.Component {
             sceneHistory: [scene.tag],
             currentSceneIndex: 0,
         };
-    }
-    /**
-     * Called from native when either the user physically decides to exit vr (hits
-     * the "X" buton).
-     */
-    _onExitViro(_event) {
-        this.props.onExitViro && this.props.onExitViro();
     }
     getRandomTag() {
         var randomTag = Math.random() + mathRandomOffset;
@@ -318,7 +318,7 @@ class Viro3DSceneNavigator extends react_1.default.Component {
         return -1;
     }
     _recenterTracking() {
-        Viro3DSceneNavigatorModule.recenterTracking(react_native_1.findNodeHandle(this));
+        Viro3DSceneNavigatorModule.recenterTracking((0, react_native_1.findNodeHandle)(this));
     }
     _renderSceneStackItems() {
         let views = [];
@@ -333,10 +333,10 @@ class Viro3DSceneNavigator extends react_1.default.Component {
         return views;
     }
     async _project(point) {
-        return await Viro3DSceneNavigatorModule.project(react_native_1.findNodeHandle(this), point);
+        return await Viro3DSceneNavigatorModule.project((0, react_native_1.findNodeHandle)(this), point);
     }
     async _unproject(point) {
-        return await Viro3DSceneNavigatorModule.unproject(react_native_1.findNodeHandle(this), point);
+        return await Viro3DSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     }
     render() {
         // Uncomment this line to check for misnamed props
@@ -365,7 +365,7 @@ var styles = react_native_1.StyleSheet.create({
         alignItems: "center",
     },
 });
-var VRT3DSceneNavigator = react_native_1.requireNativeComponent("VRT3DSceneNavigator", 
+var VRT3DSceneNavigator = (0, react_native_1.requireNativeComponent)("VRT3DSceneNavigator", 
 // @ts-ignore
 Viro3DSceneNavigator, {
     nativeOnly: {

@@ -15,8 +15,8 @@ import {
   ViroARAnchorFoundEvent,
   ViroARAnchorRemovedEvent,
   ViroARAnchorUpdatedEvent,
-} from "@components/Types/ViroEvents";
-import { ViroBase } from "@components/ViroBase";
+} from "../Types/ViroEvents";
+import { ViroBase } from "../ViroBase";
 import React from "react";
 import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 

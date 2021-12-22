@@ -21,19 +21,16 @@ const react_native_1 = require("react-native");
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroParticleEmitter extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this.state = {
-            propsPositionState: this.props.position,
-            nativePositionState: undefined,
-        };
-        this._component = null;
-    }
+    state = {
+        propsPositionState: this.props.position,
+        nativePositionState: undefined,
+    };
+    _component = null;
     async getTransformAsync() {
-        return await react_native_1.NativeModules.VRTNodeModule.getNodeTransform(react_native_1.findNodeHandle(this));
+        return await react_native_1.NativeModules.VRTNodeModule.getNodeTransform((0, react_native_1.findNodeHandle)(this));
     }
     async getBoundingBoxAsync() {
-        return await react_native_1.NativeModules.VRTNodeModule.getBoundingBox(react_native_1.findNodeHandle(this));
+        return await react_native_1.NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
     }
     // Called from native on the event a positional change has occured
     // for the underlying control within the renderer.
@@ -59,10 +56,10 @@ class ViroParticleEmitter extends react_1.default.Component {
         this._component?.setNativeProps(nativeProps);
     }
     render() {
-        ViroProps_1.checkMisnamedProps("ViroParticleEmitter", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("ViroParticleEmitter", this.props);
         let image = { ...this.props.image };
         if (image.source != undefined) {
-            image.source = resolveAssetSource_1.default(image.source);
+            image.source = (0, resolveAssetSource_1.default)(image.source);
         }
         let transformBehaviors = typeof this.props.transformBehaviors === "string"
             ? new Array(this.props.transformBehaviors)
@@ -85,14 +82,14 @@ class ViroParticleEmitter extends react_1.default.Component {
                 console.error("The <ViroParticleEmitter> component requires initial value of [min, max] when defining inital rotation property!");
                 return;
             }
-            let minColorFinal = react_native_1.processColor(colorModifier.initialRange[0]);
-            let maxColorFinal = react_native_1.processColor(colorModifier.initialRange[1]);
+            let minColorFinal = (0, react_native_1.processColor)(colorModifier.initialRange[0]);
+            let maxColorFinal = (0, react_native_1.processColor)(colorModifier.initialRange[1]);
             let modifierFinal = [];
             let interpolationLength = colorModifier.interpolation != undefined
                 ? colorModifier.interpolation.length
                 : 0;
             for (let i = 0; i < interpolationLength; i++) {
-                let processedColor = react_native_1.processColor(colorModifier.interpolation[i].endValue);
+                let processedColor = (0, react_native_1.processColor)(colorModifier.interpolation[i].endValue);
                 let mod = {
                     interval: colorModifier.interpolation[i].interval,
                     endValue: processedColor,
@@ -162,7 +159,7 @@ class ViroParticleEmitter extends react_1.default.Component {
     }
 }
 exports.ViroParticleEmitter = ViroParticleEmitter;
-var VRTParticleEmitter = react_native_1.requireNativeComponent("VRTParticleEmitter", 
+var VRTParticleEmitter = (0, react_native_1.requireNativeComponent)("VRTParticleEmitter", 
 // @ts-ignore
 ViroParticleEmitter, {
     nativeOnly: {

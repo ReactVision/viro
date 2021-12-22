@@ -17,37 +17,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARSceneNavigator = void 0;
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
-var NativeModules = require("react-native").NativeModules;
-var ViroARSceneNavigatorModule = require("react-native").NativeModules.VRTARSceneNavigatorModule;
-// type Scene = {
-//   scene: Function;
-//   passProps?: Object,
-// };
+const ViroARSceneNavigatorModule = react_native_1.NativeModules.VRTARSceneNavigatorModule;
 var mathRandomOffset = 0;
 /**
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
 class ViroARSceneNavigator extends react_1.default.Component {
-    constructor(props) {
-        super(props);
-        this._component = null;
-        var initialSceneTag = this.props.initialSceneKey;
-        if (initialSceneTag == null) {
-            initialSceneTag = this.getRandomTag();
-        }
-        var scene = {
-            sceneClass: this.props.initialScene,
-            tag: initialSceneTag,
-            referenceCount: 1,
-        };
-        var sceneDict = {};
-        sceneDict[scene.tag] = scene;
-        this.state = {
-            sceneDictionary: sceneDict,
-            sceneHistory: [scene.tag],
-            currentSceneIndex: 0,
-        };
-    }
+    arSceneNavigator;
+    sceneNavigator;
+    _component = null;
     componentWillMount() {
         // Precompute a pack of callbacks that's frequently generated and passed to
         // instances.
@@ -80,6 +58,25 @@ class ViroARSceneNavigator extends react_1.default.Component {
             project: this._project,
             unproject: this._unproject,
             viroAppProps: {},
+        };
+    }
+    constructor(props) {
+        super(props);
+        var initialSceneTag = this.props.initialSceneKey;
+        if (initialSceneTag == null) {
+            initialSceneTag = this.getRandomTag();
+        }
+        var scene = {
+            sceneClass: this.props.initialScene,
+            tag: initialSceneTag,
+            referenceCount: 1,
+        };
+        var sceneDict = {};
+        sceneDict[scene.tag] = scene;
+        this.state = {
+            sceneDictionary: sceneDict,
+            sceneHistory: [scene.tag],
+            currentSceneIndex: 0,
         };
     }
     getRandomTag() {
@@ -347,7 +344,7 @@ class ViroARSceneNavigator extends react_1.default.Component {
     _startVideoRecording(fileName, saveToCameraRoll, 
     // TODO: What are the errorCodes? make a type for this
     onError) {
-        ViroARSceneNavigatorModule.startVideoRecording(react_native_1.findNodeHandle(this), fileName, saveToCameraRoll, onError);
+        ViroARSceneNavigatorModule.startVideoRecording((0, react_native_1.findNodeHandle)(this), fileName, saveToCameraRoll, onError);
     }
     /*
     Stops recording video of the Viro renderer
@@ -355,7 +352,7 @@ class ViroARSceneNavigator extends react_1.default.Component {
     returns Object w/ success, url and errorCode keys.
      */
     async _stopVideoRecording() {
-        return await ViroARSceneNavigatorModule.stopVideoRecording(react_native_1.findNodeHandle(this));
+        return await ViroARSceneNavigatorModule.stopVideoRecording((0, react_native_1.findNodeHandle)(this));
     }
     /*
     Takes a screenshot of the Viro renderer
@@ -366,13 +363,13 @@ class ViroARSceneNavigator extends react_1.default.Component {
     returns Object w/ success, url and errorCode keys.
      */
     async _takeScreenshot(fileName, saveToCameraRoll) {
-        return await ViroARSceneNavigatorModule.takeScreenshot(react_native_1.findNodeHandle(this), fileName, saveToCameraRoll);
+        return await ViroARSceneNavigatorModule.takeScreenshot((0, react_native_1.findNodeHandle)(this), fileName, saveToCameraRoll);
     }
     async _project(point) {
-        return await ViroARSceneNavigatorModule.project(react_native_1.findNodeHandle(this), point);
+        return await ViroARSceneNavigatorModule.project((0, react_native_1.findNodeHandle)(this), point);
     }
     async _unproject(point) {
-        return await ViroARSceneNavigatorModule.unproject(react_native_1.findNodeHandle(this), point);
+        return await ViroARSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     }
     /*
     [iOS Only] Resets the tracking of the AR session.
@@ -381,7 +378,7 @@ class ViroARSceneNavigator extends react_1.default.Component {
     removeAnchors - determines if the existing anchors should be removed too.
      */
     _resetARSession(resetTracking, removeAnchors) {
-        ViroARSceneNavigatorModule.resetARSession(react_native_1.findNodeHandle(this), resetTracking, removeAnchors);
+        ViroARSceneNavigatorModule.resetARSession((0, react_native_1.findNodeHandle)(this), resetTracking, removeAnchors);
     }
     /*
     [iOS/ARKit 1.5+ Only] Allows the developer to offset the current world orgin
@@ -393,7 +390,7 @@ class ViroARSceneNavigator extends react_1.default.Component {
                   an array containing 3 floats (note: rotation is in degrees).
      */
     _setWorldOrigin(worldOrigin) {
-        ViroARSceneNavigatorModule.setWorldOrigin(react_native_1.findNodeHandle(this), worldOrigin);
+        ViroARSceneNavigatorModule.setWorldOrigin((0, react_native_1.findNodeHandle)(this), worldOrigin);
     }
     _renderSceneStackItems() {
         let views = [];
@@ -435,7 +432,7 @@ var styles = react_native_1.StyleSheet.create({
         alignItems: "center",
     },
 });
-var VRTARSceneNavigator = react_native_1.requireNativeComponent("VRTARSceneNavigator", 
+var VRTARSceneNavigator = (0, react_native_1.requireNativeComponent)("VRTARSceneNavigator", 
 // @ts-ignore
 ViroARSceneNavigator, {
     nativeOnly: { currentSceneIndex: true },

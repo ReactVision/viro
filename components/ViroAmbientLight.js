@@ -21,10 +21,7 @@ const react_native_1 = require("react-native");
  * Used to render a ViroAmbientLight
  */
 class ViroAmbientLight extends react_1.default.Component {
-    constructor() {
-        super(...arguments);
-        this._component = null;
-    }
+    _component = null;
     setNativeProps(nativeProps) {
         this._component?.setNativeProps(nativeProps);
     }
@@ -41,6 +38,6 @@ class ViroAmbientLight extends react_1.default.Component {
     }
 }
 exports.ViroAmbientLight = ViroAmbientLight;
-var VRTAmbientLight = react_native_1.requireNativeComponent("VRTAmbientLight", 
+var VRTAmbientLight = (0, react_native_1.requireNativeComponent)("VRTAmbientLight", 
 // @ts-ignore
 ViroAmbientLight);

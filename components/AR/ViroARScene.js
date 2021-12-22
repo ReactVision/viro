@@ -4,18 +4,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARScene = void 0;
-const ViroBase_1 = require("@components/ViroBase");
+/**
+ * Copyright (c) 2017-present, Viro Media, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
+const ViroConstants_1 = require("../ViroConstants");
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
-const ViroConstants_1 = require("../ViroConstants");
+const ViroBase_1 = require("../ViroBase");
 const ViroCameraModule = react_native_1.NativeModules.ViroCameraModule;
 class ViroARScene extends ViroBase_1.ViroBase {
-    constructor() {
-        super(...arguments);
-        this.onTrackingFirstInitialized = false;
-    }
+    onTrackingFirstInitialized = false;
     _onCameraARHitTest(event) {
         var hitTestEventObj = {
             hitTestResults: event.nativeEvent.hitTestResults,
@@ -111,8 +116,9 @@ class ViroARScene extends ViroBase_1.ViroBase {
             this.props.onTrackingUpdated(event.nativeEvent.state, event.nativeEvent.reason);
         }
         // TODO VIRO-3172: Remove in favor of deprecating onTrackingInitialized
-        if ((event.nativeEvent.state == ViroConstants_1.ViroConstants.TRACKING_LIMITED ||
-            event.nativeEvent.state == ViroConstants_1.ViroConstants.TRACKING_NORMAL) &&
+        if ((event.nativeEvent.state == ViroConstants_1.ViroTrackingStateConstants.TRACKING_LIMITED ||
+            event.nativeEvent.state ==
+                ViroConstants_1.ViroTrackingStateConstants.TRACKING_NORMAL) &&
             !this.onTrackingFirstInitialized) {
             this.onTrackingFirstInitialized = true;
             if (this.props.onTrackingInitialized) {
@@ -151,22 +157,22 @@ class ViroARScene extends ViroBase_1.ViroBase {
             this.props.onAnchorRemoved(event.nativeEvent.anchor);
     }
     async findCollisionsWithRayAsync(from, to, closest, viroTag) {
-        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithRayAsync(react_native_1.findNodeHandle(this), from, to, closest, viroTag);
+        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithRayAsync((0, react_native_1.findNodeHandle)(this), from, to, closest, viroTag);
     }
     async findCollisionsWithShapeAsync(from, to, shapeString, shapeParam, viroTag) {
-        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithShapeAsync(react_native_1.findNodeHandle(this), from, to, shapeString, shapeParam, viroTag);
+        return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithShapeAsync((0, react_native_1.findNodeHandle)(this), from, to, shapeString, shapeParam, viroTag);
     }
     async performARHitTestWithRay(ray) {
-        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithRay(react_native_1.findNodeHandle(this), ray);
+        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithRay((0, react_native_1.findNodeHandle)(this), ray);
     }
     async performARHitTestWithWorldPoints(origin, destination) {
-        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithRay(react_native_1.findNodeHandle(this), origin, destination);
+        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithRay((0, react_native_1.findNodeHandle)(this), origin, destination);
     }
     async performARHitTestWithPosition(position) {
-        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithPosition(react_native_1.findNodeHandle(this), position);
+        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithPosition((0, react_native_1.findNodeHandle)(this), position);
     }
     async performARHitTestWithPoint(x, y) {
-        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithPoint(react_native_1.findNodeHandle(this), x, y);
+        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithPoint((0, react_native_1.findNodeHandle)(this), x, y);
     }
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
@@ -183,7 +189,7 @@ class ViroARScene extends ViroBase_1.ViroBase {
     //   return position;
     // }
     async getCameraOrientationAsync() {
-        var orientation = await react_native_1.NativeModules.VRTCameraModule.getCameraOrientation(react_native_1.findNodeHandle(this));
+        var orientation = await react_native_1.NativeModules.VRTCameraModule.getCameraOrientation((0, react_native_1.findNodeHandle)(this));
         return {
             position: [orientation[0], orientation[1], orientation[2]],
             rotation: [orientation[3], orientation[4], orientation[5]],
@@ -193,26 +199,26 @@ class ViroARScene extends ViroBase_1.ViroBase {
     }
     async getCameraPositionAsync() {
         // TODO: Two functions with the same name??
-        return await ViroCameraModule.getCameraPosition(react_native_1.findNodeHandle(this));
+        return await ViroCameraModule.getCameraPosition((0, react_native_1.findNodeHandle)(this));
     }
     getChildContext() {
         return {
             cameraDidMount: (camera) => {
                 if (camera.props.active) {
-                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
             },
             cameraWillUnmount: (camera) => {
                 if (camera.props.active) {
-                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
             },
             cameraDidUpdate: (camera, active) => {
                 if (active) {
-                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
                 else {
-                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera(react_native_1.findNodeHandle(this), react_native_1.findNodeHandle(camera));
+                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                 }
             },
         };
@@ -236,7 +242,7 @@ class ViroARScene extends ViroBase_1.ViroBase {
         // parse out displayPointCloud prop
         if (this.props.displayPointCloud) {
             displayPointCloud = true;
-            pointCloudImage = resolveAssetSource_1.default(this.props.displayPointCloud.imageSource);
+            pointCloudImage = (0, resolveAssetSource_1.default)(this.props.displayPointCloud.imageSource);
             pointCloudScale = this.props.displayPointCloud.imageScale;
             pointCloudMaxPoints = this.props.displayPointCloud.maxPoints;
         }
@@ -253,7 +259,7 @@ exports.ViroARScene = ViroARScene;
 //   cameraWillUnmount: PropTypes.func,
 //   cameraDidUpdate: PropTypes.func,
 // };
-var VRTARScene = react_native_1.requireNativeComponent("VRTARScene", 
+var VRTARScene = (0, react_native_1.requireNativeComponent)("VRTARScene", 
 // @ts-ignore
 ViroARScene, {
     nativeOnly: {

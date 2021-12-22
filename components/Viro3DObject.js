@@ -13,23 +13,8 @@ const { resolveAssetSource } = react_native_1.Image;
  * Viro3DObject is a component that is used to render 3D models in the scene.
  */
 class Viro3DObject extends ViroBase_1.ViroBase {
-    constructor() {
-        super(...arguments);
-        this._onLoadStart = (event) => {
-            this.props.onLoadStart && this.props.onLoadStart(event);
-        };
-        this._onLoadEnd = (event) => {
-            this.props.onLoadEnd && this.props.onLoadEnd(event);
-        };
-        this.getBoundingBoxAsync = () => {
-            return react_native_1.NativeModules.VRTNodeModule.getBoundingBox(react_native_1.findNodeHandle(this));
-        };
-        this.getMorphTargets = () => {
-            return react_native_1.NativeModules.VRTNodeModule.getMorphTargets(react_native_1.findNodeHandle(this));
-        };
-    }
     render() {
-        ViroProps_1.checkMisnamedProps("Viro3DObject", this.props);
+        (0, ViroProps_1.checkMisnamedProps)("Viro3DObject", this.props);
         const modelsrc = resolveAssetSource(this.props.source);
         const resources = this.props.resources?.map((resource) => resolveAssetSource(resource));
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
@@ -62,10 +47,22 @@ class Viro3DObject extends ViroBase_1.ViroBase {
             }} highAccuracyEvents={highAccuracyEvents} onNativeTransformDelegateViro={transformDelegate} hasTransformDelegate={this.props.onTransformUpdate != undefined} physicsBody={newPhysicsBody} source={modelsrc} resources={resources} materials={materials} transformBehaviors={transformBehaviors} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
                 this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canFuse={this.props.onFuse != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onFuseViro={this._onFuse} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onLoadStartViro={this._onLoadStart} onLoadEndViro={this._onLoadEnd} onErrorViro={this._onError} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} timeToFuse={timeToFuse} canCollide={this.props.onCollision != undefined} onCollisionViro={this._onCollision}/>);
     }
+    _onLoadStart = (event) => {
+        this.props.onLoadStart && this.props.onLoadStart(event);
+    };
+    _onLoadEnd = (event) => {
+        this.props.onLoadEnd && this.props.onLoadEnd(event);
+    };
+    getBoundingBoxAsync = () => {
+        return react_native_1.NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
+    };
+    getMorphTargets = () => {
+        return react_native_1.NativeModules.VRTNodeModule.getMorphTargets((0, react_native_1.findNodeHandle)(this));
+    };
 }
 exports.Viro3DObject = Viro3DObject;
 // We can probably give a better type for this, but it's not exposed ouside this file so not urgent
-const VRT3DObject = react_native_1.requireNativeComponent("VRT3DObject", 
+const VRT3DObject = (0, react_native_1.requireNativeComponent)("VRT3DObject", 
 // @ts-ignore type signature incorrect, or extra arguments are ignored?
 Viro3DObject, {
     nativeOnly: {

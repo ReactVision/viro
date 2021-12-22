@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Copyright (c) 2017-present, Viro, Inc.
  * All rights reserved.
@@ -8,26 +9,23 @@
  *
  * @providesModule ViroConstants
  */
-
-const ViroConstants = {
-  // Viro recording error constants
-  RECORD_ERROR_NONE : -1,
-  RECORD_ERROR_UNKNOWN : 0,
-  RECORD_ERROR_NO_PERMISSION : 1,
-  RECORD_ERROR_INITIALIZATION : 2,
-  RECORD_ERROR_WRITE_TO_FILE : 3,
-  RECORD_ERROR_ALREADY_RUNNING : 4,
-  RECORD_ERROR_ALREADY_STOPPED : 5,
-
-  // Viro AR Tracking constants,
-  TRACKING_UNAVAILABLE : 1,
-  TRACKING_LIMITED : 2,
-  TRACKING_NORMAL : 3,
-
-  // Viro AR Tracking reason constants,
-  TRACKING_REASON_NONE : 1,
-  TRACKING_REASON_EXCESSIVE_MOTION : 2,
-  TRACKING_REASON_INSUFFICIENT_FEATURES : 3,
-}
-
-module.exports = ViroConstants
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroConstants = void 0;
+exports.ViroConstants = {
+    // Viro recording error constants
+    RECORD_ERROR_NONE: -1,
+    RECORD_ERROR_UNKNOWN: 0,
+    RECORD_ERROR_NO_PERMISSION: 1,
+    RECORD_ERROR_INITIALIZATION: 2,
+    RECORD_ERROR_WRITE_TO_FILE: 3,
+    RECORD_ERROR_ALREADY_RUNNING: 4,
+    RECORD_ERROR_ALREADY_STOPPED: 5,
+    // Viro AR Tracking constants,
+    TRACKING_UNAVAILABLE: 1,
+    TRACKING_LIMITED: 2,
+    TRACKING_NORMAL: 3,
+    // Viro AR Tracking reason constants,
+    TRACKING_REASON_NONE: 1,
+    TRACKING_REASON_EXCESSIVE_MOTION: 2,
+    TRACKING_REASON_INSUFFICIENT_FEATURES: 3,
+};

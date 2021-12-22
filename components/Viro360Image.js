@@ -9,109 +9,57 @@
  * @providesModule Viro360Image
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, StyleSheet } from 'react-native';
-import React, { Component } from 'react';
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import PropTypes from 'prop-types';
-import { checkMisnamedProps } from './Utilities/ViroProps';
-
-var createReactClass = require('create-react-class');
-
-/**
- * Used to render a 360 image in a sphere.
- */
-var Viro360Image = createReactClass({
-
-  propTypes: {
-    ...View.propTypes,
-
-    /**
-     * The image file, which is required
-     */
-    source: PropTypes.oneOfType([
-      PropTypes.shape({
-        uri: PropTypes.string,
-      }),
-      // Opaque type returned by require('./image.jpg')
-      PropTypes.number,
-    ]).isRequired,
-    rotation: PropTypes.arrayOf(PropTypes.number),
-    format: PropTypes.oneOf(['RGBA8', 'RGB565']),
-    stereoMode:PropTypes.oneOf(['LeftRight', 'RightLeft', 'TopBottom', 'BottomTop', 'None']),
-    /**
-     * Callback triggered when we are processing the assets to be
-     * displayed in this 360 Photo (either downloading / reading from file).
-     */
-    onLoadStart: PropTypes.func,
-
-    /**
-     * Callback triggered when we have finished processing assets to be
-     * displayed. Wether or not assets were processed successfully and
-     * thus displayed will be indicated by the parameter "success".
-     * For example:
-     *
-     *   _onLoadEnd(event:Event){
-     *      // Indication of asset loading success
-     *      event.nativeEvent.success
-     *   }
-     *
-     */
-    onLoadEnd: PropTypes.func,
-
-    /**
-     * Callback triggered when the image fails to load. Invoked with
-     * {nativeEvent: {error}}
-     */
-    onError: PropTypes.func,
-    isHdr: PropTypes.bool,
-  },
-
-  _onLoadStart: function(event/*: Event*/) {
-    this.props.onLoadStart && this.props.onLoadStart(event);
-  },
-
-  _onLoadEnd: function(event/*: Event*/) {
-    this.props.onLoadEnd && this.props.onLoadEnd(event);
-  },
-
-  _onError: function(event/*: Event*/) {
-    this.props.onError && this.props.onError(event);
-  },
-
-  setNativeProps: function(nativeProps) {
-    this._component.setNativeProps(nativeProps);
-  },
-
-  render: function() {
-
-    checkMisnamedProps("Viro360Image", this.props)
-
-    var imgsrc = resolveAssetSource(this.props.source);
-
-    // Create native props object.
-    let nativeProps = Object.assign({}, this.props);
-    nativeProps.source = imgsrc;
-    nativeProps.onErrorViro = this._onError;
-    nativeProps.onLoadStartViro = this._onLoadStart;
-    nativeProps.onLoadEndViro = this._onLoadEnd;
-    nativeProps.ref = component => {this._component = component; };
-
-
-    return (
-      <VRT360Image {...nativeProps} />
-    );
-  }
-});
-
-var VRT360Image = requireNativeComponent(
-  'VRT360Image', Viro360Image, {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Viro360Image = void 0;
+const react_1 = __importDefault(require("react"));
+const react_native_1 = require("react-native");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+const ViroProps_1 = require("./Utilities/ViroProps");
+var createReactClass = require("create-react-class");
+class Viro360Image extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
+    }
+    _onLoadStart(event) {
+        this.props.onLoadStart && this.props.onLoadStart(event);
+    }
+    _onLoadEnd(event) {
+        this.props.onLoadEnd && this.props.onLoadEnd(event);
+    }
+    _onError(event) {
+        this.props.onError && this.props.onError(event);
+    }
+    setNativeProps(nativeProps) {
+        this._component?.setNativeProps(nativeProps);
+    }
+    render() {
+        ViroProps_1.checkMisnamedProps("Viro360Image", this.props);
+        var imgsrc = resolveAssetSource_1.default(this.props.source);
+        // Create native props object.
+        let nativeProps = Object.assign({}, this.props);
+        nativeProps.source = imgsrc;
+        nativeProps.onErrorViro = this._onError;
+        nativeProps.onLoadStartViro = this._onLoadStart;
+        nativeProps.onLoadEndViro = this._onLoadEnd;
+        nativeProps.ref = (component) => {
+            this._component = component;
+        };
+        return <VRT360Image {...nativeProps}/>;
+    }
+}
+exports.Viro360Image = Viro360Image;
+var VRT360Image = react_native_1.requireNativeComponent("VRT360Image", 
+// @ts-ignore
+Viro360Image, {
     nativeOnly: {
-      onLoadStartViro: true,
-      onErrorViro: true,
-      onLoadEndViro: true}
-  }
-);
-
-module.exports = Viro360Image;
+        onLoadStartViro: true,
+        onErrorViro: true,
+        onLoadEndViro: true,
+    },
+});

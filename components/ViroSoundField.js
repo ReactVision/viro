@@ -9,99 +9,78 @@
  * @providesModule ViroSoundField
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, findNodeHandle, Platform } from 'react-native';
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import React from 'react';
-
-import PropTypes from 'prop-types';
-import { checkMisnamedProps } from './Utilities/ViroProps';
-var NativeModules = require('react-native').NativeModules;
-var createReactClass = require('create-react-class');
-
-var ViroSoundField = createReactClass({
-  propTypes: {
-    ...View.propTypes,
-
-    // Source can either be a String referencing a preloaded file, a web uri, or a
-    // local js file (using require())
-    source: PropTypes.oneOfType([
-      PropTypes.string,
-      PropTypes.shape({
-        uri: PropTypes.string,
-      }),
-      // Opaque type returned by require('./sound.mp3')
-      PropTypes.number,
-    ]).isRequired,
-
-    paused: PropTypes.bool,
-    loop: PropTypes.bool,
-    muted: PropTypes.bool,
-    volume: PropTypes.number,
-    rotation: PropTypes.arrayOf(PropTypes.number),
-    onFinish: PropTypes.func,
-    onError: PropTypes.func,
-  },
-
-  _onFinish: function(event/*: Event*/) {
-    this.props.onFinish && this.props.onFinish(event);
-  },
-
-  _onError: function(event/*: Event*/) {
-    this.props.onError && this.props.onError(event);
-  },
-
-  setNativeProps: function(nativeProps) {
-    this._component.setNativeProps(nativeProps);
-  },
-
-  render: function() {
-    checkMisnamedProps("ViroSoundField", this.props);
-
-    var soundSrc = this.props.source;
-    if (typeof soundSrc === 'number') {
-      soundSrc = resolveAssetSource(soundSrc);
-    } else if (typeof soundSrc === 'string') {
-      soundSrc = {name: soundSrc};
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroSoundField = void 0;
+const react_1 = __importDefault(require("react"));
+const react_native_1 = require("react-native");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+const ViroProps_1 = require("./Utilities/ViroProps");
+class ViroSoundField extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
     }
-
-    let nativeProps = Object.assign({}, this.props);
-    nativeProps.source = soundSrc;
-    nativeProps.onErrorViro = this._onError;
-    nativeProps.onFinishViro = this._onFinish;
-    nativeProps.ref = component => {this._component = component; };
-
-    return (
-      <VRTSoundField {...nativeProps} />
-    );
-  },
-
-  seekToTime(timeInSeconds) {
-    switch (Platform.OS) {
-      case 'ios':
-        NativeModules.VRTSoundFieldManager.seekToTime(findNodeHandle(this), timeInSeconds);
-        break;
-      case 'android':
-        NativeModules.UIManager.dispatchViewManagerCommand(
-            findNodeHandle(this),
-            NativeModules.UIManager.VRTSoundField.Commands.seekToTime,
-            [ timeInSeconds ]);
-        break;
+    _onFinish(event) {
+        this.props.onFinish && this.props.onFinish(event);
     }
-  },
-
-});
-
-var VRTSound = require('./ViroSound').VRTSound;
-
-var VRTSoundField = requireNativeComponent(
-  'VRTSoundField', ViroSoundField, {
+    _onError(event) {
+        this.props.onError && this.props.onError(event);
+    }
+    setNativeProps(nativeProps) {
+        this._component?.setNativeProps(nativeProps);
+    }
+    render() {
+        ViroProps_1.checkMisnamedProps("ViroSoundField", this.props);
+        var soundSrc = this.props.source;
+        if (typeof soundSrc === "number") {
+            soundSrc = resolveAssetSource_1.default(soundSrc);
+        }
+        else if (typeof soundSrc === "string") {
+            /**
+             * @todo
+             *
+             * This throws a typescript error:
+             * Type '{ name: never; }' is not assignable to type 'ImageSourcePropType'.
+             * Object literal may only specify known properties, and 'name' does not
+             * exist in type 'ImageURISource | ImageURISource[]'.
+             *
+             * I assume that this works correctly for Viro, but we would need to standardize
+             * this or remove this usage. The usage should be {uri: string} or require format
+             * to be consistent with images/video.
+             */
+            soundSrc = { name: soundSrc };
+        }
+        let nativeProps = Object.assign({}, this.props);
+        nativeProps.source = soundSrc;
+        nativeProps.onErrorViro = this._onError;
+        nativeProps.onFinishViro = this._onFinish;
+        nativeProps.ref = (component) => {
+            this._component = component;
+        };
+        return <VRTSoundField {...nativeProps}/>;
+    }
+    seekToTime(timeInSeconds) {
+        switch (react_native_1.Platform.OS) {
+            case "ios":
+                react_native_1.NativeModules.VRTSoundFieldManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                break;
+            case "android":
+                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), react_native_1.NativeModules.UIManager.VRTSoundField.Commands.seekToTime, [timeInSeconds]);
+                break;
+        }
+    }
+}
+exports.ViroSoundField = ViroSoundField;
+var VRTSoundField = react_native_1.requireNativeComponent("VRTSoundField", 
+// @ts-ignore
+ViroSoundField, {
     nativeOnly: {
-      onFinishViro: true,
-      onErrorViro: true,
-    }
-  }
-);
-
-module.exports = ViroSoundField;
+        onFinishViro: true,
+        onErrorViro: true,
+    },
+});

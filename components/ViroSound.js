@@ -9,112 +9,96 @@
  * @providesModule ViroSound
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, findNodeHandle, Platform } from 'react-native';
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import React from 'react';
-
-import PropTypes from 'prop-types';
-import { checkMisnamedProps } from './Utilities/ViroProps';
-var NativeModules = require('react-native').NativeModules;
-var createReactClass = require('create-react-class');
-var SoundModule = NativeModules.VRTSoundModule;
-
-var ViroSound = createReactClass({
-  statics: {
-    preloadSounds: async function(soundMap/*:{[key: string]: string}*/) {
-      var results = {};
-      for (var index in soundMap) {
-        const response = await SoundModule.preloadSounds({[index]:soundMap[index]});
-        results[response.key] = {result:response.result, msg:response.msg};
-      }
-
-      return results;
-    },
-
-    unloadSounds: function(soundKeys/*: [string]*/) {
-      SoundModule.unloadSounds(soundKeys);
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VRTSound = exports.ViroSound = void 0;
+const react_1 = __importDefault(require("react"));
+const react_native_1 = require("react-native");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+const ViroProps_1 = require("./Utilities/ViroProps");
+const SoundModule = react_native_1.NativeModules.VRTSoundModule;
+/**
+ * ViroSound is a component that plays a sound file.
+ */
+class ViroSound extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
     }
-  },
-  propTypes: {
-    ...View.propTypes,
-
-    // Source can either be a String referencing a preloaded file, a web uri, or a
-    // local js file (using require())
-    source: PropTypes.oneOfType([
-      PropTypes.string,
-      PropTypes.shape({
-        uri: PropTypes.string,
-      }),
-      // Opaque type returned by require('./sound.mp3')
-      PropTypes.number,
-    ]).isRequired,
-
-    paused: PropTypes.bool,
-    loop: PropTypes.bool,
-    muted: PropTypes.bool,
-    volume: PropTypes.number,
-    onFinish: PropTypes.func,
-    onError: PropTypes.func,
-  },
-
-  _onFinish: function(event/*: Event*/) {
-    this.props.onFinish && this.props.onFinish(event);
-  },
-
-  _onError: function(event/*: Event*/) {
-    this.props.onError && this.props.onError(event);
-  },
-
-  setNativeProps: function(nativeProps) {
-    this._component.setNativeProps(nativeProps);
-  },
-
-  render: function() {
-    checkMisnamedProps("ViroSound", this.props);
-
-    var soundSrc = this.props.source;
-    if (typeof soundSrc === 'number') {
-      soundSrc = resolveAssetSource(soundSrc);
-    } else if (typeof soundSrc === 'string') {
-      soundSrc = {name: soundSrc};
+    static unloadSounds(soundKeys) {
+        SoundModule.unloadSounds(soundKeys);
     }
-
-    let nativeProps = Object.assign({}, this.props);
-    nativeProps.source = soundSrc;
-    nativeProps.onFinishViro = this._onFinish;
-    nativeProps.onErrorViro = this._onError;
-    nativeProps.ref = component => {this._component = component; };
-
-    return (
-      <VRTSound {...nativeProps} />
-    );
-  },
-
-  seekToTime(timeInSeconds) {
-    switch (Platform.OS) {
-      case 'ios':
-        NativeModules.VRTSoundManager.seekToTime(findNodeHandle(this), timeInSeconds);
-        break;
-      case 'android':
-        NativeModules.UIManager.dispatchViewManagerCommand(
-            findNodeHandle(this),
-            NativeModules.UIManager.VRTSound.Commands.seekToTime,
-            [ timeInSeconds ]);
-        break;
+    _onFinish(event) {
+        this.props.onFinish && this.props.onFinish(event);
     }
-  },
-});
-
-var VRTSound = requireNativeComponent(
-  'VRTSound', ViroSound, {
+    _onError(event) {
+        this.props.onError && this.props.onError(event);
+    }
+    setNativeProps(nativeProps) {
+        this._component?.setNativeProps(nativeProps);
+    }
+    render() {
+        ViroProps_1.checkMisnamedProps("ViroSound", this.props);
+        var soundSrc = this.props.source;
+        if (typeof soundSrc === "number") {
+            soundSrc = resolveAssetSource_1.default(soundSrc);
+        }
+        else if (typeof soundSrc === "string") {
+            /**
+             * @todo
+             *
+             * This throws a typescript error:
+             * Type '{ name: never; }' is not assignable to type 'ImageSourcePropType'.
+             * Object literal may only specify known properties, and 'name' does not
+             * exist in type 'ImageURISource | ImageURISource[]'.
+             *
+             * I assume that this works correctly for Viro, but we would need to standardize
+             * this or remove this usage. The usage should be {uri: string} or require format
+             * to be consistent with images/video.
+             */
+            soundSrc = { name: soundSrc };
+        }
+        let nativeProps = Object.assign({}, this.props);
+        nativeProps.source = soundSrc;
+        nativeProps.onFinishViro = this._onFinish;
+        nativeProps.onErrorViro = this._onError;
+        nativeProps.ref = (component) => {
+            this._component = component;
+        };
+        return <VRTSound {...nativeProps}/>;
+    }
+    seekToTime(timeInSeconds) {
+        switch (react_native_1.Platform.OS) {
+            case "ios":
+                react_native_1.NativeModules.VRTSoundManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                break;
+            case "android":
+                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), react_native_1.NativeModules.UIManager.VRTSound.Commands.seekToTime, [timeInSeconds]);
+                break;
+        }
+    }
+}
+exports.ViroSound = ViroSound;
+ViroSound.preloadSounds = async (soundMap) => {
+    var results = {};
+    for (var index in soundMap) {
+        const response = await SoundModule.preloadSounds({
+            [index]: soundMap[index],
+        });
+        results[response.key] = { result: response.result, msg: response.msg };
+    }
+    return results;
+};
+var VRTSound = react_native_1.requireNativeComponent("VRTSound", 
+// @ts-ignore
+ViroSound, {
     nativeOnly: {
-      onFinishViro: true,
-      onErrorViro: true,
-    }
-  }
-);
-
-module.exports = ViroSound;
-module.exports.VRTSound = VRTSound;
+        onFinishViro: true,
+        onErrorViro: true,
+    },
+});
+exports.VRTSound = VRTSound;

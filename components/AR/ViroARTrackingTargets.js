@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Copyright (c) 2018-present, Viro Media, Inc.
  * All rights reserved.
@@ -9,63 +10,44 @@
  * @providesModule VRTARTrackingTargets
  * @flow
  */
-
-
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-var ARTrackingTargetsModule = require('react-native').NativeModules.VRTARTrackingTargetsModule;
-import PropTypes from 'prop-types';
-
-// Currently only used for reference purposes (we manually validate)
-var ARTrackingTargetsPropTypes = {
-  source: PropTypes.oneOfType([
-    PropTypes.shape({
-      uri: PropTypes.string,
-    }),
-    // Opaque type returned by require('./image.jpg')
-    PropTypes.number,
-  ]).isRequired,
-  orientation: PropTypes.oneOf(['Up', 'Down', 'Left', 'Right']),
-  physicalWidth: PropTypes.number,
-  type : PropTypes.oneOf(['Image', 'Object']), // default is 'Image'
-}
-
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroARTrackingTargets = void 0;
+const react_native_1 = require("react-native");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+const ARTrackingTargetsModule = react_native_1.NativeModules.VRTARTrackingTargetsModule;
 class ViroARTrackingTargets {
-
-  static createTargets(targets/*:{[key: string]: any}*/){
-    for(var key in targets) {
-      var target = targets[key]
-     
-      // Check for required props
-      ViroARTrackingTargets.checkForRequiredProps(key, target);
-
-      // resolve asset source if applicable and update the object
-      var resultSource = resolveAssetSource(target.source);
-      target.source = resultSource;
+    static createTargets(targets) {
+        for (var key in targets) {
+            var target = targets[key];
+            // Check for required props
+            ViroARTrackingTargets.checkForRequiredProps(key, target);
+            // resolve asset source if applicable and update the object
+            var resultSource = resolveAssetSource_1.default(target.source);
+            target.source = resultSource;
+        }
+        // call the createTargets function in the native module
+        ARTrackingTargetsModule.createTargets(targets);
     }
-
-    // call the createTargets function in the native module
-    ARTrackingTargetsModule.createTargets(targets);
-  }
-
-  static checkForRequiredProps(key, target) {
-    // source is required
-    if (target.source == undefined) {
-      console.error("ViroTrackingTarget [" + target + "] requires a `source` property");
+    static checkForRequiredProps(_key, target) {
+        // source is required
+        if (target.source == undefined) {
+            console.error("ViroTrackingTarget [" + target + "] requires a `source` property");
+        }
+        // physicalWidth is required for Image targets
+        if (!target.type || target.type == "Image") {
+            if (target.physicalWidth == undefined) {
+                console.error("ViroTrackingTarget [" +
+                    target +
+                    "] requires a `physicalWidth` property");
+            }
+        }
     }
-
-    // physicalWidth is required for Image targets
-    if (!target.type || target.type == 'Image') {
-      if (target.physicalWidth == undefined) {
-        console.error("ViroTrackingTarget [" + target + "] requires a `physicalWidth` property");
-      }
+    static deleteTarget(targetName) {
+        ARTrackingTargetsModule.deleteTarget(targetName);
     }
-
-  }
-
-  static deleteTarget(targetName) {
-    ARTrackingTargetsModule.deleteTarget(targetName);
-  }
-
 }
-
-module.exports = ViroARTrackingTargets;
+exports.ViroARTrackingTargets = ViroARTrackingTargets;

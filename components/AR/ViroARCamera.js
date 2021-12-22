@@ -9,29 +9,24 @@
  * @providesModule ViroARCamera
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, StyleSheet } from 'react-native';
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
-var createReactClass = require('create-react-class');
-import { checkMisnamedProps } from '../Utilities/ViroProps';
-var ViroCamera = require('../ViroCamera');
-var ViroARCamera = createReactClass({
-  propTypes: {
-    ...View.propTypes,
-  },
-
-
-  render: function() {
-    // Uncomment this to check props
-    return (
-      <ViroCamera
-        ref={ component => {this._component = component; }}
-        {...this.props} active={true}
-      />
-    );
-  },
-});
-
-module.exports = ViroARCamera;
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroARCamera = void 0;
+const react_1 = __importDefault(require("react"));
+const ViroCamera_1 = require("../ViroCamera");
+class ViroARCamera extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
+    }
+    render() {
+        // Uncomment this to check props
+        return (<ViroCamera_1.ViroCamera ref={(component) => {
+                this._component = component;
+            }} {...this.props} active={true}/>);
+    }
+}
+exports.ViroARCamera = ViroARCamera;

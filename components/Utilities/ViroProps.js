@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Copyright (c) 2018-present, Viro Media, Inc.
  * All rights reserved.
@@ -6,7 +7,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkMisnamedProps = void 0;
 /*
  This function is a simple helper function that attempts to check
  for misnamed props. Returns whether or not a prop was misnamed.
@@ -34,49 +36,56 @@
  AR/ViroARSceneNavigator
 
  */
-export function checkMisnamedProps(component, props) {
-
-  var upperCaseComponent = component.toUpperCase();
-
-  if (props.transformBehavior) {
-    console.warn('The <' + component + '> component takes a `transformBehaviors` property rather than `transformBehavior`.');
-    return true;
-  }
-
-  if (props.material) {
-    console.warn('The <' + component + '> component takes a `materials` property rather than `material`.');
-    return true;
-  }
-
-  if (props.src) {
-    console.warn('The <' + component + '> component takes a `source` property rather than `src`.');
-    return true;
-  }
-
-  if (props.dragPlane) {
-    if (!props.dragPlane.planePoint) {
-      console.warn('The <' + component + '> component with `dragPlane` property requires a `planePoint`.')
-      return true;
-    } else if (!props.dragPlane.planeNormal) {
-      console.warn('The <' + component + '> component with `dragPlane` property requires a `planeNormal`.')
-      return true;
+function checkMisnamedProps(component, props) {
+    var upperCaseComponent = component.toUpperCase();
+    if (props.transformBehavior) {
+        console.warn("The <" +
+            component +
+            "> component takes a `transformBehaviors` property rather than `transformBehavior`.");
+        return true;
     }
-  }
-
-  if (upperCaseComponent === 'ViroSkyBox'.toUpperCase()
-      || upperCaseComponent === 'Viro360Image'.toUpperCase()
-      || upperCaseComponent === 'Viro360Video'.toUpperCase()) {
-
-    if (props.onHover) {
-      console.warn('The <' + component + '> component does not take on an `onHover` property. Pass the `onHover` prop to <ViroScene> instead.');
-      return true;
+    if (props.material) {
+        console.warn("The <" +
+            component +
+            "> component takes a `materials` property rather than `material`.");
+        return true;
     }
-
-    if (props.onClick) {
-      console.warn('The <' + component + '> component does not take on an `onClick` property. Pass the `onClick` prop to <ViroScene> instead.');
-      return true;
+    if (props.src) {
+        console.warn("The <" +
+            component +
+            "> component takes a `source` property rather than `src`.");
+        return true;
     }
-  }
-
-  return false;
-};
+    if (props.dragPlane) {
+        if (!props.dragPlane.planePoint) {
+            console.warn("The <" +
+                component +
+                "> component with `dragPlane` property requires a `planePoint`.");
+            return true;
+        }
+        else if (!props.dragPlane.planeNormal) {
+            console.warn("The <" +
+                component +
+                "> component with `dragPlane` property requires a `planeNormal`.");
+            return true;
+        }
+    }
+    if (upperCaseComponent === "ViroSkyBox".toUpperCase() ||
+        upperCaseComponent === "Viro360Image".toUpperCase() ||
+        upperCaseComponent === "Viro360Video".toUpperCase()) {
+        if (props.onHover) {
+            console.warn("The <" +
+                component +
+                "> component does not take on an `onHover` property. Pass the `onHover` prop to <ViroScene> instead.");
+            return true;
+        }
+        if (props.onClick) {
+            console.warn("The <" +
+                component +
+                "> component does not take on an `onClick` property. Pass the `onClick` prop to <ViroScene> instead.");
+            return true;
+        }
+    }
+    return false;
+}
+exports.checkMisnamedProps = checkMisnamedProps;

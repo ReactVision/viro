@@ -9,41 +9,53 @@
  * @providesModule MaterialPropTypes
  * @flow
  */
-'use strict';
-
-import React from 'react';
-import PropTypes from 'prop-types';
-
-var CubeMapPropType = require('./CubeMapPropType');
-var ColorPropType = require('react-native/Libraries/DeprecatedPropTypes/DeprecatedColorPropType');
-
-var MaterialPropTypes = {
-  shininess: PropTypes.number,
-  fresnelExponent: PropTypes.number,
-  lightingModel: PropTypes.oneOf(['Phong', 'Blinn', 'Lambert', 'Constant', 'PBR']),
-  writesToDepthBuffer: PropTypes.bool,
-  readsFromDepthBuffer: PropTypes.bool,
-  colorWriteMask: PropTypes.arrayOf(PropTypes.oneOf(['None', 'Red', 'Green', 'Blue', 'Alpha', 'All'])),
-  cullMode: PropTypes.oneOf(['None', 'Back', 'Front']),
-  blendMode: PropTypes.oneOf(['None', 'Alpha', 'Add', 'Subtract', 'Multiply', 'Screen']),
-  diffuseTexture: PropTypes.any,
-  diffuseIntensity: PropTypes.number,
-  specularTexture: PropTypes.any,
-  normalTexture: PropTypes.any,
-  reflectiveTexture: CubeMapPropType,
-  diffuseColor: ColorPropType,
-  chromaKeyFilteringColor: ColorPropType,
-  wrapS: PropTypes.oneOf(['Clamp', 'Repeat', 'Mirror']),
-  wrapT: PropTypes.oneOf(['Clamp', 'Repeat', 'Mirror']),
-  minificationFilter: PropTypes.oneOf(['Nearest', 'Linear']),
-  magnificationFilter: PropTypes.oneOf(['Nearest', 'Linear']),
-  mipFilter: PropTypes.oneOf(['Nearest', 'Linear']),
-  bloomThreshold: PropTypes.number,
-  roughness: PropTypes.number,
-  roughnessTexture: PropTypes.any,
-  metalness: PropTypes.number,
-  metalnessTexture: PropTypes.any,
-  ambientOcclusionTexture: PropTypes.any,
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-
-module.exports = MaterialPropTypes;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MaterialPropTypes = void 0;
+const prop_types_1 = __importDefault(require("prop-types"));
+const CubeMapPropType_1 = require("./CubeMapPropType");
+var ColorPropType = require("react-native/Libraries/DeprecatedPropTypes/DeprecatedColorPropType");
+exports.MaterialPropTypes = {
+    shininess: prop_types_1.default.number,
+    fresnelExponent: prop_types_1.default.number,
+    lightingModel: prop_types_1.default.oneOf([
+        "Phong",
+        "Blinn",
+        "Lambert",
+        "Constant",
+        "PBR",
+    ]),
+    writesToDepthBuffer: prop_types_1.default.bool,
+    readsFromDepthBuffer: prop_types_1.default.bool,
+    colorWriteMask: prop_types_1.default.arrayOf(prop_types_1.default.oneOf(["None", "Red", "Green", "Blue", "Alpha", "All"])),
+    cullMode: prop_types_1.default.oneOf(["None", "Back", "Front"]),
+    blendMode: prop_types_1.default.oneOf([
+        "None",
+        "Alpha",
+        "Add",
+        "Subtract",
+        "Multiply",
+        "Screen",
+    ]),
+    diffuseTexture: prop_types_1.default.any,
+    diffuseIntensity: prop_types_1.default.number,
+    specularTexture: prop_types_1.default.any,
+    normalTexture: prop_types_1.default.any,
+    reflectiveTexture: CubeMapPropType_1.CubeMapPropType,
+    diffuseColor: ColorPropType,
+    chromaKeyFilteringColor: ColorPropType,
+    wrapS: prop_types_1.default.oneOf(["Clamp", "Repeat", "Mirror"]),
+    wrapT: prop_types_1.default.oneOf(["Clamp", "Repeat", "Mirror"]),
+    minificationFilter: prop_types_1.default.oneOf(["Nearest", "Linear"]),
+    magnificationFilter: prop_types_1.default.oneOf(["Nearest", "Linear"]),
+    mipFilter: prop_types_1.default.oneOf(["Nearest", "Linear"]),
+    bloomThreshold: prop_types_1.default.number,
+    roughness: prop_types_1.default.number,
+    roughnessTexture: prop_types_1.default.any,
+    metalness: prop_types_1.default.number,
+    metalnessTexture: prop_types_1.default.any,
+    ambientOcclusionTexture: prop_types_1.default.any,
+};

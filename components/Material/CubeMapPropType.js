@@ -9,54 +9,49 @@
  * @providesModule CubeMapPropType
  * @flow
  */
-'use strict';
-
-import React from 'react';
-import PropTypes from 'prop-types';
-
-// Reflective textures are cube maps(nx, px, ny, py, nz, pz), which is
-// left(negative x), right(positive x), down(neg y), up(pos y), forward(neg z), backward(pos z)
-
-var CubeMapPropType = PropTypes.shape(
-    {
-      // Opaque type returned by require('./image.jpg')
-      nx: PropTypes.oneOfType([
-        PropTypes.shape({
-          uri: PropTypes.string,
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CubeMapPropType = void 0;
+const prop_types_1 = __importDefault(require("prop-types"));
+exports.CubeMapPropType = prop_types_1.default.shape({
+    // Opaque type returned by require('./image.jpg')
+    nx: prop_types_1.default.oneOfType([
+        prop_types_1.default.shape({
+            uri: prop_types_1.default.string,
         }),
-        PropTypes.number,
-      ]).isRequired,
-      px: PropTypes.oneOfType([
-        PropTypes.shape({
-          uri: PropTypes.string,
+        prop_types_1.default.number,
+    ]).isRequired,
+    px: prop_types_1.default.oneOfType([
+        prop_types_1.default.shape({
+            uri: prop_types_1.default.string,
         }),
-        PropTypes.number,
-      ]).isRequired,
-      ny: PropTypes.oneOfType([
-        PropTypes.shape({
-          uri: PropTypes.string,
+        prop_types_1.default.number,
+    ]).isRequired,
+    ny: prop_types_1.default.oneOfType([
+        prop_types_1.default.shape({
+            uri: prop_types_1.default.string,
         }),
-        PropTypes.number,
-      ]).isRequired,
-      py: PropTypes.oneOfType([
-        PropTypes.shape({
-          uri: PropTypes.string,
+        prop_types_1.default.number,
+    ]).isRequired,
+    py: prop_types_1.default.oneOfType([
+        prop_types_1.default.shape({
+            uri: prop_types_1.default.string,
         }),
-        PropTypes.number,
-      ]).isRequired,
-      nz: PropTypes.oneOfType([
-        PropTypes.shape({
-          uri: PropTypes.string,
+        prop_types_1.default.number,
+    ]).isRequired,
+    nz: prop_types_1.default.oneOfType([
+        prop_types_1.default.shape({
+            uri: prop_types_1.default.string,
         }),
-        PropTypes.number,
-      ]).isRequired,
-      pz: PropTypes.oneOfType([
-        PropTypes.shape({
-          uri: PropTypes.string,
+        prop_types_1.default.number,
+    ]).isRequired,
+    pz: prop_types_1.default.oneOfType([
+        prop_types_1.default.shape({
+            uri: prop_types_1.default.string,
         }),
-        PropTypes.number,
-      ]).isRequired,
-    }
-);
-
-module.exports = CubeMapPropType;
+        prop_types_1.default.number,
+    ]).isRequired,
+});

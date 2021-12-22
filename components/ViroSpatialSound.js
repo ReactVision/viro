@@ -9,110 +9,85 @@
  * @providesModule ViroSpatialSound
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, Platform, findNodeHandle } from 'react-native';
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import React from 'react';
-
-import PropTypes from 'prop-types';
-import { checkMisnamedProps } from './Utilities/ViroProps';
-var NativeModules = require('react-native').NativeModules;
-var createReactClass = require('create-react-class');
-
-var ViroSpatialSound = createReactClass({
-  propTypes: {
-    ...View.propTypes,
-
-    // Source can either be a String referencing a preloaded file, a web uri, or a
-    // local js file (using require())
-    source: PropTypes.oneOfType([
-      PropTypes.string,
-      PropTypes.shape({
-        uri: PropTypes.string,
-      }),
-      // Opaque type returned by require('./sound.mp3')
-      PropTypes.number,
-    ]).isRequired,
-
-    paused: PropTypes.bool,
-    loop: PropTypes.bool,
-    muted: PropTypes.bool,
-    volume: PropTypes.number,
-    position: PropTypes.arrayOf(PropTypes.number),
-    rolloffModel: PropTypes.string,
-    minDistance: PropTypes.number,
-    maxDistance: PropTypes.number,
-    onFinish: PropTypes.func,
-    onError: PropTypes.func,
-  },
-
-  _onFinish: function(event/*: Event*/) {
-    this.props.onFinish && this.props.onFinish(event);
-  },
-
-  _onError: function(event/*: Event*/) {
-    this.props.onError && this.props.onError(event);
-  },
-
-  setNativeProps: function(nativeProps) {
-    this._component.setNativeProps(nativeProps);
-  },
-
-  render: function() {
-    checkMisnamedProps("ViroSpatialSound", this.props);
-
-    var soundSrc = this.props.source;
-    if (typeof soundSrc === 'number') {
-      soundSrc = resolveAssetSource(soundSrc);
-    } else if (typeof soundSrc === 'string') {
-      soundSrc = {name: soundSrc};
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroSpatialSound = void 0;
+const react_native_1 = require("react-native");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+const react_1 = __importDefault(require("react"));
+const ViroProps_1 = require("./Utilities/ViroProps");
+var NativeModules = require("react-native").NativeModules;
+class ViroSpatialSound extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
     }
-
-    let nativeProps = Object.assign({}, this.props);
-    nativeProps.source = soundSrc;
-    nativeProps.onErrorViro = this._onError;
-    nativeProps.onFinishViro = this._onFinish;
-    nativeProps.ref = component => {this._component = component; };
-
-    return (
-      <VRTSpatialSound {...nativeProps} />
-    );
-  },
-
-  async getTransformAsync() {
-      return await NativeModules.VRTNodeModule.getNodeTransform(findNodeHandle(this));
-  },
-
-  async getBoundingBoxAsync() {
-    return await NativeModules.VRTNodeModule.getBoundingBox(findNodeHandle(this));
-  },
-
-  seekToTime(timeInSeconds) {
-    switch (Platform.OS) {
-      case 'ios':
-        NativeModules.VRTSpatialSoundManager.seekToTime(findNodeHandle(this), timeInSeconds);
-        break;
-      case 'android':
-        NativeModules.UIManager.dispatchViewManagerCommand(
-            findNodeHandle(this),
-            NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime,
-            [ timeInSeconds ]);
-        break;
+    _onFinish(event) {
+        this.props.onFinish && this.props.onFinish(event);
     }
-  },
-
-});
-
-var VRTSound = require('./ViroSound').VRTSound;
-
-var VRTSpatialSound = requireNativeComponent(
-  'VRTSpatialSound', ViroSpatialSound, {
+    _onError(event) {
+        this.props.onError && this.props.onError(event);
+    }
+    setNativeProps(nativeProps) {
+        this._component?.setNativeProps(nativeProps);
+    }
+    render() {
+        ViroProps_1.checkMisnamedProps("ViroSpatialSound", this.props);
+        var soundSrc = this.props.source;
+        if (typeof soundSrc === "number") {
+            soundSrc = resolveAssetSource_1.default(soundSrc);
+        }
+        else if (typeof soundSrc === "string") {
+            /**
+             * @todo
+             *
+             * This throws a typescript error:
+             * Type '{ name: never; }' is not assignable to type 'ImageSourcePropType'.
+             * Object literal may only specify known properties, and 'name' does not
+             * exist in type 'ImageURISource | ImageURISource[]'.
+             *
+             * I assume that this works correctly for Viro, but we would need to standardize
+             * this or remove this usage. The usage should be {uri: string} or require format
+             * to be consistent with images/video.
+             */
+            soundSrc = { name: soundSrc };
+        }
+        let nativeProps = Object.assign({}, this.props);
+        nativeProps.source = soundSrc;
+        nativeProps.onErrorViro = this._onError;
+        nativeProps.onFinishViro = this._onFinish;
+        nativeProps.ref = (component) => {
+            this._component = component;
+        };
+        return <VRTSpatialSound {...nativeProps}/>;
+    }
+    async getTransformAsync() {
+        return await NativeModules.VRTNodeModule.getNodeTransform(react_native_1.findNodeHandle(this));
+    }
+    async getBoundingBoxAsync() {
+        return await NativeModules.VRTNodeModule.getBoundingBox(react_native_1.findNodeHandle(this));
+    }
+    seekToTime(timeInSeconds) {
+        switch (react_native_1.Platform.OS) {
+            case "ios":
+                NativeModules.VRTSpatialSoundManager.seekToTime(react_native_1.findNodeHandle(this), timeInSeconds);
+                break;
+            case "android":
+                NativeModules.UIManager.dispatchViewManagerCommand(react_native_1.findNodeHandle(this), NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime, [timeInSeconds]);
+                break;
+        }
+    }
+}
+exports.ViroSpatialSound = ViroSpatialSound;
+var VRTSpatialSound = react_native_1.requireNativeComponent("VRTSpatialSound", 
+// @ts-ignore
+ViroSpatialSound, {
     nativeOnly: {
-      onFinishViro: true,
-      onErrorViro: true,
-    }
-  }
-);
-
-module.exports = ViroSpatialSound;
+        onFinishViro: true,
+        onErrorViro: true,
+    },
+});

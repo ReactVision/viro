@@ -9,100 +9,56 @@
  * @providesModule Viro360Image
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, StyleSheet } from 'react-native';
-import React, { Component } from 'react';
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import PropTypes from 'prop-types';
-var createReactClass = require('create-react-class');
-import { checkMisnamedProps } from './Utilities/ViroProps';
-
-var ViroLightingEnvironment = createReactClass({
-  propTypes: {
-    ...View.propTypes,
-
-    /**
-     * The hdr image file, which is required
-     */
-    source: PropTypes.oneOfType([
-      PropTypes.shape({
-        uri: PropTypes.string,
-      }),
-      // Opaque type returned by require('./image.jpg')
-      PropTypes.number,
-    ]).isRequired,
-
-    /**
-     * Callback triggered when we are processing the assets to be
-     * used in computing this lighting environment (either downloading / reading from file).
-     */
-    onLoadStart: PropTypes.func,
-
-    /**
-     * Callback triggered when we have finished processing assets to be
-     * used in computing this lighting environment. Wether or not assets were
-     * processed successfully will be indicated by the parameter "success".
-     * For example:
-     *
-     *   _onLoadEnd(event:Event){
-     *      // Indication of asset loading success
-     *      event.nativeEvent.success
-     *   }
-     *
-     */
-    onLoadEnd: PropTypes.func,
-
-    /**
-     * Callback triggered when the hdr image fails to load. Invoked with
-     * {nativeEvent: {error}}
-     */
-    onError: PropTypes.func,
-
-  },
-
-  _onLoadStart: function(event/*: Event*/) {
-    this.props.onLoadStart && this.props.onLoadStart(event);
-  },
-
-  _onLoadEnd: function(event/*: Event*/) {
-    this.props.onLoadEnd && this.props.onLoadEnd(event);
-  },
-
-  _onError: function(event/*: Event*/) {
-    this.props.onError && this.props.onError(event);
-  },
-
-  setNativeProps: function(nativeProps) {
-    this._component.setNativeProps(nativeProps);
-  },
-
-  render: function() {
-    checkMisnamedProps("ViroLightingEnvironment", this.props);
-
-    var imgsrc = resolveAssetSource(this.props.source);
-
-    // Create native props object.
-    let nativeProps = Object.assign({}, this.props);
-    nativeProps.source = imgsrc;
-    nativeProps.onErrorViro = this._onError;
-    nativeProps.onLoadStartViro = this._onLoadStart;
-    nativeProps.onLoadEndViro = this._onLoadEnd;
-    nativeProps.ref = component => {this._component = component; };
-
-    return (
-      <VRTLightingEnvironment {...nativeProps} />
-    );
-  }
-});
-
-var VRTLightingEnvironment = requireNativeComponent(
-  'VRTLightingEnvironment', ViroLightingEnvironment, {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroLightingEnvironment = void 0;
+const react_1 = __importDefault(require("react"));
+const react_native_1 = require("react-native");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+const ViroProps_1 = require("./Utilities/ViroProps");
+class ViroLightingEnvironment extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
+    }
+    _onLoadStart(event) {
+        this.props.onLoadStart && this.props.onLoadStart(event);
+    }
+    _onLoadEnd(event) {
+        this.props.onLoadEnd && this.props.onLoadEnd(event);
+    }
+    _onError(event) {
+        this.props.onError && this.props.onError(event);
+    }
+    setNativeProps(nativeProps) {
+        this._component?.setNativeProps(nativeProps);
+    }
+    render() {
+        ViroProps_1.checkMisnamedProps("ViroLightingEnvironment", this.props);
+        var imgsrc = resolveAssetSource_1.default(this.props.source);
+        // Create native props object.
+        let nativeProps = Object.assign({}, this.props);
+        nativeProps.source = imgsrc;
+        nativeProps.onErrorViro = this._onError;
+        nativeProps.onLoadStartViro = this._onLoadStart;
+        nativeProps.onLoadEndViro = this._onLoadEnd;
+        nativeProps.ref = (component) => {
+            this._component = component;
+        };
+        return <VRTLightingEnvironment {...nativeProps}/>;
+    }
+}
+exports.ViroLightingEnvironment = ViroLightingEnvironment;
+var VRTLightingEnvironment = react_native_1.requireNativeComponent("VRTLightingEnvironment", 
+// @ts-ignore
+ViroLightingEnvironment, {
     nativeOnly: {
-      onLoadStartViro: true,
-      onErrorViro: true,
-      onLoadEndViro: true}
-  }
-);
-
-module.exports = ViroLightingEnvironment;
+        onLoadStartViro: true,
+        onErrorViro: true,
+        onLoadEndViro: true,
+    },
+});

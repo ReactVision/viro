@@ -9,62 +9,48 @@
  * @providesModule ViroAnimatedComponent
  * @flow
  */
-'use strict';
-
-import { requireNativeComponent, View, StyleSheet, Platform } from 'react-native';
-import React from 'react';
-import PropTypes from 'prop-types';
-var createReactClass = require('create-react-class');
-import { checkMisnamedProps } from './Utilities/ViroProps';
-
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ViroAnimatedComponent = void 0;
+const react_1 = __importDefault(require("react"));
+const react_native_1 = require("react-native");
+var createReactClass = require("create-react-class");
 /**
  * Used to render a ViroAnimatedComponent
  */
-var ViroAnimatedComponent = createReactClass({
-  propTypes: {
-    ...View.propTypes,
-    animation: PropTypes.string,
-    delay: PropTypes.number,
-    loop: PropTypes.bool,
-    onStart: PropTypes.func,
-    onFinish: PropTypes.func,
-    run: PropTypes.bool,
-  },
-
-  _onStart: function(event/*: Event*/) {
-    this.props.onStart && this.props.onStart();
-  },
-
-  _onFinish: function(event/*: Event*/) {
-    this.props.onFinish && this.props.onFinish();
-  },
-
-  setNativeProps: function(nativeProps) {
-    this._component.setNativeProps(nativeProps);
-  },
-
-  render: function() {
-    console.warn("<ViroAnimatedComponent> is deprecated, please use each component's 'animation' property");
-
-    // Uncomment this line to check for misnamed props
-    //checkMisnamedProps("ViroAnimatedComponent", this.props);
-
-    let nativeProps = Object.assign({}, this.props);
-    nativeProps.onAnimationFinishViro = this._onFinish;
-    nativeProps.onAnimationStartViro = this._onStart;
-    nativeProps.ref = component => {this._component = component; };
-
-    return (
-      <VRTAnimatedComponent {...nativeProps} />
-    );
-  }
+class ViroAnimatedComponent extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this._component = null;
+    }
+    _onStart(_event) {
+        this.props.onStart && this.props.onStart();
+    }
+    _onFinish(_event) {
+        this.props.onFinish && this.props.onFinish();
+    }
+    setNativeProps(nativeProps) {
+        this._component?.setNativeProps(nativeProps);
+    }
+    render() {
+        console.warn("<ViroAnimatedComponent> is deprecated, please use each component's 'animation' property");
+        // Uncomment this line to check for misnamed props
+        //checkMisnamedProps("ViroAnimatedComponent", this.props);
+        let nativeProps = Object.assign({}, this.props);
+        nativeProps.onAnimationFinishViro = this._onFinish;
+        nativeProps.onAnimationStartViro = this._onStart;
+        nativeProps.ref = (component) => {
+            this._component = component;
+        };
+        return <VRTAnimatedComponent {...nativeProps}/>;
+    }
+}
+exports.ViroAnimatedComponent = ViroAnimatedComponent;
+var VRTAnimatedComponent = react_native_1.requireNativeComponent("VRTAnimatedComponent", 
+// @ts-ignore
+ViroAnimatedComponent, {
+    nativeOnly: { onAnimationStartViro: true, onAnimationFinishViro: true },
 });
-
-
-var VRTAnimatedComponent = requireNativeComponent(
-  'VRTAnimatedComponent', ViroAnimatedComponent, {
-    nativeOnly: { onAnimationStartViro:true, onAnimationFinishViro:true }
-  }
-);
-
-module.exports = ViroAnimatedComponent;

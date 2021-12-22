@@ -9,9 +9,8 @@
  * @providesModule ViroVRSceneNavigator
  * @flow
  */
-"use strict";
 
-import React from "react";
+import * as React from "react";
 import {
   findNodeHandle,
   NativeModules,
@@ -459,10 +458,10 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     var i = 0;
     var sceneDictionary = this.state.sceneDictionary;
     for (var scene in sceneDictionary) {
-      var Component = sceneDictionary[scene].sceneClass.scene;
+      var Scene = sceneDictionary[scene].sceneClass.scene;
       var props = sceneDictionary[scene].sceneClass.passProps;
       views.push(
-        <Component
+        <Scene
           key={"scene" + i}
           sceneNavigator={this.sceneNavigator}
           {...props}
@@ -484,7 +483,9 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     // If the user simply passes us the props from the root React component,
     // then we'll have an extra 'rootTag' key which React automatically includes
     // so remove it.
-    delete this.sceneNavigator.viroAppProps.rootTag;
+    if (this.sceneNavigator.viroAppProps?.rootTag) {
+      delete this.sceneNavigator.viroAppProps?.rootTag;
+    }
 
     const { viroAppProps = {} } = this.props;
 

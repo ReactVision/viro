@@ -10,7 +10,7 @@
  * @flow
  */
 
-import React from "react";
+import * as React from "react";
 import {
   NativeSyntheticEvent,
   requireNativeComponent,
@@ -21,6 +21,7 @@ import {
   ViroAnimationStartEvent,
 } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroRotation } from "./Types/ViroUtils";
+import { ViroSceneContext } from "./ViroSceneContext";
 
 type Props = ViewProps & {
   position?: Viro3DPoint;
@@ -44,6 +45,7 @@ type State = {
 
 export class ViroCamera extends React.Component<Props, State> {
   _component: any;
+  static contextType?: React.Context<any> | undefined = ViroSceneContext;
 
   componentDidMount() {
     this.context.cameraDidMount(this);

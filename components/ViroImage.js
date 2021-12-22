@@ -10,24 +10,37 @@
  * @flow
  */
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroImage = void 0;
+const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
-const react_1 = __importDefault(require("react"));
 const ViroProps_1 = require("./Utilities/ViroProps");
-var NativeModules = require("react-native").NativeModules;
-var createReactClass = require("create-react-class");
 const ViroBase_1 = require("./ViroBase");
-var StyleSheet = require("react-native/Libraries/StyleSheet/StyleSheet");
-var ViroImageModule = NativeModules.VRTImageModule;
-var ViroPropTypes = require("./Styles/ViroPropTypes");
-var StyleSheetPropType = require("react-native/Libraries/DeprecatedPropTypes/DeprecatedStyleSheetPropType");
-var stylePropType = StyleSheetPropType(ViroPropTypes);
+const ViroImageModule = react_native_1.NativeModules.VRTImageModule;
 /**
  * Used to render a ViroImage
  */

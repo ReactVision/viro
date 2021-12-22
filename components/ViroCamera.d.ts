@@ -9,7 +9,7 @@
  * @providesModule ViroCamera
  * @flow
  */
-import React from "react";
+import * as React from "react";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroAnimationFinishEvent, ViroAnimationStartEvent } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroRotation } from "./Types/ViroUtils";
@@ -33,6 +33,7 @@ declare type State = {
 };
 export declare class ViroCamera extends React.Component<Props, State> {
     _component: any;
+    static contextType?: React.Context<any> | undefined;
     componentDidMount(): void;
     componentWillUnmount(): void;
     componentDidUpdate(prevProps: Props, _prevState: State): void;

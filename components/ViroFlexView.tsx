@@ -11,7 +11,7 @@
  */
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import { requireNativeComponent } from "react-native";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroNativeRef } from "./Types/ViroUtils";

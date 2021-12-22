@@ -19,7 +19,6 @@
     "preset": "react-native"
   },
   "peerDependencies": {
-    "react": "17.0.2",
     "react-native": "0.65.1"
   },
   "files": [
@@ -37,8 +36,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "create-react-class": "^15.7.0",
-    "prop-types": "^15.5.10"
+    "react": "^17.0.2"
   },
   "devDependencies": {
     "@types/react-native": "^0.66.9",

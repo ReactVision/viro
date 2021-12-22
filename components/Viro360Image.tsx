@@ -11,7 +11,7 @@
  */
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import {
   ImageSourcePropType,
   NativeSyntheticEvent,
@@ -27,8 +27,6 @@ import {
 } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroRotation } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
-
-var createReactClass = require("create-react-class");
 
 type Props = ViewProps & {
   /**
@@ -68,17 +66,17 @@ type Props = ViewProps & {
 export class Viro360Image extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
-  _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>) {
+  _onLoadStart = (event: NativeSyntheticEvent<ViroLoadStartEvent>) => {
     this.props.onLoadStart && this.props.onLoadStart(event);
-  }
+  };
 
-  _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>) {
+  _onLoadEnd = (event: NativeSyntheticEvent<ViroLoadEndEvent>) => {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
-  }
+  };
 
-  _onError(event: NativeSyntheticEvent<ViroLoadErrorEvent>) {
+  _onError = (event: NativeSyntheticEvent<ViroLoadErrorEvent>) => {
     this.props.onError && this.props.onError(event);
-  }
+  };
 
   setNativeProps(nativeProps: Props) {
     this._component?.setNativeProps(nativeProps);

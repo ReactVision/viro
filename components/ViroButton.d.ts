@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroForce, Viro3DPoint, ViroSource, ViroTorque, ViroVelocity } from "./Types/ViroUtils";
 import { ViroNode } from "./ViroNode";

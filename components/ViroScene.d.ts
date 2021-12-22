@@ -4,7 +4,6 @@ import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformEvent, ViroPlatformInfo, ViroTrackingReason, ViroTrackingState } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroPhysicsWorld, ViroSoundRoom } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-import { ViroCamera } from "./ViroCamera";
 declare type Props = ViroCommonProps & {
     onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
     onCameraTransformUpdate?: (cameraTransform: ViroCameraTransform) => void;
@@ -32,11 +31,6 @@ export declare class ViroScene extends ViroBase<Props> {
         forward: any[];
         up: any[];
     }>;
-    getChildContext(): {
-        cameraDidMount: (camera: ViroCamera) => void;
-        cameraWillUnmount: (camera: ViroCamera) => void;
-        cameraDidUpdate: (camera: ViroCamera, active: boolean) => void;
-    };
     render(): JSX.Element;
 }
 export {};

@@ -13,7 +13,7 @@
 
 import { ViroARPlaneSizes, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
 import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
-import React from "react";
+import * as React from "react";
 import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
 import { ViroQuad } from "../ViroQuad";

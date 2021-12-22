@@ -1,6 +1,22 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroScene = void 0;
@@ -12,9 +28,10 @@ exports.ViroScene = void 0;
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-const react_1 = __importDefault(require("react"));
+const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroBase_1 = require("./ViroBase");
+const ViroSceneContext_1 = require("./ViroSceneContext");
 class ViroScene extends ViroBase_1.ViroBase {
     _onPlatformUpdate(event) {
         /**
@@ -101,28 +118,6 @@ class ViroScene extends ViroBase_1.ViroBase {
             up: [orientation[9], orientation[10], orientation[11]],
         };
     }
-    getChildContext() {
-        return {
-            cameraDidMount: (camera) => {
-                if (camera.props.active) {
-                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
-                }
-            },
-            cameraWillUnmount: (camera) => {
-                if (camera.props.active) {
-                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
-                }
-            },
-            cameraDidUpdate: (camera, active) => {
-                if (active) {
-                    react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
-                }
-                else {
-                    react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
-                }
-            },
-        };
-    }
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroScene", this.props);
@@ -131,10 +126,31 @@ class ViroScene extends ViroBase_1.ViroBase {
             typeof this.props.onFuse === "object") {
             timeToFuse = this.props.onFuse.timeToFuse;
         }
-        return (<VRTScene {...this.props} ref={(component) => {
+        return (<ViroSceneContext_1.ViroSceneContext.Provider value={{
+                cameraDidMount: (camera) => {
+                    if (camera.props.active) {
+                        react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
+                    }
+                },
+                cameraWillUnmount: (camera) => {
+                    if (camera.props.active) {
+                        react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
+                    }
+                },
+                cameraDidUpdate: (camera, active) => {
+                    if (active) {
+                        react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
+                    }
+                    else {
+                        react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
+                    }
+                },
+            }}>
+        <VRTScene {...this.props} ref={(component) => {
                 this._component = component;
             }} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
-                this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canFuse={this.props.onFuse != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canCameraTransformUpdate={this.props.onCameraTransformUpdate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onFuseViro={this._onFuse} onDragViro={this._onDrag} onRotateViro={this._onRotate} onPinchViro={this._onPinch} onPlatformUpdateViro={this._onPlatformUpdate} onCameraTransformUpdateViro={this._onCameraTransformUpdate} timeToFuse={timeToFuse}/>);
+                this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canFuse={this.props.onFuse != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canCameraTransformUpdate={this.props.onCameraTransformUpdate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onFuseViro={this._onFuse} onDragViro={this._onDrag} onRotateViro={this._onRotate} onPinchViro={this._onPinch} onPlatformUpdateViro={this._onPlatformUpdate} onCameraTransformUpdateViro={this._onCameraTransformUpdate} timeToFuse={timeToFuse}/>
+      </ViroSceneContext_1.ViroSceneContext.Provider>);
     }
 }
 exports.ViroScene = ViroScene;

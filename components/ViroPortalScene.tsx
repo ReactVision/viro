@@ -11,7 +11,7 @@
 
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroPortalEnterEvent, ViroPortalExitEvent } from "./Types/ViroEvents";

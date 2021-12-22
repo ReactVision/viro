@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-import React from "react";
+import * as React from "react";
 import {
   findNodeHandle,
   NativeModules,
@@ -30,6 +30,7 @@ import {
 } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 import { ViroCamera } from "./ViroCamera";
+import { ViroSceneContext } from "./ViroSceneContext";
 
 type Props = ViroCommonProps & {
   onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
@@ -170,40 +171,6 @@ export class ViroScene extends ViroBase<Props> {
     };
   }
 
-  getChildContext() {
-    return {
-      cameraDidMount: (camera: ViroCamera) => {
-        if (camera.props.active) {
-          NativeModules.VRTCameraModule.setSceneCamera(
-            findNodeHandle(this),
-            findNodeHandle(camera)
-          );
-        }
-      },
-      cameraWillUnmount: (camera: ViroCamera) => {
-        if (camera.props.active) {
-          NativeModules.VRTCameraModule.removeSceneCamera(
-            findNodeHandle(this),
-            findNodeHandle(camera)
-          );
-        }
-      },
-      cameraDidUpdate: (camera: ViroCamera, active: boolean) => {
-        if (active) {
-          NativeModules.VRTCameraModule.setSceneCamera(
-            findNodeHandle(this),
-            findNodeHandle(camera)
-          );
-        } else {
-          NativeModules.VRTCameraModule.removeSceneCamera(
-            findNodeHandle(this),
-            findNodeHandle(camera)
-          );
-        }
-      },
-    };
-  }
-
   render() {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroScene", this.props);
@@ -217,39 +184,73 @@ export class ViroScene extends ViroBase<Props> {
     }
 
     return (
-      <VRTScene
-        {...this.props}
-        ref={(component) => {
-          this._component = component;
+      <ViroSceneContext.Provider
+        value={{
+          cameraDidMount: (camera: ViroCamera) => {
+            if (camera.props.active) {
+              NativeModules.VRTCameraModule.setSceneCamera(
+                findNodeHandle(this),
+                findNodeHandle(camera)
+              );
+            }
+          },
+          cameraWillUnmount: (camera: ViroCamera) => {
+            if (camera.props.active) {
+              NativeModules.VRTCameraModule.removeSceneCamera(
+                findNodeHandle(this),
+                findNodeHandle(camera)
+              );
+            }
+          },
+          cameraDidUpdate: (camera: ViroCamera, active: boolean) => {
+            if (active) {
+              NativeModules.VRTCameraModule.setSceneCamera(
+                findNodeHandle(this),
+                findNodeHandle(camera)
+              );
+            } else {
+              NativeModules.VRTCameraModule.removeSceneCamera(
+                findNodeHandle(this),
+                findNodeHandle(camera)
+              );
+            }
+          },
         }}
-        canHover={this.props.onHover != undefined}
-        canClick={
-          this.props.onClick != undefined ||
-          this.props.onClickState != undefined
-        }
-        canTouch={this.props.onTouch != undefined}
-        canScroll={this.props.onScroll != undefined}
-        canSwipe={this.props.onSwipe != undefined}
-        canFuse={this.props.onFuse != undefined}
-        canDrag={this.props.onDrag != undefined}
-        canPinch={this.props.onPinch != undefined}
-        canRotate={this.props.onRotate != undefined}
-        canCameraTransformUpdate={
-          this.props.onCameraTransformUpdate != undefined
-        }
-        onHoverViro={this._onHover}
-        onClickViro={this._onClickState}
-        onTouchViro={this._onTouch}
-        onScrollViro={this._onScroll}
-        onSwipeViro={this._onSwipe}
-        onFuseViro={this._onFuse}
-        onDragViro={this._onDrag}
-        onRotateViro={this._onRotate}
-        onPinchViro={this._onPinch}
-        onPlatformUpdateViro={this._onPlatformUpdate}
-        onCameraTransformUpdateViro={this._onCameraTransformUpdate}
-        timeToFuse={timeToFuse}
-      />
+      >
+        <VRTScene
+          {...this.props}
+          ref={(component) => {
+            this._component = component;
+          }}
+          canHover={this.props.onHover != undefined}
+          canClick={
+            this.props.onClick != undefined ||
+            this.props.onClickState != undefined
+          }
+          canTouch={this.props.onTouch != undefined}
+          canScroll={this.props.onScroll != undefined}
+          canSwipe={this.props.onSwipe != undefined}
+          canFuse={this.props.onFuse != undefined}
+          canDrag={this.props.onDrag != undefined}
+          canPinch={this.props.onPinch != undefined}
+          canRotate={this.props.onRotate != undefined}
+          canCameraTransformUpdate={
+            this.props.onCameraTransformUpdate != undefined
+          }
+          onHoverViro={this._onHover}
+          onClickViro={this._onClickState}
+          onTouchViro={this._onTouch}
+          onScrollViro={this._onScroll}
+          onSwipeViro={this._onSwipe}
+          onFuseViro={this._onFuse}
+          onDragViro={this._onDrag}
+          onRotateViro={this._onRotate}
+          onPinchViro={this._onPinch}
+          onPlatformUpdateViro={this._onPlatformUpdate}
+          onCameraTransformUpdateViro={this._onCameraTransformUpdate}
+          timeToFuse={timeToFuse}
+        />
+      </ViroSceneContext.Provider>
     );
   }
 }

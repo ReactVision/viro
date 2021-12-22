@@ -11,11 +11,10 @@
  */
 "use strict";
 
-import PropTypes from "prop-types";
-import React from "react";
+import * as React from "react";
 import { requireNativeComponent, ViewProps } from "react-native";
 import { ViroAnimation } from "./Animation/ViroAnimations";
-import { ViroNativeRef, Viro3DPoint } from "./Types/ViroUtils";
+import { Viro3DPoint, ViroNativeRef } from "./Types/ViroUtils";
 
 export type Props = ViewProps & {
   position?: Viro3DPoint;
@@ -59,12 +58,6 @@ export class ViroOrbitCamera extends React.Component<Props> {
       />
     );
   }
-
-  static contextTypes = {
-    cameraDidMount: PropTypes.func,
-    cameraWillUnmount: PropTypes.func,
-    cameraDidUpdate: PropTypes.func,
-  };
 }
 
 var VRTOrbitCamera = requireNativeComponent(

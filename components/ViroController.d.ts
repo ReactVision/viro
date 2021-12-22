@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroClickEvent, ViroClickStateEvent, ViroControllerStatus, ViroControllerStatusEvent, ViroDragEvent, ViroFuseEvent, ViroPinchEvent, ViroRotateEvent, ViroScrollEvent, ViroSwipeEvent, ViroTouchEvent } from "./Types/ViroEvents";

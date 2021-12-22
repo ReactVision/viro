@@ -11,23 +11,20 @@
  */
 "use strict";
 
+import * as React from "react";
 import {
-  requireNativeComponent,
-  View,
-  Platform,
   findNodeHandle,
-  ViewProps,
+  NativeModules,
   NativeSyntheticEvent,
+  Platform,
+  requireNativeComponent,
+  ViewProps,
 } from "react-native";
 // @ts-ignore
 import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import React from "react";
-
-import PropTypes from "prop-types";
-import { checkMisnamedProps } from "./Utilities/ViroProps";
-import { Viro3DPoint, ViroNativeRef, ViroSource } from "./Types/ViroUtils";
 import { ViroErrorEvent, ViroSoundFinishEvent } from "./Types/ViroEvents";
-var NativeModules = require("react-native").NativeModules;
+import { Viro3DPoint, ViroNativeRef, ViroSource } from "./Types/ViroUtils";
+import { checkMisnamedProps } from "./Utilities/ViroProps";
 
 type Props = ViewProps & {
   // Source can either be a String referencing a preloaded file, a web uri, or a

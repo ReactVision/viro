@@ -1,7 +1,7 @@
-import { ViewProps, NativeSyntheticEvent } from "react-native";
-import React from "react";
-import { Viro3DPoint, ViroNativeRef, ViroSource } from "./Types/ViroUtils";
+import * as React from "react";
+import { NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroErrorEvent, ViroSoundFinishEvent } from "./Types/ViroEvents";
+import { Viro3DPoint, ViroNativeRef, ViroSource } from "./Types/ViroUtils";
 declare type Props = ViewProps & {
     source: ViroSource;
     paused?: boolean;

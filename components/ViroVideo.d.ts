@@ -42,7 +42,6 @@ export declare class ViroVideo extends ViroBase<Props> {
     _onBufferStart(event: NativeSyntheticEvent<ViroVideoBufferStartEvent>): void;
     _onBufferEnd(event: NativeSyntheticEvent<ViroVideoBufferEndEvent>): void;
     _onFinish(): void;
-    _onError(event: NativeSyntheticEvent<ViroVideoErrorEvent>): void;
     _onUpdateTime(event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>): void;
     render(): JSX.Element;
     seekToTime(timeInSeconds: number): void;

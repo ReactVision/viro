@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { ColorValue, NativeSyntheticEvent } from "react-native";
 import { ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroNativeTransformUpdateEvent } from "./Types/ViroEvents";

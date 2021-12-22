@@ -11,7 +11,7 @@
  */
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import { ColorValue, requireNativeComponent, ViewProps } from "react-native";
 import { Viro3DPoint, ViroNativeRef } from "./Types/ViroUtils";
 

@@ -12,7 +12,7 @@
 
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import {
   findNodeHandle,
   NativeModules,
@@ -75,44 +75,37 @@ type State = {
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
 export class ViroARSceneNavigator extends React.Component<Props, State> {
-  arSceneNavigator: any;
-  sceneNavigator: any;
   _component: ViroNativeRef = null;
-
-  componentWillMount() {
-    // Precompute a pack of callbacks that's frequently generated and passed to
-    // instances.
-    this.arSceneNavigator = {
-      push: this.push,
-      pop: this.pop,
-      popN: this.popN,
-      jump: this.jump,
-      replace: this.replace,
-      startVideoRecording: this._startVideoRecording,
-      stopVideoRecording: this._stopVideoRecording,
-      takeScreenshot: this._takeScreenshot,
-      resetARSession: this._resetARSession,
-      setWorldOrigin: this._setWorldOrigin,
-      project: this._project,
-      unproject: this._unproject,
-      viroAppProps: {} as any,
-    };
-    this.sceneNavigator = {
-      push: this.push,
-      pop: this.pop,
-      popN: this.popN,
-      jump: this.jump,
-      replace: this.replace,
-      startVideoRecording: this._startVideoRecording,
-      stopVideoRecording: this._stopVideoRecording,
-      takeScreenshot: this._takeScreenshot,
-      resetARSession: this._resetARSession,
-      setWorldOrigin: this._setWorldOrigin,
-      project: this._project,
-      unproject: this._unproject,
-      viroAppProps: {} as any,
-    };
-  }
+  arSceneNavigator = {
+    push: this.push,
+    pop: this.pop,
+    popN: this.popN,
+    jump: this.jump,
+    replace: this.replace,
+    startVideoRecording: this._startVideoRecording,
+    stopVideoRecording: this._stopVideoRecording,
+    takeScreenshot: this._takeScreenshot,
+    resetARSession: this._resetARSession,
+    setWorldOrigin: this._setWorldOrigin,
+    project: this._project,
+    unproject: this._unproject,
+    viroAppProps: {} as any,
+  };
+  sceneNavigator = {
+    push: this.push,
+    pop: this.pop,
+    popN: this.popN,
+    jump: this.jump,
+    replace: this.replace,
+    startVideoRecording: this._startVideoRecording,
+    stopVideoRecording: this._stopVideoRecording,
+    takeScreenshot: this._takeScreenshot,
+    resetARSession: this._resetARSession,
+    setWorldOrigin: this._setWorldOrigin,
+    project: this._project,
+    unproject: this._unproject,
+    viroAppProps: {} as any,
+  };
 
   constructor(props: Props) {
     super(props);
@@ -572,8 +565,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     // If the user simply passes us the props from the root React component,
     // then we'll have an extra 'rootTag' key which React automatically includes
     // so remove it.
-    delete this.arSceneNavigator.viroAppProps.rootTag;
-    delete this.sceneNavigator.viroAppProps.rootTag;
+    if (this.arSceneNavigator.viroAppProps?.rootTag) {
+      delete this.arSceneNavigator.viroAppProps?.rootTag;
+    }
+    if (this.sceneNavigator.viroAppProps?.rootTag) {
+      delete this.sceneNavigator.viroAppProps?.rootTag;
+    }
 
     const { viroAppProps = {} } = this.props;
 

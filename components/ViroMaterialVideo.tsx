@@ -6,25 +6,22 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-import PropTypes from "prop-types";
-import React from "react";
+import * as React from "react";
 import {
   findNodeHandle,
+  NativeModules,
   NativeSyntheticEvent,
   Platform,
   requireNativeComponent,
-  View,
   ViewProps,
 } from "react-native";
 import {
-  ViroVideoBufferStartEvent,
   ViroErrorEvent,
   ViroVideoBufferEndEvent,
+  ViroVideoBufferStartEvent,
   ViroVideoUpdateTimeEvent,
 } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
-var NativeModules = require("react-native").NativeModules;
-var createReactClass = require("create-react-class");
 
 type Props = ViewProps & {
   material?: string;

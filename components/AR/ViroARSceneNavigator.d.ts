@@ -9,7 +9,7 @@
  * @providesModule ViroARSceneNavigator
  * @flow
  */
-import React from "react";
+import * as React from "react";
 import { ViewProps } from "react-native";
 import { ViroWorldOrigin } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
@@ -52,10 +52,37 @@ declare type State = {
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
 export declare class ViroARSceneNavigator extends React.Component<Props, State> {
-    arSceneNavigator: any;
-    sceneNavigator: any;
     _component: ViroNativeRef;
-    componentWillMount(): void;
+    arSceneNavigator: {
+        push: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        pop: () => void;
+        popN: (n: number) => void;
+        jump: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        replace: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+        stopVideoRecording: () => Promise<any>;
+        takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
+        resetARSession: (resetTracking: any, removeAnchors: any) => void;
+        setWorldOrigin: (worldOrigin: ViroWorldOrigin) => void;
+        project: (point: Viro3DPoint) => Promise<any>;
+        unproject: (point: Viro3DPoint) => Promise<any>;
+        viroAppProps: any;
+    };
+    sceneNavigator: {
+        push: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        pop: () => void;
+        popN: (n: number) => void;
+        jump: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        replace: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+        stopVideoRecording: () => Promise<any>;
+        takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
+        resetARSession: (resetTracking: any, removeAnchors: any) => void;
+        setWorldOrigin: (worldOrigin: ViroWorldOrigin) => void;
+        project: (point: Viro3DPoint) => Promise<any>;
+        unproject: (point: Viro3DPoint) => Promise<any>;
+        viroAppProps: any;
+    };
     constructor(props: Props);
     getRandomTag(): string;
     /**

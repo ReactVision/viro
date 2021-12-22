@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { ViewProps } from "react-native";
 import { ViroCamera } from "../ViroCamera";
 export declare class ViroARCamera extends React.Component<ViewProps> {

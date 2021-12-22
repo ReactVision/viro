@@ -1,9 +1,9 @@
 /// <reference types="react" />
 import { NativeSyntheticEvent } from "react-native";
-import { ViroBase } from "./ViroBase";
-import { ViroSource } from "./Types/ViroUtils";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
+import { ViroSource } from "./Types/ViroUtils";
+import { ViroBase } from "./ViroBase";
 declare type Props = {
     source: ViroSource;
     style?: ViroStyle;

@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { ImageSourcePropType, NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroLoadEndEvent, ViroLoadErrorEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroRotation } from "./Types/ViroUtils";
@@ -37,9 +37,9 @@ declare type Props = ViewProps & {
 };
 export declare class Viro360Image extends React.Component<Props> {
     _component: ViroNativeRef;
-    _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>): void;
-    _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>): void;
-    _onError(event: NativeSyntheticEvent<ViroLoadErrorEvent>): void;
+    _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+    _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+    _onError: (event: NativeSyntheticEvent<ViroLoadErrorEvent>) => void;
     setNativeProps(nativeProps: Props): void;
     render(): JSX.Element;
 }

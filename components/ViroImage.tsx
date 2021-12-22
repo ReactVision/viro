@@ -11,31 +11,21 @@
  */
 "use strict";
 
+import * as React from "react";
 import {
-  requireNativeComponent,
-  View,
-  Platform,
-  findNodeHandle,
+  NativeModules,
   NativeSyntheticEvent,
+  Platform,
+  requireNativeComponent,
 } from "react-native";
 // @ts-ignore
 import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import React from "react";
-import { checkMisnamedProps } from "./Utilities/ViroProps";
-
-var NativeModules = require("react-native").NativeModules;
-var createReactClass = require("create-react-class");
-import PropTypes from "prop-types";
-import { ViroBase } from "./ViroBase";
-import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
-var StyleSheet = require("react-native/Libraries/StyleSheet/StyleSheet");
-var ViroImageModule = NativeModules.VRTImageModule;
-
-var ViroPropTypes = require("./Styles/ViroPropTypes");
-var StyleSheetPropType = require("react-native/Libraries/DeprecatedPropTypes/DeprecatedStyleSheetPropType");
-var stylePropType = StyleSheetPropType(ViroPropTypes);
+import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
+import { checkMisnamedProps } from "./Utilities/ViroProps";
+import { ViroBase } from "./ViroBase";
+const ViroImageModule = NativeModules.VRTImageModule;
 
 type Props = {
   source: ViroSource;

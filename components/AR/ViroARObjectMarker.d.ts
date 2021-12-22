@@ -20,7 +20,6 @@ export declare class ViroARObjectMarker extends ViroBase<Props> {
     _onAnchorFound(event: NativeSyntheticEvent<ViroARAnchorFoundEvent>): void;
     _onAnchorUpdated(event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>): void;
     _onAnchorRemoved(_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>): void;
-    setNativeProps(nativeProps: Props): void;
     render(): JSX.Element;
 }
 export {};

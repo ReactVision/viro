@@ -10,7 +10,7 @@
  */
 "user strict";
 
-import React from "react";
+import * as React from "react";
 import { ViroAnimations } from "./Animation/ViroAnimations";
 import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
 import {

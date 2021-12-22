@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { ViewProps, NativeSyntheticEvent } from "react-native";
 import { ViroExitViroEvent } from "./Types/ViroEvents";
 import { Viro3DPoint } from "./Types/ViroUtils";

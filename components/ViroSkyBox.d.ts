@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { ColorValue, NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroCubeMap } from "./Material/CubeMapPropType";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";

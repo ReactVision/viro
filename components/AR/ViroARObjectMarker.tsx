@@ -12,7 +12,7 @@
 "use strict";
 
 import { ViroBase } from "../ViroBase";
-import React from "react";
+import * as React from "react";
 import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 import {
   ViroARAnchorFoundEvent,
@@ -42,10 +42,6 @@ export class ViroARObjectMarker extends ViroBase<Props> {
     if (this.props.onAnchorRemoved) {
       this.props.onAnchorRemoved();
     }
-  }
-
-  setNativeProps(nativeProps: Props) {
-    this._component?.setNativeProps(nativeProps);
   }
 
   render() {

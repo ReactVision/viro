@@ -11,12 +11,10 @@
  */
 "use strict";
 
-import PropTypes from "prop-types";
-import React from "react";
+import * as React from "react";
 import {
   NativeSyntheticEvent,
   requireNativeComponent,
-  View,
   ViewProps,
 } from "react-native";
 import {
@@ -24,7 +22,6 @@ import {
   ViroAnimatedComponentStartEvent,
 } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
-var createReactClass = require("create-react-class");
 
 type Props = ViewProps & {
   animation: string;

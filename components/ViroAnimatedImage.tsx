@@ -8,57 +8,32 @@
  */
 "use strict";
 
+import * as React from "react";
 import {
-  requireNativeComponent,
-  View,
-  Platform,
-  ViewPropTypes,
-  findNodeHandle,
-  ViewProps,
   NativeSyntheticEvent,
+  Platform,
+  requireNativeComponent,
 } from "react-native";
 // @ts-ignore
 import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import React from "react";
-import { checkMisnamedProps } from "./Utilities/ViroProps";
-
-var NativeModules = require("react-native").NativeModules;
-var createReactClass = require("create-react-class");
-import PropTypes from "prop-types";
+import { ViroAnimation } from "./Animation/ViroAnimations";
+import { ViroCommonProps } from "./AR/ViroCommonProps";
+import { ViroStyle } from "./Styles/ViroStyle";
 import {
+  ViroErrorEvent,
+  ViroLoadEndEvent,
+  ViroLoadStartEvent,
+} from "./Types/ViroEvents";
+import {
+  Viro3DPoint,
   ViroNativeRef,
   ViroPhysicsBody,
-  Viro3DPoint,
   ViroRotation,
   ViroScale,
   ViroSource,
 } from "./Types/ViroUtils";
-import { ViroCommonProps } from "./AR/ViroCommonProps";
-
-import { ViroStyle } from "./Styles/ViroStyle";
-import {
-  ViroVideoErrorEvent,
-  ViroAnimationFinishEvent,
-  ViroAnimationStartEvent,
-  ViroClickEvent,
-  ViroClickState,
-  ViroClickStateEvent,
-  ViroCollisionEvent,
-  ViroDragEvent,
-  ViroErrorEvent,
-  ViroFuseEvent,
-  ViroHoverEvent,
-  ViroLoadEndEvent,
-  ViroLoadStartEvent,
-  ViroNativeTransformUpdateEvent,
-  ViroPinchEvent,
-  ViroRotateEvent,
-  ViroScrollEvent,
-  ViroSwipeEvent,
-  ViroTouchEvent,
-} from "./Types/ViroEvents";
+import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
-import { ViroAnimation } from "./Animation/ViroAnimations";
 
 type Props = ViroCommonProps & {
   source: ViroSource;

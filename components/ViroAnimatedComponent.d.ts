@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroAnimatedComponentFinishEvent, ViroAnimatedComponentStartEvent } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";

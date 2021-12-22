@@ -9,7 +9,7 @@
  * @providesModule Viro3DSceneNavigator
  * @flow
  */
-import React from "react";
+import * as React from "react";
 import { ViewProps } from "react-native";
 import { ViroExitViroEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, Viro3DPoint, ViroSceneDictionary } from "./Types/ViroUtils";

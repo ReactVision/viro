@@ -10,56 +10,66 @@
  * @flow
  */
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARSceneNavigator = void 0;
-const react_1 = __importDefault(require("react"));
+const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroARSceneNavigatorModule = react_native_1.NativeModules.VRTARSceneNavigatorModule;
 var mathRandomOffset = 0;
 /**
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
-class ViroARSceneNavigator extends react_1.default.Component {
-    arSceneNavigator;
-    sceneNavigator;
+class ViroARSceneNavigator extends React.Component {
     _component = null;
-    componentWillMount() {
-        // Precompute a pack of callbacks that's frequently generated and passed to
-        // instances.
-        this.arSceneNavigator = {
-            push: this.push,
-            pop: this.pop,
-            popN: this.popN,
-            jump: this.jump,
-            replace: this.replace,
-            startVideoRecording: this._startVideoRecording,
-            stopVideoRecording: this._stopVideoRecording,
-            takeScreenshot: this._takeScreenshot,
-            resetARSession: this._resetARSession,
-            setWorldOrigin: this._setWorldOrigin,
-            project: this._project,
-            unproject: this._unproject,
-            viroAppProps: {},
-        };
-        this.sceneNavigator = {
-            push: this.push,
-            pop: this.pop,
-            popN: this.popN,
-            jump: this.jump,
-            replace: this.replace,
-            startVideoRecording: this._startVideoRecording,
-            stopVideoRecording: this._stopVideoRecording,
-            takeScreenshot: this._takeScreenshot,
-            resetARSession: this._resetARSession,
-            setWorldOrigin: this._setWorldOrigin,
-            project: this._project,
-            unproject: this._unproject,
-            viroAppProps: {},
-        };
-    }
+    arSceneNavigator = {
+        push: this.push,
+        pop: this.pop,
+        popN: this.popN,
+        jump: this.jump,
+        replace: this.replace,
+        startVideoRecording: this._startVideoRecording,
+        stopVideoRecording: this._stopVideoRecording,
+        takeScreenshot: this._takeScreenshot,
+        resetARSession: this._resetARSession,
+        setWorldOrigin: this._setWorldOrigin,
+        project: this._project,
+        unproject: this._unproject,
+        viroAppProps: {},
+    };
+    sceneNavigator = {
+        push: this.push,
+        pop: this.pop,
+        popN: this.popN,
+        jump: this.jump,
+        replace: this.replace,
+        startVideoRecording: this._startVideoRecording,
+        stopVideoRecording: this._stopVideoRecording,
+        takeScreenshot: this._takeScreenshot,
+        resetARSession: this._resetARSession,
+        setWorldOrigin: this._setWorldOrigin,
+        project: this._project,
+        unproject: this._unproject,
+        viroAppProps: {},
+    };
     constructor(props) {
         super(props);
         var initialSceneTag = this.props.initialSceneKey;
@@ -414,8 +424,12 @@ class ViroARSceneNavigator extends react_1.default.Component {
         // If the user simply passes us the props from the root React component,
         // then we'll have an extra 'rootTag' key which React automatically includes
         // so remove it.
-        delete this.arSceneNavigator.viroAppProps.rootTag;
-        delete this.sceneNavigator.viroAppProps.rootTag;
+        if (this.arSceneNavigator.viroAppProps?.rootTag) {
+            delete this.arSceneNavigator.viroAppProps?.rootTag;
+        }
+        if (this.sceneNavigator.viroAppProps?.rootTag) {
+            delete this.sceneNavigator.viroAppProps?.rootTag;
+        }
         const { viroAppProps = {} } = this.props;
         return (<VRTARSceneNavigator ref={(component) => {
                 this._component = component;

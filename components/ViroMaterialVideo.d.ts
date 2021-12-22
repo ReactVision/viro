@@ -1,6 +1,14 @@
-import React from "react";
+/**
+ * Copyright (c) 2018-present, Viro Media, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
+import * as React from "react";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
-import { ViroVideoBufferStartEvent, ViroErrorEvent, ViroVideoBufferEndEvent, ViroVideoUpdateTimeEvent } from "./Types/ViroEvents";
+import { ViroErrorEvent, ViroVideoBufferEndEvent, ViroVideoBufferStartEvent, ViroVideoUpdateTimeEvent } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
 declare type Props = ViewProps & {
     material?: string;

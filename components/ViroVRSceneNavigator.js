@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Copyright (c) 2018-present, Viro Media, Inc.
  * All rights reserved.
@@ -9,20 +10,35 @@
  * @providesModule ViroVRSceneNavigator
  * @flow
  */
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroVRSceneNavigator = void 0;
-const react_1 = __importDefault(require("react"));
+const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroSceneNavigatorModule = react_native_1.NativeModules.VRTSceneNavigatorModule;
 var mathRandomOffset = 0;
 /**
  * ViroVRSceneNavigator is used to transition between multiple scenes.
  */
-class ViroVRSceneNavigator extends react_1.default.Component {
+class ViroVRSceneNavigator extends React.Component {
     sceneNavigator = {
         push: this.push,
         pop: this.pop,
@@ -331,9 +347,9 @@ class ViroVRSceneNavigator extends react_1.default.Component {
         var i = 0;
         var sceneDictionary = this.state.sceneDictionary;
         for (var scene in sceneDictionary) {
-            var Component = sceneDictionary[scene].sceneClass.scene;
+            var Scene = sceneDictionary[scene].sceneClass.scene;
             var props = sceneDictionary[scene].sceneClass.passProps;
-            views.push(<Component key={"scene" + i} sceneNavigator={this.sceneNavigator} {...props}/>);
+            views.push(<Scene key={"scene" + i} sceneNavigator={this.sceneNavigator} {...props}/>);
             i++;
         }
         return views;
@@ -347,7 +363,9 @@ class ViroVRSceneNavigator extends react_1.default.Component {
         // If the user simply passes us the props from the root React component,
         // then we'll have an extra 'rootTag' key which React automatically includes
         // so remove it.
-        delete this.sceneNavigator.viroAppProps.rootTag;
+        if (this.sceneNavigator.viroAppProps?.rootTag) {
+            delete this.sceneNavigator.viroAppProps?.rootTag;
+        }
         const { viroAppProps = {} } = this.props;
         return (<VRTVRSceneNavigator ref={(component) => {
                 this._component = component;

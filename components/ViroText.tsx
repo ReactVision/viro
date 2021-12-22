@@ -11,7 +11,7 @@
  */
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import { ColorValue, processColor, requireNativeComponent } from "react-native";
 import { ViroTextStyle } from "./Styles/ViroTextStyle";
 import { checkMisnamedProps } from "./Utilities/ViroProps";

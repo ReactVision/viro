@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-import React from "react";
+import * as React from "react";
 import {
   findNodeHandle,
   NativeModules,
@@ -79,10 +79,6 @@ export class ViroVideo extends ViroBase<Props> {
 
   _onFinish() {
     this.props.onFinish && this.props.onFinish();
-  }
-
-  _onError(event: NativeSyntheticEvent<ViroVideoErrorEvent>) {
-    this.props.onError && this.props.onError(event);
   }
 
   _onUpdateTime(event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) {

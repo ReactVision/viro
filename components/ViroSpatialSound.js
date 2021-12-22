@@ -10,18 +10,36 @@
  * @flow
  */
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSpatialSound = void 0;
+const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
-const react_1 = __importDefault(require("react"));
 const ViroProps_1 = require("./Utilities/ViroProps");
-var NativeModules = require("react-native").NativeModules;
-class ViroSpatialSound extends react_1.default.Component {
+class ViroSpatialSound extends React.Component {
     _component = null;
     _onFinish(event) {
         this.props.onFinish && this.props.onFinish(event);
@@ -63,18 +81,18 @@ class ViroSpatialSound extends react_1.default.Component {
         return <VRTSpatialSound {...nativeProps}/>;
     }
     async getTransformAsync() {
-        return await NativeModules.VRTNodeModule.getNodeTransform((0, react_native_1.findNodeHandle)(this));
+        return await react_native_1.NativeModules.VRTNodeModule.getNodeTransform((0, react_native_1.findNodeHandle)(this));
     }
     async getBoundingBoxAsync() {
-        return await NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
+        return await react_native_1.NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
     }
     seekToTime(timeInSeconds) {
         switch (react_native_1.Platform.OS) {
             case "ios":
-                NativeModules.VRTSpatialSoundManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
+                react_native_1.NativeModules.VRTSpatialSoundManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
                 break;
             case "android":
-                NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime, [timeInSeconds]);
+                react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
     }

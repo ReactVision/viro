@@ -17,7 +17,7 @@ import {
   ViroARAnchorUpdatedEvent,
 } from "../Types/ViroEvents";
 import { ViroBase } from "../ViroBase";
-import React from "react";
+import * as React from "react";
 import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 
 type Props = {

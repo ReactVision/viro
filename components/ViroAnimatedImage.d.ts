@@ -1,11 +1,11 @@
 /// <reference types="react" />
 import { NativeSyntheticEvent } from "react-native";
-import { ViroNativeRef, ViroPhysicsBody, Viro3DPoint, ViroRotation, ViroScale, ViroSource } from "./Types/ViroUtils";
+import { ViroAnimation } from "./Animation/ViroAnimations";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroErrorEvent, ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
+import { Viro3DPoint, ViroNativeRef, ViroPhysicsBody, ViroRotation, ViroScale, ViroSource } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-import { ViroAnimation } from "./Animation/ViroAnimations";
 declare type Props = ViroCommonProps & {
     source: ViroSource;
     placeholderSource?: ViroSource;

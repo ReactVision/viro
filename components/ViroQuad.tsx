@@ -11,7 +11,7 @@
  */
 "use strict";
 
-import React from "react";
+import * as React from "react";
 import { requireNativeComponent } from "react-native";
 import { ViroNativeRef, ViroUVCoordinate } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";

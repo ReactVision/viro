@@ -1,5 +1,5 @@
 /// <reference types="react" />
-import { ViroStyle } from "./Styles/ViroPropTypes";
+import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroBase } from "./ViroBase";
 declare type Props = {
     style?: ViroStyle;

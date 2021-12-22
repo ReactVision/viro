@@ -13,7 +13,7 @@
 
 import React from "react";
 import { requireNativeComponent } from "react-native";
-import { ViroStyle } from "./Styles/ViroPropTypes";
+import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroNativeRef } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";

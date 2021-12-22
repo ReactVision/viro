@@ -35,7 +35,7 @@ import {
 } from "./Types/ViroUtils";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
 
-import { ViroStyle } from "./Styles/ViroPropTypes";
+import { ViroStyle } from "./Styles/ViroStyle";
 import {
   ViroVideoErrorEvent,
   ViroAnimationFinishEvent,

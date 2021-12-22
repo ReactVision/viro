@@ -36,7 +36,7 @@ type Props = ViewProps & {
 /**
  * Used to render a skybox as a scene background.
  */
-export class ViroSkybox extends React.Component<Props> {
+export class ViroSkyBox extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
   _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>) {

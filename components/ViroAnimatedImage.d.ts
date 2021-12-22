@@ -2,7 +2,7 @@
 import { NativeSyntheticEvent } from "react-native";
 import { ViroNativeRef, ViroPhysicsBody, Viro3DPoint, ViroRotation, ViroScale, ViroSource } from "./Types/ViroUtils";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
-import { ViroStyle } from "./Styles/ViroPropTypes";
+import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroErrorEvent, ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroBase } from "./ViroBase";
 import { ViroAnimation } from "./Animation/ViroAnimations";

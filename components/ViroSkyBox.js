@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ViroSkybox = void 0;
+exports.ViroSkyBox = void 0;
 const react_1 = __importDefault(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
@@ -23,7 +23,7 @@ const ViroProps_1 = require("./Utilities/ViroProps");
 /**
  * Used to render a skybox as a scene background.
  */
-class ViroSkybox extends react_1.default.Component {
+class ViroSkyBox extends react_1.default.Component {
     constructor() {
         super(...arguments);
         this._component = null;
@@ -58,7 +58,7 @@ class ViroSkybox extends react_1.default.Component {
         return <VRTSkybox {...nativeProps}/>;
     }
 }
-exports.ViroSkybox = ViroSkybox;
+exports.ViroSkyBox = ViroSkyBox;
 var VRTSkybox = react_native_1.requireNativeComponent("VRTSkybox", 
 // @ts-ignore
 ViroSkybox, {

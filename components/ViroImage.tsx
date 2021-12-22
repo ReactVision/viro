@@ -28,7 +28,7 @@ var createReactClass = require("create-react-class");
 import PropTypes from "prop-types";
 import { ViroBase } from "./ViroBase";
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
-import { ViroStyle } from "./Styles/ViroPropTypes";
+import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 var StyleSheet = require("react-native/Libraries/StyleSheet/StyleSheet");
 var ViroImageModule = NativeModules.VRTImageModule;

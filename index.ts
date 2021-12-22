@@ -5,177 +5,239 @@
  */
 
 import { ViroAnimations } from "@components/Animation/ViroAnimations";
-import { ViroMaterials } from "@components/Material/ViroMaterials";
 import { Viro3DObject } from "@components/Viro3DObject";
+import { Viro360Image } from "@components/Viro360Image";
+import { Viro360Video } from "@components/Viro360Video";
+import { ViroAnimatedImage } from "@components/ViroAnimatedImage";
+import { ViroAmbientLight } from "@components/ViroAmbientLight";
+import { ViroAnimatedComponent } from "@components/ViroAnimatedComponent";
+import { ViroARImageMarker } from "@components/AR/ViroARImageMarker";
+import { ViroARObjectMarker } from "@components/AR/ViroARObjectMarker";
+import { ViroARTrackingTargets } from "@components/AR/ViroARTrackingTargets";
+import { ViroARPlane } from "@components/AR/ViroARPlane";
+import { ViroARPlaneSelector } from "@components/AR/ViroARPlaneSelector";
+import { ViroARScene } from "@components/AR/ViroARScene";
+import { ViroARSceneNavigator } from "@components/AR/ViroARSceneNavigator";
+import { ViroBox } from "@components/ViroBox";
+import { ViroButton } from "@components/ViroButton";
+import { ViroCamera } from "@components/ViroCamera";
+import { ViroConstants } from "@components/ViroConstants";
+import { ViroController } from "@components/ViroController";
+import { ViroDirectionalLight } from "@components/ViroDirectionalLight";
+import { ViroFlexView } from "@components/ViroFlexView";
+import { ViroGeometry } from "@components/ViroGeometry";
+import { ViroLightingEnvironment } from "@components/ViroLightingEnvironment";
+import { ViroImage } from "@components/ViroImage";
+import { ViroMaterials } from "@components/Material/ViroMaterials";
+import { ViroMaterialVideo } from "@components/ViroMaterialVideo";
+import { ViroNode } from "@components/ViroNode";
+import { ViroOmniLight } from "@components/ViroOmniLight";
+import { ViroOrbitCamera } from "@components/ViroOrbitCamera";
+import { ViroParticleEmitter } from "@components/ViroParticleEmitter";
+import { ViroPolygon } from "@components/ViroPolygon";
+import { ViroPolyline } from "@components/ViroPolyline";
+import { ViroPortal } from "@components/ViroPortal";
+import { ViroPortalScene } from "@components/ViroPortalScene";
+import { ViroQuad } from "@components/ViroQuad";
 import { ViroScene } from "@components/ViroScene";
+import { ViroSkyBox } from "@components/ViroSkyBox";
+import { ViroSound } from "@components/ViroSound";
+import { ViroSoundField } from "@components/ViroSoundField";
+import { ViroSpatialSound } from "@components/ViroSpatialSound";
+import { ViroSphere } from "@components/ViroSphere";
+import { ViroSpinner } from "@components/ViroSpinner";
+import { ViroSpotLight } from "@components/ViroSpotLight";
+import { ViroText } from "@components/ViroText";
+import { ViroVideo } from "@components/ViroVideo";
+import { ViroVRSceneNavigator } from "@components/ViroVRSceneNavigator";
+import { Viro3DSceneNavigator } from "@components/Viro3DSceneNavigator";
+import { ViroTextStyle } from "@components/Styles/ViroTextStyle";
+import { ViroStyle } from "@components/Styles/ViroStyle";
+import {
+  polarToCartesian,
+  polarToCartesianActual,
+  isARSupportedOnDevice,
+} from "@components/Utilities/ViroUtils";
+import { ViroARCamera } from "@components/AR/ViroARCamera";
+import {
+  ViroHoverEvent,
+  ViroClickEvent,
+  ViroClickStateEvent,
+  ViroTouchEvent,
+  ViroScrollEvent,
+  ViroSwipeEvent,
+  ViroFuseEvent,
+  ViroPinchEvent,
+  ViroRotateEvent,
+  ViroDragEvent,
+  ViroPlatformEvent,
+  ViroCollisionEvent,
+  ViroPlatformInfo,
+  ViroCameraTransformEvent,
+  ViroPlatformUpdateEvent,
+  ViroCameraTransform,
+  ViroExitViroEvent,
+  ViroErrorEvent,
+  ViroAnimationStartEvent,
+  ViroAnimationFinishEvent,
+  ViroLoadStartEvent,
+  ViroLoadEndEvent,
+  ViroLoadErrorEvent,
+  ViroVideoBufferStartEvent,
+  ViroVideoBufferEndEvent,
+  ViroVideoUpdateTimeEvent,
+  ViroVideoErrorEvent,
+  ViroVideoFinishEvent,
+  ViroAnimatedComponentStartEvent,
+  ViroAnimatedComponentFinishEvent,
+  ViroARAnchorRemovedEvent,
+  ViroARAnchorUpdatedEvent,
+  ViroARAnchorFoundEvent,
+  ViroAnchor,
+  ViroAnchorFoundMap,
+  ViroAnchorUpdatedMap,
+  ViroPlaneUpdatedMap,
+  ViroPlaneUpdatedEvent,
+  ViroARPlaneSizes,
+  ViroCameraARHitTestEvent,
+  ViroCameraARHitTest,
+  ViroARHitTestResult,
+  ViroARPointCloudUpdateEvent,
+  ViroARPointCloud,
+  ViroTrackingUpdatedEvent,
+  ViroTrackingState,
+  ViroTrackingReason,
+  ViroAmbientLightUpdateEvent,
+  ViroAmbientLightInfo,
+  ViroWorldOrigin,
+  ViroNativeTransformUpdateEvent,
+  ViroControllerStatusEvent,
+  ViroControllerStatus,
+  ViroPortalEnterEvent,
+  ViroPortalExitEvent,
+  ViroSoundFinishEvent,
+  ViroPinchStateTypes,
+  ViroClickStateTypes,
+  ViroRotateStateTypes,
+} from "@components/Types/ViroEvents";
+import { ViroSurface } from "@components/ViroSurface";
 import { ViroSceneNavigator } from "@components/ViroSceneNavigator";
 
-// TODO: Fill this entirely in with sidebar of docs at
-// https://docs.viromedia.com/docs/viro3dscenenavigator
 export {
-  Viro3DObject,
-  ViroScene,
-  ViroSceneNavigator,
-  ViroAnimations,
+  ViroARImageMarker,
+  ViroARObjectMarker,
+  ViroARTrackingTargets,
+  ViroARPlane,
+  ViroARPlaneSelector,
+  ViroARScene,
+  ViroARSceneNavigator,
+  ViroBox,
+  ViroButton,
+  ViroCamera,
+  ViroConstants,
+  ViroController,
+  ViroDirectionalLight,
+  ViroFlexView,
+  ViroGeometry,
+  ViroLightingEnvironment,
+  ViroImage,
   ViroMaterials,
+  ViroARCamera,
+  ViroMaterialVideo,
+  ViroNode,
+  ViroOmniLight,
+  ViroOrbitCamera,
+  ViroParticleEmitter,
+  ViroPolygon,
+  ViroPolyline,
+  ViroPortal,
+  ViroPortalScene,
+  ViroQuad,
+  ViroScene,
+  ViroSurface,
+  ViroSceneNavigator,
+  ViroSkyBox,
+  ViroAnimations,
+  Viro3DObject,
+  Viro360Image,
+  Viro360Video,
+  ViroAnimatedImage,
+  ViroAmbientLight,
+  ViroAnimatedComponent,
+  ViroSound,
+  ViroSoundField,
+  ViroSpatialSound,
+  ViroSphere,
+  ViroSpinner,
+  ViroSpotLight,
+  ViroText,
+  ViroVideo,
+  ViroVRSceneNavigator,
+  Viro3DSceneNavigator,
+  // Utilities
+  polarToCartesian,
+  polarToCartesianActual,
+  isARSupportedOnDevice,
+  // Types
+  ViroHoverEvent,
+  ViroClickEvent,
+  ViroClickStateEvent,
+  ViroClickStateTypes,
+  ViroTouchEvent,
+  ViroScrollEvent,
+  ViroSwipeEvent,
+  ViroFuseEvent,
+  ViroPinchEvent,
+  ViroPinchStateTypes,
+  ViroRotateEvent,
+  ViroRotateStateTypes,
+  ViroDragEvent,
+  ViroPlatformEvent,
+  ViroCollisionEvent,
+  ViroPlatformInfo,
+  ViroCameraTransformEvent,
+  ViroPlatformUpdateEvent,
+  ViroCameraTransform,
+  ViroExitViroEvent,
+  ViroErrorEvent,
+  ViroAnimationStartEvent,
+  ViroAnimationFinishEvent,
+  ViroLoadStartEvent,
+  ViroLoadEndEvent,
+  ViroLoadErrorEvent,
+  ViroVideoBufferStartEvent,
+  ViroVideoBufferEndEvent,
+  ViroVideoUpdateTimeEvent,
+  ViroVideoErrorEvent,
+  ViroVideoFinishEvent,
+  ViroAnimatedComponentStartEvent,
+  ViroAnimatedComponentFinishEvent,
+  ViroARAnchorRemovedEvent,
+  ViroARAnchorUpdatedEvent,
+  ViroARAnchorFoundEvent,
+  ViroAnchor,
+  ViroAnchorFoundMap,
+  ViroAnchorUpdatedMap,
+  ViroPlaneUpdatedMap,
+  ViroPlaneUpdatedEvent,
+  ViroARPlaneSizes,
+  ViroCameraARHitTestEvent,
+  ViroCameraARHitTest,
+  ViroARHitTestResult,
+  ViroARPointCloudUpdateEvent,
+  ViroARPointCloud,
+  ViroTrackingUpdatedEvent,
+  ViroTrackingState,
+  ViroTrackingReason,
+  ViroAmbientLightUpdateEvent,
+  ViroAmbientLightInfo,
+  ViroWorldOrigin,
+  ViroNativeTransformUpdateEvent,
+  ViroControllerStatusEvent,
+  ViroControllerStatus,
+  ViroPortalEnterEvent,
+  ViroPortalExitEvent,
+  ViroSoundFinishEvent,
+  ViroTextStyle,
+  ViroStyle,
 };
-
-const ReactViro = {
-  // Components
-  get ViroSceneNavigator() {
-    return require("./components/ViroSceneNavigator");
-  },
-  get ViroBox() {
-    return require("./components/ViroBox");
-  },
-  get ViroMaterials() {
-    return require("./components/Material/ViroMaterials");
-  },
-  get ViroMaterialVideo() {
-    return require("./components/ViroMaterialVideo");
-  },
-  get ViroVideo() {
-    return require("./components/ViroVideo");
-  },
-  get Viro360Video() {
-    return require("./components/Viro360Video");
-  },
-  get ViroNode() {
-    return require("./components/ViroNode");
-  },
-  get ViroPortal() {
-    return require("./components/ViroPortal");
-  },
-  get ViroPortalScene() {
-    return require("./components/ViroPortalScene");
-  },
-  get ViroCamera() {
-    return require("./components/ViroCamera");
-  },
-  get ViroOrbitCamera() {
-    return require("./components/ViroOrbitCamera");
-  },
-  get ViroSphere() {
-    return require("./components/ViroSphere");
-  },
-  get ViroImage() {
-    return require("./components/ViroImage");
-  },
-  get Viro360Image() {
-    return require("./components/Viro360Image");
-  },
-  get ViroSkyBox() {
-    return require("./components/ViroSkyBox");
-  },
-  get Viro3DObject() {
-    return Viro3DObject;
-  },
-  get ViroAnimatedComponent() {
-    return require("./components/ViroAnimatedComponent");
-  },
-  get ViroAnimations() {
-    return require("./components/Animation/ViroAnimations");
-  },
-  get ViroDirectionalLight() {
-    return require("./components/ViroDirectionalLight");
-  },
-  get ViroAmbientLight() {
-    return require("./components/ViroAmbientLight");
-  },
-  get ViroOmniLight() {
-    return require("./components/ViroOmniLight");
-  },
-  get ViroSpotLight() {
-    return require("./components/ViroSpotLight");
-  },
-  get ViroFlexView() {
-    return require("./components/ViroFlexView");
-  },
-  get ViroUtils() {
-    return require("./components/Utilities/ViroUtils");
-  },
-  get ViroProps() {
-    return require("./components/Utilities/ViroProps");
-  },
-  get ViroText() {
-    return require("./components/ViroText");
-  },
-  get ViroGeometry() {
-    return require("./components/ViroGeometry");
-  },
-  get ViroSurface() {
-    return require("./components/ViroSurface");
-  },
-  get ViroQuad() {
-    return require("./components/ViroQuad");
-  },
-  get ViroAnimatedImage() {
-    return require("./components/ViroAnimatedImage");
-  },
-  get ViroPolygon() {
-    return require("./components/ViroPolygon");
-  },
-  get ViroButton() {
-    return require("./components/ViroButton");
-  },
-  get ViroSound() {
-    return require("./components/ViroSound");
-  },
-  get ViroSoundField() {
-    return require("./components/ViroSoundField");
-  },
-  get ViroSpatialSound() {
-    return require("./components/ViroSpatialSound");
-  },
-  get ViroController() {
-    return require("./components/ViroController");
-  },
-  get ViroSpinner() {
-    return require("./components/ViroSpinner");
-  },
-  get ViroPolyline() {
-    return require("./components/ViroPolyline");
-  },
-  get ViroConstants() {
-    return require("./components/ViroConstants");
-  },
-  get ViroParticleEmitter() {
-    return require("./components/ViroParticleEmitter");
-  },
-  get ViroLightingEnvironment() {
-    return require("./components/ViroLightingEnvironment");
-  },
-  get Viro3DSceneNavigator() {
-    return require("./components/Viro3DSceneNavigator");
-  },
-  get ViroVRSceneNavigator() {
-    return require("./components/ViroVRSceneNavigator");
-  },
-  // AR Components
-  get ViroARSceneNavigator() {
-    return require("./components/AR/ViroARSceneNavigator");
-  },
-  get ViroARScene() {
-    return require("./components/AR/ViroARScene");
-  },
-  get ViroARPlane() {
-    return require("./components/AR/ViroARPlane");
-  },
-  get ViroARPlaneSelector() {
-    return require("./components/AR/ViroARPlaneSelector");
-  },
-  get ViroARTrackingTargets() {
-    return require("./components/AR/ViroARTrackingTargets");
-  },
-  get ViroARImageMarker() {
-    return require("./components/AR/ViroARImageMarker");
-  },
-  get ViroARObjectMarker() {
-    return require("./components/AR/ViroARObjectMarker");
-  },
-  get ViroARCamera() {
-    return require("./components/AR/ViroARCamera");
-  },
-};
-
-module.exports = ReactViro;

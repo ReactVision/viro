@@ -9,11 +9,9 @@
  * @providesModule ViroTextStyle
  * @flow
  */
-
 import { TextStyle } from "react-native";
-import { ViroStyle } from "./ViroPropTypes";
-
+import { ViroStyle } from "./ViroStyle";
 /**
  * Warning: Some of these properties may not be supported in all releases.
  */
-export type ViroTextStyle = ViroStyle & TextStyle;
+export declare type ViroTextStyle = ViroStyle & TextStyle;

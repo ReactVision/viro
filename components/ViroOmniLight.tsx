@@ -16,13 +16,13 @@ import { ColorValue, requireNativeComponent, ViewProps } from "react-native";
 import { ViroNativeRef, Viro3DPoint } from "./Types/ViroUtils";
 
 type Props = ViewProps & {
-  position: Viro3DPoint;
-  color: ColorValue;
-  intensity: number;
-  temperature: number;
-  influenceBitMask: number;
-  attenuationStartDistance: number;
-  attenuationEndDistance: number;
+  position?: Viro3DPoint;
+  color?: ColorValue;
+  intensity?: number;
+  temperature?: number;
+  influenceBitMask?: number;
+  attenuationStartDistance?: number;
+  attenuationEndDistance?: number;
 };
 
 /**
@@ -31,9 +31,9 @@ type Props = ViewProps & {
 export class ViroOmniLight extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

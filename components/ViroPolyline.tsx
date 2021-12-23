@@ -9,7 +9,7 @@
 
 import * as React from "react";
 import { requireNativeComponent } from "react-native";
-import { Viro2DPoint } from "./Types/ViroUtils";
+import { Viro3DPoint } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 
@@ -17,11 +17,11 @@ type Props = {
   /**
    * Array of 2D points in world space in the xy plane specified as [x,y].
    */
-  points: Viro2DPoint[];
+  points?: Viro3DPoint[];
   /**
    * The thickness of the line specified in meters.
    */
-  thickness: number;
+  thickness?: number;
 };
 
 export class ViroPolyline extends ViroBase<Props> {

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ViroSkybox
+ * @providesModule ViroSkyBox
  * @flow
  */
 "use strict";
@@ -20,15 +20,15 @@ import {
 } from "react-native";
 // @ts-ignore
 import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
-import { ViroCubeMap, ViroResolvedCubeMap } from "./Material/CubeMapPropType";
+import { ViroCubeMap, ViroResolvedCubeMap } from "./Material/ViroMaterials";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 
 type Props = ViewProps & {
-  source: ViroCubeMap;
-  color: ColorValue;
-  format: "RGBA8" | "RGB565";
+  source?: ViroCubeMap;
+  color?: ColorValue;
+  format?: "RGBA8" | "RGB565";
   onLoadStart?: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
   onLoadEnd?: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
 };
@@ -39,17 +39,17 @@ type Props = ViewProps & {
 export class ViroSkyBox extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
-  _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>) {
+  _onLoadStart = (event: NativeSyntheticEvent<ViroLoadStartEvent>) => {
     this.props.onLoadStart && this.props.onLoadStart(event);
-  }
+  };
 
-  _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>) {
+  _onLoadEnd = (event: NativeSyntheticEvent<ViroLoadEndEvent>) => {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
-  }
+  };
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroSkyBox", this.props);
@@ -73,14 +73,14 @@ export class ViroSkyBox extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTSkybox {...nativeProps} />;
+    return <VRTSkyBox {...nativeProps} />;
   }
 }
 
-var VRTSkybox = requireNativeComponent(
+var VRTSkyBox = requireNativeComponent(
   "VRTSkybox",
   // @ts-ignore
-  ViroSkybox,
+  ViroSkyBox,
   {
     nativeOnly: { onViroSkyBoxLoadStart: true, onViroSkyBoxLoadEnd: true },
   }

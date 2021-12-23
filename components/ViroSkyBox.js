@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ViroSkybox
+ * @providesModule ViroSkyBox
  * @flow
  */
 "use strict";
@@ -44,15 +44,15 @@ const ViroProps_1 = require("./Utilities/ViroProps");
  */
 class ViroSkyBox extends React.Component {
     _component = null;
-    _onLoadStart(event) {
+    _onLoadStart = (event) => {
         this.props.onLoadStart && this.props.onLoadStart(event);
-    }
-    _onLoadEnd(event) {
+    };
+    _onLoadEnd = (event) => {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
-    }
-    setNativeProps(nativeProps) {
+    };
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroSkyBox", this.props);
         // Create and set the native props.
@@ -71,12 +71,12 @@ class ViroSkyBox extends React.Component {
         nativeProps.ref = (component) => {
             this._component = component;
         };
-        return <VRTSkybox {...nativeProps}/>;
+        return <VRTSkyBox {...nativeProps}/>;
     }
 }
 exports.ViroSkyBox = ViroSkyBox;
-var VRTSkybox = (0, react_native_1.requireNativeComponent)("VRTSkybox", 
+var VRTSkyBox = (0, react_native_1.requireNativeComponent)("VRTSkybox", 
 // @ts-ignore
-ViroSkybox, {
+ViroSkyBox, {
     nativeOnly: { onViroSkyBoxLoadStart: true, onViroSkyBoxLoadEnd: true },
 });

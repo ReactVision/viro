@@ -50,31 +50,31 @@ class ViroButton extends React.Component {
     state = {
         buttonType: ViroButtonStateTypes.BTN_TYPE_NORMAL,
     };
-    applyImpulse(force, atPosition) {
+    applyImpulse = (force, atPosition) => {
         this._component?.applyImpulse(force, atPosition);
-    }
-    applyTorqueImpulse(torque) {
+    };
+    applyTorqueImpulse = (torque) => {
         this._component?.applyTorqueImpulse(torque);
-    }
-    setVelocity(velocity) {
+    };
+    setVelocity = (velocity) => {
         this._component?.setVelocity(velocity);
-    }
-    _onAnimationStart() {
+    };
+    _onAnimationStart = () => {
         this.props.animation &&
             this.props.animation.onStart &&
             this.props.animation.onStart();
-    }
-    _onAnimationFinish() {
+    };
+    _onAnimationFinish = () => {
         this.props.animation &&
             this.props.animation.onFinish &&
             this.props.animation.onFinish();
-    }
-    async getTransformAsync() {
+    };
+    getTransformAsync = async () => {
         return await this._component?.getTransformAsync();
-    }
-    async getBoundingBoxAsync() {
+    };
+    getBoundingBoxAsync = async () => {
         return await this._component?.getBoundingBoxAsync();
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroButton", this.props);
         // We default to showing the button if it's undefined
@@ -85,9 +85,10 @@ class ViroButton extends React.Component {
         var hoverSource = this.props.hoverSource || this.props.gazeSource;
         var clickSource = this.props.clickSource || this.props.tapSource;
         let buttonScale = this.props.scale || [1, 1, 1];
+        console.log("BUTTON TYPE", this.state.buttonType);
         switch (this.state.buttonType) {
             case ViroButtonStateTypes.BTN_TYPE_HOVER:
-                hoverSrcVisible = this.props.visible && true;
+                hoverSrcVisible = visible && true;
                 clickSrcVisible = false;
                 normalSrcVisible = false;
                 break;
@@ -99,11 +100,11 @@ class ViroButton extends React.Component {
                     0.9 * buttonScale[2],
                 ];
                 hoverSrcVisible = false;
-                clickSrcVisible = this.props.visible && true;
+                clickSrcVisible = visible && true;
                 normalSrcVisible = false;
                 break;
             default:
-                normalSrcVisible = this.props.visible && true;
+                normalSrcVisible = visible && true;
                 hoverSrcVisible = false;
                 clickSrcVisible = false;
         }
@@ -111,7 +112,7 @@ class ViroButton extends React.Component {
         // {...this.props} which will save us time when adding new properties
         return (<ViroNode_1.ViroNode ref={(component) => {
                 this._component = component;
-            }} physicsBody={this.props.physicsBody} position={this.props.position} onTransformUpdate={this.props.onTransformUpdate} onClickState={this.props.onClickState} onTouch={this.props.onTouch} onScroll={this.props.onScroll} onSwipe={this.props.onSwipe} onHover={this._onButtonHover} onClick={this._onButtonClicked} onDrag={this.props.onDrag} onPinch={this.props.onPinch} onRotate={this.props.onRotate} onCollision={this.props.onCollision} viroTag={this.props.viroTag} onFuse={this.props.onFuse} animation={this.props.animation} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} ignoreEventHandling={this.props.ignoreEventHandling} dragType={this.props.dragType}>
+            }} visible={visible} physicsBody={this.props.physicsBody} position={this.props.position} onTransformUpdate={this.props.onTransformUpdate} onClickState={this.props.onClickState} onTouch={this.props.onTouch} onScroll={this.props.onScroll} onSwipe={this.props.onSwipe} onHover={this._onButtonHover} onClick={this._onButtonClicked} onDrag={this.props.onDrag} onPinch={this.props.onPinch} onRotate={this.props.onRotate} onCollision={this.props.onCollision} viroTag={this.props.viroTag} onFuse={this.props.onFuse} animation={this.props.animation} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} ignoreEventHandling={this.props.ignoreEventHandling} dragType={this.props.dragType}>
         <ViroImage_1.ViroImage source={this.props.source} rotation={this.props.rotation} rotationPivot={this.props.rotationPivot} scale={buttonScale} scalePivot={this.props.scalePivot} opacity={this.props.opacity} transformBehaviors={this.props.transformBehaviors} visible={normalSrcVisible} renderingOrder={this.props.renderingOrder} height={this.props.height} width={this.props.width} materials={this.props.materials}/>
 
         <ViroImage_1.ViroImage source={hoverSource ? hoverSource : this.props.source} rotation={this.props.rotation} rotationPivot={this.props.rotationPivot} scale={buttonScale} scalePivot={this.props.scalePivot} opacity={this.props.opacity} transformBehaviors={this.props.transformBehaviors} visible={hoverSrcVisible} renderingOrder={this.props.renderingOrder} height={this.props.height} width={this.props.width} materials={this.props.materials}/>
@@ -127,7 +128,7 @@ class ViroButton extends React.Component {
             }}/>
       </ViroNode_1.ViroNode>);
     }
-    _onButtonHover(isHovering, position, source) {
+    _onButtonHover = (isHovering, position, source) => {
         if (isHovering) {
             this.setState({
                 buttonType: ViroButtonStateTypes.BTN_TYPE_HOVER,
@@ -142,20 +143,20 @@ class ViroButton extends React.Component {
                 buttonType: ViroButtonStateTypes.BTN_TYPE_NORMAL,
             });
         }
-    }
-    _onButtonClicked(position, source) {
+    };
+    _onButtonClicked = (position, source) => {
         this.setState({
             buttonType: ViroButtonStateTypes.BTN_TYPE_CLICKED,
         });
         if (this.props.onClick) {
             this.props.onClick(position, source);
         }
-    }
-    _onAnimationFinished() {
+    };
+    _onAnimationFinished = () => {
         this.setState({
             buttonType: ViroButtonStateTypes.BTN_TYPE_HOVER,
         });
-    }
+    };
 }
 exports.ViroButton = ViroButton;
 ViroAnimations_1.ViroAnimations.registerAnimations({

@@ -45,12 +45,12 @@ const ViroImageModule = react_native_1.NativeModules.VRTImageModule;
  * Used to render a ViroImage
  */
 class ViroImage extends ViroBase_1.ViroBase {
-    _onLoadStart(event) {
+    _onLoadStart = (event) => {
         this.props.onLoadStart && this.props.onLoadStart(event);
-    }
-    _onLoadEnd(event) {
+    };
+    _onLoadEnd = (event) => {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroImage", this.props);
         var defaultPlaceholder = require("./Resources/viro_blank.png");

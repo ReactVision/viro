@@ -43,17 +43,17 @@ type Props = ViewProps & {
 export class ViroSoundField extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
-  _onFinish(event: NativeSyntheticEvent<ViroSoundFinishEvent>) {
+  _onFinish = (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => {
     this.props.onFinish && this.props.onFinish(event);
-  }
+  };
 
-  _onError(event: NativeSyntheticEvent<ViroErrorEvent>) {
+  _onError = (event: NativeSyntheticEvent<ViroErrorEvent>) => {
     this.props.onError && this.props.onError(event);
-  }
+  };
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroSoundField", this.props);
@@ -88,7 +88,7 @@ export class ViroSoundField extends React.Component<Props> {
     return <VRTSoundField {...nativeProps} />;
   }
 
-  seekToTime(timeInSeconds: number) {
+  seekToTime = (timeInSeconds: number) => {
     switch (Platform.OS) {
       case "ios":
         NativeModules.VRTSoundFieldManager.seekToTime(
@@ -104,7 +104,7 @@ export class ViroSoundField extends React.Component<Props> {
         );
         break;
     }
-  }
+  };
 }
 
 var VRTSoundField = requireNativeComponent(

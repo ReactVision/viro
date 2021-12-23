@@ -33,7 +33,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VRTSound = exports.ViroSound = void 0;
+exports.ViroSound = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
@@ -55,18 +55,18 @@ class ViroSound extends React.Component {
         }
         return results;
     };
-    static unloadSounds(soundKeys) {
+    static unloadSounds = (soundKeys) => {
         SoundModule.unloadSounds(soundKeys);
-    }
-    _onFinish(event) {
+    };
+    _onFinish = (event) => {
         this.props.onFinish && this.props.onFinish(event);
-    }
-    _onError(event) {
+    };
+    _onError = (event) => {
         this.props.onError && this.props.onError(event);
-    }
-    setNativeProps(nativeProps) {
+    };
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroSound", this.props);
         var soundSrc = this.props.source;
@@ -97,7 +97,7 @@ class ViroSound extends React.Component {
         };
         return <VRTSound {...nativeProps}/>;
     }
-    seekToTime(timeInSeconds) {
+    seekToTime = (timeInSeconds) => {
         switch (react_native_1.Platform.OS) {
             case "ios":
                 react_native_1.NativeModules.VRTSoundManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
@@ -106,7 +106,7 @@ class ViroSound extends React.Component {
                 react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTSound.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
-    }
+    };
 }
 exports.ViroSound = ViroSound;
 var VRTSound = (0, react_native_1.requireNativeComponent)("VRTSound", 
@@ -117,4 +117,3 @@ ViroSound, {
         onErrorViro: true,
     },
 });
-exports.VRTSound = VRTSound;

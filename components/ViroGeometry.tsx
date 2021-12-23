@@ -9,15 +9,15 @@
 
 import * as React from "react";
 import { requireNativeComponent } from "react-native";
-import { ViroNativeRef } from "./Types/ViroUtils";
+import { Viro2DPoint, Viro3DPoint, ViroNativeRef } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 
 type Props = {
-  vertices: number[];
-  normals: number[];
-  texcoords: number[];
-  triangleIndices: number[][];
+  vertices?: Viro3DPoint[];
+  normals?: Viro3DPoint[];
+  texcoords?: Viro2DPoint[];
+  triangleIndices?: Viro3DPoint[];
 };
 
 export class ViroGeometry extends ViroBase<Props> {

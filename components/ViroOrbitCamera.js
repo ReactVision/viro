@@ -33,8 +33,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroOrbitCamera = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroSceneContext_1 = require("./ViroSceneContext");
 class ViroOrbitCamera extends React.Component {
     _component = null;
+    static contextType = ViroSceneContext_1.ViroSceneContext;
     componentDidMount() {
         this.context.cameraDidMount(this);
     }
@@ -46,9 +48,9 @@ class ViroOrbitCamera extends React.Component {
             this.context.cameraDidUpdate(this, this.props.active);
         }
     }
-    setNativeProps(nativeProps) {
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroOrbitCamera", this.props);

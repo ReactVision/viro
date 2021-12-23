@@ -102,34 +102,34 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
     }
   }
 
-  _getOnClickSurface(index: number) {
+  _getOnClickSurface = (index: number) => {
     return () => {
       this.setState({ selectedSurface: index });
       this._onPlaneSelected(this.state.foundARPlanes[index]);
     };
-  }
+  };
 
-  _onARPlaneUpdated(index: number) {
+  _onARPlaneUpdated = (index: number) => {
     return (updateMap: ViroPlaneUpdatedMap) => {
       this.state.foundARPlanes[index] = updateMap;
       this.setState({
         arPlaneSizes: this.state.arPlaneSizes,
       });
     };
-  }
+  };
 
-  _onPlaneSelected(updateMap: ViroPlaneUpdatedMap) {
+  _onPlaneSelected = (updateMap: ViroPlaneUpdatedMap) => {
     this.props.onPlaneSelected && this.props.onPlaneSelected(updateMap);
-  }
+  };
 
   /*
   This function allows the user to reset the surface and select a new plane.
   */
-  reset() {
+  reset = () => {
     this.setState({
       selectedSurface: -1,
     });
-  }
+  };
 }
 
 ViroMaterials.createMaterials({

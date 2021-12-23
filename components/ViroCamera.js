@@ -48,19 +48,19 @@ class ViroCamera extends React.Component {
             this.context.cameraDidUpdate(this, this.props.active);
         }
     }
-    setNativeProps(nativeProps) {
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
-    _onAnimationStart(_event) {
+    };
+    _onAnimationStart = (_event) => {
         this.props.animation &&
             this.props.animation.onStart &&
             this.props.animation.onStart();
-    }
-    _onAnimationFinish(_event) {
+    };
+    _onAnimationFinish = (_event) => {
         this.props.animation &&
             this.props.animation.onFinish &&
             this.props.animation.onFinish();
-    }
+    };
     render() {
         // Uncomment this to check props
         //checkMisnamedProps("ViroCamera", this.props);

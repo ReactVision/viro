@@ -11,36 +11,40 @@
 
 "use strict";
 
+import * as React from "react";
+import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 import {
   ViroARAnchorFoundEvent,
   ViroARAnchorRemovedEvent,
   ViroARAnchorUpdatedEvent,
 } from "../Types/ViroEvents";
 import { ViroBase } from "../ViroBase";
-import * as React from "react";
-import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
 
 /**
  * Container for Viro Components anchored to a detected image.
  */
 export class ViroARImageMarker extends ViroBase<{}> {
-  _onAnchorFound(event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) {
+  _onAnchorFound = (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => {
     if (this.props.onAnchorFound) {
       this.props.onAnchorFound(event.nativeEvent.anchorFoundMap);
     }
-  }
+  };
 
-  _onAnchorUpdated(event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>) {
+  _onAnchorUpdated = (
+    event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>
+  ) => {
     if (this.props.onAnchorUpdated) {
       this.props.onAnchorUpdated(event.nativeEvent.anchorUpdatedMap);
     }
-  }
+  };
 
-  _onAnchorRemoved(_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>) {
+  _onAnchorRemoved = (
+    _event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>
+  ) => {
     if (this.props.onAnchorRemoved) {
       this.props.onAnchorRemoved();
     }
-  }
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

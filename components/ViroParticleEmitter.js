@@ -97,7 +97,7 @@ class ViroParticleEmitter extends React.Component {
         // For color modifiers, we'll need to processColor for each color value.
         if (this.props.particleAppearance && this.props.particleAppearance.color) {
             let colorModifier = this.props.particleAppearance.color;
-            if (colorModifier.initialRange.length != 2) {
+            if (colorModifier.initialRange?.length != 2) {
                 console.error("The <ViroParticleEmitter> component requires initial value of [min, max] when defining inital rotation property!");
                 return;
             }
@@ -127,11 +127,19 @@ class ViroParticleEmitter extends React.Component {
         if (this.props.particleAppearance &&
             this.props.particleAppearance.rotation) {
             let rotMod = this.props.particleAppearance.rotation;
-            if (rotMod.initialRange.length != 2) {
+            if (rotMod.initialRange.length !== 2) {
                 console.error("The <ViroParticleEmitter> component requires initial value of [min, max] when defining inital rotation property!");
             }
-            let minRotFinal = [0, 0, (rotMod.initialRange[0] * Math.PI) / 180];
-            let maxRotFinal = [0, 0, (rotMod.initialRange[1] * Math.PI) / 180];
+            let minRotFinal = [
+                0,
+                0,
+                (rotMod.initialRange[0] * Math.PI) / 180,
+            ];
+            let maxRotFinal = [
+                0,
+                0,
+                (rotMod.initialRange[1] * Math.PI) / 180,
+            ];
             let modifierFinal = [];
             let interpolationLength = rotMod.interpolation != undefined ? rotMod.interpolation.length : 0;
             for (var i = 0; i < interpolationLength; i++) {

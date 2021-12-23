@@ -61,21 +61,25 @@ export class ViroCamera extends React.Component<Props, State> {
     }
   }
 
-  setNativeProps(nativeProps: any) {
+  setNativeProps = (nativeProps: any) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
-  _onAnimationStart(_event: NativeSyntheticEvent<ViroAnimationStartEvent>) {
+  _onAnimationStart = (
+    _event: NativeSyntheticEvent<ViroAnimationStartEvent>
+  ) => {
     this.props.animation &&
       this.props.animation.onStart &&
       this.props.animation.onStart();
-  }
+  };
 
-  _onAnimationFinish(_event: NativeSyntheticEvent<ViroAnimationFinishEvent>) {
+  _onAnimationFinish = (
+    _event: NativeSyntheticEvent<ViroAnimationFinishEvent>
+  ) => {
     this.props.animation &&
       this.props.animation.onFinish &&
       this.props.animation.onFinish();
-  }
+  };
 
   render() {
     // Uncomment this to check props

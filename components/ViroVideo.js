@@ -38,19 +38,19 @@ const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Ima
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
 class ViroVideo extends ViroBase_1.ViroBase {
-    _onBufferStart(event) {
+    _onBufferStart = (event) => {
         this.props.onBufferStart && this.props.onBufferStart(event);
-    }
-    _onBufferEnd(event) {
+    };
+    _onBufferEnd = (event) => {
         this.props.onBufferEnd && this.props.onBufferEnd(event);
-    }
-    _onFinish() {
+    };
+    _onFinish = () => {
         this.props.onFinish && this.props.onFinish();
-    }
-    _onUpdateTime(event) {
+    };
+    _onUpdateTime = (event) => {
         this.props.onUpdateTime &&
             this.props.onUpdateTime(event.nativeEvent.currentTime, event.nativeEvent.totalTime);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroVideo", this.props);
         var source = (0, resolveAssetSource_1.default)(this.props.source);
@@ -111,7 +111,7 @@ class ViroVideo extends ViroBase_1.ViroBase {
         };
         return <VRTVideoSurface {...nativeProps}/>;
     }
-    seekToTime(timeInSeconds) {
+    seekToTime = (timeInSeconds) => {
         switch (react_native_1.Platform.OS) {
             case "ios":
                 react_native_1.NativeModules.VRTVideoSurfaceManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
@@ -120,7 +120,7 @@ class ViroVideo extends ViroBase_1.ViroBase {
                 react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTVideoSurface.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
-    }
+    };
 }
 exports.ViroVideo = ViroVideo;
 var VRTVideoSurface = (0, react_native_1.requireNativeComponent)("VRTVideoSurface", 

@@ -35,23 +35,27 @@ type Props = {
  * Container for Viro Components anchored to a detected plane.
  */
 export class ViroARPlane extends ViroBase<Props> {
-  _onAnchorFound(event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) {
+  _onAnchorFound = (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => {
     if (this.props.onAnchorFound) {
       this.props.onAnchorFound(event.nativeEvent.anchorFoundMap);
     }
-  }
+  };
 
-  _onAnchorUpdated(event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>) {
+  _onAnchorUpdated = (
+    event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>
+  ) => {
     if (this.props.onAnchorUpdated) {
       this.props.onAnchorUpdated(event.nativeEvent.anchorUpdatedMap);
     }
-  }
+  };
 
-  _onAnchorRemoved(_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>) {
+  _onAnchorRemoved = (
+    _event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>
+  ) => {
     if (this.props.onAnchorRemoved) {
       this.props.onAnchorRemoved();
     }
-  }
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

@@ -11,7 +11,7 @@ declare type Props = ViewProps & {
      * Callback triggered when we are processing the assets to be
      * used in computing this lighting environment (either downloading / reading from file).
      */
-    onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+    onLoadStart?: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
     /**
      * Callback triggered when we have finished processing assets to be
      * used in computing this lighting environment. Wether or not assets were
@@ -24,19 +24,19 @@ declare type Props = ViewProps & {
      *   }
      *
      */
-    onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+    onLoadEnd?: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     /**
      * Callback triggered when the hdr image fails to load. Invoked with
      * {nativeEvent: {error}}
      */
-    onError: (event: NativeSyntheticEvent<ViroLoadErrorEvent>) => void;
+    onError?: (event: NativeSyntheticEvent<ViroLoadErrorEvent>) => void;
 };
 export declare class ViroLightingEnvironment extends React.Component<Props> {
     _component: ViroNativeRef;
-    _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>): void;
-    _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>): void;
-    _onError(event: NativeSyntheticEvent<ViroLoadErrorEvent>): void;
-    setNativeProps(nativeProps: Props): void;
+    _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+    _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+    _onError: (event: NativeSyntheticEvent<ViroLoadErrorEvent>) => void;
+    setNativeProps: (nativeProps: Props) => void;
     render(): JSX.Element;
 }
 export {};

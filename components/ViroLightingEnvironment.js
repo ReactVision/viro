@@ -41,18 +41,18 @@ const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Ima
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroLightingEnvironment extends React.Component {
     _component = null;
-    _onLoadStart(event) {
+    _onLoadStart = (event) => {
         this.props.onLoadStart && this.props.onLoadStart(event);
-    }
-    _onLoadEnd(event) {
+    };
+    _onLoadEnd = (event) => {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
-    }
-    _onError(event) {
+    };
+    _onError = (event) => {
         this.props.onError && this.props.onError(event);
-    }
-    setNativeProps(nativeProps) {
+    };
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroLightingEnvironment", this.props);
         var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);

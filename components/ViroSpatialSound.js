@@ -41,15 +41,15 @@ const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Ima
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroSpatialSound extends React.Component {
     _component = null;
-    _onFinish(event) {
+    _onFinish = (event) => {
         this.props.onFinish && this.props.onFinish(event);
-    }
-    _onError(event) {
+    };
+    _onError = (event) => {
         this.props.onError && this.props.onError(event);
-    }
-    setNativeProps(nativeProps) {
+    };
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroSpatialSound", this.props);
         var soundSrc = this.props.source;
@@ -80,13 +80,13 @@ class ViroSpatialSound extends React.Component {
         };
         return <VRTSpatialSound {...nativeProps}/>;
     }
-    async getTransformAsync() {
+    getTransformAsync = async () => {
         return await react_native_1.NativeModules.VRTNodeModule.getNodeTransform((0, react_native_1.findNodeHandle)(this));
-    }
-    async getBoundingBoxAsync() {
+    };
+    getBoundingBoxAsync = async () => {
         return await react_native_1.NativeModules.VRTNodeModule.getBoundingBox((0, react_native_1.findNodeHandle)(this));
-    }
-    seekToTime(timeInSeconds) {
+    };
+    seekToTime = (timeInSeconds) => {
         switch (react_native_1.Platform.OS) {
             case "ios":
                 react_native_1.NativeModules.VRTSpatialSoundManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
@@ -95,7 +95,7 @@ class ViroSpatialSound extends React.Component {
                 react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTSpatialSound.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
-    }
+    };
 }
 exports.ViroSpatialSound = ViroSpatialSound;
 var VRTSpatialSound = (0, react_native_1.requireNativeComponent)("VRTSpatialSound", 

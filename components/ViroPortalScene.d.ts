@@ -14,16 +14,16 @@ import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroPortalEnterEvent, ViroPortalExitEvent } from "./Types/ViroEvents";
 import { ViroBase } from "./ViroBase";
 declare type Props = ViroCommonProps & {
-    onPortalEnter: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
-    onPortalExit: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
-    passable: boolean;
+    onPortalEnter?: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
+    onPortalExit?: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
+    passable?: boolean;
 };
 /**
  * Portal container for revealing different sections of the scene graph.
  */
 export declare class ViroPortalScene extends ViroBase<Props> {
-    _onPortalEnter(event: NativeSyntheticEvent<ViroPortalEnterEvent>): void;
-    _onPortalExit(event: NativeSyntheticEvent<ViroPortalExitEvent>): void;
+    _onPortalEnter: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
+    _onPortalExit: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
     render(): JSX.Element;
 }
 export {};

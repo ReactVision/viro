@@ -30,28 +30,28 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARImageMarker = void 0;
-const ViroBase_1 = require("../ViroBase");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroBase_1 = require("../ViroBase");
 /**
  * Container for Viro Components anchored to a detected image.
  */
 class ViroARImageMarker extends ViroBase_1.ViroBase {
-    _onAnchorFound(event) {
+    _onAnchorFound = (event) => {
         if (this.props.onAnchorFound) {
             this.props.onAnchorFound(event.nativeEvent.anchorFoundMap);
         }
-    }
-    _onAnchorUpdated(event) {
+    };
+    _onAnchorUpdated = (event) => {
         if (this.props.onAnchorUpdated) {
             this.props.onAnchorUpdated(event.nativeEvent.anchorUpdatedMap);
         }
-    }
-    _onAnchorRemoved(_event) {
+    };
+    _onAnchorRemoved = (_event) => {
         if (this.props.onAnchorRemoved) {
             this.props.onAnchorRemoved();
         }
-    }
+    };
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroARImageMarker", this.props);

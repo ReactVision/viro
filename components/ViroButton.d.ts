@@ -47,16 +47,16 @@ export declare class ViroButton extends React.Component<Props, State> {
     state: {
         buttonType: ViroButtonStateTypes;
     };
-    applyImpulse(force: ViroForce, atPosition: Viro3DPoint): void;
-    applyTorqueImpulse(torque: ViroTorque): void;
-    setVelocity(velocity: ViroVelocity): void;
-    _onAnimationStart(): void;
-    _onAnimationFinish(): void;
-    getTransformAsync(): Promise<any>;
-    getBoundingBoxAsync(): Promise<any>;
+    applyImpulse: (force: ViroForce, atPosition: Viro3DPoint) => void;
+    applyTorqueImpulse: (torque: ViroTorque) => void;
+    setVelocity: (velocity: ViroVelocity) => void;
+    _onAnimationStart: () => void;
+    _onAnimationFinish: () => void;
+    getTransformAsync: () => Promise<any>;
+    getBoundingBoxAsync: () => Promise<any>;
     render(): JSX.Element;
-    _onButtonHover(isHovering: boolean, position: Viro3DPoint, source: ViroSource): void;
-    _onButtonClicked(position: Viro3DPoint, source: ViroSource): void;
-    _onAnimationFinished(): void;
+    _onButtonHover: (isHovering: boolean, position: Viro3DPoint, source: ViroSource) => void;
+    _onButtonClicked: (position: Viro3DPoint, source: ViroSource) => void;
+    _onAnimationFinished: () => void;
 }
 export {};

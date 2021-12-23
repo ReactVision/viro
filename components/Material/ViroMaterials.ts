@@ -10,71 +10,115 @@
  * @flow
  */
 
-// @ts-ignore
-import { resolveAssetSource } from "react-native/Libraries/Image/resolveAssetSource";
+import {
+  ColorValue,
+  ImageResolvedAssetSource,
+  NativeModules,
+  processColor,
+} from "react-native";
 // @ts-ignore
 import assetRegistry from "react-native/Libraries/Image/AssetRegistry";
+const resolveAssetSource = require("react-native/Libraries/Image/resolveAssetSource");
+import { ViroSource } from "../Types/ViroUtils";
 
-import { NativeModules, processColor } from "react-native";
-import { MaterialValidation } from "./MaterialValidation";
 var MaterialManager = NativeModules.VRTMaterialManager;
 
+// Reflective textures are cube maps(nx, px, ny, py, nz, pz), which is
+// left(negative x), right(positive x), down(neg y), up(pos y), forward(neg z), backward(pos z)
+
+export type ViroCubeMap = {
+  nx: ViroSource;
+  px: ViroSource;
+  ny: ViroSource;
+  py: ViroSource;
+  nz: ViroSource;
+  pz: ViroSource;
+};
+
+export type ViroResolvedCubeMap = {
+  nx: ImageResolvedAssetSource;
+  px: ImageResolvedAssetSource;
+  ny: ImageResolvedAssetSource;
+  py: ImageResolvedAssetSource;
+  nz: ImageResolvedAssetSource;
+  pz: ImageResolvedAssetSource;
+};
+
+export type ViroMaterial = {
+  shininess?: number;
+  fresnelExponent?: number;
+  lightingModel?: "Phong" | "Blinn" | "Lambert" | "Constant" | "PBR";
+  writesToDepthBuffer?: boolean;
+  readsFromDepthBuffer?: boolean;
+  colorWritesMask?: "None" | "Red" | "Green" | "Blue" | "Alpha" | "All";
+  cullMode?: "None" | "Back" | "Front";
+  blendMode?: "None" | "Alpha" | "Add" | "Subtract" | "Multiply" | "Screen";
+  diffuseTexture?: any; // TODO: types
+  diffuseIntensity?: number;
+  specularTexture?: any; // TODO: types
+  normalTexture?: any; // TODO: types
+  reflectiveTexture?: ViroCubeMap;
+  diffuseColor?: ColorValue;
+  chromaKeyFilteringColor?: ColorValue;
+  wrapS?: "Clamp" | "Repeat" | "Mirror";
+  wrapT?: "Clamp" | "Repeat" | "Mirror";
+  minificationFilter?: "Nearest" | "Linear";
+  magnificationFilter?: "Nearest" | "Linear";
+  mipFilter?: "Nearest" | "Linear";
+  bloomThreshold?: number;
+  roughness?: number;
+  roughnessTexture?: any; // TODO: types
+  metalness?: number;
+  metalnessTexture?: any; // TODO: types
+  ambientOcclusionTexture?: any; // TODO: types
+};
+
+export type ViroMaterialDict = {
+  [key: string]: ViroMaterial;
+};
+
 export class ViroMaterials {
-  static createMaterials(materials: any) {
+  static createMaterials(materials: ViroMaterialDict) {
     var result: any = {};
     for (var key in materials) {
-      MaterialValidation.validateMaterial(key, materials);
-      var materialDict = materials[key];
+      var material = materials[key] as any; // TODO: as ViroMaterial; // types weren't working
       var resultMaterial: any = {};
-      for (var materialProperty in materialDict) {
+      for (var prop in material) {
         //not the best check, modify to make sure property ends with texture..
-        if (
-          materialProperty.endsWith("texture") ||
-          materialProperty.endsWith("Texture")
-        ) {
+        if (prop.endsWith("texture") || prop.endsWith("Texture")) {
           //textures point to assets, so lets resolve the asset
-          if (
-            materialProperty === "ReflectiveTexture" ||
-            materialProperty === "reflectiveTexture"
-          ) {
+          if (prop === "ReflectiveTexture" || prop === "reflectiveTexture") {
             var reflectiveShape: any = {};
-            for (var cubeMapTexture in materialDict[materialProperty]) {
+            for (var cubeMapTexture in material[prop]) {
               var cubeMapSource = resolveAssetSource(
-                materialDict[materialProperty][cubeMapTexture]
+                material[prop][cubeMapTexture]
               );
               reflectiveShape[cubeMapTexture] = cubeMapSource;
             }
-            resultMaterial[materialProperty] = reflectiveShape;
-          } else if (materialDict[materialProperty].hasOwnProperty("source")) {
-            var source = resolveAssetSource(
-              materialDict[materialProperty]["source"]
-            );
-            resultMaterial[materialProperty] = materialDict[materialProperty];
-            resultMaterial[materialProperty]["source"] = source;
+            resultMaterial[prop] = reflectiveShape;
+          } else if (material[prop].hasOwnProperty("source")) {
+            var source = resolveAssetSource(material[prop]["source"]);
+            resultMaterial[prop] = material[prop];
+            resultMaterial[prop]["source"] = source;
           } else {
             var assetType = "unknown";
-            if (typeof materialDict[materialProperty] !== "object") {
-              var asset = assetRegistry.getAssetByID(
-                materialDict[materialProperty]
-              );
+            if (typeof material[prop] !== "object") {
+              var asset = assetRegistry.getAssetByID(material[prop]);
               if (asset) {
                 assetType = asset.type;
               }
             }
 
-            var source = resolveAssetSource(materialDict[materialProperty]);
+            var source = resolveAssetSource(material[prop]);
             source["type"] = assetType;
-            resultMaterial[materialProperty] = source;
+            resultMaterial[prop] = source;
           }
-        } else if (
-          materialProperty.endsWith("color") ||
-          materialProperty.endsWith("Color")
-        ) {
-          var color = processColor(materialDict[materialProperty]);
-          resultMaterial[materialProperty] = color;
+        } else if (prop.endsWith("color") || prop.endsWith("Color")) {
+          var color = processColor(material[prop]);
+          resultMaterial[prop] = color;
         } else {
           //just apply material property directly.
-          resultMaterial[materialProperty] = materialDict[materialProperty];
+          resultMaterial[prop] = material[prop];
         }
         result[key] = resultMaterial;
       }

@@ -37,21 +37,21 @@ const react_native_1 = require("react-native");
  * Container for Viro Components anchored to a detected plane.
  */
 class ViroARPlane extends ViroBase_1.ViroBase {
-    _onAnchorFound(event) {
+    _onAnchorFound = (event) => {
         if (this.props.onAnchorFound) {
             this.props.onAnchorFound(event.nativeEvent.anchorFoundMap);
         }
-    }
-    _onAnchorUpdated(event) {
+    };
+    _onAnchorUpdated = (event) => {
         if (this.props.onAnchorUpdated) {
             this.props.onAnchorUpdated(event.nativeEvent.anchorUpdatedMap);
         }
-    }
-    _onAnchorRemoved(_event) {
+    };
+    _onAnchorRemoved = (_event) => {
         if (this.props.onAnchorRemoved) {
             this.props.onAnchorRemoved();
         }
-    }
+    };
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroARPlane", this.props);

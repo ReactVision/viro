@@ -64,21 +64,21 @@ export class ViroSound extends React.Component<Props> {
     return results;
   };
 
-  static unloadSounds(soundKeys: ViroSound[]) {
+  static unloadSounds = (soundKeys: ViroSound[]) => {
     SoundModule.unloadSounds(soundKeys);
-  }
+  };
 
-  _onFinish(event: NativeSyntheticEvent<ViroSoundFinishEvent>) {
+  _onFinish = (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => {
     this.props.onFinish && this.props.onFinish(event);
-  }
+  };
 
-  _onError(event: NativeSyntheticEvent<ViroErrorEvent>) {
+  _onError = (event: NativeSyntheticEvent<ViroErrorEvent>) => {
     this.props.onError && this.props.onError(event);
-  }
+  };
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroSound", this.props);
@@ -113,7 +113,7 @@ export class ViroSound extends React.Component<Props> {
     return <VRTSound {...nativeProps} />;
   }
 
-  seekToTime(timeInSeconds: number) {
+  seekToTime = (timeInSeconds: number) => {
     switch (Platform.OS) {
       case "ios":
         NativeModules.VRTSoundManager.seekToTime(
@@ -129,7 +129,7 @@ export class ViroSound extends React.Component<Props> {
         );
         break;
     }
-  }
+  };
 }
 
 var VRTSound = requireNativeComponent(
@@ -143,5 +143,3 @@ var VRTSound = requireNativeComponent(
     },
   }
 );
-
-export { VRTSound };

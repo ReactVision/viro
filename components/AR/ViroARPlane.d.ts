@@ -22,9 +22,9 @@ declare type Props = {
  * Container for Viro Components anchored to a detected plane.
  */
 export declare class ViroARPlane extends ViroBase<Props> {
-    _onAnchorFound(event: NativeSyntheticEvent<ViroARAnchorFoundEvent>): void;
-    _onAnchorUpdated(event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>): void;
-    _onAnchorRemoved(_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>): void;
+    _onAnchorFound: (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => void;
+    _onAnchorUpdated: (event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>) => void;
+    _onAnchorRemoved: (_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>) => void;
     render(): JSX.Element;
 }
 export {};

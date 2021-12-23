@@ -38,12 +38,12 @@ const ViroBase_1 = require("./ViroBase");
  * Portal container for revealing different sections of the scene graph.
  */
 class ViroPortalScene extends ViroBase_1.ViroBase {
-    _onPortalEnter(event) {
+    _onPortalEnter = (event) => {
         this.props.onPortalEnter && this.props.onPortalEnter(event);
-    }
-    _onPortalExit(event) {
+    };
+    _onPortalExit = (event) => {
         this.props.onPortalExit && this.props.onPortalExit(event);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroPortalScene", this.props);
         // Since transformBehaviors can be either a string or an array, convert the string to a 1-element array.

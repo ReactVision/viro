@@ -9,15 +9,15 @@
  * @providesModule ViroARImageMarker
  */
 /// <reference types="react" />
+import { NativeSyntheticEvent } from "react-native";
 import { ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent } from "../Types/ViroEvents";
 import { ViroBase } from "../ViroBase";
-import { NativeSyntheticEvent } from "react-native";
 /**
  * Container for Viro Components anchored to a detected image.
  */
 export declare class ViroARImageMarker extends ViroBase<{}> {
-    _onAnchorFound(event: NativeSyntheticEvent<ViroARAnchorFoundEvent>): void;
-    _onAnchorUpdated(event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>): void;
-    _onAnchorRemoved(_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>): void;
+    _onAnchorFound: (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => void;
+    _onAnchorUpdated: (event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>) => void;
+    _onAnchorRemoved: (_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>) => void;
     render(): JSX.Element;
 }

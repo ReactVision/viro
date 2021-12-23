@@ -19,23 +19,23 @@ import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 
 type Props = ViroCommonProps & {
-  onPortalEnter: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
-  onPortalExit: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
+  onPortalEnter?: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
+  onPortalExit?: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
 
-  passable: boolean;
+  passable?: boolean;
 };
 
 /**
  * Portal container for revealing different sections of the scene graph.
  */
 export class ViroPortalScene extends ViroBase<Props> {
-  _onPortalEnter(event: NativeSyntheticEvent<ViroPortalEnterEvent>) {
+  _onPortalEnter = (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => {
     this.props.onPortalEnter && this.props.onPortalEnter(event);
-  }
+  };
 
-  _onPortalExit(event: NativeSyntheticEvent<ViroPortalExitEvent>) {
+  _onPortalExit = (event: NativeSyntheticEvent<ViroPortalExitEvent>) => {
     this.props.onPortalExit && this.props.onPortalExit(event);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroPortalScene", this.props);

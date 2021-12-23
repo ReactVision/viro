@@ -46,17 +46,17 @@ type Props = ViewProps & {
 export class ViroSpatialSound extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
-  _onFinish(event: NativeSyntheticEvent<ViroSoundFinishEvent>) {
+  _onFinish = (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => {
     this.props.onFinish && this.props.onFinish(event);
-  }
+  };
 
-  _onError(event: NativeSyntheticEvent<ViroErrorEvent>) {
+  _onError = (event: NativeSyntheticEvent<ViroErrorEvent>) => {
     this.props.onError && this.props.onError(event);
-  }
+  };
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroSpatialSound", this.props);
@@ -91,19 +91,19 @@ export class ViroSpatialSound extends React.Component<Props> {
     return <VRTSpatialSound {...nativeProps} />;
   }
 
-  async getTransformAsync() {
+  getTransformAsync = async () => {
     return await NativeModules.VRTNodeModule.getNodeTransform(
       findNodeHandle(this)
     );
-  }
+  };
 
-  async getBoundingBoxAsync() {
+  getBoundingBoxAsync = async () => {
     return await NativeModules.VRTNodeModule.getBoundingBox(
       findNodeHandle(this)
     );
-  }
+  };
 
-  seekToTime(timeInSeconds: number) {
+  seekToTime = (timeInSeconds: number) => {
     switch (Platform.OS) {
       case "ios":
         NativeModules.VRTSpatialSoundManager.seekToTime(
@@ -119,7 +119,7 @@ export class ViroSpatialSound extends React.Component<Props> {
         );
         break;
     }
-  }
+  };
 }
 
 var VRTSpatialSound = requireNativeComponent(

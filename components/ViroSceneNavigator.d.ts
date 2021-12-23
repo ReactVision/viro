@@ -18,7 +18,7 @@ declare type Props = ViewProps & {
     /**
      * A flag to enable/disable some debug features
      */
-    debug: boolean;
+    debug?: boolean;
     /**
      * ViroSceneNavigator uses "scene" objects like the following to
      * describe a scene.
@@ -34,7 +34,7 @@ declare type Props = ViewProps & {
      * Called when either the user physically decides to exit vr (hits
      * the "X" buton).
      */
-    onExitViro: () => void;
+    onExitViro?: () => void;
 };
 declare type State = {
     sceneDictionary: ViroSceneDictionary;
@@ -64,7 +64,7 @@ export declare class ViroSceneNavigator extends React.Component<Props, State> {
      * Called from native when either the user physically decides to exit vr (hits
      * the "X" buton).
      */
-    _onExitViro(_event: NativeSyntheticEvent<ViroExitViroEvent>): void;
+    _onExitViro: (_event: NativeSyntheticEvent<ViroExitViroEvent>) => void;
     constructor(props: Props);
     getRandomTag(): string;
     /**

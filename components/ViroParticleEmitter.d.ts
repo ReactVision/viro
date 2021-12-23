@@ -3,16 +3,12 @@ import { ColorValue, NativeSyntheticEvent } from "react-native";
 import { ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroNativeTransformUpdateEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
-declare type ViroInterpolation = {
-    interval: number[];
-    endValue: number;
-}[];
 declare type Props = ViroObjectProps & {
-    duration: number;
-    delay: number;
-    loop: boolean;
-    run: boolean;
-    fixedToEmitter: boolean;
+    delay?: number;
+    duration?: number;
+    loop?: boolean;
+    run?: boolean;
+    fixedToEmitter?: boolean;
     image: {
         source: ViroSource;
         height: number;
@@ -23,63 +19,75 @@ declare type Props = ViroObjectProps & {
     width?: number;
     bloomThreshold?: number;
     blendMode?: string;
-    spawnBehavior: {
+    spawnBehavior?: {
         emissionRatePerSecond?: number[];
         emissionRatePerMeter?: number[];
         particleLifetime?: number[];
         maxParticles?: number;
         emissionBurst?: {
-            time: number;
-            min: number;
-            max: number;
-            cycles: number;
-            cooldownPeriod: number;
+            time?: number;
+            min?: number;
+            max?: number;
+            cycles?: number;
+            cooldownPeriod?: number;
         } | {
-            distance: number;
-            min: number;
-            max: number;
-            cycles: number;
-            cooldownDistance: number;
+            distance?: number;
+            min?: number;
+            max?: number;
+            cycles?: number;
+            cooldownDistance?: number;
         };
-        spawnVolume: {
-            shape: string;
-            params: number[];
-            spawnOnSurface: boolean;
+        spawnVolume?: {
+            shape?: string;
+            params?: number[];
+            spawnOnSurface?: boolean;
         };
     };
     particleAppearance?: {
-        opacity: {
+        opacity?: {
             initialRange: number[];
-            factor: "Time" | "Distance";
-            interpolation: ViroInterpolation;
+            factor?: "Time" | "Distance" | "time" | "distance";
+            interpolation?: {
+                interval?: number[];
+                endValue?: number;
+            }[];
         };
-        scale: {
-            initialRange: number[][];
-            factor: "Time" | "Distance";
-            interpolation: ViroInterpolation;
+        scale?: {
+            initialRange?: number[][];
+            factor?: "Time" | "Distance" | "time" | "distance";
+            interpolation?: {
+                interval?: number[];
+                endValue?: number[];
+            }[];
         };
-        rotation: {
-            initialRange: number[];
-            factor: "Time" | "Distance";
-            interpolation: ViroInterpolation;
+        rotation?: {
+            initialRange?: number[];
+            factor?: "Time" | "Distance" | "time" | "distance";
+            interpolation?: {
+                interval?: number[];
+                endValue?: number;
+            }[];
         };
-        color: {
-            initialRange: ColorValue[];
-            factor: "Time" | "Distance";
-            interpolation: ViroInterpolation;
+        color?: {
+            initialRange?: ColorValue[];
+            factor?: "Time" | "Distance" | "time" | "distance";
+            interpolation?: {
+                interval?: number[];
+                endValue?: ColorValue;
+            }[];
         };
     };
     particlePhysics?: {
-        velocity: {
-            initialRange: number[][];
+        velocity?: {
+            initialRange?: number[][];
         };
-        acceleration: {
-            initialRange: number[][];
+        acceleration?: {
+            initialRange?: number[][];
         };
-        explosiveImpulse: {
-            impulse: number;
-            position: number[];
-            decelerationPeriod: number;
+        explosiveImpulse?: {
+            impulse?: number;
+            position?: number[];
+            decelerationPeriod?: number;
         };
     };
 };

@@ -54,18 +54,18 @@ type Props = ViroCommonProps & {
   imageClipMode?: "None" | "ClipToBounds";
   stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
 
-  materials: ViroSource[];
-  animation: ViroAnimation;
-  transformBehaviors: string | string[];
-  highAccuracyEvents: boolean;
-  lightReceivingBitMask: number;
-  shadowCastingBitMask: number;
-  onTransformUpdate: (position: Viro3DPoint) => void;
-  visible: boolean;
-  style: ViroStyle;
+  materials?: ViroSource[];
+  animation?: ViroAnimation;
+  transformBehaviors?: string | string[];
+  highAccuracyEvents?: boolean;
+  lightReceivingBitMask?: number;
+  shadowCastingBitMask?: number;
+  onTransformUpdate?: (position: Viro3DPoint) => void;
+  visible?: boolean;
+  style?: ViroStyle;
 
-  paused: boolean;
-  loop: boolean;
+  paused?: boolean;
+  loop?: boolean;
 
   /**
    * Callback triggered when we are processing the assets to be
@@ -85,30 +85,30 @@ type Props = ViroCommonProps & {
    *   }
    *
    */
-  onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+  onLoadEnd?: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
 
   /**
    * Callback triggered when the image fails to load. Invoked with
    * {nativeEvent: {error}}
    */
-  onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
-  physicsBody: ViroPhysicsBody;
+  onError?: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+  physicsBody?: ViroPhysicsBody;
 
-  renderingOrder: number;
-  viroTag: string;
-  onCollision: () => void;
+  renderingOrder?: number;
+  viroTag?: string;
+  onCollision?: () => void;
 };
 
 export class ViroAnimatedImage extends ViroBase<Props> {
   _component: ViroNativeRef = null;
 
-  _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>) {
+  _onLoadStart = (event: NativeSyntheticEvent<ViroLoadStartEvent>) => {
     this.props.onLoadStart && this.props.onLoadStart(event);
-  }
+  };
 
-  _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>) {
+  _onLoadEnd = (event: NativeSyntheticEvent<ViroLoadEndEvent>) => {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroAnimatedImage", this.props);

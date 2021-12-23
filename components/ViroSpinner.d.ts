@@ -1,7 +1,7 @@
 /// <reference types="react" />
 import { ViroBase } from "./ViroBase";
 declare type Props = {
-    type?: "Dark" | "Light";
+    type?: "Dark" | "Light" | "dark" | "light";
 };
 /**
  * Composite control for a 2D Spinner

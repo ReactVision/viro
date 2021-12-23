@@ -41,8 +41,8 @@ declare type Props = {
  * Used to render a ViroImage
  */
 export declare class ViroImage extends ViroBase<Props> {
-    _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>): void;
-    _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>): void;
+    _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+    _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     render(): JSX.Element;
     static evictFromCache: (imageSource: ViroSource) => void;
 }

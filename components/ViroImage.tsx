@@ -72,13 +72,13 @@ type Props = {
  * Used to render a ViroImage
  */
 export class ViroImage extends ViroBase<Props> {
-  _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>) {
+  _onLoadStart = (event: NativeSyntheticEvent<ViroLoadStartEvent>) => {
     this.props.onLoadStart && this.props.onLoadStart(event);
-  }
+  };
 
-  _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>) {
+  _onLoadEnd = (event: NativeSyntheticEvent<ViroLoadEndEvent>) => {
     this.props.onLoadEnd && this.props.onLoadEnd(event);
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroImage", this.props);

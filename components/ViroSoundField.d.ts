@@ -14,10 +14,10 @@ declare type Props = ViewProps & {
 };
 export declare class ViroSoundField extends React.Component<Props> {
     _component: ViroNativeRef;
-    _onFinish(event: NativeSyntheticEvent<ViroSoundFinishEvent>): void;
-    _onError(event: NativeSyntheticEvent<ViroErrorEvent>): void;
-    setNativeProps(nativeProps: Props): void;
+    _onFinish: (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => void;
+    _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+    setNativeProps: (nativeProps: Props) => void;
     render(): JSX.Element;
-    seekToTime(timeInSeconds: number): void;
+    seekToTime: (timeInSeconds: number) => void;
 }
 export {};

@@ -60,9 +60,9 @@ class ViroSceneNavigator extends React.Component {
      * Called from native when either the user physically decides to exit vr (hits
      * the "X" buton).
      */
-    _onExitViro(_event) {
+    _onExitViro = (_event) => {
         this.props.onExitViro && this.props.onExitViro();
-    }
+    };
     constructor(props) {
         super(props);
         var initialSceneTag = this.props.initialSceneKey;

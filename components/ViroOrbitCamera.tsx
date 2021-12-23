@@ -15,17 +15,20 @@ import * as React from "react";
 import { requireNativeComponent, ViewProps } from "react-native";
 import { ViroAnimation } from "./Animation/ViroAnimations";
 import { Viro3DPoint, ViroNativeRef } from "./Types/ViroUtils";
+import { ViroSceneContext } from "./ViroSceneContext";
 
 export type Props = ViewProps & {
   position?: Viro3DPoint;
   focalPoint?: Viro3DPoint;
   active: boolean;
   animation?: ViroAnimation;
-  fieldOfView: number;
+  fieldOfView?: number;
 };
 
 export class ViroOrbitCamera extends React.Component<Props> {
   _component: ViroNativeRef = null;
+
+  static contextType?: React.Context<any> | undefined = ViroSceneContext;
 
   componentDidMount() {
     this.context.cameraDidMount(this);
@@ -41,9 +44,9 @@ export class ViroOrbitCamera extends React.Component<Props> {
     }
   }
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

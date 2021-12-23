@@ -34,37 +34,38 @@ type Props = ViewProps & {
    * Callback invoked when the underlying video component begins buffering. Called at
    * least once at the beginning of playback/video creation.
    */
-  onBufferStart: (
+  onBufferStart?: (
     event: NativeSyntheticEvent<ViroVideoBufferStartEvent>
   ) => void;
 
   /**
    * Callback invoked when the underlying video component has finished buffering.
    */
-  onBufferEnd: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
+  onBufferEnd?: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
 
   /**
    * Callback that is called when the video is finished playing. This
    * function isn't called at the end of a video if looping is enabled.
    */
-  onFinish: () => void;
+  onFinish?: () => void;
 
   /**
    * Callback that is called when the current playback position has changed.
    * This is called in the form:
    *     onUpdateTime(currentPlaybackTimeInSeconds, totalPlayBackDurationInSeconds);
    */
-  onUpdateTime: (currentTime: number, totalTime: number) => void;
+  onUpdateTime?: (currentTime: number, totalTime: number) => void;
 
   /**
    * Callback triggered when the video fails to load. Invoked with
    * {nativeEvent: {error}}
    */
-  onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+  onError?: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
 };
 
 export class ViroMaterialVideo extends React.Component<Props> {
   _component: ViroNativeRef = null;
+
   componentWillUnmount() {
     // pause the current video texture on Android since java gc will release when it feels like it.
     if (Platform.OS == "android") {
@@ -76,33 +77,33 @@ export class ViroMaterialVideo extends React.Component<Props> {
     }
   }
 
-  _onBufferStart(event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) {
+  _onBufferStart = (event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) => {
     this.props.onBufferStart && this.props.onBufferStart(event);
-  }
+  };
 
-  _onBufferEnd(event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) {
+  _onBufferEnd = (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => {
     this.props.onBufferEnd && this.props.onBufferEnd(event);
-  }
+  };
 
-  _onFinish() {
+  _onFinish = () => {
     this.props.onFinish && this.props.onFinish();
-  }
+  };
 
-  _onError(event: NativeSyntheticEvent<ViroErrorEvent>) {
+  _onError = (event: NativeSyntheticEvent<ViroErrorEvent>) => {
     this.props.onError && this.props.onError(event);
-  }
+  };
 
-  _onUpdateTime(event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) {
+  _onUpdateTime = (event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) => {
     this.props.onUpdateTime &&
       this.props.onUpdateTime(
         event.nativeEvent.currentTime,
         event.nativeEvent.totalTime
       );
-  }
+  };
 
-  setNativeProps(nativeProps: Props) {
+  setNativeProps = (nativeProps: Props) => {
     this._component?.setNativeProps(nativeProps);
-  }
+  };
 
   render() {
     // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
@@ -121,7 +122,7 @@ export class ViroMaterialVideo extends React.Component<Props> {
     return <VRTMaterialVideo {...nativeProps} />;
   }
 
-  seekToTime(timeInSeconds: number) {
+  seekToTime = (timeInSeconds: number) => {
     switch (Platform.OS) {
       case "ios":
         NativeModules.VRTMaterialVideoManager.seekToTime(
@@ -137,7 +138,7 @@ export class ViroMaterialVideo extends React.Component<Props> {
         );
         break;
     }
-  }
+  };
 }
 
 var VRTMaterialVideo = requireNativeComponent(

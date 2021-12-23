@@ -38,9 +38,9 @@ const react_native_1 = require("react-native");
  */
 class ViroOmniLight extends React.Component {
     _component = null;
-    setNativeProps(nativeProps) {
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroOmniLight", this.props);

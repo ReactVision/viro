@@ -83,37 +83,37 @@ export class ViroButton extends React.Component<Props, State> {
     buttonType: ViroButtonStateTypes.BTN_TYPE_NORMAL,
   };
 
-  applyImpulse(force: ViroForce, atPosition: Viro3DPoint) {
+  applyImpulse = (force: ViroForce, atPosition: Viro3DPoint) => {
     this._component?.applyImpulse(force, atPosition);
-  }
+  };
 
-  applyTorqueImpulse(torque: ViroTorque) {
+  applyTorqueImpulse = (torque: ViroTorque) => {
     this._component?.applyTorqueImpulse(torque);
-  }
+  };
 
-  setVelocity(velocity: ViroVelocity) {
+  setVelocity = (velocity: ViroVelocity) => {
     this._component?.setVelocity(velocity);
-  }
+  };
 
-  _onAnimationStart() {
+  _onAnimationStart = () => {
     this.props.animation &&
       this.props.animation.onStart &&
       this.props.animation.onStart();
-  }
+  };
 
-  _onAnimationFinish() {
+  _onAnimationFinish = () => {
     this.props.animation &&
       this.props.animation.onFinish &&
       this.props.animation.onFinish();
-  }
+  };
 
-  async getTransformAsync() {
+  getTransformAsync = async () => {
     return await this._component?.getTransformAsync();
-  }
+  };
 
-  async getBoundingBoxAsync() {
+  getBoundingBoxAsync = async () => {
     return await this._component?.getBoundingBoxAsync();
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroButton", this.props);
@@ -128,9 +128,10 @@ export class ViroButton extends React.Component<Props, State> {
     var clickSource = this.props.clickSource || this.props.tapSource;
 
     let buttonScale = this.props.scale || [1, 1, 1];
+    console.log("BUTTON TYPE", this.state.buttonType);
     switch (this.state.buttonType) {
       case ViroButtonStateTypes.BTN_TYPE_HOVER:
-        hoverSrcVisible = this.props.visible && true;
+        hoverSrcVisible = visible && true;
         clickSrcVisible = false;
         normalSrcVisible = false;
         break;
@@ -142,11 +143,11 @@ export class ViroButton extends React.Component<Props, State> {
           0.9 * buttonScale[2],
         ];
         hoverSrcVisible = false;
-        clickSrcVisible = this.props.visible && true;
+        clickSrcVisible = visible && true;
         normalSrcVisible = false;
         break;
       default:
-        normalSrcVisible = this.props.visible && true;
+        normalSrcVisible = visible && true;
         hoverSrcVisible = false;
         clickSrcVisible = false;
     }
@@ -158,6 +159,7 @@ export class ViroButton extends React.Component<Props, State> {
         ref={(component: ViroNode) => {
           this._component = component;
         }}
+        visible={visible}
         physicsBody={this.props.physicsBody}
         position={this.props.position}
         onTransformUpdate={this.props.onTransformUpdate}
@@ -236,11 +238,11 @@ export class ViroButton extends React.Component<Props, State> {
     );
   }
 
-  _onButtonHover(
+  _onButtonHover = (
     isHovering: boolean,
     position: Viro3DPoint,
     source: ViroSource
-  ) {
+  ) => {
     if (isHovering) {
       this.setState({
         buttonType: ViroButtonStateTypes.BTN_TYPE_HOVER,
@@ -254,22 +256,22 @@ export class ViroButton extends React.Component<Props, State> {
         buttonType: ViroButtonStateTypes.BTN_TYPE_NORMAL,
       });
     }
-  }
+  };
 
-  _onButtonClicked(position: Viro3DPoint, source: ViroSource) {
+  _onButtonClicked = (position: Viro3DPoint, source: ViroSource) => {
     this.setState({
       buttonType: ViroButtonStateTypes.BTN_TYPE_CLICKED,
     });
     if (this.props.onClick) {
       this.props.onClick(position, source);
     }
-  }
+  };
 
-  _onAnimationFinished() {
+  _onAnimationFinished = () => {
     this.setState({
       buttonType: ViroButtonStateTypes.BTN_TYPE_HOVER,
     });
-  }
+  };
 }
 
 ViroAnimations.registerAnimations({

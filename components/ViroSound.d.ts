@@ -17,12 +17,11 @@ declare type Props = ViewProps & {
 export declare class ViroSound extends React.Component<Props> {
     _component: ViroNativeRef;
     static preloadSounds: (soundMap: ViroSoundMap) => Promise<ViroSoundPreloadResult>;
-    static unloadSounds(soundKeys: ViroSound[]): void;
-    _onFinish(event: NativeSyntheticEvent<ViroSoundFinishEvent>): void;
-    _onError(event: NativeSyntheticEvent<ViroErrorEvent>): void;
-    setNativeProps(nativeProps: Props): void;
+    static unloadSounds: (soundKeys: ViroSound[]) => void;
+    _onFinish: (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => void;
+    _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+    setNativeProps: (nativeProps: Props) => void;
     render(): JSX.Element;
-    seekToTime(timeInSeconds: number): void;
+    seekToTime: (timeInSeconds: number) => void;
 }
-declare var VRTSound: import("react-native").HostComponent<unknown>;
-export { VRTSound };
+export {};

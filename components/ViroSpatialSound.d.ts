@@ -17,12 +17,12 @@ declare type Props = ViewProps & {
 };
 export declare class ViroSpatialSound extends React.Component<Props> {
     _component: ViroNativeRef;
-    _onFinish(event: NativeSyntheticEvent<ViroSoundFinishEvent>): void;
-    _onError(event: NativeSyntheticEvent<ViroErrorEvent>): void;
-    setNativeProps(nativeProps: Props): void;
+    _onFinish: (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => void;
+    _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+    setNativeProps: (nativeProps: Props) => void;
     render(): JSX.Element;
-    getTransformAsync(): Promise<any>;
-    getBoundingBoxAsync(): Promise<any>;
-    seekToTime(timeInSeconds: number): void;
+    getTransformAsync: () => Promise<any>;
+    getBoundingBoxAsync: () => Promise<any>;
+    seekToTime: (timeInSeconds: number) => void;
 }
 export {};

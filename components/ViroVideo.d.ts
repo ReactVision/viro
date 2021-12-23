@@ -4,7 +4,7 @@ import { ViroVideoBufferEndEvent, ViroVideoBufferStartEvent, ViroVideoErrorEvent
 import { ViroSource } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 declare type Props = {
-    stereoMode: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
+    stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
     width?: number;
     height?: number;
     paused?: boolean;
@@ -16,34 +16,34 @@ declare type Props = {
      * Callback invoked when the underlying video component begins buffering. Called at
      * least once at the beginning of playback/video creation.
      */
-    onBufferStart: (event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) => void;
+    onBufferStart?: (event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) => void;
     /**
      * Callback invoked when the underlying video component has finished buffering.
      */
-    onBufferEnd: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
+    onBufferEnd?: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
     /**
      * Callback that is called when the video is finished playing. This
      * function isn't called at the end of a video if looping is enabled.
      */
-    onFinish: () => void;
+    onFinish?: () => void;
     /**
      * Callback that is called when the current playback position has changed.
      * This is called in the form:
      *     onUpdateTime(currentPlaybackTimeInSeconds, totalPlayBackDurationInSeconds);
      */
-    onUpdateTime: (currentTime: number, totalTime: number) => void;
+    onUpdateTime?: (currentTime: number, totalTime: number) => void;
     /**
      * Callback triggered when the video fails to load. Invoked with
      * {nativeEvent: {error}}
      */
-    onError: (event: NativeSyntheticEvent<ViroVideoErrorEvent>) => void;
+    onError?: (event: NativeSyntheticEvent<ViroVideoErrorEvent>) => void;
 };
 export declare class ViroVideo extends ViroBase<Props> {
-    _onBufferStart(event: NativeSyntheticEvent<ViroVideoBufferStartEvent>): void;
-    _onBufferEnd(event: NativeSyntheticEvent<ViroVideoBufferEndEvent>): void;
-    _onFinish(): void;
-    _onUpdateTime(event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>): void;
+    _onBufferStart: (event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) => void;
+    _onBufferEnd: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
+    _onFinish: () => void;
+    _onUpdateTime: (event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) => void;
     render(): JSX.Element;
-    seekToTime(timeInSeconds: number): void;
+    seekToTime: (timeInSeconds: number) => void;
 }
 export {};

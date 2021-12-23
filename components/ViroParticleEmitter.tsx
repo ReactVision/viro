@@ -28,16 +28,17 @@ import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 
 type ViroInterpolation = {
-  interval: number[];
-  endValue: number;
+  interval?: number[];
+  endValue: number[];
 }[];
 
 type Props = ViroObjectProps & {
-  duration: number;
-  delay: number;
-  loop: boolean;
-  run: boolean;
-  fixedToEmitter: boolean;
+  // The delay in milliseconds to apply before this emitter starts a new emission cycle. Particles are produced during each emission cycle.
+  delay?: number;
+  duration?: number;
+  loop?: boolean;
+  run?: boolean;
+  fixedToEmitter?: boolean;
 
   image: {
     source: ViroSource;
@@ -50,69 +51,143 @@ type Props = ViroObjectProps & {
   bloomThreshold?: number;
   blendMode?: string;
 
-  spawnBehavior: {
+  spawnBehavior?: {
+    // The total number of particles this emitter spawns in a second. This value is
+    // chosen at random from the given [min, max] range array, and is in addition
+    // to the other emission parameters.
     emissionRatePerSecond?: number[];
+    // The total number of particles this emitter spawns per meter travelled. This
+    // value is chosen at random from the given [min, max] range array, and is in
+    // addition to the other emission parameters.
     emissionRatePerMeter?: number[];
+    // The lifetime of a particle in milliseconds.
     particleLifetime?: number[];
+    // The maximum number of live particles that can exist at any moment from
+    // this emitter. This includes particles that have been created by the
+    // emissionRatePerSecond, emissionRatePerMeter, and emissionBurst parameters.
+    // When the cap is reached, new particles will only be spawned as existing particles die off.
     maxParticles?: number;
+
+    // An array of parameters controlling how this emitter spawns particles in
+    // bursts, if any. Bursts can be scheduled to occur at certain times, or
+    // after a certain distance travelled by the emitter.
     emissionBurst?:
       | {
-          time: number;
-          min: number;
-          max: number;
-          cycles: number;
-          cooldownPeriod: number;
+          // Time in milliseconds, at which to emit this burst of particles. This time is set in reference to the start of the emission cycle of this emitter.
+          time?: number;
+          // The minimum number of particles to burst.
+          min?: number;
+          // The maximum number of particles to burst.
+          max?: number;
+          // The number of times to loop and repeat this burst.
+          cycles?: number;
+          // The cool down / waiting duration between cycles before the emitter
+          // spawns another burst of particles.
+          cooldownPeriod?: number;
         }
       | {
-          distance: number;
-          min: number;
-          max: number;
-          cycles: number;
-          cooldownDistance: number;
+          // Can also be in terms of distance travelled, in meters.|
+          distance?: number;
+          // The minimum number of particles to burst.
+          min?: number;
+          // The maximum number of particles to burst.
+          max?: number;
+          // The number of times to loop and repeat this burst.
+          cycles?: number;
+          // The cool down / waiting duration between cycles before the emitter
+          // spawns another burst of particles.
+          cooldownDistance?: number;
         };
-    spawnVolume: {
-      shape: string;
-      params: number[];
-      spawnOnSurface: boolean;
+    // The shape of the volume within which to spawn particles, and the parameters
+    // that describe that volume. If spawnOnSurface is true, particles will spawn on
+    // the surface of the volume, instead of within the volume. Note that particles
+    // will be uniformly distributed throughout the volume.
+    spawnVolume?: {
+      // Box: [width, height, and length]
+      // Sphere: A single float describing a radius parameter for a perfect sphere,
+      // or a vector representing the [x, y, z] length of an ellipsoid.
+      shape?: string;
+      params?: number[];
+      spawnOnSurface?: boolean;
     };
   };
 
   particleAppearance?: {
-    opacity: {
+    opacity?: {
+      // The [min, max] range array within which to initialize a randomized opacity for
+      // particles to start of with.
       initialRange: number[];
-      factor: "Time" | "Distance";
-      interpolation: ViroInterpolation;
+      // The unit of reference against which to interpolate your visual property values,
+      // can be either time or distance.
+      factor?: "Time" | "Distance" | "time" | "distance";
+      // An array of data points, each containing an endValue and an interpolation
+      // interval, thereby "charting" the behavior of this property over the lifetime
+      // of the particle.
+      interpolation?: {
+        interval?: number[];
+        endValue?: number;
+      }[];
     };
-    scale: {
-      initialRange: number[][];
-      factor: "Time" | "Distance";
-      interpolation: ViroInterpolation;
+    scale?: {
+      // The [min, max] range array within which to initialize a randomized opacity for
+      // particles to start of with. Here, min and max are vectors, as particles are
+      // scaled in 3d space.
+      initialRange?: number[][];
+      // The unit of reference against which to interpolate your visual property values,
+      // can be either time or distance.
+      factor?: "Time" | "Distance" | "time" | "distance";
+      // An array of data points, each containing an endValue and an interpolation
+      // interval, thereby "charting" the behavior of this property over the lifetime
+      // of the particle.
+      interpolation?: {
+        interval?: number[];
+        endValue?: number[];
+      }[];
     };
     // rotation is only about the Z axis
-    rotation: {
-      initialRange: number[];
-      factor: "Time" | "Distance";
-      interpolation: ViroInterpolation;
+    rotation?: {
+      // The [min, max] range array defining the interval of initial rotation values
+      // for each particle. Min and max are floats. Rotation is performed on the
+      // quad's Z axis, and are then billboarded to the user.
+      initialRange?: number[];
+      // The unit of reference against which to interpolate visual property values, can
+      // be either time or distance.
+      factor?: "Time" | "Distance" | "time" | "distance";
+      // An array of data points, each containing an endValue and an interpolation
+      // interval, thereby "charting" the behavior of this property over the lifetime
+      // of the particle.
+      interpolation?: {
+        interval?: number[];
+        endValue?: number;
+      }[];
     };
-    color: {
-      initialRange: ColorValue[];
-      factor: "Time" | "Distance";
-      interpolation: ViroInterpolation;
+    color?: {
+      // The [min, max] range within which to initialize each particle's color.
+      initialRange?: ColorValue[];
+      // The unit of reference against which to interpolate your visual property values,
+      // can be either time or distance.
+      factor?: "Time" | "Distance" | "time" | "distance";
+      // An array of data points, each containing an endValue and an interpolation interval,
+      // thereby "charting" the behavior of this property over the lifetime of the particle.
+      interpolation?: {
+        interval?: number[];
+        endValue?: ColorValue;
+      }[];
     };
   };
 
   particlePhysics?: {
-    velocity: {
-      initialRange: number[][];
+    velocity?: {
+      initialRange?: number[][];
     };
-    acceleration: {
-      initialRange: number[][];
+    acceleration?: {
+      initialRange?: number[][];
     };
 
-    explosiveImpulse: {
-      impulse: number;
-      position: number[];
-      decelerationPeriod: number;
+    explosiveImpulse?: {
+      impulse?: number;
+      position?: number[];
+      decelerationPeriod?: number;
     };
   };
 };
@@ -195,7 +270,7 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
     // For color modifiers, we'll need to processColor for each color value.
     if (this.props.particleAppearance && this.props.particleAppearance.color) {
       let colorModifier = this.props.particleAppearance.color;
-      if (colorModifier.initialRange.length != 2) {
+      if (colorModifier.initialRange?.length != 2) {
         console.error(
           "The <ViroParticleEmitter> component requires initial value of [min, max] when defining inital rotation property!"
         );
@@ -210,10 +285,10 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
           : 0;
       for (let i = 0; i < interpolationLength; i++) {
         let processedColor = processColor(
-          colorModifier.interpolation[i].endValue
+          (colorModifier.interpolation as any)[i].endValue as ColorValue
         );
         let mod = {
-          interval: colorModifier.interpolation[i].interval,
+          interval: (colorModifier.interpolation as any[])[i].interval,
           endValue: processedColor,
         };
         modifierFinal.push(mod);
@@ -232,13 +307,21 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
       this.props.particleAppearance.rotation
     ) {
       let rotMod = this.props.particleAppearance.rotation;
-      if (rotMod.initialRange.length != 2) {
+      if ((rotMod.initialRange as any[]).length !== 2) {
         console.error(
           "The <ViroParticleEmitter> component requires initial value of [min, max] when defining inital rotation property!"
         );
       }
-      let minRotFinal = [0, 0, (rotMod.initialRange[0] * Math.PI) / 180];
-      let maxRotFinal = [0, 0, (rotMod.initialRange[1] * Math.PI) / 180];
+      let minRotFinal = [
+        0,
+        0,
+        ((rotMod.initialRange as number[])[0] * Math.PI) / 180,
+      ];
+      let maxRotFinal = [
+        0,
+        0,
+        ((rotMod.initialRange as number[])[1] * Math.PI) / 180,
+      ];
       let modifierFinal = [];
       let interpolationLength =
         rotMod.interpolation != undefined ? rotMod.interpolation.length : 0;
@@ -246,10 +329,10 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
         let processedRot = [
           0,
           0,
-          (rotMod.interpolation[i].endValue * Math.PI) / 180,
+          ((rotMod.interpolation as any[])[i].endValue * Math.PI) / 180,
         ];
         let mod = {
-          interval: rotMod.interpolation[i].interval,
+          interval: (rotMod.interpolation as any[])[i].interval,
           endValue: processedRot,
         };
         modifierFinal.push(mod);

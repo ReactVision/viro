@@ -14,20 +14,14 @@ exports.ViroAnimations = void 0;
  */
 const react_native_1 = require("react-native");
 const AnimationManager = react_native_1.NativeModules.VRTAnimationManager;
-const ViroAnimationValidation_1 = require("./ViroAnimationValidation");
 class ViroAnimations {
     static registerAnimations(animations) {
         for (var key in animations) {
-            if (animations[key].constructor === Array) {
-                // Validate a given animation chain.
-                ViroAnimationValidation_1.ViroAnimationValidation.validateAnimationChain(key, animations);
-            }
-            else {
-                // Validate single animation.
-                ViroAnimationValidation_1.ViroAnimationValidation.validateAnimation(key, animations);
-                if (animations[key].properties && animations[key].properties.color) {
-                    var newColor = (0, react_native_1.processColor)(animations[key].properties.color);
-                    animations[key].properties.color = newColor;
+            if (!Array.isArray(animations[key])) {
+                const animation = animations[key];
+                if (animation.properties && animation.properties.color) {
+                    var newColor = (0, react_native_1.processColor)(animation.properties.color);
+                    animation.properties.color = newColor;
                 }
             }
         }

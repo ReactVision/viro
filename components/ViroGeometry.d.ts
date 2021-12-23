@@ -7,12 +7,13 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 /// <reference types="react" />
+import { Viro2DPoint, Viro3DPoint } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 declare type Props = {
-    vertices: number[];
-    normals: number[];
-    texcoords: number[];
-    triangleIndices: number[][];
+    vertices?: Viro3DPoint[];
+    normals?: Viro3DPoint[];
+    texcoords?: Viro2DPoint[];
+    triangleIndices?: Viro3DPoint[];
 };
 export declare class ViroGeometry extends ViroBase<Props> {
     render(): JSX.Element;

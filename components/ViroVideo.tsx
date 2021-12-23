@@ -27,7 +27,7 @@ import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 
 type Props = {
-  stereoMode: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
+  stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
   width?: number;
   height?: number;
   paused?: boolean;
@@ -39,55 +39,55 @@ type Props = {
    * Callback invoked when the underlying video component begins buffering. Called at
    * least once at the beginning of playback/video creation.
    */
-  onBufferStart: (
+  onBufferStart?: (
     event: NativeSyntheticEvent<ViroVideoBufferStartEvent>
   ) => void;
 
   /**
    * Callback invoked when the underlying video component has finished buffering.
    */
-  onBufferEnd: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
+  onBufferEnd?: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
 
   /**
    * Callback that is called when the video is finished playing. This
    * function isn't called at the end of a video if looping is enabled.
    */
-  onFinish: () => void;
+  onFinish?: () => void;
 
   /**
    * Callback that is called when the current playback position has changed.
    * This is called in the form:
    *     onUpdateTime(currentPlaybackTimeInSeconds, totalPlayBackDurationInSeconds);
    */
-  onUpdateTime: (currentTime: number, totalTime: number) => void;
+  onUpdateTime?: (currentTime: number, totalTime: number) => void;
 
   /**
    * Callback triggered when the video fails to load. Invoked with
    * {nativeEvent: {error}}
    */
-  onError: (event: NativeSyntheticEvent<ViroVideoErrorEvent>) => void;
+  onError?: (event: NativeSyntheticEvent<ViroVideoErrorEvent>) => void;
 };
 
 export class ViroVideo extends ViroBase<Props> {
-  _onBufferStart(event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) {
+  _onBufferStart = (event: NativeSyntheticEvent<ViroVideoBufferStartEvent>) => {
     this.props.onBufferStart && this.props.onBufferStart(event);
-  }
+  };
 
-  _onBufferEnd(event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) {
+  _onBufferEnd = (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => {
     this.props.onBufferEnd && this.props.onBufferEnd(event);
-  }
+  };
 
-  _onFinish() {
+  _onFinish = () => {
     this.props.onFinish && this.props.onFinish();
-  }
+  };
 
-  _onUpdateTime(event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) {
+  _onUpdateTime = (event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) => {
     this.props.onUpdateTime &&
       this.props.onUpdateTime(
         event.nativeEvent.currentTime,
         event.nativeEvent.totalTime
       );
-  }
+  };
 
   render() {
     checkMisnamedProps("ViroVideo", this.props);
@@ -159,7 +159,7 @@ export class ViroVideo extends ViroBase<Props> {
     return <VRTVideoSurface {...nativeProps} />;
   }
 
-  seekToTime(timeInSeconds: number) {
+  seekToTime = (timeInSeconds: number) => {
     switch (Platform.OS) {
       case "ios":
         NativeModules.VRTVideoSurfaceManager.seekToTime(
@@ -175,7 +175,7 @@ export class ViroVideo extends ViroBase<Props> {
         );
         break;
     }
-  }
+  };
 }
 
 var VRTVideoSurface = requireNativeComponent(

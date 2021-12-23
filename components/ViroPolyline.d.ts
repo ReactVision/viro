@@ -7,17 +7,17 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 /// <reference types="react" />
-import { Viro2DPoint } from "./Types/ViroUtils";
+import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 declare type Props = {
     /**
      * Array of 2D points in world space in the xy plane specified as [x,y].
      */
-    points: Viro2DPoint[];
+    points?: Viro3DPoint[];
     /**
      * The thickness of the line specified in meters.
      */
-    thickness: number;
+    thickness?: number;
 };
 export declare class ViroPolyline extends ViroBase<Props> {
     render(): JSX.Element;

@@ -20,17 +20,17 @@ declare type Props = ViroCommonProps & {
     resizeMode?: "ScaleToFill" | "ScaleToFit" | "StretchToFill";
     imageClipMode?: "None" | "ClipToBounds";
     stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
-    materials: ViroSource[];
-    animation: ViroAnimation;
-    transformBehaviors: string | string[];
-    highAccuracyEvents: boolean;
-    lightReceivingBitMask: number;
-    shadowCastingBitMask: number;
-    onTransformUpdate: (position: Viro3DPoint) => void;
-    visible: boolean;
-    style: ViroStyle;
-    paused: boolean;
-    loop: boolean;
+    materials?: ViroSource[];
+    animation?: ViroAnimation;
+    transformBehaviors?: string | string[];
+    highAccuracyEvents?: boolean;
+    lightReceivingBitMask?: number;
+    shadowCastingBitMask?: number;
+    onTransformUpdate?: (position: Viro3DPoint) => void;
+    visible?: boolean;
+    style?: ViroStyle;
+    paused?: boolean;
+    loop?: boolean;
     /**
      * Callback triggered when we are processing the assets to be
      * displayed in this ViroImage (either downloading / reading from file).
@@ -48,21 +48,21 @@ declare type Props = ViroCommonProps & {
      *   }
      *
      */
-    onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
+    onLoadEnd?: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     /**
      * Callback triggered when the image fails to load. Invoked with
      * {nativeEvent: {error}}
      */
-    onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
-    physicsBody: ViroPhysicsBody;
-    renderingOrder: number;
-    viroTag: string;
-    onCollision: () => void;
+    onError?: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+    physicsBody?: ViroPhysicsBody;
+    renderingOrder?: number;
+    viroTag?: string;
+    onCollision?: () => void;
 };
 export declare class ViroAnimatedImage extends ViroBase<Props> {
     _component: ViroNativeRef;
-    _onLoadStart(event: NativeSyntheticEvent<ViroLoadStartEvent>): void;
-    _onLoadEnd(event: NativeSyntheticEvent<ViroLoadEndEvent>): void;
+    _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
+    _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     render(): JSX.Element;
 }
 export {};

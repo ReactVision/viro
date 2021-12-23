@@ -8,37 +8,7 @@
  */
 
 import * as React from "react";
-import {
-  findNodeHandle,
-  NativeModules,
-  NativeSyntheticEvent,
-  requireNativeComponent,
-} from "react-native";
-import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
-import {
-  ViroAnimationFinishEvent,
-  ViroAnimationStartEvent,
-  ViroClickEvent,
-  ViroClickStateEvent,
-  ViroClickStateTypes,
-  ViroCollisionEvent,
-  ViroDragEvent,
-  ViroFuseEvent,
-  ViroHoverEvent,
-  ViroNativeTransformUpdateEvent,
-  ViroPinchEvent,
-  ViroRotateEvent,
-  ViroScrollEvent,
-  ViroSwipeEvent,
-  ViroTouchEvent,
-} from "./Types/ViroEvents";
-import {
-  ViroForce,
-  ViroNativeRef,
-  Viro3DPoint,
-  ViroTorque,
-  ViroVelocity,
-} from "./Types/ViroUtils";
+import { requireNativeComponent } from "react-native";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 

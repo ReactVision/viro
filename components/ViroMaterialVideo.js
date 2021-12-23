@@ -38,25 +38,25 @@ class ViroMaterialVideo extends React.Component {
             react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTMaterialVideo.Commands.pause, [0]);
         }
     }
-    _onBufferStart(event) {
+    _onBufferStart = (event) => {
         this.props.onBufferStart && this.props.onBufferStart(event);
-    }
-    _onBufferEnd(event) {
+    };
+    _onBufferEnd = (event) => {
         this.props.onBufferEnd && this.props.onBufferEnd(event);
-    }
-    _onFinish() {
+    };
+    _onFinish = () => {
         this.props.onFinish && this.props.onFinish();
-    }
-    _onError(event) {
+    };
+    _onError = (event) => {
         this.props.onError && this.props.onError(event);
-    }
-    _onUpdateTime(event) {
+    };
+    _onUpdateTime = (event) => {
         this.props.onUpdateTime &&
             this.props.onUpdateTime(event.nativeEvent.currentTime, event.nativeEvent.totalTime);
-    }
-    setNativeProps(nativeProps) {
+    };
+    setNativeProps = (nativeProps) => {
         this._component?.setNativeProps(nativeProps);
-    }
+    };
     render() {
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         //let materials = typeof this.props.materials === 'string' ? new Array(this.props.materials) : this.props.materials;
@@ -72,7 +72,7 @@ class ViroMaterialVideo extends React.Component {
         };
         return <VRTMaterialVideo {...nativeProps}/>;
     }
-    seekToTime(timeInSeconds) {
+    seekToTime = (timeInSeconds) => {
         switch (react_native_1.Platform.OS) {
             case "ios":
                 react_native_1.NativeModules.VRTMaterialVideoManager.seekToTime((0, react_native_1.findNodeHandle)(this), timeInSeconds);
@@ -81,7 +81,7 @@ class ViroMaterialVideo extends React.Component {
                 react_native_1.NativeModules.UIManager.dispatchViewManagerCommand((0, react_native_1.findNodeHandle)(this), react_native_1.NativeModules.UIManager.VRTMaterialVideo.Commands.seekToTime, [timeInSeconds]);
                 break;
         }
-    }
+    };
 }
 exports.ViroMaterialVideo = ViroMaterialVideo;
 var VRTMaterialVideo = (0, react_native_1.requireNativeComponent)("VRTMaterialVideo", 

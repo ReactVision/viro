@@ -15,60 +15,54 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroMaterials = void 0;
-// @ts-ignore
-const resolveAssetSource_1 = require("react-native/Libraries/Image/resolveAssetSource");
+const react_native_1 = require("react-native");
 // @ts-ignore
 const AssetRegistry_1 = __importDefault(require("react-native/Libraries/Image/AssetRegistry"));
-const react_native_1 = require("react-native");
-const MaterialValidation_1 = require("./MaterialValidation");
+const resolveAssetSource = require("react-native/Libraries/Image/resolveAssetSource");
 var MaterialManager = react_native_1.NativeModules.VRTMaterialManager;
 class ViroMaterials {
     static createMaterials(materials) {
         var result = {};
         for (var key in materials) {
-            MaterialValidation_1.MaterialValidation.validateMaterial(key, materials);
-            var materialDict = materials[key];
+            var material = materials[key]; // TODO: as ViroMaterial; // types weren't working
             var resultMaterial = {};
-            for (var materialProperty in materialDict) {
+            for (var prop in material) {
                 //not the best check, modify to make sure property ends with texture..
-                if (materialProperty.endsWith("texture") ||
-                    materialProperty.endsWith("Texture")) {
+                if (prop.endsWith("texture") || prop.endsWith("Texture")) {
                     //textures point to assets, so lets resolve the asset
-                    if (materialProperty === "ReflectiveTexture" ||
-                        materialProperty === "reflectiveTexture") {
+                    if (prop === "ReflectiveTexture" || prop === "reflectiveTexture") {
                         var reflectiveShape = {};
-                        for (var cubeMapTexture in materialDict[materialProperty]) {
-                            var cubeMapSource = (0, resolveAssetSource_1.resolveAssetSource)(materialDict[materialProperty][cubeMapTexture]);
+                        for (var cubeMapTexture in material[prop]) {
+                            var cubeMapSource = resolveAssetSource(material[prop][cubeMapTexture]);
                             reflectiveShape[cubeMapTexture] = cubeMapSource;
                         }
-                        resultMaterial[materialProperty] = reflectiveShape;
+                        resultMaterial[prop] = reflectiveShape;
                     }
-                    else if (materialDict[materialProperty].hasOwnProperty("source")) {
-                        var source = (0, resolveAssetSource_1.resolveAssetSource)(materialDict[materialProperty]["source"]);
-                        resultMaterial[materialProperty] = materialDict[materialProperty];
-                        resultMaterial[materialProperty]["source"] = source;
+                    else if (material[prop].hasOwnProperty("source")) {
+                        var source = resolveAssetSource(material[prop]["source"]);
+                        resultMaterial[prop] = material[prop];
+                        resultMaterial[prop]["source"] = source;
                     }
                     else {
                         var assetType = "unknown";
-                        if (typeof materialDict[materialProperty] !== "object") {
-                            var asset = AssetRegistry_1.default.getAssetByID(materialDict[materialProperty]);
+                        if (typeof material[prop] !== "object") {
+                            var asset = AssetRegistry_1.default.getAssetByID(material[prop]);
                             if (asset) {
                                 assetType = asset.type;
                             }
                         }
-                        var source = (0, resolveAssetSource_1.resolveAssetSource)(materialDict[materialProperty]);
+                        var source = resolveAssetSource(material[prop]);
                         source["type"] = assetType;
-                        resultMaterial[materialProperty] = source;
+                        resultMaterial[prop] = source;
                     }
                 }
-                else if (materialProperty.endsWith("color") ||
-                    materialProperty.endsWith("Color")) {
-                    var color = (0, react_native_1.processColor)(materialDict[materialProperty]);
-                    resultMaterial[materialProperty] = color;
+                else if (prop.endsWith("color") || prop.endsWith("Color")) {
+                    var color = (0, react_native_1.processColor)(material[prop]);
+                    resultMaterial[prop] = color;
                 }
                 else {
                     //just apply material property directly.
-                    resultMaterial[materialProperty] = materialDict[materialProperty];
+                    resultMaterial[prop] = material[prop];
                 }
                 result[key] = resultMaterial;
             }

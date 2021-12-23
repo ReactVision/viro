@@ -39,12 +39,12 @@ const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
 class ViroAnimatedImage extends ViroBase_1.ViroBase {
     _component = null;
-    _onLoadStart(event) {
+    _onLoadStart = (event) => {
         this.props.onLoadStart && this.props.onLoadStart(event);
-    }
-    _onLoadEnd(event) {
+    };
+    _onLoadEnd = (event) => {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
-    }
+    };
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroAnimatedImage", this.props);
         var defaultPlaceholder = require("./Resources/viro_blank.png");

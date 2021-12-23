@@ -26,7 +26,7 @@ const ViroSpinner_1_w = require("./Resources/viro_spinner_1_w.png");
 const ViroSpinner_1a_w = require("./Resources/viro_spinner_1a_w.png");
 
 type Props = {
-  type?: "Dark" | "Light";
+  type?: "Dark" | "Light" | "dark" | "light";
 };
 
 /**

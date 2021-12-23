@@ -9,16 +9,47 @@
  * @providesModule ViroAnimations
  * @flow
  */
-import { NativeModules, processColor } from "react-native";
+import {
+  ColorValue,
+  NativeModules,
+  processColor,
+  ProcessedColorValue,
+} from "react-native";
+
 const AnimationManager = NativeModules.VRTAnimationManager;
-import { ViroAnimationValidation } from "./ViroAnimationValidation";
+
+export type ViroRegisterableAnimation = {
+  duration: number;
+  delay?: number;
+  easing?: string;
+  properties: {
+    positionX?: number | string;
+    positionY?: number | string;
+    positionZ?: number | string;
+    scaleX?: number | string;
+    scaleY?: number | string;
+    scaleZ?: number | string;
+    rotateX?: number | string;
+    rotateY?: number | string;
+    rotateZ?: number | string;
+    translateX?: number | string;
+    translateY?: number | string;
+    translateZ?: number | string;
+
+    opacity?: number | string;
+    color?: ColorValue | ProcessedColorValue;
+    material?: string;
+  };
+};
 
 export type ViroAnimationDict = {
-  [key: string]: ViroAnimation;
+  [key: string]: ViroRegisterableAnimation | ViroRegisterableAnimation[];
 };
 export type ViroAnimationChainDict = {
   [key: string]: ViroAnimation | ViroAnimation[];
 };
+
+export type ViroAnimationProp = { name: string; loop: boolean };
 
 export type ViroAnimation = {
   name?: string;
@@ -28,33 +59,16 @@ export type ViroAnimation = {
   onFinish?: () => void;
   run?: boolean;
   interruptible?: boolean;
-
-  // TODO: https://docs.viromedia.com/docs/viroanimations says that properties and duration are required.
-  // However, the ViroSpinner doesn't use them.
-  properties?: any;
-  // TODO: Type for properties
-  duration?: number;
-
-  // Linear: the animation will occur evenly over its duration
-  // EaseIn: the animation will begin slowly and then speed up as it progresses
-  // EaseOut: the animation will begin quickly and then slow as it progresses
-  // EaseInEaseOut: the animation will begin slowly, accelerate through the middle of its duration, and then slow again before completing
-  // Bounce: the animation will begin quickly and overshoot* its final position before settling into its final resting place
-  easing?: "Bounce" | "Linear" | "EaseIn" | "EaseOut" | "EaseInEaseOut";
 };
 
 export class ViroAnimations {
   static registerAnimations(animations: ViroAnimationDict) {
     for (var key in animations) {
-      if (animations[key].constructor === Array) {
-        // Validate a given animation chain.
-        ViroAnimationValidation.validateAnimationChain(key, animations);
-      } else {
-        // Validate single animation.
-        ViroAnimationValidation.validateAnimation(key, animations);
-        if (animations[key].properties && animations[key].properties.color) {
-          var newColor = processColor(animations[key].properties.color);
-          animations[key].properties.color = newColor;
+      if (!Array.isArray(animations[key])) {
+        const animation = animations[key] as ViroRegisterableAnimation;
+        if (animation.properties && animation.properties.color) {
+          var newColor = processColor(animation.properties.color);
+          animation.properties.color = newColor as ProcessedColorValue;
         }
       }
     }

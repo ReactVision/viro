@@ -6,7 +6,7 @@ declare type Props = ViewProps & {
     color?: ColorValue;
     intensity?: number;
     temperature?: number;
-    direction: Viro3DPoint;
+    direction?: Viro3DPoint;
     attenuationStartDistance?: number;
     attenuationEndDistance?: number;
     innerAngle?: number;

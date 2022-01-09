@@ -13,13 +13,17 @@
   "properties" : {
 
   },
-  "storage" : "model.espresso.weights",
+  "analyses" : {
+
+  },
   "format_version" : 200,
+  "storage" : "model.espresso.weights",
   "layers" : [
     {
       "pad_r" : 3,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "533",
       "pad_fill_mode" : 0,
       "pad_b" : 3,
       "pad_l" : 3,
@@ -50,6 +54,7 @@
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "536",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -68,8 +73,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -78,6 +83,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "539",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -96,8 +102,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -106,6 +112,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "542",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -124,8 +131,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -134,6 +141,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "544",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -152,62 +160,66 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "543,545",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "546",
       "top" : "546",
       "type" : "elementwise",
       "name" : "546",
       "beta" : 0
     },
     {
-      "mode" : 0,
+      "bottom" : "546",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "547",
       "top" : "547",
       "type" : "activation",
-      "name" : "547",
-      "bottom" : "546"
+      "name" : "547"
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "548",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "548",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "548",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "547",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "547",
-      "pad_l" : 0,
-      "name" : "548",
-      "top" : "548"
+      "pad_value" : 0
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "549",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -226,8 +238,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -236,6 +248,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "552",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -254,8 +267,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -264,6 +277,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "555",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -281,20 +295,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "555,548",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "556",
       "top" : "556",
       "type" : "elementwise",
       "name" : "556",
@@ -306,25 +321,28 @@
       "weights" : {
 
       },
+      "debug_info" : "557",
       "top" : "557",
       "C" : 128,
       "blob_batchnorm_params" : 31,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "557",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "558",
       "top" : "558",
       "type" : "activation",
-      "name" : "558",
-      "bottom" : "557"
+      "name" : "558"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "559",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -343,8 +361,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -353,6 +371,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "562",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -371,8 +390,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -381,6 +400,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "565",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -398,20 +418,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "565,556",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "566",
       "top" : "566",
       "type" : "elementwise",
       "name" : "566",
@@ -423,25 +444,28 @@
       "weights" : {
 
       },
+      "debug_info" : "567",
       "top" : "567",
       "C" : 128,
       "blob_batchnorm_params" : 43,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "567",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "568",
       "top" : "568",
       "type" : "activation",
-      "name" : "568",
-      "bottom" : "567"
+      "name" : "568"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "569",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -460,8 +484,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -470,6 +494,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "572",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -488,8 +513,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -498,6 +523,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "575",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -515,47 +541,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "575,566",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "576",
       "top" : "576",
       "type" : "elementwise",
       "name" : "576",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "577",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "577",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "577",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "576",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "576",
-      "pad_l" : 0,
-      "name" : "577",
-      "top" : "577"
+      "pad_value" : 0
     },
     {
       "name" : "578",
@@ -563,25 +591,28 @@
       "weights" : {
 
       },
+      "debug_info" : "578",
       "top" : "578",
       "C" : 128,
       "blob_batchnorm_params" : 55,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "578",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "579",
       "top" : "579",
       "type" : "activation",
-      "name" : "579",
-      "bottom" : "578"
+      "name" : "579"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "580",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -600,8 +631,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -610,6 +641,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "583",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -628,8 +660,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -638,6 +670,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "586",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -655,47 +688,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "586,577",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "587",
       "top" : "587",
       "type" : "elementwise",
       "name" : "587",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "588",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "588",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "588",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "587",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "587",
-      "pad_l" : 0,
-      "name" : "588",
-      "top" : "588"
+      "pad_value" : 0
     },
     {
       "name" : "589",
@@ -703,25 +738,28 @@
       "weights" : {
 
       },
+      "debug_info" : "589",
       "top" : "589",
       "C" : 128,
       "blob_batchnorm_params" : 67,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "589",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "590",
       "top" : "590",
       "type" : "activation",
-      "name" : "590",
-      "bottom" : "589"
+      "name" : "590"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "591",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -740,8 +778,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -750,6 +788,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "594",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -768,8 +807,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -778,6 +817,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "597",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -795,47 +835,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "597,588",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "598",
       "top" : "598",
       "type" : "elementwise",
       "name" : "598",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "599",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "599",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "599",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "598",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "598",
-      "pad_l" : 0,
-      "name" : "599",
-      "top" : "599"
+      "pad_value" : 0
     },
     {
       "name" : "600",
@@ -843,25 +885,28 @@
       "weights" : {
 
       },
+      "debug_info" : "600",
       "top" : "600",
       "C" : 128,
       "blob_batchnorm_params" : 79,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "600",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "601",
       "top" : "601",
       "type" : "activation",
-      "name" : "601",
-      "bottom" : "600"
+      "name" : "601"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "602",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -880,8 +925,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -890,6 +935,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "605",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -908,8 +954,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -918,6 +964,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "608",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -935,47 +982,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "608,599",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "609",
       "top" : "609",
       "type" : "elementwise",
       "name" : "609",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "610",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "610",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "610",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "609",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "609",
-      "pad_l" : 0,
-      "name" : "610",
-      "top" : "610"
+      "pad_value" : 0
     },
     {
       "name" : "611",
@@ -983,25 +1032,28 @@
       "weights" : {
 
       },
+      "debug_info" : "611",
       "top" : "611",
       "C" : 128,
       "blob_batchnorm_params" : 91,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "611",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "612",
       "top" : "612",
       "type" : "activation",
-      "name" : "612",
-      "bottom" : "611"
+      "name" : "612"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "613",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1020,8 +1072,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1030,6 +1082,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "616",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1048,8 +1101,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1058,6 +1111,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "619",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1075,45 +1129,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "619,610",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "620",
       "top" : "620",
       "type" : "elementwise",
       "name" : "620",
       "beta" : 0
     },
     {
-      "bottom" : "620",
-      "scaling_factor_y" : 2,
+      "top" : "622",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "622",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "622"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "620",
+      "debug_info" : "622",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "622",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "609,622",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "623",
       "top" : "623",
       "type" : "elementwise",
       "name" : "623",
@@ -1125,25 +1187,28 @@
       "weights" : {
 
       },
+      "debug_info" : "624",
       "top" : "624",
       "C" : 128,
       "blob_batchnorm_params" : 103,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "624",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "625",
       "top" : "625",
       "type" : "activation",
-      "name" : "625",
-      "bottom" : "624"
+      "name" : "625"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "626",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1162,8 +1227,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1172,6 +1237,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "629",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1190,8 +1256,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1200,6 +1266,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "632",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1217,45 +1284,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "632,623",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "633",
       "top" : "633",
       "type" : "elementwise",
       "name" : "633",
       "beta" : 0
     },
     {
-      "bottom" : "633",
-      "scaling_factor_y" : 2,
+      "top" : "635",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "635",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "635"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "633",
+      "debug_info" : "635",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "635",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "598,635",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "636",
       "top" : "636",
       "type" : "elementwise",
       "name" : "636",
@@ -1267,25 +1342,28 @@
       "weights" : {
 
       },
+      "debug_info" : "637",
       "top" : "637",
       "C" : 128,
       "blob_batchnorm_params" : 115,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "637",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "638",
       "top" : "638",
       "type" : "activation",
-      "name" : "638",
-      "bottom" : "637"
+      "name" : "638"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "639",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1304,8 +1382,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1314,6 +1392,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "642",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1332,8 +1411,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1342,6 +1421,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "645",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1359,45 +1439,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "645,636",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "646",
       "top" : "646",
       "type" : "elementwise",
       "name" : "646",
       "beta" : 0
     },
     {
-      "bottom" : "646",
-      "scaling_factor_y" : 2,
+      "top" : "648",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "648",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "648"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "646",
+      "debug_info" : "648",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "648",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "587,648",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "649",
       "top" : "649",
       "type" : "elementwise",
       "name" : "649",
@@ -1409,25 +1497,28 @@
       "weights" : {
 
       },
+      "debug_info" : "650",
       "top" : "650",
       "C" : 128,
       "blob_batchnorm_params" : 127,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "650",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "651",
       "top" : "651",
       "type" : "activation",
-      "name" : "651",
-      "bottom" : "650"
+      "name" : "651"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "652",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1446,8 +1537,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1456,6 +1547,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "655",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1474,8 +1566,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1484,6 +1576,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "658",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1501,45 +1594,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "658,649",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "659",
       "top" : "659",
       "type" : "elementwise",
       "name" : "659",
       "beta" : 0
     },
     {
-      "bottom" : "659",
-      "scaling_factor_y" : 2,
+      "top" : "661",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "661",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "661"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "659",
+      "debug_info" : "661",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "661",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "576,661",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "662",
       "top" : "662",
       "type" : "elementwise",
       "name" : "662",
@@ -1551,25 +1652,28 @@
       "weights" : {
 
       },
+      "debug_info" : "663",
       "top" : "663",
       "C" : 128,
       "blob_batchnorm_params" : 139,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "663",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "664",
       "top" : "664",
       "type" : "activation",
-      "name" : "664",
-      "bottom" : "663"
+      "name" : "664"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "665",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1588,8 +1692,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1598,6 +1702,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "668",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1616,8 +1721,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1626,6 +1731,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "671",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1643,20 +1749,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "671,662",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "672",
       "top" : "672",
       "type" : "elementwise",
       "name" : "672",
@@ -1668,25 +1775,28 @@
       "weights" : {
 
       },
+      "debug_info" : "673",
       "top" : "673",
       "C" : 128,
       "blob_batchnorm_params" : 151,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "673",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "674",
       "top" : "674",
       "type" : "activation",
-      "name" : "674",
-      "bottom" : "673"
+      "name" : "674"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "675",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1705,8 +1815,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1715,6 +1825,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "678",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1733,8 +1844,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1743,6 +1854,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "679",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1761,8 +1873,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1771,6 +1883,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "680",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1789,33 +1902,35 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "566,679",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "681",
       "top" : "681",
       "type" : "elementwise",
       "name" : "681",
       "beta" : 0
     },
     {
-      "alpha" : 1,
       "bottom" : "681,680",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "682",
       "top" : "682",
       "type" : "elementwise",
       "name" : "682",
@@ -1827,25 +1942,28 @@
       "weights" : {
 
       },
+      "debug_info" : "683",
       "top" : "683",
       "C" : 128,
       "blob_batchnorm_params" : 169,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "683",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "684",
       "top" : "684",
       "type" : "activation",
-      "name" : "684",
-      "bottom" : "683"
+      "name" : "684"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "685",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1864,8 +1982,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1874,6 +1992,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "688",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1892,8 +2011,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1902,6 +2021,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "691",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1919,47 +2039,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "691,682",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "692",
       "top" : "692",
       "type" : "elementwise",
       "name" : "692",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "693",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "693",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "693",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "692",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "692",
-      "pad_l" : 0,
-      "name" : "693",
-      "top" : "693"
+      "pad_value" : 0
     },
     {
       "name" : "694",
@@ -1967,25 +2089,28 @@
       "weights" : {
 
       },
+      "debug_info" : "694",
       "top" : "694",
       "C" : 128,
       "blob_batchnorm_params" : 181,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "694",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "695",
       "top" : "695",
       "type" : "activation",
-      "name" : "695",
-      "bottom" : "694"
+      "name" : "695"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "696",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2004,8 +2129,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2014,6 +2139,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "699",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2032,8 +2158,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2042,6 +2168,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "702",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2059,47 +2186,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "702,693",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "703",
       "top" : "703",
       "type" : "elementwise",
       "name" : "703",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "704",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "704",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "704",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "703",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "703",
-      "pad_l" : 0,
-      "name" : "704",
-      "top" : "704"
+      "pad_value" : 0
     },
     {
       "name" : "705",
@@ -2107,25 +2236,28 @@
       "weights" : {
 
       },
+      "debug_info" : "705",
       "top" : "705",
       "C" : 128,
       "blob_batchnorm_params" : 193,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "705",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "706",
       "top" : "706",
       "type" : "activation",
-      "name" : "706",
-      "bottom" : "705"
+      "name" : "706"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "707",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2144,8 +2276,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2154,6 +2286,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "710",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2172,8 +2305,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2182,6 +2315,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "713",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2199,47 +2333,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "713,704",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "714",
       "top" : "714",
       "type" : "elementwise",
       "name" : "714",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "715",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "715",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "715",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "714",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "714",
-      "pad_l" : 0,
-      "name" : "715",
-      "top" : "715"
+      "pad_value" : 0
     },
     {
       "name" : "716",
@@ -2247,25 +2383,28 @@
       "weights" : {
 
       },
+      "debug_info" : "716",
       "top" : "716",
       "C" : 128,
       "blob_batchnorm_params" : 205,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "716",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "717",
       "top" : "717",
       "type" : "activation",
-      "name" : "717",
-      "bottom" : "716"
+      "name" : "717"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "718",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2284,8 +2423,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2294,6 +2433,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "721",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2312,8 +2452,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2322,6 +2462,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "724",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2339,47 +2480,49 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "724,715",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "725",
       "top" : "725",
       "type" : "elementwise",
       "name" : "725",
       "beta" : 0
     },
     {
-      "pad_value" : 0,
-      "average_count_exclude_padding" : 1,
+      "pad_r" : 0,
+      "debug_info" : "726",
+      "pad_fill_mode" : 0,
+      "pad_b" : 0,
+      "pad_l" : 0,
+      "size_x" : 2,
+      "top" : "726",
       "top_shape_style" : 0,
-      "avg_or_max" : 1,
       "stride_x" : 2,
-      "pad_mode" : 2,
-      "stride_y" : 2,
+      "avg_or_max" : 1,
+      "average_count_exclude_padding" : 1,
+      "type" : "pool",
+      "name" : "726",
       "pad_t" : 0,
+      "stride_y" : 2,
+      "bottom" : "725",
       "weights" : {
 
       },
+      "pad_mode" : 2,
       "size_y" : 2,
-      "type" : "pool",
-      "pad_r" : 0,
-      "pad_b" : 0,
-      "size_x" : 2,
-      "pad_fill_mode" : 0,
-      "bottom" : "725",
-      "pad_l" : 0,
-      "name" : "726",
-      "top" : "726"
+      "pad_value" : 0
     },
     {
       "name" : "727",
@@ -2387,25 +2530,28 @@
       "weights" : {
 
       },
+      "debug_info" : "727",
       "top" : "727",
       "C" : 128,
       "blob_batchnorm_params" : 217,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "727",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "728",
       "top" : "728",
       "type" : "activation",
-      "name" : "728",
-      "bottom" : "727"
+      "name" : "728"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "729",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2424,8 +2570,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2434,6 +2580,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "732",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2452,8 +2599,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2462,6 +2609,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "735",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2479,45 +2627,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "735,726",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "736",
       "top" : "736",
       "type" : "elementwise",
       "name" : "736",
       "beta" : 0
     },
     {
-      "bottom" : "736",
-      "scaling_factor_y" : 2,
+      "top" : "738",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "738",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "738"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "736",
+      "debug_info" : "738",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "738",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "725,738",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "739",
       "top" : "739",
       "type" : "elementwise",
       "name" : "739",
@@ -2529,25 +2685,28 @@
       "weights" : {
 
       },
+      "debug_info" : "740",
       "top" : "740",
       "C" : 128,
       "blob_batchnorm_params" : 229,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "740",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "741",
       "top" : "741",
       "type" : "activation",
-      "name" : "741",
-      "bottom" : "740"
+      "name" : "741"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "742",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2566,8 +2725,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2576,6 +2735,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "745",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2594,8 +2754,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2604,6 +2764,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "748",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2621,45 +2782,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "748,739",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "749",
       "top" : "749",
       "type" : "elementwise",
       "name" : "749",
       "beta" : 0
     },
     {
-      "bottom" : "749",
-      "scaling_factor_y" : 2,
+      "top" : "751",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "751",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "751"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "749",
+      "debug_info" : "751",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "751",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "714,751",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "752",
       "top" : "752",
       "type" : "elementwise",
       "name" : "752",
@@ -2671,25 +2840,28 @@
       "weights" : {
 
       },
+      "debug_info" : "753",
       "top" : "753",
       "C" : 128,
       "blob_batchnorm_params" : 241,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "753",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "754",
       "top" : "754",
       "type" : "activation",
-      "name" : "754",
-      "bottom" : "753"
+      "name" : "754"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "755",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2708,8 +2880,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2718,6 +2890,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "758",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2736,8 +2909,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2746,6 +2919,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "761",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2763,45 +2937,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "761,752",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "762",
       "top" : "762",
       "type" : "elementwise",
       "name" : "762",
       "beta" : 0
     },
     {
-      "bottom" : "762",
-      "scaling_factor_y" : 2,
+      "top" : "764",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "764",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "764"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "762",
+      "debug_info" : "764",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "764",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "703,764",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "765",
       "top" : "765",
       "type" : "elementwise",
       "name" : "765",
@@ -2813,25 +2995,28 @@
       "weights" : {
 
       },
+      "debug_info" : "766",
       "top" : "766",
       "C" : 128,
       "blob_batchnorm_params" : 253,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "766",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "767",
       "top" : "767",
       "type" : "activation",
-      "name" : "767",
-      "bottom" : "766"
+      "name" : "767"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "768",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2850,8 +3035,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2860,6 +3045,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "771",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2878,8 +3064,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2888,6 +3074,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "774",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2905,45 +3092,53 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "774,765",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "775",
       "top" : "775",
       "type" : "elementwise",
       "name" : "775",
       "beta" : 0
     },
     {
-      "bottom" : "775",
-      "scaling_factor_y" : 2,
+      "top" : "777",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "777",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "777"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "775",
+      "debug_info" : "777",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "777",
+      "scaling_factor_y" : 2
     },
     {
-      "alpha" : 1,
       "bottom" : "692,777",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "778",
       "top" : "778",
       "type" : "elementwise",
       "name" : "778",
@@ -2955,25 +3150,28 @@
       "weights" : {
 
       },
+      "debug_info" : "779",
       "top" : "779",
       "C" : 128,
       "blob_batchnorm_params" : 265,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "779",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "780",
       "top" : "780",
       "type" : "activation",
-      "name" : "780",
-      "bottom" : "779"
+      "name" : "780"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "781",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2992,8 +3190,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -3002,6 +3200,7 @@
       "pad_r" : 1,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "784",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -3020,8 +3219,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -3030,6 +3229,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "787",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -3047,20 +3247,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "787,778",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "788",
       "top" : "788",
       "type" : "elementwise",
       "name" : "788",
@@ -3072,25 +3273,28 @@
       "weights" : {
 
       },
+      "debug_info" : "789",
       "top" : "789",
       "C" : 128,
       "blob_batchnorm_params" : 277,
       "type" : "batchnorm"
     },
     {
-      "mode" : 0,
+      "bottom" : "789",
       "weights" : {
 
       },
+      "mode" : 0,
+      "debug_info" : "790",
       "top" : "790",
       "type" : "activation",
-      "name" : "790",
-      "bottom" : "789"
+      "name" : "790"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 1,
       "fused_tanh" : 0,
+      "debug_info" : "791",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -3109,8 +3313,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -3119,6 +3323,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "hourglass",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -3137,11 +3342,14 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
-      "n_parallel" : 1
+      "n_parallel" : 1,
+      "attributes" : {
+        "is_output" : 1
+      }
     }
   ]
 }

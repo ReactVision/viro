@@ -1,0 +1,65 @@
+[
+  {
+    "shortDescription" : "",
+    "metadataOutputVersion" : "3.0",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float32",
+        "formattedType" : "MultiArray (Float32 3 × 224 × 224)",
+        "shortDescription" : "UV Position Map (CxHxW)",
+        "shape" : "[3, 224, 224]",
+        "name" : "uv_map",
+        "type" : "MultiArray"
+      }
+    ],
+    "version" : "",
+    "modelParameters" : [
+
+    ],
+    "author" : "",
+    "specificationVersion" : 1,
+    "license" : "",
+    "isUpdatable" : "0",
+    "availability" : {
+      "macOS" : "10.13",
+      "tvOS" : "11.0",
+      "watchOS" : "4.0",
+      "iOS" : "11.0",
+      "macCatalyst" : "11.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_neuralNetwork"
+    },
+    "inputSchema" : [
+      {
+        "height" : "224",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "224",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 224 × 224)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "",
+        "name" : "image"
+      }
+    ],
+    "userDefinedMetadata" : {
+
+    },
+    "generatedClassName" : "bodymesh",
+    "neuralNetworkLayerTypeHistogram" : {
+      "PaddingReflection" : 1,
+      "ActivationLinear" : 68,
+      "ActivationSigmoidHard" : 34,
+      "Add" : 10,
+      "ActivationTanh" : 1,
+      "BatchNorm" : 51,
+      "Convolution" : 62,
+      "UpsampleNearestNeighbor" : 5
+    },
+    "method" : "predict"
+  }
+]

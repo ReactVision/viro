@@ -13,13 +13,17 @@
   "properties" : {
 
   },
-  "storage" : "model.espresso.weights",
+  "analyses" : {
+
+  },
   "format_version" : 200,
+  "storage" : "model.espresso.weights",
   "layers" : [
     {
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "329",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -53,6 +57,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "331_scale_0_1",
       "top" : "330_scale_0_1",
       "type" : "activation",
       "name" : "331_scale_0_1",
@@ -64,6 +69,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "331_clip_0_1",
       "top" : "330_clip_0_1",
       "type" : "activation",
       "name" : "331_clip_0_1",
@@ -76,6 +82,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "331",
       "top" : "331",
       "type" : "activation",
       "name" : "331",
@@ -85,6 +92,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "332",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -103,8 +111,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -116,6 +124,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "334_scale_0_1",
       "top" : "333_scale_0_1",
       "type" : "activation",
       "name" : "334_scale_0_1",
@@ -127,6 +136,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "334_clip_0_1",
       "top" : "333_clip_0_1",
       "type" : "activation",
       "name" : "334_clip_0_1",
@@ -139,6 +149,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "334",
       "top" : "334",
       "type" : "activation",
       "name" : "334",
@@ -148,6 +159,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "335",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -166,8 +178,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -176,6 +188,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "337",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -194,8 +207,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -207,6 +220,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "339_scale_0_1",
       "top" : "338_scale_0_1",
       "type" : "activation",
       "name" : "339_scale_0_1",
@@ -218,6 +232,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "339_clip_0_1",
       "top" : "338_clip_0_1",
       "type" : "activation",
       "name" : "339_clip_0_1",
@@ -230,6 +245,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "339",
       "top" : "339",
       "type" : "activation",
       "name" : "339",
@@ -239,6 +255,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "340",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -272,6 +289,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "342_scale_0_1",
       "top" : "341_scale_0_1",
       "type" : "activation",
       "name" : "342_scale_0_1",
@@ -283,6 +301,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "342_clip_0_1",
       "top" : "341_clip_0_1",
       "type" : "activation",
       "name" : "342_clip_0_1",
@@ -295,6 +314,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "342",
       "top" : "342",
       "type" : "activation",
       "name" : "342",
@@ -304,6 +324,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "343",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -322,8 +343,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -332,6 +353,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "345",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -350,8 +372,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -363,6 +385,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "347_scale_0_1",
       "top" : "346_scale_0_1",
       "type" : "activation",
       "name" : "347_scale_0_1",
@@ -374,6 +397,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "347_clip_0_1",
       "top" : "346_clip_0_1",
       "type" : "activation",
       "name" : "347_clip_0_1",
@@ -386,6 +410,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "347",
       "top" : "347",
       "type" : "activation",
       "name" : "347",
@@ -395,6 +420,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "348",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -413,8 +439,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -426,6 +452,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "350_scale_0_1",
       "top" : "349_scale_0_1",
       "type" : "activation",
       "name" : "350_scale_0_1",
@@ -437,6 +464,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "350_clip_0_1",
       "top" : "349_clip_0_1",
       "type" : "activation",
       "name" : "350_clip_0_1",
@@ -449,6 +477,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "350",
       "top" : "350",
       "type" : "activation",
       "name" : "350",
@@ -458,6 +487,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "351",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -476,20 +506,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "344,352",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "353",
       "top" : "353",
       "type" : "elementwise",
       "name" : "353",
@@ -499,6 +530,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "354",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -517,8 +549,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -530,6 +562,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "356_scale_0_1",
       "top" : "355_scale_0_1",
       "type" : "activation",
       "name" : "356_scale_0_1",
@@ -541,6 +574,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "356_clip_0_1",
       "top" : "355_clip_0_1",
       "type" : "activation",
       "name" : "356_clip_0_1",
@@ -553,6 +587,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "356",
       "top" : "356",
       "type" : "activation",
       "name" : "356",
@@ -562,6 +597,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "357",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -595,6 +631,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "359_scale_0_1",
       "top" : "358_scale_0_1",
       "type" : "activation",
       "name" : "359_scale_0_1",
@@ -606,6 +643,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "359_clip_0_1",
       "top" : "358_clip_0_1",
       "type" : "activation",
       "name" : "359_clip_0_1",
@@ -618,6 +656,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "359",
       "top" : "359",
       "type" : "activation",
       "name" : "359",
@@ -627,6 +666,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "360",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -645,8 +685,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -655,6 +695,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "362",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -673,8 +714,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -686,6 +727,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "364_scale_0_1",
       "top" : "363_scale_0_1",
       "type" : "activation",
       "name" : "364_scale_0_1",
@@ -697,6 +739,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "364_clip_0_1",
       "top" : "363_clip_0_1",
       "type" : "activation",
       "name" : "364_clip_0_1",
@@ -709,6 +752,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "364",
       "top" : "364",
       "type" : "activation",
       "name" : "364",
@@ -718,6 +762,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "365",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -736,8 +781,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -749,6 +794,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "367_scale_0_1",
       "top" : "366_scale_0_1",
       "type" : "activation",
       "name" : "367_scale_0_1",
@@ -760,6 +806,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "367_clip_0_1",
       "top" : "366_clip_0_1",
       "type" : "activation",
       "name" : "367_clip_0_1",
@@ -772,6 +819,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "367",
       "top" : "367",
       "type" : "activation",
       "name" : "367",
@@ -781,6 +829,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "368",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -799,20 +848,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "361,369",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "370",
       "top" : "370",
       "type" : "elementwise",
       "name" : "370",
@@ -822,6 +872,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "371",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -840,8 +891,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -853,6 +904,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "373_scale_0_1",
       "top" : "372_scale_0_1",
       "type" : "activation",
       "name" : "373_scale_0_1",
@@ -864,6 +916,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "373_clip_0_1",
       "top" : "372_clip_0_1",
       "type" : "activation",
       "name" : "373_clip_0_1",
@@ -876,6 +929,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "373",
       "top" : "373",
       "type" : "activation",
       "name" : "373",
@@ -885,6 +939,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "374",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -903,8 +958,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -916,6 +971,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "376_scale_0_1",
       "top" : "375_scale_0_1",
       "type" : "activation",
       "name" : "376_scale_0_1",
@@ -927,6 +983,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "376_clip_0_1",
       "top" : "375_clip_0_1",
       "type" : "activation",
       "name" : "376_clip_0_1",
@@ -939,6 +996,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "376",
       "top" : "376",
       "type" : "activation",
       "name" : "376",
@@ -948,6 +1006,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "377",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -966,20 +1025,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "370,378",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "379",
       "top" : "379",
       "type" : "elementwise",
       "name" : "379",
@@ -989,6 +1049,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "380",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1007,8 +1068,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1020,6 +1081,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "382_scale_0_1",
       "top" : "381_scale_0_1",
       "type" : "activation",
       "name" : "382_scale_0_1",
@@ -1031,6 +1093,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "382_clip_0_1",
       "top" : "381_clip_0_1",
       "type" : "activation",
       "name" : "382_clip_0_1",
@@ -1043,6 +1106,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "382",
       "top" : "382",
       "type" : "activation",
       "name" : "382",
@@ -1052,6 +1116,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "383",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1085,6 +1150,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "385_scale_0_1",
       "top" : "384_scale_0_1",
       "type" : "activation",
       "name" : "385_scale_0_1",
@@ -1096,6 +1162,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "385_clip_0_1",
       "top" : "384_clip_0_1",
       "type" : "activation",
       "name" : "385_clip_0_1",
@@ -1108,6 +1175,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "385",
       "top" : "385",
       "type" : "activation",
       "name" : "385",
@@ -1117,6 +1185,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "386",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1135,8 +1204,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1145,6 +1214,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "388",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1163,8 +1233,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1176,6 +1246,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "390_scale_0_1",
       "top" : "389_scale_0_1",
       "type" : "activation",
       "name" : "390_scale_0_1",
@@ -1187,6 +1258,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "390_clip_0_1",
       "top" : "389_clip_0_1",
       "type" : "activation",
       "name" : "390_clip_0_1",
@@ -1199,6 +1271,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "390",
       "top" : "390",
       "type" : "activation",
       "name" : "390",
@@ -1208,6 +1281,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "391",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1226,8 +1300,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1239,6 +1313,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "393_scale_0_1",
       "top" : "392_scale_0_1",
       "type" : "activation",
       "name" : "393_scale_0_1",
@@ -1250,6 +1325,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "393_clip_0_1",
       "top" : "392_clip_0_1",
       "type" : "activation",
       "name" : "393_clip_0_1",
@@ -1262,6 +1338,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "393",
       "top" : "393",
       "type" : "activation",
       "name" : "393",
@@ -1271,6 +1348,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "394",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1289,20 +1367,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "387,395",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "396",
       "top" : "396",
       "type" : "elementwise",
       "name" : "396",
@@ -1312,6 +1391,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "397",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1330,8 +1410,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1343,6 +1423,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "399_scale_0_1",
       "top" : "398_scale_0_1",
       "type" : "activation",
       "name" : "399_scale_0_1",
@@ -1354,6 +1435,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "399_clip_0_1",
       "top" : "398_clip_0_1",
       "type" : "activation",
       "name" : "399_clip_0_1",
@@ -1366,6 +1448,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "399",
       "top" : "399",
       "type" : "activation",
       "name" : "399",
@@ -1375,6 +1458,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "400",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1393,8 +1477,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1406,6 +1490,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "402_scale_0_1",
       "top" : "401_scale_0_1",
       "type" : "activation",
       "name" : "402_scale_0_1",
@@ -1417,6 +1502,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "402_clip_0_1",
       "top" : "401_clip_0_1",
       "type" : "activation",
       "name" : "402_clip_0_1",
@@ -1429,6 +1515,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "402",
       "top" : "402",
       "type" : "activation",
       "name" : "402",
@@ -1438,6 +1525,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "403",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1456,20 +1544,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "396,404",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "405",
       "top" : "405",
       "type" : "elementwise",
       "name" : "405",
@@ -1479,6 +1568,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "406",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1497,8 +1587,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1510,6 +1600,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "408_scale_0_1",
       "top" : "407_scale_0_1",
       "type" : "activation",
       "name" : "408_scale_0_1",
@@ -1521,6 +1612,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "408_clip_0_1",
       "top" : "407_clip_0_1",
       "type" : "activation",
       "name" : "408_clip_0_1",
@@ -1533,6 +1625,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "408",
       "top" : "408",
       "type" : "activation",
       "name" : "408",
@@ -1542,6 +1635,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "409",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1560,8 +1654,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1573,6 +1667,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "411_scale_0_1",
       "top" : "410_scale_0_1",
       "type" : "activation",
       "name" : "411_scale_0_1",
@@ -1584,6 +1679,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "411_clip_0_1",
       "top" : "410_clip_0_1",
       "type" : "activation",
       "name" : "411_clip_0_1",
@@ -1596,6 +1692,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "411",
       "top" : "411",
       "type" : "activation",
       "name" : "411",
@@ -1605,6 +1702,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "412",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1623,20 +1721,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "405,413",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "414",
       "top" : "414",
       "type" : "elementwise",
       "name" : "414",
@@ -1646,6 +1745,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "415",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1664,8 +1764,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1677,6 +1777,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "417_scale_0_1",
       "top" : "416_scale_0_1",
       "type" : "activation",
       "name" : "417_scale_0_1",
@@ -1688,6 +1789,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "417_clip_0_1",
       "top" : "416_clip_0_1",
       "type" : "activation",
       "name" : "417_clip_0_1",
@@ -1700,6 +1802,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "417",
       "top" : "417",
       "type" : "activation",
       "name" : "417",
@@ -1709,6 +1812,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "418",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1727,8 +1831,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1740,6 +1844,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "420_scale_0_1",
       "top" : "419_scale_0_1",
       "type" : "activation",
       "name" : "420_scale_0_1",
@@ -1751,6 +1856,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "420_clip_0_1",
       "top" : "419_clip_0_1",
       "type" : "activation",
       "name" : "420_clip_0_1",
@@ -1763,6 +1869,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "420",
       "top" : "420",
       "type" : "activation",
       "name" : "420",
@@ -1772,6 +1879,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "421",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1790,8 +1898,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1800,6 +1908,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "423",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1818,8 +1927,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1831,6 +1940,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "425_scale_0_1",
       "top" : "424_scale_0_1",
       "type" : "activation",
       "name" : "425_scale_0_1",
@@ -1842,6 +1952,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "425_clip_0_1",
       "top" : "424_clip_0_1",
       "type" : "activation",
       "name" : "425_clip_0_1",
@@ -1854,6 +1965,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "425",
       "top" : "425",
       "type" : "activation",
       "name" : "425",
@@ -1863,6 +1975,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "426",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -1881,8 +1994,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -1894,6 +2007,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "428_scale_0_1",
       "top" : "427_scale_0_1",
       "type" : "activation",
       "name" : "428_scale_0_1",
@@ -1905,6 +2019,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "428_clip_0_1",
       "top" : "427_clip_0_1",
       "type" : "activation",
       "name" : "428_clip_0_1",
@@ -1917,6 +2032,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "428",
       "top" : "428",
       "type" : "activation",
       "name" : "428",
@@ -1926,6 +2042,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "429",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1944,20 +2061,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "422,430",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "431",
       "top" : "431",
       "type" : "elementwise",
       "name" : "431",
@@ -1967,6 +2085,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "432",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -1985,8 +2104,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -1998,6 +2117,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "434_scale_0_1",
       "top" : "433_scale_0_1",
       "type" : "activation",
       "name" : "434_scale_0_1",
@@ -2009,6 +2129,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "434_clip_0_1",
       "top" : "433_clip_0_1",
       "type" : "activation",
       "name" : "434_clip_0_1",
@@ -2021,6 +2142,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "434",
       "top" : "434",
       "type" : "activation",
       "name" : "434",
@@ -2030,6 +2152,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "435",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2048,8 +2171,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2061,6 +2184,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "437_scale_0_1",
       "top" : "436_scale_0_1",
       "type" : "activation",
       "name" : "437_scale_0_1",
@@ -2072,6 +2196,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "437_clip_0_1",
       "top" : "436_clip_0_1",
       "type" : "activation",
       "name" : "437_clip_0_1",
@@ -2084,6 +2209,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "437",
       "top" : "437",
       "type" : "activation",
       "name" : "437",
@@ -2093,6 +2219,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "438",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2111,20 +2238,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "431,439",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "440",
       "top" : "440",
       "type" : "elementwise",
       "name" : "440",
@@ -2134,6 +2262,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "441",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2152,8 +2281,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2165,6 +2294,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "443_scale_0_1",
       "top" : "442_scale_0_1",
       "type" : "activation",
       "name" : "443_scale_0_1",
@@ -2176,6 +2306,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "443_clip_0_1",
       "top" : "442_clip_0_1",
       "type" : "activation",
       "name" : "443_clip_0_1",
@@ -2188,6 +2319,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "443",
       "top" : "443",
       "type" : "activation",
       "name" : "443",
@@ -2197,6 +2329,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "444",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2230,6 +2363,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "446_scale_0_1",
       "top" : "445_scale_0_1",
       "type" : "activation",
       "name" : "446_scale_0_1",
@@ -2241,6 +2375,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "446_clip_0_1",
       "top" : "445_clip_0_1",
       "type" : "activation",
       "name" : "446_clip_0_1",
@@ -2253,6 +2388,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "446",
       "top" : "446",
       "type" : "activation",
       "name" : "446",
@@ -2262,6 +2398,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "447",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2280,8 +2417,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2290,6 +2427,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "449",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2308,8 +2446,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2321,6 +2459,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "451_scale_0_1",
       "top" : "450_scale_0_1",
       "type" : "activation",
       "name" : "451_scale_0_1",
@@ -2332,6 +2471,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "451_clip_0_1",
       "top" : "450_clip_0_1",
       "type" : "activation",
       "name" : "451_clip_0_1",
@@ -2344,6 +2484,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "451",
       "top" : "451",
       "type" : "activation",
       "name" : "451",
@@ -2353,6 +2494,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "452",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2371,8 +2513,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2384,6 +2526,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "454_scale_0_1",
       "top" : "453_scale_0_1",
       "type" : "activation",
       "name" : "454_scale_0_1",
@@ -2395,6 +2538,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "454_clip_0_1",
       "top" : "453_clip_0_1",
       "type" : "activation",
       "name" : "454_clip_0_1",
@@ -2407,6 +2551,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "454",
       "top" : "454",
       "type" : "activation",
       "name" : "454",
@@ -2416,6 +2561,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "455",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2434,20 +2580,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "448,456",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "457",
       "top" : "457",
       "type" : "elementwise",
       "name" : "457",
@@ -2457,6 +2604,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "458",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2475,8 +2623,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2488,6 +2636,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "460_scale_0_1",
       "top" : "459_scale_0_1",
       "type" : "activation",
       "name" : "460_scale_0_1",
@@ -2499,6 +2648,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "460_clip_0_1",
       "top" : "459_clip_0_1",
       "type" : "activation",
       "name" : "460_clip_0_1",
@@ -2511,6 +2661,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "460",
       "top" : "460",
       "type" : "activation",
       "name" : "460",
@@ -2520,6 +2671,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "461",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2538,8 +2690,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2551,6 +2703,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "463_scale_0_1",
       "top" : "462_scale_0_1",
       "type" : "activation",
       "name" : "463_scale_0_1",
@@ -2562,6 +2715,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "463_clip_0_1",
       "top" : "462_clip_0_1",
       "type" : "activation",
       "name" : "463_clip_0_1",
@@ -2574,6 +2728,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "463",
       "top" : "463",
       "type" : "activation",
       "name" : "463",
@@ -2583,6 +2738,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "464",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2601,20 +2757,21 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "alpha" : 1,
       "bottom" : "457,465",
+      "alpha" : 1,
       "operation" : 0,
       "weights" : {
 
       },
       "fused_relu" : 0,
+      "debug_info" : "466",
       "top" : "466",
       "type" : "elementwise",
       "name" : "466",
@@ -2624,6 +2781,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "467",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2642,8 +2800,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
@@ -2655,6 +2813,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "469_scale_0_1",
       "top" : "468_scale_0_1",
       "type" : "activation",
       "name" : "469_scale_0_1",
@@ -2666,6 +2825,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "469_clip_0_1",
       "top" : "468_clip_0_1",
       "type" : "activation",
       "name" : "469_clip_0_1",
@@ -2678,6 +2838,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "469",
       "top" : "469",
       "type" : "activation",
       "name" : "469",
@@ -2687,6 +2848,7 @@
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "470",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2705,8 +2867,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2718,6 +2880,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "472_scale_0_1",
       "top" : "471_scale_0_1",
       "type" : "activation",
       "name" : "472_scale_0_1",
@@ -2729,6 +2892,7 @@
 
       },
       "mode" : 7,
+      "debug_info" : "472_clip_0_1",
       "top" : "471_clip_0_1",
       "type" : "activation",
       "name" : "472_clip_0_1",
@@ -2741,6 +2905,7 @@
 
       },
       "mode" : 6,
+      "debug_info" : "472",
       "top" : "472",
       "type" : "activation",
       "name" : "472",
@@ -2750,6 +2915,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "473",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2768,28 +2934,35 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "bottom" : "474",
-      "scaling_factor_y" : 2,
+      "top" : "476",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "476",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "476"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "474",
+      "debug_info" : "476",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "476",
+      "scaling_factor_y" : 2
     },
     {
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "477",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2808,8 +2981,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2818,6 +2991,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "478",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2836,28 +3010,35 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "bottom" : "478",
-      "scaling_factor_y" : 2,
+      "top" : "480",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "480",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "480"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "478",
+      "debug_info" : "480",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "480",
+      "scaling_factor_y" : 2
     },
     {
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "481",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2876,8 +3057,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2886,6 +3067,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "482",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2904,28 +3086,35 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "bottom" : "482",
-      "scaling_factor_y" : 2,
+      "top" : "484",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "484",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "484"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "482",
+      "debug_info" : "484",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "484",
+      "scaling_factor_y" : 2
     },
     {
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "485",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -2944,8 +3133,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -2954,6 +3143,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "486",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -2972,28 +3162,35 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "bottom" : "486",
-      "scaling_factor_y" : 2,
+      "top" : "488",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "488",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "488"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "486",
+      "debug_info" : "488",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "488",
+      "scaling_factor_y" : 2
     },
     {
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "489",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -3012,8 +3209,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -3022,6 +3219,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "490",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -3040,28 +3238,35 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "bottom" : "490",
-      "scaling_factor_y" : 2,
+      "top" : "492",
+      "use_fractional_scale_factors" : false,
       "weights" : {
 
       },
-      "mode" : 0,
-      "top" : "492",
-      "scaling_factor_x" : 2,
+      "fractional_scaling_factor_y" : 1,
       "type" : "upsample",
-      "name" : "492"
+      "scaling_factor_x" : 2,
+      "mode" : 0,
+      "align_corners" : 0,
+      "bottom" : "490",
+      "debug_info" : "492",
+      "fractional_scaling_factor_x" : 1,
+      "is_legacy_mode" : 1,
+      "name" : "492",
+      "scaling_factor_y" : 2
     },
     {
       "pad_r" : 1,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "493",
       "pad_fill_mode" : 0,
       "pad_b" : 1,
       "pad_l" : 1,
@@ -3080,8 +3285,8 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 3,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 3,
       "n_parallel" : 1
@@ -3090,6 +3295,7 @@
       "pad_r" : 0,
       "fused_relu" : 0,
       "fused_tanh" : 0,
+      "debug_info" : "494",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
@@ -3108,15 +3314,17 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 1,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 1,
       "n_parallel" : 1
     },
     {
-      "pad_value" : 0,
-      "top" : "495",
+      "name" : "495",
+      "weights" : {
+
+      },
       "pad_pad_mode" : 0,
       "pad_t" : 3,
       "pad_r" : 3,
@@ -3125,19 +3333,19 @@
       "pad_fill_mode" : 2,
       "bottom" : "494",
       "pad_l" : 3,
-      "name" : "495",
-      "weights" : {
-
-      }
+      "debug_info" : "495",
+      "pad_value" : 0,
+      "top" : "495"
     },
     {
       "pad_r" : 0,
       "fused_relu" : 0,
-      "fused_tanh" : 1,
+      "fused_tanh" : 0,
+      "debug_info" : "496",
       "pad_fill_mode" : 0,
       "pad_b" : 0,
       "pad_l" : 0,
-      "top" : "uv_map",
+      "top" : "496",
       "blob_weights" : 247,
       "K" : 10,
       "blob_biases" : 245,
@@ -3152,11 +3360,25 @@
       "weights" : {
 
       },
-      "pad_mode" : 0,
       "Nx" : 7,
+      "pad_mode" : 0,
       "pad_value" : 0,
       "Ny" : 7,
       "n_parallel" : 1
+    },
+    {
+      "bottom" : "496",
+      "weights" : {
+
+      },
+      "mode" : 1,
+      "debug_info" : "uv_map",
+      "top" : "uv_map",
+      "type" : "activation",
+      "name" : "uv_map",
+      "attributes" : {
+        "is_output" : 1
+      }
     }
   ]
 }

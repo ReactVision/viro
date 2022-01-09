@@ -528,6 +528,34 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0393AD95278A6BB800F18551 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = FE6D792B6328AAF68E46924D7F466631;
+			remoteInfo = "React-Core-AccessibilityResources";
+		};
+		03FFC961278BA6950004B077 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = F4BDA69E3BCB0166D49FB679ABADCA00;
+			remoteInfo = fmt;
+		};
+		03FFC963278BA6950004B077 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1936453FF2A7E3A13063C4917C4D5598;
+			remoteInfo = "RCT-Folly";
+		};
+		03FFC965278BA6950004B077 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 666E72807891C591E025A75410CD2A26;
+			remoteInfo = "React-perflogger";
+		};
 		131E1ED120B89C190075D8E0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
@@ -562,13 +590,6 @@
 			proxyType = 2;
 			remoteGlobalIDString = ABFEEA82A6C346B22843FBE0B0582182;
 			remoteInfo = FBReactNativeSpec;
-		};
-		A230928A248F709800A5A81F /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 06489499588BFA8FD5E63DD6375CD533;
-			remoteInfo = Folly;
 		};
 		A230928C248F709800A5A81F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -1306,18 +1327,21 @@
 			children = (
 				A2309287248F709800A5A81F /* libDoubleConversion.a */,
 				A2309289248F709800A5A81F /* libFBReactNativeSpec.a */,
-				A230928B248F709800A5A81F /* libFolly.a */,
+				03FFC962278BA6950004B077 /* libfmt.a */,
 				A230928D248F709800A5A81F /* libglog.a */,
 				8BDD9DA31E09F39B00A42870 /* libPods-ViroReact.a */,
 				131E1ED220B89C190075D8E0 /* libPods-ViroReact_release_tests.a */,
 				1385B2B120CA0A5200C3B6CE /* libPods-ViroReact_static_lib.a */,
+				03FFC964278BA6950004B077 /* libRCT-Folly.a */,
 				A230928F248F709800A5A81F /* libRCTTypeSafety.a */,
 				A2309291248F709800A5A81F /* libReact-Core.a */,
+				0393AD96278A6BB800F18551 /* AccessibilityResources.bundle */,
 				A2309293248F709800A5A81F /* libReact-CoreModules.a */,
 				A2309295248F709800A5A81F /* libReact-cxxreact.a */,
 				A2309297248F709800A5A81F /* libReact-jsi.a */,
 				A2309299248F709800A5A81F /* libReact-jsiexecutor.a */,
 				A230929B248F709800A5A81F /* libReact-jsinspector.a */,
+				03FFC966278BA6950004B077 /* libReact-perflogger.a */,
 				A230929D248F709800A5A81F /* libReact-RCTAnimation.a */,
 				A230929F248F709800A5A81F /* libReact-RCTBlob.a */,
 				A23092A1248F709800A5A81F /* libReact-RCTImage.a */,
@@ -1712,6 +1736,34 @@
 /* End PBXProject section */
 
 /* Begin PBXReferenceProxy section */
+		0393AD96278A6BB800F18551 /* AccessibilityResources.bundle */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = AccessibilityResources.bundle;
+			remoteRef = 0393AD95278A6BB800F18551 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		03FFC962278BA6950004B077 /* libfmt.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfmt.a;
+			remoteRef = 03FFC961278BA6950004B077 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		03FFC964278BA6950004B077 /* libRCT-Folly.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libRCT-Folly.a";
+			remoteRef = 03FFC963278BA6950004B077 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		03FFC966278BA6950004B077 /* libReact-perflogger.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-perflogger.a";
+			remoteRef = 03FFC965278BA6950004B077 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
 		131E1ED220B89C190075D8E0 /* libPods-ViroReact_release_tests.a */ = {
 			isa = PBXReferenceProxy;
 			fileType = archive.ar;
@@ -1745,13 +1797,6 @@
 			fileType = archive.ar;
 			path = libFBReactNativeSpec.a;
 			remoteRef = A2309288248F709800A5A81F /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-		A230928B248F709800A5A81F /* libFolly.a */ = {
-			isa = PBXReferenceProxy;
-			fileType = archive.ar;
-			path = libFolly.a;
-			remoteRef = A230928A248F709800A5A81F /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 		A230928D248F709800A5A81F /* libglog.a */ = {
@@ -1912,7 +1957,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = $SRCROOT/ngrok_launch.sh;
+			shellScript = "$SRCROOT/ngrok_launch.sh\n";
 		};
 		1385B1CB20CA091C00C3B6CE /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1957,7 +2002,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "VIROREACT_DIST_PATH=${SRCROOT}/dist/static_lib\nmkdir -p $VIROREACT_DIST_PATH\nVIRO_DEVICE_LIBRARY=$VIROREACT_DIST_PATH/armv7_arm64\nVIRO_SIMULATOR_LIBRARY=$VIROREACT_DIST_PATH/x86_64\n\n# Copy (and rename) the static library (device or simulator) to dist folder\nif [ ${PLATFORM_NAME} = \"iphonesimulator\" ]; then\nmkdir -p $VIRO_SIMULATOR_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact_static_lib.a $VIRO_SIMULATOR_LIBRARY/libViroReact.a\nelse\nmkdir -p $VIRO_DEVICE_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact_static_lib.a $VIRO_DEVICE_LIBRARY/libViroReact.a\nfi\n\n# Rename libViroReact_static_lib.a to libViroReact.a for lipo to be able to find it later\nmv $VIROREACT_DIST_PATH/libViroReact_static_lib.a $VIROREACT_DIST_PATH/libViroReact.a\n\n# If both the device and simulator frameworks now exist, create the Universal framework\nif [ -f $VIRO_DEVICE_LIBRARY/libViroReact.a ] && [ -f $VIRO_SIMULATOR_LIBRARY/libViroReact.a ]; then\nlipo $VIRO_SIMULATOR_LIBRARY/libViroReact.a $VIRO_DEVICE_LIBRARY/libViroReact.a -create -output $VIROREACT_DIST_PATH/libViroReact.a\nfi\n\n# Copy (and rename) over the podspec\ncp -r $PROJECT_DIR/ViroReact_static_lib.podspec $VIROREACT_DIST_PATH/ViroReact.podspec";
+			shellScript = "VIROREACT_DIST_PATH=${SRCROOT}/dist/static_lib\nmkdir -p $VIROREACT_DIST_PATH\nVIRO_DEVICE_LIBRARY=$VIROREACT_DIST_PATH/armv7_arm64\nVIRO_SIMULATOR_LIBRARY=$VIROREACT_DIST_PATH/x86_64\n\n# Copy (and rename) the static library (device or simulator) to dist folder\nif [ ${PLATFORM_NAME} = \"iphonesimulator\" ]; then\nmkdir -p $VIRO_SIMULATOR_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact_static_lib.a $VIRO_SIMULATOR_LIBRARY/libViroReact.a\nelse\nmkdir -p $VIRO_DEVICE_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact_static_lib.a $VIRO_DEVICE_LIBRARY/libViroReact.a\nfi\n\n# Rename libViroReact_static_lib.a to libViroReact.a for lipo to be able to find it later\nmv $VIROREACT_DIST_PATH/libViroReact_static_lib.a $VIROREACT_DIST_PATH/libViroReact.a\n\n# If both the device and simulator frameworks now exist, create the Universal framework\nif [ -f $VIRO_DEVICE_LIBRARY/libViroReact.a ] && [ -f $VIRO_SIMULATOR_LIBRARY/libViroReact.a ]; then\nlipo $VIRO_SIMULATOR_LIBRARY/libViroReact.a $VIRO_DEVICE_LIBRARY/libViroReact.a -create -output $VIROREACT_DIST_PATH/libViroReact.a\nfi\n\n# Copy (and rename) over the podspec\ncp -r $PROJECT_DIR/ViroReact_static_lib.podspec $VIROREACT_DIST_PATH/ViroReact.podspec\n";
 		};
 		13A6EC6F20B76B5200873F9B /* Lipo static library */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1971,7 +2016,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "VIROREACT_DIST_PATH=${SRCROOT}/dist/\nVIRO_DEVICE_LIBRARY=$VIROREACT_DIST_PATH/armv7_arm64\nVIRO_SIMULATOR_LIBRARY=$VIROREACT_DIST_PATH/x86_64\n\n# Copy the static library (device or simulator) to dist folder\nif [ ${PLATFORM_NAME} = \"iphonesimulator\" ]; then\nmkdir -p $VIRO_SIMULATOR_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact.a $VIRO_SIMULATOR_LIBRARY\nelse\nmkdir -p $VIRO_DEVICE_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact.a $VIRO_DEVICE_LIBRARY\nfi\n\n# If both the device and simulator frameworks now exist, create the Universal framework\nif [ -f $VIRO_DEVICE_LIBRARY/libViroReact.a ] && [ -f $VIRO_SIMULATOR_LIBRARY/libViroReact.a ]; then\nlipo $VIRO_SIMULATOR_LIBRARY/libViroReact.a $VIRO_DEVICE_LIBRARY/libViroReact.a -create -output $VIROREACT_DIST_PATH/lib/libViroReact.a\nfi";
+			shellScript = "VIROREACT_DIST_PATH=${SRCROOT}/dist/\nVIRO_DEVICE_LIBRARY=$VIROREACT_DIST_PATH/armv7_arm64\nVIRO_SIMULATOR_LIBRARY=$VIROREACT_DIST_PATH/x86_64\n\n# Copy the static library (device or simulator) to dist folder\nif [ ${PLATFORM_NAME} = \"iphonesimulator\" ]; then\nmkdir -p $VIRO_SIMULATOR_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact.a $VIRO_SIMULATOR_LIBRARY\nelse\nmkdir -p $VIRO_DEVICE_LIBRARY\ncp -r $TARGET_BUILD_DIR/libViroReact.a $VIRO_DEVICE_LIBRARY\nfi\n\n# If both the device and simulator frameworks now exist, create the Universal framework\nif [ -f $VIRO_DEVICE_LIBRARY/libViroReact.a ] && [ -f $VIRO_SIMULATOR_LIBRARY/libViroReact.a ]; then\nlipo $VIRO_SIMULATOR_LIBRARY/libViroReact.a $VIRO_DEVICE_LIBRARY/libViroReact.a -create -output $VIROREACT_DIST_PATH/lib/libViroReact.a\nfi\n";
 		};
 		1B05FB767790B52B1693D430 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2002,7 +2047,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = $SRCROOT/ngrok_launch.sh;
+			shellScript = "$SRCROOT/ngrok_launch.sh\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2604,7 +2649,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 8EB99B003C13099B09EC75DC /* Pods-ViroReact.release.xcconfig */;
 			buildSettings = {
-				ENABLE_BITCODE = NO;
+				ENABLE_BITCODE = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/dist/ViroRenderer",

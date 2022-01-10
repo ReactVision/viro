@@ -1,7 +1,7 @@
 {
   "name": "@viro-community/react-viro",
   "main": "index.js",
-  "version": "2.21.0",
+  "version": "2.22.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -32,6 +32,12 @@
   ],
   "dependencies": {
     "create-react-class": "^15.7.0",
-    "prop-types": "^15.5.10"
+    "prop-types": "^15.5.10",
+    "react-native-codegen": "^0.0.7"
+  },
+  "devDependencies": {
+    "react": "^17.0.2",
+    "react-native": "^0.65.1",
+    "typescript": "^4.4.2"
   }
 }

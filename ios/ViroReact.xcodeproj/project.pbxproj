@@ -214,13 +214,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		131E1ED120B89C190075D8E0 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 080D7323FFBA699FD466424B6566634E;
-			remoteInfo = "Pods-ViroReact_release_tests";
-		};
 		4130E56C276D9EF2001A9615 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
@@ -860,7 +853,6 @@
 				4130E571276D9EF2001A9615 /* fmt */,
 				4130E573276D9EF2001A9615 /* glog */,
 				8BDD9DA31E09F39B00A42870 /* Pods-ViroReact */,
-				131E1ED220B89C190075D8E0 /* Pods-ViroReact_release_tests */,
 				4130E575276D9EF2001A9615 /* RCT-Folly */,
 				4130E577276D9EF2001A9615 /* RCTTypeSafety */,
 				4130E579276D9EF2001A9615 /* React-Core */,
@@ -1218,14 +1210,6 @@
 /* End PBXProject section */
 
 /* Begin PBXReferenceProxy section */
-		131E1ED220B89C190075D8E0 /* Pods-ViroReact_release_tests */ = {
-			isa = PBXReferenceProxy;
-			fileType = archive.ar;
-			name = "Pods-ViroReact_release_tests";
-			path = "libPods-ViroReact_release_tests.a";
-			remoteRef = 131E1ED120B89C190075D8E0 /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
 		4130E56D276D9EF2001A9615 /* DoubleConversion */ = {
 			isa = PBXReferenceProxy;
 			fileType = archive.ar;
@@ -1725,7 +1709,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 8EB99B003C13099B09EC75DC /* Pods-ViroReact.release.xcconfig */;
 			buildSettings = {
-				ENABLE_BITCODE = NO;
+				ENABLE_BITCODE = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/dist/ViroRenderer",

@@ -69,6 +69,6 @@
     "skipLibCheck": true /* Skip type checking of declaration files. */,
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
   },
-  "include": ["./**/*.ts", "./**/*.tsx", "components/Viro3DObject.tsx"],
+  "include": ["./**/*.ts", "./**/*.tsx"],
   "exclude": ["node_modules", "build", "dist", "./**/*.js", "./**/*.jsx"]
 }

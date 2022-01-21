@@ -13,7 +13,9 @@
   "scripts": {
     "start": "echo 'I dont think you meant to run npm start here.'",
     "test": "jest",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "build": "yarn tsc && yarn copy-files",
+    "copy-files": "cp -r ./components/Resources/ ./dist/components/Resources/"
   },
   "jest": {
     "preset": "react-native"

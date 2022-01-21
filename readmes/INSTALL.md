@@ -6,8 +6,16 @@ The steps below are for manually installing and linking the library to an existi
 
 ## Install
 
+#### NPM 
+
 ```console
 $ npm install --save @viro-community/react-viro
+```
+
+#### Yarn
+
+```console
+$ yarn add @viro-community/react-viro
 ```
 
 ## Linking (You _must_ do this - we do not support auto-linking)

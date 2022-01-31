@@ -31,7 +31,7 @@ If you are starting a fresh project with ViroReact, consider cloning our [starte
 
 # Documentation
 
-Currently all documentation is hosted on the old [Viro Media](http://docs.viromedia.com/) website. If you'd like to help us with migrating here to the Viro Community github, please [get in touch](https://discord.gg/H3ksm5NhzT)!
+The documentation is found [here](https://viro-community.readme.io/docs/overview). Currently, the documentation is migrated with issues to code samples and broken links. If you would like to help fix these issues, either submit an edit or [get in touch](https://discord.gg/H3ksm5NhzT)!
 
 # FAQ
 

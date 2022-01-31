@@ -1,6 +1,8 @@
 {
   "name": "@viro-community/react-viro",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "version": "2.22.0",
   "license": "MIT",
   "publishConfig": {
@@ -10,16 +12,21 @@
   "description": "Official community version of react-viro",
   "scripts": {
     "start": "echo 'I dont think you meant to run npm start here.'",
-    "test": "jest"
+    "test": "jest",
+    "tsc": "tsc",
+    "build": "yarn tsc && yarn copy-files",
+    "copy-files": "cp -r ./components/Resources/ ./dist/components/Resources/"
   },
   "jest": {
     "preset": "react-native"
   },
   "peerDependencies": {
-    "react": "17.0.2",
     "react-native": "0.65.1"
   },
   "files": [
+    "index.d.ts",
+    "index.js",
+    "index.ts",
     "components",
     "android/react_viro",
     "android/viro_renderer",
@@ -31,13 +38,11 @@
     "LICENSE"
   ],
   "dependencies": {
-    "create-react-class": "^15.7.0",
-    "prop-types": "^15.5.10",
-    "react-native-codegen": "^0.0.7"
+    "react": "^17.0.2"
   },
   "devDependencies": {
-    "react": "^17.0.2",
-    "react-native": "^0.65.1",
-    "typescript": "^4.4.2"
+    "@types/babel__core": "^7.1.18",
+    "@types/react-native": "^0.66.9",
+    "typescript": "^4.5.4"
   }
 }

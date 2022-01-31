@@ -55,13 +55,13 @@ Figment/ios/ngrokendpoint.txt
 # Node
 node_modules
 npm-debug.log
-yarn.lock
+package-lock.lock
 
 .DS_Store
 local.properties
 build/
 react-viro*.tgz
-
+yarn.lock
 
 # Fastlane
 ios/fastlane/report.xml

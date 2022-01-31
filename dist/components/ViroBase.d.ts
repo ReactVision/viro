@@ -1,0 +1,30 @@
+import * as React from "react";
+import { NativeSyntheticEvent } from "react-native";
+import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
+import { ViroHoverEvent, ViroClickEvent, ViroClickStateEvent, ViroTouchEvent, ViroScrollEvent, ViroSwipeEvent, ViroPinchEvent, ViroRotateEvent, ViroDragEvent, ViroFuseEvent, ViroAnimationStartEvent, ViroAnimationFinishEvent, ViroCollisionEvent, ViroNativeTransformUpdateEvent, ViroErrorEvent } from "./Types/ViroEvents";
+import { ViroNativeRef, ViroForce, Viro3DPoint, ViroTorque, ViroVelocity } from "./Types/ViroUtils";
+export declare type ViroBaseProps = ViroCommonProps & ViroObjectProps;
+export declare class ViroBase<T> extends React.Component<ViroBaseProps & T> {
+    _component: ViroNativeRef;
+    _onHover: (event: NativeSyntheticEvent<ViroHoverEvent>) => void;
+    _onClick: (event: NativeSyntheticEvent<ViroClickEvent>) => void;
+    _onClickState: (event: NativeSyntheticEvent<ViroClickStateEvent>) => void;
+    _onTouch: (event: NativeSyntheticEvent<ViroTouchEvent>) => void;
+    _onScroll: (event: NativeSyntheticEvent<ViroScrollEvent>) => void;
+    _onSwipe: (event: NativeSyntheticEvent<ViroSwipeEvent>) => void;
+    _onPinch: (event: NativeSyntheticEvent<ViroPinchEvent>) => void;
+    _onRotate: (event: NativeSyntheticEvent<ViroRotateEvent>) => void;
+    _onDrag: (event: NativeSyntheticEvent<ViroDragEvent>) => void;
+    _onFuse: (event: NativeSyntheticEvent<ViroFuseEvent>) => void;
+    _onAnimationStart: (_event: NativeSyntheticEvent<ViroAnimationStartEvent>) => void;
+    _onAnimationFinish: (_event: NativeSyntheticEvent<ViroAnimationFinishEvent>) => void;
+    _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
+    getTransformAsync: () => Promise<any>;
+    getBoundingBoxAsync: () => Promise<any>;
+    applyImpulse: (force: ViroForce, position: Viro3DPoint) => void;
+    applyTorqueImpulse: (torque: ViroTorque) => void;
+    setVelocity: (velocity: ViroVelocity) => void;
+    _onCollision: (event: NativeSyntheticEvent<ViroCollisionEvent>) => void;
+    _onNativeTransformUpdate: (event: NativeSyntheticEvent<ViroNativeTransformUpdateEvent>) => void;
+    setNativeProps: (nativeProps: ViroBaseProps & T) => void;
+}

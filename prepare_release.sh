@@ -6,17 +6,19 @@
 
 set -x
 
+echo '== Compiling TypeScript =='
+npm run build
+
 # to be safe, clear out any old libraries in the output directory
 echo '== Clearing out the old build artifacts =='
 rm android/viro_bridge/build/outputs/aar/*.aar
 
 echo '== Building the React-Viro library =='
-( cd android && ./gradlew :viro_bridge:assembleRelease )
+(cd android && ./gradlew :viro_bridge:assembleRelease)
 
 echo '== Checking for build artifacts =='
-if [ ! -f android/viro_bridge/build/outputs/aar/viro_bridge-release.aar ]
-then
-    echo "Unable to find viro-bridge release output!";
+if [ ! -f android/viro_bridge/build/outputs/aar/viro_bridge-release.aar ]; then
+    echo "Unable to find viro-bridge release output!"
     exit
 fi
 

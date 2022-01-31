@@ -40,7 +40,3 @@ target 'ViroReact' do
   common_pods
 end
 
-
-target 'ViroReact_release_tests' do
-  common_pods
-end

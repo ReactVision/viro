@@ -1,0 +1,63 @@
+[
+  {
+    "shortDescription" : "",
+    "metadataOutputVersion" : "3.0",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float32",
+        "formattedType" : "MultiArray (Float32 16 × 64 × 64)",
+        "shortDescription" : "Convolution Heatmap (CxHxW)",
+        "shape" : "[16, 64, 64]",
+        "name" : "hourglass",
+        "type" : "MultiArray"
+      }
+    ],
+    "version" : "",
+    "modelParameters" : [
+
+    ],
+    "author" : "",
+    "specificationVersion" : 1,
+    "license" : "",
+    "isUpdatable" : "0",
+    "availability" : {
+      "macOS" : "10.13",
+      "tvOS" : "11.0",
+      "watchOS" : "4.0",
+      "iOS" : "11.0",
+      "macCatalyst" : "11.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_neuralNetwork"
+    },
+    "inputSchema" : [
+      {
+        "height" : "256",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "256",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 256 × 256)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "",
+        "name" : "image"
+      }
+    ],
+    "userDefinedMetadata" : {
+
+    },
+    "generatedClassName" : "hourglass_2_1_ds_t",
+    "neuralNetworkLayerTypeHistogram" : {
+      "UpsampleNearestNeighbor" : 8,
+      "PoolingMax" : 9,
+      "Convolution" : 71,
+      "BatchNorm" : 68,
+      "ActivationReLU" : 67,
+      "Add" : 31
+    },
+    "method" : "predict"
+  }
+]

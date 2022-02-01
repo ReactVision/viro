@@ -28,6 +28,7 @@
     "index.js",
     "index.ts",
     "components",
+    "app.plugin.js",
     "android/react_viro",
     "android/viro_renderer",
     "android/gvr_common",

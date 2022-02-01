@@ -3,6 +3,8 @@ import {
   withDangerousMod,
   withXcodeProject,
   ConfigPlugin,
+  ExportedConfigWithProps,
+  XcodeProject,
 } from "@expo/config-plugins";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
@@ -16,9 +18,7 @@ const withViroPods = (config: ExpoConfig) => {
 
       fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
         data = insertLinesHelper(
-          `  pod 'ViroReact', :path => '../node_modules/@viro-community/react-viro/ios/'
-    pod 'ViroKit_static_lib', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/static_lib'
-            `,
+          `pod 'ViroKit', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/'`,
           "post_install do |installer|",
           data,
           -1
@@ -41,9 +41,35 @@ const withEnabledBitcode = (config: ExpoConfig) =>
     return newConfig;
   });
 
+const setExcludedArchitectures = (
+  project: ExportedConfigWithProps<XcodeProject>["modResults"]
+) => {
+  const configurations = project.pbxXCBuildConfigurationSection();
+
+  // @ts-ignore
+  for (const { buildSettings } of Object.values(configurations || {})) {
+    if (
+      typeof (buildSettings === null || buildSettings === void 0
+        ? void 0
+        : buildSettings.PRODUCT_NAME) !== "undefined"
+    ) {
+      buildSettings['"EXCLUDED_ARCHS[sdk=iphonesimulator*]"'] = '"arm64"';
+    }
+  }
+
+  return project;
+};
+
+const withExcludedSimulatorArchitectures = (config: ExpoConfig) => {
+  return withXcodeProject(config, (newConfig) => {
+    newConfig.modResults = setExcludedArchitectures(newConfig.modResults);
+    return newConfig;
+  });
+};
+
 export const withViroIos: ConfigPlugin = (config, props) => {
   withPlugins(config, [[withViroPods, props]]);
   withEnabledBitcode(config);
-
+  withExcludedSimulatorArchitectures(config);
   return config;
 };

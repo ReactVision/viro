@@ -13,9 +13,8 @@ const withViroPods = (config) => {
         async (newConfig) => {
             const root = newConfig.modRequest.platformProjectRoot;
             fs_1.default.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
-                data = (0, insertLinesHelper_1.insertLinesHelper)(`  pod 'ViroReact', :path => '../node_modules/@viro-community/react-viro/ios/'
-    pod 'ViroKit_static_lib', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/static_lib'
-            `, "post_install do |installer|", data, -1);
+                data = (0, insertLinesHelper_1.insertLinesHelper)(`pod 'ViroKit', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/'`, "post_install do |installer|", data, -1);
+                // https://github.com/ViroCommunity/viro/issues/56#issuecomment-986437376
                 fs_1.default.writeFile(`${root}/Podfile`, data, "utf-8", function (err) {
                     if (err)
                         console.log("Error writing Podfile");
@@ -30,9 +29,30 @@ const withEnabledBitcode = (config) => (0, config_plugins_1.withXcodeProject)(co
     newConfig.modResults.addBuildProperty("ENABLE_BITCODE", "NO", "Release");
     return newConfig;
 });
+const setExcludedArchitectures = (project) => {
+    const configurations = project.pbxXCBuildConfigurationSection();
+    // @ts-ignore
+    for (const { buildSettings } of Object.values(configurations || {})) {
+        // Guessing that this is the best way to emulate Xcode.
+        // Using `project.addToBuildSettings` modifies too many targets.
+        if (typeof (buildSettings === null || buildSettings === void 0
+            ? void 0
+            : buildSettings.PRODUCT_NAME) !== "undefined") {
+            buildSettings['"EXCLUDED_ARCHS[sdk=iphonesimulator*]"'] = '"arm64"';
+        }
+    }
+    return project;
+};
+const withExcludedSimulatorArchitectures = (config) => {
+    return (0, config_plugins_1.withXcodeProject)(config, (newConfig) => {
+        newConfig.modResults = setExcludedArchitectures(newConfig.modResults);
+        return newConfig;
+    });
+};
 const withViroIos = (config, props) => {
     (0, config_plugins_1.withPlugins)(config, [[withViroPods, props]]);
     withEnabledBitcode(config);
+    withExcludedSimulatorArchitectures(config);
     return config;
 };
 exports.withViroIos = withViroIos;

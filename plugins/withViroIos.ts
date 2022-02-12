@@ -18,7 +18,8 @@ const withViroPods = (config: ExpoConfig) => {
 
       fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
         data = insertLinesHelper(
-          `pod 'ViroKit', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/'`,
+          `  pod 'ViroReact', :path => '../node_modules/@viro-community/react-viro/ios/'\n` +
+            `  pod 'ViroKit', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/'`,
           "post_install do |installer|",
           data,
           -1

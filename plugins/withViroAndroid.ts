@@ -15,7 +15,7 @@ import fs from "fs";
 import path from "path";
 import { insertLinesHelper } from "./util/insertLinesHelper";
 
-const withBranchAndroid = (config: ExpoConfig) => {
+const withBranchAndroid = (config: ExpoConfig, props: any) => {
   // Directly edit MainApplication.java
   config = withDangerousMod(config, [
     "android",
@@ -38,8 +38,46 @@ const withBranchAndroid = (config: ExpoConfig) => {
           data
         );
 
+        /**
+         * ********************************************************************
+         * Sample app.json with property config
+         * Options: "AR", "GVR", "OVR_MOBILE"
+         *
+         * https://docs.expo.dev/guides/config-plugins/#using-a-plugin-in-your-app
+         * ********************************************************************
+         *
+         * plugins: [
+         *   [
+         *     "@viro-community/react-viro",
+         *     {
+         *       "androidXrMode": "GVR"
+         *     }
+         *   ]
+         * ],
+         *
+         * ********************************************************************
+         * Sample app.json without property config
+         * The default configuration is "AR"
+         * ********************************************************************
+         *
+         * plugins: [ "@viro-community/react-viro" ],
+         *
+         */
+
+        const viroPlugin = config?.plugins?.find(
+          (plugin) =>
+            Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
+        );
+        let viroPluginConfig = "AR";
+        if (
+          Array.isArray(viroPlugin) &&
+          ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)
+        ) {
+          viroPluginConfig = viroPlugin[1]?.androidXrMode;
+        }
+
         data = insertLinesHelper(
-          `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("AR")));`,
+          `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroPluginConfig}")));`,
           "List<ReactPackage> packages = new PackageList(this).getPackages();",
           data
         );
@@ -125,6 +163,11 @@ const withViroManifest = (config: ExpoConfig) =>
 
       contents.manifest["uses-feature"] = [];
 
+      contents.manifest["uses-permission"].push({
+        $: {
+          "android:name": "android.permission.CAMERA",
+        },
+      });
       contents.manifest["uses-feature"].push({
         $: {
           "android:name": "android.hardware.camera",

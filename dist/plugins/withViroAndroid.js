@@ -8,7 +8,7 @@ const config_plugins_1 = require("@expo/config-plugins");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const insertLinesHelper_1 = require("./util/insertLinesHelper");
-const withBranchAndroid = (config) => {
+const withBranchAndroid = (config, props) => {
     // Directly edit MainApplication.java
     config = (0, config_plugins_1.withDangerousMod)(config, [
         "android",
@@ -17,7 +17,38 @@ const withBranchAndroid = (config) => {
             const root = config.modRequest.platformProjectRoot;
             fs_1.default.readFile(mainApplicationPath, "utf-8", (err, data) => {
                 data = (0, insertLinesHelper_1.insertLinesHelper)("import com.viromedia.bridge.ReactViroPackage;", `package ${config?.android?.package};`, data);
-                data = (0, insertLinesHelper_1.insertLinesHelper)(`      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("AR")));`, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
+                /**
+                 * ********************************************************************
+                 * Sample app.json with property config
+                 * Options: "AR", "GVR", "OVR_MOBILE"
+                 *
+                 * https://docs.expo.dev/guides/config-plugins/#using-a-plugin-in-your-app
+                 * ********************************************************************
+                 *
+                 * plugins: [
+                 *   [
+                 *     "@viro-community/react-viro",
+                 *     {
+                 *       "androidXrMode": "GVR"
+                 *     }
+                 *   ]
+                 * ],
+                 *
+                 * ********************************************************************
+                 * Sample app.json without property config
+                 * The default configuration is "AR"
+                 * ********************************************************************
+                 *
+                 * plugins: [ "@viro-community/react-viro" ],
+                 *
+                 */
+                const viroPlugin = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro");
+                let viroPluginConfig = "AR";
+                if (Array.isArray(viroPlugin) &&
+                    ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)) {
+                    viroPluginConfig = viroPlugin[1]?.androidXrMode;
+                }
+                data = (0, insertLinesHelper_1.insertLinesHelper)(`      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroPluginConfig}")));`, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
                 fs_1.default.writeFile(mainApplicationPath, data, "utf-8", function (err) {
                     if (err)
                         console.log("Error writing MainApplication.java");
@@ -75,6 +106,11 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
         },
     ];
     contents.manifest["uses-feature"] = [];
+    contents.manifest["uses-permission"].push({
+        $: {
+            "android:name": "android.permission.CAMERA",
+        },
+    });
     contents.manifest["uses-feature"].push({
         $: {
             "android:name": "android.hardware.camera",

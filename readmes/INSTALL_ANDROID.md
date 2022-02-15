@@ -1,6 +1,6 @@
 # Android Linking (You **_must_** do this - we do not yet support auto-linking)
 
-1. In your `android/build.gradle` Bump the minimum SDK version to at least `24`, and the gradle plugin to at least `4.1.1`:
+## 1. In your `android/build.gradle` Bump the minimum SDK version to at least `24`, and the gradle plugin to at least `4.1.1`:
 
    ```groovy
    buildscript{
@@ -18,7 +18,7 @@
 
    See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/android/build.gradle) here.
 
-2. In your `android/app/build.gradle` Add the following lines to the dependencies section:
+## 2. In your `android/app/build.gradle` Add the following lines to the dependencies section:
 
    ```groovy
    dependencies {
@@ -38,7 +38,7 @@
 
    See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/android/app/build.gradle) here.
 
-3. In your `android/settings.gradle` Add the following lines to the end:
+## 3. In your `android/settings.gradle` Add the following lines to the end:
 
    ```groovy
    include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
@@ -50,7 +50,7 @@
 
    See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/android/settings.gradle) here.
 
-4. In your `android/gradle/wrapper/gradle-wrapper.properties` set the `distributionUrl` to at least 6.5:
+## 4. In your `android/gradle/wrapper/gradle-wrapper.properties` set the `distributionUrl` to at least 6.5:
 
    ```properties
    distributionUrl=https\://services.gradle.org/distributions/gradle-6.5-bin.zip
@@ -58,7 +58,7 @@
 
    See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/android/gradle/wrapper/gradle-wrapper.properties) here.
 
-5. Now add the Viro package to your `MainApplication.java`:
+## 5. Now add the Viro package to your `MainApplication.java`:
 
    - Add the following line to the end of the import list:
 
@@ -86,9 +86,9 @@
 
    See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/android/app/src/main/java/com/myviroapp/MainApplication.java) here.
 
-6. In your `android/app/src/main/AndroidManifest.xml`:
+## 6. In your `android/app/src/main/AndroidManifest.xml`:
 
-   **For AR**
+   ### **For AR**
 
    - Ensure the `<manifest>` has the `tools` namespace schema:
 
@@ -126,7 +126,7 @@
      <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" tools:replace="required" />
      ```
 
-   **For VR**
+   ### **For VR**
 
    - If your app supports Cardboard or Datdream, you should add them as a category to the `intent-filter` in your activity:
 
@@ -147,7 +147,7 @@
      <meta-data android:name="com.samsung.android.vr.application.mode" android:value="vr_only"/>
      ```
 
-   **For API level 30 or above**
+   ### **For API level 30 or above**
 
      If you are targetting API Level 30 or above, make sure to add the following lines to the `<manifest>`:
      ```xml
@@ -156,7 +156,7 @@
      </queries>
      ```
 
-   **Optional - when debugging**
+   ### **Optional - when debugging**
 
    Add the following line as an attribute on the `<application>` node. This should only used when debugging and is not recommended for production (you may want to inject the value using [manifestPlaceholders](https://developer.android.com/studio/build/manifest-build-variables) set for specific [build types](https://developer.android.com/studio/build/build-variants)).
 
@@ -169,4 +169,4 @@
 
    See an [example](https://github.com/ViroCommunity/starter-kit/blob/master/android/app/src/main/AndroidManifest.xml) here. This example is for AR only.
 
-7. You're done! You can now run `npx react-native run-android` to upload the app to your device.
+## 7. You're done! You can now run `npx react-native run-android` to upload the app to your device.

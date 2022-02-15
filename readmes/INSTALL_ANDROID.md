@@ -128,7 +128,7 @@
 
    ### **For VR**
 
-   - If your app supports Cardboard or Datdream, you should add them as a category to the `intent-filter` in your activity:
+   - If your app supports Cardboard or Daydream, you should add them as a category to the `intent-filter` in your activity:
 
      ```xml
      <intent-filter>

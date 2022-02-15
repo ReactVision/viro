@@ -69,7 +69,6 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
          * ],
          * ********************************************************************
          * Sample app.json without property config
-         * The default configuration is "AR"
          * ********************************************************************
          *
          * plugins: [ "@viro-community/react-viro" ],

@@ -36,7 +36,6 @@ const withBranchAndroid = (config, props) => {
                  *
                  * ********************************************************************
                  * Sample app.json with multiple options for Viro config
-                 * The default configuration is "AR"
                  * ********************************************************************
                  * plugins: [
                  *   [

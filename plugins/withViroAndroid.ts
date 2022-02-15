@@ -56,6 +56,18 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
          * ],
          *
          * ********************************************************************
+         * Sample app.json with multiple options for Viro config
+         * The default configuration is "AR"
+         * ********************************************************************
+         * plugins: [
+         *   [
+         *     "@viro-community/react-viro",
+         *     {
+         *       "androidXrMode": ["GVR", "AR"]
+         *     }
+         *   ]
+         * ],
+         * ********************************************************************
          * Sample app.json without property config
          * The default configuration is "AR"
          * ********************************************************************
@@ -68,16 +80,29 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
           (plugin) =>
             Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
         );
-        let viroPluginConfig = "AR";
-        if (
-          Array.isArray(viroPlugin) &&
-          ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)
-        ) {
-          viroPluginConfig = viroPlugin[1]?.androidXrMode;
+
+        let viroPluginConfig = ["AR"];
+        if (Array.isArray(viroPlugin)) {
+          if (Array.isArray(viroPlugin[1].androidXrMode)) {
+            viroPluginConfig = (viroPlugin[1].androidXrMode as string[]).filter(
+              (mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode)
+            );
+          } else if (
+            ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)
+          ) {
+            viroPluginConfig = [viroPlugin[1]?.androidXrMode];
+          }
+        }
+
+        let target = "";
+        for (const viroConfig of viroPluginConfig) {
+          target =
+            target +
+            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")));\n`;
         }
 
         data = insertLinesHelper(
-          `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroPluginConfig}")));`,
+          target,
           "List<ReactPackage> packages = new PackageList(this).getPackages();",
           data
         );

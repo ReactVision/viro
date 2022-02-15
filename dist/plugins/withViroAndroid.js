@@ -35,6 +35,18 @@ const withBranchAndroid = (config, props) => {
                  * ],
                  *
                  * ********************************************************************
+                 * Sample app.json with multiple options for Viro config
+                 * The default configuration is "AR"
+                 * ********************************************************************
+                 * plugins: [
+                 *   [
+                 *     "@viro-community/react-viro",
+                 *     {
+                 *       "androidXrMode": ["GVR", "AR"]
+                 *     }
+                 *   ]
+                 * ],
+                 * ********************************************************************
                  * Sample app.json without property config
                  * The default configuration is "AR"
                  * ********************************************************************
@@ -43,12 +55,25 @@ const withBranchAndroid = (config, props) => {
                  *
                  */
                 const viroPlugin = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro");
-                let viroPluginConfig = "AR";
-                if (Array.isArray(viroPlugin) &&
-                    ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)) {
-                    viroPluginConfig = viroPlugin[1]?.androidXrMode;
+                console.log("viroPlugin", viroPlugin);
+                let viroPluginConfig = ["AR"];
+                if (Array.isArray(viroPlugin)) {
+                    if (Array.isArray(viroPlugin[1].androidXrMode)) {
+                        viroPluginConfig = viroPlugin[1].androidXrMode.filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode));
+                    }
+                    else if (["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)) {
+                        viroPluginConfig = [viroPlugin[1]?.androidXrMode];
+                    }
                 }
-                data = (0, insertLinesHelper_1.insertLinesHelper)(`      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroPluginConfig}")));`, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
+                console.log("viroPluginConfig", viroPluginConfig);
+                let target = "";
+                for (const viroConfig of viroPluginConfig) {
+                    target =
+                        target +
+                            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")));\n`;
+                }
+                console.log("target", target);
+                data = (0, insertLinesHelper_1.insertLinesHelper)(target, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
                 fs_1.default.writeFile(mainApplicationPath, data, "utf-8", function (err) {
                     if (err)
                         console.log("Error writing MainApplication.java");

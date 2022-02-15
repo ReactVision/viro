@@ -6,6 +6,9 @@
 
 set -x
 
+echo '== Cleaning local tarballs =='
+rm -rf ./*.tgz
+
 echo '== Compiling TypeScript =='
 npm run build
 

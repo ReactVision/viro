@@ -59,6 +59,6 @@ We, as a community, owe a great debt to Viro Media and the people who developed 
 
 <p align="center">
   <a href="https://themorrow.digital/">
-    <img src="src/assets/morrow-supporter.png" alt="Morrow">
+    <img src="readmes/morrow-supporter.png" alt="Morrow">
   </a>
 </p>

@@ -1,19 +1,19 @@
 import {
-  withPlugins,
-  withDangerousMod,
   ConfigPlugin,
+  ExportedConfigWithProps,
   withAndroidManifest,
+  withAppBuildGradle,
+  withDangerousMod,
+  withPlugins,
   withProjectBuildGradle,
   withSettingsGradle,
-  ExportedConfigWithProps,
-  withAppBuildGradle,
 } from "@expo/config-plugins";
-import { Manifest } from "@expo/config-plugins/build/android";
-import { GradleProjectFile } from "@expo/config-plugins/build/android/Paths";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
 import path from "path";
 import { insertLinesHelper } from "./util/insertLinesHelper";
+
+let viroPluginConfig = ["AR"];
 
 const withBranchAndroid = (config: ExpoConfig, props: any) => {
   // Directly edit MainApplication.java
@@ -80,7 +80,6 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
             Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
         );
 
-        let viroPluginConfig = ["AR"];
         if (Array.isArray(viroPlugin)) {
           if (Array.isArray(viroPlugin[1].androidXrMode)) {
             viroPluginConfig = (viroPlugin[1].androidXrMode as string[]).filter(
@@ -172,6 +171,30 @@ const withViroManifest = (config: ExpoConfig) =>
           "android:value": "optional",
         },
       });
+
+      if (
+        viroPluginConfig.includes("GVR") ||
+        viroPluginConfig.includes("OVR_MOBILE")
+      ) {
+        //   <!-- Add the following line for cardboard -->
+        //   <category android:name="com.google.intent.category.CARDBOARD" />
+        contents?.manifest?.application?.[0]?.activity[0][
+          "intent-filter"
+        ][0].category.push({
+          $: {
+            "android:name": "com.google.intent.category.CARDBOARD",
+          },
+        });
+        //   <!-- Add the following line for daydream -->
+        //   <category android:name="com.google.intent.category.DAYDREAM" />
+        contents?.manifest?.application?.[0]?.activity[0][
+          "intent-filter"
+        ][0].category.push({
+          $: {
+            "android:name": "com.google.intent.category.DAYDREAM",
+          },
+        });
+      }
 
       contents.manifest.queries = [
         {

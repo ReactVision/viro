@@ -53,8 +53,6 @@ export class Viro3DObject extends ViroBase<Props> {
       resolveAssetSource(resource)
     );
 
-    console.log("RESOURCES", resources);
-
     // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
     const materials =
       typeof this.props.materials === "string"

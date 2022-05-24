@@ -25,7 +25,7 @@ ViroReact is a library for developers to rapidly build augmented reality (AR) an
 
 # [Installing](readmes/INSTALL.md)
 
-If you are integrating ViroReact into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md). Please note that this does _not_ work with Expo Managed Workflows. Sorry!
+If you are integrating ViroReact into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md).
 
 If you are starting a fresh project with ViroReact, consider cloning our [starter kit](https://github.com/ViroCommunity/starter-kit) repo instead.
 

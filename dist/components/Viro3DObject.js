@@ -32,8 +32,7 @@ class Viro3DObject extends ViroBase_1.ViroBase {
     render() {
         (0, ViroProps_1.checkMisnamedProps)("Viro3DObject", this.props);
         const modelsrc = resolveAssetSource(this.props.source);
-        const resources = this.props.resources?.map((resource) => resolveAssetSource(resource));
-        console.log("RESOURCES", resources);
+        const resources = this.props.resources?.map((resource) => resolveAssetSource(resource));        
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         const materials = typeof this.props.materials === "string"
             ? [this.props.materials]

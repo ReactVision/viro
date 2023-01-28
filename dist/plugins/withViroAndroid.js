@@ -92,7 +92,7 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
     implementation project(path: ':viro_renderer')
-    implementation 'com.google.android.exoplayer:exoplayer:2.7.1'
+    implementation 'com.google.android.exoplayer:exoplayer:2.17.1'
     implementation 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'`);
     return config;
 });
@@ -117,8 +117,6 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
     });
     if (viroPluginConfig.includes("GVR") ||
         viroPluginConfig.includes("OVR_MOBILE")) {
-        console.log(contents?.manifest?.application?.[0]?.activity[0]["intent-filter"][0]
-            .category);
         //   <!-- Add the following line for cardboard -->
         //   <category android:name="com.google.intent.category.CARDBOARD" />
         contents?.manifest?.application?.[0]?.activity[0]["intent-filter"][0].category.push({
@@ -133,8 +131,6 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
                 "android:name": "com.google.intent.category.DAYDREAM",
             },
         });
-        console.log(contents?.manifest?.application?.[0]?.activity[0]["intent-filter"][0]
-            .category);
     }
     contents.manifest.queries = [
         {

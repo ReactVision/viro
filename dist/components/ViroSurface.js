@@ -96,7 +96,7 @@ class ViroSurface extends ViroBase_1.ViroBase {
     }
 }
 exports.ViroSurface = ViroSurface;
-var VRTSurface = (0, react_native_1.requireNativeComponent)("VRTQuad", 
+var VRTSurface = (0, react_native_1.requireNativeComponent)("VRTSurface", 
 // @ts-ignore
 ViroSurface, {
     nativeOnly: {

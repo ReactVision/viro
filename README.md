@@ -18,7 +18,7 @@ ViroReact is a library for developers to rapidly build augmented reality (AR) an
       <img height="200" src="https://raw.githubusercontent.com/viromedia/viro/master/code-samples/js/ARCarDemo/viro_car_marker_demo.gif">
     </td>
     <td align="center">
-      <img height="200" src="https://raw.githubusercontent.com/viromedia/viro/master/code-samples/js/ARPosterDemo/viro_black_panther_marker_demo.gif">
+      <img height="200" src="https://github.com/ViroCommunity/viro/assets/430272/b153b8e4-7b40-4197-b05b-dd1eb1566102">
     </td>
   </tr>
 </table>

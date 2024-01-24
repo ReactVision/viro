@@ -1,7 +1,7 @@
 /// <reference types="react" />
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     style?: ViroStyle;
 };
 /**

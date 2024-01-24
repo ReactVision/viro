@@ -3,7 +3,7 @@ import { ColorValue, NativeSyntheticEvent } from "react-native";
 import { ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroNativeTransformUpdateEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
-declare type Props = ViroObjectProps & {
+type Props = ViroObjectProps & {
     delay?: number;
     duration?: number;
     loop?: boolean;
@@ -91,7 +91,7 @@ declare type Props = ViroObjectProps & {
         };
     };
 };
-declare type State = {
+type State = {
     nativePositionState: any;
     propsPositionState: any;
 };

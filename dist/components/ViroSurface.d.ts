@@ -1,7 +1,7 @@
 /// <reference types="react" />
 import { ViroUVCoordinate } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     uvCoordinates: ViroUVCoordinate[];
 };
 /**

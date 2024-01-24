@@ -14,4 +14,4 @@ import { ViroStyle } from "./ViroStyle";
 /**
  * Warning: Some of these properties may not be supported in all releases.
  */
-export declare type ViroTextStyle = ViroStyle & TextStyle;
+export type ViroTextStyle = ViroStyle & TextStyle;

@@ -2,7 +2,7 @@
 import { ColorValue } from "react-native";
 import { ViroTextStyle } from "./Styles/ViroTextStyle";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     text: string;
     color?: ColorValue;
     extrusionDepth?: number;

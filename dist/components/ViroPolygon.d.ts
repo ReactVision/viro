@@ -2,7 +2,7 @@
 import { ViroStyle } from "./Styles/ViroStyle";
 import { Viro2DPoint, ViroUVCoordinate } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     /**
      * An array of boundary vertex positions in local model space.
      * Each point is a 2D array consisting of an X and a Y coordinate.

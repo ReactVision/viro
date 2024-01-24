@@ -9,10 +9,10 @@
  * @providesModule VRTARTrackingTargets
  * @flow
  */
-export declare type ViroARTrackingTargetsMap = {
+export type ViroARTrackingTargetsMap = {
     [key: string]: ViroARTrackingTarget;
 };
-export declare type ViroARTrackingTarget = any;
+export type ViroARTrackingTarget = any;
 export declare class ViroARTrackingTargets {
     static createTargets(targets: ViroARTrackingTargetsMap): void;
     static checkForRequiredProps(_key: string, target: ViroARTrackingTarget): void;

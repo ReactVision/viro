@@ -2,7 +2,7 @@
 import { ImageSourcePropType, NativeSyntheticEvent } from "react-native";
 import { ViroErrorEvent, ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     type: "OBJ" | "VRX" | "GLTF" | "GLB";
     /**
      * The model file, which is required

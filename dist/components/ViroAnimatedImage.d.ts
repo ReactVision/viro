@@ -6,7 +6,7 @@ import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroErrorEvent, ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroPhysicsBody, ViroRotation, ViroScale, ViroSource } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = ViroCommonProps & {
+type Props = ViroCommonProps & {
     source: ViroSource;
     placeholderSource?: ViroSource;
     position?: Viro3DPoint;

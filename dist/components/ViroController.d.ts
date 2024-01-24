@@ -3,7 +3,7 @@ import { NativeSyntheticEvent } from "react-native";
 import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroClickEvent, ViroClickStateEvent, ViroControllerStatus, ViroControllerStatusEvent, ViroDragEvent, ViroFuseEvent, ViroPinchEvent, ViroRotateEvent, ViroScrollEvent, ViroSwipeEvent, ViroTouchEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
-declare type Props = ViroCommonProps & ViroObjectProps & {
+type Props = ViroCommonProps & ViroObjectProps & {
     onSwipe?: () => void;
     onControllerStatus?: (status: ViroControllerStatus, source: ViroSource) => void;
     reticleVisibility?: boolean;

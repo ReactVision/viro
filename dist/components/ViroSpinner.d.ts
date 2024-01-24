@@ -1,6 +1,6 @@
 /// <reference types="react" />
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     type?: "Dark" | "Light" | "dark" | "light";
 };
 /**

@@ -10,7 +10,7 @@ import * as React from "react";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroErrorEvent, ViroVideoBufferEndEvent, ViroVideoBufferStartEvent, ViroVideoUpdateTimeEvent } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
-declare type Props = ViewProps & {
+type Props = ViewProps & {
     material?: string;
     paused?: boolean;
     loop?: boolean;

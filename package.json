@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.23.1-alpha",
+  "version": "2.23.1-beta",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -14,7 +14,7 @@
     "start": "echo 'I dont think you meant to run npm start here.'",
     "test": "jest",
     "tsc": "tsc",
-    "build": "yarn tsc && yarn copy-files",
+    "build": "tsc && npm run copy-files",
     "bundle": "./prepare_release.sh",
     "copy-files": "cp -r ./components/Resources/ ./dist/components/Resources/",
     "clean": "rm -rf ./dist/ *.tgz node_modules/"
@@ -23,7 +23,7 @@
     "preset": "react-native"
   },
   "peerDependencies": {
-    "react-native": "0.71.14"
+    "react-native": "*"
   },
   "files": [
     "index.d.ts",

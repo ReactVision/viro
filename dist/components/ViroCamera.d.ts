@@ -13,7 +13,7 @@ import * as React from "react";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroAnimationFinishEvent, ViroAnimationStartEvent } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroRotation } from "./Types/ViroUtils";
-declare type Props = ViewProps & {
+type Props = ViewProps & {
     position?: Viro3DPoint;
     rotation?: ViroRotation;
     active: boolean;
@@ -28,7 +28,7 @@ declare type Props = ViewProps & {
     };
     fieldOfView?: number;
 };
-declare type State = {
+type State = {
     active: boolean;
 };
 export declare class ViroCamera extends React.Component<Props, State> {

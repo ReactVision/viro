@@ -7,8 +7,8 @@ export declare enum ViroButtonStateTypes {
     BTN_TYPE_NORMAL = "normal",
     BTN_TYPE_CLICKED = "clicked"
 }
-export declare type ViroButtonState = ViroButtonStateTypes.BTN_TYPE_HOVER | ViroButtonStateTypes.BTN_TYPE_NORMAL | ViroButtonStateTypes.BTN_TYPE_CLICKED;
-export declare type Props = ViroCommonProps & ViroObjectProps & {
+export type ViroButtonState = ViroButtonStateTypes.BTN_TYPE_HOVER | ViroButtonStateTypes.BTN_TYPE_NORMAL | ViroButtonStateTypes.BTN_TYPE_CLICKED;
+export type Props = ViroCommonProps & ViroObjectProps & {
     /**
      * The button image file, which is required
      */
@@ -36,7 +36,7 @@ export declare type Props = ViroCommonProps & ViroObjectProps & {
      */
     gazeSource?: ViroSource;
 };
-declare type State = {
+type State = {
     buttonType: ViroButtonState;
 };
 /**

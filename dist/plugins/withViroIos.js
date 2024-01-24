@@ -7,6 +7,7 @@ exports.withViroIos = void 0;
 const config_plugins_1 = require("@expo/config-plugins");
 const fs_1 = __importDefault(require("fs"));
 const insertLinesHelper_1 = require("./util/insertLinesHelper");
+const withViro_1 = require("./withViro");
 const withViroPods = (config) => {
     config = (0, config_plugins_1.withDangerousMod)(config, [
         "ios",
@@ -47,8 +48,28 @@ const withExcludedSimulatorArchitectures = (config) => {
         return newConfig;
     });
 };
+const withDefaultInfoPlist = (config, { ios }) => {
+    if (!config.ios)
+        config.ios = {};
+    if (!config.ios.infoPlist)
+        config.ios.infoPlist = {};
+    config.ios.infoPlist.NSPhotoLibraryUsageDescription =
+        ios.photosPermission ||
+            config.ios.infoPlist.NSPhotoLibraryUsageDescription ||
+            withViro_1.DEFAULTS.ios.photosPermission;
+    config.ios.infoPlist.NSPhotoLibraryAddUsageDescription =
+        ios.savePhotosPermission ||
+            config.ios.infoPlist.NSPhotoLibraryAddUsageDescription ||
+            withViro_1.DEFAULTS.ios.savePhotosPermission;
+    config.ios.infoPlist.NSCameraUsageDescription =
+        ios.cameraUsagePermission ||
+            config.ios.infoPlist.NSCameraUsageDescription ||
+            withViro_1.DEFAULTS.ios.cameraUsagePermission;
+    return config;
+};
 const withViroIos = (config, props) => {
     (0, config_plugins_1.withPlugins)(config, [[withViroPods, props]]);
+    withDefaultInfoPlist(config, props);
     withEnabledBitcode(config);
     withExcludedSimulatorArchitectures(config);
     return config;

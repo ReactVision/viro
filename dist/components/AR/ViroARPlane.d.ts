@@ -12,7 +12,7 @@
 import { ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent } from "../Types/ViroEvents";
 import { ViroBase } from "../ViroBase";
 import { NativeSyntheticEvent } from "react-native";
-declare type Props = {
+type Props = {
     anchorId?: string;
     minHeight?: number;
     minWidth?: number;

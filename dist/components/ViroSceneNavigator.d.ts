@@ -4,7 +4,7 @@ import { ViroExitViroEvent } from "./Types/ViroEvents";
 import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroSceneDictionary } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
-declare type Props = ViewProps & {
+type Props = ViewProps & {
     initialSceneKey?: string;
     /**
      * Calling vrModeEnabled allows switching to and from VR mode.
@@ -36,7 +36,7 @@ declare type Props = ViewProps & {
      */
     onExitViro?: () => void;
 };
-declare type State = {
+type State = {
     sceneDictionary: ViroSceneDictionary;
     sceneHistory: string[];
     currentSceneIndex: number;
@@ -50,11 +50,11 @@ declare type State = {
 export declare class ViroSceneNavigator extends React.Component<Props, State> {
     _component: any;
     sceneNavigator: {
-        push: (param1?: string | ViroScene | undefined, param2?: string | ViroScene | undefined) => void;
+        push: (param1?: string | ViroScene, param2?: string | ViroScene) => void;
         pop: () => void;
         popN: (n: number) => void;
-        jump: (param1?: string | ViroScene | undefined, param2?: string | ViroScene | undefined) => void;
-        replace: (param1?: string | ViroScene | undefined, param2?: string | ViroScene | undefined) => void;
+        jump: (param1?: string | ViroScene, param2?: string | ViroScene) => void;
+        replace: (param1?: string | ViroScene, param2?: string | ViroScene) => void;
         recenterTracking: () => void;
         project: (point: Viro3DPoint) => Promise<any>;
         unproject: (point: Viro3DPoint) => Promise<any>;

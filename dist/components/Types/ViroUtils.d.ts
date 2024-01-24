@@ -1,9 +1,9 @@
 /// <reference types="react" />
 import { ImageSourcePropType, NativeMethods } from "react-native";
-export declare type ViroSceneDictionary = {
+export type ViroSceneDictionary = {
     [val: string]: ViroScene;
 };
-export declare type ViroScene = {
+export type ViroScene = {
     tag: string;
     referenceCount: number;
     sceneClass: any;
@@ -11,7 +11,7 @@ export declare type ViroScene = {
 /**
  * Cartesian position in 3D space, stored as [x, y, z].
  */
-export declare type Viro3DPoint = [
+export type Viro3DPoint = [
     number,
     number,
     number
@@ -20,7 +20,7 @@ export declare type Viro3DPoint = [
  * The rotation of the container around it's local axis specified as Euler angles [x, y, z].
  * Units for each angle are specified in degrees.
  */
-export declare type ViroRotation = [
+export type ViroRotation = [
     number,
     number,
     number
@@ -31,13 +31,13 @@ export declare type ViroRotation = [
  * will make the container proportionally smaller while a value >1 will make
  * the container proportionally bigger along the specified axis.
  */
-export declare type ViroScale = [
+export type ViroScale = [
     number,
     number,
     number
 ];
-export declare type ViroNativeRef = (React.Component<unknown, {}, any> & Readonly<NativeMethods>) | null;
-export declare type ViroPhysicsBody = {
+export type ViroNativeRef = (React.Component<unknown, {}, any> & Readonly<NativeMethods>) | null;
+export type ViroPhysicsBody = {
     /**
      * The type of this rigid body.
      */
@@ -103,43 +103,43 @@ export declare type ViroPhysicsBody = {
      */
     velocity?: number[];
 };
-export declare type ViroPhysicsBodyType = "Dynamic" | "Kinematic" | "Static";
-export declare type ViroPhysicsBodyShape = {
+export type ViroPhysicsBodyType = "Dynamic" | "Kinematic" | "Static";
+export type ViroPhysicsBodyShape = {
     type: ViroPhysicsBodyShapeType;
     params: number[];
 };
-export declare type ViroPhysicsBodyShapeType = "Box" | "Sphere" | "Compound";
+export type ViroPhysicsBodyShapeType = "Box" | "Sphere" | "Compound";
 /**
  * A single force vector or an array of force vectors applied to the physics body.
  * If an array of forces is provided, the corresponding net force will be applied.
  * Force units are in newtons.
  */
-export declare type ViroForce = {
+export type ViroForce = {
     value: Array<number>;
     position: Array<number>;
 };
-export declare type ViroSource = ImageSourcePropType;
-export declare type ViroARPlaneType = any;
-export declare type ViroSoundRoom = {
+export type ViroSource = ImageSourcePropType;
+export type ViroARPlaneType = any;
+export type ViroSoundRoom = {
     size: ViroScale;
     wallMaterial: string;
     ceilingMaterial: string;
     floorMaterial: string;
 };
-export declare type ViroPhysicsWorld = {
+export type ViroPhysicsWorld = {
     gravity: number;
     drawBounds?: boolean;
 };
-export declare type ViroRay = any;
-export declare type ViroTorque = any;
-export declare type ViroVelocity = any;
-export declare type Viro2DPoint = [number, number];
-export declare type ViroUVCoordinate = [number, number, number, number];
-export declare type ViroSoundMap = {
+export type ViroRay = any;
+export type ViroTorque = any;
+export type ViroVelocity = any;
+export type Viro2DPoint = [number, number];
+export type ViroUVCoordinate = [number, number, number, number];
+export type ViroSoundMap = {
     [key: string]: ViroSound;
 };
-export declare type ViroSound = string;
-export declare type ViroSoundPreloadResult = {
+export type ViroSound = string;
+export type ViroSoundPreloadResult = {
     [key: string]: {
         result: any;
         msg: any;

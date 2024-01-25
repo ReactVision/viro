@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.23.1-rc3",
+  "version": "2.23.1-rc4",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -57,7 +57,7 @@
     "@types/node": "^17.0.14",
     "@types/react-native": "^0.66.9",
     "babel-jest": "^29.7.0",
-    "expo": "^47.0.0",
+    "expo": "^50.0.0",
     "jest": "^29.7.0",
     "react-native": "0.71.14",
     "ts-node": "^10.9.2",

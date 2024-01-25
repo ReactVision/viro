@@ -1,7 +1,7 @@
 [
   {
-    "shortDescription" : "",
     "metadataOutputVersion" : "3.0",
+    "storagePrecision" : "Float32",
     "outputSchema" : [
       {
         "hasShapeFlexibility" : "0",
@@ -14,24 +14,37 @@
         "type" : "MultiArray"
       }
     ],
-    "version" : "",
     "modelParameters" : [
 
     ],
-    "author" : "",
     "specificationVersion" : 1,
-    "license" : "",
+    "computePrecision" : "Float16",
     "isUpdatable" : "0",
     "availability" : {
       "macOS" : "10.13",
       "tvOS" : "11.0",
+      "visionOS" : "1.0",
       "watchOS" : "4.0",
       "iOS" : "11.0",
       "macCatalyst" : "11.0"
     },
+    "neuralNetworkLayerTypeHistogram" : {
+      "PaddingReflection" : 1,
+      "ActivationLinear" : 68,
+      "ActivationSigmoidHard" : 34,
+      "Add" : 10,
+      "ActivationTanh" : 1,
+      "BatchNorm" : 51,
+      "Convolution" : 62,
+      "UpsampleNearestNeighbor" : 5
+    },
     "modelType" : {
       "name" : "MLModelType_neuralNetwork"
     },
+    "userDefinedMetadata" : {
+
+    },
+    "generatedClassName" : "bodymesh",
     "inputSchema" : [
       {
         "height" : "224",
@@ -46,20 +59,6 @@
         "name" : "image"
       }
     ],
-    "userDefinedMetadata" : {
-
-    },
-    "generatedClassName" : "bodymesh",
-    "neuralNetworkLayerTypeHistogram" : {
-      "PaddingReflection" : 1,
-      "ActivationLinear" : 68,
-      "ActivationSigmoidHard" : 34,
-      "Add" : 10,
-      "ActivationTanh" : 1,
-      "BatchNorm" : 51,
-      "Convolution" : 62,
-      "UpsampleNearestNeighbor" : 5
-    },
     "method" : "predict"
   }
 ]

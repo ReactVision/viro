@@ -4,7 +4,7 @@ import { ViroAmbientLightInfo, ViroAmbientLightUpdateEvent, ViroARAnchorFoundEve
 import { Viro3DPoint, ViroPhysicsWorld, ViroRay, ViroScale, ViroSoundRoom, ViroSource } from "../Types/ViroUtils";
 import { ViroBase } from "../ViroBase";
 import { ViroCommonProps } from "./ViroCommonProps";
-declare type Props = ViroCommonProps & {
+type Props = ViroCommonProps & {
     displayPointCloud?: {
         imageSource?: ViroSource;
         imageScale?: ViroScale;

@@ -1,2 +1,3 @@
 import { ConfigPlugin } from "@expo/config-plugins";
-export declare const withViroAndroid: ConfigPlugin;
+import { ViroConfigurationOptions } from "./withViro";
+export declare const withViroAndroid: ConfigPlugin<ViroConfigurationOptions>;

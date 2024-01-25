@@ -70,5 +70,5 @@
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
   },
   "include": ["./**/*.ts", "./**/*.tsx"],
-  "exclude": ["node_modules", "build", "dist", "./**/*.js", "./**/*.jsx"]
+  "exclude": ["node_modules", "build", "dist", "__test__", "jest.config.ts", "./**/*.js", "./**/*.jsx"]
 }

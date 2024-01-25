@@ -10,7 +10,7 @@
  */
 /// <reference types="react" />
 import { ViroBase } from "./ViroBase";
-declare type Props = {};
+type Props = {};
 /**
  * Frame that serves as a 'window' into a ViroPortal
  */

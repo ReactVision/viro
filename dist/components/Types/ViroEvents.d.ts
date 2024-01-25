@@ -12,72 +12,72 @@
  */
 import { ViroARTrackingReasonConstants, ViroTrackingStateConstants } from "../ViroConstants";
 import { Viro3DPoint, ViroRotation, ViroSource } from "./ViroUtils";
-export declare type ViroHoverEvent = {
+export type ViroHoverEvent = {
     isHovering: boolean;
     position: Viro3DPoint;
     source: ViroSource;
 };
-export declare type ViroClickEvent = {
+export type ViroClickEvent = {
     position: Viro3DPoint;
     source: ViroSource;
 };
-export declare type ViroClickStateEvent = {
+export type ViroClickStateEvent = {
     clickState: ViroClickState;
     position: Viro3DPoint;
     source: ViroSource;
 };
-export declare type ViroClickState = ViroClickStateTypes.CLICK_DOWN | ViroClickStateTypes.CLICK_UP | ViroClickStateTypes.CLICKED;
+export type ViroClickState = ViroClickStateTypes.CLICK_DOWN | ViroClickStateTypes.CLICK_UP | ViroClickStateTypes.CLICKED;
 export declare enum ViroClickStateTypes {
     CLICK_DOWN = 1,
     CLICK_UP = 2,
     CLICKED = 3
 }
-export declare type ViroTouchEvent = {
+export type ViroTouchEvent = {
     touchState: any;
     touchPos: Viro3DPoint;
     source: ViroSource;
 };
-export declare type ViroScrollEvent = {
+export type ViroScrollEvent = {
     scrollPos: Viro3DPoint;
     source: ViroSource;
 };
-export declare type ViroSwipeEvent = {
+export type ViroSwipeEvent = {
     swipeState: any;
     source: ViroSource;
 };
-export declare type ViroFuseEvent = {
+export type ViroFuseEvent = {
     source: ViroSource;
 };
-export declare type ViroPinchEvent = {
+export type ViroPinchEvent = {
     pinchState: ViroPinchState;
     scaleFactor: number;
     source: ViroSource;
 };
-export declare type ViroPinchState = ViroPinchStateTypes.PINCH_START | ViroPinchStateTypes.PINCH_MOVE | ViroPinchStateTypes.PINCH_END;
+export type ViroPinchState = ViroPinchStateTypes.PINCH_START | ViroPinchStateTypes.PINCH_MOVE | ViroPinchStateTypes.PINCH_END;
 export declare enum ViroPinchStateTypes {
     PINCH_START = 1,
     PINCH_MOVE = 2,
     PINCH_END = 3
 }
-export declare type ViroRotateEvent = {
+export type ViroRotateEvent = {
     rotateState: ViroRotateState;
     rotationFactor: number;
     source: ViroSource;
 };
-export declare type ViroRotateState = ViroRotateStateTypes.ROTATE_START | ViroRotateStateTypes.ROTATE_MOVE | ViroRotateStateTypes.ROTATE_END;
+export type ViroRotateState = ViroRotateStateTypes.ROTATE_START | ViroRotateStateTypes.ROTATE_MOVE | ViroRotateStateTypes.ROTATE_END;
 export declare enum ViroRotateStateTypes {
     ROTATE_START = 1,
     ROTATE_MOVE = 2,
     ROTATE_END = 3
 }
-export declare type ViroDragEvent = {
+export type ViroDragEvent = {
     dragToPos: Viro3DPoint;
     source: ViroSource;
 };
-export declare type ViroPlatformEvent = {
+export type ViroPlatformEvent = {
     platformInfoViro: ViroPlatformInfo;
 };
-export declare type ViroCollisionEvent = {
+export type ViroCollisionEvent = {
     viroTag: string;
     collidedPoint: Viro3DPoint;
     collidedNormal: Viro3DPoint;
@@ -91,7 +91,7 @@ export declare type ViroCollisionEvent = {
  * |Headset|cardboard|cardboard|daydream|gearvr|
  * |Controller|cardboard|cardboard|daydream|gearvr|
  */
-export declare type ViroPlatformInfo = {
+export type ViroPlatformInfo = {
     platform: ViroPlatformTypes;
     /** @deprecated */
     vrPlatform: ViroPlatformTypes;
@@ -112,13 +112,13 @@ export declare enum ViroControllerTypes {
     DAYDREAM = "daydream",
     GEARVR = "gearvr"
 }
-export declare type ViroCameraTransformEvent = {
+export type ViroCameraTransformEvent = {
     cameraTransform: number[];
 };
-export declare type ViroPlatformUpdateEvent = {
+export type ViroPlatformUpdateEvent = {
     platformInfoViro: ViroPlatformInfo;
 };
-export declare type ViroCameraTransform = {
+export type ViroCameraTransform = {
     /** @deprecated The cameraTransform key will be deprecated in a future release */
     cameraTransform: {
         position: Viro3DPoint;
@@ -131,70 +131,70 @@ export declare type ViroCameraTransform = {
     forward: Viro3DPoint;
     up: Viro3DPoint;
 };
-export declare type ViroExitViroEvent = {};
-export declare type ViroErrorEvent = {
+export type ViroExitViroEvent = {};
+export type ViroErrorEvent = {
     error: Error;
 };
 /** ===========================================================================
  * Viro Animation Events
  * ============================================================================ */
-export declare type ViroAnimationStartEvent = {};
-export declare type ViroAnimationFinishEvent = {};
+export type ViroAnimationStartEvent = {};
+export type ViroAnimationFinishEvent = {};
 /** ===========================================================================
  * Viro Loading Events
  * ============================================================================ */
-export declare type ViroLoadStartEvent = {};
-export declare type ViroLoadEndEvent = {
+export type ViroLoadStartEvent = {};
+export type ViroLoadEndEvent = {
     success: boolean;
 };
-export declare type ViroLoadErrorEvent = ViroErrorEvent;
+export type ViroLoadErrorEvent = ViroErrorEvent;
 /** ===========================================================================
  * Viro 360 Video Events
  * ============================================================================ */
-export declare type ViroVideoBufferStartEvent = {};
-export declare type ViroVideoBufferEndEvent = {};
-export declare type ViroVideoUpdateTimeEvent = {
+export type ViroVideoBufferStartEvent = {};
+export type ViroVideoBufferEndEvent = {};
+export type ViroVideoUpdateTimeEvent = {
     currentTime: number;
     totalTime: number;
 };
-export declare type ViroVideoErrorEvent = ViroErrorEvent;
-export declare type ViroVideoFinishEvent = ViroErrorEvent;
+export type ViroVideoErrorEvent = ViroErrorEvent;
+export type ViroVideoFinishEvent = ViroErrorEvent;
 /** ===========================================================================
  * Viro Animated Component Events
  * ============================================================================ */
-export declare type ViroAnimatedComponentStartEvent = {};
-export declare type ViroAnimatedComponentFinishEvent = {};
+export type ViroAnimatedComponentStartEvent = {};
+export type ViroAnimatedComponentFinishEvent = {};
 /** ===========================================================================
  * Viro AR Anchor Events
  * ============================================================================ */
-export declare type ViroARAnchorRemovedEvent = {
+export type ViroARAnchorRemovedEvent = {
     anchor: ViroAnchor;
 };
-export declare type ViroARAnchorUpdatedEvent = {
+export type ViroARAnchorUpdatedEvent = {
     anchorUpdatedMap: ViroAnchorUpdatedMap;
     anchor: ViroAnchor;
 };
-export declare type ViroARAnchorFoundEvent = {
+export type ViroARAnchorFoundEvent = {
     anchorFoundMap: ViroAnchorFoundMap;
     anchor: ViroAnchor;
 };
-export declare type ViroAnchor = any;
-export declare type ViroAnchorFoundMap = any;
-export declare type ViroAnchorUpdatedMap = any;
+export type ViroAnchor = any;
+export type ViroAnchorFoundMap = any;
+export type ViroAnchorUpdatedMap = any;
 /** ===========================================================================
  * Viro AR Plane Events
  * ============================================================================ */
-export declare type ViroPlaneUpdatedMap = any;
-export declare type ViroPlaneUpdatedEvent = any;
-export declare type ViroARPlaneSizes = any;
+export type ViroPlaneUpdatedMap = any;
+export type ViroPlaneUpdatedEvent = any;
+export type ViroARPlaneSizes = any;
 /** ===========================================================================
  * Viro AR Hit Test
  * ============================================================================ */
-export declare type ViroCameraARHitTestEvent = {
+export type ViroCameraARHitTestEvent = {
     hitTestResults: ViroARHitTestResult[];
     cameraOrientation: number[];
 };
-export declare type ViroCameraARHitTest = {
+export type ViroCameraARHitTest = {
     hitTestResults: ViroARHitTestResult[];
     cameraOrientation: {
         position: Viro3DPoint;
@@ -203,42 +203,42 @@ export declare type ViroCameraARHitTest = {
         up: Viro3DPoint;
     };
 };
-export declare type ViroARHitTestResult = any;
-export declare type ViroARPointCloudUpdateEvent = {
+export type ViroARHitTestResult = any;
+export type ViroARPointCloudUpdateEvent = {
     pointCloud: ViroARPointCloud;
 };
-export declare type ViroARPointCloud = any;
-export declare type ViroTrackingUpdatedEvent = {
+export type ViroARPointCloud = any;
+export type ViroTrackingUpdatedEvent = {
     state: ViroTrackingState;
     reason: ViroTrackingReason;
 };
-export declare type ViroTrackingState = ViroTrackingStateConstants.TRACKING_NORMAL | ViroTrackingStateConstants.TRACKING_LIMITED | ViroTrackingStateConstants.TRACKING_UNAVAILABLE;
-export declare type ViroTrackingReason = ViroARTrackingReasonConstants.TRACKING_REASON_NONE | ViroARTrackingReasonConstants.TRACKING_REASON_EXCESSIVE_MOTION | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES;
-export declare type ViroAmbientLightUpdateEvent = {
+export type ViroTrackingState = ViroTrackingStateConstants.TRACKING_NORMAL | ViroTrackingStateConstants.TRACKING_LIMITED | ViroTrackingStateConstants.TRACKING_UNAVAILABLE;
+export type ViroTrackingReason = ViroARTrackingReasonConstants.TRACKING_REASON_NONE | ViroARTrackingReasonConstants.TRACKING_REASON_EXCESSIVE_MOTION | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES;
+export type ViroAmbientLightUpdateEvent = {
     ambientLightInfo: ViroAmbientLightInfo;
 };
-export declare type ViroAmbientLightInfo = {
+export type ViroAmbientLightInfo = {
     intensity: number;
     color: string;
 };
-export declare type ViroWorldOrigin = {
+export type ViroWorldOrigin = {
     position: Viro3DPoint;
     rotation: ViroRotation;
 };
-export declare type ViroNativeTransformUpdateEvent = {
+export type ViroNativeTransformUpdateEvent = {
     position: Viro3DPoint;
 };
-export declare type ViroControllerStatusEvent = {
+export type ViroControllerStatusEvent = {
     controllerStatus: ViroControllerStatus;
     source: ViroSource;
 };
-export declare type ViroControllerStatus = any;
+export type ViroControllerStatus = any;
 /** ===========================================================================
  * Viro AR Portal Events
  * ============================================================================ */
-export declare type ViroPortalEnterEvent = any;
-export declare type ViroPortalExitEvent = any;
+export type ViroPortalEnterEvent = any;
+export type ViroPortalExitEvent = any;
 /** ===========================================================================
  * Viro Sound Events
  * ============================================================================ */
-export declare type ViroSoundFinishEvent = any;
+export type ViroSoundFinishEvent = any;

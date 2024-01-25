@@ -1,23 +1,4 @@
 {
-  "transform_params" : {
-    "image" : {
-      "bias_a" : 0,
-      "bias_g" : -0.4440000057220459,
-      "bias_r" : -0.43270000815391541,
-      "bias_b" : -0.44040000438690186,
-      "center_mean" : 0,
-      "is_network_bgr" : 0,
-      "scale" : 0.0039215688593685627
-    }
-  },
-  "properties" : {
-
-  },
-  "analyses" : {
-
-  },
-  "format_version" : 200,
-  "storage" : "model.espresso.weights",
   "layers" : [
     {
       "pad_r" : 3,
@@ -3351,5 +3332,27 @@
         "is_output" : 1
       }
     }
-  ]
+  ],
+  "transform_params" : {
+    "image" : {
+      "bias_a" : 0,
+      "bias_g" : -0.4440000057220459,
+      "bias_r" : -0.43270000815391541,
+      "bias_b" : -0.44040000438690186,
+      "center_mean" : 0,
+      "is_network_bgr" : 0,
+      "scale" : 0.0039215688593685627
+    }
+  },
+  "storage" : "model.espresso.weights",
+  "metadata_in_weights" : [
+
+  ],
+  "properties" : {
+
+  },
+  "analyses" : {
+
+  },
+  "format_version" : 200
 }

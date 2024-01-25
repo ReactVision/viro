@@ -13,7 +13,7 @@ import { NativeSyntheticEvent } from "react-native";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroPortalEnterEvent, ViroPortalExitEvent } from "./Types/ViroEvents";
 import { ViroBase } from "./ViroBase";
-declare type Props = ViroCommonProps & {
+type Props = ViroCommonProps & {
     onPortalEnter?: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
     onPortalExit?: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
     passable?: boolean;

@@ -9,7 +9,7 @@
 /// <reference types="react" />
 import { Viro2DPoint, Viro3DPoint } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     vertices?: Viro3DPoint[];
     normals?: Viro3DPoint[];
     texcoords?: Viro2DPoint[];

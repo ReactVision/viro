@@ -4,7 +4,7 @@ import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroSource } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     source: ViroSource;
     style?: ViroStyle;
     resizeMode?: "ScaleToFill" | "ScaleToFit" | "StretchToFill";

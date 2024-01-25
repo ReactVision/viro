@@ -10,7 +10,7 @@
  * @flow
  */
 import { ColorValue, ProcessedColorValue } from "react-native";
-export declare type ViroRegisterableAnimation = {
+export type ViroRegisterableAnimation = {
     duration: number;
     delay?: number;
     easing?: string;
@@ -32,17 +32,17 @@ export declare type ViroRegisterableAnimation = {
         material?: string;
     };
 };
-export declare type ViroAnimationDict = {
+export type ViroAnimationDict = {
     [key: string]: ViroRegisterableAnimation | ViroRegisterableAnimation[];
 };
-export declare type ViroAnimationChainDict = {
+export type ViroAnimationChainDict = {
     [key: string]: ViroAnimation | ViroAnimation[];
 };
-export declare type ViroAnimationProp = {
+export type ViroAnimationProp = {
     name: string;
     loop: boolean;
 };
-export declare type ViroAnimation = {
+export type ViroAnimation = {
     name?: string;
     delay?: number;
     loop?: boolean;

@@ -1,7 +1,11 @@
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -33,7 +37,6 @@ class Viro3DObject extends ViroBase_1.ViroBase {
         (0, ViroProps_1.checkMisnamedProps)("Viro3DObject", this.props);
         const modelsrc = resolveAssetSource(this.props.source);
         const resources = this.props.resources?.map((resource) => resolveAssetSource(resource));
-        console.log("RESOURCES", resources);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         const materials = typeof this.props.materials === "string"
             ? [this.props.materials]

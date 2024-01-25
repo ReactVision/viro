@@ -9,7 +9,7 @@
 /// <reference types="react" />
 import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     /**
      * Array of 2D points in world space in the xy plane specified as [x,y].
      */

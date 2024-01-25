@@ -3,7 +3,7 @@ import { NativeSyntheticEvent } from "react-native";
 import { ViroVideoBufferEndEvent, ViroVideoBufferStartEvent, ViroVideoErrorEvent, ViroVideoUpdateTimeEvent } from "./Types/ViroEvents";
 import { ViroSource } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = {
+type Props = {
     stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
     width?: number;
     height?: number;

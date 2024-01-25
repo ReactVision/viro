@@ -14,7 +14,7 @@ import { ViewProps } from "react-native";
 import { ViroExitViroEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, Viro3DPoint, ViroSceneDictionary } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
-declare type Props = ViewProps & {
+type Props = ViewProps & {
     /**
      * initial scene key
      *
@@ -51,7 +51,7 @@ declare type Props = ViewProps & {
     shadowsEnabled: boolean;
     multisamplingEnabled: boolean;
 };
-declare type State = {
+type State = {
     sceneDictionary: ViroSceneDictionary;
     sceneHistory: string[];
     currentSceneIndex: number;
@@ -62,11 +62,11 @@ declare type State = {
 export declare class Viro3DSceneNavigator extends React.Component<Props, State> {
     _component: ViroNativeRef;
     sceneNavigator: {
-        push: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        push: (param1?: ViroScene | string, param2?: ViroScene) => void;
         pop: () => void;
         popN: (n: number) => void;
-        jump: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
-        replace: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        jump: (param1?: ViroScene | string, param2?: ViroScene) => void;
+        replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         recenterTracking: () => void;
         project: (point: Viro3DPoint) => Promise<any>;
         unproject: (point: Viro3DPoint) => Promise<any>;

@@ -13,7 +13,7 @@ import * as React from "react";
 import { ViewProps } from "react-native";
 import { ViroWorldOrigin } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
-declare type Props = ViewProps & {
+type Props = ViewProps & {
     /**
      * ViroARSceneNavigator uses "scene" objects like the following to
      * describe a scene.
@@ -43,7 +43,7 @@ declare type Props = ViewProps & {
     shadowsEnabled?: boolean;
     multisamplingEnabled?: boolean;
 };
-declare type State = {
+type State = {
     sceneDictionary: ViroSceneDictionary;
     sceneHistory: string[];
     currentSceneIndex: number;
@@ -54,11 +54,11 @@ declare type State = {
 export declare class ViroARSceneNavigator extends React.Component<Props, State> {
     _component: ViroNativeRef;
     arSceneNavigator: {
-        push: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        push: (param1?: ViroScene | string, param2?: ViroScene) => void;
         pop: () => void;
         popN: (n: number) => void;
-        jump: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
-        replace: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        jump: (param1?: ViroScene | string, param2?: ViroScene) => void;
+        replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
         stopVideoRecording: () => Promise<any>;
         takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
@@ -69,11 +69,11 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         viroAppProps: any;
     };
     sceneNavigator: {
-        push: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        push: (param1?: ViroScene | string, param2?: ViroScene) => void;
         pop: () => void;
         popN: (n: number) => void;
-        jump: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
-        replace: (param1?: string | ViroScene | undefined, param2?: ViroScene | undefined) => void;
+        jump: (param1?: ViroScene | string, param2?: ViroScene) => void;
+        replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
         stopVideoRecording: () => Promise<any>;
         takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;

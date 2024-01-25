@@ -9,7 +9,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const insertLinesHelper_1 = require("./util/insertLinesHelper");
 let viroPluginConfig = ["AR"];
-const withBranchAndroid = (config, props) => {
+const withBranchAndroid = (config) => {
     // Directly edit MainApplication.java
     config = (0, config_plugins_1.withDangerousMod)(config, [
         "android",
@@ -30,7 +30,9 @@ const withBranchAndroid = (config, props) => {
                  *   [
                  *     "@viro-community/react-viro",
                  *     {
-                 *       "androidXrMode": "GVR"
+                 *       android: {
+                 *         xRMode: "GVR"
+                 *       }
                  *     }
                  *   ]
                  * ],
@@ -43,7 +45,9 @@ const withBranchAndroid = (config, props) => {
                  *   [
                  *     "@viro-community/react-viro",
                  *     {
-                 *       "androidXrMode": ["GVR", "AR"]
+                 *       android: {
+                 *         xRMode: ["GVR", "AR"]
+                 *       }
                  *     }
                  *   ]
                  * ],
@@ -56,11 +60,11 @@ const withBranchAndroid = (config, props) => {
                  */
                 const viroPlugin = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro");
                 if (Array.isArray(viroPlugin)) {
-                    if (Array.isArray(viroPlugin[1].androidXrMode)) {
-                        viroPluginConfig = viroPlugin[1].androidXrMode.filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode));
+                    if (Array.isArray(viroPlugin[1].android?.xRMode)) {
+                        viroPluginConfig = (viroPlugin[1].android?.xRMode).filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode));
                     }
-                    else if (["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)) {
-                        viroPluginConfig = [viroPlugin[1]?.androidXrMode];
+                    else if (["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.android?.xRMode)) {
+                        viroPluginConfig = [viroPlugin[1]?.android.xRMode];
                     }
                 }
                 let target = "";
@@ -117,8 +121,6 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
     });
     if (viroPluginConfig.includes("GVR") ||
         viroPluginConfig.includes("OVR_MOBILE")) {
-        console.log(contents?.manifest?.application?.[0]?.activity[0]["intent-filter"][0]
-            .category);
         //   <!-- Add the following line for cardboard -->
         //   <category android:name="com.google.intent.category.CARDBOARD" />
         contents?.manifest?.application?.[0]?.activity[0]["intent-filter"][0].category.push({
@@ -133,8 +135,6 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
                 "android:name": "com.google.intent.category.DAYDREAM",
             },
         });
-        console.log(contents?.manifest?.application?.[0]?.activity[0]["intent-filter"][0]
-            .category);
     }
     contents.manifest.queries = [
         {

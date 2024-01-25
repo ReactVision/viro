@@ -12,10 +12,10 @@ import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
 import path from "path";
 import { insertLinesHelper } from "./util/insertLinesHelper";
-
+import { ViroConfigurationOptions, XrMode } from "./withViro";
 let viroPluginConfig = ["AR"];
 
-const withBranchAndroid = (config: ExpoConfig, props: any) => {
+const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
   // Directly edit MainApplication.java
   config = withDangerousMod(config, [
     "android",
@@ -50,7 +50,9 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
          *   [
          *     "@viro-community/react-viro",
          *     {
-         *       "androidXrMode": "GVR"
+         *       android: {
+         *         xRMode: "GVR"
+         *       }
          *     }
          *   ]
          * ],
@@ -63,7 +65,9 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
          *   [
          *     "@viro-community/react-viro",
          *     {
-         *       "androidXrMode": ["GVR", "AR"]
+         *       android: {
+         *         xRMode: ["GVR", "AR"]
+         *       }
          *     }
          *   ]
          * ],
@@ -81,14 +85,14 @@ const withBranchAndroid = (config: ExpoConfig, props: any) => {
         );
 
         if (Array.isArray(viroPlugin)) {
-          if (Array.isArray(viroPlugin[1].androidXrMode)) {
-            viroPluginConfig = (viroPlugin[1].androidXrMode as string[]).filter(
-              (mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode)
-            );
+          if (Array.isArray(viroPlugin[1].android?.xRMode)) {
+            viroPluginConfig = (
+              viroPlugin[1].android?.xRMode as XrMode[]
+            ).filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode));
           } else if (
-            ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.androidXrMode)
+            ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.android?.xRMode)
           ) {
-            viroPluginConfig = [viroPlugin[1]?.androidXrMode];
+            viroPluginConfig = [viroPlugin[1]?.android.xRMode];
           }
         }
 
@@ -255,7 +259,10 @@ const withViroManifest = (config: ExpoConfig) =>
     }
   );
 
-export const withViroAndroid: ConfigPlugin = (config, props) => {
+export const withViroAndroid: ConfigPlugin<ViroConfigurationOptions> = (
+  config,
+  props
+) => {
   withPlugins(config, [[withBranchAndroid, props]]);
   withViroProjectBuildGradle(config);
   withViroManifest(config);

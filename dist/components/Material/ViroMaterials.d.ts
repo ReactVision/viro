@@ -11,7 +11,7 @@
  */
 import { ColorValue, ImageResolvedAssetSource } from "react-native";
 import { ViroSource } from "../Types/ViroUtils";
-export declare type ViroCubeMap = {
+export type ViroCubeMap = {
     nx: ViroSource;
     px: ViroSource;
     ny: ViroSource;
@@ -19,7 +19,7 @@ export declare type ViroCubeMap = {
     nz: ViroSource;
     pz: ViroSource;
 };
-export declare type ViroResolvedCubeMap = {
+export type ViroResolvedCubeMap = {
     nx: ImageResolvedAssetSource;
     px: ImageResolvedAssetSource;
     ny: ImageResolvedAssetSource;
@@ -27,7 +27,7 @@ export declare type ViroResolvedCubeMap = {
     nz: ImageResolvedAssetSource;
     pz: ImageResolvedAssetSource;
 };
-export declare type ViroMaterial = {
+export type ViroMaterial = {
     shininess?: number;
     fresnelExponent?: number;
     lightingModel?: "Phong" | "Blinn" | "Lambert" | "Constant" | "PBR";
@@ -55,7 +55,7 @@ export declare type ViroMaterial = {
     metalnessTexture?: any;
     ambientOcclusionTexture?: any;
 };
-export declare type ViroMaterialDict = {
+export type ViroMaterialDict = {
     [key: string]: ViroMaterial;
 };
 export declare class ViroMaterials {

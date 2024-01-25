@@ -4,7 +4,7 @@ import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformEvent, ViroPlatformInfo, ViroTrackingReason, ViroTrackingState } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroPhysicsWorld, ViroSoundRoom } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
-declare type Props = ViroCommonProps & {
+type Props = ViroCommonProps & {
     onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
     onCameraTransformUpdate?: (cameraTransform: ViroCameraTransform) => void;
     onTrackingUpdated?: (state: ViroTrackingState, reason: ViroTrackingReason) => void;

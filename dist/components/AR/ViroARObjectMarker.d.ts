@@ -12,7 +12,7 @@
 import { ViroBase } from "../ViroBase";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent } from "../Types/ViroEvents";
-declare type Props = {};
+type Props = {};
 /**
  * Container for Viro Components anchored to a detected object.
  */

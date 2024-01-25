@@ -6,4 +6,4 @@ import { ShadowStyleIOS, ViewStyle } from "react-native";
 /**
  * Warning: Some of these properties may not be supported in all releases.
  */
-export declare type ViroStyle = ViewStyle & ShadowStyleIOS;
+export type ViroStyle = ViewStyle & ShadowStyleIOS;

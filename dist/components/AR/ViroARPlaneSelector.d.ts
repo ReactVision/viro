@@ -12,14 +12,14 @@ import { ViroARPlaneSizes, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
 import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
 import * as React from "react";
 import { ViroCommonProps, ViroObjectProps } from "./ViroCommonProps";
-declare type Props = ViroCommonProps & ViroObjectProps & {
+type Props = ViroCommonProps & ViroObjectProps & {
     maxPlanes?: number;
     minHeight?: number;
     minWidth?: number;
     alignment?: "Horizontal" | "HorizontalUpward" | "HorizontalDownward" | "Vertical";
     onPlaneSelected?: (updateMap: ViroPlaneUpdatedMap) => void;
 };
-declare type State = {
+type State = {
     selectedSurface: number;
     foundARPlanes: ViroARPlaneType[];
     arPlaneSizes: ViroARPlaneSizes;

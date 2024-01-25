@@ -1,14 +1,15 @@
 import {
-  withPlugins,
-  withDangerousMod,
-  withXcodeProject,
   ConfigPlugin,
   ExportedConfigWithProps,
   XcodeProject,
+  withDangerousMod,
+  withPlugins,
+  withXcodeProject,
 } from "@expo/config-plugins";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
 import { insertLinesHelper } from "./util/insertLinesHelper";
+import { DEFAULTS, ViroConfigurationOptions } from "./withViro";
 
 const withViroPods = (config: ExpoConfig) => {
   config = withDangerousMod(config, [
@@ -36,7 +37,7 @@ const withViroPods = (config: ExpoConfig) => {
   return config;
 };
 
-const withEnabledBitcode = (config: ExpoConfig) =>
+const withEnabledBitcode: ConfigPlugin = (config) =>
   withXcodeProject(config, async (newConfig) => {
     newConfig.modResults.addBuildProperty("ENABLE_BITCODE", "NO", "Release");
     return newConfig;
@@ -68,8 +69,53 @@ const withExcludedSimulatorArchitectures = (config: ExpoConfig) => {
   });
 };
 
-export const withViroIos: ConfigPlugin = (config, props) => {
+export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
+  config,
+  props
+) => {
+  let savePhotosPermission = DEFAULTS.ios.savePhotosPermission;
+  let photosPermission = DEFAULTS.ios.photosPermission;
+  let cameraUsagePermission = DEFAULTS.ios.cameraUsagePermission;
+  let microphoneUsagePermission = DEFAULTS.ios.microphoneUsagePermission;
+  if (Array.isArray(config.plugins)) {
+    const pluginConfig = config?.plugins?.find(
+      (plugin) =>
+        Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
+    );
+    if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
+      const config = pluginConfig[1] as ViroConfigurationOptions;
+      savePhotosPermission =
+        config.ios?.savePhotosPermission || savePhotosPermission;
+      photosPermission = config.ios?.photosPermission || photosPermission;
+      microphoneUsagePermission =
+        config.ios?.microphoneUsagePermission || microphoneUsagePermission;
+      cameraUsagePermission =
+        config.ios?.cameraUsagePermission || cameraUsagePermission;
+    }
+  }
+
+  if (!config.ios) config.ios = {};
+  if (!config.ios.infoPlist) config.ios.infoPlist = {};
+  config.ios.infoPlist.NSPhotoLibraryUsageDescription =
+    config.ios.infoPlist.NSPhotoLibraryUsageDescription || photosPermission;
+  config.ios.infoPlist.NSPhotoLibraryAddUsageDescription =
+    config.ios.infoPlist.NSPhotoLibraryAddUsageDescription ||
+    savePhotosPermission;
+  config.ios.infoPlist.NSCameraUsageDescription =
+    config.ios.infoPlist.NSCameraUsageDescription || cameraUsagePermission;
+  config.ios.infoPlist.NSMicrophoneUsageDescription =
+    config.ios.infoPlist.NSMicrophoneUsageDescription ||
+    microphoneUsagePermission;
+
+  return config;
+};
+
+export const withViroIos: ConfigPlugin<ViroConfigurationOptions> = (
+  config,
+  props
+) => {
   withPlugins(config, [[withViroPods, props]]);
+  withDefaultInfoPlist(config, props);
   withEnabledBitcode(config);
   withExcludedSimulatorArchitectures(config);
   return config;

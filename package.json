@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.23.1-rc3",
+  "version": "2.23.1-rc4",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"

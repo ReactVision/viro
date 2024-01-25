@@ -25,7 +25,7 @@ npm run test
 echo '========================================================================='
 echo 'Cleaning out the old build artifacts'
 echo '========================================================================='
-rm android/viro_bridge/build/outputs/aar/*.aar
+# rm android/viro_bridge/build/outputs/aar/*.aar
 
 echo '========================================================================='
 echo 'Building the React-Viro library'

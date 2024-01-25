@@ -11,53 +11,32 @@ const insertLinesHelper_1 = require("./util/insertLinesHelper");
 let viroPluginConfig = ["AR"];
 const withBranchAndroid = (config) => {
     // Directly edit MainApplication.java
-    config = (0, config_plugins_1.withDangerousMod)(config, [
+    return (0, config_plugins_1.withDangerousMod)(config, [
         "android",
         async (config) => {
-            const mainApplicationPath = path_1.default.join(config.modRequest.platformProjectRoot, "app", "src", "main", "java", ...(config?.android?.package?.split?.(".") || []), "MainApplication.java");
-            const root = config.modRequest.platformProjectRoot;
+            let mainApplicationPath = "";
+            let isJava;
+            const mainApplicationPrefix = path_1.default.join(config.modRequest.platformProjectRoot, "app", "src", "main", "java", ...(config?.android?.package?.split?.(".") || []));
+            const mainApplicationPathJava = path_1.default.join(mainApplicationPrefix, "MainApplication.java");
+            const mainApplicationPathKotlin = path_1.default.join(mainApplicationPrefix, "MainApplication.kt");
+            if (fs_1.default.existsSync(mainApplicationPathJava)) {
+                isJava = true;
+                mainApplicationPath = mainApplicationPathJava;
+            }
+            else if (fs_1.default.existsSync(mainApplicationPathKotlin)) {
+                isJava = false;
+                mainApplicationPath = mainApplicationPathKotlin;
+            }
+            else {
+                throw new Error("MainApplication.kt or MainApplication.java file not found.");
+            }
             fs_1.default.readFile(mainApplicationPath, "utf-8", (err, data) => {
-                data = (0, insertLinesHelper_1.insertLinesHelper)("import com.viromedia.bridge.ReactViroPackage;", `package ${config?.android?.package};`, data);
-                /**
-                 * ********************************************************************
-                 * Sample app.json with property config
-                 * Options: "AR", "GVR", "OVR_MOBILE"
-                 *
-                 * https://docs.expo.dev/guides/config-plugins/#using-a-plugin-in-your-app
-                 * ********************************************************************
-                 *
-                 * plugins: [
-                 *   [
-                 *     "@viro-community/react-viro",
-                 *     {
-                 *       android: {
-                 *         xRMode: "GVR"
-                 *       }
-                 *     }
-                 *   ]
-                 * ],
-                 *
-                 * ********************************************************************
-                 * Sample app.json with multiple options for Viro config
-                 * The default configuration is "AR"
-                 * ********************************************************************
-                 * plugins: [
-                 *   [
-                 *     "@viro-community/react-viro",
-                 *     {
-                 *       android: {
-                 *         xRMode: ["GVR", "AR"]
-                 *       }
-                 *     }
-                 *   ]
-                 * ],
-                 * ********************************************************************
-                 * Sample app.json without property config
-                 * ********************************************************************
-                 *
-                 * plugins: [ "@viro-community/react-viro" ],
-                 *
-                 */
+                if (isJava) {
+                    data = (0, insertLinesHelper_1.insertLinesHelper)("import com.viromedia.bridge.ReactViroPackage;", `package ${config?.android?.package};`, data);
+                }
+                else {
+                    data = (0, insertLinesHelper_1.insertLinesHelper)("import com.viromedia.bridge.ReactViroPackage", `package ${config?.android?.package}`, data);
+                }
                 const viroPlugin = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro");
                 if (Array.isArray(viroPlugin)) {
                     if (Array.isArray(viroPlugin[1].android?.xRMode)) {
@@ -71,9 +50,14 @@ const withBranchAndroid = (config) => {
                 for (const viroConfig of viroPluginConfig) {
                     target =
                         target +
-                            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")));\n`;
+                            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")))${isJava ? ";" : ""}\n`;
                 }
-                data = (0, insertLinesHelper_1.insertLinesHelper)(target, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
+                if (isJava) {
+                    data = (0, insertLinesHelper_1.insertLinesHelper)(target, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
+                }
+                else {
+                    data = (0, insertLinesHelper_1.insertLinesHelper)(target, "override fun getPackages(): List<ReactPackage> {", data);
+                }
                 fs_1.default.writeFile(mainApplicationPath, data, "utf-8", function (err) {
                     if (err)
                         console.log("Error writing MainApplication.java");
@@ -82,7 +66,6 @@ const withBranchAndroid = (config) => {
             return config;
         },
     ]);
-    return config;
 };
 const withViroProjectBuildGradle = (config) => (0, config_plugins_1.withProjectBuildGradle)(config, async (newConfig) => {
     newConfig.modResults.contents = newConfig.modResults.contents.replace(/minSdkVersion.*/, `minSdkVersion = 24`);

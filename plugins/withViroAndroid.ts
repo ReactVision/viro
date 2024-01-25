@@ -7,14 +7,13 @@ import {
   withPlugins,
   withProjectBuildGradle,
   withSettingsGradle,
-} from "@expo/config-plugins"
-import { ExpoConfig } from "@expo/config-types"
-import fs from "fs"
-import path from "path"
-import { insertLinesHelper } from "./util/insertLinesHelper"
-import { ViroConfigurationOptions, XrMode } from "./withViro"
-
-let viroPluginConfig = ["AR"]
+} from "@expo/config-plugins";
+import { ExpoConfig } from "@expo/config-types";
+import fs from "fs";
+import path from "path";
+import { insertLinesHelper } from "./util/insertLinesHelper";
+import { ViroConfigurationOptions, XrMode } from "./withViro";
+let viroPluginConfig = ["AR"];
 
 const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
   // Directly edit MainApplication.java
@@ -29,15 +28,15 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
         "java",
         ...(config?.android?.package?.split?.(".") || []),
         "MainApplication.java"
-      )
+      );
 
-      const root = config.modRequest.platformProjectRoot
+      const root = config.modRequest.platformProjectRoot;
       fs.readFile(mainApplicationPath, "utf-8", (err, data) => {
         data = insertLinesHelper(
           "import com.viromedia.bridge.ReactViroPackage;",
           `package ${config?.android?.package};`,
           data
-        )
+        );
 
         /**
          * ********************************************************************
@@ -83,57 +82,57 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
         const viroPlugin = config?.plugins?.find(
           (plugin) =>
             Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
-        )
+        );
 
         if (Array.isArray(viroPlugin)) {
           if (Array.isArray(viroPlugin[1].android?.xRMode)) {
             viroPluginConfig = (
               viroPlugin[1].android?.xRMode as XrMode[]
-            ).filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode))
+            ).filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode));
           } else if (
             ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.android?.xRMode)
           ) {
-            viroPluginConfig = [viroPlugin[1]?.android.xRMode]
+            viroPluginConfig = [viroPlugin[1]?.android.xRMode];
           }
         }
 
-        let target = ""
+        let target = "";
         for (const viroConfig of viroPluginConfig) {
           target =
             target +
-            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")));\n`
+            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")));\n`;
         }
 
         data = insertLinesHelper(
           target,
           "List<ReactPackage> packages = new PackageList(this).getPackages();",
           data
-        )
+        );
 
         fs.writeFile(mainApplicationPath, data, "utf-8", function (err) {
-          if (err) console.log("Error writing MainApplication.java")
-        })
-      })
-      return config
+          if (err) console.log("Error writing MainApplication.java");
+        });
+      });
+      return config;
     },
-  ])
+  ]);
 
-  return config
-}
+  return config;
+};
 
 const withViroProjectBuildGradle = (config: ExpoConfig) =>
   withProjectBuildGradle(config, async (newConfig) => {
     newConfig.modResults.contents = newConfig.modResults.contents.replace(
       /minSdkVersion.*/,
       `minSdkVersion = 24`
-    )
+    );
 
     newConfig.modResults.contents = newConfig.modResults.contents.replace(
       /classpath\("com.android.tools.build:gradle.*/,
       `classpath('com.android.tools.build:gradle:4.1.1')`
-    )
-    return newConfig
-  })
+    );
+    return newConfig;
+  });
 
 const withViroAppBuildGradle = (config: ExpoConfig) =>
   withAppBuildGradle(config, async (config) => {
@@ -147,9 +146,9 @@ const withViroAppBuildGradle = (config: ExpoConfig) =>
     implementation project(path: ':viro_renderer')
     implementation 'com.google.android.exoplayer:exoplayer:2.7.1'
     implementation 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'`
-    )
-    return config
-  })
+    );
+    return config;
+  });
 
 const withViroSettingsGradle = (config: ExpoConfig) =>
   withSettingsGradle(config, async (config) => {
@@ -159,23 +158,23 @@ project(':arcore_client').projectDir = new File('../node_modules/@viro-community
 project(':gvr_common').projectDir = new File('../node_modules/@viro-community/react-viro/android/gvr_common')
 project(':viro_renderer').projectDir = new File('../node_modules/@viro-community/react-viro/android/viro_renderer')
 project(':react_viro').projectDir = new File('../node_modules/@viro-community/react-viro/android/react_viro')
-    `
-    return config
-  })
+    `;
+    return config;
+  });
 
 const withViroManifest = (config: ExpoConfig) =>
   withAndroidManifest(
     config,
     async (newConfig: ExportedConfigWithProps<any>) => {
-      const contents = newConfig.modResults
-      contents.manifest.$["xmlns:tools"] = "http://schemas.android.com/tools"
+      const contents = newConfig.modResults;
+      contents.manifest.$["xmlns:tools"] = "http://schemas.android.com/tools";
 
       contents?.manifest?.application?.[0]["meta-data"]?.push({
         $: {
           "android:name": "com.google.ar.core",
           "android:value": "optional",
         },
-      })
+      });
 
       if (
         viroPluginConfig.includes("GVR") ||
@@ -189,7 +188,7 @@ const withViroManifest = (config: ExpoConfig) =>
           $: {
             "android:name": "com.google.intent.category.CARDBOARD",
           },
-        })
+        });
         //   <!-- Add the following line for daydream -->
         //   <category android:name="com.google.intent.category.DAYDREAM" />
         contents?.manifest?.application?.[0]?.activity[0][
@@ -198,7 +197,7 @@ const withViroManifest = (config: ExpoConfig) =>
           $: {
             "android:name": "com.google.intent.category.DAYDREAM",
           },
-        })
+        });
       }
 
       contents.manifest.queries = [
@@ -211,27 +210,27 @@ const withViroManifest = (config: ExpoConfig) =>
             },
           ],
         },
-      ]
+      ];
 
-      contents.manifest["uses-feature"] = []
+      contents.manifest["uses-feature"] = [];
 
       contents.manifest["uses-permission"].push({
         $: {
           "android:name": "android.permission.CAMERA",
         },
-      })
+      });
       contents.manifest["uses-feature"].push({
         $: {
           "android:name": "android.hardware.camera",
         },
-      })
+      });
       contents.manifest["uses-feature"].push({
         $: {
           "android:name": "android.hardware.camera.autofocus",
           "android:required": "false",
           "tools:replace": "required",
         },
-      })
+      });
 
       contents.manifest["uses-feature"].push({
         $: {
@@ -240,34 +239,34 @@ const withViroManifest = (config: ExpoConfig) =>
           "tools:node": "remove",
           "tools:replace": "required",
         },
-      })
+      });
       contents.manifest["uses-feature"].push({
         $: {
           "android:name": "android.hardware.sensor.accelerometer",
           "android:required": "false",
           "tools:replace": "required",
         },
-      })
+      });
       contents.manifest["uses-feature"].push({
         $: {
           "android:name": "android.hardware.sensor.gyroscope",
           "android:required": "false",
           "tools:replace": "required",
         },
-      })
+      });
 
-      return newConfig
+      return newConfig;
     }
-  )
+  );
 
 export const withViroAndroid: ConfigPlugin<ViroConfigurationOptions> = (
   config,
   props
 ) => {
-  withPlugins(config, [[withBranchAndroid, props]])
-  withViroProjectBuildGradle(config)
-  withViroManifest(config)
-  withViroSettingsGradle(config)
-  withViroAppBuildGradle(config)
-  return config
-}
+  withPlugins(config, [[withBranchAndroid, props]]);
+  withViroProjectBuildGradle(config);
+  withViroManifest(config);
+  withViroSettingsGradle(config);
+  withViroAppBuildGradle(config);
+  return config;
+};

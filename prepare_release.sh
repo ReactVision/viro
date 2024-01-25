@@ -43,7 +43,7 @@ echo '========================================================================='
 echo '========================================================================='
 echo 'Copying build artifacts to the lib directory'
 echo '========================================================================='
-rm android/react_viro/*.aar
+# rm android/react_viro/*.aar
 cp android/viro_bridge/build/outputs/aar/viro_bridge-release.aar android/react_viro/react_viro-release.aar
 
 echo '========================================================================='

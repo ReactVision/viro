@@ -61,6 +61,7 @@ local.properties
 build/
 *.tgz
 yarn.lock
+.env
 
 # Fastlane
 ios/fastlane/report.xml

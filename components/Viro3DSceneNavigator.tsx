@@ -25,6 +25,7 @@ import {
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
+import { ViroTelemetry } from "./Telemetry";
 const Viro3DSceneNavigatorModule = NativeModules.VRT3DSceneNavigatorModule;
 
 var mathRandomOffset = 0;
@@ -106,6 +107,7 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
+    ViroTelemetry.recordTelemetry("INIT", { vr: true });
     var initialSceneTag = this.props.initialSceneKey;
     if (initialSceneTag == null) {
       initialSceneTag = this.getRandomTag();

@@ -1,8 +1,3 @@
-/**
- * Copyright (c) 2016-present, Viro Media, Inc.
- * All rights reserved.
- *
- */
 import { ViroAnimations } from "./components/Animation/ViroAnimations";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";

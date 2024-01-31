@@ -47,6 +47,7 @@ import { ViroBase } from "../ViroBase";
 import { ViroCamera } from "../ViroCamera";
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import { ViroCommonProps } from "./ViroCommonProps";
+import { ViroTelemetry } from "../Telemetry";
 
 const ViroCameraModule = NativeModules.ViroCameraModule;
 

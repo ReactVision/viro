@@ -83,19 +83,6 @@ type State = {
 export class Viro3DSceneNavigator extends React.Component<Props, State> {
   _component: ViroNativeRef = null;
 
-  sceneNavigator = {
-    push: this.push,
-    pop: this.pop,
-    popN: this.popN,
-    jump: this.jump,
-    replace: this.replace,
-    // exitViro: this.exitViro, TODO: this was unused
-    recenterTracking: this._recenterTracking,
-    project: this._project,
-    unproject: this._unproject,
-    viroAppProps: {} as any,
-  };
-
   /**
    * Called from native when either the user physically decides to exit vr (hits
    * the "X" buton).
@@ -349,8 +336,7 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
    * (counts equals 0), we then remove that scene from sceneDictionary.
    */
   decrementReferenceForLastNScenes(n: number) {
-    var sceneHistory = this.state.sceneHistory;
-    var sceneDictionary = this.state.sceneDictionary;
+    const { sceneHistory, sceneDictionary } = this.state;
 
     // Now update and release any reference counts
     for (var i = 1; i <= n; i++) {
@@ -472,6 +458,19 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
       point
     );
   }
+
+  sceneNavigator = {
+    push: this.push,
+    pop: this.pop,
+    popN: this.popN,
+    jump: this.jump,
+    replace: this.replace,
+    // exitViro: this.exitViro, TODO: this was unused
+    recenterTracking: this._recenterTracking,
+    project: this._project,
+    unproject: this._unproject,
+    viroAppProps: {} as any,
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

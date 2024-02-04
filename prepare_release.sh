@@ -30,7 +30,7 @@ echo '========================================================================='
 echo '========================================================================='
 echo 'Building the React-Viro library'
 echo '========================================================================='
-# cd android && ./gradlew :viro_bridge:assembleRelease
+cd android && ./gradlew :viro_bridge:assembleRelease
 
 echo '========================================================================='
 echo 'Checking for build artifacts'
@@ -39,6 +39,7 @@ echo '========================================================================='
 #     echo -e "Unable to find viro-bridge release output!"
 #     exit
 # fi
+cd ..
 
 echo '========================================================================='
 echo 'Copying build artifacts to the lib directory'

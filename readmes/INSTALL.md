@@ -6,7 +6,7 @@ The steps below are for manually installing and linking the library to an existi
 
 ## Install
 
-#### NPM 
+#### NPM
 
 ```console
 $ npm install --save @viro-community/react-viro
@@ -18,13 +18,35 @@ $ npm install --save @viro-community/react-viro
 $ yarn add @viro-community/react-viro
 ```
 
-## Linking (You _must_ do this - we do not support auto-linking)
+## » [General Instructions](https://viro-community.readme.io/docs/installation-instructions#installation-instructions)
+
+## OS Linking (You _must_ do this - we do not support auto-linking)
 
 If you're unsure about which file to edit or where to put specified the lines, we have added links to how this is done in our [starter-kit](https://github.com/ViroCommunity/starter-kit) repo.
 
-## » [iOS linking](./INSTALL_IOS.md)
+## » [iOS linking](https://viro-community.readme.io/docs/installation-instructions#ios-linking-you-must-do-this---we-do-not-yet-support-auto-linking)
 
-## » [Android linking](./INSTALL_ANDROID.md)
+## » [Android linking](https://viro-community.readme.io/docs/installation-instructions#android-linking-you-must-do-this---we-do-not-yet-support-auto-linking)
+
+## Expo Plugin
+
+## » [General Instructions](https://viro-community.readme.io/docs/integrating-with-expo#installation-instructions)
+
+## » [Android Options](https://viro-community.readme.io/docs/integrating-with-expo#android-options)
+
+## » [iOS Options](https://viro-community.readme.io/docs/integrating-with-expo#ios-options)
+
+## » [Running your Expo app](https://viro-community.readme.io/docs/integrating-with-expo#running-your-expo-app)
+
+## Examples
+
+Please note that these examples are a bit old, the code targets an older version of viro before the NativeVision took over the project. They will be updated soon!
+
+## » [AR](https://viro-community.readme.io/docs/examples#ar-examples)
+
+## » [VR](https://viro-community.readme.io/docs/examples#vr-examples)
+
+## » [Tutorials](https://viro-community.readme.io/docs/examples#tutorials)
 
 # **Troubleshooting**
 

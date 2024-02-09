@@ -1,6 +1,6 @@
 <p align="center" style="background-color: #CCCCCC;">
-  <a href="https://virocommunity.github.io/">
-    <img src="https://raw.githubusercontent.com/ViroCommunity/virocommunity.github.io/main/viro_community_logo.png" alt="Viro Community logo">
+  <a href="https://www.nativevision.xyz/">
+    <img src="../viro/public/icons/NVLogo.png">
   </a>
 </p>
 
@@ -41,7 +41,7 @@ The documentation is found [here](https://viro-community.readme.io/docs/overview
 
 # Examples
 
-See our [Example projects](readmes/EXAMPLES.md) page. These are a little old (~2019) but are a great reference point for how to use bits of the library.
+See our [Example projects](https://viro-community.readme.io/docs/examples) page. These are a little old (~2019) but are a great reference point for how to use bits of the library.
 
 # Need help? Or want to contribute?
 
@@ -51,14 +51,6 @@ See our [Example projects](readmes/EXAMPLES.md) page. These are a little old (~2
 
 # A little history...
 
-ViroReact was originaly developed by the [Viro Media](http://www.viromedia.com/) company, but was open sourced in 2019. In late 2020 the [Viro Community](https://virocommunity.github.io/) was formed to help maintain and move the project onwards, updating it so it could run with modern versions of react native, and start to add in new features.
+ViroReact was originaly developed by the [Viro Media](http://www.viromedia.com/) company, but was open sourced in 2019. In late 2020 the Viro Community was formed to help maintain and move the project onwards, updating it so it could run with modern versions of react native, and start to add in new features. NativeVision now focuses on the project full time making sure the codebase is updated and ready for the future of XR / Spatial Computing.
 
-We, as a community, owe a great debt to Viro Media and the people who developed this library originally. We hope to make them proud as it continues to develop and grow in the Viro Community.
-
-# Supporters
-
-<p align="center">
-  <a href="https://themorrow.digital/">
-    <img src="readmes/morrow-supporter.png" alt="Morrow">
-  </a>
-</p>
+We, as a community, owe a great debt to Viro Media and the people who developed this library originally. We hope to make them proud as it continues to develop and grow in the spirit of open source.

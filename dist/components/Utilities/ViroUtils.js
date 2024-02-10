@@ -62,34 +62,28 @@ function polarToCartesianActual(polarcoords) {
 }
 exports.polarToCartesianActual = polarToCartesianActual;
 const react_native_1 = require("react-native");
-function isARSupportedOnDevice(notSupportedCallback, supportedCallback) {
-    if (react_native_1.Platform.OS == "ios") {
-        react_native_1.NativeModules.VRTARUtils.isARSupported((error, result) => {
-            if (result.isARSupported == true) {
-                {
-                    supportedCallback();
-                }
-            }
-            else {
-                {
-                    notSupportedCallback();
-                }
-            }
-        });
-    }
-    else {
-        react_native_1.NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice((result) => {
-            if (result == "SUPPORTED") {
-                {
-                    supportedCallback();
-                }
-            }
-            else {
-                {
-                    notSupportedCallback(result);
-                }
-            }
-        });
-    }
+function isARSupportedOnDevice() {
+    return new Promise((resolve, reject) => {
+        if (react_native_1.Platform.OS == "ios") {
+            react_native_1.NativeModules.VRTARUtils.isARSupported((error, result) => {
+                console.log("[isARSupportedOnDevice]: iOS", { error, result });
+                if (error)
+                    reject(error);
+                if (result)
+                    resolve(result);
+                reject("AR Support Unknown.");
+            });
+        }
+        else {
+            react_native_1.NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice((result) => {
+                console.log("[isARSupportedOnDevice]: Android", { result });
+                if (result == "SUPPORTED")
+                    resolve({ isARSupported: true });
+                if (result)
+                    reject(new Error(result));
+                reject("AR Support Unknown.");
+            });
+        }
+    });
 }
 exports.isARSupportedOnDevice = isARSupportedOnDevice;

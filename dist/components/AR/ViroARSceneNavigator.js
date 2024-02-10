@@ -63,12 +63,12 @@ class ViroARSceneNavigator extends React.Component {
             currentSceneIndex: 0,
         };
     }
-    /*
-     Starts recording video of the Viro renderer and external audio
-  
-     fileName - name of the file (without extension)
-     saveToCameraRoll - whether or not the file should also be saved to the camera roll
-     onError - callback function that accepts an errorCode.
+    /**
+     * Starts recording video of the Viro renderer and external audio
+     *
+     * @param fileName - name of the file (without extension)
+     * @param saveToCameraRoll - whether or not the file should also be saved to the camera roll
+     * @param onError - callback function that accepts an errorCode.
      */
     _startVideoRecording = (fileName, saveToCameraRoll, 
     // TODO: What are the errorCodes? make a type for this
@@ -86,6 +86,7 @@ class ViroARSceneNavigator extends React.Component {
     };
     /**
      * Takes a screenshot of the Viro renderer
+     *
      * @param fileName - name of the file (without extension)
      * @param saveToCameraRoll - whether or not the file should also be saved to the camera roll
      * returns Object w/ success, url and errorCode keys.
@@ -93,9 +94,20 @@ class ViroARSceneNavigator extends React.Component {
     _takeScreenshot = async (fileName, saveToCameraRoll) => {
         return await ViroARSceneNavigatorModule.takeScreenshot((0, react_native_1.findNodeHandle)(this), fileName, saveToCameraRoll);
     };
+    /**
+     * @todo document _project
+     *
+     * @param point
+     * @returns
+     */
     async _project(point) {
         return await ViroARSceneNavigatorModule.project((0, react_native_1.findNodeHandle)(this), point);
     }
+    /**
+     * Gets a random tag string.
+     *
+     * @returns a random tag.
+     */
     getRandomTag = () => {
         const randomTag = Math.random() + mathRandomOffset;
         mathRandomOffset++;
@@ -113,7 +125,8 @@ class ViroARSceneNavigator extends React.Component {
      * push ("sceneKey", scene);
      * push (scene);
      *
-     * @todo: use Typescript function overloading rather than this inaccurate solution
+     * @todo use Typescript function overloading rather than this inaccurate solution
+     * @todo document parameters
      */
     push = (param1, param2) => {
         let sceneKey = undefined;
@@ -151,7 +164,8 @@ class ViroARSceneNavigator extends React.Component {
      * replace ("sceneKey", scene);
      * replace (scene);
      *
-     * @todo: use Typescript function overloading rather than this inaccurate solution
+     * @todo use Typescript function overloading rather than this inaccurate solution
+     * @todo document parameters
      */
     replace = (param1, param2) => {
         let sceneKey = undefined;
@@ -194,7 +208,8 @@ class ViroARSceneNavigator extends React.Component {
      * jump ("sceneKey", scene);
      * jump (scene);
      *
-     * @todo: use Typescript function overloading rather than this inaccurate solution
+     * @todo use Typescript function overloading rather than this inaccurate solution
+     * @todo document parameters
      */
     jump = (param1, param2) => {
         let sceneKey = undefined;
@@ -223,9 +238,18 @@ class ViroARSceneNavigator extends React.Component {
         this.incrementSceneReference(scene, sceneKey, true);
         this.reorderHistory(sceneKey);
     };
+    /**
+     * Pop 1 screen from the stack.
+     */
     pop = () => {
         this.popN(1);
     };
+    /**
+     * Pop n screens from the stack.
+     *
+     * @param n number of scenes to pop
+     * @returns void
+     */
     popN = (n) => {
         if (n === 0) {
             return;
@@ -242,6 +266,8 @@ class ViroARSceneNavigator extends React.Component {
      * mapped to the given sceneKey. If no scenes are found / mapped, we create
      * one, initialize it with a reference count of 1, and store it within the
      * sceneDictionary for future reference.
+     *
+     * @todo TODO: Document parameters.
      */
     incrementSceneReference = (scene, sceneKey, limitOne) => {
         const currentSceneDictionary = this.state.sceneDictionary;
@@ -273,6 +299,8 @@ class ViroARSceneNavigator extends React.Component {
      * Decrements the reference count for the last N scenes within
      * the sceneHistory by 1. If nothing else references that given scene
      * (counts equals 0), we then remove that scene from sceneDictionary.
+     *
+     * @param n number to decrement by.
      */
     decrementReferenceForLastNScenes = (n) => {
         const { sceneHistory, sceneDictionary } = this.state;
@@ -296,6 +324,8 @@ class ViroARSceneNavigator extends React.Component {
     /**
      * Adds the given sceneKey to the sceneHistory and updates the currentSceneIndex to point
      * to the scene on the top of the history stack (the most recent scene).
+     *
+     * @param sceneKey scene to insert into the stack.
      */
     addToHistory = (sceneKey) => {
         const updatedHistory = this.state.sceneHistory.concat([sceneKey]);
@@ -310,6 +340,8 @@ class ViroARSceneNavigator extends React.Component {
      * matching the given sceneKey and re-order it to the front. We then update the
      * currentSceneIndex to point to the scene on the top of the history stack
      * (the most recent scene).
+     *
+     * @param sceneKey scene to put at the top of the stack.
      */
     reorderHistory = (sceneKey) => {
         // Find the last sceneKey within sceneHistory and remove it.
@@ -328,6 +360,11 @@ class ViroARSceneNavigator extends React.Component {
             sceneHistory: updatedHistory,
         });
     };
+    /**
+     * Pops the history entries by n screens.
+     *
+     * @param n number of history entries to pop.
+     */
     popHistoryByN(n) {
         const { sceneHistory } = this.state;
         sceneHistory.splice(sceneHistory.length - n, n);
@@ -338,6 +375,12 @@ class ViroARSceneNavigator extends React.Component {
             sceneHistory: sceneHistory,
         });
     }
+    /**
+     * Gets the index of a scene by the scene tag.
+     *
+     * @param sceneTag tag of the scene
+     * @returns the index of the scene
+     */
     getSceneIndex = (sceneTag) => {
         const { sceneDictionary } = this.state;
         let i = 0;
@@ -350,30 +393,45 @@ class ViroARSceneNavigator extends React.Component {
         // Unable to find the given sceneTag, return -1
         return -1;
     };
+    /**
+     * TODO: Document _unproject
+     *
+     * @param point
+     * @returns
+     */
     _unproject = async (point) => {
         return await ViroARSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     };
-    /*
-    [iOS Only] Resets the tracking of the AR session.
-  
-    resetTracking - determines if the tracking should be reset.
-    removeAnchors - determines if the existing anchors should be removed too.
+    /**
+     * [iOS Only]
+     *
+     * Resets the tracking of the AR session.
+     *
+     * @param resetTracking - determines if the tracking should be reset.
+     * @param removeAnchors - determines if the existing anchors should be removed too.
      */
     _resetARSession = (resetTracking, removeAnchors) => {
         ViroARSceneNavigatorModule.resetARSession((0, react_native_1.findNodeHandle)(this), resetTracking, removeAnchors);
     };
-    /*
-    [iOS/ARKit 1.5+ Only] Allows the developer to offset the current world orgin
-    by the given transformation matrix. ie. if this is called twice with the
-    position [0, 0, 1], then current world origin will be at [0, 0, 2] from its
-    initial position (it's additive, not meant to replace the existing origin)
-  
-    worldOrigin - a dictionary that can contain a `position` and `rotation` key with
-                  an array containing 3 floats (note: rotation is in degrees).
+    /**
+     * [iOS/ARKit 1.5+ Only]
+     *
+     * Allows the developer to offset the current world orgin
+     * by the given transformation matrix. ie. if this is called twice with the
+     * position [0, 0, 1], then current world origin will be at [0, 0, 2] from its
+     * initial position (it's additive, not meant to replace the existing origin)
+     *
+     * @param worldOrigin - a dictionary that can contain a `position` and `rotation` key with an
+     *  array containing 3 floats (note: rotation is in degrees).
      */
     _setWorldOrigin = (worldOrigin) => {
         ViroARSceneNavigatorModule.setWorldOrigin((0, react_native_1.findNodeHandle)(this), worldOrigin);
     };
+    /**
+     * Renders the Scene Views in the stack.
+     *
+     * @returns Array of rendered Scene views.
+     */
     _renderSceneStackItems = () => {
         let views = [];
         let i = 0;

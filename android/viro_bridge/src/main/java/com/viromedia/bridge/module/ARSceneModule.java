@@ -51,7 +51,11 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
     public ARSceneModule(ReactApplicationContext context) {
         super(context);
     }
-
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
     @Override
     public String getName() {
         return "VRTARSceneModule";

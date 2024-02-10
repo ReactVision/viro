@@ -61,6 +61,21 @@ type State = {
  */
 export declare class Viro3DSceneNavigator extends React.Component<Props, State> {
     _component: ViroNativeRef;
+    /**
+     * Pushes a scene and reference it with the given key if provided.
+     * If the scene has been previously pushed, we simply show the scene again.
+     * Note that the back history order of which scenes were pushed is preserved.
+     * Also note that scenes are reference counted and only a unique set of
+     * scenes are stored and mapped to within sceneDictionary.
+     *
+     * Can take in either 1 or two parameters in the form:
+     * push ("sceneKey");
+     * push ("sceneKey", scene);
+     * push (scene);
+     *
+     * @todo: use Typescript function overloading rather than this inaccurate solution
+     */
+    push: (param1?: ViroScene | string, param2?: ViroScene) => void;
     sceneNavigator: {
         push: (param1?: ViroScene | string, param2?: ViroScene) => void;
         pop: () => void;
@@ -79,21 +94,6 @@ export declare class Viro3DSceneNavigator extends React.Component<Props, State> 
     _onExitViro(_event: ViroExitViroEvent): void;
     constructor(props: Props);
     getRandomTag(): string;
-    /**
-     * Pushes a scene and reference it with the given key if provided.
-     * If the scene has been previously pushed, we simply show the scene again.
-     * Note that the back history order of which scenes were pushed is preserved.
-     * Also note that scenes are reference counted and only a unique set of
-     * scenes are stored and mapped to within sceneDictionary.
-     *
-     * Can take in either 1 or two parameters in the form:
-     * push ("sceneKey");
-     * push ("sceneKey", scene);
-     * push (scene);
-     *
-     * @todo: use Typescript function overloading rather than this inaccurate solution
-     */
-    push(param1?: ViroScene | string, param2?: ViroScene): void;
     /**
      * Replace the top scene in the stack with the given scene. The remainder of the back
      * history is kept in the same order as before.

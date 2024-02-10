@@ -40,7 +40,11 @@ public class VRTImageModule extends ReactContextBaseJavaModule {
     public String getName() {
         return "VRTImageModule";
     }
-
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
     public VRTImageModule(ReactApplicationContext context) {
         super(context);
         mContext = context;

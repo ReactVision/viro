@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.viromedia.virobridge">
+    package="com.viromedia.bridge">
 
     <application android:label="@string/app_name"
         android:supportsRtl="true">

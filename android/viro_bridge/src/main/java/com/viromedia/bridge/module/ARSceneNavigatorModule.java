@@ -62,7 +62,11 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     private static final int PERMISSION_REQ_CODE_STORAGE = 2;
 
     private ReactApplicationContext mContext;
-
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
     public ARSceneNavigatorModule(ReactApplicationContext context) {
         super(context);
         mContext = context;

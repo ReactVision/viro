@@ -49,6 +49,12 @@ public class SoundModule extends ReactContextBaseJavaModule {
         return "VRTSoundModule";
     }
 
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
+
     /**
      * This function takes a map of keys to sounds and creates SoundData objects
      * to prefetch the data before storing them in a local map. We currently only

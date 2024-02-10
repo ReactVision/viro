@@ -478,7 +478,9 @@ export class ViroSceneNavigator extends React.Component<Props, State> {
     // If the user simply passes us the props from the root React component,
     // then we'll have an extra 'rootTag' key which React automatically includes
     // so remove it.
-    delete this.sceneNavigator.viroAppProps.rootTag;
+    if (this.sceneNavigator.viroAppProps?.rootTag) {
+      delete this.sceneNavigator.viroAppProps?.rootTag;
+    }
 
     const {
       vrModeEnabled = true, // default to true

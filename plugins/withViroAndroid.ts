@@ -13,7 +13,7 @@ import fs from "fs";
 import path from "path";
 import { insertLinesHelper } from "./util/insertLinesHelper";
 import { ViroConfigurationOptions, XrMode } from "./withViro";
-let viroPluginConfig = ["AR"];
+let viroPluginConfig = ["AR", "GVR"];
 
 const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
   // Directly edit MainApplication.java
@@ -84,11 +84,15 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
 
         let target = "";
         for (const viroConfig of viroPluginConfig) {
-          target =
-            target +
-            `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.valueOf("${viroConfig}")))${
-              isJava ? ";" : ""
-            }\n`;
+          if (isJava) {
+            target =
+              target +
+              `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+          } else {
+            target =
+              target +
+              `              add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+          }
         }
 
         if (isJava) {
@@ -98,11 +102,71 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
             data
           );
         } else {
-          data = insertLinesHelper(
-            target,
-            "override fun getPackages(): List<ReactPackage> {",
-            data
-          );
+          if (data.includes("// packages.add(new MyReactNativePackage());")) {
+            // console.log("[VIRO]: \n" + target);
+            /**
+             * ================================================================
+             * HACK/EXPO PREBIULD BUG
+             * ================================================================
+             *
+             * ```
+             * // DOESN'T WORK - EXPO SDK 50 `npx expo prebuild` RESULT
+             * override fun getPackages(): List<ReactPackage> {
+             *   // Packages that cannot be autolinked yet can be added manually here, for example:
+             *   // packages.add(new MyReactNativePackage());
+             *   PackageList(this).packages.apply {
+             *     add(ReactViroPackage(ReactViroPackage.ViroPlatform.GVR))
+             *   }
+             *   return PackageList(this).packages
+             * }
+             *
+             * // DOES WORK - REACT NATIVE STARTER KIT 0.73.4
+             * override fun getPackages(): List<ReactPackage> =
+             *   PackageList(this).packages.apply {
+             *     // Packages that cannot be autolinked yet can be added manually here, for example:
+             *     // add(MyReactNativePackage())
+             *     // https://viro-community.readme.io/docs/installation-instructions#5-now-add-the-viro-package-to-your-mainapplication
+             *     // add(ReactViroPackage(ReactViroPackage.ViroPlatform.OVR_MOBILE))
+             *     add(ReactViroPackage(ReactViroPackage.ViroPlatform.GVR))
+             *     // add(ReactViroPackage(ReactViroPackage.ViroPlatform.AR))
+             *   }
+             * ```
+             */
+
+            data = data.replace(
+              `override fun getPackages(): List<ReactPackage> {
+            // Packages that cannot be autolinked yet can be added manually here, for example:
+            // packages.add(new MyReactNativePackage());
+            return PackageList(this).packages
+          }`,
+              `override fun getPackages(): List<ReactPackage> =
+            PackageList(this).packages.apply {
+              // Packages that cannot be autolinked yet can be added manually here, for example:
+              // add(MyReactNativePackage())
+            }`
+            );
+            data = insertLinesHelper(
+              target,
+              "// add(MyReactNativePackage())",
+              data
+            );
+          } else if (data.includes("// add(MyReactNativePackage())")) {
+            // console.log("[VIRO]: \n" + target);
+            data = insertLinesHelper(
+              target,
+              "// add(MyReactNativePackage())",
+              data
+            );
+          } else {
+            throw new Error(
+              "Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message!"
+            );
+          }
+          // data = insertLinesHelper(
+          //   target,
+          //   "// packages.add(new MyReactNativePackage());",
+          //   data
+          // );
         }
 
         fs.writeFile(mainApplicationPath, data, "utf-8", function (err) {
@@ -134,12 +198,30 @@ const withViroAppBuildGradle = (config: ExpoConfig) =>
       /implementation "com.facebook.react:react-native:\+"  \/\/ From node_modules/,
       `implementation "com.facebook.react:react-native:+"  // From node_modules
 
+    // ========================================================================
+    // https://viro-community.readme.io/docs/installation-instructions#2-in-your-androidappbuildgradle-add-the-following-lines-to-the-dependencies-section
     implementation project(':gvr_common')
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
     implementation project(path: ':viro_renderer')
-    implementation 'com.google.android.exoplayer:exoplayer:2.7.1'
-    implementation 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'`
+    implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
+    // ========================================================================`
+    );
+    config.modResults.contents = config.modResults.contents.replace(
+      /implementation\("com.facebook.react:react-android"\)/,
+      `implementation("com.facebook.react:react-android")
+
+    // =====================================r===================================
+    // https://viro-community.readme.io/docs/installation-instructions#2-in-your-androidappbuildgradle-add-the-following-lines-to-the-dependencies-section
+    implementation project(':gvr_common')
+    implementation project(':arcore_client')
+    implementation project(path: ':react_viro')
+    implementation project(path: ':viro_renderer')
+    implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
+    // ========================================================================
+    `
     );
     return config;
   });

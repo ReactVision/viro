@@ -38,6 +38,9 @@ type Props = {
  */
 export class ViroText extends ViroBase<Props> {
   render() {
+    console.log("[ViroText].render");
+    console.log("[ViroText].render", this);
+    console.log("[ViroText].render", this.props);
     checkMisnamedProps("ViroText", this.props);
 
     // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.

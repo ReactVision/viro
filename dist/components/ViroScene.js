@@ -37,7 +37,7 @@ const react_native_1 = require("react-native");
 const ViroBase_1 = require("./ViroBase");
 const ViroSceneContext_1 = require("./ViroSceneContext");
 class ViroScene extends ViroBase_1.ViroBase {
-    _onPlatformUpdate(event) {
+    _onPlatformUpdate = (event) => {
         /**
          * ##### DEPRECATION WARNING - 'vrPlatform' is deprecated in favor of 'platform'! Support
          * for 'vrPlatform' may be removed in the future.
@@ -46,9 +46,9 @@ class ViroScene extends ViroBase_1.ViroBase {
             event.nativeEvent.platformInfoViro.platform;
         this.props.onPlatformUpdate &&
             this.props.onPlatformUpdate(event.nativeEvent.platformInfoViro);
-    }
-    _onCameraTransformUpdate(event) {
-        var cameraTransform = {
+    };
+    _onCameraTransformUpdate = (event) => {
+        const cameraTransform = {
             // ** DEPRECATION WARNING ** The cameraTransform key will be deprecated in a future release,
             cameraTransform: {
                 position: [
@@ -95,14 +95,14 @@ class ViroScene extends ViroBase_1.ViroBase {
         };
         this.props.onCameraTransformUpdate &&
             this.props.onCameraTransformUpdate(cameraTransform);
-    }
+    };
     // TODO: types for closest
-    async findCollisionsWithRayAsync(from, to, closest, viroTag) {
+    findCollisionsWithRayAsync = async (from, to, closest, viroTag) => {
         return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithRayAsync((0, react_native_1.findNodeHandle)(this), from, to, closest, viroTag);
-    }
-    async findCollisionsWithShapeAsync(from, to, shapeString, shapeParam, viroTag) {
+    };
+    findCollisionsWithShapeAsync = async (from, to, shapeString, shapeParam, viroTag) => {
         return await react_native_1.NativeModules.VRTSceneModule.findCollisionsWithShapeAsync((0, react_native_1.findNodeHandle)(this), from, to, shapeString, shapeParam, viroTag);
-    }
+    };
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
      * @deprecated
@@ -125,6 +125,9 @@ class ViroScene extends ViroBase_1.ViroBase {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroScene", this.props);
+        console.log("[ViroScene].render");
+        console.log("[ViroScene].render", this);
+        console.log("[ViroScene].render", this.props);
         let timeToFuse = undefined;
         if (this.props.onFuse != undefined &&
             typeof this.props.onFuse === "object") {
@@ -132,16 +135,19 @@ class ViroScene extends ViroBase_1.ViroBase {
         }
         return (<ViroSceneContext_1.ViroSceneContext.Provider value={{
                 cameraDidMount: (camera) => {
+                    console.log("[ViroScene::ViroSceneContext.Provider.cameraDidMount]", camera);
                     if (camera.props.active) {
                         react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                     }
                 },
                 cameraWillUnmount: (camera) => {
+                    console.log("[ViroScene::ViroSceneContext.Provider.cameraWillUnmount]", camera);
                     if (camera.props.active) {
                         react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                     }
                 },
                 cameraDidUpdate: (camera, active) => {
+                    console.log("[ViroScene::ViroSceneContext.Provider.cameraDidUpdate]", camera);
                     if (active) {
                         react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                     }

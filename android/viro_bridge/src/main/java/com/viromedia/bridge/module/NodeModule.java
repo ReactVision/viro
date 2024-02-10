@@ -56,7 +56,11 @@ public class NodeModule extends ReactContextBaseJavaModule {
     public NodeModule(ReactApplicationContext context) {
         super(context);
     }
-
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
     @Override
     public String getName() {
         return "VRTNodeModule";

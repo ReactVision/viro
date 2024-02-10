@@ -61,17 +61,6 @@ type State = {
  */
 export declare class Viro3DSceneNavigator extends React.Component<Props, State> {
     _component: ViroNativeRef;
-    sceneNavigator: {
-        push: (param1?: ViroScene | string, param2?: ViroScene) => void;
-        pop: () => void;
-        popN: (n: number) => void;
-        jump: (param1?: ViroScene | string, param2?: ViroScene) => void;
-        replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
-        recenterTracking: () => void;
-        project: (point: Viro3DPoint) => Promise<any>;
-        unproject: (point: Viro3DPoint) => Promise<any>;
-        viroAppProps: any;
-    };
     /**
      * Called from native when either the user physically decides to exit vr (hits
      * the "X" buton).
@@ -152,6 +141,17 @@ export declare class Viro3DSceneNavigator extends React.Component<Props, State> 
     _renderSceneStackItems(): JSX.Element[];
     _project(point: Viro3DPoint): Promise<any>;
     _unproject(point: Viro3DPoint): Promise<any>;
+    sceneNavigator: {
+        push: (param1?: ViroScene | string, param2?: ViroScene) => void;
+        pop: () => void;
+        popN: (n: number) => void;
+        jump: (param1?: ViroScene | string, param2?: ViroScene) => void;
+        replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
+        recenterTracking: () => void;
+        project: (point: Viro3DPoint) => Promise<any>;
+        unproject: (point: Viro3DPoint) => Promise<any>;
+        viroAppProps: any;
+    };
     render(): JSX.Element;
 }
 export {};

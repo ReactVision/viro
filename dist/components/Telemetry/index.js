@@ -6,8 +6,9 @@ const react_native_1 = require("react-native");
 class ViroTelemetry {
     static _isDisabled = false;
     static _isDebugging = false;
+    // TODO: use custom domain
     // private static _telemetryUrl = "https://telemetry.nativevision.xyz";
-    static _telemetryUrl = "https://ea13-2601-182-d17f-200-c106-b67a-1683-eb98.ngrok-free.app";
+    static _telemetryUrl = "https://native-vision-telemetry.onrender.com";
     static _timeout = 8000;
     /**
      * Allow a user to start debugging the telemetry to see what is sent.

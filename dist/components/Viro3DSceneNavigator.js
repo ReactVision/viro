@@ -37,6 +37,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro3DSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const Telemetry_1 = require("./Telemetry");
 const Viro3DSceneNavigatorModule = react_native_1.NativeModules.VRT3DSceneNavigatorModule;
 var mathRandomOffset = 0;
 /**
@@ -53,6 +54,7 @@ class Viro3DSceneNavigator extends React.Component {
     }
     constructor(props) {
         super(props);
+        Telemetry_1.ViroTelemetry.recordTelemetry("INIT", { vr: true });
         var initialSceneTag = this.props.initialSceneKey;
         if (initialSceneTag == null) {
             initialSceneTag = this.getRandomTag();

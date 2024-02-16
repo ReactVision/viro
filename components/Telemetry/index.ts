@@ -4,9 +4,9 @@ import { Platform } from "react-native";
 export class ViroTelemetry {
   private static _isDisabled = false;
   private static _isDebugging = false;
+  // TODO: use custom domain
   // private static _telemetryUrl = "https://telemetry.nativevision.xyz";
-  private static _telemetryUrl =
-    "https://ea13-2601-182-d17f-200-c106-b67a-1683-eb98.ngrok-free.app";
+  private static _telemetryUrl = "https://native-vision-telemetry.onrender.com";
   private static _timeout = 8000;
 
   /**

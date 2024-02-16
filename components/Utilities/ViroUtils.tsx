@@ -67,35 +67,54 @@ export function polarToCartesianActual(polarcoords: number[]) {
 }
 
 import { Platform, NativeModules } from "react-native";
-export function isARSupportedOnDevice(
-  notSupportedCallback: (result?: string | Error) => void,
-  supportedCallback: (result?: string | Error) => void
-) {
-  if (Platform.OS == "ios") {
-    NativeModules.VRTARUtils.isARSupported((error: Error, result: any) => {
-      if (result.isARSupported == true) {
-        {
-          supportedCallback();
+
+export interface ViroiOSArSupportResponse {
+  isARSupported: boolean;
+}
+
+export type ViroAndroidArSupportResponse =
+  /**
+   * The device is <b>supported</b> by ARCore.
+   */
+  | "SUPPORTED"
+  /**
+   * The device is <b>unsupported</b> by ARCore.
+   */
+  | "UNSUPPORTED"
+  /**
+   * ARCore support is <b>unknown</b> for this device.
+   */
+  | "UNKNOWN"
+  /**
+   * ARCore is still checking for support. This is a temporary state, and the application should
+   * check again soon.
+   */
+  | "TRANSIENT";
+
+export interface ViroARSupportResponse {
+  isARSupported: boolean;
+}
+
+export function isARSupportedOnDevice() {
+  return new Promise<ViroARSupportResponse>((resolve, reject) => {
+    if (Platform.OS == "ios") {
+      NativeModules.VRTARUtils.isARSupported(
+        (error: Error, result: ViroiOSArSupportResponse) => {
+          console.log("[isARSupportedOnDevice]: iOS", { error, result });
+          if (error) reject(error);
+          if (result) resolve(result);
+          reject("AR Support Unknown.");
         }
-      } else {
-        {
-          notSupportedCallback();
+      );
+    } else {
+      NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice(
+        (result: ViroAndroidArSupportResponse) => {
+          console.log("[isARSupportedOnDevice]: Android", { result });
+          if (result == "SUPPORTED") resolve({ isARSupported: true });
+          if (result) reject(new Error(result));
+          reject("AR Support Unknown.");
         }
-      }
-    });
-  } else {
-    NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice(
-      (result: any) => {
-        if (result == "SUPPORTED") {
-          {
-            supportedCallback();
-          }
-        } else {
-          {
-            notSupportedCallback(result);
-          }
-        }
-      }
-    );
-  }
+      );
+    }
+  });
 }

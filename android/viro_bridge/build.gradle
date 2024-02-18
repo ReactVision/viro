@@ -2,13 +2,13 @@ apply plugin: 'com.android.library'
 apply plugin: "kotlin-android"
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 31
     buildToolsVersion '30.0.2'
     namespace "com.viromedia.bridge"
 
     defaultConfig {
         minSdkVersion 24
-        targetSdkVersion 30
+        targetSdkVersion 31
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
@@ -33,7 +33,8 @@ dependencies {
     implementation project(':arcore_client')
     implementation project(':gvr_common')
     implementation project(':viro_renderer')
-    implementation 'com.google.android.exoplayer:exoplayer:2.7.1'
-    implementation 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'
+    implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
+    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.0.0'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 }

@@ -4,7 +4,7 @@
 # Copyright © 2017 Viro Media. All rights reserved.
 #
 
-# set -x
+set -e
 
 echo '========================================================================='
 echo 'Cleaning local tarballs'
@@ -30,7 +30,9 @@ rm android/viro_bridge/build/outputs/aar/*.aar
 echo '========================================================================='
 echo 'Building the React-Viro library'
 echo '========================================================================='
-cd android && ./gradlew :viro_bridge:assembleRelease
+cd android
+./gradlew :viro_bridge:clean
+./gradlew :viro_bridge:assembleRelease
 cd ..
 
 echo '========================================================================='

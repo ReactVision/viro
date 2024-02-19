@@ -2,31 +2,35 @@
 
 ## v2.40.1 - 19 February 2024
 
-- feat: Add release-it and auto-changelog [`1d96937`](https://github.com/NativeVision/viro/commit/1d96937ae62df3dd29e8c86c7482d35b01fd6e48)
-- fix: Add import/export of VIRO_VERSION [`67473ff`](https://github.com/NativeVision/viro/commit/67473ff1066c5dcee06f3f30f9f894fa990fb591)
-- fix: changelog-template improperly formatted [`1114609`](https://github.com/NativeVision/viro/commit/1114609b5724d5eb5ecd4e97334934d71d6c8949)
+- fix: Add import/export of VIRO_VERSION [`#268`](https://github.com/NativeVision/viro/pull/268)
+
 ## v2.24.0 - 16 February 2024
 
 - Add Telemetry [`#264`](https://github.com/NativeVision/viro/pull/264)
 - fix: fix isARSupportedOnDevice [`#262`](https://github.com/NativeVision/viro/pull/262)
+
 ## v2.23.3 - 10 February 2024
 
 - fix: fix isARSupportedOnDevice [`220847d`](https://github.com/NativeVision/viro/commit/220847dcfd15296c4860419f8b388c27e686eb1e)
 - chore: version bump 2.23.3 [`31adf38`](https://github.com/NativeVision/viro/commit/31adf38b728de36126c3d9b0a246407fe8753ca6)
+
 ## v2.23.2 - 9 February 2024
 
 - Fix screenshot taking and screen recording in AR [`#256`](https://github.com/NativeVision/viro/pull/256)
 - docs: update readme installation instructions [`#259`](https://github.com/NativeVision/viro/pull/259)
 - feat: added code of conduct [`#255`](https://github.com/NativeVision/viro/pull/255)
 - Update ISSUE_TEMPLATE.md [`219fff7`](https://github.com/NativeVision/viro/commit/219fff72d57280d4dc81b40854872d3a33eb8d20)
+
 ## v2.23.2-beta - 2 February 2024
 
 - Fix screenshot taking [`844be5a`](https://github.com/NativeVision/viro/commit/844be5a6058494fdecbd4c91a60c847581b49465)
+
 ## v2.23.1 - 25 January 2024
 
 ## v2.23.1-rc4 - 25 January 2024
 
 - Support kotlin and Expo SDK 50 for Android [`#249`](https://github.com/NativeVision/viro/pull/249)
+
 ## v2.23.1-rc1 - 25 January 2024
 
 - Fix Expo plugin issues, dependency issues, and stabilize [`#247`](https://github.com/NativeVision/viro/pull/247)
@@ -66,9 +70,11 @@
 - Update LICENSE [`#67`](https://github.com/NativeVision/viro/pull/67)
 - Add out-of-the-box expo plugin support (#88) [`#87`](https://github.com/NativeVision/viro/issues/87)
 - Revert "Fix iOS compatibility and ViroVideo (#47)" [`3a4b8e0`](https://github.com/NativeVision/viro/commit/3a4b8e07319fe3ea3f31dd0b77e3b1185fe4fc48)
+
 ## v2.21.1 - 8 September 2021
 
 - Fix iOS compatibility and ViroVideo [`#47`](https://github.com/NativeVision/viro/pull/47)
+
 ## v2.21.0 - 5 September 2021
 
 - Update package.json [`#46`](https://github.com/NativeVision/viro/pull/46)

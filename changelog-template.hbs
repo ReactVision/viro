@@ -12,4 +12,5 @@
     {{#each commits}}
     - {{#if breaking}}**Breaking change:** {{/if}}{{{subject}}}{{#if href}} [`{{shorthash}}`]({{href}}){{/if}}
     {{/each}}
+    
   {{/each}}

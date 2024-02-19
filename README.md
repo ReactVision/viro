@@ -10,7 +10,7 @@
 
 # ViroReact
 
-ViroReact is a library for developers to rapidly build augmented reality (AR) and virtual reality (VR) experiences. Developers write in React Native, and Viro runs their code natively across all mobile VR (including Google Daydream, Samsung Gear VR, and Google Cardboard for iOS and Android) and AR (iOS ARKit and Android ARCore) platforms.
+ViroReact is a library for developers to rapidly build augmented reality (AR) and virtual reality (VR) experiences. Developers write in React Native and Viro runs their code natively across all mobile VR (including Google Daydream, Samsung Gear VR, and Google Cardboard for iOS and Android) and AR (iOS ARKit and Android ARCore) platforms.
 
 <table>
   <tr>
@@ -23,21 +23,17 @@ ViroReact is a library for developers to rapidly build augmented reality (AR) an
   </tr>
 </table>
 
-# [Installing](readmes/INSTALL.md)
-
-If you are integrating ViroReact into an existing project, have a look at our [Installation instructions](readmes/INSTALL.md).
-
-If you are starting a fresh project with ViroReact, consider cloning our [starter kit](https://github.com/ViroCommunity/starter-kit) repo instead.
-
 # Documentation
 
-The documentation is found [here](https://viro-community.readme.io/docs/overview). Currently, the documentation is migrated with issues to code samples and broken links. If you would like to help fix these issues, either submit an edit or [get in touch](https://discord.gg/H3ksm5NhzT)!
+[Documentation can be found here!](https://viro-community.readme.io/docs/overview). Currently, the documentation has some issues with code samples and broken links. If you would like to help fix these issues, either submit an edit or [get in touch](https://discord.gg/H3ksm5NhzT)!
 
-# FAQ
+## Getting Started
 
-- _Older versions couldn't be submitted to Apple's app store due to use of `UIWebView`. Is this still a problem?_
+If you are starting a fresh project with ViroReact, consider cloning one of our starter kits:
 
-  Reliance on `UIWebView` has been removed from the project, so you should not have this problem if using the `@viro-community/react-viro` package.
+- [Expo + TypeScript](https://github.com/NativeVision/expo-starter-kit-typescript)
+- [React Native](https://github.com/NativeVision/starter-kit)
+- [Expo + JavaScript](https://github.com/NativeVision/expo-starter-kit)
 
 # Examples
 

@@ -25,6 +25,7 @@ import {
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
+import { ViroTelemetry } from "./Telemetry";
 const Viro3DSceneNavigatorModule = NativeModules.VRT3DSceneNavigatorModule;
 
 var mathRandomOffset = 0;
@@ -136,32 +137,16 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
     this.addToHistory(sceneKey);
   };
 
-  sceneNavigator = {
-    push: this.push,
-    pop: this.pop,
-    popN: this.popN,
-    jump: this.jump,
-    replace: this.replace,
-    // exitViro: this.exitViro, TODO: this was unused
-    recenterTracking: this._recenterTracking,
-    project: this._project,
-    unproject: this._unproject,
-    viroAppProps: {} as any,
-  };
-
   /**
    * Called from native when either the user physically decides to exit vr (hits
    * the "X" buton).
    */
   _onExitViro(_event: ViroExitViroEvent) {
-    console.log("[Viro3DSceneNavigator]._onExitViro", this);
-    console.log("[Viro3DSceneNavigator]._onExitViro", this.props);
     this.props.onExitViro && this.props.onExitViro();
   }
 
   constructor(props: Props) {
     super(props);
-    console.log("[Viro3DSceneNavigator].constructor", props);
     let initialSceneTag = props.initialSceneKey;
     if (initialSceneTag == null) {
       initialSceneTag = this.getRandomTag();
@@ -354,8 +339,7 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
    * (counts equals 0), we then remove that scene from sceneDictionary.
    */
   decrementReferenceForLastNScenes(n: number) {
-    var sceneHistory = this.state.sceneHistory;
-    var sceneDictionary = this.state.sceneDictionary;
+    const { sceneHistory, sceneDictionary } = this.state;
 
     // Now update and release any reference counts
     for (var i = 1; i <= n; i++) {
@@ -477,6 +461,19 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
       point
     );
   }
+
+  sceneNavigator = {
+    push: this.push,
+    pop: this.pop,
+    popN: this.popN,
+    jump: this.jump,
+    replace: this.replace,
+    // exitViro: this.exitViro, TODO: this was unused
+    recenterTracking: this._recenterTracking,
+    project: this._project,
+    unproject: this._unproject,
+    viroAppProps: {} as any,
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

@@ -3,7 +3,7 @@
  * All rights reserved.
  *
  */
-
+import { ViroTelemetry } from "./components/Telemetry";
 import { ViroAnimations } from "./components/Animation/ViroAnimations";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";
@@ -61,6 +61,7 @@ import {
   polarToCartesian,
   polarToCartesianActual,
   isARSupportedOnDevice,
+  ViroARSupportResponse,
 } from "./components/Utilities/ViroUtils";
 import { ViroARCamera } from "./components/AR/ViroARCamera";
 import {
@@ -185,6 +186,7 @@ export {
   polarToCartesianActual,
   isARSupportedOnDevice,
   // Types
+  ViroARSupportResponse,
   ViroHoverEvent,
   ViroClickEvent,
   ViroClickStateEvent,

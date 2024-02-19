@@ -84,18 +84,6 @@ type Props = ViewProps & {
  * ViroVRSceneNavigator is used to transition between multiple scenes.
  */
 export class ViroVRSceneNavigator extends React.Component<Props, State> {
-  sceneNavigator = {
-    push: this.push,
-    pop: this.pop,
-    popN: this.popN,
-    jump: this.jump,
-    replace: this.replace,
-    // exitViro: this.exitViro, // not defined?
-    project: this._project,
-    unproject: this._unproject,
-    recenterTracking: this._recenterTracking,
-    viroAppProps: {} as any,
-  };
   _component: ViroNativeRef = null;
 
   /**
@@ -471,6 +459,19 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     }
     return views;
   }
+
+  sceneNavigator = {
+    push: this.push,
+    pop: this.pop,
+    popN: this.popN,
+    jump: this.jump,
+    replace: this.replace,
+    // exitViro: this.exitViro, // not defined?
+    project: this._project,
+    unproject: this._unproject,
+    recenterTracking: this._recenterTracking,
+    viroAppProps: {} as any,
+  };
 
   render() {
     const items = this._renderSceneStackItems();

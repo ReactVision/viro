@@ -28,4 +28,28 @@ export declare function polarToCartesian(polarcoords: number[]): number[];
  * phi - the yz-plane angle starting from y = 0 degrees
  */
 export declare function polarToCartesianActual(polarcoords: number[]): number[];
-export declare function isARSupportedOnDevice(notSupportedCallback: (result?: string | Error) => void, supportedCallback: (result?: string | Error) => void): void;
+export interface ViroiOSArSupportResponse {
+    isARSupported: boolean;
+}
+export type ViroAndroidArSupportResponse = 
+/**
+ * The device is <b>supported</b> by ARCore.
+ */
+"SUPPORTED"
+/**
+ * The device is <b>unsupported</b> by ARCore.
+ */
+ | "UNSUPPORTED"
+/**
+ * ARCore support is <b>unknown</b> for this device.
+ */
+ | "UNKNOWN"
+/**
+ * ARCore is still checking for support. This is a temporary state, and the application should
+ * check again soon.
+ */
+ | "TRANSIENT";
+export interface ViroARSupportResponse {
+    isARSupported: boolean;
+}
+export declare function isARSupportedOnDevice(): Promise<ViroARSupportResponse>;

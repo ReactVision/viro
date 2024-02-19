@@ -43,18 +43,6 @@ var mathRandomOffset = 0;
  * ViroVRSceneNavigator is used to transition between multiple scenes.
  */
 class ViroVRSceneNavigator extends React.Component {
-    sceneNavigator = {
-        push: this.push,
-        pop: this.pop,
-        popN: this.popN,
-        jump: this.jump,
-        replace: this.replace,
-        // exitViro: this.exitViro, // not defined?
-        project: this._project,
-        unproject: this._unproject,
-        recenterTracking: this._recenterTracking,
-        viroAppProps: {},
-    };
     _component = null;
     /**
      * Called from native when either the user physically decides to exit vr (hits
@@ -358,6 +346,18 @@ class ViroVRSceneNavigator extends React.Component {
         }
         return views;
     }
+    sceneNavigator = {
+        push: this.push,
+        pop: this.pop,
+        popN: this.popN,
+        jump: this.jump,
+        replace: this.replace,
+        // exitViro: this.exitViro, // not defined?
+        project: this._project,
+        unproject: this._unproject,
+        recenterTracking: this._recenterTracking,
+        viroAppProps: {},
+    };
     render() {
         const items = this._renderSceneStackItems();
         // Uncomment this line to check for misnamed props

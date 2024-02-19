@@ -1,7 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARTrackingReasonConstants = exports.Viro3DSceneNavigator = exports.ViroVRSceneNavigator = exports.ViroVideo = exports.ViroText = exports.ViroSpotLight = exports.ViroSpinner = exports.ViroSphere = exports.ViroSpatialSound = exports.ViroSoundField = exports.ViroSound = exports.ViroAnimatedComponent = exports.ViroAmbientLight = exports.ViroAnimatedImage = exports.Viro360Video = exports.Viro360Image = exports.Viro3DObject = exports.ViroAnimations = exports.ViroSkyBox = exports.ViroSceneNavigator = exports.ViroSurface = exports.ViroScene = exports.ViroQuad = exports.ViroPortalScene = exports.ViroPortal = exports.ViroPolyline = exports.ViroPolygon = exports.ViroParticleEmitter = exports.ViroOrbitCamera = exports.ViroOmniLight = exports.ViroNode = exports.ViroMaterialVideo = exports.ViroARCamera = exports.ViroMaterials = exports.ViroImage = exports.ViroLightingEnvironment = exports.ViroGeometry = exports.ViroFlexView = exports.ViroDirectionalLight = exports.ViroController = exports.ViroCamera = exports.ViroButton = exports.ViroBox = exports.ViroARSceneNavigator = exports.ViroARScene = exports.ViroARPlaneSelector = exports.ViroARPlane = exports.ViroARTrackingTargets = exports.ViroARObjectMarker = exports.ViroARImageMarker = void 0;
-exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = void 0;
+exports.VIRO_VERSION = exports.ViroTelemetry = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = void 0;
+/**
+ * Copyright (c) 2016-present, Viro Media, Inc.
+ * All rights reserved.
+ *
+ */
+const Telemetry_1 = require("./components/Telemetry");
+Object.defineProperty(exports, "ViroTelemetry", { enumerable: true, get: function () { return Telemetry_1.ViroTelemetry; } });
 const ViroAnimations_1 = require("./components/Animation/ViroAnimations");
 Object.defineProperty(exports, "ViroAnimations", { enumerable: true, get: function () { return ViroAnimations_1.ViroAnimations; } });
 const Viro3DObject_1 = require("./components/Viro3DObject");
@@ -112,3 +119,5 @@ const ViroSurface_1 = require("./components/ViroSurface");
 Object.defineProperty(exports, "ViroSurface", { enumerable: true, get: function () { return ViroSurface_1.ViroSurface; } });
 const ViroSceneNavigator_1 = require("./components/ViroSceneNavigator");
 Object.defineProperty(exports, "ViroSceneNavigator", { enumerable: true, get: function () { return ViroSceneNavigator_1.ViroSceneNavigator; } });
+const ViroVersion_1 = require("./components/Utilities/ViroVersion");
+Object.defineProperty(exports, "VIRO_VERSION", { enumerable: true, get: function () { return ViroVersion_1.VIRO_VERSION; } });

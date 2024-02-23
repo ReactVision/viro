@@ -7,8 +7,8 @@ exports.VIRO_VERSION = exports.ViroTelemetry = exports.ViroRotateStateTypes = ex
  * All rights reserved.
  *
  */
-const Telemetry_1 = require("./components/Telemetry");
-Object.defineProperty(exports, "ViroTelemetry", { enumerable: true, get: function () { return Telemetry_1.ViroTelemetry; } });
+const ViroTelemetry_1 = require("./components/Telemetry/ViroTelemetry");
+Object.defineProperty(exports, "ViroTelemetry", { enumerable: true, get: function () { return ViroTelemetry_1.ViroTelemetry; } });
 const ViroAnimations_1 = require("./components/Animation/ViroAnimations");
 Object.defineProperty(exports, "ViroAnimations", { enumerable: true, get: function () { return ViroAnimations_1.ViroAnimations; } });
 const Viro3DObject_1 = require("./components/Viro3DObject");

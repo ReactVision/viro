@@ -50,14 +50,6 @@ export class ViroTelemetry {
   }
 
   private static getAnonymousMeta() {
-    let isExpo = false;
-    try {
-      const myModule = require("expo");
-      isExpo = true;
-    } catch (err) {
-      // send error to log file
-    }
-
     try {
       const traits = {
         // expo

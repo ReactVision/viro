@@ -27,7 +27,7 @@ import {
   ViroScene,
   ViroSceneDictionary,
 } from "../Types/ViroUtils";
-import { ViroTelemetry } from "../Telemetry";
+import { ViroTelemetry } from "../Telemetry/ViroTelemetry";
 
 const ViroARSceneNavigatorModule = NativeModules.VRTARSceneNavigatorModule;
 

@@ -37,7 +37,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
-const Telemetry_1 = require("../Telemetry");
+const ViroTelemetry_1 = require("../Telemetry/ViroTelemetry");
 const ViroARSceneNavigatorModule = react_native_1.NativeModules.VRTARSceneNavigatorModule;
 let mathRandomOffset = 0;
 /**
@@ -47,7 +47,7 @@ class ViroARSceneNavigator extends React.Component {
     _component = null;
     constructor(props) {
         super(props);
-        Telemetry_1.ViroTelemetry.recordTelemetry("INIT", { ar: true });
+        ViroTelemetry_1.ViroTelemetry.recordTelemetry("INIT", { ar: true });
         let initialSceneTag = this.props.initialSceneKey;
         if (initialSceneTag == null) {
             initialSceneTag = this.getRandomTag();

@@ -16,10 +16,10 @@ type Props = ViroCommonProps & {
     postProcessEffects?: string[];
 };
 export declare class ViroScene extends ViroBase<Props> {
-    _onPlatformUpdate(event: NativeSyntheticEvent<ViroPlatformEvent>): void;
-    _onCameraTransformUpdate(event: NativeSyntheticEvent<ViroCameraTransformEvent>): void;
-    findCollisionsWithRayAsync(from: Viro3DPoint, to: Viro3DPoint, closest: any, viroTag: string): Promise<any>;
-    findCollisionsWithShapeAsync(from: Viro3DPoint, to: Viro3DPoint, shapeString: string, shapeParam: any, viroTag: string): Promise<any>;
+    _onPlatformUpdate: (event: NativeSyntheticEvent<ViroPlatformEvent>) => void;
+    _onCameraTransformUpdate: (event: NativeSyntheticEvent<ViroCameraTransformEvent>) => void;
+    findCollisionsWithRayAsync: (from: Viro3DPoint, to: Viro3DPoint, closest: any, viroTag: string) => Promise<any>;
+    findCollisionsWithShapeAsync: (from: Viro3DPoint, to: Viro3DPoint, shapeString: string, shapeParam: any, viroTag: string) => Promise<any>;
     /**
      * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
      * @deprecated

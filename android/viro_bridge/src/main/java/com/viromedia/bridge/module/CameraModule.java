@@ -49,6 +49,12 @@ public class CameraModule extends ReactContextBaseJavaModule {
         return "VRTCameraModule";
     }
 
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
+
     @ReactMethod
     public void getCameraOrientation(final int sceneTag, final Promise promise) {
         UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);

@@ -56,7 +56,11 @@ public class SceneModule extends ReactContextBaseJavaModule {
     public String getName() {
         return "VRTSceneModule";
     }
-
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
     @ReactMethod
     public void findCollisionsWithRayAsync(final int viewTag, final ReadableArray fromPos, final ReadableArray toPos,
                                final boolean closest, final String tag, final Promise promise) {

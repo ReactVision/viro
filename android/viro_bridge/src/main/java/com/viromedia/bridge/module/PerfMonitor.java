@@ -35,7 +35,11 @@ import java.lang.ref.WeakReference;
 
 @ReactModule(name = "VRTPerfMonitor")
 public class PerfMonitor extends ReactContextBaseJavaModule {
-
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
     private static class PerfOptionHandler implements DevOptionHandler {
 
         private WeakReference<PerfMonitor> mPerfMonitor;

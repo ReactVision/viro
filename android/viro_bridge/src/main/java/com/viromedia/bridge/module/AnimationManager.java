@@ -86,6 +86,12 @@ public class AnimationManager extends ReactContextBaseJavaModule {
         sParsedAnimations = new HashMap<>();
     }
 
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
+
     @Override
     public String getName() {
         return "VRTAnimationManager";

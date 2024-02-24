@@ -48,7 +48,7 @@ type Props = ViroCommonProps & {
 };
 
 export class ViroScene extends ViroBase<Props> {
-  _onPlatformUpdate(event: NativeSyntheticEvent<ViroPlatformEvent>) {
+  _onPlatformUpdate = (event: NativeSyntheticEvent<ViroPlatformEvent>) => {
     /**
      * ##### DEPRECATION WARNING - 'vrPlatform' is deprecated in favor of 'platform'! Support
      * for 'vrPlatform' may be removed in the future.
@@ -57,12 +57,12 @@ export class ViroScene extends ViroBase<Props> {
       event.nativeEvent.platformInfoViro.platform;
     this.props.onPlatformUpdate &&
       this.props.onPlatformUpdate(event.nativeEvent.platformInfoViro);
-  }
+  };
 
-  _onCameraTransformUpdate(
+  _onCameraTransformUpdate = (
     event: NativeSyntheticEvent<ViroCameraTransformEvent>
-  ) {
-    var cameraTransform = {
+  ) => {
+    const cameraTransform = {
       // ** DEPRECATION WARNING ** The cameraTransform key will be deprecated in a future release,
       cameraTransform: {
         position: [
@@ -109,15 +109,15 @@ export class ViroScene extends ViroBase<Props> {
     };
     this.props.onCameraTransformUpdate &&
       this.props.onCameraTransformUpdate(cameraTransform);
-  }
+  };
 
   // TODO: types for closest
-  async findCollisionsWithRayAsync(
+  findCollisionsWithRayAsync = async (
     from: Viro3DPoint,
     to: Viro3DPoint,
     closest: any,
     viroTag: string
-  ) {
+  ) => {
     return await NativeModules.VRTSceneModule.findCollisionsWithRayAsync(
       findNodeHandle(this),
       from,
@@ -125,15 +125,15 @@ export class ViroScene extends ViroBase<Props> {
       closest,
       viroTag
     );
-  }
+  };
 
-  async findCollisionsWithShapeAsync(
+  findCollisionsWithShapeAsync = async (
     from: Viro3DPoint,
     to: Viro3DPoint,
     shapeString: string,
     shapeParam: any,
     viroTag: string
-  ) {
+  ) => {
     return await NativeModules.VRTSceneModule.findCollisionsWithShapeAsync(
       findNodeHandle(this),
       from,
@@ -142,7 +142,7 @@ export class ViroScene extends ViroBase<Props> {
       shapeParam,
       viroTag
     );
-  }
+  };
 
   /**
    * ##### DEPRECATION WARNING - this prop may be removed in future releases #####
@@ -174,7 +174,9 @@ export class ViroScene extends ViroBase<Props> {
   render() {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroScene", this.props);
-
+    console.log("[ViroScene].render");
+    console.log("[ViroScene].render", this);
+    console.log("[ViroScene].render", this.props);
     let timeToFuse = undefined;
     if (
       this.props.onFuse != undefined &&
@@ -187,6 +189,10 @@ export class ViroScene extends ViroBase<Props> {
       <ViroSceneContext.Provider
         value={{
           cameraDidMount: (camera: ViroCamera) => {
+            console.log(
+              "[ViroScene::ViroSceneContext.Provider.cameraDidMount]",
+              camera
+            );
             if (camera.props.active) {
               NativeModules.VRTCameraModule.setSceneCamera(
                 findNodeHandle(this),
@@ -195,6 +201,10 @@ export class ViroScene extends ViroBase<Props> {
             }
           },
           cameraWillUnmount: (camera: ViroCamera) => {
+            console.log(
+              "[ViroScene::ViroSceneContext.Provider.cameraWillUnmount]",
+              camera
+            );
             if (camera.props.active) {
               NativeModules.VRTCameraModule.removeSceneCamera(
                 findNodeHandle(this),
@@ -203,6 +213,10 @@ export class ViroScene extends ViroBase<Props> {
             }
           },
           cameraDidUpdate: (camera: ViroCamera, active: boolean) => {
+            console.log(
+              "[ViroScene::ViroSceneContext.Provider.cameraDidUpdate]",
+              camera
+            );
             if (active) {
               NativeModules.VRTCameraModule.setSceneCamera(
                 findNodeHandle(this),

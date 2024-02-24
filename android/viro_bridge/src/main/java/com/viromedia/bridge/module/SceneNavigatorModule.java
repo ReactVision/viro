@@ -50,6 +50,12 @@ public class SceneNavigatorModule extends ReactContextBaseJavaModule {
         return "VRTSceneNavigatorModule";
     }
 
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
+
     @ReactMethod
     public void requestExitVr(final int sceneNavTag) {
         UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);

@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.viromedia.virobridge">
+    package="com.viromedia.bridge">
+    <meta-data android:name="com.google.ar.core" android:value="optional" />
 
     <application android:label="@string/app_name"
         android:supportsRtl="true">

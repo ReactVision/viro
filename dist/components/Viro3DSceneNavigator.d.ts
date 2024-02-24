@@ -62,13 +62,6 @@ type State = {
 export declare class Viro3DSceneNavigator extends React.Component<Props, State> {
     _component: ViroNativeRef;
     /**
-     * Called from native when either the user physically decides to exit vr (hits
-     * the "X" buton).
-     */
-    _onExitViro(_event: ViroExitViroEvent): void;
-    constructor(props: Props);
-    getRandomTag(): string;
-    /**
      * Pushes a scene and reference it with the given key if provided.
      * If the scene has been previously pushed, we simply show the scene again.
      * Note that the back history order of which scenes were pushed is preserved.
@@ -82,7 +75,14 @@ export declare class Viro3DSceneNavigator extends React.Component<Props, State> 
      *
      * @todo: use Typescript function overloading rather than this inaccurate solution
      */
-    push(param1?: ViroScene | string, param2?: ViroScene): void;
+    push: (param1?: ViroScene | string, param2?: ViroScene) => void;
+    /**
+     * Called from native when either the user physically decides to exit vr (hits
+     * the "X" buton).
+     */
+    _onExitViro(_event: ViroExitViroEvent): void;
+    constructor(props: Props);
+    getRandomTag(): string;
     /**
      * Replace the top scene in the stack with the given scene. The remainder of the back
      * history is kept in the same order as before.

@@ -25,6 +25,7 @@ package com.viromedia.bridge.utility;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.util.Log;
 
 import com.facebook.common.references.CloseableReference;
 import com.facebook.datasource.BaseDataSubscriber;
@@ -33,7 +34,7 @@ import com.facebook.datasource.DataSubscriber;
 import com.facebook.drawee.backends.pipeline.Fresco;
 import com.facebook.imagepipeline.core.DefaultExecutorSupplier;
 import com.facebook.imagepipeline.core.ImagePipeline;
-import com.facebook.imagepipeline.image.CloseableBitmap;
+import com.facebook.imagepipeline.image.BaseCloseableStaticBitmap;
 import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.request.ImageRequestBuilder;
@@ -151,8 +152,9 @@ public class ImageDownloader {
                         // data contained within.
                         CloseableReference<CloseableImage> result = dataSource.getResult();
                         CloseableImage image = result.get();
-                        if (image instanceof CloseableBitmap) {
-                            Bitmap bitmap = ((CloseableBitmap) image).getUnderlyingBitmap();
+                        Log.d("[ImageDownloader.onNewResultImpl]", image.getClass().toString());
+                        if (image instanceof BaseCloseableStaticBitmap) {
+                            Bitmap bitmap = ((BaseCloseableStaticBitmap) image).getUnderlyingBitmap();
 
                             if (listener != null) {
                                 listener.completed(bitmap.copy(mConfig, true));

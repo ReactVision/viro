@@ -84,6 +84,12 @@ public class MaterialManager extends ReactContextBaseJavaModule {
         sMaterialChangeListeners = new HashMap<String, WeakReference<MaterialChangeListener>>();
     }
 
+    // https://stackoverflow.com/a/44879687
+    @Override
+    public boolean canOverrideExistingModule() {
+        return true;
+    }
+
     @Override
     public String getName() {
         return "VRTMaterialManager";

@@ -1,8 +1,14 @@
 # CHANGELOG
 
+## v2.41.0 - 24 February 2024
+
+- Bump ip from 1.1.8 to 1.1.9 [`#270`](https://github.com/NativeVision/viro/pull/270)
+- chore: Update android [`#261`](https://github.com/NativeVision/viro/pull/261)
+
 ## v2.40.1 - 19 February 2024
 
 - fix: Add import/export of VIRO_VERSION [`#268`](https://github.com/NativeVision/viro/pull/268)
+- chore: release v2.40.1 [`44a6900`](https://github.com/NativeVision/viro/commit/44a690053703ae0cfe6aae3b1c2586b18f57e519)
 
 ## v2.24.0 - 16 February 2024
 

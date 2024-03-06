@@ -100,7 +100,6 @@ export function isARSupportedOnDevice() {
     if (Platform.OS == "ios") {
       NativeModules.VRTARUtils.isARSupported(
         (error: Error, result: ViroiOSArSupportResponse) => {
-          console.log("[isARSupportedOnDevice]: iOS", { error, result });
           if (error) reject(error);
           if (result) resolve(result);
           reject("AR Support Unknown.");
@@ -109,7 +108,6 @@ export function isARSupportedOnDevice() {
     } else {
       NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice(
         (result: ViroAndroidArSupportResponse) => {
-          console.log("[isARSupportedOnDevice]: Android", { result });
           if (result == "SUPPORTED") resolve({ isARSupported: true });
           if (result) reject(new Error(result));
           reject("AR Support Unknown.");

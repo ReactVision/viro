@@ -1,9 +1,16 @@
 # CHANGELOG
 
-## v2.41.0 - 24 February 2024
+## v2.41.1 - 6 March 2024
+
+- fix(ViroBase): fix onClick not working for &lt;ViroText /&gt; components [`#277`](https://github.com/NativeVision/viro/pull/277)
+- fix(react): remove unnecessary debug logging [`#276`](https://github.com/NativeVision/viro/pull/276)
+- fix(ViroBase): fix onClick not working for &lt;ViroText /&gt; components (#277) [`#272`](https://github.com/NativeVision/viro/issues/272)
+
+## v2.41.0 - 23 February 2024
 
 - Bump ip from 1.1.8 to 1.1.9 [`#270`](https://github.com/NativeVision/viro/pull/270)
 - chore: Update android [`#261`](https://github.com/NativeVision/viro/pull/261)
+- chore: release v2.41.0 [`fefff31`](https://github.com/NativeVision/viro/commit/fefff31be858404ef83c81282d2322ff338e8157)
 
 ## v2.40.1 - 19 February 2024
 

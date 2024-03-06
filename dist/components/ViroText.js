@@ -44,9 +44,6 @@ const ViroBase_1 = require("./ViroBase");
  */
 class ViroText extends ViroBase_1.ViroBase {
     render() {
-        console.log("[ViroText].render");
-        console.log("[ViroText].render", this);
-        console.log("[ViroText].render", this.props);
         (0, ViroProps_1.checkMisnamedProps)("ViroText", this.props);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let materials = typeof this.props.materials === "string"

@@ -125,9 +125,6 @@ class ViroScene extends ViroBase_1.ViroBase {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroScene", this.props);
-        console.log("[ViroScene].render");
-        console.log("[ViroScene].render", this);
-        console.log("[ViroScene].render", this.props);
         let timeToFuse = undefined;
         if (this.props.onFuse != undefined &&
             typeof this.props.onFuse === "object") {
@@ -135,19 +132,16 @@ class ViroScene extends ViroBase_1.ViroBase {
         }
         return (<ViroSceneContext_1.ViroSceneContext.Provider value={{
                 cameraDidMount: (camera) => {
-                    console.log("[ViroScene::ViroSceneContext.Provider.cameraDidMount]", camera);
                     if (camera.props.active) {
                         react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                     }
                 },
                 cameraWillUnmount: (camera) => {
-                    console.log("[ViroScene::ViroSceneContext.Provider.cameraWillUnmount]", camera);
                     if (camera.props.active) {
                         react_native_1.NativeModules.VRTCameraModule.removeSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                     }
                 },
                 cameraDidUpdate: (camera, active) => {
-                    console.log("[ViroScene::ViroSceneContext.Provider.cameraDidUpdate]", camera);
                     if (active) {
                         react_native_1.NativeModules.VRTCameraModule.setSceneCamera((0, react_native_1.findNodeHandle)(this), (0, react_native_1.findNodeHandle)(camera));
                     }

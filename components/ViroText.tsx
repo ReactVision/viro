@@ -97,6 +97,9 @@ export class ViroText extends ViroBase<Props> {
         canFuse={this.props.onFuse != undefined}
         onHoverViro={this._onHover}
         onClickViro={this._onClickState}
+        // Fixes #272. this.props
+        // https://github.com/NativeVision/viro/issues/272
+        onClick={undefined}
         onTouchViro={this._onTouch}
         onScrollViro={this._onScroll}
         onSwipeViro={this._onSwipe}

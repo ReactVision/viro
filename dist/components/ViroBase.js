@@ -40,8 +40,8 @@ class ViroBase extends React.Component {
     _onClickState = (event) => {
         this.props.onClickState &&
             this.props.onClickState(event.nativeEvent.clickState, event.nativeEvent.position, event.nativeEvent.source);
-        let CLICKED = ViroEvents_1.ViroClickStateTypes.CLICKED; // Value representation of Clicked ClickState within EventDelegateJni.
-        if (event.nativeEvent.clickState == CLICKED) {
+        // Value representation of Clicked ClickState within EventDelegateJni.
+        if (event.nativeEvent.clickState == ViroEvents_1.ViroClickStateTypes.CLICKED) {
             this._onClick(event);
         }
     };

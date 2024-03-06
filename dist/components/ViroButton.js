@@ -89,7 +89,6 @@ class ViroButton extends React.Component {
         var hoverSource = this.props.hoverSource || this.props.gazeSource;
         var clickSource = this.props.clickSource || this.props.tapSource;
         let buttonScale = this.props.scale || [1, 1, 1];
-        console.log("BUTTON TYPE", this.state.buttonType);
         switch (this.state.buttonType) {
             case ViroButtonStateTypes.BTN_TYPE_HOVER:
                 hoverSrcVisible = visible && true;

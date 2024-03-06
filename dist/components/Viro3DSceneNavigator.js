@@ -59,8 +59,6 @@ class Viro3DSceneNavigator extends React.Component {
      * @todo: use Typescript function overloading rather than this inaccurate solution
      */
     push = (param1, param2) => {
-        console.log("[Viro3DSceneNavigator].push", this);
-        console.log("[Viro3DSceneNavigator].push", this.props);
         let sceneKey = undefined;
         let scene = undefined;
         if (typeof param1 == "string") {
@@ -362,7 +360,6 @@ class Viro3DSceneNavigator extends React.Component {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("Viro3DSceneNavigator", this.props);
-        console.log("[Viro3DSceneNavigator].render", this.props);
         const items = this._renderSceneStackItems();
         // update the sceneNavigator with the latest given props on every render
         this.sceneNavigator.viroAppProps = this.props.viroAppProps;
@@ -374,7 +371,6 @@ class Viro3DSceneNavigator extends React.Component {
         }
         const { viroAppProps = {}, // Make sure viroAppProps aren't null to save us having to always check
          } = this.props;
-        console.log("[Viro3DSceneNavigator].render end");
         return (<VRT3DSceneNavigator ref={(component) => {
                 this._component = component;
             }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} hasOnExitViroCallback={!!this.props.onExitViro} onExitViro={this._onExitViro}>

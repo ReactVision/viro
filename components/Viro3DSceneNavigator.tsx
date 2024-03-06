@@ -99,8 +99,6 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
    * @todo: use Typescript function overloading rather than this inaccurate solution
    */
   push = (param1?: ViroScene | string, param2?: ViroScene) => {
-    console.log("[Viro3DSceneNavigator].push", this);
-    console.log("[Viro3DSceneNavigator].push", this.props);
     let sceneKey = undefined;
     let scene = undefined;
     if (typeof param1 == "string") {
@@ -478,7 +476,6 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
   render() {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("Viro3DSceneNavigator", this.props);
-    console.log("[Viro3DSceneNavigator].render", this.props);
     const items = this._renderSceneStackItems();
 
     // update the sceneNavigator with the latest given props on every render
@@ -493,7 +490,6 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
     const {
       viroAppProps = {}, // Make sure viroAppProps aren't null to save us having to always check
     } = this.props;
-    console.log("[Viro3DSceneNavigator].render end");
     return (
       <VRT3DSceneNavigator
         ref={(component) => {

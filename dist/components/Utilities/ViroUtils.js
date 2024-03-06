@@ -66,7 +66,6 @@ function isARSupportedOnDevice() {
     return new Promise((resolve, reject) => {
         if (react_native_1.Platform.OS == "ios") {
             react_native_1.NativeModules.VRTARUtils.isARSupported((error, result) => {
-                console.log("[isARSupportedOnDevice]: iOS", { error, result });
                 if (error)
                     reject(error);
                 if (result)
@@ -76,7 +75,6 @@ function isARSupportedOnDevice() {
         }
         else {
             react_native_1.NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice((result) => {
-                console.log("[isARSupportedOnDevice]: Android", { result });
                 if (result == "SUPPORTED")
                     resolve({ isARSupported: true });
                 if (result)

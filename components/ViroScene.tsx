@@ -174,9 +174,6 @@ export class ViroScene extends ViroBase<Props> {
   render() {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroScene", this.props);
-    console.log("[ViroScene].render");
-    console.log("[ViroScene].render", this);
-    console.log("[ViroScene].render", this.props);
     let timeToFuse = undefined;
     if (
       this.props.onFuse != undefined &&
@@ -189,10 +186,6 @@ export class ViroScene extends ViroBase<Props> {
       <ViroSceneContext.Provider
         value={{
           cameraDidMount: (camera: ViroCamera) => {
-            console.log(
-              "[ViroScene::ViroSceneContext.Provider.cameraDidMount]",
-              camera
-            );
             if (camera.props.active) {
               NativeModules.VRTCameraModule.setSceneCamera(
                 findNodeHandle(this),
@@ -201,10 +194,6 @@ export class ViroScene extends ViroBase<Props> {
             }
           },
           cameraWillUnmount: (camera: ViroCamera) => {
-            console.log(
-              "[ViroScene::ViroSceneContext.Provider.cameraWillUnmount]",
-              camera
-            );
             if (camera.props.active) {
               NativeModules.VRTCameraModule.removeSceneCamera(
                 findNodeHandle(this),
@@ -213,10 +202,6 @@ export class ViroScene extends ViroBase<Props> {
             }
           },
           cameraDidUpdate: (camera: ViroCamera, active: boolean) => {
-            console.log(
-              "[ViroScene::ViroSceneContext.Provider.cameraDidUpdate]",
-              camera
-            );
             if (active) {
               NativeModules.VRTCameraModule.setSceneCamera(
                 findNodeHandle(this),

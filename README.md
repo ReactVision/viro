@@ -1,6 +1,6 @@
 <p align="center" style="background-color: #CCCCCC;">
   <a href="https://www.nativevision.xyz/">
-    <img src="../viro/public/icons/NVLogo.png">
+    <img src="./public/icons/NVLogo.png">
   </a>
 </p>
 

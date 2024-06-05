@@ -2,6 +2,7 @@
 import { ViroUVCoordinate } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 type Props = {
+    arShadowReceiver?: boolean;
     uvCoordinates?: ViroUVCoordinate[];
 };
 /**

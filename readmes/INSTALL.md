@@ -40,7 +40,7 @@ If you're unsure about which file to edit or where to put specified the lines, w
 
 ## Examples
 
-Please note that these examples are a bit old, the code targets an older version of viro before the NativeVision took over the project. They will be updated soon!
+Please note that these examples are a bit old, the code targets an older version of viro before the ReactVision took over the project. They will be updated soon!
 
 ## » [AR](https://viro-community.readme.io/docs/examples#ar-examples)
 

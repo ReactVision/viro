@@ -1,5 +1,5 @@
 {
-  "name": "@viro-community/react-viro",
+  "name": "@reactvision/react-viro",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,8 +8,8 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
-  "repository": "git@github.com:virocommunity/viro.git",
-  "description": "Official community version of react-viro",
+  "repository": "git@github.com:ReactVision/viro.git",
+  "description": "Maintained version of react-viro",
   "scripts": {
     "start": "echo 'I dont think you meant to run npm start here.'",
     "test": "jest",

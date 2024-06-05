@@ -5,7 +5,7 @@ const TEST_TEXT = "This is not the default text.";
 export const infoPlistDefinedTestPluginConfigs = [
   {
     config: [
-      "@viro-community/react-viro",
+      "@reactvision/react-viro",
       { ios: { photosPermission: TEST_TEXT } },
     ],
     afterInfoPlist: {
@@ -17,7 +17,7 @@ export const infoPlistDefinedTestPluginConfigs = [
   },
   {
     config: [
-      "@viro-community/react-viro",
+      "@reactvision/react-viro",
       { ios: { savePhotosPermission: TEST_TEXT } },
     ],
     afterInfoPlist: {
@@ -29,7 +29,7 @@ export const infoPlistDefinedTestPluginConfigs = [
   },
   {
     config: [
-      "@viro-community/react-viro",
+      "@reactvision/react-viro",
       { ios: { cameraUsagePermission: TEST_TEXT } },
     ],
     afterInfoPlist: {
@@ -41,7 +41,7 @@ export const infoPlistDefinedTestPluginConfigs = [
   },
   {
     config: [
-      "@viro-community/react-viro",
+      "@reactvision/react-viro",
       { ios: { microphoneUsagePermission: TEST_TEXT } },
     ],
     afterInfoPlist: {
@@ -53,7 +53,7 @@ export const infoPlistDefinedTestPluginConfigs = [
   },
   {
     config: [
-      "@viro-community/react-viro",
+      "@reactvision/react-viro",
       {
         ios: {
           microphoneUsagePermission: TEST_TEXT,

@@ -67,7 +67,7 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
 
         const viroPlugin = config?.plugins?.find(
           (plugin) =>
-            Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
+            Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
         );
 
         if (Array.isArray(viroPlugin)) {
@@ -230,10 +230,10 @@ const withViroSettingsGradle = (config: ExpoConfig) =>
   withSettingsGradle(config, async (config) => {
     config.modResults.contents += `
 include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
-project(':arcore_client').projectDir = new File('../node_modules/@viro-community/react-viro/android/arcore_client')
-project(':gvr_common').projectDir = new File('../node_modules/@viro-community/react-viro/android/gvr_common')
-project(':viro_renderer').projectDir = new File('../node_modules/@viro-community/react-viro/android/viro_renderer')
-project(':react_viro').projectDir = new File('../node_modules/@viro-community/react-viro/android/react_viro')
+project(':arcore_client').projectDir = new File('../node_modules/@reactvision/react-viro/android/arcore_client')
+project(':gvr_common').projectDir = new File('../node_modules/@reactvision/react-viro/android/gvr_common')
+project(':viro_renderer').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_renderer')
+project(':react_viro').projectDir = new File('../node_modules/@reactvision/react-viro/android/react_viro')
     `;
     return config;
   });

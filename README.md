@@ -4,8 +4,8 @@
   </a>
 </p>
 
-[![npm version](https://img.shields.io/npm/v/@viro-community/react-viro)](https://www.npmjs.com/package/@viro-community/react-viro)
-[![downloads](https://img.shields.io/npm/dm/@viro-community/react-viro?color=purple)](https://www.npmjs.com/package/@viro-community/react-viro)
+[![npm version](https://img.shields.io/npm/v/@reactvision/react-viro)](https://www.npmjs.com/package/@reactvision/react-viro)
+[![downloads](https://img.shields.io/npm/dm/@reactvision/react-viro?color=purple)](https://www.npmjs.com/package/@reactvision/react-viro)
 [![Discord](https://img.shields.io/discord/774471080713781259?label=Discord)](https://discord.gg/H3ksm5NhzT)
 
 # ViroReact

@@ -8,7 +8,10 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
-  "repository": "git@github.com:ReactVision/viro.git",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/ReactVision/viro.git"
+  },
   "description": "Maintained version of react-viro",
   "scripts": {
     "start": "echo 'I dont think you meant to run npm start here.'",
@@ -66,5 +69,10 @@
     "release-it": "^17.1.1",
     "ts-node": "^10.9.2",
     "typescript": "^4.6.3"
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/ReactVision/viro/issues"
+  },
+  "homepage": "https://github.com/ReactVision/viro#readme",
+  "author": ""
 }

@@ -9,13 +9,13 @@ The steps below are for manually installing and linking the library to an existi
 #### NPM
 
 ```console
-$ npm install --save @viro-community/react-viro
+$ npm install --save @reactvision/react-viro
 ```
 
 #### Yarn
 
 ```console
-$ yarn add @viro-community/react-viro
+$ yarn add @reactvision/react-viro
 ```
 
 ## » [General Instructions](https://viro-community.readme.io/docs/installation-instructions#installation-instructions)

@@ -1,10 +1,10 @@
 import { DEFAULTS } from "../plugins/withViro";
 
 export const pluginConfigs = [
-  "@viro-community/react-viro",
-  ["@viro-community/react-viro", { ios: {} }],
-  ["@viro-community/react-viro", { android: { xRMode: ["GVR"] } }],
-  ["@viro-community/react-viro", { android: { xRMode: ["GVR"] }, ios: {} }],
+  "@reactvision/react-viro",
+  ["@reactvision/react-viro", { ios: {} }],
+  ["@reactvision/react-viro", { android: { xRMode: ["GVR"] } }],
+  ["@reactvision/react-viro", { android: { xRMode: ["GVR"] }, ios: {} }],
 ];
 
 export const noInfoPlistDefinitionsAppConfigBefore: any = {

@@ -19,8 +19,8 @@ const withViroPods = (config: ExpoConfig) => {
 
       fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
         data = insertLinesHelper(
-          `  pod 'ViroReact', :path => '../node_modules/@viro-community/react-viro/ios'\n` +
-            `  pod 'ViroKit', :path => '../node_modules/@viro-community/react-viro/ios/dist/ViroRenderer/'`,
+          `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
+            `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`,
           "post_install do |installer|",
           data,
           -1
@@ -80,7 +80,7 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
   if (Array.isArray(config.plugins)) {
     const pluginConfig = config?.plugins?.find(
       (plugin) =>
-        Array.isArray(plugin) && plugin[0] === "@viro-community/react-viro"
+        Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
     );
     if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
       const config = pluginConfig[1] as ViroConfigurationOptions;

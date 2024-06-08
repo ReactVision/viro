@@ -100,7 +100,7 @@ export class ViroText extends ViroBase<Props> {
         // Fixes #272. for some reason, onClick was making it
         // to the native code. Other incorrect props don't make it
         // to the native code.
-        // https://github.com/NativeVision/viro/issues/272
+        // https://github.com/ReactVision/viro/issues/272
         onClick={undefined}
         onTouchViro={this._onTouch}
         onScrollViro={this._onScroll}

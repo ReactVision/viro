@@ -11,7 +11,11 @@
 
 "use strict";
 
-import { ViroARPlaneSizes, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
+import {
+  ViroARPlaneSizes,
+  ViroClickStateEvent,
+  ViroPlaneUpdatedMap,
+} from "../Types/ViroEvents";
 import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
 import * as React from "react";
 import { ViroMaterials } from "../Material/ViroMaterials";
@@ -65,9 +69,9 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
 
   _getARPlanes() {
     if (this.state.selectedSurface == -1) {
-      let arPlanes = [];
+      let arPlanes: JSX.Element[] = [];
       let numPlanes = this.props.maxPlanes || _maxPlanes;
-      for (var i = 0; i < numPlanes; i++) {
+      for (let i = 0; i < numPlanes; i++) {
         let foundARPlane = this.state.foundARPlanes[i];
         let surfaceWidth = foundARPlane ? foundARPlane.width : 0;
         let surfaceHeight = foundARPlane ? foundARPlane.height : 0;
@@ -82,7 +86,9 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
           >
             <ViroQuad
               materials={"ViroARPlaneSelector_Translucent"}
-              onClick={this._getOnClickSurface(i)}
+              onClickState={(clickState, position, source) =>
+                this._getOnClickSurface(i, { clickState, position, source })
+              }
               position={surfacePosition}
               width={surfaceWidth}
               height={surfaceHeight}
@@ -102,17 +108,20 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
     }
   }
 
-  _getOnClickSurface = (index: number) => {
-    return () => {
-      this.setState({ selectedSurface: index });
-      this._onPlaneSelected(this.state.foundARPlanes[index]);
-    };
+  _getOnClickSurface = (index: number, event: ViroClickStateEvent) => {
+    if (event.clickState < 3) {
+      return;
+    }
+    this.setState({ selectedSurface: index });
+    this._onPlaneSelected(this.state.foundARPlanes[index]);
   };
 
   _onARPlaneUpdated = (index: number) => {
     return (updateMap: ViroPlaneUpdatedMap) => {
-      this.state.foundARPlanes[index] = updateMap;
+      let newPlanes = [...this.state.foundARPlanes];
+      newPlanes[index] = updateMap;
       this.setState({
+        foundARPlanes: newPlanes,
         arPlaneSizes: this.state.arPlaneSizes,
       });
     };

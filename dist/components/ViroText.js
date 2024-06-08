@@ -77,7 +77,7 @@ class ViroText extends ViroBase_1.ViroBase {
         // Fixes #272. for some reason, onClick was making it
         // to the native code. Other incorrect props don't make it
         // to the native code.
-        // https://github.com/NativeVision/viro/issues/272
+        // https://github.com/ReactVision/viro/issues/272
         onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onFuseViro={this._onFuse} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} materials={materials} transformBehaviors={transformBehaviors} outerStroke={outerStroke} canCollide={this.props.onCollision != undefined} onCollisionViro={this._onCollision} timeToFuse={timeToFuse}/>);
     }
 }

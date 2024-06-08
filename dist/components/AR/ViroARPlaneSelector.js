@@ -62,13 +62,13 @@ class ViroARPlaneSelector extends React.Component {
         if (this.state.selectedSurface == -1) {
             let arPlanes = [];
             let numPlanes = this.props.maxPlanes || _maxPlanes;
-            for (var i = 0; i < numPlanes; i++) {
+            for (let i = 0; i < numPlanes; i++) {
                 let foundARPlane = this.state.foundARPlanes[i];
                 let surfaceWidth = foundARPlane ? foundARPlane.width : 0;
                 let surfaceHeight = foundARPlane ? foundARPlane.height : 0;
                 let surfacePosition = foundARPlane ? foundARPlane.center : [0, 0, 0];
                 arPlanes.push(<ViroARPlane_1.ViroARPlane key={_planePrefix + i} minWidth={this.props.minWidth} minHeight={this.props.minHeight} alignment={this.props.alignment} onAnchorUpdated={this._onARPlaneUpdated(i)}>
-            <ViroQuad_1.ViroQuad materials={"ViroARPlaneSelector_Translucent"} onClick={this._getOnClickSurface(i)} position={surfacePosition} width={surfaceWidth} height={surfaceHeight} rotation={[-90, 0, 0]}/>
+            <ViroQuad_1.ViroQuad materials={"ViroARPlaneSelector_Translucent"} onClickState={(clickState, position, source) => this._getOnClickSurface(i, { clickState, position, source })} position={surfacePosition} width={surfaceWidth} height={surfaceHeight} rotation={[-90, 0, 0]}/>
           </ViroARPlane_1.ViroARPlane>);
             }
             return arPlanes;
@@ -77,16 +77,19 @@ class ViroARPlaneSelector extends React.Component {
             return (<ViroARPlane_1.ViroARPlane key={_planePrefix + this.state.selectedSurface} {...this.props}></ViroARPlane_1.ViroARPlane>);
         }
     }
-    _getOnClickSurface = (index) => {
-        return () => {
-            this.setState({ selectedSurface: index });
-            this._onPlaneSelected(this.state.foundARPlanes[index]);
-        };
+    _getOnClickSurface = (index, event) => {
+        if (event.clickState < 3) {
+            return;
+        }
+        this.setState({ selectedSurface: index });
+        this._onPlaneSelected(this.state.foundARPlanes[index]);
     };
     _onARPlaneUpdated = (index) => {
         return (updateMap) => {
-            this.state.foundARPlanes[index] = updateMap;
+            let newPlanes = [...this.state.foundARPlanes];
+            newPlanes[index] = updateMap;
             this.setState({
+                foundARPlanes: newPlanes,
                 arPlaneSizes: this.state.arPlaneSizes,
             });
         };

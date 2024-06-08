@@ -8,7 +8,7 @@
  *
  * @providesModule ViroARPlaneSelector
  */
-import { ViroARPlaneSizes, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
+import { ViroARPlaneSizes, ViroClickStateEvent, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
 import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
 import * as React from "react";
 import { ViroCommonProps, ViroObjectProps } from "./ViroCommonProps";
@@ -38,7 +38,7 @@ export declare class ViroARPlaneSelector extends React.Component<Props, State> {
     };
     render(): JSX.Element;
     _getARPlanes(): JSX.Element | JSX.Element[];
-    _getOnClickSurface: (index: number) => () => void;
+    _getOnClickSurface: (index: number, event: ViroClickStateEvent) => void;
     _onARPlaneUpdated: (index: number) => (updateMap: ViroPlaneUpdatedMap) => void;
     _onPlaneSelected: (updateMap: ViroPlaneUpdatedMap) => void;
     reset: () => void;

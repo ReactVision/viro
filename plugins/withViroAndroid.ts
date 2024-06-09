@@ -204,7 +204,10 @@ const withViroAppBuildGradle = (config: ExpoConfig) =>
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
     implementation project(path: ':viro_renderer')
-    implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    implementation 'androidx.media3:media3-exoplayer:1.1.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.1.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.1.1'
+    implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.1.1'
     implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
     // ========================================================================`
     );
@@ -218,7 +221,10 @@ const withViroAppBuildGradle = (config: ExpoConfig) =>
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
     implementation project(path: ':viro_renderer')
-    implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    implementation 'androidx.media3:media3-exoplayer:1.1.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.1.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.1.1'
+    implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.1.1'
     implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
     // ========================================================================
     `

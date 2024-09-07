@@ -332,18 +332,45 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
         ReactActivity reactActivity = (ReactActivity) activity;
         if (audioAndRecordingPerm){
-            reactActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.RECORD_AUDIO}, PERMISSION_REQ_CODE_AUDIO, listener);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                reactActivity.requestPermissions(new String[]{
+                        Manifest.permission.READ_MEDIA_IMAGES,
+                        Manifest.permission.READ_MEDIA_AUDIO,
+                        Manifest.permission.READ_MEDIA_VIDEO,
+                        Manifest.permission.RECORD_AUDIO
+                }, PERMISSION_REQ_CODE_AUDIO, listener);
+            } else {
+                reactActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.RECORD_AUDIO}, PERMISSION_REQ_CODE_AUDIO, listener);
+            }
         } else {
-            reactActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    PERMISSION_REQ_CODE_STORAGE, listener);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                reactActivity.requestPermissions(new String[]{
+                        Manifest.permission.READ_MEDIA_IMAGES,
+                        Manifest.permission.READ_MEDIA_AUDIO,
+                        Manifest.permission.READ_MEDIA_VIDEO,
+                        Manifest.permission.RECORD_AUDIO
+                }, PERMISSION_REQ_CODE_AUDIO, listener);
+            } else {
+                reactActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        PERMISSION_REQ_CODE_STORAGE, listener);
+            }
         }
     }
 
     private static boolean hasAudioAndRecordingPermissions(Context context) {
-        boolean hasRecordPermissions = ContextCompat.checkSelfPermission(context, "android.permission.RECORD_AUDIO") == 0;
-        boolean hasExternalStoragePerm = ContextCompat.checkSelfPermission(context, "android.permission.WRITE_EXTERNAL_STORAGE") == 0;
-        return hasRecordPermissions && hasExternalStoragePerm;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            boolean hasReadMediaImagesPermissions = ContextCompat.checkSelfPermission(context, "android.permission.READ_MEDIA_IMAGES") == 0;
+            boolean hasReadMediaAudioPermissions = ContextCompat.checkSelfPermission(context, "android.permission.READ_MEDIA_AUDIO") == 0;
+            boolean hasReadMediaVideoPermissions = ContextCompat.checkSelfPermission(context, "android.permission.READ_MEDIA_VIDEO") == 0;
+
+            return hasReadMediaImagesPermissions && hasReadMediaAudioPermissions && hasReadMediaVideoPermissions;
+        } else {
+            boolean hasRecordPermissions = ContextCompat.checkSelfPermission(context, "android.permission.RECORD_AUDIO") == 0;
+            boolean hasExternalStoragePerm = ContextCompat.checkSelfPermission(context, "android.permission.WRITE_EXTERNAL_STORAGE") == 0;
+            return hasRecordPermissions && hasExternalStoragePerm;
+        }
+
     }
 
     private static boolean hasRecordingPermissions(Context context) {

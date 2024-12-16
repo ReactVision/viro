@@ -29,7 +29,7 @@ dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.0.0'
     testImplementation 'junit:junit:4.12'
-    implementation 'com.facebook.react:react-native:+'
+    implementation 'com.facebook.react:react-android'
     implementation 'com.google.ar:core:1.41.0'
     implementation project(':gvr_common')
     implementation project(':viro_renderer')

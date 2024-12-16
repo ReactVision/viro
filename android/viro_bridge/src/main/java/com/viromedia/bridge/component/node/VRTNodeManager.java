@@ -24,7 +24,6 @@ package com.viromedia.bridge.component.node;
 import android.provider.MediaStore;
 
 import com.facebook.react.bridge.Dynamic;
-import com.facebook.react.bridge.DynamicFromMap;
 import com.facebook.react.bridge.JavaOnlyMap;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
@@ -39,6 +38,7 @@ import com.facebook.yoga.YogaConstants;
 import com.viro.core.Material;
 import com.viro.core.VideoTexture;
 import com.viromedia.bridge.component.VRTViroViewGroupManager;
+import com.viromedia.bridge.module.DynamicFromMap;
 import com.viromedia.bridge.module.MaterialManager;
 import com.viromedia.bridge.module.MaterialManager.MaterialWrapper;
 import com.viromedia.bridge.utility.Helper;

@@ -10,7 +10,9 @@
  * @providesModule polarToCartesian
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = void 0;
+exports.polarToCartesian = polarToCartesian;
+exports.polarToCartesianActual = polarToCartesianActual;
+exports.isARSupportedOnDevice = isARSupportedOnDevice;
 /**
  * Convert the given polar coords of the form [r, theta, phi] to cartesian
  * coordinates based on the default user location of (0, 0, 0) w/ viewing vector
@@ -35,7 +37,6 @@ function polarToCartesian(polarcoords) {
     cartesianCoords.push(z);
     return cartesianCoords;
 }
-exports.polarToCartesian = polarToCartesian;
 /**
  * Convert the given polar coords of the form [r, theta, phi] to cartesian
  * coordinates following the proper mathematical notation (from the zeros of
@@ -60,7 +61,6 @@ function polarToCartesianActual(polarcoords) {
     cartesianCoords.push(z);
     return cartesianCoords;
 }
-exports.polarToCartesianActual = polarToCartesianActual;
 const react_native_1 = require("react-native");
 function isARSupportedOnDevice() {
     return new Promise((resolve, reject) => {
@@ -84,4 +84,3 @@ function isARSupportedOnDevice() {
         }
     });
 }
-exports.isARSupportedOnDevice = isARSupportedOnDevice;

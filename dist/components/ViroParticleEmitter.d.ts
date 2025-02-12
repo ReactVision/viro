@@ -106,7 +106,7 @@ export declare class ViroParticleEmitter extends React.Component<Props, State> {
     _onNativeTransformUpdate(event: NativeSyntheticEvent<ViroNativeTransformUpdateEvent>): void;
     shouldComponentUpdate(_nextProps: Props, nextState: State): boolean;
     setNativeProps(nativeProps: Props): void;
-    render(): JSX.Element | undefined;
+    render(): React.JSX.Element | undefined;
     static getDerivedStateFromProps(nextProps: Props, prevState: State): {
         propsPositionState: number[];
     } | {

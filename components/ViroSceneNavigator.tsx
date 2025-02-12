@@ -25,7 +25,7 @@ import { ViroExitViroEvent } from "./Types/ViroEvents";
 import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroSceneDictionary } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
-import { ViroTelemetry } from "./Telemetry/ViroTelemetry";
+
 var ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 
 var mathRandomOffset = 0;

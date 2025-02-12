@@ -1,4 +1,12 @@
-/// <reference types="react" />
+/**
+ * Copyright (c) 2015-present, Viro Media, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroVideoBufferEndEvent, ViroVideoBufferStartEvent, ViroVideoErrorEvent, ViroVideoUpdateTimeEvent } from "./Types/ViroEvents";
 import { ViroSource } from "./Types/ViroUtils";
@@ -43,7 +51,7 @@ export declare class ViroVideo extends ViroBase<Props> {
     _onBufferEnd: (event: NativeSyntheticEvent<ViroVideoBufferEndEvent>) => void;
     _onFinish: () => void;
     _onUpdateTime: (event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     seekToTime: (timeInSeconds: number) => void;
 }
 export {};

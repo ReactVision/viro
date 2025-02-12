@@ -1,4 +1,3 @@
-/// <reference types="react" />
 import { ImageSourcePropType, NativeMethods } from "react-native";
 export type ViroSceneDictionary = {
     [val: string]: ViroScene;

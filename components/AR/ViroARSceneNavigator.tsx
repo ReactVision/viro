@@ -27,7 +27,7 @@ import {
   ViroScene,
   ViroSceneDictionary,
 } from "../Types/ViroUtils";
-import { ViroTelemetry } from "../Telemetry/ViroTelemetry";
+
 
 const ViroARSceneNavigatorModule = NativeModules.VRTARSceneNavigatorModule;
 
@@ -80,7 +80,6 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    ViroTelemetry.recordTelemetry("INIT", { ar: true });
     let initialSceneTag = this.props.initialSceneKey;
     if (initialSceneTag == null) {
       initialSceneTag = this.getRandomTag();

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.42.0 - 7 February 2025
+
+- Compatibility with Expo 52
+- Removed Telemetry
+- Cleaned codebase
+
 ## v2.41.1 - 6 March 2024
 
 - fix(ViroBase): fix onClick not working for &lt;ViroText /&gt; components [`#277`](https://github.com/NativeVision/viro/pull/277)
@@ -100,7 +106,7 @@
 - Removing references to fbjs. [`#8`](https://github.com/NativeVision/viro/pull/8)
 - fix typo in package.json [`#6`](https://github.com/NativeVision/viro/pull/6)
 - Adding NPM publish action [`#4`](https://github.com/NativeVision/viro/pull/4)
-- * Removed the star from every pod as when doing pod install it drops … [`#1`](https://github.com/NativeVision/viro/pull/1)
+- - Removed the star from every pod as when doing pod install it drops … [`#1`](https://github.com/NativeVision/viro/pull/1)
 - First [`4fb045b`](https://github.com/NativeVision/viro/commit/4fb045b7948533abc8787a10981f74b003a3ea68)
 - Remove broken scripts [`2d94c22`](https://github.com/NativeVision/viro/commit/2d94c22e0447a655cffbb3ae415ebc111e4d15bc)
 - Updating Readme to give better install instructions and moving examples to their own page(#7) [`bee93cc`](https://github.com/NativeVision/viro/commit/bee93cc7a18666294a14eb13606ef4e2f160202a)

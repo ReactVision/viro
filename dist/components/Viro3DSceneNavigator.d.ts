@@ -138,7 +138,7 @@ export declare class Viro3DSceneNavigator extends React.Component<Props, State> 
     popHistoryByN(n: number): void;
     getSceneIndex(sceneTag: string): number;
     _recenterTracking(): void;
-    _renderSceneStackItems(): JSX.Element[];
+    _renderSceneStackItems(): React.JSX.Element[];
     _project(point: Viro3DPoint): Promise<any>;
     _unproject(point: Viro3DPoint): Promise<any>;
     sceneNavigator: {
@@ -152,6 +152,6 @@ export declare class Viro3DSceneNavigator extends React.Component<Props, State> 
         unproject: (point: Viro3DPoint) => Promise<any>;
         viroAppProps: any;
     };
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

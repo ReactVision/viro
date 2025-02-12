@@ -13,6 +13,7 @@ import * as React from "react";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 import { ViroAnimationFinishEvent, ViroAnimationStartEvent } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroRotation } from "./Types/ViroUtils";
+import { ViroSceneContext } from "./ViroSceneContext";
 type Props = ViewProps & {
     position?: Viro3DPoint;
     rotation?: ViroRotation;
@@ -34,12 +35,13 @@ type State = {
 export declare class ViroCamera extends React.Component<Props, State> {
     _component: any;
     static contextType?: React.Context<any> | undefined;
+    context: React.ContextType<typeof ViroSceneContext>;
     componentDidMount(): void;
     componentWillUnmount(): void;
     componentDidUpdate(prevProps: Props, _prevState: State): void;
     setNativeProps: (nativeProps: any) => void;
     _onAnimationStart: (_event: NativeSyntheticEvent<ViroAnimationStartEvent>) => void;
     _onAnimationFinish: (_event: NativeSyntheticEvent<ViroAnimationFinishEvent>) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

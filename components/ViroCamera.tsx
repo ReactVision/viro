@@ -46,6 +46,7 @@ type State = {
 export class ViroCamera extends React.Component<Props, State> {
   _component: any;
   static contextType?: React.Context<any> | undefined = ViroSceneContext;
+  declare context: React.ContextType<typeof ViroSceneContext>;
 
   componentDidMount() {
     this.context.cameraDidMount(this);

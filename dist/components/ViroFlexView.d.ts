@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroBase } from "./ViroBase";
 type Props = {
@@ -8,6 +8,6 @@ type Props = {
  * Used to render a ViroFlexView
  */
 export declare class ViroFlexView extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

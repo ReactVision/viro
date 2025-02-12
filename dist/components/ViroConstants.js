@@ -23,18 +23,18 @@ var ViroRecordingErrorConstants;
     ViroRecordingErrorConstants[ViroRecordingErrorConstants["RECORD_ERROR_WRITE_TO_FILE"] = 3] = "RECORD_ERROR_WRITE_TO_FILE";
     ViroRecordingErrorConstants[ViroRecordingErrorConstants["RECORD_ERROR_ALREADY_RUNNING"] = 4] = "RECORD_ERROR_ALREADY_RUNNING";
     ViroRecordingErrorConstants[ViroRecordingErrorConstants["RECORD_ERROR_ALREADY_STOPPED"] = 5] = "RECORD_ERROR_ALREADY_STOPPED";
-})(ViroRecordingErrorConstants = exports.ViroRecordingErrorConstants || (exports.ViroRecordingErrorConstants = {}));
+})(ViroRecordingErrorConstants || (exports.ViroRecordingErrorConstants = ViroRecordingErrorConstants = {}));
 var ViroTrackingStateConstants;
 (function (ViroTrackingStateConstants) {
     // Viro AR Tracking constants,
     ViroTrackingStateConstants[ViroTrackingStateConstants["TRACKING_UNAVAILABLE"] = 1] = "TRACKING_UNAVAILABLE";
     ViroTrackingStateConstants[ViroTrackingStateConstants["TRACKING_LIMITED"] = 2] = "TRACKING_LIMITED";
     ViroTrackingStateConstants[ViroTrackingStateConstants["TRACKING_NORMAL"] = 3] = "TRACKING_NORMAL";
-})(ViroTrackingStateConstants = exports.ViroTrackingStateConstants || (exports.ViroTrackingStateConstants = {}));
+})(ViroTrackingStateConstants || (exports.ViroTrackingStateConstants = ViroTrackingStateConstants = {}));
 var ViroARTrackingReasonConstants;
 (function (ViroARTrackingReasonConstants) {
     // Viro AR Tracking reason constants,
     ViroARTrackingReasonConstants[ViroARTrackingReasonConstants["TRACKING_REASON_NONE"] = 1] = "TRACKING_REASON_NONE";
     ViroARTrackingReasonConstants[ViroARTrackingReasonConstants["TRACKING_REASON_EXCESSIVE_MOTION"] = 2] = "TRACKING_REASON_EXCESSIVE_MOTION";
     ViroARTrackingReasonConstants[ViroARTrackingReasonConstants["TRACKING_REASON_INSUFFICIENT_FEATURES"] = 3] = "TRACKING_REASON_INSUFFICIENT_FEATURES";
-})(ViroARTrackingReasonConstants = exports.ViroARTrackingReasonConstants || (exports.ViroARTrackingReasonConstants = {}));
+})(ViroARTrackingReasonConstants || (exports.ViroARTrackingReasonConstants = ViroARTrackingReasonConstants = {}));

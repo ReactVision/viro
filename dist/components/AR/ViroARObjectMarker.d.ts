@@ -8,8 +8,8 @@
  *
  * @providesModule ViroARObjectMarker
  */
-/// <reference types="react" />
 import { ViroBase } from "../ViroBase";
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent } from "../Types/ViroEvents";
 type Props = {};
@@ -20,6 +20,6 @@ export declare class ViroARObjectMarker extends ViroBase<Props> {
     _onAnchorFound(event: NativeSyntheticEvent<ViroARAnchorFoundEvent>): void;
     _onAnchorUpdated(event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>): void;
     _onAnchorRemoved(_event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>): void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

@@ -28,8 +28,8 @@ export type ViroClickStateEvent = {
 };
 export type ViroClickState = ViroClickStateTypes.CLICK_DOWN | ViroClickStateTypes.CLICK_UP | ViroClickStateTypes.CLICKED;
 export declare enum ViroClickStateTypes {
-    CLICK_DOWN = 1,
-    CLICK_UP = 2,
+    CLICK_DOWN = 1,// Click Down: Triggered when the user has performed a click down action while hovering on this control.|
+    CLICK_UP = 2,// Click Up: Triggered when the user has performed a click up action while hovering on this control.|
     CLICKED = 3
 }
 export type ViroTouchEvent = {
@@ -55,8 +55,8 @@ export type ViroPinchEvent = {
 };
 export type ViroPinchState = ViroPinchStateTypes.PINCH_START | ViroPinchStateTypes.PINCH_MOVE | ViroPinchStateTypes.PINCH_END;
 export declare enum ViroPinchStateTypes {
-    PINCH_START = 1,
-    PINCH_MOVE = 2,
+    PINCH_START = 1,// Triggered when the user has started a pinch gesture.
+    PINCH_MOVE = 2,// Triggered when the user has adjusted the pinch, moving both fingers.
     PINCH_END = 3
 }
 export type ViroRotateEvent = {
@@ -66,8 +66,8 @@ export type ViroRotateEvent = {
 };
 export type ViroRotateState = ViroRotateStateTypes.ROTATE_START | ViroRotateStateTypes.ROTATE_MOVE | ViroRotateStateTypes.ROTATE_END;
 export declare enum ViroRotateStateTypes {
-    ROTATE_START = 1,
-    ROTATE_MOVE = 2,
+    ROTATE_START = 1,// Triggered when the user has started a rotation gesture.
+    ROTATE_MOVE = 2,// Triggered when the user has adjusted the rotation, moving both fingers.
     ROTATE_END = 3
 }
 export type ViroDragEvent = {

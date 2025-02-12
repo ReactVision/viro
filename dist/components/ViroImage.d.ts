@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
@@ -43,7 +43,7 @@ type Props = {
 export declare class ViroImage extends ViroBase<Props> {
     _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
     _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     static evictFromCache: (imageSource: ViroSource) => void;
 }
 export {};

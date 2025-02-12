@@ -56,7 +56,7 @@ const withBranchAndroid = (config) => {
                     else {
                         target =
                             target +
-                                `              add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+                                `              packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
                     }
                 }
                 if (isJava) {
@@ -93,16 +93,20 @@ const withBranchAndroid = (config) => {
                          *   }
                          * ```
                          */
-                        data = data.replace(`override fun getPackages(): List<ReactPackage> {
-            // Packages that cannot be autolinked yet can be added manually here, for example:
-            // packages.add(new MyReactNativePackage());
-            return PackageList(this).packages
-          }`, `override fun getPackages(): List<ReactPackage> =
-            PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
-            }`);
-                        data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// add(MyReactNativePackage())", data);
+                        /*
+                        data = data.replace(
+                          `override fun getPackages(): List<ReactPackage> {
+                        // Packages that cannot be autolinked yet can be added manually here, for example:
+                        // packages.add(new MyReactNativePackage());
+                        return PackageList(this).packages
+                      }`,
+                          `override fun getPackages(): List<ReactPackage> =
+                        PackageList(this).packages.apply {
+                          // Packages that cannot be autolinked yet can be added manually here, for example:
+                          // add(MyReactNativePackage())
+                        }`
+                        );*/
+                        data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// packages.add(new MyReactNativePackage());", data);
                     }
                     else if (data.includes("// add(MyReactNativePackage())")) {
                         // console.log("[VIRO]: \n" + target);

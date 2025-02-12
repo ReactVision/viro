@@ -139,7 +139,7 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
     _recenterTracking(): void;
     _project(point: Viro3DPoint): Promise<any>;
     _unproject(point: Viro3DPoint): Promise<any>;
-    _renderSceneStackItems(): JSX.Element[];
+    _renderSceneStackItems(): React.JSX.Element[];
     sceneNavigator: {
         push: (param1?: ViroScene | string, param2?: ViroScene) => void;
         pop: () => void;
@@ -151,6 +151,6 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
         recenterTracking: () => void;
         viroAppProps: any;
     };
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

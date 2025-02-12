@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { ColorValue } from "react-native";
 import { ViroTextStyle } from "./Styles/ViroTextStyle";
 import { ViroBase } from "./ViroBase";
@@ -20,6 +20,6 @@ type Props = {
  * Used to render a ViroText
  */
 export declare class ViroText extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

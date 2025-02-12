@@ -57,6 +57,9 @@ RCT_MULTI_ENUM_CONVERTER(UIAccessibilityTraits, (@{
                                                    @"adjustable": @(UIAccessibilityTraitAdjustable),
                                                    @"allowsDirectInteraction": @(UIAccessibilityTraitAllowsDirectInteraction),
                                                    @"pageTurn": @(UIAccessibilityTraitCausesPageTurn),
+                                                   @"switch": @(SwitchAccessibilityTrait),
+                                                   @"tabbar": @(UIAccessibilityTraitTabBar),
+                                                   @"tablist" : @(UIAccessibilityTraitNone),
                                                    }), UIAccessibilityTraitNone, unsignedLongLongValue)
 
 @end

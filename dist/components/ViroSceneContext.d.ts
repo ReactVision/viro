@@ -1,7 +1,8 @@
 import * as React from "react";
 import { ViroCamera } from "./ViroCamera";
+import { ViroOrbitCamera } from "./ViroOrbitCamera";
 export declare const ViroSceneContext: React.Context<{
-    cameraDidMount: (camera: ViroCamera) => void;
-    cameraWillUnmount: (camera: ViroCamera) => void;
-    cameraDidUpdate: (camera: ViroCamera, active: boolean) => void;
+    cameraDidMount: (camera: ViroCamera | ViroOrbitCamera) => void;
+    cameraWillUnmount: (camera: ViroCamera | ViroOrbitCamera) => void;
+    cameraDidUpdate: (camera: ViroCamera | ViroOrbitCamera, active: boolean) => void;
 }>;

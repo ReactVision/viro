@@ -47,7 +47,7 @@ export declare class Viro360Video extends React.Component<Props> {
     _onError: (event: NativeSyntheticEvent<ViroVideoErrorEvent>) => void;
     _onUpdateTime: (event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) => void;
     setNativeProps: (nativeProps: Props) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     seekToTime: (timeInSeconds: number) => void;
 }
 export {};

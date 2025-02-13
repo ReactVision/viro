@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroAmbientLightInfo, ViroAmbientLightUpdateEvent, ViroARAnchorFoundEvent, ViroARAnchorRemovedEvent, ViroARAnchorUpdatedEvent, ViroARPointCloud, ViroARPointCloudUpdateEvent, ViroCameraARHitTest, ViroCameraARHitTestEvent, ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformInfo, ViroPlatformUpdateEvent, ViroTrackingReason, ViroTrackingState, ViroTrackingUpdatedEvent } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroPhysicsWorld, ViroRay, ViroScale, ViroSoundRoom, ViroSource } from "../Types/ViroUtils";
@@ -67,6 +67,6 @@ export declare class ViroARScene extends ViroBase<Props> {
         up: any[];
     }>;
     getCameraPositionAsync: () => Promise<any>;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

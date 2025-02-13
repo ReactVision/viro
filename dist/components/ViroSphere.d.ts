@@ -8,7 +8,7 @@
  *
  * @providesModule ViroSphere
  */
-/// <reference types="react" />
+import * as React from "react";
 import { ViroBase } from "./ViroBase";
 type Props = {
     widthSegmentCount?: number;
@@ -20,6 +20,6 @@ type Props = {
  * Used to render a ViroSphere
  */
 export declare class ViroSphere extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

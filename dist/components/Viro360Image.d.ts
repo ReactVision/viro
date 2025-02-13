@@ -41,6 +41,6 @@ export declare class Viro360Image extends React.Component<Props> {
     _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     _onError: (event: NativeSyntheticEvent<ViroLoadErrorEvent>) => void;
     setNativeProps(nativeProps: Props): void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

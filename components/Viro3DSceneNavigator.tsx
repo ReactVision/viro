@@ -25,7 +25,7 @@ import {
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
-import { ViroTelemetry } from "./Telemetry/ViroTelemetry";
+
 const Viro3DSceneNavigatorModule = NativeModules.VRT3DSceneNavigatorModule;
 
 var mathRandomOffset = 0;

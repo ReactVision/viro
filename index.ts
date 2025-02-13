@@ -3,7 +3,6 @@
  * All rights reserved.
  *
  */
-import { ViroTelemetry } from "./components/Telemetry/ViroTelemetry";
 import { ViroAnimations } from "./components/Animation/ViroAnimations";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";
@@ -249,6 +248,5 @@ export {
   ViroSoundFinishEvent,
   ViroTextStyle,
   ViroStyle,
-  ViroTelemetry,
   VIRO_VERSION,
 };

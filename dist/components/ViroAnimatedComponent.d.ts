@@ -18,6 +18,6 @@ export declare class ViroAnimatedComponent extends React.Component<Props> {
     _onStart(_event: NativeSyntheticEvent<ViroAnimatedComponentStartEvent>): void;
     _onFinish(_event: NativeSyntheticEvent<ViroAnimatedComponentFinishEvent>): void;
     setNativeProps(nativeProps: Props): void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

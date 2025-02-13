@@ -18,6 +18,6 @@ export declare class ViroSkyBox extends React.Component<Props> {
     _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
     _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     setNativeProps: (nativeProps: Props) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

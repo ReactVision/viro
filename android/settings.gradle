@@ -1,1 +1,5 @@
+pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+includeBuild("../node_modules/@react-native/gradle-plugin")
 include ':gvr_common', ':viro_bridge', ':viro_renderer', ':arcore_client'

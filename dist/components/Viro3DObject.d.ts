@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { ImageSourcePropType, NativeSyntheticEvent } from "react-native";
 import { ViroErrorEvent, ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroBase } from "./ViroBase";
@@ -27,7 +27,7 @@ type Props = {
  * Viro3DObject is a component that is used to render 3D models in the scene.
  */
 export declare class Viro3DObject extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
     _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
     getBoundingBoxAsync: () => Promise<any>;

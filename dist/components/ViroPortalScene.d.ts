@@ -8,7 +8,7 @@
  *
  * @providesModule ViroPortalScene
  */
-/// <reference types="react" />
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroPortalEnterEvent, ViroPortalExitEvent } from "./Types/ViroEvents";
@@ -24,6 +24,6 @@ type Props = ViroCommonProps & {
 export declare class ViroPortalScene extends ViroBase<Props> {
     _onPortalEnter: (event: NativeSyntheticEvent<ViroPortalEnterEvent>) => void;
     _onPortalExit: (event: NativeSyntheticEvent<ViroPortalExitEvent>) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

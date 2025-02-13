@@ -18,33 +18,33 @@ var ViroClickStateTypes;
     ViroClickStateTypes[ViroClickStateTypes["CLICK_DOWN"] = 1] = "CLICK_DOWN";
     ViroClickStateTypes[ViroClickStateTypes["CLICK_UP"] = 2] = "CLICK_UP";
     ViroClickStateTypes[ViroClickStateTypes["CLICKED"] = 3] = "CLICKED";
-})(ViroClickStateTypes = exports.ViroClickStateTypes || (exports.ViroClickStateTypes = {}));
+})(ViroClickStateTypes || (exports.ViroClickStateTypes = ViroClickStateTypes = {}));
 var ViroPinchStateTypes;
 (function (ViroPinchStateTypes) {
     ViroPinchStateTypes[ViroPinchStateTypes["PINCH_START"] = 1] = "PINCH_START";
     ViroPinchStateTypes[ViroPinchStateTypes["PINCH_MOVE"] = 2] = "PINCH_MOVE";
     ViroPinchStateTypes[ViroPinchStateTypes["PINCH_END"] = 3] = "PINCH_END";
-})(ViroPinchStateTypes = exports.ViroPinchStateTypes || (exports.ViroPinchStateTypes = {}));
+})(ViroPinchStateTypes || (exports.ViroPinchStateTypes = ViroPinchStateTypes = {}));
 var ViroRotateStateTypes;
 (function (ViroRotateStateTypes) {
     ViroRotateStateTypes[ViroRotateStateTypes["ROTATE_START"] = 1] = "ROTATE_START";
     ViroRotateStateTypes[ViroRotateStateTypes["ROTATE_MOVE"] = 2] = "ROTATE_MOVE";
     ViroRotateStateTypes[ViroRotateStateTypes["ROTATE_END"] = 3] = "ROTATE_END";
-})(ViroRotateStateTypes = exports.ViroRotateStateTypes || (exports.ViroRotateStateTypes = {}));
+})(ViroRotateStateTypes || (exports.ViroRotateStateTypes = ViroRotateStateTypes = {}));
 var ViroPlatformTypes;
 (function (ViroPlatformTypes) {
     ViroPlatformTypes["GVR"] = "gvr";
     ViroPlatformTypes["GEAR_VR"] = "ovr-mobile";
-})(ViroPlatformTypes = exports.ViroPlatformTypes || (exports.ViroPlatformTypes = {}));
+})(ViroPlatformTypes || (exports.ViroPlatformTypes = ViroPlatformTypes = {}));
 var ViroHeadsetTypes;
 (function (ViroHeadsetTypes) {
     ViroHeadsetTypes["CARDBOARD"] = "cardboard";
     ViroHeadsetTypes["DAYDREAM"] = "daydream";
     ViroHeadsetTypes["GEARVR"] = "gearvr";
-})(ViroHeadsetTypes = exports.ViroHeadsetTypes || (exports.ViroHeadsetTypes = {}));
+})(ViroHeadsetTypes || (exports.ViroHeadsetTypes = ViroHeadsetTypes = {}));
 var ViroControllerTypes;
 (function (ViroControllerTypes) {
     ViroControllerTypes["CARDBOARD"] = "cardboard";
     ViroControllerTypes["DAYDREAM"] = "daydream";
     ViroControllerTypes["GEARVR"] = "gearvr";
-})(ViroControllerTypes = exports.ViroControllerTypes || (exports.ViroControllerTypes = {}));
+})(ViroControllerTypes || (exports.ViroControllerTypes = ViroControllerTypes = {}));

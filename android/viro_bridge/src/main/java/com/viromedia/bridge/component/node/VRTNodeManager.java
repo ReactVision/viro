@@ -24,7 +24,6 @@ package com.viromedia.bridge.component.node;
 import android.provider.MediaStore;
 
 import com.facebook.react.bridge.Dynamic;
-import com.facebook.react.bridge.DynamicFromMap;
 import com.facebook.react.bridge.JavaOnlyMap;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
@@ -41,6 +40,7 @@ import com.viro.core.VideoTexture;
 import com.viromedia.bridge.component.VRTViroViewGroupManager;
 import com.viromedia.bridge.module.MaterialManager;
 import com.viromedia.bridge.module.MaterialManager.MaterialWrapper;
+import com.viromedia.bridge.utility.DynamicUtil;
 import com.viromedia.bridge.utility.Helper;
 import com.viromedia.bridge.utility.ViroEvents;
 import com.viromedia.bridge.utility.ViroLog;
@@ -244,7 +244,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                 super.setWidth(width);
             } else if (width.getType() == ReadableType.Number){
                 JavaOnlyMap map = JavaOnlyMap.of(WIDTH_NAME, width.asDouble() * s2DUnitPer3DUnit);
-                Dynamic newWidth = DynamicFromMap.create(map, WIDTH_NAME);
+                Dynamic newWidth = DynamicUtil.create(map, WIDTH_NAME);
                 super.setWidth(newWidth);
             } else {
                 ViroLog.warn(TAG, "Width is not of type Number or String. Doing nothing.");
@@ -257,7 +257,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                 super.setHeight(height);
             } else if (height.getType() == ReadableType.Number) {
                 JavaOnlyMap map = JavaOnlyMap.of(HEIGHT_NAME, height.asDouble() * s2DUnitPer3DUnit);
-                Dynamic newHeight = DynamicFromMap.create(map, HEIGHT_NAME);
+                Dynamic newHeight = DynamicUtil.create(map, HEIGHT_NAME);
                 super.setHeight(newHeight);
             } else {
                 ViroLog.warn(TAG, "Height is not of type Number or String. Doing nothing.");
@@ -278,7 +278,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                 super.setPaddings(index, padding);
             } else if (padding.getType() == ReadableType.Number) {
                 JavaOnlyMap map = JavaOnlyMap.of(PADDING_NAME, padding.asDouble() * s2DUnitPer3DUnit);
-                Dynamic newPadding = DynamicFromMap.create(map, PADDING_NAME);
+                Dynamic newPadding = DynamicUtil.create(map, PADDING_NAME);
                 super.setPaddings(index, newPadding);
             } else {
                 ViroLog.warn(TAG, "Padding is not of type Number of String. Doing nothing.");

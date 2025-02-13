@@ -137,7 +137,7 @@ export declare class ViroSceneNavigator extends React.Component<Props, State> {
     _project(point: Viro3DPoint): Promise<any>;
     _unproject(point: Viro3DPoint): Promise<any>;
     _recenterTracking(): void;
-    _renderSceneStackItems(): JSX.Element[];
-    render(): JSX.Element;
+    _renderSceneStackItems(): React.JSX.Element[];
+    render(): React.JSX.Element;
 }
 export {};

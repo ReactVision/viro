@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-/// <reference types="react" />
+import * as React from "react";
 import { ViroBase } from "./ViroBase";
 export declare class ViroBox extends ViroBase<{}> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }

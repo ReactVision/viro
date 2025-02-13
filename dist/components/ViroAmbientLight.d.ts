@@ -13,6 +13,6 @@ type Props = ViewProps & {
 export declare class ViroAmbientLight extends React.Component<Props> {
     _component: ViroNativeRef;
     setNativeProps(nativeProps: Props): void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

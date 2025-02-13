@@ -54,7 +54,7 @@ export declare class ViroButton extends React.Component<Props, State> {
     _onAnimationFinish: () => void;
     getTransformAsync: () => Promise<any>;
     getBoundingBoxAsync: () => Promise<any>;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     _onButtonHover: (isHovering: boolean, position: Viro3DPoint, source: ViroSource) => void;
     _onButtonClicked: (position: Viro3DPoint, source: ViroSource) => void;
     _onAnimationFinished: () => void;

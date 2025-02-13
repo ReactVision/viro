@@ -51,7 +51,7 @@ export declare class ViroMaterialVideo extends React.Component<Props> {
     _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
     _onUpdateTime: (event: NativeSyntheticEvent<ViroVideoUpdateTimeEvent>) => void;
     setNativeProps: (nativeProps: Props) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     seekToTime: (timeInSeconds: number) => void;
 }
 export {};

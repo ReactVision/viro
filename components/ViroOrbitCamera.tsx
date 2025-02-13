@@ -29,6 +29,7 @@ export class ViroOrbitCamera extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
   static contextType?: React.Context<any> | undefined = ViroSceneContext;
+  declare context: React.ContextType<typeof ViroSceneContext>;
 
   componentDidMount() {
     this.context.cameraDidMount(this);

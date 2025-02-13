@@ -8,11 +8,11 @@
  *
  * @providesModule ViroNode
  */
-/// <reference types="react" />
+import * as React from "react";
 import { ViroBase } from "./ViroBase";
 /**
  * Absolute container for Viro Controls
  */
 export declare class ViroNode extends ViroBase<{}> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }

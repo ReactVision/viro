@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { ViroUVCoordinate } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 type Props = {
@@ -9,6 +9,6 @@ type Props = {
  * Used to render a ViroQuad.
  */
 export declare class ViroQuad extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

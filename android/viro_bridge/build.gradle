@@ -1,9 +1,9 @@
 apply plugin: 'com.android.library'
 apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
 
 android {
-    compileSdkVersion 33
-    buildToolsVersion '30.0.2'
+    compileSdkVersion 34
     namespace "com.viromedia.bridge"
 
     defaultConfig {
@@ -27,10 +27,12 @@ dependencies {
     })
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.6.0"
 
+    implementation("com.facebook.react:react-android:0.76.0")
+    //implementation("com.facebook.react:react-native:+")
+
     implementation 'androidx.appcompat:appcompat:1.0.0'
     testImplementation 'junit:junit:4.12'
-    implementation 'com.facebook.react:react-native:+'
-    implementation 'com.google.ar:core:1.41.0'
+    implementation 'com.google.ar:core:1.43.0'
     implementation project(':gvr_common')
     implementation project(':viro_renderer')
     implementation 'com.google.android.exoplayer:exoplayer:2.19.1'

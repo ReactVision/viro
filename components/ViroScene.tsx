@@ -31,6 +31,7 @@ import {
 import { ViroBase } from "./ViroBase";
 import { ViroCamera } from "./ViroCamera";
 import { ViroSceneContext } from "./ViroSceneContext";
+import { ViroOrbitCamera } from "./ViroOrbitCamera";
 
 type Props = ViroCommonProps & {
   onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
@@ -185,7 +186,7 @@ export class ViroScene extends ViroBase<Props> {
     return (
       <ViroSceneContext.Provider
         value={{
-          cameraDidMount: (camera: ViroCamera) => {
+          cameraDidMount: (camera: ViroCamera | ViroOrbitCamera) => {
             if (camera.props.active) {
               NativeModules.VRTCameraModule.setSceneCamera(
                 findNodeHandle(this),
@@ -193,7 +194,7 @@ export class ViroScene extends ViroBase<Props> {
               );
             }
           },
-          cameraWillUnmount: (camera: ViroCamera) => {
+          cameraWillUnmount: (camera: ViroCamera | ViroOrbitCamera) => {
             if (camera.props.active) {
               NativeModules.VRTCameraModule.removeSceneCamera(
                 findNodeHandle(this),
@@ -201,7 +202,10 @@ export class ViroScene extends ViroBase<Props> {
               );
             }
           },
-          cameraDidUpdate: (camera: ViroCamera, active: boolean) => {
+          cameraDidUpdate: (
+            camera: ViroCamera | ViroOrbitCamera,
+            active: boolean
+          ) => {
             if (active) {
               NativeModules.VRTCameraModule.setSceneCamera(
                 findNodeHandle(this),

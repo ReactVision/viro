@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-/// <reference types="react" />
+import * as React from "react";
 import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
 type Props = {
@@ -20,6 +20,6 @@ type Props = {
     thickness?: number;
 };
 export declare class ViroPolyline extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

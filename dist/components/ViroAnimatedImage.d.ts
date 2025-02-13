@@ -1,4 +1,4 @@
-/// <reference types="react" />
+import * as React from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { ViroAnimation } from "./Animation/ViroAnimations";
 import { ViroCommonProps } from "./AR/ViroCommonProps";
@@ -63,6 +63,6 @@ export declare class ViroAnimatedImage extends ViroBase<Props> {
     _component: ViroNativeRef;
     _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
     _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

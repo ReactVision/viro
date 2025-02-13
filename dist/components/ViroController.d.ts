@@ -23,6 +23,6 @@ export declare class ViroController extends React.Component<Props> {
     getControllerForwardAsync(): Promise<any>;
     setNativeProps(nativeProps: Props): void;
     _onDrag(event: NativeSyntheticEvent<ViroDragEvent>): void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

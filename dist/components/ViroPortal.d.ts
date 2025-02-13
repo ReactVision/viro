@@ -8,13 +8,13 @@
  *
  * @providesModule ViroPortal
  */
-/// <reference types="react" />
+import * as React from "react";
 import { ViroBase } from "./ViroBase";
 type Props = {};
 /**
  * Frame that serves as a 'window' into a ViroPortal
  */
 export declare class ViroPortal extends ViroBase<Props> {
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

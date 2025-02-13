@@ -91,7 +91,7 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
           } else {
             target =
               target +
-              `              add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+              `              packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
           }
         }
 
@@ -132,7 +132,7 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
              *   }
              * ```
              */
-
+            /*
             data = data.replace(
               `override fun getPackages(): List<ReactPackage> {
             // Packages that cannot be autolinked yet can be added manually here, for example:
@@ -144,10 +144,10 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
             }`
-            );
+            );*/
             data = insertLinesHelper(
               target,
-              "// add(MyReactNativePackage())",
+              "// packages.add(new MyReactNativePackage());",
               data
             );
           } else if (data.includes("// add(MyReactNativePackage())")) {

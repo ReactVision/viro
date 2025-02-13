@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.41.6",
+  "version": "2.42.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -26,8 +26,8 @@
     "after:release": "./prepare_release.sh"
   },
   "peerDependencies": {
-    "expo": ">=47.0.0",
-    "react-native": "*"
+    "expo": "52.0.30",
+    "react-native": "0.76.0"
   },
   "peerDependenciesMeta": {
     "expo": {
@@ -51,24 +51,33 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@expo/config-plugins": "^7.2.5",
-    "react": "^18.2.0"
+    "@expo/config-plugins": "^9.0.14",
+    "react": "^18.3.1",
+    "react-native-gradle-plugin": "^0.71.19"
   },
   "devDependencies": {
-    "@babel/core": "^7.23.7",
-    "@babel/preset-env": "^7.23.8",
-    "@babel/preset-typescript": "^7.23.3",
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/preset-typescript": "^7.26.0",
     "@jest/globals": "^29.7.0",
-    "@types/babel__core": "^7.1.18",
-    "@types/node": "^17.0.14",
-    "@types/react-native": "^0.66.9",
+    "@react-native-community/cli": "15.0.1",
+    "@react-native-community/cli-platform-android": "15.0.1",
+    "@react-native-community/cli-platform-ios": "15.0.1",
+    "@react-native/babel-preset": "0.77.0",
+    "@react-native/eslint-config": "0.77.0",
+    "@react-native/metro-config": "0.77.0",
+    "@react-native/typescript-config": "0.77.0",
+    "@types/babel__core": "^7.20.5",
+    "@types/node": "^22.13.1",
+    "@types/react": "^18.3.18",
+    "@types/react-native": "^0.73.0",
     "babel-jest": "^29.7.0",
-    "expo": "^50.0.0",
+    "expo": "52.0.30",
     "jest": "^29.7.0",
-    "react-native": "0.71.14",
+    "react-native": "0.76.0",
     "release-it": "^17.1.1",
     "ts-node": "^10.9.2",
-    "typescript": "^4.6.3"
+    "typescript": "^5.3.0"
   },
   "bugs": {
     "url": "https://github.com/ReactVision/viro/issues"

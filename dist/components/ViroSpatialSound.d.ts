@@ -20,7 +20,7 @@ export declare class ViroSpatialSound extends React.Component<Props> {
     _onFinish: (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => void;
     _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
     setNativeProps: (nativeProps: Props) => void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
     getTransformAsync: () => Promise<any>;
     getBoundingBoxAsync: () => Promise<any>;
     seekToTime: (timeInSeconds: number) => void;

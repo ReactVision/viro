@@ -223,7 +223,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      *
      * @returns Array of rendered Scene views.
      */
-    _renderSceneStackItems: () => JSX.Element[];
+    _renderSceneStackItems: () => React.JSX.Element[];
     arSceneNavigator: {
         push: (param1?: ViroScene | string, param2?: ViroScene) => void;
         pop: () => void;
@@ -254,6 +254,6 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         unproject: (point: Viro3DPoint) => Promise<any>;
         viroAppProps: any;
     };
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export {};

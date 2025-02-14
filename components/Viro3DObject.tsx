@@ -118,6 +118,7 @@ export class Viro3DObject extends ViroBase<Props> {
         canRotate={this.props.onRotate != undefined}
         onHoverViro={this._onHover}
         onClickViro={this._onClickState}
+        onClick={undefined}
         onTouchViro={this._onTouch}
         onScrollViro={this._onScroll}
         onSwipeViro={this._onSwipe}

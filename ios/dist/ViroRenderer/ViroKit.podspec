@@ -8,6 +8,8 @@ Pod::Spec.new do |s|
   s.license             = {:type => 'Copyright', :text => "Copyright 2018 ViroMedia, Inc" }
   s.author              = 'Viro Media'
   s.requires_arc        = true
-  s.platform            = :ios, '10.0'
+  s.platform            = :ios, '12.0'
   s.dependency 'React'
+  s.dependency 'ARCore/CloudAnchors', '~> 1.43.0'
+  s.dependency 'ARCore/AugmentedFaces', '~> 1.43.0'
 end

@@ -15,7 +15,7 @@ const withViroPods = (config) => {
             const root = newConfig.modRequest.platformProjectRoot;
             fs_1.default.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
                 data = (0, insertLinesHelper_1.insertLinesHelper)(`  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
-                    `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`, "post_install do |installer|", data, -1);
+                    `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'\n`, "post_install do |installer|", data, -1);
                 fs_1.default.writeFile(`${root}/Podfile`, data, "utf-8", function (err) {
                     if (err)
                         console.log("Error writing Podfile");

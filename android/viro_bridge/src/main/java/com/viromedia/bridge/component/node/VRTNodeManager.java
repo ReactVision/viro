@@ -37,6 +37,7 @@ import com.facebook.react.uimanager.annotations.ReactPropGroup;
 import com.facebook.yoga.YogaConstants;
 import com.viro.core.Material;
 import com.viro.core.VideoTexture;
+import com.viromedia.bridge.component.VRTComponent;
 import com.viromedia.bridge.component.VRTViroViewGroupManager;
 import com.viromedia.bridge.module.MaterialManager;
 import com.viromedia.bridge.module.MaterialManager.MaterialWrapper;
@@ -56,6 +57,8 @@ import javax.annotation.Nullable;
  */
 public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroupManager<T> {
 
+    private static String TAG = VRTNodeManager.class.getSimpleName();
+
     public static final float s2DUnitPer3DUnit = 1000;
     private static final String WIDTH_NAME = "width";
     private static final String HEIGHT_NAME = "height";
@@ -68,156 +71,324 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "position")
     public void setPosition(T view, ReadableArray position) {
-        view.setPosition(Helper.toFloatArray(position, DEFAULT_ZERO_VEC));
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            // Skip property update for detached or torn down views
+            return;
+        }
+        try {
+            view.setPosition(Helper.toFloatArray(position, DEFAULT_ZERO_VEC));
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating position property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "rotation")
     public void setRotation(VRTNode view, ReadableArray rotation) {
-        view.setRotation(Helper.toFloatArray(rotation, DEFAULT_ZERO_VEC));
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setRotation(Helper.toFloatArray(rotation, DEFAULT_ZERO_VEC));
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating rotation property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "scale")
     public void setScale(VRTNode view, ReadableArray scale) {
-        view.setScale(Helper.toFloatArray(scale, new float[]{1,1,1}));
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setScale(Helper.toFloatArray(scale, new float[]{1,1,1}));
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating scale property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "rotationPivot")
     public void setRotationPivot(VRTNode view, ReadableArray scale) {
-        view.setRotationPivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC));
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setRotationPivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC));
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating rotationPivot property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "scalePivot")
     public void setScalePivot(VRTNode view, ReadableArray scale) {
-        view.setScalePivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC));
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setScalePivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC));
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating scalePivot property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "opacity", defaultFloat = 1f)
     public void setOpacity(VRTNode view, float opacity) {
-        view.setOpacity(opacity);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setOpacity(opacity);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating opacity property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "visible", defaultBoolean = true)
     public void setVisible(VRTNode view, boolean visibility) {
-        view.setVisible(visibility);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setVisible(visibility);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating visible property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "renderingOrder", defaultInt = 0)
     public void setRenderingOrder(VRTNode view, int renderingOrder) {
-        view.setRenderingOrder(renderingOrder);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setRenderingOrder(renderingOrder);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating renderingOrder property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canHover", defaultBoolean = VRTNode.DEFAULT_CAN_HOVER)
     public void setCanHover(VRTNode view, boolean canHover) {
-        view.setCanHover(canHover);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanHover(canHover);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canHover property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canClick", defaultBoolean = VRTNode.DEFAULT_CAN_CLICK)
     public void setCanClick(VRTNode view, boolean canClick) {
-        view.setCanClick(canClick);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanClick(canClick);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canClick property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canTouch", defaultBoolean = VRTNode.DEFAULT_CAN_TOUCH)
     public void setCanTouch(VRTNode view, boolean canTouch) {
-        view.setCanTouch(canTouch);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanTouch(canTouch);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canTouch property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canScroll", defaultBoolean = VRTNode.DEFAULT_CAN_SCROLL)
     public void setCanScroll(VRTNode view, boolean canScroll) {
-        view.setCanScroll(canScroll);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanScroll(canScroll);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canScroll property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canSwipe", defaultBoolean = VRTNode.DEFAULT_CAN_SWIPE)
     public void setCanSwipe(VRTNode view, boolean canSwipe) {
-        view.setCanSwipe(canSwipe);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanSwipe(canSwipe);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canSwipe property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canDrag", defaultBoolean = VRTNode.DEFAULT_CAN_DRAG)
     public void setCanDrag(VRTNode view, boolean canDrag) {
-        view.setCanDrag(canDrag);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanDrag(canDrag);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canDrag property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canFuse", defaultBoolean = VRTNode.DEFAULT_CAN_FUSE)
     public void setCanFuse(VRTNode view, boolean canFuse) {
-        view.setCanFuse(canFuse);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanFuse(canFuse);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canFuse property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canPinch", defaultBoolean = VRTNode.DEFAULT_CAN_PINCH)
     public void setCanPinch(VRTNode view, boolean canPinch) {
-        view.setCanPinch(canPinch);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanPinch(canPinch);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canPinch property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canRotate", defaultBoolean = VRTNode.DEFAULT_CAN_ROTATE)
     public void setCanRotate(VRTNode view, boolean canRotate) {
-        view.setCanRotate(canRotate);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanRotate(canRotate);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canRotate property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "timeToFuse", defaultFloat = VRTNode.DEFAULT_TIME_TO_FUSE_MILLIS)
     public void setTimeToFuse(VRTNode view, float durationMillis) {
-        view.setTimeToFuse(durationMillis);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setTimeToFuse(durationMillis);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating timeToFuse property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "dragType")
     public void setDragType(VRTNode view, String dragType) {
-        view.setDragType(dragType);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setDragType(dragType);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating dragType property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "dragPlane")
     public void setDragPlane(VRTNode view, ReadableMap dragPlane) {
-        view.setDragPlane(dragPlane);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setDragPlane(dragPlane);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating dragPlane property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "animation")
     public void setAnimation(VRTNode view, @androidx.annotation.Nullable ReadableMap map) {
-        view.setAnimation(map);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setAnimation(map);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating animation property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "ignoreEventHandling", defaultBoolean = VRTNode.DEFAULT_IGNORE_EVENT_HANDLING)
     public void setIgnoreEventHandling(VRTNode view, boolean ignore) {
-        view.setIgnoreEventHandling(ignore);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setIgnoreEventHandling(ignore);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating ignoreEventHandling property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "materials")
     public void setMaterials(VRTNode view, @Nullable ReadableArray materials) {
-        // get material manager
-        MaterialManager materialManager = getContext().getNativeModule(MaterialManager.class);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            // get material manager
+            MaterialManager materialManager = getContext().getNativeModule(MaterialManager.class);
 
-        ArrayList<Material> nativeMaterials = new ArrayList<>();
-        if (materials != null) {
-            for (int i = 0; i < materials.size(); i++) {
-                Material nativeMaterial = materialManager.getMaterial(materials.getString(i));
-                if (materialManager.isVideoMaterial(materials.getString(i))) {
-                    if (!(nativeMaterial.getDiffuseTexture() instanceof VideoTexture)) {
-                        // Recreate the material with the proper context.
-                        if (view.getViroContext() != null) {
-                            MaterialWrapper materialWrapper = materialManager.getMaterialWrapper(materials.getString(i));
-                            VideoTexture videoTexture = new VideoTexture(view.getViroContext(), materialWrapper.getVideoTextureURI());
-                            materialWrapper.recreate(videoTexture);
-                            nativeMaterial = materialWrapper.getNativeMaterial();
+            ArrayList<Material> nativeMaterials = new ArrayList<>();
+            if (materials != null) {
+                for (int i = 0; i < materials.size(); i++) {
+                    Material nativeMaterial = materialManager.getMaterial(materials.getString(i));
+                    if (materialManager.isVideoMaterial(materials.getString(i))) {
+                        if (!(nativeMaterial.getDiffuseTexture() instanceof VideoTexture)) {
+                            // Recreate the material with the proper context.
+                            if (view.getViroContext() != null) {
+                                MaterialWrapper materialWrapper = materialManager.getMaterialWrapper(materials.getString(i));
+                                VideoTexture videoTexture = new VideoTexture(view.getViroContext(), materialWrapper.getVideoTextureURI());
+                                materialWrapper.recreate(videoTexture);
+                                nativeMaterial = materialWrapper.getNativeMaterial();
+                            }
                         }
                     }
-                }
 
-                if (nativeMaterial == null) {
-                    throw new IllegalArgumentException("Material [" + materials.getString(i) + "] not found. Did you create it?");
-                }
+                    if (nativeMaterial == null) {
+                        throw new IllegalArgumentException("Material [" + materials.getString(i) + "] not found. Did you create it?");
+                    }
 
-                nativeMaterials.add(nativeMaterial);
+                    nativeMaterials.add(nativeMaterial);
+                }
             }
+            view.setMaterials(nativeMaterials);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating materials property: " + e.getMessage());
         }
-        view.setMaterials(nativeMaterials);
     }
 
     @ReactProp(name = "transformBehaviors")
     public void setTransformBehaviors(VRTNode view, @Nullable ReadableArray transformBehaviors) {
-
-        String[] behaviors = new String[0];
-        if (transformBehaviors != null) {
-            behaviors = new String[transformBehaviors.size()];
-            for (int i = 0; i < transformBehaviors.size(); i++) {
-                behaviors[i] = transformBehaviors.getString(i);
-            }
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
         }
-        view.setTransformBehaviors(behaviors);
+        try {
+            String[] behaviors = new String[0];
+            if (transformBehaviors != null) {
+                behaviors = new String[transformBehaviors.size()];
+                for (int i = 0; i < transformBehaviors.size(); i++) {
+                    behaviors[i] = transformBehaviors.getString(i);
+                }
+            }
+            view.setTransformBehaviors(behaviors);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating transformBehaviors property: " + e.getMessage());
+        }
     }
 
     @Override
@@ -324,22 +495,50 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "physicsBody")
     public void setPhysicsBody(VRTNode view, ReadableMap map) {
-        view.setPhysicsBody(map);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setPhysicsBody(map);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating physicsBody property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "canCollide", defaultBoolean = VRTNode.DEFAULT_CAN_FUSE)
     public void setCanCollide(VRTNode view, boolean canCollide) {
-        view.setCanCollide(canCollide);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setCanCollide(canCollide);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating canCollide property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "viroTag")
     public void setViroTag(VRTNode view, String tag) {
-        view.setViroTag(tag);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setViroTag(tag);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating viroTag property: " + e.getMessage());
+        }
     }
 
     @ReactProp(name = "hasTransformDelegate", defaultBoolean = false)
     public void setViroTag(VRTNode view, boolean hasDelegate) {
-        view.setOnNativeTransformDelegate(hasDelegate);
+        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+            return;
+        }
+        try {
+            view.setOnNativeTransformDelegate(hasDelegate);
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error updating hasTransformDelegate property: " + e.getMessage());
+        }
     }
 
 }

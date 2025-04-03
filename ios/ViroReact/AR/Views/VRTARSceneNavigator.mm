@@ -243,7 +243,36 @@
     [self parentDidDisappear];
     if (_vroView) {
         VROViewAR *viewAR = (VROViewAR *)_vroView;
-        [viewAR deleteGL];
+        
+        // First pause the AR session
+        [viewAR setPaused:YES];
+        
+        // Terminate AR session explicitly
+        @try {
+            std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+            if (arSession) {
+                arSession->pause();
+                
+                // Allow time for AR resources to release
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    @try {
+                        [viewAR deleteGL];
+                    } @catch (NSException *exception) {
+                        NSLog(@"Error during AR view cleanup: %@", exception.reason);
+                    }
+                });
+            } else {
+                [viewAR deleteGL];
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"Error terminating AR session: %@", exception.reason);
+            // Still try to delete GL resources
+            @try {
+                [viewAR deleteGL];
+            } @catch (NSException *innerException) {
+                NSLog(@"Error during AR view cleanup: %@", innerException.reason);
+            }
+        }
     }
 
     [super removeFromSuperview];
@@ -320,7 +349,23 @@
         // pause the view before removing it.
         VROViewAR *viewAR = (VROViewAR *)_vroView;
         [viewAR setPaused:YES];
+        
+        // Properly terminate the AR session
+        @try {
+            std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+            if (arSession) {
+                arSession->pause();
+                
+                // Give the AR session time to clean up resources
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    // Additional cleanup if needed
+                });
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"Error terminating AR session during invalidate: %@", exception.reason);
+        }
     }
+    
     //NOTE: DO NOT NULL OUT _currentViews here, that will cause a memory leak and prevent child views from being released.
     _currentScene = nil;
     _vroView = nil;

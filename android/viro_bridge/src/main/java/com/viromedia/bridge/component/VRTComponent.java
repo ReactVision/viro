@@ -202,7 +202,20 @@ public class VRTComponent extends ReactViewGroup {
      * Children should override and invoke this super method.
      */
     public void onTearDown() {
-        mTornDown = true;
+        try {
+            // Clear references to parent components
+            mScene = null;
+            mViroContext = null;
+            
+            // Reset state flags
+            mParentHasAppeared = false;
+            
+            // Mark as torn down
+            mTornDown = true;
+        } catch (Exception e) {
+            // Log error but don't crash
+            android.util.Log.e(TAG, "Error during component base teardown: " + e.getMessage());
+        }
     }
 
     /**

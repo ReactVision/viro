@@ -350,14 +350,64 @@ public class VRTNode extends VRTComponent {
 
     @Override
     public void onTearDown() {
-        super.onTearDown();
-        if (mNodeJni != null){
-            mTransformDelegate = null;
+        try {
+            // Cancel any ongoing anchor attempts
+            if (mAnchorAttempt != null) {
+                mAnchorAttempt.cancel();
+                mAnchorAttempt = null;
+            }
+            
+            // Clean up animation resources
+            if (mNodeAnimation != null) {
+                mNodeAnimation.setAnimationName(null);
+                mNodeAnimation.updateAnimation();
+                mNodeAnimation = null;
+            }
+            
+            // Clean up transform delegate
+            if (mTransformDelegate != null) {
+                if (mNodeJni != null) {
+                    mNodeJni.removeTransformListener();
+                }
+                mTransformDelegate = null;
+            }
+            
+            // Clean up component event delegate
+            if (mComponentEventDelegate != null) {
+                mComponentEventDelegate = null;
+            }
+            
+            // Clean up physics resources
             clearPhysicsBody();
-            mEventDelegateJni.setEventDelegateCallback(null);
-            mEventDelegateJni.dispose();
-            mNodeJni.dispose();
-            mNodeJni = null;
+            
+            // Clean up event delegate
+            if (mEventDelegateJni != null) {
+                mEventDelegateJni.setEventDelegateCallback(null);
+                mEventDelegateJni.dispose();
+                mEventDelegateJni = null;
+            }
+            
+            // Clean up materials
+            if (mMaterials != null) {
+                mMaterials.clear();
+                mMaterials = null;
+            }
+            
+            // Clean up node
+            if (mNodeJni != null) {
+                mNodeJni.dispose();
+                mNodeJni = null;
+            }
+            
+            // Clean up anchor
+            if (mAnchor != null) {
+                mAnchor.detach();
+                mAnchor = null;
+            }
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error during component teardown: " + e.getMessage());
+        } finally {
+            super.onTearDown();
         }
     }
 

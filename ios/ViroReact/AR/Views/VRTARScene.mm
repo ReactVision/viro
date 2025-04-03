@@ -230,4 +230,49 @@ static NSString *const kPointCloudKey = @"pointCloud";
     });
 }
 
+- (void)removeFromSuperview {
+    // Clean up AR-specific resources before removing from superview
+    @try {
+        if (_vroArScene) {
+            // Reset point cloud surface
+            _vroArScene->resetPointCloudSurface();
+            
+            // Pause and clean up the declarative session
+            if (_vroArScene->getDeclarativeSession()) {
+                _vroArScene->getDeclarativeSession()->pause();
+            }
+            
+            // Clear delegates to prevent callbacks after removal
+            _sceneDelegate = nullptr;
+            _vroArScene->setDelegate(nullptr);
+            
+            if (_vroArScene->getDeclarativeSession()) {
+                _vroArScene->getDeclarativeSession()->setDelegate(nullptr);
+            }
+        }
+        
+        // Release image loader
+        if (_loader) {
+            _loader = nil;
+        }
+        
+        // Release texture resources
+        _pointCloudSurfaceTexture = nullptr;
+        _pointCloudParticleSurface = nullptr;
+    } @catch (NSException *exception) {
+        NSLog(@"Error cleaning up AR scene: %@", exception.reason);
+    }
+    
+    // Call super implementation
+    [super removeFromSuperview];
+}
+
+- (void)dealloc {
+    // Ensure all resources are properly released
+    _sceneDelegate = nullptr;
+    _vroArScene = nullptr;
+    _pointCloudSurfaceTexture = nullptr;
+    _pointCloudParticleSurface = nullptr;
+}
+
 @end

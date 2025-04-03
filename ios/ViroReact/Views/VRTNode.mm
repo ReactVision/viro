@@ -171,13 +171,19 @@ const double kTransformDelegateDistanceFilter = 0.01;
     }
     else if([vroView isKindOfClass:[VRT360Image class]]) {
         VRTNode *nodeView = (VRTNode *)vroView;
-        nodeView.node->getParentPortal()->removeBackground();
-        nodeView.node->removeFromParentNode();
+        if (nodeView.node && nodeView.node->getParentPortal()) {
+            nodeView.node->getParentPortal()->removeBackground();
+        }
+        if (nodeView.node) {
+            nodeView.node->removeFromParentNode();
+        }
     }
     else if ([vroView isKindOfClass:[VRTNode class]]) {
         VRTNode *nodeView = (VRTNode *)vroView;
         [nodeView clearPhysicsBody];
-        nodeView.node->removeFromParentNode();
+        if (nodeView.node) {
+            nodeView.node->removeFromParentNode();
+        }
     }
     
     else if ([vroView isKindOfClass:[VRTAnimatedComponent class]]) {
@@ -190,7 +196,9 @@ const double kTransformDelegateDistanceFilter = 0.01;
             }
             
             VRTNode *subsubNodeView = (VRTNode *)subsubview;
-            subsubNodeView.node->removeFromParentNode();
+            if (subsubNodeView.node) {
+                subsubNodeView.node->removeFromParentNode();
+            }
         }
     }
     
@@ -216,21 +224,45 @@ const double kTransformDelegateDistanceFilter = 0.01;
 }
 
 - (void)setRenderingOrder:(int)renderingOrder {
-    _renderingOrder = renderingOrder;
-    [self node]->setRenderingOrder(renderingOrder);
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _renderingOrder = renderingOrder;
+        [self node]->setRenderingOrder(renderingOrder);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating renderingOrder property: %@", exception.reason);
+    }
 }
 
 - (void)setVisible:(BOOL)visible {
-    _visible = visible;
-    [self handleAppearanceChange];
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _visible = visible;
+        [self handleAppearanceChange];
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating visible property: %@", exception.reason);
+    }
 }
 
 - (void)setViroTag:(NSString *)tag {
-    std::string nodeTag;
-    if (tag) {
-        nodeTag = std::string([tag UTF8String]);
+    if (!self.node) {
+        return;
     }
-    [self node]->setTag(nodeTag);
+    
+    @try {
+        std::string nodeTag;
+        if (tag) {
+            nodeTag = std::string([tag UTF8String]);
+        }
+        [self node]->setTag(nodeTag);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating viroTag property: %@", exception.reason);
+    }
 }
 
 - (void)setContext:(VRORenderContext *)context {
@@ -267,10 +299,18 @@ const double kTransformDelegateDistanceFilter = 0.01;
 #pragma mark - Transforms
 
 - (void)setPosition:(NSArray<NSNumber *> *)position {
-    _position = [position copy];
-    float positionValues[3];
-    populateFloatArrayFromNSArray(position, positionValues, 3);
-    [self node]->setPosition({positionValues[0], positionValues[1], positionValues[2]});
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _position = [position copy];
+        float positionValues[3];
+        populateFloatArrayFromNSArray(position, positionValues, 3);
+        [self node]->setPosition({positionValues[0], positionValues[1], positionValues[2]});
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating position property: %@", exception.reason);
+    }
 }
 
 -(void)setHasTransformDelegate:(BOOL)hasDelegate {
@@ -295,56 +335,104 @@ const double kTransformDelegateDistanceFilter = 0.01;
 }
 
 - (void)setOpacity:(float)opacity {
-    _opacity = opacity;
-    [self node]->setOpacity(_opacity);
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _opacity = opacity;
+        [self node]->setOpacity(_opacity);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating opacity property: %@", exception.reason);
+    }
 }
 
 - (void)setRotation:(NSArray<NSNumber *> *)rotation {
-    _rotation = [rotation copy];
-    float rotationValues[3];
-    populateFloatArrayFromNSArray(rotation, rotationValues, 3);
-    [self node]->setRotation({toRadians(rotationValues[0]), toRadians(rotationValues[1]), toRadians(rotationValues[2])});
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _rotation = [rotation copy];
+        float rotationValues[3];
+        populateFloatArrayFromNSArray(rotation, rotationValues, 3);
+        [self node]->setRotation({toRadians(rotationValues[0]), toRadians(rotationValues[1]), toRadians(rotationValues[2])});
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating rotation property: %@", exception.reason);
+    }
 }
 
 - (void)setScale:(NSArray<NSNumber *> *)scale {
-    _scale = [scale copy];
-    float scaleValues[3];
-    populateFloatArrayFromNSArray(scale, scaleValues, 3);
-    [self node]->setScale({scaleValues[0], scaleValues[1], scaleValues[2]});
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _scale = [scale copy];
+        float scaleValues[3];
+        populateFloatArrayFromNSArray(scale, scaleValues, 3);
+        [self node]->setScale({scaleValues[0], scaleValues[1], scaleValues[2]});
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating scale property: %@", exception.reason);
+    }
 }
 
 - (void)setRotationPivot:(NSArray<NSNumber *> *)pivot {
-    _rotationPivot = [pivot copy];
-    float pivotValues[3];
-    populateFloatArrayFromNSArray(pivot, pivotValues, 3);
+    if (!self.node) {
+        return;
+    }
     
-    VROMatrix4f pivotMatrix;
-    pivotMatrix.translate(pivotValues[0], pivotValues[1], pivotValues[2]);
-    [self node]->setRotationPivot(pivotMatrix);
+    @try {
+        _rotationPivot = [pivot copy];
+        float pivotValues[3];
+        populateFloatArrayFromNSArray(pivot, pivotValues, 3);
+        
+        VROMatrix4f pivotMatrix;
+        pivotMatrix.translate(pivotValues[0], pivotValues[1], pivotValues[2]);
+        [self node]->setRotationPivot(pivotMatrix);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating rotationPivot property: %@", exception.reason);
+    }
 }
 
 - (void)setScalePivot:(NSArray<NSNumber *> *)pivot {
-    _scalePivot = [pivot copy];
-    float pivotValues[3];
-    populateFloatArrayFromNSArray(pivot, pivotValues, 3);
+    if (!self.node) {
+        return;
+    }
     
-    VROMatrix4f pivotMatrix;
-    pivotMatrix.translate(pivotValues[0], pivotValues[1], pivotValues[2]);
-    [self node]->setScalePivot(pivotMatrix);
+    @try {
+        _scalePivot = [pivot copy];
+        float pivotValues[3];
+        populateFloatArrayFromNSArray(pivot, pivotValues, 3);
+        
+        VROMatrix4f pivotMatrix;
+        pivotMatrix.translate(pivotValues[0], pivotValues[1], pivotValues[2]);
+        [self node]->setScalePivot(pivotMatrix);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating scalePivot property: %@", exception.reason);
+    }
 }
 
 - (void)setTransformBehaviors:(NSArray<NSString *> *)behaviors {
-    [self node]->removeAllConstraints();
-    for (NSString *behavior in behaviors) {
-        if ([behavior caseInsensitiveCompare:@"billboard"] == NSOrderedSame) {
-            [self node]->addConstraint(std::make_shared<VROBillboardConstraint>(VROBillboardAxis::All));
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        [self node]->removeAllConstraints();
+        for (NSString *behavior in behaviors) {
+            if ([behavior caseInsensitiveCompare:@"billboard"] == NSOrderedSame) {
+                [self node]->addConstraint(std::make_shared<VROBillboardConstraint>(VROBillboardAxis::All));
+            }
+            if ([behavior caseInsensitiveCompare:@"billboardX"] == NSOrderedSame) {
+                [self node]->addConstraint(std::make_shared<VROBillboardConstraint>(VROBillboardAxis::X));
+            }
+            if ([behavior caseInsensitiveCompare:@"billboardY"] == NSOrderedSame) {
+                [self node]->addConstraint(std::make_shared<VROBillboardConstraint>(VROBillboardAxis::Y));
+            }
         }
-        if ([behavior caseInsensitiveCompare:@"billboardX"] == NSOrderedSame) {
-            [self node]->addConstraint(std::make_shared<VROBillboardConstraint>(VROBillboardAxis::X));
-        }
-        if ([behavior caseInsensitiveCompare:@"billboardY"] == NSOrderedSame) {
-            [self node]->addConstraint(std::make_shared<VROBillboardConstraint>(VROBillboardAxis::Y));
-        }
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating transformBehaviors property: %@", exception.reason);
     }
 }
 
@@ -565,8 +653,16 @@ const double kTransformDelegateDistanceFilter = 0.01;
 #pragma mark - Events
 
 - (void)setHighAccuracyEvents:(BOOL)enabled{
-    _highAccuracyEvents = enabled;
-    [self node]->setHighAccuracyEvents(enabled);
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _highAccuracyEvents = enabled;
+        [self node]->setHighAccuracyEvents(enabled);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating highAccuracyEvents property: %@", exception.reason);
+    }
 }
 
 - (void)onHoverViro:(RCTDirectEventBlock)block {
@@ -578,119 +674,239 @@ const double kTransformDelegateDistanceFilter = 0.01;
 }
 
 - (void)setCanCollide:(BOOL)canCollide {
-    _canCollide = canCollide;
-    
-    if (canCollide && !_physicsDelegate) {
-        _physicsDelegate = std::make_shared<VROPhysicsBodyDelegateiOS>(self);
-    } else if (!canCollide) {
-        _physicsDelegate = nil;
-    }
-    
-    // Update the physic body's delegate if possible
-    std::shared_ptr<VROPhysicsBody> body = [self node]->getPhysicsBody();
-    if (!body) {
+    if (!self.node) {
         return;
     }
     
-    if (canCollide) {
-        body->setPhysicsDelegate(_physicsDelegate);
-    } else {
-        body->setPhysicsDelegate(nullptr);
+    @try {
+        _canCollide = canCollide;
+        
+        if (canCollide && !_physicsDelegate) {
+            _physicsDelegate = std::make_shared<VROPhysicsBodyDelegateiOS>(self);
+        } else if (!canCollide) {
+            _physicsDelegate = nil;
+        }
+        
+        // Update the physic body's delegate if possible
+        std::shared_ptr<VROPhysicsBody> body = [self node]->getPhysicsBody();
+        if (!body) {
+            return;
+        }
+        
+        if (canCollide) {
+            body->setPhysicsDelegate(_physicsDelegate);
+        } else {
+            body->setPhysicsDelegate(nullptr);
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canCollide property: %@", exception.reason);
     }
 }
 
 - (void)setCanPinch:(BOOL)canPinch {
-    _canPinch = canPinch;
-    self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnPinch, canPinch);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _canPinch = canPinch;
+        self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnPinch, canPinch);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canPinch property: %@", exception.reason);
+    }
 }
 
 - (void)setCanRotate:(BOOL)canRotate {
-    _canRotate = canRotate;
-    self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnRotate, canRotate);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _canRotate = canRotate;
+        self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnRotate, canRotate);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canRotate property: %@", exception.reason);
+    }
 }
 
 - (void)setCanHover:(BOOL)canHover {
-    _canHover = canHover;
-    self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnHover, canHover);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _canHover = canHover;
+        self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnHover, canHover);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canHover property: %@", exception.reason);
+    }
 }
 
 - (void)setCanClick:(BOOL)canClick {
-    _canClick = canClick;
-    self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnClick, canClick);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _canClick = canClick;
+        self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnClick, canClick);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canClick property: %@", exception.reason);
+    }
 }
 
 - (void)setCanFuse:(BOOL)canFuse {
-    _canFuse = canFuse;
-    self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnFuse, canFuse);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _canFuse = canFuse;
+        self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnFuse, canFuse);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canFuse property: %@", exception.reason);
+    }
 }
 
 - (void)setCanDrag:(BOOL)canDrag {
-    _canDrag = canDrag;
-    self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnDrag, canDrag);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _canDrag = canDrag;
+        self.eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnDrag, canDrag);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating canDrag property: %@", exception.reason);
+    }
 }
 
 - (void)setTimeToFuse:(float)durationMillis {
-    _timeToFuse = durationMillis;
-    self.eventDelegate->setTimeToFuse(durationMillis);
+    if (!self.node || !self.eventDelegate) {
+        return;
+    }
+    
+    @try {
+        _timeToFuse = durationMillis;
+        self.eventDelegate->setTimeToFuse(durationMillis);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating timeToFuse property: %@", exception.reason);
+    }
 }
 
 - (void)setDragType:(NSString *)dragType {
-    if ([dragType caseInsensitiveCompare:@"FixedDistance"] == NSOrderedSame) {
-        _node->setDragType(VRODragType::FixedDistance);
-    } else if ([dragType caseInsensitiveCompare:@"FixedToWorld"] == NSOrderedSame) {
-        _node->setDragType(VRODragType::FixedToWorld);
-    } else if ([dragType caseInsensitiveCompare:@"FixedToPlane"] == NSOrderedSame) {
-        _node->setDragType(VRODragType::FixedToPlane);
-    } else {
-        RCTLogError(@"Received unknown drag type: %@", dragType);
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        if ([dragType caseInsensitiveCompare:@"FixedDistance"] == NSOrderedSame) {
+            _node->setDragType(VRODragType::FixedDistance);
+        } else if ([dragType caseInsensitiveCompare:@"FixedToWorld"] == NSOrderedSame) {
+            _node->setDragType(VRODragType::FixedToWorld);
+        } else if ([dragType caseInsensitiveCompare:@"FixedToPlane"] == NSOrderedSame) {
+            _node->setDragType(VRODragType::FixedToPlane);
+        } else {
+            RCTLogError(@"Received unknown drag type: %@", dragType);
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating dragType property: %@", exception.reason);
     }
 }
 
 - (void)setDragPlane:(NSDictionary *)dict {
-    NSArray *planePoint = [dict objectForKey:@"planePoint"];
-    NSArray *planeNormal = [dict objectForKey:@"planeNormal"];
-    if (planePoint && planeNormal) {
-        [self node]->setDragPlanePoint({[[planePoint objectAtIndex:0] floatValue],
-                                        [[planePoint objectAtIndex:1] floatValue],
-                                        [[planePoint objectAtIndex:2] floatValue]});
-
-        [self node]->setDragPlaneNormal({[[planeNormal objectAtIndex:0] floatValue],
-                                         [[planeNormal objectAtIndex:1] floatValue],
-                                         [[planeNormal objectAtIndex:2] floatValue]});
+    if (!self.node) {
+        return;
     }
+    
+    @try {
+        NSArray *planePoint = [dict objectForKey:@"planePoint"];
+        NSArray *planeNormal = [dict objectForKey:@"planeNormal"];
+        if (planePoint && planeNormal) {
+            [self node]->setDragPlanePoint({[[planePoint objectAtIndex:0] floatValue],
+                                            [[planePoint objectAtIndex:1] floatValue],
+                                            [[planePoint objectAtIndex:2] floatValue]});
 
-    NSNumber *maxDistance = [dict objectForKey:@"maxDistance"];
-    if (maxDistance) {
-        [self node]->setDragMaxDistance([maxDistance floatValue]);
+            [self node]->setDragPlaneNormal({[[planeNormal objectAtIndex:0] floatValue],
+                                             [[planeNormal objectAtIndex:1] floatValue],
+                                             [[planeNormal objectAtIndex:2] floatValue]});
+        }
+
+        NSNumber *maxDistance = [dict objectForKey:@"maxDistance"];
+        if (maxDistance) {
+            [self node]->setDragMaxDistance([maxDistance floatValue]);
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating dragPlane property: %@", exception.reason);
     }
 }
 
 - (void)setIgnoreEventHandling:(BOOL)ignoreEventHandling {
-    _ignoreEventHandling = ignoreEventHandling;
-    [self resolveIgnoreEventHandling];
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _ignoreEventHandling = ignoreEventHandling;
+        [self resolveIgnoreEventHandling];
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating ignoreEventHandling property: %@", exception.reason);
+    }
 }
 
 - (void)setShouldIgnoreEventHandling:(BOOL)ignoreEventHandling {
-    _shouldIgnoreEventHandling = ignoreEventHandling;
-    [self resolveIgnoreEventHandling];
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _shouldIgnoreEventHandling = ignoreEventHandling;
+        [self resolveIgnoreEventHandling];
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating shouldIgnoreEventHandling property: %@", exception.reason);
+    }
 }
 
 - (void)resolveIgnoreEventHandling {
-    BOOL resolvedIgnoreEventHandling = _ignoreEventHandling || _shouldIgnoreEventHandling;
-    [self node]->setIgnoreEventHandling(resolvedIgnoreEventHandling);
-    for (VRTNode *child : [self reactSubviews]) {
-        child.shouldIgnoreEventHandling = resolvedIgnoreEventHandling;
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        BOOL resolvedIgnoreEventHandling = _ignoreEventHandling || _shouldIgnoreEventHandling;
+        [self node]->setIgnoreEventHandling(resolvedIgnoreEventHandling);
+        for (VRTNode *child : [self reactSubviews]) {
+            child.shouldIgnoreEventHandling = resolvedIgnoreEventHandling;
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Error in resolveIgnoreEventHandling: %@", exception.reason);
     }
 }
 
 - (void)setLightReceivingBitMask:(int)lightReceivingBitMask {
-    _lightReceivingBitMask = lightReceivingBitMask;
-    _node->setLightReceivingBitMask(lightReceivingBitMask);
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _lightReceivingBitMask = lightReceivingBitMask;
+        _node->setLightReceivingBitMask(lightReceivingBitMask);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating lightReceivingBitMask property: %@", exception.reason);
+    }
 }
 
 - (void)setShadowCastingBitMask:(int)shadowCastingBitMask {
-    _shadowCastingBitMask = shadowCastingBitMask;
-    _node->setShadowCastingBitMask(shadowCastingBitMask);
+    if (!self.node) {
+        return;
+    }
+    
+    @try {
+        _shadowCastingBitMask = shadowCastingBitMask;
+        _node->setShadowCastingBitMask(shadowCastingBitMask);
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating shadowCastingBitMask property: %@", exception.reason);
+    }
 }
 
 -(void)onHover:(int)source node:(std::shared_ptr<VRONode>)node

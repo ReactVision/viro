@@ -1,6 +1,6 @@
 <p align="center" style="background-color: #CCCCCC;">
-  <a href="https://www.reactvision.org/">
-    <img src="../viro/public/icons/NVLogo.png">
+  <a href="https://www.reactvision.xyz/">
+    <img src="https://jjhxsdfjbcyrgmbjocnp.supabase.co/storage/v1/object/public/Downloads/ReactVision/rv-logo-icon.png" alt="react vision logo">
   </a>
 </p>
 
@@ -25,7 +25,7 @@ ViroReact is a library for developers to rapidly build augmented reality (AR) an
 
 # Documentation
 
-[Documentation can be found here!](https://viro-community.readme.io/docs/overview). Currently, the documentation has some issues with code samples and broken links. If you would like to help fix these issues, either submit an edit or [get in touch](https://discord.gg/H3ksm5NhzT)!
+[Documentation can be found here](https://viro-community.readme.io/docs/overview). While we do our best to keep all documentation up to date you may come across issues with broken links or outdated code samples If you do come across any issues please do let us know by either submitting an edit or [get in touch on Discord.](https://discord.gg/H3ksm5NhzT)
 
 ## Getting Started
 
@@ -41,15 +41,17 @@ See our [Example projects](https://viro-community.readme.io/docs/examples) page.
 
 # Need help? Or want to contribute?
 
+Whether you're looking for support with building your AR or VR application or you want to contribute to ViroReact, the best way to contact our team is via Discord. If you need more hands-on support with a project, you can visit our documentation site, where we have a [list of trusted partners whom you can hire to help with your project](https://viro-community.readme.io/docs/hire-a-viro-react-expert). 
+
 <a href="https://discord.gg/H3ksm5NhzT">
    <img src="https://discordapp.com/api/guilds/774471080713781259/widget.png?style=banner2" alt="Discord Banner 2"/>
 </a>
 
 # A little history...
 
-ViroReact was originaly developed by the [Viro Media](http://www.viromedia.com/) company, but was open sourced in 2019. In late 2020 the Viro Community was formed to help maintain and move the project onwards, updating it so it could run with modern versions of react native, and start to add in new features. ReactVision now focuses on the project full time making sure the codebase is updated and ready for the future of XR / Spatial Computing.
+ViroReact was originaly developed by the [Viro Media](http://www.viromedia.com/), but was open-sourced in 2019. In late 2020, the Viro Community was formed to help maintain and move the project onwards, updating it so it could run with modern versions of react native, and start to add in new features. Following years of support, in 2025, [Morrow acquired ReactVision](https://www.themorrow.digital/blog/morrow-acquires-reactvision-and-viroreact-library) to help accelerate its development and give it the resources needed to enable ReactVision to capture the rapidly growing demand for ViroReact. ReactVision now has a team working full-time to help ensure the codebase is updated and ready for the future of XR / Spatial Computing.
 
-We, as a community, owe a great debt to Viro Media and the people who developed this library originally. We hope to make them proud as it continues to develop and grow in the Viro Community.
+We, as a community, owe a great debt to Viro Media and the people who developed this library originally. We hope to make them proud as it continues to develop and grow within ReactVision.
 
 # Supporters
 

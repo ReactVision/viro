@@ -105,11 +105,10 @@ public class ViroFabricContainerManager extends ViewGroupManager<ViroFabricConta
                 switch (commandId) {
                     case COMMAND_INITIALIZE:
                         if (args != null) {
-                            String apiKey = args.getString(0);
-                            boolean debug = args.getBoolean(1);
-                            boolean arEnabled = args.getBoolean(2);
-                            String worldAlignment = args.getString(3);
-                            view.initialize(apiKey, debug, arEnabled, worldAlignment);
+                            boolean debug = args.getBoolean(0);
+                            boolean arEnabled = args.getBoolean(1);
+                            String worldAlignment = args.getString(2);
+                            view.initialize(debug, arEnabled, worldAlignment);
                         }
                         break;
                     case COMMAND_CLEANUP:

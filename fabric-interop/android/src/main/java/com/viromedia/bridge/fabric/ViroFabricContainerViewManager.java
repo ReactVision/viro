@@ -92,12 +92,27 @@ public class ViroFabricContainerViewManager extends ViewGroupManager<ViroFabricC
         mDelegate.receiveCommand(view, commandId, args);
     }
 
-    @Override
+    // Note: This method signature needs to match the interface
+    // If the interface expects apiKey, we need to update our ViroFabricContainer.java
+    // For now, let's implement both versions for compatibility
     public void initialize(ViroFabricContainer view, String apiKey, boolean debug, boolean arEnabled, String worldAlignment) {
+        Log.d(TAG, "Initializing ViroFabricContainer with apiKey (legacy)");
+        UiThreadUtil.runOnUiThread(() -> {
+            try {
+                // Ignore apiKey for now since our implementation doesn't use it
+                view.initialize(debug, arEnabled, worldAlignment);
+            } catch (Exception e) {
+                Log.e(TAG, "Error initializing ViroFabricContainer", e);
+            }
+        });
+    }
+    
+    @Override
+    public void initialize(ViroFabricContainer view, boolean debug, boolean arEnabled, String worldAlignment) {
         Log.d(TAG, "Initializing ViroFabricContainer");
         UiThreadUtil.runOnUiThread(() -> {
             try {
-                view.initialize(apiKey, debug, arEnabled, worldAlignment);
+                view.initialize(debug, arEnabled, worldAlignment);
             } catch (Exception e) {
                 Log.e(TAG, "Error initializing ViroFabricContainer", e);
             }

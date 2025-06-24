@@ -12,7 +12,13 @@
 #import <ReactCommon/RuntimeExecutor.h>
 #import <jsi/jsi.h>
 
-@interface ViroFabricContainer : RCTView
+@interface ViroFabricContainer : RCTView {
+    // Material registry
+    NSMutableDictionary<NSString *, id> *_materialRegistry;
+    
+    // Animation registry
+    NSMutableDictionary<NSString *, id> *_animationRegistry;
+}
 
 @property (nonatomic, copy) RCTDirectEventBlock onInitialized;
 @property (nonatomic, copy) RCTDirectEventBlock onTrackingUpdated;
@@ -21,8 +27,20 @@
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 
 // Commands
-- (void)initialize:(NSString *)apiKey debug:(BOOL)debug arEnabled:(BOOL)arEnabled worldAlignment:(NSString *)worldAlignment;
+- (void)initialize:(BOOL)debug arEnabled:(BOOL)arEnabled worldAlignment:(NSString *)worldAlignment;
 - (void)cleanup;
+
+// Material management
+- (void)createMaterial:(NSString *)materialName withProps:(NSDictionary *)props;
+- (void)updateMaterial:(NSString *)materialName withProps:(NSDictionary *)props;
+
+// Animation management
+- (void)createAnimation:(NSString *)animationName withProps:(NSDictionary *)props;
+- (void)executeAnimation:(NSString *)animationName onNode:(NSString *)nodeId withOptions:(NSDictionary *)options;
+
+// AR configuration
+- (void)setARPlaneDetection:(NSDictionary *)config;
+- (void)setARImageTargets:(NSDictionary *)targets;
 
 @end
 

@@ -378,12 +378,33 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return facebook::jsi::Function::createFromHostFunction(
             runtime,
             name,
-            0,  // no parameters
+            1,  // config
             [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
                 __strong ViroFabricContainer *container = weakContainer;
                 if (!container) return facebook::jsi::Value::undefined();
                 
-                // Initialize Viro (this is a placeholder - actual initialization happens in the initialize: method)
+                // Initialize Viro with configuration
+                BOOL debug = NO;
+                BOOL arEnabled = NO;
+                NSString *worldAlignment = @"Gravity";
+                
+                if (count > 0 && args[0].isObject()) {
+                    auto config = args[0].getObject(rt);
+                    
+                    if (config.hasProperty(rt, "debug")) {
+                        debug = config.getProperty(rt, "debug").getBool();
+                    }
+                    if (config.hasProperty(rt, "arEnabled")) {
+                        arEnabled = config.getProperty(rt, "arEnabled").getBool();
+                    }
+                    if (config.hasProperty(rt, "worldAlignment")) {
+                        auto alignmentStr = config.getProperty(rt, "worldAlignment").getString(rt).utf8(rt);
+                        worldAlignment = [NSString stringWithUTF8String:alignmentStr.c_str()];
+                    }
+                }
+                
+                // Call the initialize method
+                [container initialize:debug arEnabled:arEnabled worldAlignment:worldAlignment];
                 
                 // Return a promise that resolves to true using Promise.resolve()
                 auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
@@ -391,6 +412,146 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
                 auto promise = resolveMethod.callWithThis(rt, promiseConstructor, facebook::jsi::Value(true));
                 
                 return promise;
+            }
+        );
+    }
+    // Material management functions
+    else if (nameStr == "createViroMaterial") {
+        return facebook::jsi::Function::createFromHostFunction(
+            runtime,
+            name,
+            2,  // materialName, properties
+            [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
+                __strong ViroFabricContainer *container = weakContainer;
+                if (!container) return facebook::jsi::Value::undefined();
+                
+                if (count < 2) {
+                    throw facebook::jsi::JSError(rt, "createViroMaterial requires 2 arguments");
+                }
+                
+                NSString *materialName = [NSString stringWithUTF8String:args[0].getString(rt).utf8(rt).c_str()];
+                id props = [container convertJSIValueToObjC:args[1] runtime:rt];
+                
+                // Create the material
+                [container createMaterial:materialName withProps:props];
+                
+                return facebook::jsi::Value::undefined();
+            }
+        );
+    }
+    else if (nameStr == "updateViroMaterial") {
+        return facebook::jsi::Function::createFromHostFunction(
+            runtime,
+            name,
+            2,  // materialName, properties
+            [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
+                __strong ViroFabricContainer *container = weakContainer;
+                if (!container) return facebook::jsi::Value::undefined();
+                
+                if (count < 2) {
+                    throw facebook::jsi::JSError(rt, "updateViroMaterial requires 2 arguments");
+                }
+                
+                NSString *materialName = [NSString stringWithUTF8String:args[0].getString(rt).utf8(rt).c_str()];
+                id props = [container convertJSIValueToObjC:args[1] runtime:rt];
+                
+                // Update the material
+                [container updateMaterial:materialName withProps:props];
+                
+                return facebook::jsi::Value::undefined();
+            }
+        );
+    }
+    // Animation functions
+    else if (nameStr == "createViroAnimation") {
+        return facebook::jsi::Function::createFromHostFunction(
+            runtime,
+            name,
+            2,  // animationName, properties
+            [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
+                __strong ViroFabricContainer *container = weakContainer;
+                if (!container) return facebook::jsi::Value::undefined();
+                
+                if (count < 2) {
+                    throw facebook::jsi::JSError(rt, "createViroAnimation requires 2 arguments");
+                }
+                
+                NSString *animationName = [NSString stringWithUTF8String:args[0].getString(rt).utf8(rt).c_str()];
+                id props = [container convertJSIValueToObjC:args[1] runtime:rt];
+                
+                // Create the animation
+                [container createAnimation:animationName withProps:props];
+                
+                return facebook::jsi::Value::undefined();
+            }
+        );
+    }
+    else if (nameStr == "executeViroAnimation") {
+        return facebook::jsi::Function::createFromHostFunction(
+            runtime,
+            name,
+            3,  // nodeId, animationName, options
+            [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
+                __strong ViroFabricContainer *container = weakContainer;
+                if (!container) return facebook::jsi::Value::undefined();
+                
+                if (count < 3) {
+                    throw facebook::jsi::JSError(rt, "executeViroAnimation requires 3 arguments");
+                }
+                
+                NSString *nodeId = [NSString stringWithUTF8String:args[0].getString(rt).utf8(rt).c_str()];
+                NSString *animationName = [NSString stringWithUTF8String:args[1].getString(rt).utf8(rt).c_str()];
+                id options = [container convertJSIValueToObjC:args[2] runtime:rt];
+                
+                // Execute the animation
+                [container executeAnimation:animationName onNode:nodeId withOptions:options];
+                
+                return facebook::jsi::Value::undefined();
+            }
+        );
+    }
+    // AR specific functions
+    else if (nameStr == "setViroARPlaneDetection") {
+        return facebook::jsi::Function::createFromHostFunction(
+            runtime,
+            name,
+            1,  // config
+            [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
+                __strong ViroFabricContainer *container = weakContainer;
+                if (!container) return facebook::jsi::Value::undefined();
+                
+                if (count < 1) {
+                    throw facebook::jsi::JSError(rt, "setViroARPlaneDetection requires 1 argument");
+                }
+                
+                id config = [container convertJSIValueToObjC:args[0] runtime:rt];
+                
+                // Set AR plane detection
+                [container setARPlaneDetection:config];
+                
+                return facebook::jsi::Value::undefined();
+            }
+        );
+    }
+    else if (nameStr == "setViroARImageTargets") {
+        return facebook::jsi::Function::createFromHostFunction(
+            runtime,
+            name,
+            1,  // targets
+            [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
+                __strong ViroFabricContainer *container = weakContainer;
+                if (!container) return facebook::jsi::Value::undefined();
+                
+                if (count < 1) {
+                    throw facebook::jsi::JSError(rt, "setViroARImageTargets requires 1 argument");
+                }
+                
+                id targets = [container convertJSIValueToObjC:args[0] runtime:rt];
+                
+                // Set AR image targets
+                [container setARImageTargets:targets];
+                
+                return facebook::jsi::Value::undefined();
             }
         );
     }
@@ -727,6 +888,168 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
                                                          }];
     } else {
         RCTLogError(@"Cannot dispatch event: bridge is not available");
+    }
+}
+
+#pragma mark - Material Management
+
+- (void)createMaterial:(NSString *)materialName withProps:(NSDictionary *)props {
+    RCTLogInfo(@"Creating material: %@", materialName);
+    
+    // Create a new VRT material using the existing ViroReact framework
+    Class materialClass = NSClassFromString(@"VRTMaterial");
+    if (!materialClass) {
+        RCTLogError(@"VRTMaterial class not found");
+        return;
+    }
+    
+    id material = [[materialClass alloc] initWithBridge:_bridge];
+    
+    // Set material properties
+    if (props && [material respondsToSelector:@selector(setProperties:)]) {
+        [material performSelector:@selector(setProperties:) withObject:props];
+    }
+    
+    // Store the material in a registry (we'll need to add this property)
+    if (!_materialRegistry) {
+        _materialRegistry = [NSMutableDictionary new];
+    }
+    _materialRegistry[materialName] = material;
+    
+    RCTLogInfo(@"Successfully created material: %@", materialName);
+}
+
+- (void)updateMaterial:(NSString *)materialName withProps:(NSDictionary *)props {
+    RCTLogInfo(@"Updating material: %@", materialName);
+    
+    // Get the material from the registry
+    id material = _materialRegistry[materialName];
+    if (!material) {
+        RCTLogError(@"Cannot update material: material not found - %@", materialName);
+        return;
+    }
+    
+    // Update material properties
+    if (props && [material respondsToSelector:@selector(setProperties:)]) {
+        [material performSelector:@selector(setProperties:) withObject:props];
+    }
+    
+    RCTLogInfo(@"Successfully updated material: %@", materialName);
+}
+
+#pragma mark - Animation Management
+
+- (void)createAnimation:(NSString *)animationName withProps:(NSDictionary *)props {
+    RCTLogInfo(@"Creating animation: %@", animationName);
+    
+    // Create a new VRT animation using the existing ViroReact framework
+    Class animationClass = NSClassFromString(@"VRTAnimation");
+    if (!animationClass) {
+        RCTLogError(@"VRTAnimation class not found");
+        return;
+    }
+    
+    id animation = [[animationClass alloc] initWithBridge:_bridge];
+    
+    // Set animation properties
+    if (props && [animation respondsToSelector:@selector(setProperties:)]) {
+        [animation performSelector:@selector(setProperties:) withObject:props];
+    }
+    
+    // Store the animation in a registry (we'll need to add this property)
+    if (!_animationRegistry) {
+        _animationRegistry = [NSMutableDictionary new];
+    }
+    _animationRegistry[animationName] = animation;
+    
+    RCTLogInfo(@"Successfully created animation: %@", animationName);
+}
+
+- (void)executeAnimation:(NSString *)animationName onNode:(NSString *)nodeId withOptions:(NSDictionary *)options {
+    RCTLogInfo(@"Executing animation: %@ on node: %@", animationName, nodeId);
+    
+    // Get the node from the registry
+    id node = _nodeRegistry[nodeId];
+    if (!node) {
+        RCTLogError(@"Cannot execute animation: node not found - %@", nodeId);
+        return;
+    }
+    
+    // Get the animation from the registry
+    id animation = _animationRegistry[animationName];
+    if (!animation) {
+        RCTLogError(@"Cannot execute animation: animation not found - %@", animationName);
+        return;
+    }
+    
+    // If the node is a VRT node, execute the animation
+    Class vrtNodeClass = NSClassFromString(@"VRTNode");
+    if (vrtNodeClass && [node isKindOfClass:vrtNodeClass]) {
+        // Try to execute the animation using the existing VRT animation system
+        if ([node respondsToSelector:@selector(executeAnimation:withOptions:)]) {
+            [node performSelector:@selector(executeAnimation:withOptions:) 
+                      withObject:animation 
+                      withObject:options];
+        } else if ([node respondsToSelector:@selector(runAnimation:)]) {
+            [node performSelector:@selector(runAnimation:) withObject:animation];
+        }
+        
+        RCTLogInfo(@"Successfully executed animation: %@ on node: %@", animationName, nodeId);
+    } else {
+        RCTLogWarn(@"Cannot execute animation on non-VRT node: %@", nodeId);
+    }
+}
+
+#pragma mark - AR Configuration
+
+- (void)setARPlaneDetection:(NSDictionary *)config {
+    RCTLogInfo(@"Setting AR plane detection configuration");
+    
+    if (!_isAR || !_arSceneNavigator) {
+        RCTLogWarn(@"Cannot set AR plane detection: not in AR mode");
+        return;
+    }
+    
+    // Configure AR plane detection using the existing VRTARSceneNavigator API
+    if (config) {
+        // Extract configuration options
+        BOOL enabled = [config[@"enabled"] boolValue];
+        NSString *alignment = config[@"alignment"] ?: @"Horizontal";
+        
+        // Apply configuration to the AR scene navigator
+        if ([_arSceneNavigator respondsToSelector:@selector(setPlaneDetectionEnabled:)]) {
+            [_arSceneNavigator performSelector:@selector(setPlaneDetectionEnabled:) 
+                                    withObject:@(enabled)];
+        }
+        
+        if ([_arSceneNavigator respondsToSelector:@selector(setPlaneDetectionAlignment:)]) {
+            [_arSceneNavigator performSelector:@selector(setPlaneDetectionAlignment:) 
+                                    withObject:alignment];
+        }
+        
+        RCTLogInfo(@"Successfully configured AR plane detection - enabled: %@, alignment: %@", 
+                   @(enabled), alignment);
+    }
+}
+
+- (void)setARImageTargets:(NSDictionary *)targets {
+    RCTLogInfo(@"Setting AR image targets");
+    
+    if (!_isAR || !_arSceneNavigator) {
+        RCTLogWarn(@"Cannot set AR image targets: not in AR mode");
+        return;
+    }
+    
+    // Configure AR image targets using the existing VRTARSceneNavigator API
+    if (targets) {
+        // Apply image targets to the AR scene navigator
+        if ([_arSceneNavigator respondsToSelector:@selector(setImageTargets:)]) {
+            [_arSceneNavigator performSelector:@selector(setImageTargets:) 
+                                    withObject:targets];
+        }
+        
+        RCTLogInfo(@"Successfully configured AR image targets with %lu targets", 
+                   (unsigned long)[targets count]);
     }
 }
 

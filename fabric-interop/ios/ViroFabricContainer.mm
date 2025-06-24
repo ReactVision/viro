@@ -589,11 +589,8 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
             // Create a scene using the existing VRTScene implementation
             id scene = [[sceneClass alloc] initWithBridge:_bridge];
             
-            // Instead of using setProps:, set properties individually or use a different method
-            // Check if the scene responds to specific property setters
-            if ([scene respondsToSelector:@selector(setProperties:)]) {
-                [scene performSelector:@selector(setProperties:) withObject:props];
-            }
+            // Set properties using individual property setters
+            [self setNodeProperties:scene withProps:props];
             
             // Use setScene: instead of setSceneView:
             if ([_sceneNavigator respondsToSelector:@selector(setScene:)]) {
@@ -1246,11 +1243,7 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         
         // Set props if node was created and props are provided
         if (node && props) {
-            if ([node respondsToSelector:@selector(setProperties:)]) {
-                [node performSelector:@selector(setProperties:) withObject:props];
-            } else if ([node respondsToSelector:@selector(setProps:)]) {
-                [node performSelector:@selector(setProps:) withObject:props];
-            }
+            [self setNodeProperties:node withProps:props];
         }
         
     } @catch (NSException *exception) {
@@ -1389,6 +1382,300 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
     }
     
     return facebook::jsi::Value::undefined();
+}
+
+#pragma mark - Property Setting System
+
+/**
+ * Set properties on a VRT node using individual property setters.
+ * This replaces the generic setProperties: method with the actual VRT property setting pattern.
+ */
+- (void)setNodeProperties:(id)node withProps:(NSDictionary *)props {
+    if (!node || !props) {
+        return;
+    }
+    
+    @try {
+        // Transform properties
+        if (props[@"position"] && [props[@"position"] isKindOfClass:[NSArray class]]) {
+            NSArray *position = props[@"position"];
+            if ([node respondsToSelector:@selector(setPosition:)]) {
+                [node performSelector:@selector(setPosition:) withObject:position];
+            }
+        }
+        
+        if (props[@"rotation"] && [props[@"rotation"] isKindOfClass:[NSArray class]]) {
+            NSArray *rotation = props[@"rotation"];
+            if ([node respondsToSelector:@selector(setRotation:)]) {
+                [node performSelector:@selector(setRotation:) withObject:rotation];
+            }
+        }
+        
+        if (props[@"scale"] && [props[@"scale"] isKindOfClass:[NSArray class]]) {
+            NSArray *scale = props[@"scale"];
+            if ([node respondsToSelector:@selector(setScale:)]) {
+                [node performSelector:@selector(setScale:) withObject:scale];
+            }
+        }
+        
+        if (props[@"rotationPivot"] && [props[@"rotationPivot"] isKindOfClass:[NSArray class]]) {
+            NSArray *rotationPivot = props[@"rotationPivot"];
+            if ([node respondsToSelector:@selector(setRotationPivot:)]) {
+                [node performSelector:@selector(setRotationPivot:) withObject:rotationPivot];
+            }
+        }
+        
+        if (props[@"scalePivot"] && [props[@"scalePivot"] isKindOfClass:[NSArray class]]) {
+            NSArray *scalePivot = props[@"scalePivot"];
+            if ([node respondsToSelector:@selector(setScalePivot:)]) {
+                [node performSelector:@selector(setScalePivot:) withObject:scalePivot];
+            }
+        }
+        
+        // Appearance properties
+        if (props[@"opacity"] && [props[@"opacity"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *opacity = props[@"opacity"];
+            if ([node respondsToSelector:@selector(setOpacity:)]) {
+                [node performSelector:@selector(setOpacity:) withObject:opacity];
+            }
+        }
+        
+        if (props[@"visible"] && [props[@"visible"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *visible = props[@"visible"];
+            if ([node respondsToSelector:@selector(setVisible:)]) {
+                [node performSelector:@selector(setVisible:) withObject:visible];
+            }
+        }
+        
+        if (props[@"renderingOrder"] && [props[@"renderingOrder"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *renderingOrder = props[@"renderingOrder"];
+            if ([node respondsToSelector:@selector(setRenderingOrder:)]) {
+                [node performSelector:@selector(setRenderingOrder:) withObject:renderingOrder];
+            }
+        }
+        
+        // Lighting properties
+        if (props[@"lightReceivingBitMask"] && [props[@"lightReceivingBitMask"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *bitMask = props[@"lightReceivingBitMask"];
+            if ([node respondsToSelector:@selector(setLightReceivingBitMask:)]) {
+                [node performSelector:@selector(setLightReceivingBitMask:) withObject:bitMask];
+            }
+        }
+        
+        if (props[@"shadowCastingBitMask"] && [props[@"shadowCastingBitMask"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *bitMask = props[@"shadowCastingBitMask"];
+            if ([node respondsToSelector:@selector(setShadowCastingBitMask:)]) {
+                [node performSelector:@selector(setShadowCastingBitMask:) withObject:bitMask];
+            }
+        }
+        
+        // Event handling properties
+        if (props[@"canHover"] && [props[@"canHover"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canHover = props[@"canHover"];
+            if ([node respondsToSelector:@selector(setCanHover:)]) {
+                [node performSelector:@selector(setCanHover:) withObject:canHover];
+            }
+        }
+        
+        if (props[@"canClick"] && [props[@"canClick"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canClick = props[@"canClick"];
+            if ([node respondsToSelector:@selector(setCanClick:)]) {
+                [node performSelector:@selector(setCanClick:) withObject:canClick];
+            }
+        }
+        
+        if (props[@"canTouch"] && [props[@"canTouch"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canTouch = props[@"canTouch"];
+            if ([node respondsToSelector:@selector(setCanTouch:)]) {
+                [node performSelector:@selector(setCanTouch:) withObject:canTouch];
+            }
+        }
+        
+        if (props[@"canScroll"] && [props[@"canScroll"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canScroll = props[@"canScroll"];
+            if ([node respondsToSelector:@selector(setCanScroll:)]) {
+                [node performSelector:@selector(setCanScroll:) withObject:canScroll];
+            }
+        }
+        
+        if (props[@"canSwipe"] && [props[@"canSwipe"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canSwipe = props[@"canSwipe"];
+            if ([node respondsToSelector:@selector(setCanSwipe:)]) {
+                [node performSelector:@selector(setCanSwipe:) withObject:canSwipe];
+            }
+        }
+        
+        if (props[@"canDrag"] && [props[@"canDrag"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canDrag = props[@"canDrag"];
+            if ([node respondsToSelector:@selector(setCanDrag:)]) {
+                [node performSelector:@selector(setCanDrag:) withObject:canDrag];
+            }
+        }
+        
+        if (props[@"canFuse"] && [props[@"canFuse"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canFuse = props[@"canFuse"];
+            if ([node respondsToSelector:@selector(setCanFuse:)]) {
+                [node performSelector:@selector(setCanFuse:) withObject:canFuse];
+            }
+        }
+        
+        if (props[@"canPinch"] && [props[@"canPinch"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canPinch = props[@"canPinch"];
+            if ([node respondsToSelector:@selector(setCanPinch:)]) {
+                [node performSelector:@selector(setCanPinch:) withObject:canPinch];
+            }
+        }
+        
+        if (props[@"canRotate"] && [props[@"canRotate"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canRotate = props[@"canRotate"];
+            if ([node respondsToSelector:@selector(setCanRotate:)]) {
+                [node performSelector:@selector(setCanRotate:) withObject:canRotate];
+            }
+        }
+        
+        if (props[@"timeToFuse"] && [props[@"timeToFuse"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *timeToFuse = props[@"timeToFuse"];
+            if ([node respondsToSelector:@selector(setTimeToFuse:)]) {
+                [node performSelector:@selector(setTimeToFuse:) withObject:timeToFuse];
+            }
+        }
+        
+        if (props[@"highAccuracyEvents"] && [props[@"highAccuracyEvents"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *highAccuracyEvents = props[@"highAccuracyEvents"];
+            if ([node respondsToSelector:@selector(setHighAccuracyEvents:)]) {
+                [node performSelector:@selector(setHighAccuracyEvents:) withObject:highAccuracyEvents];
+            }
+        }
+        
+        if (props[@"ignoreEventHandling"] && [props[@"ignoreEventHandling"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *ignoreEventHandling = props[@"ignoreEventHandling"];
+            if ([node respondsToSelector:@selector(setIgnoreEventHandling:)]) {
+                [node performSelector:@selector(setIgnoreEventHandling:) withObject:ignoreEventHandling];
+            }
+        }
+        
+        // Drag properties
+        if (props[@"dragType"] && [props[@"dragType"] isKindOfClass:[NSString class]]) {
+            NSString *dragType = props[@"dragType"];
+            if ([node respondsToSelector:@selector(setDragType:)]) {
+                [node performSelector:@selector(setDragType:) withObject:dragType];
+            }
+        }
+        
+        if (props[@"dragPlane"] && [props[@"dragPlane"] isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *dragPlane = props[@"dragPlane"];
+            if ([node respondsToSelector:@selector(setDragPlane:)]) {
+                [node performSelector:@selector(setDragPlane:) withObject:dragPlane];
+            }
+        }
+        
+        // Animation properties
+        if (props[@"animation"] && [props[@"animation"] isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *animation = props[@"animation"];
+            if ([node respondsToSelector:@selector(setAnimation:)]) {
+                [node performSelector:@selector(setAnimation:) withObject:animation];
+            }
+        }
+        
+        // Material properties
+        if (props[@"materials"] && [props[@"materials"] isKindOfClass:[NSArray class]]) {
+            NSArray *materials = props[@"materials"];
+            [self setNodeMaterials:node withMaterials:materials];
+        }
+        
+        // Transform behaviors
+        if (props[@"transformBehaviors"] && [props[@"transformBehaviors"] isKindOfClass:[NSArray class]]) {
+            NSArray *transformBehaviors = props[@"transformBehaviors"];
+            if ([node respondsToSelector:@selector(setTransformBehaviors:)]) {
+                [node performSelector:@selector(setTransformBehaviors:) withObject:transformBehaviors];
+            }
+        }
+        
+        // Physics properties
+        if (props[@"physicsBody"] && [props[@"physicsBody"] isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *physicsBody = props[@"physicsBody"];
+            if ([node respondsToSelector:@selector(setPhysicsBody:)]) {
+                [node performSelector:@selector(setPhysicsBody:) withObject:physicsBody];
+            }
+        }
+        
+        if (props[@"canCollide"] && [props[@"canCollide"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *canCollide = props[@"canCollide"];
+            if ([node respondsToSelector:@selector(setCanCollide:)]) {
+                [node performSelector:@selector(setCanCollide:) withObject:canCollide];
+            }
+        }
+        
+        // Viro tag
+        if (props[@"viroTag"] && [props[@"viroTag"] isKindOfClass:[NSString class]]) {
+            NSString *viroTag = props[@"viroTag"];
+            if ([node respondsToSelector:@selector(setViroTag:)]) {
+                [node performSelector:@selector(setViroTag:) withObject:viroTag];
+            }
+        }
+        
+        // Transform delegate
+        if (props[@"hasTransformDelegate"] && [props[@"hasTransformDelegate"] isKindOfClass:[NSNumber class]]) {
+            NSNumber *hasTransformDelegate = props[@"hasTransformDelegate"];
+            if ([node respondsToSelector:@selector(setOnNativeTransformDelegate:)]) {
+                [node performSelector:@selector(setOnNativeTransformDelegate:) withObject:hasTransformDelegate];
+            }
+        }
+        
+    } @catch (NSException *exception) {
+        RCTLogError(@"Error setting node properties: %@", exception.reason);
+    }
+}
+
+/**
+ * Set materials on a VRT node using the MaterialManager.
+ */
+- (void)setNodeMaterials:(id)node withMaterials:(NSArray *)materials {
+    if (!node || !materials) {
+        return;
+    }
+    
+    @try {
+        // Get the material manager
+        Class materialManagerClass = NSClassFromString(@"VRTMaterialManager");
+        if (!materialManagerClass) {
+            RCTLogError(@"VRTMaterialManager class not found");
+            return;
+        }
+        
+        id materialManager = [_bridge moduleForClass:materialManagerClass];
+        if (!materialManager) {
+            RCTLogError(@"VRTMaterialManager module not available");
+            return;
+        }
+        
+        // Convert material names to actual Material objects
+        NSMutableArray *nativeMaterials = [NSMutableArray new];
+        for (NSString *materialName in materials) {
+            if (![materialName isKindOfClass:[NSString class]]) {
+                continue;
+            }
+            
+            // Get the material by name
+            if ([materialManager respondsToSelector:@selector(getMaterialByName:)]) {
+                id nativeMaterial = [materialManager performSelector:@selector(getMaterialByName:) withObject:materialName];
+                
+                if (nativeMaterial) {
+                    [nativeMaterials addObject:nativeMaterial];
+                } else {
+                    RCTLogWarn(@"Material [%@] not found. Did you create it?", materialName);
+                }
+            }
+        }
+        
+        // Set the materials on the node
+        if ([node respondsToSelector:@selector(setMaterials:)]) {
+            [node performSelector:@selector(setMaterials:) withObject:nativeMaterials];
+        }
+        
+    } @catch (NSException *exception) {
+        RCTLogError(@"Error setting node materials: %@", exception.reason);
+    }
 }
 
 @end

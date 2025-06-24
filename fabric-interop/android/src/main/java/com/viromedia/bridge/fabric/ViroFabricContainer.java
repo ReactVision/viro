@@ -55,8 +55,11 @@ import com.viromedia.bridge.component.VRTSound;
 import com.viromedia.bridge.component.VRTSoundField;
 import com.viromedia.bridge.component.VRTSpatialSound;
 import com.viromedia.bridge.utility.ComponentEventDelegate.VRTEventListener;
+import com.viromedia.bridge.utility.Helper;
 import com.viromedia.bridge.module.MaterialManager;
 import com.viromedia.bridge.module.AnimationManager;
+import com.facebook.react.bridge.ReadableArray;
+import com.facebook.react.bridge.ReadableType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -512,7 +515,7 @@ public class ViroFabricContainer extends FrameLayout {
             
             // Set props if node was created and props are provided
             if (node != null && props != null) {
-                node.setProps(props);
+                setNodeProperties(node, props);
             }
             
         } catch (Exception e) {
@@ -541,7 +544,7 @@ public class ViroFabricContainer extends FrameLayout {
             // If the node is a VRT node, update its properties
             if (node instanceof VRTNode) {
                 VRTNode vrtNode = (VRTNode) node;
-                vrtNode.setProps(props);
+                setNodeProperties(vrtNode, props);
                 Log.d(TAG, "Successfully updated VRT node: " + nodeId);
             } else if (node instanceof Map) {
                 // If it's just a dictionary (for nodes we don't have a VRT class for yet),
@@ -985,6 +988,246 @@ public class ViroFabricContainer extends FrameLayout {
         }
     }
     
+    /**
+     * Set properties on a VRT node using individual property setters.
+     * This replaces the generic setProps() method with the actual VRT property setting pattern.
+     */
+    private void setNodeProperties(VRTNode node, ReadableMap props) {
+        if (node == null || props == null) {
+            return;
+        }
+        
+        try {
+            // Default values for missing properties
+            final float[] DEFAULT_ZERO_VEC = new float[]{0, 0, 0};
+            final float[] DEFAULT_SCALE_VEC = new float[]{1, 1, 1};
+            
+            // Transform properties
+            if (props.hasKey("position") && props.getType("position") == ReadableType.Array) {
+                ReadableArray position = props.getArray("position");
+                node.setPosition(Helper.toFloatArray(position, DEFAULT_ZERO_VEC));
+            }
+            
+            if (props.hasKey("rotation") && props.getType("rotation") == ReadableType.Array) {
+                ReadableArray rotation = props.getArray("rotation");
+                node.setRotation(Helper.toFloatArray(rotation, DEFAULT_ZERO_VEC));
+            }
+            
+            if (props.hasKey("scale") && props.getType("scale") == ReadableType.Array) {
+                ReadableArray scale = props.getArray("scale");
+                node.setScale(Helper.toFloatArray(scale, DEFAULT_SCALE_VEC));
+            }
+            
+            if (props.hasKey("rotationPivot") && props.getType("rotationPivot") == ReadableType.Array) {
+                ReadableArray rotationPivot = props.getArray("rotationPivot");
+                node.setRotationPivot(Helper.toFloatArray(rotationPivot, DEFAULT_ZERO_VEC));
+            }
+            
+            if (props.hasKey("scalePivot") && props.getType("scalePivot") == ReadableType.Array) {
+                ReadableArray scalePivot = props.getArray("scalePivot");
+                node.setScalePivot(Helper.toFloatArray(scalePivot, DEFAULT_ZERO_VEC));
+            }
+            
+            // Appearance properties
+            if (props.hasKey("opacity") && props.getType("opacity") == ReadableType.Number) {
+                float opacity = (float) props.getDouble("opacity");
+                node.setOpacity(opacity);
+            }
+            
+            if (props.hasKey("visible") && props.getType("visible") == ReadableType.Boolean) {
+                boolean visible = props.getBoolean("visible");
+                node.setVisible(visible);
+            }
+            
+            if (props.hasKey("renderingOrder") && props.getType("renderingOrder") == ReadableType.Number) {
+                int renderingOrder = props.getInt("renderingOrder");
+                node.setRenderingOrder(renderingOrder);
+            }
+            
+            // Lighting properties
+            if (props.hasKey("lightReceivingBitMask") && props.getType("lightReceivingBitMask") == ReadableType.Number) {
+                int bitMask = props.getInt("lightReceivingBitMask");
+                node.setLightReceivingBitMask(bitMask);
+            }
+            
+            if (props.hasKey("shadowCastingBitMask") && props.getType("shadowCastingBitMask") == ReadableType.Number) {
+                int bitMask = props.getInt("shadowCastingBitMask");
+                node.setShadowCastingBitMask(bitMask);
+            }
+            
+            // Event handling properties
+            if (props.hasKey("canHover") && props.getType("canHover") == ReadableType.Boolean) {
+                boolean canHover = props.getBoolean("canHover");
+                node.setCanHover(canHover);
+            }
+            
+            if (props.hasKey("canClick") && props.getType("canClick") == ReadableType.Boolean) {
+                boolean canClick = props.getBoolean("canClick");
+                node.setCanClick(canClick);
+            }
+            
+            if (props.hasKey("canTouch") && props.getType("canTouch") == ReadableType.Boolean) {
+                boolean canTouch = props.getBoolean("canTouch");
+                node.setCanTouch(canTouch);
+            }
+            
+            if (props.hasKey("canScroll") && props.getType("canScroll") == ReadableType.Boolean) {
+                boolean canScroll = props.getBoolean("canScroll");
+                node.setCanScroll(canScroll);
+            }
+            
+            if (props.hasKey("canSwipe") && props.getType("canSwipe") == ReadableType.Boolean) {
+                boolean canSwipe = props.getBoolean("canSwipe");
+                node.setCanSwipe(canSwipe);
+            }
+            
+            if (props.hasKey("canDrag") && props.getType("canDrag") == ReadableType.Boolean) {
+                boolean canDrag = props.getBoolean("canDrag");
+                node.setCanDrag(canDrag);
+            }
+            
+            if (props.hasKey("canFuse") && props.getType("canFuse") == ReadableType.Boolean) {
+                boolean canFuse = props.getBoolean("canFuse");
+                node.setCanFuse(canFuse);
+            }
+            
+            if (props.hasKey("canPinch") && props.getType("canPinch") == ReadableType.Boolean) {
+                boolean canPinch = props.getBoolean("canPinch");
+                node.setCanPinch(canPinch);
+            }
+            
+            if (props.hasKey("canRotate") && props.getType("canRotate") == ReadableType.Boolean) {
+                boolean canRotate = props.getBoolean("canRotate");
+                node.setCanRotate(canRotate);
+            }
+            
+            if (props.hasKey("timeToFuse") && props.getType("timeToFuse") == ReadableType.Number) {
+                float timeToFuse = (float) props.getDouble("timeToFuse");
+                node.setTimeToFuse(timeToFuse);
+            }
+            
+            if (props.hasKey("highAccuracyEvents") && props.getType("highAccuracyEvents") == ReadableType.Boolean) {
+                boolean highAccuracyEvents = props.getBoolean("highAccuracyEvents");
+                node.setHighAccuracyEvents(highAccuracyEvents);
+            }
+            
+            if (props.hasKey("ignoreEventHandling") && props.getType("ignoreEventHandling") == ReadableType.Boolean) {
+                boolean ignoreEventHandling = props.getBoolean("ignoreEventHandling");
+                node.setIgnoreEventHandling(ignoreEventHandling);
+            }
+            
+            // Drag properties
+            if (props.hasKey("dragType") && props.getType("dragType") == ReadableType.String) {
+                String dragType = props.getString("dragType");
+                node.setDragType(dragType);
+            }
+            
+            if (props.hasKey("dragPlane") && props.getType("dragPlane") == ReadableType.Map) {
+                ReadableMap dragPlane = props.getMap("dragPlane");
+                node.setDragPlane(dragPlane);
+            }
+            
+            // Animation properties
+            if (props.hasKey("animation") && props.getType("animation") == ReadableType.Map) {
+                ReadableMap animation = props.getMap("animation");
+                node.setAnimation(animation);
+            }
+            
+            // Material properties
+            if (props.hasKey("materials") && props.getType("materials") == ReadableType.Array) {
+                ReadableArray materials = props.getArray("materials");
+                setNodeMaterials(node, materials);
+            }
+            
+            // Transform behaviors
+            if (props.hasKey("transformBehaviors") && props.getType("transformBehaviors") == ReadableType.Array) {
+                ReadableArray transformBehaviors = props.getArray("transformBehaviors");
+                String[] behaviors = new String[transformBehaviors.size()];
+                for (int i = 0; i < transformBehaviors.size(); i++) {
+                    behaviors[i] = transformBehaviors.getString(i);
+                }
+                node.setTransformBehaviors(behaviors);
+            }
+            
+            // Physics properties
+            if (props.hasKey("physicsBody") && props.getType("physicsBody") == ReadableType.Map) {
+                ReadableMap physicsBody = props.getMap("physicsBody");
+                node.setPhysicsBody(physicsBody);
+            }
+            
+            if (props.hasKey("canCollide") && props.getType("canCollide") == ReadableType.Boolean) {
+                boolean canCollide = props.getBoolean("canCollide");
+                node.setCanCollide(canCollide);
+            }
+            
+            // Viro tag
+            if (props.hasKey("viroTag") && props.getType("viroTag") == ReadableType.String) {
+                String viroTag = props.getString("viroTag");
+                node.setViroTag(viroTag);
+            }
+            
+            // Transform delegate
+            if (props.hasKey("hasTransformDelegate") && props.getType("hasTransformDelegate") == ReadableType.Boolean) {
+                boolean hasTransformDelegate = props.getBoolean("hasTransformDelegate");
+                node.setOnNativeTransformDelegate(hasTransformDelegate);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting node properties: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Set materials on a VRT node using the MaterialManager.
+     */
+    private void setNodeMaterials(VRTNode node, ReadableArray materials) {
+        if (node == null || materials == null) {
+            return;
+        }
+        
+        try {
+            // Initialize material manager if needed
+            if (mMaterialManager == null) {
+                mMaterialManager = mReactContext.getNativeModule(MaterialManager.class);
+            }
+            
+            if (mMaterialManager != null) {
+                // Convert material names to actual Material objects
+                List<com.viro.core.Material> nativeMaterials = new ArrayList<>();
+                for (int i = 0; i < materials.size(); i++) {
+                    String materialName = materials.getString(i);
+                    com.viro.core.Material nativeMaterial = mMaterialManager.getMaterial(materialName);
+                    
+                    if (mMaterialManager.isVideoMaterial(materialName)) {
+                        if (!(nativeMaterial.getDiffuseTexture() instanceof com.viro.core.VideoTexture)) {
+                            // Recreate the material with the proper context
+                            if (node.getViroContext() != null) {
+                                MaterialManager.MaterialWrapper materialWrapper = mMaterialManager.getMaterialWrapper(materialName);
+                                com.viro.core.VideoTexture videoTexture = new com.viro.core.VideoTexture(node.getViroContext(), materialWrapper.getVideoTextureURI());
+                                materialWrapper.recreate(videoTexture);
+                                nativeMaterial = materialWrapper.getNativeMaterial();
+                            }
+                        }
+                    }
+                    
+                    if (nativeMaterial == null) {
+                        Log.w(TAG, "Material [" + materialName + "] not found. Did you create it?");
+                        continue;
+                    }
+                    
+                    nativeMaterials.add(nativeMaterial);
+                }
+                
+                // Set the materials on the node
+                node.setMaterials(nativeMaterials);
+            } else {
+                Log.w(TAG, "MaterialManager not available for setting materials");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting node materials: " + e.getMessage(), e);
+        }
+    }
+
     @Override
     protected void finalize() throws Throwable {
         super.finalize();

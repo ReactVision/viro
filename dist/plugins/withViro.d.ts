@@ -51,6 +51,9 @@ export declare const DEFAULTS: {
 /**
  * Configures Viro to work with Expo projects.
  *
+ * IMPORTANT: This plugin requires React Native New Architecture (Fabric) to be enabled.
+ * ViroReact 2.43.1+ only supports New Architecture.
+ *
  * @param config Expo ConfigPlugin
  * @returns expo configuration
  */

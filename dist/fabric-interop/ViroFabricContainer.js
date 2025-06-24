@@ -70,7 +70,7 @@ const NativeViroFabricContainer = (0, react_native_1.requireNativeComponent)("Vi
  * It creates a native view that the Viro renderer can draw on and manages the
  * lifecycle of the Viro system.
  */
-const ViroFabricContainer = ({ apiKey, debug = false, arEnabled = false, worldAlignment = "Gravity", onInitialized, onTrackingUpdated, onCameraTransformUpdate, children, }) => {
+const ViroFabricContainer = ({ debug = false, arEnabled = false, worldAlignment = "Gravity", onInitialized, onTrackingUpdated, onCameraTransformUpdate, onSceneStateChanged, onMemoryWarning, children, }) => {
     // Reference to the native component
     const containerRef = (0, react_1.useRef)(null);
     // Root node ID for the scene
@@ -132,12 +132,7 @@ const ViroFabricContainer = ({ apiKey, debug = false, arEnabled = false, worldAl
                     return;
                 }
                 // Call the native method to initialize
-                react_native_1.UIManager.dispatchViewManagerCommand(nodeHandle, ViroFabricContainerCommands.initialize, [
-                    apiKey || "",
-                    debug || false,
-                    arEnabled || false,
-                    worldAlignment || "Gravity",
-                ]);
+                react_native_1.UIManager.dispatchViewManagerCommand(nodeHandle, ViroFabricContainerCommands.initialize, [debug || false, arEnabled || false, worldAlignment || "Gravity"]);
             }
             catch (error) {
                 console.error("Failed to initialize ViroFabricContainer:", error);
@@ -165,7 +160,7 @@ const ViroFabricContainer = ({ apiKey, debug = false, arEnabled = false, worldAl
                 }
             }
         };
-    }, [apiKey, debug, arEnabled, worldAlignment]);
+    }, [debug, arEnabled, worldAlignment]);
     // Handle initialization event
     const handleInitialized = (event) => {
         if (onInitialized) {
@@ -184,9 +179,21 @@ const ViroFabricContainer = ({ apiKey, debug = false, arEnabled = false, worldAl
             onCameraTransformUpdate(event.nativeEvent);
         }
     };
+    // Handle scene state changed event
+    const handleSceneStateChanged = (event) => {
+        if (onSceneStateChanged) {
+            onSceneStateChanged(event.nativeEvent);
+        }
+    };
+    // Handle memory warning event
+    const handleMemoryWarning = (event) => {
+        if (onMemoryWarning) {
+            onMemoryWarning(event.nativeEvent);
+        }
+    };
     // This will throw an error if the native component is not available or New Architecture is not enabled
     isFabricComponentAvailable();
-    return (<NativeViroFabricContainer ref={containerRef} style={{ flex: 1 }} onInitialized={handleInitialized} onTrackingUpdated={handleTrackingUpdated} onCameraTransformUpdate={handleCameraTransformUpdate}>
+    return (<NativeViroFabricContainer ref={containerRef} style={{ flex: 1 }} onInitialized={handleInitialized} onTrackingUpdated={handleTrackingUpdated} onCameraTransformUpdate={handleCameraTransformUpdate} onSceneStateChanged={handleSceneStateChanged} onMemoryWarning={handleMemoryWarning}>
       {children}
     </NativeViroFabricContainer>);
 };

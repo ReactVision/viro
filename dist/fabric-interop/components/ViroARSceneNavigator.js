@@ -47,17 +47,13 @@ const ViroGlobal_1 = require("./ViroGlobal");
  * It provides a container for AR scenes and handles the AR session lifecycle.
  */
 const ViroARSceneNavigator = (props) => {
-    const [apiKey] = (0, react_1.useState)(() => {
-        // Generate a random API key for demo purposes
-        return `viro-${Math.random().toString(36).substring(2, 15)}`;
-    });
     // Initialize AR session
     (0, react_1.useEffect)(() => {
         const nativeViro = (0, ViroGlobal_1.getNativeViro)();
         if (!nativeViro)
             return;
-        // Initialize Viro
-        nativeViro.initialize(apiKey);
+        // Initialize Viro (no API key needed)
+        nativeViro.initialize();
         // Set plane detection
         if (props.planeDetection) {
             nativeViro.setViroARPlaneDetection({
@@ -69,11 +65,11 @@ const ViroARSceneNavigator = (props) => {
         return () => {
             // Cleanup code here
         };
-    }, [apiKey, props.planeDetection]);
+    }, [props.planeDetection]);
     // Create the scene component
     const SceneComponent = props.initialScene.scene;
     // Render the AR scene
-    return (<ViroFabricContainer_1.ViroFabricContainer style={props.style} autofocus={props.autofocus} worldAlignment={props.worldAlignment} videoQuality={props.videoQuality} onTrackingUpdated={props.onTrackingUpdated} onARSessionFailed={props.onARSessionFailed}>
+    return (<ViroFabricContainer_1.ViroFabricContainer style={props.style} arEnabled={true} autofocus={props.autofocus} worldAlignment={props.worldAlignment} videoQuality={props.videoQuality} onTrackingUpdated={props.onTrackingUpdated} onARSessionFailed={props.onARSessionFailed}>
       <SceneComponent />
     </ViroFabricContainer_1.ViroFabricContainer>);
 };

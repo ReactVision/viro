@@ -57,16 +57,16 @@ const ViroSceneNavigator = (props) => {
         if (!nativeViro)
             return;
         // Initialize Viro
-        nativeViro.initialize(apiKey);
+        nativeViro.initialize();
         // Cleanup when unmounting
         return () => {
             // Cleanup code here
         };
-    }, [apiKey]);
+    }, []);
     // Create the scene component
     const SceneComponent = props.initialScene.scene;
     // Render the 3D scene
-    return (<ViroFabricContainer_1.ViroFabricContainer style={props.style} apiKey={apiKey} debug={false} arEnabled={false} onCameraTransformUpdate={props.onCameraTransformUpdate}>
+    return (<ViroFabricContainer_1.ViroFabricContainer style={props.style} debug={false} arEnabled={false} onCameraTransformUpdate={props.onCameraTransformUpdate}>
       <SceneComponent />
     </ViroFabricContainer_1.ViroFabricContainer>);
 };

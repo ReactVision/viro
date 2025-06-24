@@ -1,19 +1,20 @@
 /**
  * ViroController
  *
- * A component for handling VR controller input.
+ * A component for VR controller interaction.
  */
 import React from "react";
-import { ViroCommonProps, ViroEventHandler } from "./ViroUtils";
+import { ViroCommonProps } from "./ViroUtils";
 export interface ViroControllerProps extends ViroCommonProps {
-    hand?: "LEFT" | "RIGHT" | "NONE";
-    visible?: boolean;
-    onControllerStatus?: ViroEventHandler;
+    controllerVisibility?: boolean;
+    reticleVisibility?: boolean;
+    onControllerUpdate?: (event: any) => void;
+    onMove?: (event: any) => void;
     children?: React.ReactNode;
 }
 /**
- * ViroController is a component for handling VR controller input.
- * It represents a physical VR controller in the virtual environment.
+ * ViroController is a component for VR controller interaction.
+ * It provides controller tracking and interaction capabilities.
  */
 export declare const ViroController: React.FC<ViroControllerProps>;
 //# sourceMappingURL=ViroController.d.ts.map

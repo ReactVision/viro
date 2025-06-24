@@ -6,9 +6,7 @@
 import React from "react";
 import { ViroCommonProps } from "./ViroUtils";
 export interface ViroButtonProps extends ViroCommonProps {
-    width?: number;
-    height?: number;
-    source?: {
+    source: {
         uri: string;
     } | number;
     hoverSource?: {
@@ -17,16 +15,18 @@ export interface ViroButtonProps extends ViroCommonProps {
     clickSource?: {
         uri: string;
     } | number;
+    gazeSource?: {
+        uri: string;
+    } | number;
+    width?: number;
+    height?: number;
     materials?: string | string[];
-    hoverMaterials?: string | string[];
-    clickMaterials?: string | string[];
-    enabled?: boolean;
-    onHover?: (isHovering: boolean) => void;
-    onClick?: () => void;
+    lightReceivingBitMask?: number;
+    shadowCastingBitMask?: number;
     children?: React.ReactNode;
 }
 /**
  * ViroButton is a component for creating interactive buttons in 3D space.
- * It supports different visual states for normal, hover, and click interactions.
+ * It provides visual feedback for different interaction states.
  */
 export declare const ViroButton: React.FC<ViroButtonProps>;

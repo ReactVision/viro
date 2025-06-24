@@ -7,7 +7,6 @@
  */
 import React from "react";
 export interface ViroFabricContainerProps {
-    apiKey?: string;
     debug?: boolean;
     style?: React.CSSProperties;
     arEnabled?: boolean;
@@ -18,6 +17,13 @@ export interface ViroFabricContainerProps {
     onTrackingUpdated?: (state: any) => void;
     onCameraTransformUpdate?: (transform: any) => void;
     onARSessionFailed?: (error: string) => void;
+    onSceneStateChanged?: (event: {
+        sceneId: string;
+        state: string;
+    }) => void;
+    onMemoryWarning?: (event: {
+        memoryStats: Record<string, any>;
+    }) => void;
     children?: React.ReactNode;
 }
 /**

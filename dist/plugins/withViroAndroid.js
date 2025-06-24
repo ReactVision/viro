@@ -131,44 +131,41 @@ const withBranchAndroid = (config) => {
     ]);
 };
 const withViroProjectBuildGradle = (config) => (0, config_plugins_1.withProjectBuildGradle)(config, async (newConfig) => {
+    // Enforce New Architecture requirement
+    if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
+        config_plugins_1.WarningAggregator.addWarningAndroid("withViroAndroid", "ViroReact requires New Architecture to be enabled. " +
+            'Please add "newArchEnabled=true" to your android/gradle.properties file.');
+    }
     newConfig.modResults.contents = newConfig.modResults.contents.replace(/minSdkVersion.*/, `minSdkVersion = 24`);
+    // Ensure New Architecture is enabled
+    if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
+        newConfig.modResults.contents +=
+            "\n# ViroReact requires New Architecture\nnewArchEnabled=true\n";
+    }
     newConfig.modResults.contents = newConfig.modResults.contents.replace(/classpath\("com.android.tools.build:gradle.*/, `classpath('com.android.tools.build:gradle:4.1.1')`);
     return newConfig;
 });
 const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGradle)(config, async (config) => {
-    // Add Viro dependencies for legacy architecture
-    config.modResults.contents = config.modResults.contents.replace(/implementation "com.facebook.react:react-native:\+"  \/\/ From node_modules/, `implementation "com.facebook.react:react-native:+"  // From node_modules
-
+    // Prioritize fabric-interop for New Architecture
+    const viroNewArchDependencies = `
     // ========================================================================
-    // https://viro-community.readme.io/docs/installation-instructions#2-in-your-androidappbuildgradle-add-the-following-lines-to-the-dependencies-section
+    // ViroReact New Architecture (Fabric) Dependencies
+    // https://viro-community.readme.io/docs/installation-instructions
+    implementation project(':fabric-interop')
     implementation project(':gvr_common')
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
     implementation project(path: ':viro_renderer')
-    implementation project(path: ':fabric-interop')
     implementation 'androidx.media3:media3-exoplayer:1.1.1'
     implementation 'androidx.media3:media3-exoplayer-dash:1.1.1'
     implementation 'androidx.media3:media3-exoplayer-hls:1.1.1'
     implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.1.1'
     implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
-    // ========================================================================`);
-    // Add Viro dependencies for new architecture
-    config.modResults.contents = config.modResults.contents.replace(/implementation\("com.facebook.react:react-android"\)/, `implementation("com.facebook.react:react-android")
-
-    // ========================================================================
-    // https://viro-community.readme.io/docs/installation-instructions#2-in-your-androidappbuildgradle-add-the-following-lines-to-the-dependencies-section
-    implementation project(':gvr_common')
-    implementation project(':arcore_client')
-    implementation project(path: ':react_viro')
-    implementation project(path: ':viro_renderer')
-    implementation project(path: ':fabric-interop')
-    implementation 'androidx.media3:media3-exoplayer:1.1.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.1.1'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.1.1'
-    implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.1.1'
-    implementation 'com.google.protobuf.nano:protobuf-javanano:3.1.0'
-    // ========================================================================
-    `);
+    // ========================================================================`;
+    // Add Viro dependencies for legacy architecture (fallback)
+    config.modResults.contents = config.modResults.contents.replace(/implementation "com.facebook.react:react-native:\+"  \/\/ From node_modules/, `implementation "com.facebook.react:react-native:+"  // From node_modules${viroNewArchDependencies}`);
+    // Add Viro dependencies for new architecture (primary)
+    config.modResults.contents = config.modResults.contents.replace(/implementation\("com.facebook.react:react-android"\)/, `implementation("com.facebook.react:react-android")${viroNewArchDependencies}`);
     return config;
 });
 const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {

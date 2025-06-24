@@ -2,7 +2,7 @@
 /**
  * ViroAnimatedComponent
  *
- * A component for creating animated components.
+ * A component wrapper for adding animations to Viro components.
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -13,8 +13,8 @@ const react_1 = __importDefault(require("react"));
 const ViroUtils_1 = require("./ViroUtils");
 const ViroGlobal_1 = require("./ViroGlobal");
 /**
- * ViroAnimatedComponent is a component for creating animated components.
- * It allows you to apply animations to any Viro component.
+ * ViroAnimatedComponent is a wrapper for adding animations to Viro components.
+ * It provides animation capabilities to its children.
  */
 const ViroAnimatedComponent = (props) => {
     // Convert common props to the format expected by the native code
@@ -22,40 +22,42 @@ const ViroAnimatedComponent = (props) => {
         ...(0, ViroUtils_1.convertCommonProps)(props),
         animation: props.animation,
     };
-    // Create the node
-    const nodeId = (0, ViroUtils_1.useViroNode)("animatedComponent", nativeProps, "viro_root_scene");
-    // Register event handlers
+    // Create the node (parent will be determined by context)
+    const nodeId = (0, ViroUtils_1.useViroNode)("animatedComponent", nativeProps);
+    // Register animation event handlers
     react_1.default.useEffect(() => {
         const nativeViro = (0, ViroGlobal_1.getNativeViro)();
         if (!nativeViro || !props.animation)
             return;
-        // Register event handlers if provided
-        if (props.animation.onStart) {
-            const callbackId = `${nodeId}_animation_start`;
-            nativeViro.registerEventCallback(nodeId, "onAnimationStart", callbackId);
-        }
-        if (props.animation.onFinish) {
-            const callbackId = `${nodeId}_animation_finish`;
-            nativeViro.registerEventCallback(nodeId, "onAnimationFinish", callbackId);
-        }
+        const eventHandlers = [
+            { name: "onAnimationStart", handler: props.animation.onStart },
+            { name: "onAnimationFinish", handler: props.animation.onFinish },
+        ];
+        // Register all event handlers and store callback IDs for cleanup
+        const registeredCallbacks = eventHandlers
+            .filter(({ handler }) => !!handler)
+            .map(({ name, handler }) => {
+            const callbackId = `${nodeId}_${name}`;
+            // Register the callback in the global registry
+            if (typeof global !== "undefined" && global.registerViroEventCallback) {
+                global.registerViroEventCallback(callbackId, handler);
+            }
+            // Register with native code
+            nativeViro.registerEventCallback(nodeId, name, callbackId);
+            return { name, callbackId };
+        });
         // Cleanup when unmounting
         return () => {
             const nativeViro = (0, ViroGlobal_1.getNativeViro)();
-            if (!nativeViro || !props.animation)
+            if (!nativeViro)
                 return;
-            if (props.animation.onStart) {
-                const callbackId = `${nodeId}_animation_start`;
-                nativeViro.unregisterEventCallback(nodeId, "onAnimationStart", callbackId);
-            }
-            if (props.animation.onFinish) {
-                const callbackId = `${nodeId}_animation_finish`;
-                nativeViro.unregisterEventCallback(nodeId, "onAnimationFinish", callbackId);
-            }
+            // Unregister all event handlers
+            registeredCallbacks.forEach(({ name, callbackId }) => {
+                nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+            });
         };
-    }, [nodeId, props.animation]);
-    // Render children with this node as their parent
-    return props.children ? (<ViroUtils_2.ViroContext.Provider value={nodeId}>{props.children}</ViroUtils_2.ViroContext.Provider>) : null;
+    }, [nodeId, props.animation?.onStart, props.animation?.onFinish]);
+    // Render children with this animated component as their parent
+    return (<ViroUtils_1.ViroContextProvider value={nodeId}>{props.children}</ViroUtils_1.ViroContextProvider>);
 };
 exports.ViroAnimatedComponent = ViroAnimatedComponent;
-// Import ViroContext at the top level to avoid circular dependencies
-const ViroUtils_2 = require("./ViroUtils");

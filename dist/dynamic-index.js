@@ -1,36 +1,28 @@
 "use strict";
 /**
- * Viro React Native - Dynamic Architecture Detection
+ * Viro React Native - New Architecture Required
  *
- * This entry point automatically detects whether the app is using
- * React Native's New Architecture (Fabric) or the legacy architecture,
- * and exports the appropriate implementation.
+ * This library requires React Native's New Architecture (Fabric) to be enabled.
+ * Legacy architecture support has been removed as of version 2.43.1.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-const react_native_1 = require("react-native");
-// Detection function
-function isNewArchitectureEnabled() {
-    // Primary check: Look for the Fabric UI Manager
-    if (global.nativeFabricUIManager)
-        return true;
-    // Secondary check: Check for other New Architecture indicators
-    // This helps with some edge cases where the first check might not be reliable
-    if (react_native_1.NativeModules.PlatformConstants?.reactNativeVersion?.minor >= 70) {
-        // RN 0.70+ might have New Architecture
-        // You can add more sophisticated detection if needed
-        return !!global.__turboModuleProxy;
+// Strict New Architecture validation
+function validateNewArchitecture() {
+    // Check for New Architecture indicators
+    const hasFabricUIManager = !!global.nativeFabricUIManager;
+    const hasTurboModules = !!global.__turboModuleProxy;
+    if (!hasFabricUIManager && !hasTurboModules) {
+        throw new Error("ViroReact: New Architecture (Fabric) is required but not detected.\n\n" +
+            "This library requires React Native 0.76.9+ with New Architecture enabled.\n" +
+            "Please enable New Architecture in your app:\n\n" +
+            "1. Set 'newArchEnabled=true' in android/gradle.properties\n" +
+            "2. Set 'RCT_NEW_ARCH_ENABLED=1' in ios/.xcode.env\n" +
+            "3. Ensure you're using React Native 0.76.9 or higher\n\n" +
+            "For more information, visit: https://reactnative.dev/docs/new-architecture-intro");
     }
-    return false;
+    console.log("ViroReact: New Architecture (Fabric) detected ✓");
 }
-// Dynamic export based on architecture
-if (isNewArchitectureEnabled()) {
-    console.log("ViroReact: Using New Architecture (Fabric) components");
-    module.exports = require("./fabric-interop");
-}
-else {
-    console.warn("ViroReact: Using legacy architecture components. " +
-        "This mode is deprecated and will be removed in version 3.0.0. " +
-        "Please enable the New Architecture in your app for better performance and future compatibility.");
-    // Export legacy components
-    module.exports = require("./index");
-}
+// Validate New Architecture on module load
+validateNewArchitecture();
+// Export fabric-interop components directly
+module.exports = require("./fabric-interop");

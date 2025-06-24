@@ -82,9 +82,9 @@ const ViroARScene = (props) => {
         props.onAnchorRemoved,
     ]);
     // Render children with this scene as their parent
-    return (<ViroUtils_2.ViroContext.Provider value={nodeId}>{props.children}</ViroUtils_2.ViroContext.Provider>);
+    return (<ViroUtils_2.ViroContextProvider value={nodeId}>{props.children}</ViroUtils_2.ViroContextProvider>);
 };
 exports.ViroARScene = ViroARScene;
-// Import ViroContext at the top level to avoid circular dependencies
+// Import ViroContextProvider at the top level to avoid circular dependencies
 const ViroUtils_2 = require("./ViroUtils");
 //# sourceMappingURL=ViroARScene.js.map

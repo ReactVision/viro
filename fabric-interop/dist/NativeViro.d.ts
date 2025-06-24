@@ -13,6 +13,27 @@ export declare const generateCallbackId: () => string;
 export declare function handleViroEvent(callbackId: string, event: any): void;
 export declare function registerEventListener(nodeId: string, eventName: string, callback: ViroEventCallback): string;
 export declare function unregisterEventListener(nodeId: string, eventName: string, callbackId: string): void;
-export declare function initializeViro(apiKey: string): Promise<boolean>;
+export declare function initializeViro(): Promise<boolean>;
+export declare function createScene(sceneId: string, sceneType: string, props?: ViroNodeProps): void;
+export declare function activateScene(sceneId: string): void;
+export declare function deactivateScene(sceneId: string): void;
+export declare function destroyScene(sceneId: string): void;
+export declare function getSceneState(sceneId: string): string | null;
+export declare function getMemoryStats(): Record<string, any> | null;
+export declare function performMemoryCleanup(): void;
+export declare function createNode(nodeId: string, nodeType: ViroNodeType, props?: ViroNodeProps): void;
+export declare function updateNode(nodeId: string, props: ViroNodeProps): void;
+export declare function deleteNode(nodeId: string): void;
+export declare function addChild(parentId: string, childId: string): void;
+export declare function removeChild(parentId: string, childId: string): void;
+export declare function createMaterial(materialName: string, properties: Record<string, any>): void;
+export declare function updateMaterial(materialName: string, properties: Record<string, any>): void;
+export declare function createAnimation(animationName: string, properties: Record<string, any>): void;
+export declare function executeAnimation(nodeId: string, animationName: string, options?: Record<string, any>): void;
+export declare function setARPlaneDetection(config: {
+    enabled?: boolean;
+    alignment?: string;
+}): void;
+export declare function setARImageTargets(targets: Record<string, any>): void;
 export declare function isViroJSIAvailable(): boolean;
 //# sourceMappingURL=NativeViro.d.ts.map

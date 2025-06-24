@@ -1,27 +1,30 @@
 /**
  * ViroScene
  *
- * A container for 3D content in the Viro scene graph.
+ * A scene component that manages a 3D scene with scene lifecycle management.
  */
 import React from "react";
 import { ViroCommonProps } from "./ViroUtils";
 export interface ViroSceneProps extends ViroCommonProps {
-    displayPointCloud?: boolean;
-    pointCloudColor?: string;
-    pointCloudSize?: number;
-    lightReceivingBitMask?: number;
-    shadowCastingBitMask?: number;
-    physicsWorld?: {
-        gravity?: [number, number, number];
-    };
     postProcessEffects?: string[];
-    onPlatformUpdate?: (event: any) => void;
-    onCameraTransformUpdate?: (event: any) => void;
-    onAmbientLightUpdate?: (event: any) => void;
+    soundRoom?: {
+        size: [number, number, number];
+        wallMaterial?: string;
+        ceilingMaterial?: string;
+        floorMaterial?: string;
+    };
+    physicsWorld?: {
+        gravity: [number, number, number];
+        drawBounds?: boolean;
+    };
+    onSceneLoad?: () => void;
+    onSceneLoadStart?: () => void;
+    onSceneLoadEnd?: () => void;
+    onSceneError?: (error: string) => void;
     children?: React.ReactNode;
 }
 /**
- * ViroScene is a container for 3D content in the Viro scene graph.
+ * ViroScene is a 3D scene component that manages scene lifecycle and contains other Viro components.
  */
 export declare const ViroScene: React.FC<ViroSceneProps>;
 //# sourceMappingURL=ViroScene.d.ts.map

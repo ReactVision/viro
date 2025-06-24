@@ -27,7 +27,8 @@
     "index.ts",
     "ViroFabricContainer.tsx",
     "NativeViro.ts",
-    "components/**/*"
+    "components/**/*",
+    "global.d.ts"
   ],
   "exclude": [
     "node_modules",

@@ -14,17 +14,26 @@ const withViroPods = (config) => {
         async (newConfig) => {
             const root = newConfig.modRequest.platformProjectRoot;
             fs_1.default.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
-                // Add the standard Viro pods
-                // IMPORTANT: Order matters! ViroKit must be included before ViroFabric
-                let viroPods = `  # Add Viro React Native\n` +
-                    `  # IMPORTANT: Order matters! ViroKit must be included before ViroFabric\n` +
+                // Check for New Architecture environment variable
+                if (!data.includes('ENV["RCT_NEW_ARCH_ENABLED"]') &&
+                    !data.includes("RCT_NEW_ARCH_ENABLED=1")) {
+                    config_plugins_1.WarningAggregator.addWarningIOS("withViroIos", "ViroReact requires New Architecture to be enabled. " +
+                        "Please set RCT_NEW_ARCH_ENABLED=1 in your ios/.xcode.env file.");
+                }
+                // Prioritize ViroFabric for New Architecture
+                let viroPods = `  # ViroReact New Architecture (Fabric) - Required\n` +
+                    `  # IMPORTANT: ViroFabric must be included first for New Architecture\n` +
+                    `  pod 'ViroFabric', :path => '../node_modules/@reactvision/react-viro/fabric-interop/ios'\n\n` +
+                    `  # ViroReact Core Dependencies\n` +
                     `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
                     `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`;
-                // Always add the ViroFabric pod since New Architecture is mandatory
+                // Add New Architecture enforcement
                 viroPods +=
-                    `\n\n  # Add Viro Fabric components for New Architecture\n` +
-                        `  # IMPORTANT: You must explicitly specify the path to the ViroFabric podspec\n` +
-                        `  pod 'ViroFabric', :path => '../node_modules/@reactvision/react-viro/fabric-interop/ios'`;
+                    `\n\n  # Enforce New Architecture requirement\n` +
+                        `  # ViroReact 2.43.1+ requires React Native New Architecture\n` +
+                        `  if ENV['RCT_NEW_ARCH_ENABLED'] != '1'\n` +
+                        `    raise "ViroReact requires New Architecture to be enabled. Please set RCT_NEW_ARCH_ENABLED=1 in ios/.xcode.env"\n` +
+                        `  end`;
                 // Insert the pods into the Podfile
                 data = (0, insertLinesHelper_1.insertLinesHelper)(viroPods, "post_install do |installer|", data, -1);
                 fs_1.default.writeFile(`${root}/Podfile`, data, "utf-8", function (err) {

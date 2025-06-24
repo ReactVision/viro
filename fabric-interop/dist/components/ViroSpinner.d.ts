@@ -1,17 +1,19 @@
 /**
  * ViroSpinner
  *
- * Composite control for a 2D Spinner.
+ * A component for displaying loading spinners in 3D space.
  */
-import * as React from "react";
+import React from "react";
 import { ViroCommonProps } from "./ViroUtils";
-type Props = ViroCommonProps & {
-    type?: "Dark" | "Light" | "dark" | "light";
-    materials?: string | string[];
-};
+export interface ViroSpinnerProps extends ViroCommonProps {
+    type?: "light" | "dark";
+    size?: "small" | "large";
+    lightReceivingBitMask?: number;
+    shadowCastingBitMask?: number;
+}
 /**
- * Composite control for a 2D Spinner
+ * ViroSpinner is a component for displaying loading spinners in 3D space.
+ * It provides visual feedback during loading operations.
  */
-export declare function ViroSpinner(props: Props): React.ReactElement;
-export {};
+export declare const ViroSpinner: React.FC<ViroSpinnerProps>;
 //# sourceMappingURL=ViroSpinner.d.ts.map

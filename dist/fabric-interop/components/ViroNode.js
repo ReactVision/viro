@@ -17,13 +17,12 @@ const ViroUtils_1 = require("./ViroUtils");
  * It doesn't render anything itself but provides a coordinate system for its children.
  */
 const ViroNode = (props) => {
-    // Get the parent node ID from context
-    const parentId = "viro_root_scene"; // Default to root scene
+    // Parent will be determined by context automatically
     // Convert common props to the format expected by the native code
     const nativeProps = (0, ViroUtils_1.convertCommonProps)(props);
-    // Create the node
-    const nodeId = (0, ViroUtils_1.useViroNode)("node", nativeProps, parentId);
+    // Create the node (parent will be determined by context)
+    const nodeId = (0, ViroUtils_1.useViroNode)("node", nativeProps);
     // Render children with this node as their parent
-    return (<ViroUtils_1.ViroContext.Provider value={nodeId}>{props.children}</ViroUtils_1.ViroContext.Provider>);
+    return (<ViroUtils_1.ViroContextProvider value={nodeId}>{props.children}</ViroUtils_1.ViroContextProvider>);
 };
 exports.ViroNode = ViroNode;

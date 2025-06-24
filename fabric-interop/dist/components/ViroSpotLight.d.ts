@@ -10,12 +10,11 @@ export interface ViroSpotLightProps extends ViroCommonProps {
     intensity?: number;
     temperature?: number;
     direction?: [number, number, number];
-    position?: [number, number, number];
-    influenceBitMask?: number;
     innerAngle?: number;
     outerAngle?: number;
     attenuationStartDistance?: number;
     attenuationEndDistance?: number;
+    influenceBitMask?: number;
     castsShadow?: boolean;
     shadowOpacity?: number;
     shadowMapSize?: number;
@@ -25,8 +24,8 @@ export interface ViroSpotLightProps extends ViroCommonProps {
 }
 /**
  * ViroSpotLight is a component for adding spot lighting to a scene.
- * Spot light is a type of light that illuminates objects in the scene
- * from a specific position and in a specific direction, with a cone-shaped beam.
+ * Spot light is a type of light that illuminates objects in a cone-shaped area,
+ * similar to a flashlight or stage spotlight.
  */
 export declare const ViroSpotLight: React.FC<ViroSpotLightProps>;
 //# sourceMappingURL=ViroSpotLight.d.ts.map

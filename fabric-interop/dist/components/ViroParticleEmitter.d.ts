@@ -6,79 +6,47 @@
 import React from "react";
 import { ViroCommonProps } from "./ViroUtils";
 export interface ViroParticleEmitterProps extends ViroCommonProps {
-    image?: {
-        uri: string;
-    } | number;
-    delay?: number;
     duration?: number;
+    delay?: number;
     loop?: boolean;
     run?: boolean;
     fixedToEmitter?: boolean;
+    image?: {
+        source: {
+            uri: string;
+        } | number;
+        height?: number;
+        width?: number;
+        bloomThreshold?: number;
+    };
     spawnBehavior?: {
         particleLifetime?: [number, number];
         emissionRatePerSecond?: [number, number];
-        emissionRatePerDistance?: number;
-        particleCount?: number;
+        emissionRatePerMeter?: [number, number];
+        spawnVolume?: {
+            shape: "box" | "sphere";
+            params?: [number, number, number];
+            spawnOnSurface?: boolean;
+        };
         maxParticles?: number;
-        emissionBurst?: Array<{
-            time?: number;
-            min?: number;
-            max?: number;
-            cycles?: number;
-            cooldownPeriod?: number;
-        }>;
     };
     particleAppearance?: {
-        opacity?: {
-            initialRange?: [number, number];
-            factor?: "Time" | "Distance";
-            interpolation?: Array<{
-                interval?: [number, number];
-                endValue?: number;
-            }>;
-        };
-        scale?: {
-            initialRange?: [[number, number, number], [number, number, number]];
-            factor?: "Time" | "Distance";
-            interpolation?: Array<{
-                interval?: [number, number];
-                endValue?: [number, number, number];
-            }>;
-        };
-        rotation?: {
-            initialRange?: [[number, number, number], [number, number, number]];
-            factor?: "Time" | "Distance";
-            interpolation?: Array<{
-                interval?: [number, number];
-                endValue?: [number, number, number];
-            }>;
-        };
-        color?: {
-            initialRange?: [string, string];
-            factor?: "Time" | "Distance";
-            interpolation?: Array<{
-                interval?: [number, number];
-                endValue?: string;
-            }>;
-        };
+        opacity?: [number, number];
+        rotation?: [number, number];
+        rotationSpeed?: [number, number];
+        scale?: [number, number, number, number];
+        color?: [number, number, number, number];
     };
     particlePhysics?: {
-        velocity?: {
-            initialRange?: [[number, number, number], [number, number, number]];
-        };
-        acceleration?: {
-            initialRange?: [[number, number, number], [number, number, number]];
-        };
-        explosiveImpulse?: {
-            impulse?: number;
-            position?: [number, number, number];
-            decelerationPeriod?: number;
-        };
+        velocity?: [number, number, number, number, number, number];
+        acceleration?: [number, number, number, number, number, number];
+        explosiveImpulse?: [number, number];
     };
+    onFinish?: () => void;
 }
 /**
  * ViroParticleEmitter is a component for creating particle effects.
- * It can be used to create effects like fire, smoke, rain, snow, etc.
+ * It provides a flexible system for creating various particle-based visual effects.
  */
 export declare const ViroParticleEmitter: React.FC<ViroParticleEmitterProps>;
 //# sourceMappingURL=ViroParticleEmitter.d.ts.map

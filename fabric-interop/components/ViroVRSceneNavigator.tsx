@@ -50,13 +50,13 @@ export const ViroVRSceneNavigator: React.FC<ViroVRSceneNavigatorProps> = (
     if (!nativeViro) return;
 
     // Initialize Viro
-    nativeViro.initialize(apiKey);
+    nativeViro.initialize();
 
     // Cleanup when unmounting
     return () => {
       // Cleanup code here
     };
-  }, [apiKey]);
+  }, []);
 
   // Create the scene component
   const SceneComponent = props.initialScene.scene;
@@ -65,7 +65,6 @@ export const ViroVRSceneNavigator: React.FC<ViroVRSceneNavigatorProps> = (
   return (
     <ViroFabricContainer
       style={props.style}
-      apiKey={apiKey}
       debug={false}
       arEnabled={false}
       onCameraTransformUpdate={props.onCameraTransformUpdate}

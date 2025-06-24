@@ -23,47 +23,41 @@ const ViroARImageMarker = (props) => {
         target: props.target,
         visible: props.visible,
         opacity: props.opacity,
-        onAnchorFound: props.onAnchorFound ? true : undefined,
-        onAnchorUpdated: props.onAnchorUpdated ? true : undefined,
-        onAnchorRemoved: props.onAnchorRemoved ? true : undefined,
     };
-    // Create the node
-    const nodeId = (0, ViroUtils_1.useViroNode)("arImageMarker", nativeProps, "viro_root_scene");
+    // Create the node (parent will be determined by context)
+    const nodeId = (0, ViroUtils_1.useViroNode)("arImageMarker", nativeProps);
     // Register event handlers
     react_1.default.useEffect(() => {
         const nativeViro = (0, ViroGlobal_1.getNativeViro)();
         if (!nativeViro)
             return;
-        // Register event handlers if provided
-        if (props.onAnchorFound) {
-            const callbackId = `${nodeId}_anchor_found`;
-            nativeViro.registerEventCallback(nodeId, "onAnchorFound", callbackId);
-        }
-        if (props.onAnchorUpdated) {
-            const callbackId = `${nodeId}_anchor_updated`;
-            nativeViro.registerEventCallback(nodeId, "onAnchorUpdated", callbackId);
-        }
-        if (props.onAnchorRemoved) {
-            const callbackId = `${nodeId}_anchor_removed`;
-            nativeViro.registerEventCallback(nodeId, "onAnchorRemoved", callbackId);
-        }
+        const eventHandlers = [
+            { name: "onAnchorFound", handler: props.onAnchorFound },
+            { name: "onAnchorUpdated", handler: props.onAnchorUpdated },
+            { name: "onAnchorRemoved", handler: props.onAnchorRemoved },
+        ];
+        // Register all event handlers and store callback IDs for cleanup
+        const registeredCallbacks = eventHandlers
+            .filter(({ handler }) => !!handler)
+            .map(({ name, handler }) => {
+            const callbackId = `${nodeId}_${name}`;
+            // Register the callback in the global registry
+            if (typeof global !== "undefined" && global.registerViroEventCallback) {
+                global.registerViroEventCallback(callbackId, handler);
+            }
+            // Register with native code
+            nativeViro.registerEventCallback(nodeId, name, callbackId);
+            return { name, callbackId };
+        });
         // Cleanup when unmounting
         return () => {
             const nativeViro = (0, ViroGlobal_1.getNativeViro)();
             if (!nativeViro)
                 return;
-            if (props.onAnchorFound) {
-                const callbackId = `${nodeId}_anchor_found`;
-                nativeViro.unregisterEventCallback(nodeId, "onAnchorFound", callbackId);
-            }
-            if (props.onAnchorUpdated) {
-                const callbackId = `${nodeId}_anchor_updated`;
-                nativeViro.unregisterEventCallback(nodeId, "onAnchorUpdated", callbackId);
-            }
-            if (props.onAnchorRemoved) {
-                const callbackId = `${nodeId}_anchor_removed`;
-                nativeViro.unregisterEventCallback(nodeId, "onAnchorRemoved", callbackId);
-            }
+            // Unregister all event handlers
+            registeredCallbacks.forEach(({ name, callbackId }) => {
+                nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+            });
         };
     }, [
         nodeId,
@@ -71,9 +65,7 @@ const ViroARImageMarker = (props) => {
         props.onAnchorUpdated,
         props.onAnchorRemoved,
     ]);
-    // Render children with this node as their parent
-    return props.children ? (<ViroUtils_2.ViroContext.Provider value={nodeId}>{props.children}</ViroUtils_2.ViroContext.Provider>) : null;
+    // Render children with this AR image marker as their parent
+    return (<ViroUtils_1.ViroContextProvider value={nodeId}>{props.children}</ViroUtils_1.ViroContextProvider>);
 };
 exports.ViroARImageMarker = ViroARImageMarker;
-// Import ViroContext at the top level to avoid circular dependencies
-const ViroUtils_2 = require("./ViroUtils");

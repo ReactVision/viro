@@ -1,7 +1,7 @@
 /**
  * ViroAnimatedComponent
  *
- * A component for creating animated components.
+ * A component wrapper for adding animations to Viro components.
  */
 import React from "react";
 import { ViroCommonProps } from "./ViroUtils";
@@ -18,8 +18,8 @@ export interface ViroAnimatedComponentProps extends ViroCommonProps {
     children?: React.ReactNode;
 }
 /**
- * ViroAnimatedComponent is a component for creating animated components.
- * It allows you to apply animations to any Viro component.
+ * ViroAnimatedComponent is a wrapper for adding animations to Viro components.
+ * It provides animation capabilities to its children.
  */
 export declare const ViroAnimatedComponent: React.FC<ViroAnimatedComponentProps>;
 //# sourceMappingURL=ViroAnimatedComponent.d.ts.map

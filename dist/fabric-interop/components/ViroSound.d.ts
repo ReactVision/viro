@@ -1,7 +1,7 @@
 /**
  * ViroSound
  *
- * A component for playing audio in 3D space.
+ * A component for playing audio in the scene.
  */
 import React from "react";
 import { ViroCommonProps } from "./ViroUtils";
@@ -10,18 +10,14 @@ export interface ViroSoundProps extends ViroCommonProps {
         uri: string;
     } | number;
     paused?: boolean;
-    loop?: boolean;
-    muted?: boolean;
     volume?: number;
-    rolloffModel?: "None" | "Linear" | "Logarithmic";
-    minDistance?: number;
-    maxDistance?: number;
+    muted?: boolean;
+    loop?: boolean;
     onFinish?: () => void;
     onError?: (error: string) => void;
 }
 /**
- * ViroSound is a component for playing audio in 3D space.
- * It allows you to play audio files with 3D spatial effects,
- * where the sound's volume and direction change based on the listener's position.
+ * ViroSound is a component for playing audio in the scene.
+ * It provides basic audio playback functionality.
  */
 export declare const ViroSound: React.FC<ViroSoundProps>;

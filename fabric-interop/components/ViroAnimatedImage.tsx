@@ -46,65 +46,55 @@ export const ViroAnimatedImage: React.FC<ViroAnimatedImageProps> = (props) => {
     width: props.width,
     height: props.height,
     materials: props.materials,
-    onLoadStart: props.onLoadStart ? true : undefined,
-    onLoadEnd: props.onLoadEnd ? true : undefined,
-    onError: props.onError ? true : undefined,
-    onFinish: props.onFinish ? true : undefined,
   };
 
-  // Create the node
-  const nodeId = useViroNode("animatedImage", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("animatedImage", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onLoadStart) {
-      const callbackId = `${nodeId}_load_start`;
-      nativeViro.registerEventCallback(nodeId, "onLoadStart", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onLoadStart", handler: props.onLoadStart },
+      { name: "onLoadEnd", handler: props.onLoadEnd },
+      { name: "onError", handler: props.onError },
+      { name: "onFinish", handler: props.onFinish },
+      { name: "onHover", handler: props.onHover },
+      { name: "onClick", handler: props.onClick },
+      { name: "onClickState", handler: props.onClickState },
+      { name: "onTouch", handler: props.onTouch },
+      { name: "onDrag", handler: props.onDrag },
+      { name: "onPinch", handler: props.onPinch },
+      { name: "onRotate", handler: props.onRotate },
+    ];
 
-    if (props.onLoadEnd) {
-      const callbackId = `${nodeId}_load_end`;
-      nativeViro.registerEventCallback(nodeId, "onLoadEnd", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
 
-    if (props.onError) {
-      const callbackId = `${nodeId}_error`;
-      nativeViro.registerEventCallback(nodeId, "onError", callbackId);
-    }
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
 
-    if (props.onFinish) {
-      const callbackId = `${nodeId}_finish`;
-      nativeViro.registerEventCallback(nodeId, "onFinish", callbackId);
-    }
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onLoadStart) {
-        const callbackId = `${nodeId}_load_start`;
-        nativeViro.unregisterEventCallback(nodeId, "onLoadStart", callbackId);
-      }
-
-      if (props.onLoadEnd) {
-        const callbackId = `${nodeId}_load_end`;
-        nativeViro.unregisterEventCallback(nodeId, "onLoadEnd", callbackId);
-      }
-
-      if (props.onError) {
-        const callbackId = `${nodeId}_error`;
-        nativeViro.unregisterEventCallback(nodeId, "onError", callbackId);
-      }
-
-      if (props.onFinish) {
-        const callbackId = `${nodeId}_finish`;
-        nativeViro.unregisterEventCallback(nodeId, "onFinish", callbackId);
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
   }, [
     nodeId,
@@ -112,6 +102,13 @@ export const ViroAnimatedImage: React.FC<ViroAnimatedImageProps> = (props) => {
     props.onLoadEnd,
     props.onError,
     props.onFinish,
+    props.onHover,
+    props.onClick,
+    props.onClickState,
+    props.onTouch,
+    props.onDrag,
+    props.onPinch,
+    props.onRotate,
   ]);
 
   // Animated image doesn't have children, so just return null

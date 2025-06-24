@@ -5,7 +5,12 @@
  */
 
 import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
+import {
+  ViroCommonProps,
+  useViroNode,
+  convertCommonProps,
+  ViroContextProvider,
+} from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 // Custom type for transform update event
@@ -49,59 +54,51 @@ export const ViroARCamera: React.FC<ViroARCameraProps> = (props) => {
   const nativeProps = {
     ...convertCommonProps(props),
     active: props.active,
-    onTransformUpdate: props.onTransformUpdate ? true : undefined,
-    onTrackingUpdated: props.onTrackingUpdated ? true : undefined,
   };
 
-  // Create the node
-  const nodeId = useViroNode("arCamera", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("arCamera", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onTransformUpdate) {
-      const callbackId = `${nodeId}_transform_update`;
-      nativeViro.registerEventCallback(nodeId, "onTransformUpdate", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onTransformUpdate", handler: props.onTransformUpdate },
+      { name: "onTrackingUpdated", handler: props.onTrackingUpdated },
+    ];
 
-    if (props.onTrackingUpdated) {
-      const callbackId = `${nodeId}_tracking_updated`;
-      nativeViro.registerEventCallback(nodeId, "onTrackingUpdated", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onTransformUpdate) {
-        const callbackId = `${nodeId}_transform_update`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onTransformUpdate",
-          callbackId
-        );
-      }
-
-      if (props.onTrackingUpdated) {
-        const callbackId = `${nodeId}_tracking_updated`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onTrackingUpdated",
-          callbackId
-        );
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
   }, [nodeId, props.onTransformUpdate, props.onTrackingUpdated]);
 
-  // Render children with this node as their parent
-  return props.children ? (
-    <ViroContext.Provider value={nodeId}>{props.children}</ViroContext.Provider>
-  ) : null;
+  // Render children with this AR camera as their parent
+  return (
+    <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
+  );
 };
-
-// Import ViroContext at the top level to avoid circular dependencies
-import { ViroContext } from "./ViroUtils";

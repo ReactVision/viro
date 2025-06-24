@@ -45,8 +45,62 @@ export const ViroGeometry: React.FC<ViroGeometryProps> = (props) => {
     type: props.type,
   };
 
-  // Create the node
-  const nodeId = useViroNode("geometry", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("geometry", nativeProps);
+
+  // Register event handlers
+  React.useEffect(() => {
+    const nativeViro = getNativeViro();
+    if (!nativeViro) return;
+
+    const eventHandlers = [
+      { name: "onHover", handler: props.onHover },
+      { name: "onClick", handler: props.onClick },
+      { name: "onClickState", handler: props.onClickState },
+      { name: "onTouch", handler: props.onTouch },
+      { name: "onDrag", handler: props.onDrag },
+      { name: "onPinch", handler: props.onPinch },
+      { name: "onRotate", handler: props.onRotate },
+      { name: "onCollision", handler: props.onCollision },
+    ];
+
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
+
+    // Cleanup when unmounting
+    return () => {
+      const nativeViro = getNativeViro();
+      if (!nativeViro) return;
+
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
+    };
+  }, [
+    nodeId,
+    props.onHover,
+    props.onClick,
+    props.onClickState,
+    props.onTouch,
+    props.onDrag,
+    props.onPinch,
+    props.onRotate,
+    props.onCollision,
+  ]);
 
   // Geometry doesn't have children, so just return null
   return null;

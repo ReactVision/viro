@@ -5,30 +5,31 @@
  */
 
 import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
+import {
+  ViroCommonProps,
+  useViroNode,
+  convertCommonProps,
+  ViroContextProvider,
+} from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroButtonProps extends ViroCommonProps {
   // Button properties
+  source: { uri: string } | number;
+  hoverSource?: { uri: string } | number;
+  clickSource?: { uri: string } | number;
+  gazeSource?: { uri: string } | number;
+
+  // Button dimensions
   width?: number;
   height?: number;
 
-  // Visual properties
-  source?: { uri: string } | number;
-  hoverSource?: { uri: string } | number;
-  clickSource?: { uri: string } | number;
-
-  // Material properties
+  // Materials
   materials?: string | string[];
-  hoverMaterials?: string | string[];
-  clickMaterials?: string | string[];
 
-  // State properties
-  enabled?: boolean;
-
-  // Events
-  onHover?: (isHovering: boolean) => void;
-  onClick?: () => void;
+  // Lighting props
+  lightReceivingBitMask?: number;
+  shadowCastingBitMask?: number;
 
   // Children components
   children?: React.ReactNode;
@@ -36,66 +37,88 @@ export interface ViroButtonProps extends ViroCommonProps {
 
 /**
  * ViroButton is a component for creating interactive buttons in 3D space.
- * It supports different visual states for normal, hover, and click interactions.
+ * It provides visual feedback for different interaction states.
  */
 export const ViroButton: React.FC<ViroButtonProps> = (props) => {
   // Convert common props to the format expected by the native code
   const nativeProps = {
     ...convertCommonProps(props),
-    width: props.width,
-    height: props.height,
     source: props.source,
     hoverSource: props.hoverSource,
     clickSource: props.clickSource,
+    gazeSource: props.gazeSource,
+    width: props.width,
+    height: props.height,
     materials: props.materials,
-    hoverMaterials: props.hoverMaterials,
-    clickMaterials: props.clickMaterials,
-    enabled: props.enabled,
-    onHover: props.onHover ? true : undefined,
-    onClick: props.onClick ? true : undefined,
+    lightReceivingBitMask: props.lightReceivingBitMask,
+    shadowCastingBitMask: props.shadowCastingBitMask,
   };
 
-  // Create the node
-  const nodeId = useViroNode("button", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("button", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onHover) {
-      const callbackId = `${nodeId}_hover`;
-      nativeViro.registerEventCallback(nodeId, "onHover", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onHover", handler: props.onHover },
+      { name: "onClick", handler: props.onClick },
+      { name: "onClickState", handler: props.onClickState },
+      { name: "onTouch", handler: props.onTouch },
+      { name: "onDrag", handler: props.onDrag },
+      { name: "onPinch", handler: props.onPinch },
+      { name: "onRotate", handler: props.onRotate },
+      {
+        name: "onFuse",
+        handler:
+          typeof props.onFuse === "function"
+            ? props.onFuse
+            : props.onFuse?.callback,
+      },
+    ];
 
-    if (props.onClick) {
-      const callbackId = `${nodeId}_click`;
-      nativeViro.registerEventCallback(nodeId, "onClick", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onHover) {
-        const callbackId = `${nodeId}_hover`;
-        nativeViro.unregisterEventCallback(nodeId, "onHover", callbackId);
-      }
-
-      if (props.onClick) {
-        const callbackId = `${nodeId}_click`;
-        nativeViro.unregisterEventCallback(nodeId, "onClick", callbackId);
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
-  }, [nodeId, props.onHover, props.onClick]);
+  }, [
+    nodeId,
+    props.onHover,
+    props.onClick,
+    props.onClickState,
+    props.onTouch,
+    props.onDrag,
+    props.onPinch,
+    props.onRotate,
+    props.onFuse,
+  ]);
 
-  // Render children with this node as their parent
-  return props.children ? (
-    <ViroContext.Provider value={nodeId}>{props.children}</ViroContext.Provider>
-  ) : null;
+  // Render children with this button as their parent
+  return (
+    <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
+  );
 };
-
-// Import ViroContext at the top level to avoid circular dependencies
-import { ViroContext } from "./ViroUtils";

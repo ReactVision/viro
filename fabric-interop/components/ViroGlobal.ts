@@ -76,7 +76,7 @@ export interface NativeViroType {
   ) => Promise<[number, number, number]>;
 
   // Initialization
-  initialize: (apiKey: string) => Promise<boolean>;
+  initialize: () => Promise<boolean>;
 }
 
 // Get the NativeViro object with type safety

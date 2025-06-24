@@ -32,9 +32,6 @@ export interface ViroBoxProps extends ViroCommonProps {
  * ViroBox is a 3D box component with customizable dimensions and materials.
  */
 export const ViroBox: React.FC<ViroBoxProps> = (props) => {
-  // Get the parent node ID from context
-  const parentId = "viro_root_scene"; // Default to root scene
-
   // Convert common props to the format expected by the native code
   const nativeProps = {
     ...convertCommonProps(props),
@@ -47,8 +44,76 @@ export const ViroBox: React.FC<ViroBoxProps> = (props) => {
     highAccuracyEvents: props.highAccuracyEvents,
   };
 
-  // Create the node
-  const nodeId = useViroNode("box", nativeProps, parentId);
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("box", nativeProps);
+
+  // Register event handlers
+  React.useEffect(() => {
+    const nativeViro = getNativeViro();
+    if (!nativeViro) return;
+
+    const eventHandlers = [
+      { name: "onHover", handler: props.onHover },
+      { name: "onClick", handler: props.onClick },
+      { name: "onClickState", handler: props.onClickState },
+      { name: "onTouch", handler: props.onTouch },
+      { name: "onScroll", handler: props.onScroll },
+      { name: "onSwipe", handler: props.onSwipe },
+      { name: "onDrag", handler: props.onDrag },
+      { name: "onPinch", handler: props.onPinch },
+      { name: "onRotate", handler: props.onRotate },
+      {
+        name: "onFuse",
+        handler:
+          typeof props.onFuse === "function"
+            ? props.onFuse
+            : props.onFuse?.callback,
+      },
+      { name: "onCollision", handler: props.onCollision },
+      { name: "onTransformUpdate", handler: props.onTransformUpdate },
+    ];
+
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
+
+    // Cleanup when unmounting
+    return () => {
+      const nativeViro = getNativeViro();
+      if (!nativeViro) return;
+
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
+    };
+  }, [
+    nodeId,
+    props.onHover,
+    props.onClick,
+    props.onClickState,
+    props.onTouch,
+    props.onScroll,
+    props.onSwipe,
+    props.onDrag,
+    props.onPinch,
+    props.onRotate,
+    props.onFuse,
+    props.onCollision,
+    props.onTransformUpdate,
+  ]);
 
   // Box doesn't have children, so just return null
   return null;

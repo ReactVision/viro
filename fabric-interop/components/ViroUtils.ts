@@ -4,18 +4,30 @@
  * Common utility functions and hooks for Viro components.
  */
 
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { generateNodeId, ViroNodeProps, ViroNodeType } from "../NativeViro";
 
 import { getNativeViro } from "./ViroGlobal";
+
+// Create a proper React Context to pass parent node IDs down the component tree
+export const ViroContext = React.createContext("viro_root_scene");
+
+// Hook to get the current parent node ID
+export const useViroParent = () => {
+  return React.useContext(ViroContext);
+};
 
 // Hook to manage a node's lifecycle
 export function useViroNode(
   nodeType: ViroNodeType,
   props: ViroNodeProps,
-  parentId?: string
+  explicitParentId?: string
 ): string {
   const nodeId = useRef<string>(generateNodeId());
+  const contextParentId = useViroParent();
+
+  // Use explicit parent ID if provided, otherwise use context
+  const parentId = explicitParentId || contextParentId;
 
   useEffect(() => {
     // Create the node when the component mounts
@@ -144,18 +156,13 @@ export function convertCommonProps(props: ViroCommonProps): ViroNodeProps {
   return convertedProps;
 }
 
-// Create a ViroContext to pass parent node IDs down the component tree
-export const ViroContext = {
-  Provider: ({
-    value,
-    children,
-  }: {
-    value: string;
-    children: React.ReactNode;
-  }) => children,
-  Consumer: ({
-    children,
-  }: {
-    children: (parentId: string) => React.ReactNode;
-  }) => children("viro_root_scene"),
+// Provider component for ViroContext
+export const ViroContextProvider = ({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) => {
+  return React.createElement(ViroContext.Provider, { value }, children);
 };

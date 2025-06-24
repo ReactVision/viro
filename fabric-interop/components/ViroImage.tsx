@@ -53,8 +53,8 @@ export const ViroImage: React.FC<ViroImageProps> = (props) => {
     shadowCastingBitMask: props.shadowCastingBitMask,
   };
 
-  // Create the node
-  const nodeId = useViroNode("image", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("image", nativeProps);
 
   // Image doesn't have children, so just return null
   return null;

@@ -1,7 +1,7 @@
 /**
  * ViroController
  *
- * A component for handling VR controller input.
+ * A component for VR controller interaction.
  */
 
 import React from "react";
@@ -9,139 +9,78 @@ import {
   ViroCommonProps,
   useViroNode,
   convertCommonProps,
-  ViroEventHandler,
+  ViroContextProvider,
 } from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroControllerProps extends ViroCommonProps {
   // Controller properties
-  hand?: "LEFT" | "RIGHT" | "NONE";
+  controllerVisibility?: boolean;
+  reticleVisibility?: boolean;
 
-  // Visual properties
-  visible?: boolean;
-
-  // Additional events not in ViroCommonProps
-  onControllerStatus?: ViroEventHandler;
+  // Events
+  onControllerUpdate?: (event: any) => void;
+  onMove?: (event: any) => void;
 
   // Children components
   children?: React.ReactNode;
 }
 
 /**
- * ViroController is a component for handling VR controller input.
- * It represents a physical VR controller in the virtual environment.
+ * ViroController is a component for VR controller interaction.
+ * It provides controller tracking and interaction capabilities.
  */
 export const ViroController: React.FC<ViroControllerProps> = (props) => {
   // Convert common props to the format expected by the native code
   const nativeProps = {
     ...convertCommonProps(props),
-    hand: props.hand,
-    visible: props.visible,
-    onClick: props.onClick ? true : undefined,
-    onDrag: props.onDrag ? true : undefined,
-    onFuse: props.onFuse ? true : undefined,
-    onPinch: props.onPinch ? true : undefined,
-    onRotate: props.onRotate ? true : undefined,
-    onControllerStatus: props.onControllerStatus ? true : undefined,
+    controllerVisibility: props.controllerVisibility,
+    reticleVisibility: props.reticleVisibility,
   };
 
-  // Create the node
-  const nodeId = useViroNode("controller", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("controller", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onClick) {
-      const callbackId = `${nodeId}_click`;
-      nativeViro.registerEventCallback(nodeId, "onClick", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onControllerUpdate", handler: props.onControllerUpdate },
+      { name: "onMove", handler: props.onMove },
+    ];
 
-    if (props.onDrag) {
-      const callbackId = `${nodeId}_drag`;
-      nativeViro.registerEventCallback(nodeId, "onDrag", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
 
-    if (props.onFuse) {
-      const callbackId = `${nodeId}_fuse`;
-      nativeViro.registerEventCallback(nodeId, "onFuse", callbackId);
-    }
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
 
-    if (props.onPinch) {
-      const callbackId = `${nodeId}_pinch`;
-      nativeViro.registerEventCallback(nodeId, "onPinch", callbackId);
-    }
-
-    if (props.onRotate) {
-      const callbackId = `${nodeId}_rotate`;
-      nativeViro.registerEventCallback(nodeId, "onRotate", callbackId);
-    }
-
-    if (props.onControllerStatus) {
-      const callbackId = `${nodeId}_controller_status`;
-      nativeViro.registerEventCallback(
-        nodeId,
-        "onControllerStatus",
-        callbackId
-      );
-    }
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onClick) {
-        const callbackId = `${nodeId}_click`;
-        nativeViro.unregisterEventCallback(nodeId, "onClick", callbackId);
-      }
-
-      if (props.onDrag) {
-        const callbackId = `${nodeId}_drag`;
-        nativeViro.unregisterEventCallback(nodeId, "onDrag", callbackId);
-      }
-
-      if (props.onFuse) {
-        const callbackId = `${nodeId}_fuse`;
-        nativeViro.unregisterEventCallback(nodeId, "onFuse", callbackId);
-      }
-
-      if (props.onPinch) {
-        const callbackId = `${nodeId}_pinch`;
-        nativeViro.unregisterEventCallback(nodeId, "onPinch", callbackId);
-      }
-
-      if (props.onRotate) {
-        const callbackId = `${nodeId}_rotate`;
-        nativeViro.unregisterEventCallback(nodeId, "onRotate", callbackId);
-      }
-
-      if (props.onControllerStatus) {
-        const callbackId = `${nodeId}_controller_status`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onControllerStatus",
-          callbackId
-        );
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
-  }, [
-    nodeId,
-    props.onClick,
-    props.onDrag,
-    props.onFuse,
-    props.onPinch,
-    props.onRotate,
-    props.onControllerStatus,
-  ]);
+  }, [nodeId, props.onControllerUpdate, props.onMove]);
 
-  // Render children with this node as their parent
-  return props.children ? (
-    <ViroContext.Provider value={nodeId}>{props.children}</ViroContext.Provider>
-  ) : null;
+  // Render children with this controller as their parent
+  return (
+    <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
+  );
 };
-
-// Import ViroContext at the top level to avoid circular dependencies
-import { ViroContext } from "./ViroUtils";

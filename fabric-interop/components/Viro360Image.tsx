@@ -1,7 +1,7 @@
 /**
  * Viro360Image
  *
- * A component for rendering 360-degree panoramic images.
+ * A component for displaying 360-degree images.
  */
 
 import React from "react";
@@ -12,12 +12,10 @@ export interface Viro360ImageProps extends ViroCommonProps {
   // Image source
   source: { uri: string } | number;
 
-  // Visual properties
-  format?: "RGBA8" | "RGB565";
+  // Image properties
   stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
-
-  // Rotation
-  rotation?: [number, number, number];
+  format?: "RGBA8" | "RGB565";
+  isHdr?: boolean;
 
   // Events
   onLoadStart?: () => void;
@@ -26,68 +24,61 @@ export interface Viro360ImageProps extends ViroCommonProps {
 }
 
 /**
- * Viro360Image is a component for rendering 360-degree panoramic images.
- * It creates an immersive environment by wrapping an image around the user.
+ * Viro360Image is a component for displaying 360-degree images.
+ * It creates an immersive environment using spherical panoramic images.
  */
 export const Viro360Image: React.FC<Viro360ImageProps> = (props) => {
   // Convert common props to the format expected by the native code
   const nativeProps = {
     ...convertCommonProps(props),
     source: props.source,
-    format: props.format,
     stereoMode: props.stereoMode,
-    rotation: props.rotation,
-    onLoadStart: props.onLoadStart ? true : undefined,
-    onLoadEnd: props.onLoadEnd ? true : undefined,
-    onError: props.onError ? true : undefined,
+    format: props.format,
+    isHdr: props.isHdr,
   };
 
-  // Create the node
-  const nodeId = useViroNode("360Image", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("360Image", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onLoadStart) {
-      const callbackId = `${nodeId}_load_start`;
-      nativeViro.registerEventCallback(nodeId, "onLoadStart", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onLoadStart", handler: props.onLoadStart },
+      { name: "onLoadEnd", handler: props.onLoadEnd },
+      { name: "onError", handler: props.onError },
+    ];
 
-    if (props.onLoadEnd) {
-      const callbackId = `${nodeId}_load_end`;
-      nativeViro.registerEventCallback(nodeId, "onLoadEnd", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
 
-    if (props.onError) {
-      const callbackId = `${nodeId}_error`;
-      nativeViro.registerEventCallback(nodeId, "onError", callbackId);
-    }
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onLoadStart) {
-        const callbackId = `${nodeId}_load_start`;
-        nativeViro.unregisterEventCallback(nodeId, "onLoadStart", callbackId);
-      }
-
-      if (props.onLoadEnd) {
-        const callbackId = `${nodeId}_load_end`;
-        nativeViro.unregisterEventCallback(nodeId, "onLoadEnd", callbackId);
-      }
-
-      if (props.onError) {
-        const callbackId = `${nodeId}_error`;
-        nativeViro.unregisterEventCallback(nodeId, "onError", callbackId);
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
   }, [nodeId, props.onLoadStart, props.onLoadEnd, props.onError]);
 
-  // 360 image doesn't have children, so just return null
+  // 360 Image doesn't have children, so just return null
   return null;
 };

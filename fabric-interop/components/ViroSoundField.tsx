@@ -1,7 +1,7 @@
 /**
  * ViroSoundField
  *
- * A component for playing ambient audio that doesn't have a specific position in 3D space.
+ * A component for playing ambient audio field in the scene.
  */
 
 import React from "react";
@@ -9,14 +9,17 @@ import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroSoundFieldProps extends ViroCommonProps {
-  // Sound source
+  // Audio source
   source: { uri: string } | number;
 
-  // Sound properties
+  // Audio properties
   paused?: boolean;
-  loop?: boolean;
-  muted?: boolean;
   volume?: number;
+  muted?: boolean;
+  loop?: boolean;
+
+  // Sound field properties
+  rotation?: [number, number, number];
 
   // Events
   onFinish?: () => void;
@@ -24,9 +27,8 @@ export interface ViroSoundFieldProps extends ViroCommonProps {
 }
 
 /**
- * ViroSoundField is a component for playing ambient audio that doesn't have a specific position in 3D space.
- * Unlike ViroSound, ViroSoundField plays audio that is not affected by the listener's position or orientation.
- * It's ideal for background music, ambient sounds, or narration.
+ * ViroSoundField is a component for playing ambient audio field in the scene.
+ * It provides 360-degree ambient audio that surrounds the listener.
  */
 export const ViroSoundField: React.FC<ViroSoundFieldProps> = (props) => {
   // Convert common props to the format expected by the native code
@@ -34,49 +36,53 @@ export const ViroSoundField: React.FC<ViroSoundFieldProps> = (props) => {
     ...convertCommonProps(props),
     source: props.source,
     paused: props.paused,
-    loop: props.loop,
-    muted: props.muted,
     volume: props.volume,
-    onFinish: props.onFinish ? true : undefined,
-    onError: props.onError ? true : undefined,
+    muted: props.muted,
+    loop: props.loop,
+    rotation: props.rotation,
   };
 
-  // Create the node
-  const nodeId = useViroNode("soundField", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("soundField", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onFinish) {
-      const callbackId = `${nodeId}_finish`;
-      nativeViro.registerEventCallback(nodeId, "onFinish", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onFinish", handler: props.onFinish },
+      { name: "onError", handler: props.onError },
+    ];
 
-    if (props.onError) {
-      const callbackId = `${nodeId}_error`;
-      nativeViro.registerEventCallback(nodeId, "onError", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onFinish) {
-        const callbackId = `${nodeId}_finish`;
-        nativeViro.unregisterEventCallback(nodeId, "onFinish", callbackId);
-      }
-
-      if (props.onError) {
-        const callbackId = `${nodeId}_error`;
-        nativeViro.unregisterEventCallback(nodeId, "onError", callbackId);
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
   }, [nodeId, props.onFinish, props.onError]);
 
-  // SoundField doesn't have children, so just return null
+  // Sound field doesn't have children, so just return null
   return null;
 };

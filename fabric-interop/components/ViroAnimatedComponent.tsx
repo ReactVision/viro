@@ -1,11 +1,16 @@
 /**
  * ViroAnimatedComponent
  *
- * A component for creating animated components.
+ * A component wrapper for adding animations to Viro components.
  */
 
 import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
+import {
+  ViroCommonProps,
+  useViroNode,
+  convertCommonProps,
+  ViroContextProvider,
+} from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroAnimatedComponentProps extends ViroCommonProps {
@@ -25,8 +30,8 @@ export interface ViroAnimatedComponentProps extends ViroCommonProps {
 }
 
 /**
- * ViroAnimatedComponent is a component for creating animated components.
- * It allows you to apply animations to any Viro component.
+ * ViroAnimatedComponent is a wrapper for adding animations to Viro components.
+ * It provides animation capabilities to its children.
  */
 export const ViroAnimatedComponent: React.FC<ViroAnimatedComponentProps> = (
   props
@@ -37,59 +42,49 @@ export const ViroAnimatedComponent: React.FC<ViroAnimatedComponentProps> = (
     animation: props.animation,
   };
 
-  // Create the node
-  const nodeId = useViroNode(
-    "animatedComponent",
-    nativeProps,
-    "viro_root_scene"
-  );
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("animatedComponent", nativeProps);
 
-  // Register event handlers
+  // Register animation event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro || !props.animation) return;
 
-    // Register event handlers if provided
-    if (props.animation.onStart) {
-      const callbackId = `${nodeId}_animation_start`;
-      nativeViro.registerEventCallback(nodeId, "onAnimationStart", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onAnimationStart", handler: props.animation.onStart },
+      { name: "onAnimationFinish", handler: props.animation.onFinish },
+    ];
 
-    if (props.animation.onFinish) {
-      const callbackId = `${nodeId}_animation_finish`;
-      nativeViro.registerEventCallback(nodeId, "onAnimationFinish", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
-      if (!nativeViro || !props.animation) return;
+      if (!nativeViro) return;
 
-      if (props.animation.onStart) {
-        const callbackId = `${nodeId}_animation_start`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onAnimationStart",
-          callbackId
-        );
-      }
-
-      if (props.animation.onFinish) {
-        const callbackId = `${nodeId}_animation_finish`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onAnimationFinish",
-          callbackId
-        );
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
-  }, [nodeId, props.animation]);
+  }, [nodeId, props.animation?.onStart, props.animation?.onFinish]);
 
-  // Render children with this node as their parent
-  return props.children ? (
-    <ViroContext.Provider value={nodeId}>{props.children}</ViroContext.Provider>
-  ) : null;
+  // Render children with this animated component as their parent
+  return (
+    <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
+  );
 };
-
-// Import ViroContext at the top level to avoid circular dependencies
-import { ViroContext } from "./ViroUtils";

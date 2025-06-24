@@ -81,7 +81,15 @@ export function handleViroEvent(callbackId: string, event: any): void {
   const callback = eventCallbacks[callbackId];
   if (callback) {
     callback(event);
+  } else {
+    console.warn(`No callback found for ID: ${callbackId}`);
   }
+}
+
+// Set up the global event handler
+if (typeof global !== "undefined") {
+  // @ts-ignore - This property will be added by the native code
+  global.handleViroEvent = handleViroEvent;
 }
 
 import { getNativeViro, isNativeViroAvailable } from "./components/ViroGlobal";
@@ -120,10 +128,10 @@ export function unregisterEventListener(
 }
 
 // Initialize the Viro platform
-export function initializeViro(apiKey: string): Promise<boolean> {
+export function initializeViro(): Promise<boolean> {
   const nativeViro = getNativeViro();
   if (nativeViro) {
-    return nativeViro.initialize(apiKey);
+    return nativeViro.initialize();
   }
   return Promise.reject(new Error("NativeViro not available"));
 }

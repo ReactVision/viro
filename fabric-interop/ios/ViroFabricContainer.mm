@@ -118,7 +118,7 @@ public:
 
 #pragma mark - Commands
 
-- (void)initialize:(NSString *)apiKey debug:(BOOL)debug arEnabled:(BOOL)arEnabled worldAlignment:(NSString *)worldAlignment {
+- (void)initialize:(BOOL)debug arEnabled:(BOOL)arEnabled worldAlignment:(NSString *)worldAlignment {
     // Clean up any existing navigators
     [self cleanup];
     
@@ -378,16 +378,10 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return facebook::jsi::Function::createFromHostFunction(
             runtime,
             name,
-            1,  // apiKey
+            0,  // no parameters
             [weakContainer = _container](facebook::jsi::Runtime& rt, const facebook::jsi::Value& thisValue, const facebook::jsi::Value* args, size_t count) -> facebook::jsi::Value {
                 __strong ViroFabricContainer *container = weakContainer;
                 if (!container) return facebook::jsi::Value::undefined();
-                
-                if (count < 1) {
-                    throw facebook::jsi::JSError(rt, "initialize requires 1 argument");
-                }
-                
-                NSString *apiKey = [NSString stringWithUTF8String:args[0].getString(rt).utf8(rt).c_str()];
                 
                 // Initialize Viro (this is a placeholder - actual initialization happens in the initialize: method)
                 

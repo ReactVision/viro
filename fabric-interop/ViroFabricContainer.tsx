@@ -57,7 +57,6 @@ const NativeViroFabricContainer = requireNativeComponent<any>(
 // Props for the container
 export interface ViroFabricContainerProps {
   // General props
-  apiKey?: string;
   debug?: boolean;
   style?: React.CSSProperties;
 
@@ -83,7 +82,6 @@ export interface ViroFabricContainerProps {
  * lifecycle of the Viro system.
  */
 export const ViroFabricContainer: React.FC<ViroFabricContainerProps> = ({
-  apiKey,
   debug = false,
   arEnabled = false,
   worldAlignment = "Gravity",
@@ -173,12 +171,7 @@ export const ViroFabricContainer: React.FC<ViroFabricContainerProps> = ({
         UIManager.dispatchViewManagerCommand(
           nodeHandle,
           ViroFabricContainerCommands.initialize,
-          [
-            apiKey || "",
-            debug || false,
-            arEnabled || false,
-            worldAlignment || "Gravity",
-          ]
+          [debug || false, arEnabled || false, worldAlignment || "Gravity"]
         );
       } catch (error) {
         console.error("Failed to initialize ViroFabricContainer:", error);
@@ -218,7 +211,7 @@ export const ViroFabricContainer: React.FC<ViroFabricContainerProps> = ({
         }
       }
     };
-  }, [apiKey, debug, arEnabled, worldAlignment]);
+  }, [debug, arEnabled, worldAlignment]);
 
   // Handle initialization event
   const handleInitialized = (event: any) => {

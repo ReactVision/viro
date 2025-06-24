@@ -43,8 +43,8 @@ export const ViroSphere: React.FC<ViroSphereProps> = (props) => {
     highAccuracyEvents: props.highAccuracyEvents,
   };
 
-  // Create the node
-  const nodeId = useViroNode("sphere", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("sphere", nativeProps);
 
   // Sphere doesn't have children, so just return null
   return null;

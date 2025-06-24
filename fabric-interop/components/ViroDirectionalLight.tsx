@@ -53,12 +53,8 @@ export const ViroDirectionalLight: React.FC<ViroDirectionalLightProps> = (
     shadowFarZ: props.shadowFarZ,
   };
 
-  // Create the node
-  const nodeId = useViroNode(
-    "directionalLight",
-    nativeProps,
-    "viro_root_scene"
-  );
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("directionalLight", nativeProps);
 
   // Directional light doesn't have children, so just return null
   return null;

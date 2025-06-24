@@ -119,7 +119,7 @@ public class ViroFabricContainer extends FrameLayout {
     /**
      * Initialize the Viro system.
      */
-    public void initialize(String apiKey, boolean debug, boolean arEnabled, String worldAlignment) {
+    public void initialize(boolean debug, boolean arEnabled, String worldAlignment) {
         // Clean up any existing navigators
         cleanup();
 

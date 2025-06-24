@@ -14,14 +14,11 @@ export interface ViroSpotLightProps extends ViroCommonProps {
   intensity?: number;
   temperature?: number;
   direction?: [number, number, number];
-  position?: [number, number, number];
-  influenceBitMask?: number;
-
-  // Spot light specific properties
   innerAngle?: number;
   outerAngle?: number;
   attenuationStartDistance?: number;
   attenuationEndDistance?: number;
+  influenceBitMask?: number;
 
   // Shadow properties
   castsShadow?: boolean;
@@ -34,8 +31,8 @@ export interface ViroSpotLightProps extends ViroCommonProps {
 
 /**
  * ViroSpotLight is a component for adding spot lighting to a scene.
- * Spot light is a type of light that illuminates objects in the scene
- * from a specific position and in a specific direction, with a cone-shaped beam.
+ * Spot light is a type of light that illuminates objects in a cone-shaped area,
+ * similar to a flashlight or stage spotlight.
  */
 export const ViroSpotLight: React.FC<ViroSpotLightProps> = (props) => {
   // Convert common props to the format expected by the native code
@@ -45,12 +42,11 @@ export const ViroSpotLight: React.FC<ViroSpotLightProps> = (props) => {
     intensity: props.intensity,
     temperature: props.temperature,
     direction: props.direction,
-    position: props.position,
-    influenceBitMask: props.influenceBitMask,
     innerAngle: props.innerAngle,
     outerAngle: props.outerAngle,
     attenuationStartDistance: props.attenuationStartDistance,
     attenuationEndDistance: props.attenuationEndDistance,
+    influenceBitMask: props.influenceBitMask,
     castsShadow: props.castsShadow,
     shadowOpacity: props.shadowOpacity,
     shadowMapSize: props.shadowMapSize,
@@ -59,8 +55,8 @@ export const ViroSpotLight: React.FC<ViroSpotLightProps> = (props) => {
     shadowFarZ: props.shadowFarZ,
   };
 
-  // Create the node
-  const nodeId = useViroNode("spotLight", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("spotLight", nativeProps);
 
   // Spot light doesn't have children, so just return null
   return null;

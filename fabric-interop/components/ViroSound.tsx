@@ -1,7 +1,7 @@
 /**
  * ViroSound
  *
- * A component for playing audio in 3D space.
+ * A component for playing audio in the scene.
  */
 
 import React from "react";
@@ -9,19 +9,14 @@ import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroSoundProps extends ViroCommonProps {
-  // Sound source
+  // Audio source
   source: { uri: string } | number;
 
-  // Sound properties
+  // Audio properties
   paused?: boolean;
-  loop?: boolean;
-  muted?: boolean;
   volume?: number;
-
-  // 3D sound properties
-  rolloffModel?: "None" | "Linear" | "Logarithmic";
-  minDistance?: number;
-  maxDistance?: number;
+  muted?: boolean;
+  loop?: boolean;
 
   // Events
   onFinish?: () => void;
@@ -29,9 +24,8 @@ export interface ViroSoundProps extends ViroCommonProps {
 }
 
 /**
- * ViroSound is a component for playing audio in 3D space.
- * It allows you to play audio files with 3D spatial effects,
- * where the sound's volume and direction change based on the listener's position.
+ * ViroSound is a component for playing audio in the scene.
+ * It provides basic audio playback functionality.
  */
 export const ViroSound: React.FC<ViroSoundProps> = (props) => {
   // Convert common props to the format expected by the native code
@@ -39,49 +33,49 @@ export const ViroSound: React.FC<ViroSoundProps> = (props) => {
     ...convertCommonProps(props),
     source: props.source,
     paused: props.paused,
-    loop: props.loop,
-    muted: props.muted,
     volume: props.volume,
-    rolloffModel: props.rolloffModel,
-    minDistance: props.minDistance,
-    maxDistance: props.maxDistance,
-    onFinish: props.onFinish ? true : undefined,
-    onError: props.onError ? true : undefined,
+    muted: props.muted,
+    loop: props.loop,
   };
 
-  // Create the node
-  const nodeId = useViroNode("sound", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("sound", nativeProps);
 
   // Register event handlers
   React.useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Register event handlers if provided
-    if (props.onFinish) {
-      const callbackId = `${nodeId}_finish`;
-      nativeViro.registerEventCallback(nodeId, "onFinish", callbackId);
-    }
+    const eventHandlers = [
+      { name: "onFinish", handler: props.onFinish },
+      { name: "onError", handler: props.onError },
+    ];
 
-    if (props.onError) {
-      const callbackId = `${nodeId}_error`;
-      nativeViro.registerEventCallback(nodeId, "onError", callbackId);
-    }
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks = eventHandlers
+      .filter(({ handler }) => !!handler)
+      .map(({ name, handler }) => {
+        const callbackId = `${nodeId}_${name}`;
+
+        // Register the callback in the global registry
+        if (typeof global !== "undefined" && global.registerViroEventCallback) {
+          global.registerViroEventCallback(callbackId, handler);
+        }
+
+        // Register with native code
+        nativeViro.registerEventCallback(nodeId, name, callbackId);
+        return { name, callbackId };
+      });
 
     // Cleanup when unmounting
     return () => {
       const nativeViro = getNativeViro();
       if (!nativeViro) return;
 
-      if (props.onFinish) {
-        const callbackId = `${nodeId}_finish`;
-        nativeViro.unregisterEventCallback(nodeId, "onFinish", callbackId);
-      }
-
-      if (props.onError) {
-        const callbackId = `${nodeId}_error`;
-        nativeViro.unregisterEventCallback(nodeId, "onError", callbackId);
-      }
+      // Unregister all event handlers
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
+      });
     };
   }, [nodeId, props.onFinish, props.onError]);
 

@@ -58,9 +58,6 @@ export interface ViroTextProps extends ViroCommonProps {
  * ViroText is a component for rendering 3D text in the Viro scene.
  */
 export const ViroText: React.FC<ViroTextProps> = (props) => {
-  // Get the parent node ID from context
-  const parentId = "viro_root_scene"; // Default to root scene
-
   // Convert common props to the format expected by the native code
   const nativeProps = {
     ...convertCommonProps(props),
@@ -85,8 +82,8 @@ export const ViroText: React.FC<ViroTextProps> = (props) => {
     shadowCastingBitMask: props.shadowCastingBitMask,
   };
 
-  // Create the node
-  const nodeId = useViroNode("text", nativeProps, parentId);
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("text", nativeProps);
 
   // Text doesn't have children, so just return null
   return null;

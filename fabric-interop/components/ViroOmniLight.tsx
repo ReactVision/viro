@@ -13,26 +13,15 @@ export interface ViroOmniLightProps extends ViroCommonProps {
   color?: string;
   intensity?: number;
   temperature?: number;
-  position?: [number, number, number];
-  influenceBitMask?: number;
-
-  // Attenuation properties
   attenuationStartDistance?: number;
   attenuationEndDistance?: number;
-
-  // Shadow properties
-  castsShadow?: boolean;
-  shadowOpacity?: number;
-  shadowMapSize?: number;
-  shadowBias?: number;
-  shadowNearZ?: number;
-  shadowFarZ?: number;
+  influenceBitMask?: number;
 }
 
 /**
  * ViroOmniLight is a component for adding omnidirectional lighting to a scene.
- * Omni light is a type of light that illuminates objects in the scene
- * from a specific position in all directions, like a light bulb.
+ * Omni light is a type of light that illuminates objects in all directions
+ * from a single point, similar to a light bulb.
  */
 export const ViroOmniLight: React.FC<ViroOmniLightProps> = (props) => {
   // Convert common props to the format expected by the native code
@@ -41,20 +30,13 @@ export const ViroOmniLight: React.FC<ViroOmniLightProps> = (props) => {
     color: props.color,
     intensity: props.intensity,
     temperature: props.temperature,
-    position: props.position,
-    influenceBitMask: props.influenceBitMask,
     attenuationStartDistance: props.attenuationStartDistance,
     attenuationEndDistance: props.attenuationEndDistance,
-    castsShadow: props.castsShadow,
-    shadowOpacity: props.shadowOpacity,
-    shadowMapSize: props.shadowMapSize,
-    shadowBias: props.shadowBias,
-    shadowNearZ: props.shadowNearZ,
-    shadowFarZ: props.shadowFarZ,
+    influenceBitMask: props.influenceBitMask,
   };
 
-  // Create the node
-  const nodeId = useViroNode("omniLight", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("omniLight", nativeProps);
 
   // Omni light doesn't have children, so just return null
   return null;

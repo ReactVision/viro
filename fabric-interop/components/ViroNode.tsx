@@ -7,7 +7,7 @@
 
 import React, { useContext } from "react";
 import {
-  ViroContext,
+  ViroContextProvider,
   ViroCommonProps,
   useViroNode,
   convertCommonProps,
@@ -46,17 +46,16 @@ export interface ViroNodeProps extends ViroCommonProps {
  * It doesn't render anything itself but provides a coordinate system for its children.
  */
 export const ViroNode: React.FC<ViroNodeProps> = (props) => {
-  // Get the parent node ID from context
-  const parentId = "viro_root_scene"; // Default to root scene
+  // Parent will be determined by context automatically
 
   // Convert common props to the format expected by the native code
   const nativeProps = convertCommonProps(props);
 
-  // Create the node
-  const nodeId = useViroNode("node", nativeProps, parentId);
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("node", nativeProps);
 
   // Render children with this node as their parent
   return (
-    <ViroContext.Provider value={nodeId}>{props.children}</ViroContext.Provider>
+    <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
   );
 };

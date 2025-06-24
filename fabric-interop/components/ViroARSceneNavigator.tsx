@@ -40,18 +40,13 @@ export interface ViroARSceneNavigatorProps {
 export const ViroARSceneNavigator: React.FC<ViroARSceneNavigatorProps> = (
   props
 ) => {
-  const [apiKey] = useState<string>(() => {
-    // Generate a random API key for demo purposes
-    return `viro-${Math.random().toString(36).substring(2, 15)}`;
-  });
-
   // Initialize AR session
   useEffect(() => {
     const nativeViro = getNativeViro();
     if (!nativeViro) return;
 
-    // Initialize Viro
-    nativeViro.initialize(apiKey);
+    // Initialize Viro (no API key needed)
+    nativeViro.initialize();
 
     // Set plane detection
     if (props.planeDetection) {
@@ -65,7 +60,7 @@ export const ViroARSceneNavigator: React.FC<ViroARSceneNavigatorProps> = (
     return () => {
       // Cleanup code here
     };
-  }, [apiKey, props.planeDetection]);
+  }, [props.planeDetection]);
 
   // Create the scene component
   const SceneComponent = props.initialScene.scene;
@@ -74,6 +69,7 @@ export const ViroARSceneNavigator: React.FC<ViroARSceneNavigatorProps> = (
   return (
     <ViroFabricContainer
       style={props.style}
+      arEnabled={true}
       autofocus={props.autofocus}
       worldAlignment={props.worldAlignment}
       videoQuality={props.videoQuality}

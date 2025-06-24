@@ -114,9 +114,9 @@ export const ViroARScene: React.FC<ViroARSceneProps> = (props) => {
 
   // Render children with this scene as their parent
   return (
-    <ViroContext.Provider value={nodeId}>{props.children}</ViroContext.Provider>
+    <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
   );
 };
 
-// Import ViroContext at the top level to avoid circular dependencies
-import { ViroContext } from "./ViroUtils";
+// Import ViroContextProvider at the top level to avoid circular dependencies
+import { ViroContextProvider } from "./ViroUtils";

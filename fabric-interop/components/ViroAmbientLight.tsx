@@ -30,8 +30,8 @@ export const ViroAmbientLight: React.FC<ViroAmbientLightProps> = (props) => {
     influenceBitMask: props.influenceBitMask,
   };
 
-  // Create the node
-  const nodeId = useViroNode("ambientLight", nativeProps, "viro_root_scene");
+  // Create the node (parent will be determined by context)
+  const nodeId = useViroNode("ambientLight", nativeProps);
 
   // Ambient light doesn't have children, so just return null
   return null;

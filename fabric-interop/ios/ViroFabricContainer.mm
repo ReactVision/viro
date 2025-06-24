@@ -631,25 +631,18 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         }
     } else {
         // For other node types, create the appropriate VRT node and add it to the scene
-        // This would delegate to the existing VRT node creation logic
-        // For example, for a box:
-        if ([nodeType isEqualToString:@"box"]) {
-            Class boxClass = NSClassFromString(@"VRTBox");
-            if (!boxClass) {
-                RCTLogError(@"VRTBox class not found");
-                return;
+        else {
+            id node = [self createVRTNodeOfType:nodeType withProps:props];
+            if (node) {
+                _nodeRegistry[nodeId] = node;
+            } else {
+                // Store as metadata for nodes we don't have VRT classes for yet
+                _nodeRegistry[nodeId] = @{
+                    @"type": nodeType,
+                    @"props": props ?: @{}
+                };
             }
-            
-            id box = [[boxClass alloc] initWithBridge:_bridge];
-            
-            // Instead of using setProps:, set properties individually or use a different method
-            if ([box respondsToSelector:@selector(setProperties:)]) {
-                [box performSelector:@selector(setProperties:) withObject:props];
-            }
-            
-            _nodeRegistry[nodeId] = box;
         }
-        // Similar implementations for other node types
     }
 }
 
@@ -1051,6 +1044,224 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         RCTLogInfo(@"Successfully configured AR image targets with %lu targets", 
                    (unsigned long)[targets count]);
     }
+}
+
+// Helper method to create VRT nodes of different types
+- (id)createVRTNodeOfType:(NSString *)nodeType withProps:(NSDictionary *)props {
+    id node = nil;
+    
+    @try {
+        // Basic shape components
+        if ([nodeType isEqualToString:@"box"]) {
+            Class nodeClass = NSClassFromString(@"VRTBox");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"sphere"]) {
+            Class nodeClass = NSClassFromString(@"VRTSphere");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"text"]) {
+            Class nodeClass = NSClassFromString(@"VRTText");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"image"]) {
+            Class nodeClass = NSClassFromString(@"VRTImage");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"quad"]) {
+            Class nodeClass = NSClassFromString(@"VRTQuad");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"video"]) {
+            Class nodeClass = NSClassFromString(@"VRTVideo");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"3DObject"]) {
+            Class nodeClass = NSClassFromString(@"VRT3DObject");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Layout components
+        else if ([nodeType isEqualToString:@"node"]) {
+            Class nodeClass = NSClassFromString(@"VRTNode");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"flexView"]) {
+            Class nodeClass = NSClassFromString(@"VRTFlexView");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Shape components
+        else if ([nodeType isEqualToString:@"surface"]) {
+            Class nodeClass = NSClassFromString(@"VRTSurface");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"polygon"]) {
+            Class nodeClass = NSClassFromString(@"VRTPolygon");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"polyline"]) {
+            Class nodeClass = NSClassFromString(@"VRTPolyline");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"geometry"]) {
+            Class nodeClass = NSClassFromString(@"VRTGeometry");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Interactive components
+        else if ([nodeType isEqualToString:@"button"]) {
+            Class nodeClass = NSClassFromString(@"VRTButton");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"controller"]) {
+            Class nodeClass = NSClassFromString(@"VRTController");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Media components
+        else if ([nodeType isEqualToString:@"animatedImage"]) {
+            Class nodeClass = NSClassFromString(@"VRTAnimatedImage");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"materialVideo"]) {
+            Class nodeClass = NSClassFromString(@"VRTMaterialVideo");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"360Image"]) {
+            Class nodeClass = NSClassFromString(@"VRT360Image");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"360Video"]) {
+            Class nodeClass = NSClassFromString(@"VRT360Video");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Environment components
+        else if ([nodeType isEqualToString:@"skyBox"]) {
+            Class nodeClass = NSClassFromString(@"VRTSkyBox");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"lightingEnvironment"]) {
+            Class nodeClass = NSClassFromString(@"VRTLightingEnvironment");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Portal components
+        else if ([nodeType isEqualToString:@"portal"]) {
+            Class nodeClass = NSClassFromString(@"VRTPortal");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"portalScene"]) {
+            Class nodeClass = NSClassFromString(@"VRTPortalScene");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Effects components
+        else if ([nodeType isEqualToString:@"particleEmitter"]) {
+            Class nodeClass = NSClassFromString(@"VRTParticleEmitter");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"spinner"]) {
+            Class nodeClass = NSClassFromString(@"VRTSpinner");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Camera components
+        else if ([nodeType isEqualToString:@"camera"]) {
+            Class nodeClass = NSClassFromString(@"VRTCamera");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"orbitCamera"]) {
+            Class nodeClass = NSClassFromString(@"VRTOrbitCamera");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Lighting components
+        else if ([nodeType isEqualToString:@"ambientLight"]) {
+            Class nodeClass = NSClassFromString(@"VRTAmbientLight");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"directionalLight"]) {
+            Class nodeClass = NSClassFromString(@"VRTDirectionalLight");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"omniLight"]) {
+            Class nodeClass = NSClassFromString(@"VRTOmniLight");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"spotLight"]) {
+            Class nodeClass = NSClassFromString(@"VRTSpotLight");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        }
+        // Audio components
+        else if ([nodeType isEqualToString:@"sound"]) {
+            Class nodeClass = NSClassFromString(@"VRTSound");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"soundField"]) {
+            Class nodeClass = NSClassFromString(@"VRTSoundField");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else if ([nodeType isEqualToString:@"spatialSound"]) {
+            Class nodeClass = NSClassFromString(@"VRTSpatialSound");
+            if (nodeClass) {
+                node = [[nodeClass alloc] initWithBridge:_bridge];
+            }
+        } else {
+            RCTLogWarn(@"Unknown node type: %@", nodeType);
+            return nil;
+        }
+        
+        // Set props if node was created and props are provided
+        if (node && props) {
+            if ([node respondsToSelector:@selector(setProperties:)]) {
+                [node performSelector:@selector(setProperties:) withObject:props];
+            } else if ([node respondsToSelector:@selector(setProps:)]) {
+                [node performSelector:@selector(setProps:) withObject:props];
+            }
+        }
+        
+    } @catch (NSException *exception) {
+        RCTLogError(@"Error creating VRT node of type %@: %@", nodeType, exception.reason);
+        return nil;
+    }
+    
+    return node;
 }
 
 @end

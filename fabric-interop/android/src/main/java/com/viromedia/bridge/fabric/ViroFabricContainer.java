@@ -29,6 +29,33 @@ import com.viromedia.bridge.component.node.control.VRTImage;
 import com.viromedia.bridge.component.node.control.VRTQuad;
 import com.viromedia.bridge.component.node.control.VRTVideo;
 import com.viromedia.bridge.component.node.control.VRT3DObject;
+import com.viromedia.bridge.component.node.control.VRTNode;
+import com.viromedia.bridge.component.node.control.VRTButton;
+import com.viromedia.bridge.component.node.control.VRTFlexView;
+import com.viromedia.bridge.component.node.control.VRTSurface;
+import com.viromedia.bridge.component.node.control.VRTPolygon;
+import com.viromedia.bridge.component.node.control.VRTPolyline;
+import com.viromedia.bridge.component.node.control.VRTGeometry;
+import com.viromedia.bridge.component.node.control.VRTSpinner;
+import com.viromedia.bridge.component.node.control.VRT360Image;
+import com.viromedia.bridge.component.node.control.VRT360Video;
+import com.viromedia.bridge.component.node.control.VRTSkyBox;
+import com.viromedia.bridge.component.node.control.VRTPortal;
+import com.viromedia.bridge.component.node.control.VRTPortalScene;
+import com.viromedia.bridge.component.node.control.VRTParticleEmitter;
+import com.viromedia.bridge.component.node.control.VRTCamera;
+import com.viromedia.bridge.component.node.control.VRTOrbitCamera;
+import com.viromedia.bridge.component.node.control.VRTController;
+import com.viromedia.bridge.component.node.control.VRTAnimatedImage;
+import com.viromedia.bridge.component.node.control.VRTMaterialVideo;
+import com.viromedia.bridge.component.node.control.VRTLightingEnvironment;
+import com.viromedia.bridge.component.node.control.VRTAmbientLight;
+import com.viromedia.bridge.component.node.control.VRTDirectionalLight;
+import com.viromedia.bridge.component.node.control.VRTOmniLight;
+import com.viromedia.bridge.component.node.control.VRTSpotLight;
+import com.viromedia.bridge.component.node.control.VRTSound;
+import com.viromedia.bridge.component.node.control.VRTSoundField;
+import com.viromedia.bridge.component.node.control.VRTSpatialSound;
 import com.viromedia.bridge.utility.ComponentEventDelegate.VRTEventListener;
 import com.viromedia.bridge.component.material.VRTMaterial;
 import com.viromedia.bridge.component.animation.VRTAnimation;
@@ -378,6 +405,124 @@ public class ViroFabricContainer extends FrameLayout {
                     
                 case "3DObject":
                     node = new VRT3DObject(mReactContext);
+                    break;
+                    
+                // Layout components
+                case "node":
+                    node = new VRTNode(mReactContext);
+                    break;
+                    
+                case "flexView":
+                    node = new VRTFlexView(mReactContext);
+                    break;
+                    
+                // Shape components
+                case "surface":
+                    node = new VRTSurface(mReactContext);
+                    break;
+                    
+                case "polygon":
+                    node = new VRTPolygon(mReactContext);
+                    break;
+                    
+                case "polyline":
+                    node = new VRTPolyline(mReactContext);
+                    break;
+                    
+                case "geometry":
+                    node = new VRTGeometry(mReactContext);
+                    break;
+                    
+                // Interactive components
+                case "button":
+                    node = new VRTButton(mReactContext);
+                    break;
+                    
+                case "controller":
+                    node = new VRTController(mReactContext);
+                    break;
+                    
+                // Media components
+                case "animatedImage":
+                    node = new VRTAnimatedImage(mReactContext);
+                    break;
+                    
+                case "materialVideo":
+                    node = new VRTMaterialVideo(mReactContext);
+                    break;
+                    
+                case "360Image":
+                    node = new VRT360Image(mReactContext);
+                    break;
+                    
+                case "360Video":
+                    node = new VRT360Video(mReactContext);
+                    break;
+                    
+                // Environment components
+                case "skyBox":
+                    node = new VRTSkyBox(mReactContext);
+                    break;
+                    
+                case "lightingEnvironment":
+                    node = new VRTLightingEnvironment(mReactContext);
+                    break;
+                    
+                // Portal components
+                case "portal":
+                    node = new VRTPortal(mReactContext);
+                    break;
+                    
+                case "portalScene":
+                    node = new VRTPortalScene(mReactContext);
+                    break;
+                    
+                // Effects components
+                case "particleEmitter":
+                    node = new VRTParticleEmitter(mReactContext);
+                    break;
+                    
+                case "spinner":
+                    node = new VRTSpinner(mReactContext);
+                    break;
+                    
+                // Camera components
+                case "camera":
+                    node = new VRTCamera(mReactContext);
+                    break;
+                    
+                case "orbitCamera":
+                    node = new VRTOrbitCamera(mReactContext);
+                    break;
+                    
+                // Lighting components
+                case "ambientLight":
+                    node = new VRTAmbientLight(mReactContext);
+                    break;
+                    
+                case "directionalLight":
+                    node = new VRTDirectionalLight(mReactContext);
+                    break;
+                    
+                case "omniLight":
+                    node = new VRTOmniLight(mReactContext);
+                    break;
+                    
+                case "spotLight":
+                    node = new VRTSpotLight(mReactContext);
+                    break;
+                    
+                // Audio components
+                case "sound":
+                    node = new VRTSound(mReactContext);
+                    break;
+                    
+                case "soundField":
+                    node = new VRTSoundField(mReactContext);
+                    break;
+                    
+                case "spatialSound":
+                    node = new VRTSpatialSound(mReactContext);
                     break;
                     
                 default:

@@ -10,6 +10,7 @@ import {
   useViroNode,
   convertCommonProps,
   ViroContextProvider,
+  useViroEventListeners,
 } from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 

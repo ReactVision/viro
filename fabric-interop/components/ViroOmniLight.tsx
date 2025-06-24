@@ -5,7 +5,12 @@
  */
 
 import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
+import {
+  ViroCommonProps,
+  useViroNode,
+  convertCommonProps,
+  useViroEventListeners,
+} from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroOmniLightProps extends ViroCommonProps {
@@ -37,7 +42,25 @@ export const ViroOmniLight: React.FC<ViroOmniLightProps> = (props) => {
 
   // Create the node (parent will be determined by context)
   const nodeId = useViroNode("omniLight", nativeProps);
+  // Register event handlers using our new event system
+  useViroEventListeners(nodeId, {
+    onHover: props.onHover,
+    onClick: props.onClick,
+    onClickState: props.onClickState,
+    onTouch: props.onTouch,
+    onScroll: props.onScroll,
+    onSwipe: props.onSwipe,
+    onDrag: props.onDrag,
+    onPinch: props.onPinch,
+    onRotate: props.onRotate,
+    onFuse:
+      typeof props.onFuse === "function"
+        ? props.onFuse
+        : props.onFuse?.callback,
+    onCollision: props.onCollision,
+    onTransformUpdate: props.onTransformUpdate,
+  });
 
-  // Omni light doesn't have children, so just return null
+  // Component doesn't have children, so just return null
   return null;
 };

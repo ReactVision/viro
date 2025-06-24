@@ -5,7 +5,12 @@
  */
 
 import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
+import {
+  ViroCommonProps,
+  useViroNode,
+  convertCommonProps,
+  useViroEventListeners,
+} from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroARSceneProps extends ViroCommonProps {

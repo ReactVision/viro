@@ -5,7 +5,12 @@
  */
 
 import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
+import {
+  ViroCommonProps,
+  useViroNode,
+  convertCommonProps,
+  useViroEventListeners,
+} from "./ViroUtils";
 import { getNativeViro } from "./ViroGlobal";
 
 export interface ViroVideoProps extends ViroCommonProps {
@@ -61,68 +66,26 @@ export const ViroVideo: React.FC<ViroVideoProps> = (props) => {
   // Create the node (parent will be determined by context)
   const nodeId = useViroNode("video", nativeProps);
 
-  // Register event handlers
-  React.useEffect(() => {
-    const nativeViro = getNativeViro();
-    if (!nativeViro) return;
+  
+  // Register event handlers using our new event system
+  useViroEventListeners(nodeId, {
+    onHover: props.onHover,
+    onClick: props.onClick,
+    onClickState: props.onClickState,
+    onTouch: props.onTouch,
+    onScroll: props.onScroll,
+    onSwipe: props.onSwipe,
+    onDrag: props.onDrag,
+    onPinch: props.onPinch,
+    onRotate: props.onRotate,
+    onFuse:
+      typeof props.onFuse === "function"
+        ? props.onFuse
+        : props.onFuse?.callback,
+    onCollision: props.onCollision,
+    onTransformUpdate: props.onTransformUpdate,
+  });
 
-    const eventHandlers = [
-      { name: "onHover", handler: props.onHover },
-      { name: "onClick", handler: props.onClick },
-      { name: "onClickState", handler: props.onClickState },
-      { name: "onTouch", handler: props.onTouch },
-      { name: "onDrag", handler: props.onDrag },
-      { name: "onPinch", handler: props.onPinch },
-      { name: "onRotate", handler: props.onRotate },
-      { name: "onBufferStart", handler: props.onBufferStart },
-      { name: "onBufferEnd", handler: props.onBufferEnd },
-      { name: "onFinish", handler: props.onFinish },
-      { name: "onError", handler: props.onError },
-      { name: "onUpdateTime", handler: props.onUpdateTime },
-    ];
-
-    // Register all event handlers and store callback IDs for cleanup
-    const registeredCallbacks = eventHandlers
-      .filter(({ handler }) => !!handler)
-      .map(({ name, handler }) => {
-        const callbackId = `${nodeId}_${name}`;
-
-        // Register the callback in the global registry
-        if (typeof global !== "undefined" && global.registerViroEventCallback) {
-          global.registerViroEventCallback(callbackId, handler);
-        }
-
-        // Register with native code
-        nativeViro.registerEventCallback(nodeId, name, callbackId);
-        return { name, callbackId };
-      });
-
-    // Cleanup when unmounting
-    return () => {
-      const nativeViro = getNativeViro();
-      if (!nativeViro) return;
-
-      // Unregister all event handlers
-      registeredCallbacks.forEach(({ name, callbackId }) => {
-        nativeViro.unregisterEventCallback(nodeId, name, callbackId);
-      });
-    };
-  }, [
-    nodeId,
-    props.onHover,
-    props.onClick,
-    props.onClickState,
-    props.onTouch,
-    props.onDrag,
-    props.onPinch,
-    props.onRotate,
-    props.onBufferStart,
-    props.onBufferEnd,
-    props.onFinish,
-    props.onError,
-    props.onUpdateTime,
-  ]);
-
-  // Video doesn't have children, so just return null
+  // Component doesn't have children, so just return null
   return null;
 };

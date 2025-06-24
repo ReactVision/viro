@@ -436,7 +436,26 @@ export function Viro3DSceneNavigator(props: Props): React.ReactElement {
     if (nativeViro && navigatorRef.current) {
       return await nativeViro.project(navigatorRef.current, point);
     }
-    return null;
+  // Register event handlers using our new event system
+  useViroEventListeners(nodeId, {
+    onHover: props.onHover,
+    onClick: props.onClick,
+    onClickState: props.onClickState,
+    onTouch: props.onTouch,
+    onScroll: props.onScroll,
+    onSwipe: props.onSwipe,
+    onDrag: props.onDrag,
+    onPinch: props.onPinch,
+    onRotate: props.onRotate,
+    onFuse:
+      typeof props.onFuse === "function"
+        ? props.onFuse
+        : props.onFuse?.callback,
+    onCollision: props.onCollision,
+    onTransformUpdate: props.onTransformUpdate,
+  });
+
+  return null;
   };
 
   /**

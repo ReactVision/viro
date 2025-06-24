@@ -7,6 +7,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "validate": "node scripts/validate-build.js",
+    "postbuild": "npm run validate",
     "prepare": "npm run build"
   },
   "keywords": [

@@ -1,4 +1,4 @@
-import { ConfigPlugin } from "@expo/config-plugins";
+import { ConfigPlugin, WarningAggregator } from "@expo/config-plugins";
 import { withViroAndroid } from "./withViroAndroid";
 import { withViroIos } from "./withViroIos";
 
@@ -62,10 +62,41 @@ export const DEFAULTS = {
 /**
  * Configures Viro to work with Expo projects.
  *
+ * IMPORTANT: This plugin requires React Native New Architecture (Fabric) to be enabled.
+ * ViroReact 2.43.1+ only supports New Architecture.
+ *
  * @param config Expo ConfigPlugin
  * @returns expo configuration
  */
 const withViro: ConfigPlugin<ViroConfigurationOptions> = (config, props) => {
+  // Validate New Architecture is enabled
+  const newArchEnabled =
+    config.plugins?.some(
+      (plugin) =>
+        Array.isArray(plugin) &&
+        plugin[0] === "expo-dev-client" &&
+        plugin[1]?.newArchEnabled === true
+    ) || (config as any).newArchEnabled === true;
+
+  if (!newArchEnabled) {
+    WarningAggregator.addWarningAndroid(
+      "withViro",
+      "ViroReact requires React Native New Architecture (Fabric) to be enabled. " +
+        "Please enable New Architecture in your app configuration. " +
+        'Add "newArchEnabled": true to your app.json/app.config.js expo configuration, ' +
+        "or ensure your React Native project has New Architecture enabled."
+    );
+
+    WarningAggregator.addWarningIOS(
+      "withViro",
+      "ViroReact requires React Native New Architecture (Fabric) to be enabled. " +
+        "Please enable New Architecture in your app configuration. " +
+        'Add "newArchEnabled": true to your app.json/app.config.js expo configuration, ' +
+        "or ensure your React Native project has New Architecture enabled."
+    );
+  }
+
+  // Apply platform-specific configurations
   config = withViroIos(config, props);
   config = withViroAndroid(config, props);
 

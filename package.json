@@ -1,8 +1,8 @@
 {
   "name": "@reactvision/react-viro",
-  "main": "dist/dynamic-index.js",
-  "module": "dist/dynamic-index.js",
-  "types": "dist/dynamic-index.d.ts",
+  "main": "fabric-interop/dist/index.js",
+  "module": "fabric-interop/dist/index.js",
+  "types": "fabric-interop/dist/index.d.ts",
   "version": "2.43.1",
   "license": "MIT",
   "publishConfig": {
@@ -12,25 +12,28 @@
     "type": "git",
     "url": "git+ssh://git@github.com/ReactVision/viro.git"
   },
-  "description": "Maintained version of react-viro",
+  "description": "Maintained version of react-viro - New Architecture (Fabric) required",
   "scripts": {
     "start": "echo 'I dont think you meant to run npm start here.'",
     "test": "jest",
     "tsc": "tsc",
     "prebuild": "node -p \"'export const VIRO_VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > components/Utilities/ViroVersion.ts",
-    "build": "tsc && npm run copy-files",
-    "build:fabric": "cd fabric-interop && npm run build",
-    "build:all": "npm run build && npm run build:fabric && node scripts/copy-types.js",
+    "build": "cd fabric-interop && npm run build",
+    "build:legacy": "tsc && npm run copy-files",
+    "build:all": "npm run build && npm run build:legacy",
     "bundle": "./prepare_release.sh",
     "copy-files": "cp -r ./components/Resources/ ./dist/components/Resources/",
     "clean": "rm -rf ./dist/ *.tgz node_modules/ fabric-interop/dist/",
     "release": "release-it",
     "after:release": "./prepare_release.sh",
-    "prepare": "npm run build:all"
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "expo": "~52.0.43",
-    "react-native": "0.74.7 || 0.75.5 || 0.76.9"
+    "react-native": ">=0.76.9"
+  },
+  "engines": {
+    "react-native": ">=0.76.9"
   },
   "peerDependenciesMeta": {
     "expo": {

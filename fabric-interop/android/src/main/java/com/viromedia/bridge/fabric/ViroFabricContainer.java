@@ -58,6 +58,8 @@ import com.viromedia.bridge.utility.ComponentEventDelegate.VRTEventListener;
 import com.viromedia.bridge.utility.Helper;
 import com.viromedia.bridge.module.MaterialManager;
 import com.viromedia.bridge.module.AnimationManager;
+import com.viro.core.EventDelegate;
+import com.viro.core.internal.CameraCallback;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableType;
 
@@ -83,6 +85,9 @@ public class ViroFabricContainer extends FrameLayout {
 
     // Event callback registry
     private Map<String, String> mEventCallbackRegistry = new HashMap<>();
+
+    // Event delegate for handling Viro events
+    private ViroFabricEventDelegate mEventDelegate;
 
     // Material manager
     private MaterialManager mMaterialManager;
@@ -121,6 +126,9 @@ public class ViroFabricContainer extends FrameLayout {
         if (!isNewArchitectureEnabled()) {
             throw new RuntimeException("ViroFabricContainer requires the New Architecture to be enabled");
         }
+
+        // Initialize event delegate
+        mEventDelegate = new ViroFabricEventDelegate(this, mReactContext, getId());
 
         // Initialize JSI bridge on the UI thread
         UiThreadUtil.runOnUiThread(new Runnable() {
@@ -259,6 +267,12 @@ public class ViroFabricContainer extends FrameLayout {
 
         // Clear event callback registry
         mEventCallbackRegistry.clear();
+
+        // Clean up event delegate
+        if (mEventDelegate != null) {
+            mEventDelegate.dispose();
+            mEventDelegate = null;
+        }
 
         // Reset managers
         mMaterialManager = null;
@@ -1226,6 +1240,31 @@ public class ViroFabricContainer extends FrameLayout {
         } catch (Exception e) {
             Log.e(TAG, "Error setting node materials: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Get camera position asynchronously for AR hit testing.
+     * This method is called by ViroFabricEventDelegate.
+     */
+    public void getCameraPositionAsync(CameraCallback callback) {
+        if (mARSceneNavigator != null) {
+            // Use the existing VRTARSceneNavigator API to get camera position
+            mARSceneNavigator.getCameraPositionAsync(callback);
+        } else if (mSceneNavigator != null) {
+            // For non-AR scenes, we can still get camera position if available
+            mSceneNavigator.getCameraPositionAsync(callback);
+        } else {
+            // If no navigator is available, call the callback with default values
+            callback.onGetCameraOrientation(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0);
+        }
+    }
+    
+    /**
+     * Dispatch an event to JavaScript using the event delegate.
+     * This method is called by ViroFabricEventDelegate.
+     */
+    public void dispatchEventToJS(String callbackId, WritableMap data) {
+        dispatchEventToJSImpl(callbackId, data);
     }
 
     @Override

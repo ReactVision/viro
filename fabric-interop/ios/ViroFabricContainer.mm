@@ -8,6 +8,8 @@
 
 #import "ViroFabricContainer.h"
 #import "ViroFabricManager.h"
+#import "ViroFabricEventDelegate.h"
+#import "ViroFabricEvents.h"
 #import <React/RCTLog.h>
 #import <React/RCTUIManager.h>
 #import <React/RCTUtils.h>
@@ -34,6 +36,9 @@ using namespace facebook::jsi;
     // Event callback registry
     NSMutableDictionary<NSString *, NSString *> *_eventCallbackRegistry;
     
+    // Event delegate for handling Viro events
+    ViroFabricEventDelegate *_eventDelegate;
+    
     // Flag to track if we're using AR
     BOOL _isAR;
     
@@ -42,6 +47,41 @@ using namespace facebook::jsi;
     
     // Runtime executor for JSI
     facebook::react::RuntimeExecutor _runtimeExecutor;
+}
+
+/**
+ * Get camera position asynchronously for AR hit testing.
+ * This method is called by ViroFabricEventDelegate.
+ */
+- (void)getCameraPositionAsync:(void (^)(NSArray *cameraOrientation))callback {
+    if (_arSceneNavigator) {
+        // Use the existing VRTARSceneNavigator API to get camera position
+        if ([_arSceneNavigator respondsToSelector:@selector(getCameraPositionAsync:)]) {
+            [_arSceneNavigator performSelector:@selector(getCameraPositionAsync:) withObject:callback];
+        } else {
+            // Fallback with default values
+            callback(@[@0, @0, @0, @0, @0, @0, @0, @0, @1, @0, @1, @0]);
+        }
+    } else if (_sceneNavigator) {
+        // For non-AR scenes, we can still get camera position if available
+        if ([_sceneNavigator respondsToSelector:@selector(getCameraPositionAsync:)]) {
+            [_sceneNavigator performSelector:@selector(getCameraPositionAsync:) withObject:callback];
+        } else {
+            // Fallback with default values
+            callback(@[@0, @0, @0, @0, @0, @0, @0, @0, @1, @0, @1, @0]);
+        }
+    } else {
+        // If no navigator is available, call the callback with default values
+        callback(@[@0, @0, @0, @0, @0, @0, @0, @0, @1, @0, @1, @0]);
+    }
+}
+
+/**
+ * Dispatch an event to JavaScript using the event delegate.
+ * This method is called by ViroFabricEventDelegate.
+ */
+- (void)dispatchEventToJS:(NSString *)callbackId eventData:(NSDictionary *)data {
+    [self dispatchEventToJS:callbackId withData:data];
 }
 
 @end
@@ -70,6 +110,11 @@ public:
         _nodeRegistry = [NSMutableDictionary new];
         _eventCallbackRegistry = [NSMutableDictionary new];
         _isAR = NO;
+        
+        // Initialize event delegate
+        _eventDelegate = [[ViroFabricEventDelegate alloc] initWithContainer:self
+                                                                      bridge:bridge
+                                                                 containerId:@(self.tag)];
         
         // Set up the runtime when the bridge is ready
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -165,6 +210,12 @@ public:
     
     // Clear event callback registry
     [_eventCallbackRegistry removeAllObjects];
+    
+    // Clean up event delegate
+    if (_eventDelegate) {
+        [_eventDelegate dispose];
+        _eventDelegate = nil;
+    }
     
     // Reset flags
     _isAR = NO;

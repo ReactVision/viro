@@ -19,6 +19,7 @@ public:
     static void registerNatives() {
         registerHybridClass({
             makeNativeMethod("initHybrid", ViroFabricContainerJSI::initHybrid),
+            makeNativeMethod("dispatchEventToJS", ViroFabricContainerJSI::dispatchEventToJS),
         });
     }
 
@@ -35,33 +36,33 @@ private:
 
     static void initHybrid(
         jni::alias_ref<ViroFabricContainerJSI::javaobject> jThis) {
-        // Get the current ReactContext
-        auto reactContextClass = jni::findClassLocal("com/facebook/react/bridge/ReactContext");
-        auto reactApplicationContextClass = jni::findClassLocal("com/facebook/react/bridge/ReactApplicationContext");
         
-        // Get the current instance manager
-        auto reactInstanceManagerClass = jni::findClassLocal("com/facebook/react/ReactInstanceManager");
-        auto getCurrentReactContextMethod = reactInstanceManagerClass->getStaticMethod<jobject()>("getCurrentReactContext");
-        auto reactContext = getCurrentReactContextMethod();
+        __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Initializing hybrid bridge");
+        
+        // Get the current React context from the Java side
+        static const auto getReactContextMethod = 
+            jThis->getClass()->getMethod<jobject()>("getReactContext");
+        auto reactContext = getReactContextMethod(jThis);
         
         if (reactContext == nullptr) {
             __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "React context is null");
             return;
         }
         
-        // For React Native 0.76.9+, we need to get the runtime from the RuntimeExecutor
-        auto runtimeExecutorHolderClass = jni::findClassLocal("com/facebook/react/bridge/RuntimeExecutor$RuntimeExecutorHolder");
-        auto getRuntimeExecutorHolderMethod = reactContextClass->getMethod<jobject()>("getRuntimeExecutorHolder");
-        auto runtimeExecutorHolder = getRuntimeExecutorHolderMethod(reactContext);
+        // Get the CatalystInstance from ReactContext
+        auto reactContextClass = jni::findClassLocal("com/facebook/react/bridge/ReactContext");
+        auto getCatalystInstanceMethod = reactContextClass->getMethod<jobject()>("getCatalystInstance");
+        auto catalystInstance = getCatalystInstanceMethod(reactContext);
         
-        if (runtimeExecutorHolder == nullptr) {
-            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "RuntimeExecutorHolder is null");
+        if (catalystInstance == nullptr) {
+            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "CatalystInstance is null");
             return;
         }
         
-        // Get the runtime from the RuntimeExecutorHolder
-        auto getRuntimeMethod = runtimeExecutorHolderClass->getMethod<jlong()>("get");
-        auto runtimePointer = getRuntimeMethod(runtimeExecutorHolder);
+        // Get the JSI Runtime from CatalystInstance
+        auto catalystInstanceClass = jni::findClassLocal("com/facebook/react/bridge/CatalystInstance");
+        auto getJSIRuntimeMethod = catalystInstanceClass->getMethod<jlong()>("getJSIRuntime");
+        auto runtimePointer = getJSIRuntimeMethod(catalystInstance);
         
         if (runtimePointer == 0) {
             __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Runtime pointer is null");
@@ -70,18 +71,9 @@ private:
         
         auto runtime = reinterpret_cast<jsi::Runtime*>(runtimePointer);
         
-        // Get the JS call invoker
-        auto jsCallInvokerHolderClass = jni::findClassLocal("com/facebook/react/turbomodule/core/CallInvokerHolderImpl");
-        auto getJSCallInvokerHolderMethod = reactContextClass->getMethod<jobject()>("getJSCallInvokerHolder");
-        auto jsCallInvokerHolder = getJSCallInvokerHolderMethod(reactContext);
-        
-        if (jsCallInvokerHolder == nullptr) {
-            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "JSCallInvokerHolder is null");
-            return;
-        }
-        
-        auto getCallInvokerMethod = jsCallInvokerHolderClass->getMethod<jlong()>("getCallInvoker");
-        auto callInvokerPointer = getCallInvokerMethod(jsCallInvokerHolder);
+        // Get the JS call invoker from CatalystInstance
+        auto getJSCallInvokerMethod = catalystInstanceClass->getMethod<jlong()>("getJSCallInvoker");
+        auto callInvokerPointer = getJSCallInvokerMethod(catalystInstance);
         
         if (callInvokerPointer == 0) {
             __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "CallInvoker pointer is null");
@@ -99,16 +91,23 @@ private:
         // Install JSI bindings
         instance->installJSIBindings();
         
-        // Store the instance
-        jThis->cthis()->javaPart_ = jni::make_global(jThis);
+        // Store the instance in the Java object
+        static const auto setHybridDataMethod = 
+            jThis->getClass()->getMethod<void(jlong)>("setHybridData");
+        setHybridDataMethod(jThis, reinterpret_cast<jlong>(instance.get()));
+        
+        __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Hybrid bridge initialized successfully");
     }
 
     void installJSIBindings() {
         if (!runtime_) {
+            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Runtime is null, cannot install JSI bindings");
             return;
         }
         
         auto& runtime = *runtime_;
+        
+        __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Installing JSI bindings");
         
         // Create the NativeViro object
         auto nativeViro = jsi::Object(runtime);
@@ -128,8 +127,7 @@ private:
                 
                 // Convert props from JSI to ReadableMap
                 auto propsValue = args[2];
-                auto propsObj = propsValue.getObject(rt);
-                auto propsMap = jni::make_local(ReadableNativeMap::createWithContents(rt, std::move(propsObj)));
+                auto propsMap = convertJSIValueToReadableMap(rt, propsValue);
                 
                 // Call the Java method
                 static const auto createNodeMethod = 
@@ -157,8 +155,7 @@ private:
                 
                 // Convert props from JSI to ReadableMap
                 auto propsValue = args[1];
-                auto propsObj = propsValue.getObject(rt);
-                auto propsMap = jni::make_local(ReadableNativeMap::createWithContents(rt, std::move(propsObj)));
+                auto propsMap = convertJSIValueToReadableMap(rt, propsValue);
                 
                 // Call the Java method
                 static const auto updateNodeMethod = 
@@ -300,17 +297,37 @@ private:
         nativeViro.setProperty(runtime, "initialize", jsi::Function::createFromHostFunction(
             runtime,
             jsi::PropNameID::forAscii(runtime, "initialize"),
-            1,  // apiKey
+            1,  // config
             [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
-                if (count < 1) {
-                    throw jsi::JSError(rt, "initialize requires 1 argument");
+                // Initialize Viro
+                bool debug = false;
+                bool arEnabled = false;
+                std::string worldAlignment = "Gravity";
+                
+                if (count > 0 && args[0].isObject()) {
+                    auto config = args[0].getObject(rt);
+                    
+                    if (config.hasProperty(rt, "debug")) {
+                        debug = config.getProperty(rt, "debug").getBool();
+                    }
+                    if (config.hasProperty(rt, "arEnabled")) {
+                        arEnabled = config.getProperty(rt, "arEnabled").getBool();
+                    }
+                    if (config.hasProperty(rt, "worldAlignment")) {
+                        worldAlignment = config.getProperty(rt, "worldAlignment").getString(rt).utf8(rt);
+                    }
                 }
                 
-                auto apiKey = args[0].getString(rt).utf8(rt);
+                // Call the Java initialize method
+                static const auto initializeMethod = 
+                    javaPart_->getClass()->getMethod<void(jboolean, jboolean, jstring)>("initialize");
+                initializeMethod(
+                    javaPart_.get(),
+                    debug,
+                    arEnabled,
+                    jni::make_jstring(worldAlignment).get());
                 
-                // Initialize Viro (this is a placeholder - actual initialization happens in the initialize method)
-                
-                // Return a promise that resolves to true using Promise.resolve()
+                // Return a promise that resolves to true
                 auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
                 auto resolveMethod = promiseConstructor.getPropertyAsFunction(rt, "resolve");
                 auto promise = resolveMethod.callWithThis(rt, promiseConstructor, jsi::Value(true));
@@ -319,48 +336,159 @@ private:
             }
         ));
         
-        // Attach the NativeViro object to the global object
-        runtime.global().setProperty(runtime, "NativeViro", std::move(nativeViro));
-        
-        // Add a function to handle events from native code
-        runtime.global().setProperty(runtime, "handleViroEvent", jsi::Function::createFromHostFunction(
+        // Material management functions
+        nativeViro.setProperty(runtime, "createViroMaterial", jsi::Function::createFromHostFunction(
             runtime,
-            jsi::PropNameID::forAscii(runtime, "handleViroEvent"),
-            2,  // callbackId, event
+            jsi::PropNameID::forAscii(runtime, "createViroMaterial"),
+            2,  // materialName, properties
             [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
                 if (count < 2) {
-                    return jsi::Value::undefined();
+                    throw jsi::JSError(rt, "createViroMaterial requires 2 arguments");
                 }
                 
-                auto callbackId = args[0].getString(rt);
-                auto event = args[1];
+                auto materialName = args[0].getString(rt).utf8(rt);
+                auto propsValue = args[1];
+                auto propsMap = convertJSIValueToReadableMap(rt, propsValue);
                 
-                // Use the jsCallInvoker to ensure we're on the JS thread
-                jsCallInvoker_->invokeAsync([callbackIdCopy = std::string(callbackId.utf8(rt)), &rt, event]() {
-                    // Find the callback in the global registry
-                    auto callbackRegistry = rt.global().getProperty(rt, "eventCallbacks");
-                    if (!callbackRegistry.isObject()) {
-                        // Create the callback registry if it doesn't exist
-                        auto newRegistry = jsi::Object(rt);
-                        rt.global().setProperty(rt, "eventCallbacks", newRegistry);
-                        return;
-                    }
-                    
-                    auto callbackRegistryObj = callbackRegistry.getObject(rt);
-                    auto callback = callbackRegistryObj.getProperty(rt, callbackIdCopy.c_str());
-                    
-                    if (!callback.isObject() || !callback.getObject(rt).isFunction(rt)) {
-                        return;
-                    }
-                    
-                    // Call the callback with the event
-                    auto callbackFunc = callback.getObject(rt).getFunction(rt);
-                    callbackFunc.call(rt, event);
-                });
+                // Call the Java method
+                static const auto createMaterialMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, ReadableNativeMap::javaobject)>("createMaterial");
+                createMaterialMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(materialName).get(),
+                    propsMap.get());
                 
                 return jsi::Value::undefined();
             }
         ));
+        
+        nativeViro.setProperty(runtime, "updateViroMaterial", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "updateViroMaterial"),
+            2,  // materialName, properties
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 2) {
+                    throw jsi::JSError(rt, "updateViroMaterial requires 2 arguments");
+                }
+                
+                auto materialName = args[0].getString(rt).utf8(rt);
+                auto propsValue = args[1];
+                auto propsMap = convertJSIValueToReadableMap(rt, propsValue);
+                
+                // Call the Java method
+                static const auto updateMaterialMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, ReadableNativeMap::javaobject)>("updateMaterial");
+                updateMaterialMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(materialName).get(),
+                    propsMap.get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        // Animation functions
+        nativeViro.setProperty(runtime, "createViroAnimation", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "createViroAnimation"),
+            2,  // animationName, properties
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 2) {
+                    throw jsi::JSError(rt, "createViroAnimation requires 2 arguments");
+                }
+                
+                auto animationName = args[0].getString(rt).utf8(rt);
+                auto propsValue = args[1];
+                auto propsMap = convertJSIValueToReadableMap(rt, propsValue);
+                
+                // Call the Java method
+                static const auto createAnimationMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, ReadableNativeMap::javaobject)>("createAnimation");
+                createAnimationMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(animationName).get(),
+                    propsMap.get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "executeViroAnimation", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "executeViroAnimation"),
+            3,  // nodeId, animationName, options
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 3) {
+                    throw jsi::JSError(rt, "executeViroAnimation requires 3 arguments");
+                }
+                
+                auto nodeId = args[0].getString(rt).utf8(rt);
+                auto animationName = args[1].getString(rt).utf8(rt);
+                auto optionsValue = args[2];
+                auto optionsMap = convertJSIValueToReadableMap(rt, optionsValue);
+                
+                // Call the Java method
+                static const auto executeAnimationMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, jstring, ReadableNativeMap::javaobject)>("executeAnimation");
+                executeAnimationMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(nodeId).get(),
+                    jni::make_jstring(animationName).get(),
+                    optionsMap.get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        // AR specific functions
+        nativeViro.setProperty(runtime, "setViroARPlaneDetection", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "setViroARPlaneDetection"),
+            1,  // config
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    throw jsi::JSError(rt, "setViroARPlaneDetection requires 1 argument");
+                }
+                
+                auto configValue = args[0];
+                auto configMap = convertJSIValueToReadableMap(rt, configValue);
+                
+                // Call the Java method
+                static const auto setARPlaneDetectionMethod = 
+                    javaPart_->getClass()->getMethod<void(ReadableNativeMap::javaobject)>("setARPlaneDetection");
+                setARPlaneDetectionMethod(
+                    javaPart_.get(),
+                    configMap.get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "setViroARImageTargets", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "setViroARImageTargets"),
+            1,  // targets
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    throw jsi::JSError(rt, "setViroARImageTargets requires 1 argument");
+                }
+                
+                auto targetsValue = args[0];
+                auto targetsMap = convertJSIValueToReadableMap(rt, targetsValue);
+                
+                // Call the Java method
+                static const auto setARImageTargetsMethod = 
+                    javaPart_->getClass()->getMethod<void(ReadableNativeMap::javaobject)>("setARImageTargets");
+                setARImageTargetsMethod(
+                    javaPart_.get(),
+                    targetsMap.get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        // Attach the NativeViro object to the global object
+        runtime.global().setProperty(runtime, "NativeViro", std::move(nativeViro));
         
         // Add a method to register event callbacks
         runtime.global().setProperty(runtime, "registerViroEventCallback", jsi::Function::createFromHostFunction(
@@ -396,6 +524,63 @@ private:
                 return jsi::Value::undefined();
             }
         ));
+        
+        __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "JSI bindings installed successfully");
+    }
+
+    // Helper method to convert JSI values to ReadableMap
+    jni::local_ref<ReadableNativeMap::javaobject> convertJSIValueToReadableMap(jsi::Runtime& runtime, const jsi::Value& value) {
+        if (!value.isObject()) {
+            // Create an empty map for non-object values
+            return ReadableNativeMap::newObjectCxxArgs();
+        }
+        
+        auto obj = value.getObject(runtime);
+        return ReadableNativeMap::createWithContents(runtime, std::move(obj));
+    }
+
+    // Method to dispatch events to JavaScript
+    void dispatchEventToJS(jni::alias_ref<jstring> callbackId, jni::alias_ref<ReadableNativeMap::javaobject> data) {
+        if (!runtime_ || !jsCallInvoker_) {
+            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Cannot dispatch event: runtime or call invoker is null");
+            return;
+        }
+        
+        std::string callbackIdStr = callbackId->toStdString();
+        
+        // Convert ReadableMap to JSI value
+        auto dataMap = data->cthis()->consume();
+        
+        // Use the jsCallInvoker to ensure we're on the JS thread
+        jsCallInvoker_->invokeAsync([this, callbackIdStr, dataMap = std::move(dataMap)]() {
+            if (!runtime_) return;
+            
+            auto& rt = *runtime_;
+            
+            try {
+                // Find the callback in the global registry
+                auto callbackRegistry = rt.global().getProperty(rt, "eventCallbacks");
+                if (!callbackRegistry.isObject()) {
+                    return;
+                }
+                
+                auto callbackRegistryObj = callbackRegistry.getObject(rt);
+                auto callback = callbackRegistryObj.getProperty(rt, callbackIdStr.c_str());
+                
+                if (!callback.isObject() || !callback.getObject(rt).isFunction(rt)) {
+                    return;
+                }
+                
+                // Convert the data map to a JSI object
+                auto eventData = jsi::valueFromDynamic(rt, dataMap);
+                
+                // Call the callback with the event
+                auto callbackFunc = callback.getObject(rt).getFunction(rt);
+                callbackFunc.call(rt, eventData);
+            } catch (const std::exception& e) {
+                __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Error dispatching event: %s", e.what());
+            }
+        });
     }
 
     jni::global_ref<ViroFabricContainerJSI::javaobject> javaPart_;

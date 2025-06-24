@@ -89,6 +89,9 @@ public class ViroFabricContainer extends FrameLayout {
     // Event delegate for handling Viro events
     private ViroFabricEventDelegate mEventDelegate;
 
+    // Scene manager for lifecycle and memory management
+    private ViroFabricSceneManager mSceneManager;
+
     // Material manager
     private MaterialManager mMaterialManager;
 
@@ -129,6 +132,58 @@ public class ViroFabricContainer extends FrameLayout {
 
         // Initialize event delegate
         mEventDelegate = new ViroFabricEventDelegate(this, mReactContext, getId());
+
+        // Initialize scene manager
+        mSceneManager = new ViroFabricSceneManager(this, mReactContext);
+        mSceneManager.setLifecycleListener(new ViroFabricSceneManager.SceneLifecycleListener() {
+            @Override
+            public void onSceneCreated(String sceneId, VRTScene scene) {
+                Log.d(TAG, "Scene lifecycle: Scene created - " + sceneId);
+                // Register scene for memory management
+                if (mEventDelegate != null && scene instanceof VRTNode) {
+                    mEventDelegate.registerManagedNode((VRTNode) scene);
+                }
+            }
+
+            @Override
+            public void onSceneActivated(String sceneId, VRTScene scene) {
+                Log.d(TAG, "Scene lifecycle: Scene activated - " + sceneId);
+                // Send event to JavaScript
+                WritableMap event = new WritableNativeMap();
+                event.putString("sceneId", sceneId);
+                event.putString("state", "active");
+                sendEvent("onSceneStateChanged", event);
+            }
+
+            @Override
+            public void onSceneDeactivated(String sceneId, VRTScene scene) {
+                Log.d(TAG, "Scene lifecycle: Scene deactivated - " + sceneId);
+                // Send event to JavaScript
+                WritableMap event = new WritableNativeMap();
+                event.putString("sceneId", sceneId);
+                event.putString("state", "paused");
+                sendEvent("onSceneStateChanged", event);
+            }
+
+            @Override
+            public void onSceneDestroyed(String sceneId) {
+                Log.d(TAG, "Scene lifecycle: Scene destroyed - " + sceneId);
+                // Send event to JavaScript
+                WritableMap event = new WritableNativeMap();
+                event.putString("sceneId", sceneId);
+                event.putString("state", "destroyed");
+                sendEvent("onSceneStateChanged", event);
+            }
+
+            @Override
+            public void onMemoryWarning() {
+                Log.w(TAG, "Scene lifecycle: Memory warning received");
+                // Send memory warning to JavaScript
+                WritableMap event = new WritableNativeMap();
+                event.putMap("memoryStats", mSceneManager.getMemoryStats());
+                sendEvent("onMemoryWarning", event);
+            }
+        });
 
         // Initialize JSI bridge on the UI thread
         UiThreadUtil.runOnUiThread(new Runnable() {
@@ -267,6 +322,12 @@ public class ViroFabricContainer extends FrameLayout {
 
         // Clear event callback registry
         mEventCallbackRegistry.clear();
+
+        // Clean up scene manager
+        if (mSceneManager != null) {
+            mSceneManager.cleanup();
+            mSceneManager = null;
+        }
 
         // Clean up event delegate
         if (mEventDelegate != null) {

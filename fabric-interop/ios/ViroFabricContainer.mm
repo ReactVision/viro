@@ -10,6 +10,7 @@
 #import "ViroFabricManager.h"
 #import "ViroFabricEventDelegate.h"
 #import "ViroFabricEvents.h"
+#import "ViroFabricSceneManager.h"
 #import <React/RCTLog.h>
 #import <React/RCTUIManager.h>
 #import <React/RCTUtils.h>
@@ -38,6 +39,9 @@ using namespace facebook::jsi;
     
     // Event delegate for handling Viro events
     ViroFabricEventDelegate *_eventDelegate;
+    
+    // Scene manager for lifecycle and memory management
+    ViroFabricSceneManager *_sceneManager;
     
     // Flag to track if we're using AR
     BOOL _isAR;
@@ -84,6 +88,73 @@ using namespace facebook::jsi;
     [self dispatchEventToJS:callbackId withData:data];
 }
 
+#pragma mark - ViroFabricSceneLifecycleListener
+
+- (void)onSceneCreated:(NSString *)sceneId scene:(id)scene {
+    RCTLogInfo(@"[ViroFabricContainer] Scene lifecycle: Scene created - %@", sceneId);
+    
+    // Register scene for memory management
+    if (_eventDelegate && scene) {
+        [_eventDelegate registerManagedNode:scene];
+    }
+    
+    // Send event to JavaScript
+    if (self.onSceneStateChanged) {
+        self.onSceneStateChanged(@{
+            @"sceneId": sceneId,
+            @"state": @"created"
+        });
+    }
+}
+
+- (void)onSceneActivated:(NSString *)sceneId scene:(id)scene {
+    RCTLogInfo(@"[ViroFabricContainer] Scene lifecycle: Scene activated - %@", sceneId);
+    
+    // Send event to JavaScript
+    if (self.onSceneStateChanged) {
+        self.onSceneStateChanged(@{
+            @"sceneId": sceneId,
+            @"state": @"active"
+        });
+    }
+}
+
+- (void)onSceneDeactivated:(NSString *)sceneId scene:(id)scene {
+    RCTLogInfo(@"[ViroFabricContainer] Scene lifecycle: Scene deactivated - %@", sceneId);
+    
+    // Send event to JavaScript
+    if (self.onSceneStateChanged) {
+        self.onSceneStateChanged(@{
+            @"sceneId": sceneId,
+            @"state": @"paused"
+        });
+    }
+}
+
+- (void)onSceneDestroyed:(NSString *)sceneId {
+    RCTLogInfo(@"[ViroFabricContainer] Scene lifecycle: Scene destroyed - %@", sceneId);
+    
+    // Send event to JavaScript
+    if (self.onSceneStateChanged) {
+        self.onSceneStateChanged(@{
+            @"sceneId": sceneId,
+            @"state": @"destroyed"
+        });
+    }
+}
+
+- (void)onMemoryWarning {
+    RCTLogWarn(@"[ViroFabricContainer] Scene lifecycle: Memory warning received");
+    
+    // Send memory warning to JavaScript
+    if (self.onMemoryWarning && _sceneManager) {
+        NSDictionary *memoryStats = [_sceneManager getMemoryStats];
+        self.onMemoryWarning(@{
+            @"memoryStats": memoryStats
+        });
+    }
+}
+
 @end
 
 // Forward declaration of the runtime bridge class
@@ -102,7 +173,7 @@ public:
     facebook::jsi::Value get(facebook::jsi::Runtime &runtime, const facebook::jsi::PropNameID &name) override;
 };
 
-@implementation ViroFabricContainer
+@implementation ViroFabricContainer <ViroFabricSceneLifecycleListener>
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
     if (self = [super init]) {
@@ -115,6 +186,10 @@ public:
         _eventDelegate = [[ViroFabricEventDelegate alloc] initWithContainer:self
                                                                       bridge:bridge
                                                                  containerId:@(self.tag)];
+        
+        // Initialize scene manager
+        _sceneManager = [[ViroFabricSceneManager alloc] initWithContainer:self bridge:bridge];
+        [_sceneManager setLifecycleListener:self];
         
         // Set up the runtime when the bridge is ready
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -210,6 +285,12 @@ public:
     
     // Clear event callback registry
     [_eventCallbackRegistry removeAllObjects];
+    
+    // Clean up scene manager
+    if (_sceneManager) {
+        [_sceneManager cleanup];
+        _sceneManager = nil;
+    }
     
     // Clean up event delegate
     if (_eventDelegate) {

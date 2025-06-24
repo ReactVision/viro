@@ -7,6 +7,7 @@ import android.widget.FrameLayout;
 
 import com.facebook.jni.HybridData;
 import com.facebook.jni.annotations.DoNotStrip;
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.UiThreadUtil;
@@ -813,8 +814,10 @@ public class ViroFabricContainer extends FrameLayout {
             }
             
             if (mMaterialManager != null) {
-                // Use the existing MaterialManager to create materials
-                mMaterialManager.createMaterial(materialName, properties);
+                // Use the correct MaterialManager API - setJSMaterials expects a map of materials
+                WritableMap materialsMap = Arguments.createMap();
+                materialsMap.putMap(materialName, properties);
+                mMaterialManager.setJSMaterials(materialsMap);
                 Log.d(TAG, "Successfully created material: " + materialName);
             } else {
                 Log.e(TAG, "MaterialManager not available");
@@ -838,8 +841,10 @@ public class ViroFabricContainer extends FrameLayout {
             }
             
             if (mMaterialManager != null) {
-                // Use the existing MaterialManager to update materials
-                mMaterialManager.updateMaterial(materialName, properties);
+                // For updates, we also use setJSMaterials - it will overwrite existing materials
+                WritableMap materialsMap = Arguments.createMap();
+                materialsMap.putMap(materialName, properties);
+                mMaterialManager.setJSMaterials(materialsMap);
                 Log.d(TAG, "Successfully updated material: " + materialName);
             } else {
                 Log.e(TAG, "MaterialManager not available");
@@ -863,8 +868,10 @@ public class ViroFabricContainer extends FrameLayout {
             }
             
             if (mAnimationManager != null) {
-                // Use the existing AnimationManager to create animations
-                mAnimationManager.createAnimation(animationName, properties);
+                // Use the correct AnimationManager API - setJSAnimations expects a map of animations
+                WritableMap animationsMap = Arguments.createMap();
+                animationsMap.putMap(animationName, properties);
+                mAnimationManager.setJSAnimations(animationsMap);
                 Log.d(TAG, "Successfully created animation: " + animationName);
             } else {
                 Log.e(TAG, "AnimationManager not available");
@@ -898,8 +905,18 @@ public class ViroFabricContainer extends FrameLayout {
             if (node instanceof VRTNode && mAnimationManager != null) {
                 VRTNode vrtNode = (VRTNode) node;
                 
-                // Use the existing AnimationManager to execute animations
-                mAnimationManager.executeAnimation(vrtNode, animationName, options);
+                // Use the existing VRT node animation system
+                // VRT nodes have their own animation system via setAnimation
+                WritableMap animationConfig = Arguments.createMap();
+                animationConfig.putString("name", animationName);
+                if (options != null) {
+                    // Merge options into animation config
+                    WritableMap mergedConfig = Arguments.createMap();
+                    mergedConfig.merge(animationConfig);
+                    mergedConfig.merge(options);
+                    animationConfig = mergedConfig;
+                }
+                vrtNode.setAnimation(animationConfig);
                 
                 Log.d(TAG, "Successfully executed animation: " + animationName + " on node: " + nodeId);
             } else {

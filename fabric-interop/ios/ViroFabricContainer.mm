@@ -889,7 +889,7 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
 - (void)createMaterial:(NSString *)materialName withProps:(NSDictionary *)props {
     RCTLogInfo(@"Creating material: %@", materialName);
     
-    // Use the existing VRTMaterialManager instead of non-existent VRTMaterial class
+    // Use the existing VRTMaterialManager with correct API
     Class materialManagerClass = NSClassFromString(@"VRTMaterialManager");
     if (!materialManagerClass) {
         RCTLogError(@"VRTMaterialManager class not found");
@@ -903,21 +903,27 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return;
     }
     
-    // Use the existing material manager to create materials
-    if ([materialManager respondsToSelector:@selector(createMaterial:withProperties:)]) {
-        [materialManager performSelector:@selector(createMaterial:withProperties:) 
-                              withObject:materialName 
-                              withObject:props];
+    // Use the correct VRTMaterialManager API - materials property
+    if ([materialManager respondsToSelector:@selector(materials)] && 
+        [materialManager respondsToSelector:@selector(setMaterials:)]) {
+        
+        NSMutableDictionary *materials = [[materialManager materials] mutableCopy];
+        if (!materials) {
+            materials = [NSMutableDictionary new];
+        }
+        materials[materialName] = props;
+        [materialManager setMaterials:materials];
+        
         RCTLogInfo(@"Successfully created material: %@", materialName);
     } else {
-        RCTLogError(@"VRTMaterialManager does not support createMaterial method");
+        RCTLogError(@"VRTMaterialManager does not support materials property");
     }
 }
 
 - (void)updateMaterial:(NSString *)materialName withProps:(NSDictionary *)props {
     RCTLogInfo(@"Updating material: %@", materialName);
     
-    // Use the existing VRTMaterialManager instead of non-existent VRTMaterial class
+    // Use the existing VRTMaterialManager with correct API
     Class materialManagerClass = NSClassFromString(@"VRTMaterialManager");
     if (!materialManagerClass) {
         RCTLogError(@"VRTMaterialManager class not found");
@@ -931,14 +937,20 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return;
     }
     
-    // Use the existing material manager to update materials
-    if ([materialManager respondsToSelector:@selector(updateMaterial:withProperties:)]) {
-        [materialManager performSelector:@selector(updateMaterial:withProperties:) 
-                              withObject:materialName 
-                              withObject:props];
+    // Use the correct VRTMaterialManager API - materials property
+    if ([materialManager respondsToSelector:@selector(materials)] && 
+        [materialManager respondsToSelector:@selector(setMaterials:)]) {
+        
+        NSMutableDictionary *materials = [[materialManager materials] mutableCopy];
+        if (!materials) {
+            materials = [NSMutableDictionary new];
+        }
+        materials[materialName] = props;
+        [materialManager setMaterials:materials];
+        
         RCTLogInfo(@"Successfully updated material: %@", materialName);
     } else {
-        RCTLogError(@"VRTMaterialManager does not support updateMaterial method");
+        RCTLogError(@"VRTMaterialManager does not support materials property");
     }
 }
 
@@ -947,7 +959,7 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
 - (void)createAnimation:(NSString *)animationName withProps:(NSDictionary *)props {
     RCTLogInfo(@"Creating animation: %@", animationName);
     
-    // Use the existing VRTAnimationManager instead of non-existent VRTAnimation class
+    // Use the existing VRTAnimationManager with correct API
     Class animationManagerClass = NSClassFromString(@"VRTAnimationManager");
     if (!animationManagerClass) {
         RCTLogError(@"VRTAnimationManager class not found");
@@ -961,14 +973,25 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return;
     }
     
-    // Use the existing animation manager to create animations
-    if ([animationManager respondsToSelector:@selector(createAnimation:withProperties:)]) {
-        [animationManager performSelector:@selector(createAnimation:withProperties:) 
-                               withObject:animationName 
-                               withObject:props];
+    // Use the correct VRTAnimationManager API - animations property
+    if ([animationManager respondsToSelector:@selector(animations)] && 
+        [animationManager respondsToSelector:@selector(setAnimations:)]) {
+        
+        NSMutableDictionary *animations = [[animationManager animations] mutableCopy];
+        if (!animations) {
+            animations = [NSMutableDictionary new];
+        }
+        animations[animationName] = props;
+        [animationManager setAnimations:animations];
+        
+        // Parse animations to make them available
+        if ([animationManager respondsToSelector:@selector(parseAnimations)]) {
+            [animationManager performSelector:@selector(parseAnimations)];
+        }
+        
         RCTLogInfo(@"Successfully created animation: %@", animationName);
     } else {
-        RCTLogError(@"VRTAnimationManager does not support createAnimation method");
+        RCTLogError(@"VRTAnimationManager does not support animations property");
     }
 }
 
@@ -982,32 +1005,23 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return;
     }
     
-    // Use the existing VRTAnimationManager instead of non-existent VRTAnimation class
-    Class animationManagerClass = NSClassFromString(@"VRTAnimationManager");
-    if (!animationManagerClass) {
-        RCTLogError(@"VRTAnimationManager class not found");
-        return;
-    }
-    
-    // Get the animation manager instance
-    id animationManager = [_bridge moduleForClass:animationManagerClass];
-    if (!animationManager) {
-        RCTLogError(@"VRTAnimationManager module not available");
-        return;
-    }
-    
-    // If the node is a VRT node, execute the animation
+    // If the node is a VRT node, execute the animation using the node's animation system
     Class vrtNodeClass = NSClassFromString(@"VRTNode");
     if (vrtNodeClass && [node isKindOfClass:vrtNodeClass]) {
-        // Use the existing animation manager to execute animations
-        if ([animationManager respondsToSelector:@selector(executeAnimation:onNode:withOptions:)]) {
-            [animationManager performSelector:@selector(executeAnimation:onNode:withOptions:) 
-                                   withObject:animationName 
-                                   withObject:node 
-                                   withObject:options];
+        // Use the VRT node's built-in animation system
+        NSMutableDictionary *animationConfig = [NSMutableDictionary new];
+        animationConfig[@"name"] = animationName;
+        
+        if (options) {
+            [animationConfig addEntriesFromDictionary:options];
+        }
+        
+        // VRT nodes have their own animation system
+        if ([node respondsToSelector:@selector(setAnimation:)]) {
+            [node performSelector:@selector(setAnimation:) withObject:animationConfig];
             RCTLogInfo(@"Successfully executed animation: %@ on node: %@", animationName, nodeId);
         } else {
-            RCTLogError(@"VRTAnimationManager does not support executeAnimation method");
+            RCTLogError(@"VRT node does not support setAnimation method");
         }
     } else {
         RCTLogWarn(@"Cannot execute animation on non-VRT node: %@", nodeId);

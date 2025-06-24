@@ -11,6 +11,7 @@
 #import "ViroFabricEventDelegate.h"
 #import "ViroFabricEvents.h"
 #import "ViroFabricSceneManager.h"
+#import "ViroFabricJSI.h"
 #import <React/RCTLog.h>
 #import <React/RCTUIManager.h>
 #import <React/RCTUtils.h>
@@ -42,6 +43,9 @@ using namespace facebook::jsi;
     
     // Scene manager for lifecycle and memory management
     ViroFabricSceneManager *_sceneManager;
+    
+    // JSI bridge for enhanced performance
+    ViroFabricJSI *_jsiBridge;
     
     // Flag to track if we're using AR
     BOOL _isAR;
@@ -190,6 +194,11 @@ public:
         // Initialize scene manager
         _sceneManager = [[ViroFabricSceneManager alloc] initWithContainer:self bridge:bridge];
         [_sceneManager setLifecycleListener:self];
+        
+        // Initialize JSI bridge
+        _jsiBridge = [[ViroFabricJSI alloc] initWithBridge:bridge];
+        [_jsiBridge setSceneManager:_sceneManager];
+        [_jsiBridge setFabricManager:[ViroFabricManager sharedInstance]];
         
         // Set up the runtime when the bridge is ready
         [[NSNotificationCenter defaultCenter] addObserver:self

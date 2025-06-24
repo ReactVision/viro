@@ -889,45 +889,57 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
 - (void)createMaterial:(NSString *)materialName withProps:(NSDictionary *)props {
     RCTLogInfo(@"Creating material: %@", materialName);
     
-    // Create a new VRT material using the existing ViroReact framework
-    Class materialClass = NSClassFromString(@"VRTMaterial");
-    if (!materialClass) {
-        RCTLogError(@"VRTMaterial class not found");
+    // Use the existing VRTMaterialManager instead of non-existent VRTMaterial class
+    Class materialManagerClass = NSClassFromString(@"VRTMaterialManager");
+    if (!materialManagerClass) {
+        RCTLogError(@"VRTMaterialManager class not found");
         return;
     }
     
-    id material = [[materialClass alloc] initWithBridge:_bridge];
-    
-    // Set material properties
-    if (props && [material respondsToSelector:@selector(setProperties:)]) {
-        [material performSelector:@selector(setProperties:) withObject:props];
+    // Get the material manager instance
+    id materialManager = [_bridge moduleForClass:materialManagerClass];
+    if (!materialManager) {
+        RCTLogError(@"VRTMaterialManager module not available");
+        return;
     }
     
-    // Store the material in a registry (we'll need to add this property)
-    if (!_materialRegistry) {
-        _materialRegistry = [NSMutableDictionary new];
+    // Use the existing material manager to create materials
+    if ([materialManager respondsToSelector:@selector(createMaterial:withProperties:)]) {
+        [materialManager performSelector:@selector(createMaterial:withProperties:) 
+                              withObject:materialName 
+                              withObject:props];
+        RCTLogInfo(@"Successfully created material: %@", materialName);
+    } else {
+        RCTLogError(@"VRTMaterialManager does not support createMaterial method");
     }
-    _materialRegistry[materialName] = material;
-    
-    RCTLogInfo(@"Successfully created material: %@", materialName);
 }
 
 - (void)updateMaterial:(NSString *)materialName withProps:(NSDictionary *)props {
     RCTLogInfo(@"Updating material: %@", materialName);
     
-    // Get the material from the registry
-    id material = _materialRegistry[materialName];
-    if (!material) {
-        RCTLogError(@"Cannot update material: material not found - %@", materialName);
+    // Use the existing VRTMaterialManager instead of non-existent VRTMaterial class
+    Class materialManagerClass = NSClassFromString(@"VRTMaterialManager");
+    if (!materialManagerClass) {
+        RCTLogError(@"VRTMaterialManager class not found");
         return;
     }
     
-    // Update material properties
-    if (props && [material respondsToSelector:@selector(setProperties:)]) {
-        [material performSelector:@selector(setProperties:) withObject:props];
+    // Get the material manager instance
+    id materialManager = [_bridge moduleForClass:materialManagerClass];
+    if (!materialManager) {
+        RCTLogError(@"VRTMaterialManager module not available");
+        return;
     }
     
-    RCTLogInfo(@"Successfully updated material: %@", materialName);
+    // Use the existing material manager to update materials
+    if ([materialManager respondsToSelector:@selector(updateMaterial:withProperties:)]) {
+        [materialManager performSelector:@selector(updateMaterial:withProperties:) 
+                              withObject:materialName 
+                              withObject:props];
+        RCTLogInfo(@"Successfully updated material: %@", materialName);
+    } else {
+        RCTLogError(@"VRTMaterialManager does not support updateMaterial method");
+    }
 }
 
 #pragma mark - Animation Management
@@ -935,27 +947,29 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
 - (void)createAnimation:(NSString *)animationName withProps:(NSDictionary *)props {
     RCTLogInfo(@"Creating animation: %@", animationName);
     
-    // Create a new VRT animation using the existing ViroReact framework
-    Class animationClass = NSClassFromString(@"VRTAnimation");
-    if (!animationClass) {
-        RCTLogError(@"VRTAnimation class not found");
+    // Use the existing VRTAnimationManager instead of non-existent VRTAnimation class
+    Class animationManagerClass = NSClassFromString(@"VRTAnimationManager");
+    if (!animationManagerClass) {
+        RCTLogError(@"VRTAnimationManager class not found");
         return;
     }
     
-    id animation = [[animationClass alloc] initWithBridge:_bridge];
-    
-    // Set animation properties
-    if (props && [animation respondsToSelector:@selector(setProperties:)]) {
-        [animation performSelector:@selector(setProperties:) withObject:props];
+    // Get the animation manager instance
+    id animationManager = [_bridge moduleForClass:animationManagerClass];
+    if (!animationManager) {
+        RCTLogError(@"VRTAnimationManager module not available");
+        return;
     }
     
-    // Store the animation in a registry (we'll need to add this property)
-    if (!_animationRegistry) {
-        _animationRegistry = [NSMutableDictionary new];
+    // Use the existing animation manager to create animations
+    if ([animationManager respondsToSelector:@selector(createAnimation:withProperties:)]) {
+        [animationManager performSelector:@selector(createAnimation:withProperties:) 
+                               withObject:animationName 
+                               withObject:props];
+        RCTLogInfo(@"Successfully created animation: %@", animationName);
+    } else {
+        RCTLogError(@"VRTAnimationManager does not support createAnimation method");
     }
-    _animationRegistry[animationName] = animation;
-    
-    RCTLogInfo(@"Successfully created animation: %@", animationName);
 }
 
 - (void)executeAnimation:(NSString *)animationName onNode:(NSString *)nodeId withOptions:(NSDictionary *)options {
@@ -968,26 +982,33 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         return;
     }
     
-    // Get the animation from the registry
-    id animation = _animationRegistry[animationName];
-    if (!animation) {
-        RCTLogError(@"Cannot execute animation: animation not found - %@", animationName);
+    // Use the existing VRTAnimationManager instead of non-existent VRTAnimation class
+    Class animationManagerClass = NSClassFromString(@"VRTAnimationManager");
+    if (!animationManagerClass) {
+        RCTLogError(@"VRTAnimationManager class not found");
+        return;
+    }
+    
+    // Get the animation manager instance
+    id animationManager = [_bridge moduleForClass:animationManagerClass];
+    if (!animationManager) {
+        RCTLogError(@"VRTAnimationManager module not available");
         return;
     }
     
     // If the node is a VRT node, execute the animation
     Class vrtNodeClass = NSClassFromString(@"VRTNode");
     if (vrtNodeClass && [node isKindOfClass:vrtNodeClass]) {
-        // Try to execute the animation using the existing VRT animation system
-        if ([node respondsToSelector:@selector(executeAnimation:withOptions:)]) {
-            [node performSelector:@selector(executeAnimation:withOptions:) 
-                      withObject:animation 
-                      withObject:options];
-        } else if ([node respondsToSelector:@selector(runAnimation:)]) {
-            [node performSelector:@selector(runAnimation:) withObject:animation];
+        // Use the existing animation manager to execute animations
+        if ([animationManager respondsToSelector:@selector(executeAnimation:onNode:withOptions:)]) {
+            [animationManager performSelector:@selector(executeAnimation:onNode:withOptions:) 
+                                   withObject:animationName 
+                                   withObject:node 
+                                   withObject:options];
+            RCTLogInfo(@"Successfully executed animation: %@ on node: %@", animationName, nodeId);
+        } else {
+            RCTLogError(@"VRTAnimationManager does not support executeAnimation method");
         }
-        
-        RCTLogInfo(@"Successfully executed animation: %@ on node: %@", animationName, nodeId);
     } else {
         RCTLogWarn(@"Cannot execute animation on non-VRT node: %@", nodeId);
     }
@@ -1078,7 +1099,7 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }
         } else if ([nodeType isEqualToString:@"video"]) {
-            Class nodeClass = NSClassFromString(@"VRTVideo");
+            Class nodeClass = NSClassFromString(@"VRTVideoSurface");
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }
@@ -1101,12 +1122,7 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
             }
         }
         // Shape components
-        else if ([nodeType isEqualToString:@"surface"]) {
-            Class nodeClass = NSClassFromString(@"VRTSurface");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"polygon"]) {
+        else if ([nodeType isEqualToString:@"polygon"]) {
             Class nodeClass = NSClassFromString(@"VRTPolygon");
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
@@ -1116,19 +1132,9 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }
-        } else if ([nodeType isEqualToString:@"geometry"]) {
-            Class nodeClass = NSClassFromString(@"VRTGeometry");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
         }
         // Interactive components
-        else if ([nodeType isEqualToString:@"button"]) {
-            Class nodeClass = NSClassFromString(@"VRTButton");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"controller"]) {
+        else if ([nodeType isEqualToString:@"controller"]) {
             Class nodeClass = NSClassFromString(@"VRTController");
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
@@ -1158,7 +1164,7 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         }
         // Environment components
         else if ([nodeType isEqualToString:@"skyBox"]) {
-            Class nodeClass = NSClassFromString(@"VRTSkyBox");
+            Class nodeClass = NSClassFromString(@"VRTSkybox");
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }
@@ -1186,11 +1192,6 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }
-        } else if ([nodeType isEqualToString:@"spinner"]) {
-            Class nodeClass = NSClassFromString(@"VRTSpinner");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
         }
         // Camera components
         else if ([nodeType isEqualToString:@"camera"]) {
@@ -1204,41 +1205,23 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }
         }
-        // Lighting components
-        else if ([nodeType isEqualToString:@"ambientLight"]) {
-            Class nodeClass = NSClassFromString(@"VRTAmbientLight");
+        // Lighting components (using VRTLight base class)
+        else if ([nodeType isEqualToString:@"ambientLight"] ||
+                 [nodeType isEqualToString:@"directionalLight"] ||
+                 [nodeType isEqualToString:@"omniLight"] ||
+                 [nodeType isEqualToString:@"spotLight"]) {
+            Class nodeClass = NSClassFromString(@"VRTLight");
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"directionalLight"]) {
-            Class nodeClass = NSClassFromString(@"VRTDirectionalLight");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"omniLight"]) {
-            Class nodeClass = NSClassFromString(@"VRTOmniLight");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"spotLight"]) {
-            Class nodeClass = NSClassFromString(@"VRTSpotLight");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
+                // Set the light type as a property
+                if ([node respondsToSelector:@selector(setLightType:)]) {
+                    [node performSelector:@selector(setLightType:) withObject:nodeType];
+                }
             }
         }
         // Audio components
         else if ([nodeType isEqualToString:@"sound"]) {
             Class nodeClass = NSClassFromString(@"VRTSound");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"soundField"]) {
-            Class nodeClass = NSClassFromString(@"VRTSoundField");
-            if (nodeClass) {
-                node = [[nodeClass alloc] initWithBridge:_bridge];
-            }
-        } else if ([nodeType isEqualToString:@"spatialSound"]) {
-            Class nodeClass = NSClassFromString(@"VRTSpatialSound");
             if (nodeClass) {
                 node = [[nodeClass alloc] initWithBridge:_bridge];
             }

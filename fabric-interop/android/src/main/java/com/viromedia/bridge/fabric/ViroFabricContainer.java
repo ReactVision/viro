@@ -27,39 +27,35 @@ import com.viromedia.bridge.component.node.control.VRTSphere;
 import com.viromedia.bridge.component.node.control.VRTText;
 import com.viromedia.bridge.component.node.control.VRTImage;
 import com.viromedia.bridge.component.node.control.VRTQuad;
-import com.viromedia.bridge.component.node.control.VRTVideo;
+import com.viromedia.bridge.component.node.control.VRTVideoSurface;
 import com.viromedia.bridge.component.node.control.VRT3DObject;
-import com.viromedia.bridge.component.node.control.VRTNode;
-import com.viromedia.bridge.component.node.control.VRTButton;
-import com.viromedia.bridge.component.node.control.VRTFlexView;
-import com.viromedia.bridge.component.node.control.VRTSurface;
 import com.viromedia.bridge.component.node.control.VRTPolygon;
 import com.viromedia.bridge.component.node.control.VRTPolyline;
 import com.viromedia.bridge.component.node.control.VRTGeometry;
-import com.viromedia.bridge.component.node.control.VRTSpinner;
-import com.viromedia.bridge.component.node.control.VRT360Image;
-import com.viromedia.bridge.component.node.control.VRT360Video;
-import com.viromedia.bridge.component.node.control.VRTSkyBox;
-import com.viromedia.bridge.component.node.control.VRTPortal;
-import com.viromedia.bridge.component.node.control.VRTPortalScene;
-import com.viromedia.bridge.component.node.control.VRTParticleEmitter;
-import com.viromedia.bridge.component.node.control.VRTCamera;
-import com.viromedia.bridge.component.node.control.VRTOrbitCamera;
-import com.viromedia.bridge.component.node.control.VRTController;
 import com.viromedia.bridge.component.node.control.VRTAnimatedImage;
-import com.viromedia.bridge.component.node.control.VRTMaterialVideo;
-import com.viromedia.bridge.component.node.control.VRTLightingEnvironment;
-import com.viromedia.bridge.component.node.control.VRTAmbientLight;
-import com.viromedia.bridge.component.node.control.VRTDirectionalLight;
-import com.viromedia.bridge.component.node.control.VRTOmniLight;
-import com.viromedia.bridge.component.node.control.VRTSpotLight;
-import com.viromedia.bridge.component.node.control.VRTSound;
-import com.viromedia.bridge.component.node.control.VRTSoundField;
-import com.viromedia.bridge.component.node.control.VRTSpatialSound;
+import com.viromedia.bridge.component.node.control.VRTParticleEmitter;
+import com.viromedia.bridge.component.node.VRTNode;
+import com.viromedia.bridge.component.node.VRTFlexView;
+import com.viromedia.bridge.component.node.VRTCamera;
+import com.viromedia.bridge.component.node.VRTOrbitCamera;
+import com.viromedia.bridge.component.VRT360Image;
+import com.viromedia.bridge.component.VRT360Video;
+import com.viromedia.bridge.component.VRTSkyBox;
+import com.viromedia.bridge.component.node.VRTPortal;
+import com.viromedia.bridge.component.node.VRTPortalScene;
+import com.viromedia.bridge.component.VRTController;
+import com.viromedia.bridge.component.VRTMaterialVideo;
+import com.viromedia.bridge.component.VRTLightingEnvironment;
+import com.viromedia.bridge.component.VRTAmbientLight;
+import com.viromedia.bridge.component.VRTDirectionalLight;
+import com.viromedia.bridge.component.VRTOmniLight;
+import com.viromedia.bridge.component.VRTSpotLight;
+import com.viromedia.bridge.component.VRTSound;
+import com.viromedia.bridge.component.VRTSoundField;
+import com.viromedia.bridge.component.VRTSpatialSound;
 import com.viromedia.bridge.utility.ComponentEventDelegate.VRTEventListener;
-import com.viromedia.bridge.component.material.VRTMaterial;
-import com.viromedia.bridge.component.animation.VRTAnimation;
-import com.viromedia.bridge.component.animation.VRTAnimationManager;
+import com.viromedia.bridge.module.MaterialManager;
+import com.viromedia.bridge.module.AnimationManager;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -84,14 +80,11 @@ public class ViroFabricContainer extends FrameLayout {
     // Event callback registry
     private Map<String, String> mEventCallbackRegistry = new HashMap<>();
 
-    // Material registry
-    private Map<String, VRTMaterial> mMaterialRegistry = new HashMap<>();
-
-    // Animation registry
-    private Map<String, VRTAnimation> mAnimationRegistry = new HashMap<>();
+    // Material manager
+    private MaterialManager mMaterialManager;
 
     // Animation manager
-    private VRTAnimationManager mAnimationManager;
+    private AnimationManager mAnimationManager;
 
     // Flags
     private boolean mIsAR = false;
@@ -263,11 +256,9 @@ public class ViroFabricContainer extends FrameLayout {
         // Clear event callback registry
         mEventCallbackRegistry.clear();
 
-        // Clear material registry
-        mMaterialRegistry.clear();
-
-        // Clear animation registry
-        mAnimationRegistry.clear();
+        // Reset managers
+        mMaterialManager = null;
+        mAnimationManager = null;
 
         // Reset flags
         mIsAR = false;
@@ -400,7 +391,7 @@ public class ViroFabricContainer extends FrameLayout {
                     break;
                     
                 case "video":
-                    node = new VRTVideo(mReactContext);
+                    node = new VRTVideoSurface(mReactContext);
                     break;
                     
                 case "3DObject":
@@ -417,10 +408,6 @@ public class ViroFabricContainer extends FrameLayout {
                     break;
                     
                 // Shape components
-                case "surface":
-                    node = new VRTSurface(mReactContext);
-                    break;
-                    
                 case "polygon":
                     node = new VRTPolygon(mReactContext);
                     break;
@@ -434,10 +421,6 @@ public class ViroFabricContainer extends FrameLayout {
                     break;
                     
                 // Interactive components
-                case "button":
-                    node = new VRTButton(mReactContext);
-                    break;
-                    
                 case "controller":
                     node = new VRTController(mReactContext);
                     break;
@@ -480,10 +463,6 @@ public class ViroFabricContainer extends FrameLayout {
                 // Effects components
                 case "particleEmitter":
                     node = new VRTParticleEmitter(mReactContext);
-                    break;
-                    
-                case "spinner":
-                    node = new VRTSpinner(mReactContext);
                     break;
                     
                 // Camera components
@@ -828,18 +807,18 @@ public class ViroFabricContainer extends FrameLayout {
         Log.d(TAG, "Creating material: " + materialName);
         
         try {
-            // Create a new VRT material
-            VRTMaterial material = new VRTMaterial(mReactContext);
-            
-            // Set material properties from the ReadableMap
-            if (properties != null) {
-                material.setProps(properties);
+            // Initialize material manager if needed
+            if (mMaterialManager == null) {
+                mMaterialManager = mReactContext.getNativeModule(MaterialManager.class);
             }
             
-            // Store the material in the registry
-            mMaterialRegistry.put(materialName, material);
-            
-            Log.d(TAG, "Successfully created material: " + materialName);
+            if (mMaterialManager != null) {
+                // Use the existing MaterialManager to create materials
+                mMaterialManager.createMaterial(materialName, properties);
+                Log.d(TAG, "Successfully created material: " + materialName);
+            } else {
+                Log.e(TAG, "MaterialManager not available");
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error creating material " + materialName + ": " + e.getMessage(), e);
         }
@@ -852,20 +831,19 @@ public class ViroFabricContainer extends FrameLayout {
     private void updateMaterial(String materialName, ReadableMap properties) {
         Log.d(TAG, "Updating material: " + materialName);
         
-        // Get the material from the registry
-        VRTMaterial material = mMaterialRegistry.get(materialName);
-        if (material == null) {
-            Log.e(TAG, "Cannot update material: material not found - " + materialName);
-            return;
-        }
-        
         try {
-            // Update material properties
-            if (properties != null) {
-                material.setProps(properties);
+            // Initialize material manager if needed
+            if (mMaterialManager == null) {
+                mMaterialManager = mReactContext.getNativeModule(MaterialManager.class);
             }
             
-            Log.d(TAG, "Successfully updated material: " + materialName);
+            if (mMaterialManager != null) {
+                // Use the existing MaterialManager to update materials
+                mMaterialManager.updateMaterial(materialName, properties);
+                Log.d(TAG, "Successfully updated material: " + materialName);
+            } else {
+                Log.e(TAG, "MaterialManager not available");
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error updating material " + materialName + ": " + e.getMessage(), e);
         }
@@ -879,18 +857,18 @@ public class ViroFabricContainer extends FrameLayout {
         Log.d(TAG, "Creating animation: " + animationName);
         
         try {
-            // Create a new VRT animation
-            VRTAnimation animation = new VRTAnimation(mReactContext);
-            
-            // Set animation properties from the ReadableMap
-            if (properties != null) {
-                animation.setProps(properties);
+            // Initialize animation manager if needed
+            if (mAnimationManager == null) {
+                mAnimationManager = mReactContext.getNativeModule(AnimationManager.class);
             }
             
-            // Store the animation in the registry
-            mAnimationRegistry.put(animationName, animation);
-            
-            Log.d(TAG, "Successfully created animation: " + animationName);
+            if (mAnimationManager != null) {
+                // Use the existing AnimationManager to create animations
+                mAnimationManager.createAnimation(animationName, properties);
+                Log.d(TAG, "Successfully created animation: " + animationName);
+            } else {
+                Log.e(TAG, "AnimationManager not available");
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error creating animation " + animationName + ": " + e.getMessage(), e);
         }
@@ -910,29 +888,22 @@ public class ViroFabricContainer extends FrameLayout {
             return;
         }
         
-        // Get the animation from the registry
-        VRTAnimation animation = mAnimationRegistry.get(animationName);
-        if (animation == null) {
-            Log.e(TAG, "Cannot execute animation: animation not found - " + animationName);
-            return;
-        }
-        
         try {
+            // Initialize animation manager if needed
+            if (mAnimationManager == null) {
+                mAnimationManager = mReactContext.getNativeModule(AnimationManager.class);
+            }
+            
             // If the node is a VRT node, execute the animation
-            if (node instanceof VRTNode) {
+            if (node instanceof VRTNode && mAnimationManager != null) {
                 VRTNode vrtNode = (VRTNode) node;
                 
-                // Initialize animation manager if needed
-                if (mAnimationManager == null) {
-                    mAnimationManager = new VRTAnimationManager(mReactContext);
-                }
-                
-                // Execute the animation with options
-                mAnimationManager.executeAnimation(vrtNode, animation, options);
+                // Use the existing AnimationManager to execute animations
+                mAnimationManager.executeAnimation(vrtNode, animationName, options);
                 
                 Log.d(TAG, "Successfully executed animation: " + animationName + " on node: " + nodeId);
             } else {
-                Log.w(TAG, "Cannot execute animation on non-VRT node: " + nodeId);
+                Log.w(TAG, "Cannot execute animation: node is not VRT node or AnimationManager not available");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error executing animation " + animationName + " on node " + nodeId + ": " + e.getMessage(), e);

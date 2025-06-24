@@ -12,13 +12,7 @@
 #import <ReactCommon/RuntimeExecutor.h>
 #import <jsi/jsi.h>
 
-@interface ViroFabricContainer : RCTView {
-    // Material registry
-    NSMutableDictionary<NSString *, id> *_materialRegistry;
-    
-    // Animation registry
-    NSMutableDictionary<NSString *, id> *_animationRegistry;
-}
+@interface ViroFabricContainer : RCTView
 
 @property (nonatomic, copy) RCTDirectEventBlock onInitialized;
 @property (nonatomic, copy) RCTDirectEventBlock onTrackingUpdated;

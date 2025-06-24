@@ -5,7 +5,19 @@
  */
 
 import React, { useEffect, useRef } from "react";
-import { generateNodeId, ViroNodeProps, ViroNodeType } from "../NativeViro";
+import {
+  generateNodeId,
+  generateCallbackId,
+  ViroNodeProps,
+  ViroNodeType,
+  createNode,
+  updateNode,
+  deleteNode,
+  addChild,
+  removeChild,
+  registerEventListener,
+  unregisterEventListener,
+} from "../NativeViro";
 
 import { getNativeViro } from "./ViroGlobal";
 
@@ -30,38 +42,29 @@ export function useViroNode(
   const parentId = explicitParentId || contextParentId;
 
   useEffect(() => {
-    // Create the node when the component mounts
-    const nativeViro = getNativeViro();
-    if (nativeViro) {
-      nativeViro.createViroNode(nodeId.current, nodeType, props);
+    // Create the node when the component mounts using our enhanced functions
+    createNode(nodeId.current, nodeType, props);
 
-      // Add to parent if specified
-      if (parentId) {
-        nativeViro.addViroNodeChild(parentId, nodeId.current);
-      }
+    // Add to parent if specified
+    if (parentId) {
+      addChild(parentId, nodeId.current);
     }
 
     // Clean up when the component unmounts
     return () => {
-      const nativeViro = getNativeViro();
-      if (nativeViro) {
-        // Remove from parent if specified
-        if (parentId) {
-          nativeViro.removeViroNodeChild(parentId, nodeId.current);
-        }
-
-        // Delete the node
-        nativeViro.deleteViroNode(nodeId.current);
+      // Remove from parent if specified
+      if (parentId) {
+        removeChild(parentId, nodeId.current);
       }
+
+      // Delete the node
+      deleteNode(nodeId.current);
     };
   }, [nodeType, parentId]);
 
   // Update props when they change
   useEffect(() => {
-    const nativeViro = getNativeViro();
-    if (nativeViro) {
-      nativeViro.updateViroNode(nodeId.current, props);
-    }
+    updateNode(nodeId.current, props);
   }, [props]);
 
   return nodeId.current;
@@ -101,6 +104,18 @@ export interface ViroCommonProps {
     run?: boolean;
     interruptible?: boolean;
   };
+
+  // Interaction capabilities
+  canClick?: boolean;
+  canHover?: boolean;
+  canTouch?: boolean;
+  canScroll?: boolean;
+  canSwipe?: boolean;
+  canDrag?: boolean;
+  canFuse?: boolean;
+  canPinch?: boolean;
+  canRotate?: boolean;
+  timeToFuse?: number;
 
   // Event handlers
   onHover?: ViroEventHandler;
@@ -154,6 +169,31 @@ export function convertCommonProps(props: ViroCommonProps): ViroNodeProps {
   if (animation) convertedProps.animation = animation;
 
   return convertedProps;
+}
+
+// Hook to manage event listeners for a node
+export function useViroEventListeners(
+  nodeId: string,
+  eventHandlers: Record<string, ViroEventHandler | undefined>
+): void {
+  useEffect(() => {
+    // Register all event handlers and store callback IDs for cleanup
+    const registeredCallbacks: Array<{ name: string; callbackId: string }> = [];
+
+    Object.entries(eventHandlers).forEach(([eventName, handler]) => {
+      if (handler) {
+        const callbackId = registerEventListener(nodeId, eventName, handler);
+        registeredCallbacks.push({ name: eventName, callbackId });
+      }
+    });
+
+    // Cleanup when unmounting or dependencies change
+    return () => {
+      registeredCallbacks.forEach(({ name, callbackId }) => {
+        unregisterEventListener(nodeId, name, callbackId);
+      });
+    };
+  }, [nodeId, ...Object.values(eventHandlers)]);
 }
 
 // Provider component for ViroContext

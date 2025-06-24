@@ -72,6 +72,10 @@ export interface ViroFabricContainerProps {
   onCameraTransformUpdate?: (transform: any) => void;
   onARSessionFailed?: (error: string) => void;
 
+  // Scene management callbacks
+  onSceneStateChanged?: (event: { sceneId: string; state: string }) => void;
+  onMemoryWarning?: (event: { memoryStats: Record<string, any> }) => void;
+
   // Children components
   children?: React.ReactNode;
 }
@@ -88,6 +92,8 @@ export const ViroFabricContainer: React.FC<ViroFabricContainerProps> = ({
   onInitialized,
   onTrackingUpdated,
   onCameraTransformUpdate,
+  onSceneStateChanged,
+  onMemoryWarning,
   children,
 }) => {
   // Reference to the native component
@@ -234,6 +240,20 @@ export const ViroFabricContainer: React.FC<ViroFabricContainerProps> = ({
     }
   };
 
+  // Handle scene state changed event
+  const handleSceneStateChanged = (event: any) => {
+    if (onSceneStateChanged) {
+      onSceneStateChanged(event.nativeEvent);
+    }
+  };
+
+  // Handle memory warning event
+  const handleMemoryWarning = (event: any) => {
+    if (onMemoryWarning) {
+      onMemoryWarning(event.nativeEvent);
+    }
+  };
+
   // This will throw an error if the native component is not available or New Architecture is not enabled
   isFabricComponentAvailable();
 
@@ -244,6 +264,8 @@ export const ViroFabricContainer: React.FC<ViroFabricContainerProps> = ({
       onInitialized={handleInitialized}
       onTrackingUpdated={handleTrackingUpdated}
       onCameraTransformUpdate={handleCameraTransformUpdate}
+      onSceneStateChanged={handleSceneStateChanged}
+      onMemoryWarning={handleMemoryWarning}
     >
       {children}
     </NativeViroFabricContainer>

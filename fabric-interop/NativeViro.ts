@@ -136,6 +136,195 @@ export function initializeViro(): Promise<boolean> {
   return Promise.reject(new Error("NativeViro not available"));
 }
 
+// Scene Management Functions
+export function createScene(
+  sceneId: string,
+  sceneType: string,
+  props: ViroNodeProps = {}
+): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.createViroScene) {
+    nativeViro.createViroScene(sceneId, sceneType, props);
+  } else {
+    console.warn("Scene management not available - createScene");
+  }
+}
+
+export function activateScene(sceneId: string): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.activateViroScene) {
+    nativeViro.activateViroScene(sceneId);
+  } else {
+    console.warn("Scene management not available - activateScene");
+  }
+}
+
+export function deactivateScene(sceneId: string): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.deactivateViroScene) {
+    nativeViro.deactivateViroScene(sceneId);
+  } else {
+    console.warn("Scene management not available - deactivateScene");
+  }
+}
+
+export function destroyScene(sceneId: string): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.destroyViroScene) {
+    nativeViro.destroyViroScene(sceneId);
+  } else {
+    console.warn("Scene management not available - destroyScene");
+  }
+}
+
+export function getSceneState(sceneId: string): string | null {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.getViroSceneState) {
+    return nativeViro.getViroSceneState(sceneId);
+  }
+  return null;
+}
+
+export function getMemoryStats(): Record<string, any> | null {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.getViroMemoryStats) {
+    return nativeViro.getViroMemoryStats();
+  }
+  return null;
+}
+
+export function performMemoryCleanup(): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro && nativeViro.performViroMemoryCleanup) {
+    nativeViro.performViroMemoryCleanup();
+  } else {
+    console.warn("Memory management not available - performMemoryCleanup");
+  }
+}
+
+// Node Management Functions (enhanced)
+export function createNode(
+  nodeId: string,
+  nodeType: ViroNodeType,
+  props: ViroNodeProps = {}
+): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.createViroNode(nodeId, nodeType, props);
+  } else {
+    console.warn("NativeViro not available - createNode");
+  }
+}
+
+export function updateNode(nodeId: string, props: ViroNodeProps): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.updateViroNode(nodeId, props);
+  } else {
+    console.warn("NativeViro not available - updateNode");
+  }
+}
+
+export function deleteNode(nodeId: string): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.deleteViroNode(nodeId);
+  } else {
+    console.warn("NativeViro not available - deleteNode");
+  }
+}
+
+export function addChild(parentId: string, childId: string): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.addViroNodeChild(parentId, childId);
+  } else {
+    console.warn("NativeViro not available - addChild");
+  }
+}
+
+export function removeChild(parentId: string, childId: string): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.removeViroNodeChild(parentId, childId);
+  } else {
+    console.warn("NativeViro not available - removeChild");
+  }
+}
+
+// Material Management Functions (enhanced)
+export function createMaterial(
+  materialName: string,
+  properties: Record<string, any>
+): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.createViroMaterial(materialName, properties);
+  } else {
+    console.warn("NativeViro not available - createMaterial");
+  }
+}
+
+export function updateMaterial(
+  materialName: string,
+  properties: Record<string, any>
+): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.updateViroMaterial(materialName, properties);
+  } else {
+    console.warn("NativeViro not available - updateMaterial");
+  }
+}
+
+// Animation Management Functions (enhanced)
+export function createAnimation(
+  animationName: string,
+  properties: Record<string, any>
+): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.createViroAnimation(animationName, properties);
+  } else {
+    console.warn("NativeViro not available - createAnimation");
+  }
+}
+
+export function executeAnimation(
+  nodeId: string,
+  animationName: string,
+  options: Record<string, any> = {}
+): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.executeViroAnimation(nodeId, animationName, options);
+  } else {
+    console.warn("NativeViro not available - executeAnimation");
+  }
+}
+
+// AR Configuration Functions (enhanced)
+export function setARPlaneDetection(config: {
+  enabled?: boolean;
+  alignment?: string;
+}): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.setViroARPlaneDetection(config);
+  } else {
+    console.warn("NativeViro not available - setARPlaneDetection");
+  }
+}
+
+export function setARImageTargets(targets: Record<string, any>): void {
+  const nativeViro = getNativeViro();
+  if (nativeViro) {
+    nativeViro.setViroARImageTargets(targets);
+  } else {
+    console.warn("NativeViro not available - setARImageTargets");
+  }
+}
+
 // Check if the JSI interface is available
 export function isViroJSIAvailable(): boolean {
   return isNativeViroAvailable();

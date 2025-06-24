@@ -57,10 +57,27 @@ export interface NativeViroType {
     options: Record<string, any>
   ) => void;
 
+  // Scene Management
+  createViroScene: (
+    sceneId: string,
+    sceneType: string,
+    props: Record<string, any>
+  ) => void;
+  activateViroScene: (sceneId: string) => void;
+  deactivateViroScene: (sceneId: string) => void;
+  destroyViroScene: (sceneId: string) => void;
+  getViroSceneState: (sceneId: string) => string | null;
+
+  // Memory Management
+  getViroMemoryStats: () => Record<string, any> | null;
+  performViroMemoryCleanup: () => void;
+
   // AR specific
   setViroARPlaneDetection: (config: {
-    horizontal: boolean;
-    vertical: boolean;
+    enabled?: boolean;
+    alignment?: string;
+    horizontal?: boolean;
+    vertical?: boolean;
   }) => void;
   setViroARImageTargets: (targets: Record<string, any>) => void;
 

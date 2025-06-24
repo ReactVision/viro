@@ -1,135 +1,117 @@
 /**
  * ViroScene
  *
- * A container for 3D content in the Viro scene graph.
+ * A scene component that manages a 3D scene with scene lifecycle management.
  */
 
-import React from "react";
-import { ViroCommonProps, useViroNode, convertCommonProps } from "./ViroUtils";
-import { getNativeViro } from "./ViroGlobal";
+import React, { useEffect, useRef } from "react";
+import {
+  ViroCommonProps,
+  useViroNode,
+  useViroEventListeners,
+  convertCommonProps,
+  ViroContextProvider,
+} from "./ViroUtils";
+import {
+  createScene,
+  activateScene,
+  deactivateScene,
+  destroyScene,
+  getSceneState,
+  generateNodeId,
+} from "../NativeViro";
 
 export interface ViroSceneProps extends ViroCommonProps {
   // Scene-specific props
-  displayPointCloud?: boolean;
-  pointCloudColor?: string;
-  pointCloudSize?: number;
-
-  // Lighting props
-  lightReceivingBitMask?: number;
-  shadowCastingBitMask?: number;
-
-  // Physics props
+  postProcessEffects?: string[];
+  soundRoom?: {
+    size: [number, number, number];
+    wallMaterial?: string;
+    ceilingMaterial?: string;
+    floorMaterial?: string;
+  };
   physicsWorld?: {
-    gravity?: [number, number, number];
+    gravity: [number, number, number];
+    drawBounds?: boolean;
   };
 
-  // Post-processing props
-  postProcessEffects?: string[];
-
-  // Event callbacks
-  onPlatformUpdate?: (event: any) => void;
-  onCameraTransformUpdate?: (event: any) => void;
-  onAmbientLightUpdate?: (event: any) => void;
+  // Scene lifecycle events
+  onSceneLoad?: () => void;
+  onSceneLoadStart?: () => void;
+  onSceneLoadEnd?: () => void;
+  onSceneError?: (error: string) => void;
 
   // Children components
   children?: React.ReactNode;
 }
 
 /**
- * ViroScene is a container for 3D content in the Viro scene graph.
+ * ViroScene is a 3D scene component that manages scene lifecycle and contains other Viro components.
  */
 export const ViroScene: React.FC<ViroSceneProps> = (props) => {
+  const sceneId = useRef<string>(generateNodeId());
+
   // Convert common props to the format expected by the native code
   const nativeProps = {
     ...convertCommonProps(props),
-    displayPointCloud: props.displayPointCloud,
-    pointCloudColor: props.pointCloudColor,
-    pointCloudSize: props.pointCloudSize,
-    lightReceivingBitMask: props.lightReceivingBitMask,
-    shadowCastingBitMask: props.shadowCastingBitMask,
-    physicsWorld: props.physicsWorld,
     postProcessEffects: props.postProcessEffects,
-    onPlatformUpdate: props.onPlatformUpdate ? true : undefined,
-    onCameraTransformUpdate: props.onCameraTransformUpdate ? true : undefined,
-    onAmbientLightUpdate: props.onAmbientLightUpdate ? true : undefined,
+    soundRoom: props.soundRoom,
+    physicsWorld: props.physicsWorld,
   };
 
-  // Create the scene node - this is a root node, so no parent
+  // Create the scene node using our enhanced scene management
   const nodeId = useViroNode("scene", nativeProps);
 
-  // Register event handlers
-  React.useEffect(() => {
-    const nativeViro = getNativeViro();
-    if (!nativeViro) return;
+  // Scene lifecycle management
+  useEffect(() => {
+    // Create the scene with our scene manager
+    createScene(sceneId.current, "scene", nativeProps);
 
-    // Register event handlers if provided
-    if (props.onPlatformUpdate) {
-      const callbackId = `${nodeId}_platform_update`;
-      nativeViro.registerEventCallback(nodeId, "onPlatformUpdate", callbackId);
-    }
-
-    if (props.onCameraTransformUpdate) {
-      const callbackId = `${nodeId}_camera_transform_update`;
-      nativeViro.registerEventCallback(
-        nodeId,
-        "onCameraTransformUpdate",
-        callbackId
-      );
-    }
-
-    if (props.onAmbientLightUpdate) {
-      const callbackId = `${nodeId}_ambient_light_update`;
-      nativeViro.registerEventCallback(
-        nodeId,
-        "onAmbientLightUpdate",
-        callbackId
-      );
-    }
+    // Activate the scene
+    activateScene(sceneId.current);
 
     // Cleanup when unmounting
     return () => {
-      const nativeViro = getNativeViro();
-      if (!nativeViro) return;
-
-      if (props.onPlatformUpdate) {
-        const callbackId = `${nodeId}_platform_update`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onPlatformUpdate",
-          callbackId
-        );
-      }
-
-      if (props.onCameraTransformUpdate) {
-        const callbackId = `${nodeId}_camera_transform_update`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onCameraTransformUpdate",
-          callbackId
-        );
-      }
-
-      if (props.onAmbientLightUpdate) {
-        const callbackId = `${nodeId}_ambient_light_update`;
-        nativeViro.unregisterEventCallback(
-          nodeId,
-          "onAmbientLightUpdate",
-          callbackId
-        );
-      }
+      // Deactivate and destroy the scene
+      deactivateScene(sceneId.current);
+      destroyScene(sceneId.current);
     };
-  }, [
-    nodeId,
-    props.onPlatformUpdate,
-    props.onCameraTransformUpdate,
-    props.onAmbientLightUpdate,
-  ]);
+  }, []);
 
-  // Render children with this scene as their parent
+  // Update scene properties when they change
+  useEffect(() => {
+    // Scene properties are updated through the node system
+    // The scene manager will handle the lifecycle
+  }, [nativeProps]);
+
+  // Register event handlers using our new event system
+  useViroEventListeners(nodeId, {
+    onHover: props.onHover,
+    onClick: props.onClick,
+    onClickState: props.onClickState,
+    onTouch: props.onTouch,
+    onScroll: props.onScroll,
+    onSwipe: props.onSwipe,
+    onDrag: props.onDrag,
+    onPinch: props.onPinch,
+    onRotate: props.onRotate,
+    onFuse:
+      typeof props.onFuse === "function"
+        ? props.onFuse
+        : props.onFuse?.callback,
+    onCollision: props.onCollision,
+    onTransformUpdate: props.onTransformUpdate,
+  });
+
+  // Scene lifecycle event handlers
+  useViroEventListeners(nodeId, {
+    onLoadStart: props.onSceneLoadStart,
+    onLoadEnd: props.onSceneLoadEnd,
+    onError: props.onSceneError,
+  });
+
+  // Provide the scene node ID as context for children
   return (
     <ViroContextProvider value={nodeId}>{props.children}</ViroContextProvider>
   );
 };
-
-// Import ViroContextProvider at the top level to avoid circular dependencies
-import { ViroContextProvider } from "./ViroUtils";

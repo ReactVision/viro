@@ -20,11 +20,9 @@ const withViroPods = (config) => {
                     config_plugins_1.WarningAggregator.addWarningIOS("withViroIos", "ViroReact requires New Architecture to be enabled. " +
                         "Please set RCT_NEW_ARCH_ENABLED=1 in your ios/.xcode.env file.");
                 }
-                // Prioritize ViroFabric for New Architecture
-                let viroPods = `  # ViroReact New Architecture (Fabric) - Required\n` +
-                    `  # IMPORTANT: ViroFabric must be included first for New Architecture\n` +
-                    `  pod 'ViroFabric', :path => '../node_modules/@reactvision/react-viro/fabric-interop/ios'\n\n` +
-                    `  # ViroReact Core Dependencies\n` +
+                // ViroReact with integrated Fabric support
+                let viroPods = `  # ViroReact with integrated New Architecture (Fabric) support\n` +
+                    `  # Automatically includes Fabric components when RCT_NEW_ARCH_ENABLED=1\n` +
                     `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
                     `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`;
                 // Add New Architecture enforcement

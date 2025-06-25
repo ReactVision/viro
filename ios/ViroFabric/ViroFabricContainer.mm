@@ -769,17 +769,15 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         }
     } else {
         // For other node types, create the appropriate VRT node and add it to the scene
-        else {
-            id node = [self createVRTNodeOfType:nodeType withProps:props];
-            if (node) {
-                _nodeRegistry[nodeId] = node;
-            } else {
-                // Store as metadata for nodes we don't have VRT classes for yet
-                _nodeRegistry[nodeId] = @{
-                    @"type": nodeType,
-                    @"props": props ?: @{}
-                };
-            }
+        id node = [self createVRTNodeOfType:nodeType withProps:props];
+        if (node) {
+            _nodeRegistry[nodeId] = node;
+        } else {
+            // Store as metadata for nodes we don't have VRT classes for yet
+            _nodeRegistry[nodeId] = @{
+                @"type": nodeType,
+                @"props": props ?: @{}
+            };
         }
     }
 }

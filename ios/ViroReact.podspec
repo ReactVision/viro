@@ -22,52 +22,33 @@ Pod::Spec.new do |s|
   # React Native dependencies
   s.dependency 'React-Core'
   
-  # Conditionally include Fabric files for New Architecture
-  new_arch_enabled = ENV['RCT_NEW_ARCH_ENABLED'] == '1'
+  # Include Fabric source files
+  s.source_files += ', ViroFabric/**/*.{h,m,mm}'
+  s.public_header_files += ', ViroFabric/**/*.h'
   
-  if new_arch_enabled
-    # Include Fabric source files
-    s.source_files += ', ViroFabric/**/*.{h,m,mm}'
-    s.public_header_files += ', ViroFabric/**/*.h'
-    
-    # Fabric dependencies
-    s.dependency 'React-RCTFabric'
-    s.dependency 'React-Fabric'
-    s.dependency 'React-FabricComponents'
-    
-    # Fabric-specific build configuration
-    s.pod_target_xcconfig = { 
-      'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-      'HEADER_SEARCH_PATHS' => [
-        '"$(PODS_TARGET_SRCROOT)/ViroFabric"',
-        '"$(PODS_TARGET_SRCROOT)/ViroReact"',
-        '"$(PODS_TARGET_SRCROOT)/dist/include"',
-        '"$(PODS_ROOT)/Headers/Public"',
-        '"$(PODS_ROOT)/Headers/Public/ViroKit"',
-        '"$(PODS_ROOT)/ViroKit/dist/include"',
-        '"$(PODS_ROOT)/ViroKit/Headers"'
-      ].join(' '),
-      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1',
-      'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'
-    }
-    
-    # User target configuration for consumers
-    s.user_target_xcconfig = {
-      'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ViroReact/ViroFabric"'
-    }
-  else
-    # Legacy architecture configuration
-    s.pod_target_xcconfig = { 
-      'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-      'HEADER_SEARCH_PATHS' => [
-        '"$(PODS_TARGET_SRCROOT)/ViroReact"',
-        '"$(PODS_TARGET_SRCROOT)/dist/include"',
-        '"$(PODS_ROOT)/Headers/Public"',
-        '"$(PODS_ROOT)/Headers/Public/ViroKit"',
-        '"$(PODS_ROOT)/ViroKit/dist/include"',
-        '"$(PODS_ROOT)/ViroKit/Headers"'
-      ].join(' '),
-      'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'
-    }
-  end
+  # Fabric dependencies
+  s.dependency 'React-RCTFabric'
+  s.dependency 'React-Fabric'
+  s.dependency 'React-FabricComponents'
+  
+  # Fabric-specific build configuration
+  s.pod_target_xcconfig = { 
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+    'HEADER_SEARCH_PATHS' => [
+      '"$(PODS_TARGET_SRCROOT)/ViroFabric"',
+      '"$(PODS_TARGET_SRCROOT)/ViroReact"',
+      '"$(PODS_TARGET_SRCROOT)/dist/include"',
+      '"$(PODS_ROOT)/Headers/Public"',
+      '"$(PODS_ROOT)/Headers/Public/ViroKit"',
+      '"$(PODS_ROOT)/ViroKit/dist/include"',
+      '"$(PODS_ROOT)/ViroKit/Headers"'
+    ].join(' '),
+    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1',
+    'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'
+  }
+  
+  # User target configuration for consumers
+  s.user_target_xcconfig = {
+    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ViroReact/ViroFabric"'
+  }
 end

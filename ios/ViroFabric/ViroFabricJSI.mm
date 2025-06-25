@@ -11,15 +11,13 @@
 #import "ViroFabricManager.h"
 #import <React/RCTLog.h>
 #import <React/RCTBridge+Private.h>
-#import <ViroReact/VRTNode.h>
-#import <ViroReact/VRTBox.h>
-#import <ViroReact/VRTSphere.h>
-#import <ViroReact/VRTText.h>
-#import <ViroReact/VRTImage.h>
-#import <ViroReact/VRTQuad.h>
-#import <ViroReact/VRTAmbientLight.h>
-#import <ViroReact/VRTDirectionalLight.h>
-#import <ViroReact/VRTSound.h>
+#import "../ViroReact/Views/VRTNode.h"
+#import "../ViroReact/Views/VRTSphere.h"
+#import "../ViroReact/Views/VRTText.h"
+#import "../ViroReact/Views/VRTImage.h"
+#import "../ViroReact/Views/VRTQuad.h"
+#import "../ViroReact/Views/VRTLight.h"
+#import "../ViroReact/Views/VRTSound.h"
 
 using namespace facebook::jsi;
 

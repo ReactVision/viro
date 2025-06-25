@@ -9,12 +9,12 @@
 #import "ViroFabricSceneManager.h"
 #import "ViroFabricContainer.h"
 #import <React/RCTLog.h>
-#import <ViroReact/VRTScene.h>
-#import <ViroReact/VRTARScene.h>
-#import <ViroReact/VRTSceneNavigator.h>
-#import <ViroReact/VRTARSceneNavigator.h>
-#import <ViroReact/VRTVRSceneNavigator.h>
-#import <ViroReact/VRTNode.h>
+#import "../ViroReact/Views/VRTScene.h"
+#import "../ViroReact/AR/Views/VRTARScene.h"
+#import "../ViroReact/Views/VRTSceneNavigator.h"
+#import "../ViroReact/AR/Views/VRTARSceneNavigator.h"
+#import "../ViroReact/VR/Views/VRTVRSceneNavigator.h"
+#import "../ViroReact/Views/VRTNode.h"
 
 @interface ViroFabricSceneManager ()
 

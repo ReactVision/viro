@@ -22,8 +22,8 @@
 #import <jsi/jsi.h>
 
 // Import existing Viro headers
-#import <ViroReact/VRTSceneNavigator.h>
-#import <ViroReact/VRTARSceneNavigator.h>
+#import "../ViroReact/Views/VRTSceneNavigator.h"
+#import "../ViroReact/AR/Views/VRTARSceneNavigator.h"
 
 using namespace facebook::jsi;
 

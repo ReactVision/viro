@@ -57,12 +57,18 @@ Add to `ios/.xcode.env`:
 export RCT_NEW_ARCH_ENABLED=1
 ```
 
+**For Firebase or Static Library Integration:**
+
+See the [Static Library Integration Guide](./STATIC_LIBRARY_INTEGRATION.md) for detailed Podfile configuration when using Firebase or encountering folly header issues.
+
 ### **2. Install Dependencies**
 
 ```bash
 npm install @reactvision/react-viro
 cd ios && pod install
 ```
+
+**Note:** If you encounter folly header issues or need Firebase compatibility, see the [Static Library Integration Guide](./STATIC_LIBRARY_INTEGRATION.md) for the recommended static library approach.
 
 ### **3. Usage**
 
@@ -189,6 +195,22 @@ The Expo plugin automatically:
 No special Metro configuration required - the fabric-interop layer is automatically used.
 
 ## 🔧 **Troubleshooting**
+
+### **"folly/folly-config.h file not found" Error**
+
+**Solution:** Use the static library approach for better compatibility:
+
+1. See the [Static Library Integration Guide](./STATIC_LIBRARY_INTEGRATION.md)
+2. Configure your Podfile with `use_frameworks! :linkage => :static`
+3. The ViroFabric pod is now configured as a static library by default
+
+### **Firebase Integration Issues**
+
+**Solution:** The static library approach resolves Firebase compatibility:
+
+1. Follow the [Static Library Integration Guide](./STATIC_LIBRARY_INTEGRATION.md)
+2. Add `$RNFirebaseAsStaticFramework = true` to your Podfile
+3. Use `use_frameworks! :linkage => :static`
 
 ### **"New Architecture not detected" Error**
 

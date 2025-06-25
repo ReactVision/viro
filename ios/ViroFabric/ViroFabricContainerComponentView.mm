@@ -45,11 +45,6 @@ struct ViroFabricContainerViewEventEmitter {
 // Simplified ComponentDescriptor
 struct ViroFabricContainerViewComponentDescriptor {};
 
-template<typename T>
-ComponentDescriptorProvider concreteComponentDescriptorProvider() {
-    return nullptr;
-}
-
 } // namespace react
 } // namespace facebook
 
@@ -78,7 +73,7 @@ void RCTBridgingToEventEmitterOnCameraTransformUpdate(NSDictionary *event);
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    return concreteComponentDescriptorProvider<ViroFabricContainerViewComponentDescriptor>();
+    return nullptr;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -177,26 +172,23 @@ void RCTBridgingToEventEmitterOnCameraTransformUpdate(NSDictionary *event);
 
 - (RCTBridge *)getBridgeFromSurface
 {
-    // Try to get the bridge from the surface presenter
-    // This is a fallback approach for Fabric components
-    if (self.surfacePresenter) {
-        // In newer versions of React Native, we can get the bridge from the surface presenter
-        if ([self.surfacePresenter respondsToSelector:@selector(bridge)]) {
-            return [self.surfacePresenter performSelector:@selector(bridge)];
-        }
-    }
+    // In Fabric mode, we don't have direct access to the bridge
+    // The ViroFabricContainer is designed to handle nil bridge gracefully
+    // This is the expected behavior for New Architecture components
     
-    // Fallback: try to get bridge from the shared RCTBridge instance
-    // This is not ideal but may work in some cases
+    // Try to get bridge from the shared RCTBridge instance as a fallback
     Class bridgeClass = NSClassFromString(@"RCTBridge");
     if (bridgeClass) {
         // Try to get the current bridge instance
         if ([bridgeClass respondsToSelector:@selector(currentBridge)]) {
-            return [bridgeClass performSelector:@selector(currentBridge)];
+            RCTBridge *bridge = [bridgeClass performSelector:@selector(currentBridge)];
+            if (bridge) {
+                return bridge;
+            }
         }
     }
     
-    // Last resort: return nil and handle gracefully
+    // Return nil - ViroFabricContainer handles this gracefully in Fabric mode
     return nil;
 }
 

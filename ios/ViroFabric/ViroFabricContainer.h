@@ -17,12 +17,21 @@
 @property (nonatomic, copy) RCTDirectEventBlock onInitialized;
 @property (nonatomic, copy) RCTDirectEventBlock onTrackingUpdated;
 @property (nonatomic, copy) RCTDirectEventBlock onCameraTransformUpdate;
+@property (nonatomic, copy) RCTDirectEventBlock onSceneStateChanged;
+@property (nonatomic, copy) RCTDirectEventBlock onMemoryWarning;
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 
 // Commands
 - (void)initialize:(BOOL)debug arEnabled:(BOOL)arEnabled worldAlignment:(NSString *)worldAlignment;
 - (void)cleanup;
+
+// Event handling methods
+- (void)dispatchEventToJS:(NSString *)callbackId withData:(NSDictionary *)data;
+- (void)getCameraPositionAsync:(void (^)(NSArray *cameraOrientation))callback;
+
+// Navigator access
+- (id)getActiveNavigator;
 
 // Material management
 - (void)createMaterial:(NSString *)materialName withProps:(NSDictionary *)props;

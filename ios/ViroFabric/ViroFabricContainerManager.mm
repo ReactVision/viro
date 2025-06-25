@@ -39,7 +39,7 @@ RCT_EXPORT_METHOD(initialize:(nonnull NSNumber *)reactTag
       return;
     }
     
-    [view initialize:apiKey debug:debug arEnabled:arEnabled worldAlignment:worldAlignment];
+    [view initialize:debug arEnabled:arEnabled worldAlignment:worldAlignment];
   }];
 }
 

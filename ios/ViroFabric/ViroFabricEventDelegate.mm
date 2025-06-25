@@ -75,7 +75,7 @@
         NSString *key = [NSString stringWithFormat:@"%@:%@", nodeId, eventName];
         NSString *callbackId = self.eventCallbacks[key];
         if (callbackId && self.container) {
-            [self.container dispatchEventToJS:callbackId eventData:eventData];
+            [self.container dispatchEventToJS:callbackId withData:eventData];
         }
     }
 }

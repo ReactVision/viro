@@ -25,6 +25,12 @@
 #import "../ViroReact/Views/VRTSceneNavigator.h"
 #import "../ViroReact/AR/Views/VRTARSceneNavigator.h"
 
+// Forward declare VRONode to avoid circular dependencies
+namespace VRO {
+    class VRONode;
+}
+typedef std::shared_ptr<VRO::VRONode> VRONode;
+
 using namespace facebook::jsi;
 
 @interface ViroFabricContainer () {
@@ -88,9 +94,6 @@ using namespace facebook::jsi;
  * Dispatch an event to JavaScript using the event delegate.
  * This method is called by ViroFabricEventDelegate.
  */
-- (void)dispatchEventToJS:(NSString *)callbackId eventData:(NSDictionary *)data {
-    [self dispatchEventToJS:callbackId withData:data];
-}
 
 #pragma mark - ViroFabricSceneLifecycleListener
 
@@ -186,25 +189,30 @@ public:
         _eventCallbackRegistry = [NSMutableDictionary new];
         _isAR = NO;
         
-        // Initialize event delegate
+        // Initialize event delegate (handle nil bridge gracefully)
         _eventDelegate = [[ViroFabricEventDelegate alloc] initWithContainer:self
                                                                       bridge:bridge
                                                                  containerId:@(self.tag)];
         
-        // Initialize scene manager
+        // Initialize scene manager (handle nil bridge gracefully)
         _sceneManager = [[ViroFabricSceneManager alloc] initWithContainer:self bridge:bridge];
         [_sceneManager setLifecycleListener:self];
         
-        // Initialize JSI bridge
+        // Initialize JSI bridge (handle nil bridge gracefully)
         _jsiBridge = [[ViroFabricJSI alloc] initWithBridge:bridge];
         [_jsiBridge setSceneManager:_sceneManager];
         [_jsiBridge setFabricManager:[ViroFabricManager sharedInstance]];
         
-        // Set up the runtime when the bridge is ready
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(bridgeDidFinishLaunch:)
-                                                     name:RCTJavaScriptDidLoadNotification
-                                                   object:bridge];
+        // Set up the runtime when the bridge is ready (only if bridge exists)
+        if (bridge) {
+            [[NSNotificationCenter defaultCenter] addObserver:self
+                                                     selector:@selector(bridgeDidFinishLaunch:)
+                                                         name:RCTJavaScriptDidLoadNotification
+                                                       object:bridge];
+        } else {
+            // In Fabric mode without bridge, we'll use event emitter approach
+            RCTLogInfo(@"ViroFabricContainer initialized without bridge - using Fabric event emitter approach");
+        }
     }
     return self;
 }
@@ -848,31 +856,9 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         if ([parent respondsToSelector:@selector(addChildNode:)]) {
             [parent performSelector:@selector(addChildNode:) withObject:child];
         } else {
-            // Fallback to using the VRONode directly
-            // Get the node property from the parent and child using proper type handling
-            std::shared_ptr<VRONode> parentVRONode = nullptr;
-            std::shared_ptr<VRONode> childVRONode = nullptr;
-            
-            if ([parent respondsToSelector:@selector(node)]) {
-                NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
-                                           [parent methodSignatureForSelector:@selector(node)]];
-                [invocation setSelector:@selector(node)];
-                [invocation setTarget:parent];
-                [invocation invoke];
-                [invocation getReturnValue:&parentVRONode];
-            }
-            
-            if ([child respondsToSelector:@selector(node)]) {
-                NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
-                                           [child methodSignatureForSelector:@selector(node)]];
-                [invocation setSelector:@selector(node)];
-                [invocation setTarget:child];
-                [invocation invoke];
-                [invocation getReturnValue:&childVRONode];
-            }
-            
-            if (parentVRONode && childVRONode) {
-                parentVRONode->addChildNode(childVRONode);
+            // Fallback: try to add child using UIView hierarchy if VRT methods aren't available
+            if ([parent isKindOfClass:[UIView class]] && [child isKindOfClass:[UIView class]]) {
+                [(UIView *)parent addSubview:(UIView *)child];
             }
         }
     } else {
@@ -904,21 +890,9 @@ facebook::jsi::Value ViroHostObject::get(facebook::jsi::Runtime &runtime, const 
         } else if ([child respondsToSelector:@selector(removeFromParent)]) {
             [child performSelector:@selector(removeFromParent)];
         } else {
-            // Fallback to using the VRONode directly
-            // Get the node property from the child using proper type handling
-            std::shared_ptr<VRONode> childVRONode = nullptr;
-            
-            if ([child respondsToSelector:@selector(node)]) {
-                NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
-                                           [child methodSignatureForSelector:@selector(node)]];
-                [invocation setSelector:@selector(node)];
-                [invocation setTarget:child];
-                [invocation invoke];
-                [invocation getReturnValue:&childVRONode];
-            }
-            
-            if (childVRONode) {
-                childVRONode->removeFromParentNode();
+            // Fallback: try to remove child using UIView hierarchy if VRT methods aren't available
+            if ([child isKindOfClass:[UIView class]]) {
+                [(UIView *)child removeFromSuperview];
             }
         }
     } else {

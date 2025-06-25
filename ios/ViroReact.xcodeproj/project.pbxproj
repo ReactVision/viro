@@ -217,7 +217,6 @@
 		E139A8EE2E0B9C6A0050EC9A /* Props.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E139A8D42E0B9C6A0050EC9A /* Props.cpp */; };
 		E139A8EF2E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8D62E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm */; };
 		E139A8F02E0B9C6A0050EC9A /* ViroFabricContainer.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8D92E0B9C6A0050EC9A /* ViroFabricContainer.mm */; };
-		E139A8F12E0B9C6A0050EC9A /* ViroFabricContainerViewRegister.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8DE2E0B9C6A0050EC9A /* ViroFabricContainerViewRegister.mm */; };
 		E139A8F22E0B9C6A0050EC9A /* ViroFabricSceneManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E82E0B9C6A0050EC9A /* ViroFabricSceneManager.mm */; };
 		E139A8F32E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */; };
 		E139A8F42E0B9C6A0050EC9A /* ViroFabricManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E62E0B9C6A0050EC9A /* ViroFabricManager.mm */; };
@@ -1010,7 +1009,6 @@
 		E139A8DB2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViroFabricContainerComponentView.mm; sourceTree = "<group>"; };
 		E139A8DC2E0B9C6A0050EC9A /* ViroFabricContainerManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViroFabricContainerManager.h; sourceTree = "<group>"; };
 		E139A8DD2E0B9C6A0050EC9A /* ViroFabricContainerManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViroFabricContainerManager.mm; sourceTree = "<group>"; };
-		E139A8DE2E0B9C6A0050EC9A /* ViroFabricContainerViewRegister.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViroFabricContainerViewRegister.mm; sourceTree = "<group>"; };
 		E139A8DF2E0B9C6A0050EC9A /* ViroFabricEventDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViroFabricEventDelegate.h; sourceTree = "<group>"; };
 		E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViroFabricEventDelegate.mm; sourceTree = "<group>"; };
 		E139A8E12E0B9C6A0050EC9A /* ViroFabricEvents.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViroFabricEvents.h; sourceTree = "<group>"; };
@@ -1474,7 +1472,6 @@
 				E139A8DB2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.mm */,
 				E139A8DC2E0B9C6A0050EC9A /* ViroFabricContainerManager.h */,
 				E139A8DD2E0B9C6A0050EC9A /* ViroFabricContainerManager.mm */,
-				E139A8DE2E0B9C6A0050EC9A /* ViroFabricContainerViewRegister.mm */,
 				E139A8DF2E0B9C6A0050EC9A /* ViroFabricEventDelegate.h */,
 				E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */,
 				E139A8E12E0B9C6A0050EC9A /* ViroFabricEvents.h */,
@@ -2107,7 +2104,6 @@
 				E139A8EE2E0B9C6A0050EC9A /* Props.cpp in Sources */,
 				E139A8EF2E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm in Sources */,
 				E139A8F02E0B9C6A0050EC9A /* ViroFabricContainer.mm in Sources */,
-				E139A8F12E0B9C6A0050EC9A /* ViroFabricContainerViewRegister.mm in Sources */,
 				E139A8F22E0B9C6A0050EC9A /* ViroFabricSceneManager.mm in Sources */,
 				E139A8F32E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm in Sources */,
 				E139A8F42E0B9C6A0050EC9A /* ViroFabricManager.mm in Sources */,

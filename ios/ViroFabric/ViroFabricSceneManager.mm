@@ -13,7 +13,7 @@
 #import "../ViroReact/AR/Views/VRTARScene.h"
 #import "../ViroReact/Views/VRTSceneNavigator.h"
 #import "../ViroReact/AR/Views/VRTARSceneNavigator.h"
-#import "../ViroReact/VR/Views/VRTVRSceneNavigator.h"
+#import "../VRTVRSceneNavigator.h"
 #import "../ViroReact/Views/VRTNode.h"
 
 @interface ViroFabricSceneManager ()

@@ -1,6 +1,0 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.viromedia.bridge.fabric">
-    
-    <!-- No specific permissions needed for the interop layer itself -->
-    
-</manifest>

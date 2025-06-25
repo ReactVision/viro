@@ -152,6 +152,7 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
     // ViroReact New Architecture (Fabric) Dependencies
     // https://viro-community.readme.io/docs/installation-instructions
     implementation project(':fabric-interop')
+    implementation project(':viro_bridge')
     implementation project(':gvr_common')
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
@@ -170,11 +171,12 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
 });
 const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {
     config.modResults.contents += `
-include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer', ':fabric-interop'
+include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer', ':viro_bridge', ':fabric-interop'
 project(':arcore_client').projectDir = new File('../node_modules/@reactvision/react-viro/android/arcore_client')
 project(':gvr_common').projectDir = new File('../node_modules/@reactvision/react-viro/android/gvr_common')
 project(':viro_renderer').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_renderer')
 project(':react_viro').projectDir = new File('../node_modules/@reactvision/react-viro/android/react_viro')
+project(':viro_bridge').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_bridge')
 project(':fabric-interop').projectDir = new File('../node_modules/@reactvision/react-viro/fabric-interop/android')
     `;
     return config;

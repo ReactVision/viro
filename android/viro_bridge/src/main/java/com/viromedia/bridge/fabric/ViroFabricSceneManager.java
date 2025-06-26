@@ -21,6 +21,14 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.lang.ref.WeakReference;
+import java.io.RandomAccessFile;
+import java.io.IOException;
+import android.app.ActivityManager;
+import android.content.Context;
+import android.os.Debug;
+import android.os.Process;
+import android.system.Os;
+import android.system.ErrnoException;
 
 /**
  * Simplified ViroFabricSceneManager manages scene lifecycle and memory cleanup
@@ -47,6 +55,13 @@ public class ViroFabricSceneManager {
     // Container reference
     private final WeakReference<ViroFabricContainer> mContainer;
     private final ThemedReactContext mReactContext;
+    
+    // Performance monitoring
+    private long mLastMemoryCheckTime = 0;
+    private static final long MEMORY_CHECK_INTERVAL_MS = 5000; // Check every 5 seconds
+    private static final double MEMORY_WARNING_THRESHOLD = 0.8; // 80% usage threshold
+    private static final double MEMORY_CRITICAL_THRESHOLD = 0.9; // 90% usage threshold
+    private boolean mMemoryWarningActive = false;
     
     // Scene lifecycle listener - use VRTComponent as common base
     public interface SceneLifecycleListener {
@@ -141,6 +156,9 @@ public class ViroFabricSceneManager {
                 mLifecycleListener.onSceneCreated(sceneId, scene);
             }
             
+            // Check memory pressure after scene creation
+            checkMemoryPressure();
+            
             Log.d(TAG, "Successfully created scene: " + sceneId);
             return scene;
             
@@ -192,6 +210,9 @@ public class ViroFabricSceneManager {
             if (mLifecycleListener != null) {
                 mLifecycleListener.onSceneActivated(sceneId, scene);
             }
+            
+            // Check memory pressure after scene activation
+            checkMemoryPressure();
             
             Log.d(TAG, "Successfully activated scene: " + sceneId);
             return true;
@@ -327,12 +348,23 @@ public class ViroFabricSceneManager {
     }
     
     /**
-     * Perform memory cleanup.
+     * Perform memory cleanup with intelligent memory pressure handling.
      */
     public void performMemoryCleanup() {
-        Log.d(TAG, "Performing memory cleanup");
+        performMemoryCleanup(false);
+    }
+    
+    /**
+     * Perform memory cleanup with optional aggressive mode.
+     */
+    public void performMemoryCleanup(boolean aggressive) {
+        Log.d(TAG, "Performing memory cleanup (aggressive: " + aggressive + ")");
         
         try {
+            // Check current memory pressure
+            WritableMap memStats = getMemoryStats();
+            double memoryUsage = memStats.getDouble("jvmMemoryUsagePercent");
+            
             // Clean up stale scene references
             List<String> staleScenes = new ArrayList<>();
             for (Map.Entry<String, WeakReference<VRTScene>> entry : mSceneRegistry.entrySet()) {
@@ -357,6 +389,11 @@ public class ViroFabricSceneManager {
             }
             mManagedNodes.removeAll(staleNodes);
             
+            // Aggressive cleanup if memory pressure is high
+            if (aggressive || memoryUsage > MEMORY_CRITICAL_THRESHOLD) {
+                performAggressiveCleanup();
+            }
+            
             // Force garbage collection hint
             System.gc();
             
@@ -369,6 +406,115 @@ public class ViroFabricSceneManager {
             
         } catch (Exception e) {
             Log.e(TAG, "Error during memory cleanup: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Perform aggressive memory cleanup during critical memory pressure.
+     */
+    private void performAggressiveCleanup() {
+        Log.w(TAG, "Performing aggressive memory cleanup due to high memory pressure");
+        
+        try {
+            // Find and destroy oldest inactive scenes
+            long currentTime = System.currentTimeMillis();
+            List<String> candidateScenes = new ArrayList<>();
+            
+            for (Map.Entry<String, Long> entry : mSceneCreationTimes.entrySet()) {
+                String sceneId = entry.getKey();
+                long age = currentTime - entry.getValue();
+                
+                // Target scenes older than 30 seconds that aren't active
+                if (age > 30000 && !sceneId.equals(mActiveSceneId)) {
+                    SceneState state = mSceneStates.get(sceneId);
+                    if (state == SceneState.PAUSED || state == SceneState.LOADED) {
+                        candidateScenes.add(sceneId);
+                    }
+                }
+            }
+            
+            // Sort by age (oldest first)
+            candidateScenes.sort((a, b) -> {
+                long ageA = currentTime - mSceneCreationTimes.get(a);
+                long ageB = currentTime - mSceneCreationTimes.get(b);
+                return Long.compare(ageB, ageA);
+            });
+            
+            // Destroy up to half of the old scenes
+            int destroyCount = Math.min(candidateScenes.size() / 2 + 1, candidateScenes.size());
+            for (int i = 0; i < destroyCount; i++) {
+                String sceneId = candidateScenes.get(i);
+                Log.d(TAG, "Aggressively destroying old scene: " + sceneId);
+                destroyScene(sceneId);
+            }
+            
+            // Clear any cached resources
+            if (mContainer.get() != null) {
+                ViroFabricContainer container = mContainer.get();
+                // Clear component registry of unused components
+                cleanupUnusedComponents(container);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error during aggressive cleanup: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Clean up unused components from the container registry.
+     */
+    private void cleanupUnusedComponents(ViroFabricContainer container) {
+        // This would access the component registry and clean up orphaned components
+        // Implementation depends on ViroFabricContainer's component management
+        Log.d(TAG, "Cleaning up unused components");
+    }
+    
+    /**
+     * Check memory pressure and trigger automatic cleanup if needed.
+     */
+    public void checkMemoryPressure() {
+        long currentTime = System.currentTimeMillis();
+        
+        // Only check periodically to avoid performance impact
+        if (currentTime - mLastMemoryCheckTime < MEMORY_CHECK_INTERVAL_MS) {
+            return;
+        }
+        
+        mLastMemoryCheckTime = currentTime;
+        
+        try {
+            WritableMap memStats = getMemoryStats();
+            double jvmUsage = memStats.getDouble("jvmMemoryUsagePercent");
+            
+            // Check if system is under memory pressure
+            boolean systemLowMemory = false;
+            if (memStats.hasKey("systemLowMemory")) {
+                systemLowMemory = memStats.getBoolean("systemLowMemory");
+            }
+            
+            // Trigger cleanup based on memory pressure
+            if (systemLowMemory || jvmUsage > MEMORY_CRITICAL_THRESHOLD) {
+                if (!mMemoryWarningActive) {
+                    Log.w(TAG, "Critical memory pressure detected (JVM: " + jvmUsage + "%, System low: " + systemLowMemory + ")");
+                    mMemoryWarningActive = true;
+                    performMemoryCleanup(true); // Aggressive cleanup
+                }
+            } else if (jvmUsage > MEMORY_WARNING_THRESHOLD) {
+                if (!mMemoryWarningActive) {
+                    Log.w(TAG, "Memory warning threshold exceeded (JVM: " + jvmUsage + "%)");
+                    mMemoryWarningActive = true;
+                    performMemoryCleanup(false); // Normal cleanup
+                }
+            } else {
+                // Memory pressure has subsided
+                if (mMemoryWarningActive) {
+                    Log.i(TAG, "Memory pressure subsided (JVM: " + jvmUsage + "%)");
+                    mMemoryWarningActive = false;
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking memory pressure: " + e.getMessage(), e);
         }
     }
     
@@ -403,7 +549,7 @@ public class ViroFabricSceneManager {
     }
     
     /**
-     * Get memory usage statistics.
+     * Get comprehensive memory and performance statistics.
      */
     public WritableMap getMemoryStats() {
         WritableMap stats = new WritableNativeMap();
@@ -414,18 +560,30 @@ public class ViroFabricSceneManager {
             stats.putInt("activeScenes", mActiveScene != null ? 1 : 0);
             stats.putInt("managedNodes", mManagedNodes.size());
             
-            // Memory statistics
+            // JVM Memory statistics
             Runtime runtime = Runtime.getRuntime();
             long totalMemory = runtime.totalMemory();
             long freeMemory = runtime.freeMemory();
             long usedMemory = totalMemory - freeMemory;
             long maxMemory = runtime.maxMemory();
             
-            stats.putDouble("totalMemoryMB", totalMemory / (1024.0 * 1024.0));
-            stats.putDouble("usedMemoryMB", usedMemory / (1024.0 * 1024.0));
-            stats.putDouble("freeMemoryMB", freeMemory / (1024.0 * 1024.0));
-            stats.putDouble("maxMemoryMB", maxMemory / (1024.0 * 1024.0));
-            stats.putDouble("memoryUsagePercent", (usedMemory * 100.0) / maxMemory);
+            stats.putDouble("jvmTotalMemoryMB", totalMemory / (1024.0 * 1024.0));
+            stats.putDouble("jvmUsedMemoryMB", usedMemory / (1024.0 * 1024.0));
+            stats.putDouble("jvmFreeMemoryMB", freeMemory / (1024.0 * 1024.0));
+            stats.putDouble("jvmMaxMemoryMB", maxMemory / (1024.0 * 1024.0));
+            stats.putDouble("jvmMemoryUsagePercent", (usedMemory * 100.0) / maxMemory);
+            
+            // Android native memory statistics
+            addNativeMemoryStats(stats);
+            
+            // Process memory statistics
+            addProcessMemoryStats(stats);
+            
+            // System memory statistics
+            addSystemMemoryStats(stats);
+            
+            // Performance statistics
+            addPerformanceStats(stats);
             
             // Scene age statistics
             long currentTime = System.currentTimeMillis();
@@ -443,6 +601,205 @@ public class ViroFabricSceneManager {
         }
         
         return stats;
+    }
+    
+    /**
+     * Add native memory statistics (equivalent to iOS mach_task_basic_info).
+     */
+    private void addNativeMemoryStats(WritableMap stats) {
+        try {
+            // Get native heap info
+            Debug.MemoryInfo memInfo = new Debug.MemoryInfo();
+            Debug.getMemoryInfo(memInfo);
+            
+            stats.putDouble("nativeHeapSizeMB", memInfo.nativeHeapSize / 1024.0);
+            stats.putDouble("nativeHeapAllocatedMB", memInfo.nativeHeapAllocatedSize / 1024.0);
+            stats.putDouble("nativeHeapFreeMB", memInfo.nativeHeapFreeSize / 1024.0);
+            
+            // Dalvik heap info
+            stats.putDouble("dalvikHeapSizeMB", memInfo.dalvikHeapSize / 1024.0);
+            stats.putDouble("dalvikHeapAllocatedMB", memInfo.dalvikHeapAllocatedSize / 1024.0);
+            stats.putDouble("dalvikHeapFreeMB", memInfo.dalvikHeapFreeSize / 1024.0);
+            
+            // Total PSS (Proportional Set Size) - closest to iOS resident memory
+            stats.putDouble("totalPssMB", memInfo.getTotalPss() / 1024.0);
+            stats.putDouble("nativePssMB", memInfo.nativePss / 1024.0);
+            stats.putDouble("dalvikPssMB", memInfo.dalvikPss / 1024.0);
+            stats.putDouble("otherPssMB", memInfo.otherPss / 1024.0);
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get native memory stats: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add process-level memory statistics.
+     */
+    private void addProcessMemoryStats(WritableMap stats) {
+        try {
+            int pid = Process.myPid();
+            
+            // Read /proc/[pid]/status for detailed memory info
+            RandomAccessFile reader = new RandomAccessFile("/proc/" + pid + "/status", "r");
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("VmRSS:")) {
+                    // Resident Set Size (physical memory currently used)
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 2) {
+                        long vmRssKB = Long.parseLong(parts[1]);
+                        stats.putDouble("processResidentMemoryMB", vmRssKB / 1024.0);
+                    }
+                } else if (line.startsWith("VmSize:")) {
+                    // Virtual Memory Size
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 2) {
+                        long vmSizeKB = Long.parseLong(parts[1]);
+                        stats.putDouble("processVirtualMemoryMB", vmSizeKB / 1024.0);
+                    }
+                } else if (line.startsWith("VmHWM:")) {
+                    // High Water Mark (peak physical memory usage)
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 2) {
+                        long vmHwmKB = Long.parseLong(parts[1]);
+                        stats.putDouble("processPeakMemoryMB", vmHwmKB / 1024.0);
+                    }
+                } else if (line.startsWith("VmSwap:")) {
+                    // Swap usage
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 2) {
+                        long vmSwapKB = Long.parseLong(parts[1]);
+                        stats.putDouble("processSwapMB", vmSwapKB / 1024.0);
+                    }
+                }
+            }
+            reader.close();
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get process memory stats: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add system-level memory statistics.
+     */
+    private void addSystemMemoryStats(WritableMap stats) {
+        try {
+            Context context = mReactContext;
+            ActivityManager activityManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            
+            if (activityManager != null) {
+                // Get system memory info
+                ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
+                activityManager.getMemoryInfo(memInfo);
+                
+                stats.putDouble("systemAvailableMemoryMB", memInfo.availMem / (1024.0 * 1024.0));
+                stats.putDouble("systemTotalMemoryMB", memInfo.totalMem / (1024.0 * 1024.0));
+                stats.putDouble("systemMemoryUsagePercent", 
+                    ((memInfo.totalMem - memInfo.availMem) * 100.0) / memInfo.totalMem);
+                stats.putBoolean("systemLowMemory", memInfo.lowMemory);
+                stats.putDouble("systemMemoryThresholdMB", memInfo.threshold / (1024.0 * 1024.0));
+                
+                // Get running app processes
+                List<ActivityManager.RunningAppProcessInfo> runningApps = 
+                    activityManager.getRunningAppProcesses();
+                stats.putInt("systemRunningProcesses", runningApps != null ? runningApps.size() : 0);
+            }
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get system memory stats: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add performance monitoring statistics.
+     */
+    private void addPerformanceStats(WritableMap stats) {
+        try {
+            // CPU usage
+            addCpuStats(stats);
+            
+            // Thread information
+            ThreadGroup rootGroup = Thread.currentThread().getThreadGroup();
+            ThreadGroup parentGroup;
+            while ((parentGroup = rootGroup.getParent()) != null) {
+                rootGroup = parentGroup;
+            }
+            stats.putInt("totalThreads", rootGroup.activeCount());
+            
+            // GC statistics
+            stats.putLong("totalGcInvocations", Debug.getRuntimeStat("art.gc.gc-count"));
+            stats.putLong("totalGcTimeMs", Debug.getRuntimeStat("art.gc.gc-time"));
+            stats.putLong("totalAllocatedObjects", Debug.getRuntimeStat("art.gc.objects-allocated"));
+            stats.putLong("totalFreedObjects", Debug.getRuntimeStat("art.gc.objects-freed"));
+            
+            // Process uptime
+            long uptimeMs = System.currentTimeMillis() - Debug.getRuntimeStat("art.gc.gc-count-rate-histogram");
+            stats.putDouble("processUptimeSeconds", uptimeMs / 1000.0);
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get performance stats: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add CPU usage statistics.
+     */
+    private void addCpuStats(WritableMap stats) {
+        try {
+            int pid = Process.myPid();
+            
+            // Read /proc/[pid]/stat for CPU usage
+            RandomAccessFile reader = new RandomAccessFile("/proc/" + pid + "/stat", "r");
+            String line = reader.readLine();
+            reader.close();
+            
+            if (line != null) {
+                String[] statParts = line.split(" ");
+                if (statParts.length >= 15) {
+                    // User time + System time (in jiffies)
+                    long utime = Long.parseLong(statParts[13]);
+                    long stime = Long.parseLong(statParts[14]);
+                    long totalTime = utime + stime;
+                    
+                    // Get clock ticks per second
+                    long clockTicks = Os.sysconf(android.system.OsConstants._SC_CLK_TCK);
+                    double cpuTimeSeconds = totalTime / (double) clockTicks;
+                    
+                    stats.putDouble("processCpuTimeSeconds", cpuTimeSeconds);
+                    stats.putLong("processUserTimeJiffies", utime);
+                    stats.putLong("processSystemTimeJiffies", stime);
+                }
+            }
+            
+            // Read system CPU info
+            reader = new RandomAccessFile("/proc/stat", "r");
+            line = reader.readLine(); // First line contains overall CPU stats
+            reader.close();
+            
+            if (line != null && line.startsWith("cpu ")) {
+                String[] cpuParts = line.split("\\s+");
+                if (cpuParts.length >= 8) {
+                    long user = Long.parseLong(cpuParts[1]);
+                    long nice = Long.parseLong(cpuParts[2]);
+                    long system = Long.parseLong(cpuParts[3]);
+                    long idle = Long.parseLong(cpuParts[4]);
+                    long iowait = Long.parseLong(cpuParts[5]);
+                    long irq = Long.parseLong(cpuParts[6]);
+                    long softirq = Long.parseLong(cpuParts[7]);
+                    
+                    long totalCpu = user + nice + system + idle + iowait + irq + softirq;
+                    long activeCpu = totalCpu - idle;
+                    
+                    stats.putDouble("systemCpuUsagePercent", (activeCpu * 100.0) / totalCpu);
+                    stats.putLong("systemCpuTotalJiffies", totalCpu);
+                    stats.putLong("systemCpuActiveJiffies", activeCpu);
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get CPU stats: " + e.getMessage());
+        }
     }
     
     /**

@@ -7,6 +7,13 @@
 #include <react/jni/NativeMap.h>
 #include <react/nativemodule/core/ReactCommon/CallInvokerHolder.h>
 #include <android/log.h>
+#include <memory>
+#include <string>
+#include <map>
+#include <mutex>
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 using namespace facebook::jni;
 using namespace facebook::jsi;
@@ -20,6 +27,8 @@ public:
         registerHybridClass({
             makeNativeMethod("initHybrid", ViroFabricContainerJSI::initHybrid),
             makeNativeMethod("dispatchEventToJS", ViroFabricContainerJSI::dispatchEventToJS),
+            makeNativeMethod("resolvePromise", ViroFabricContainerJSI::resolvePromise),
+            makeNativeMethod("rejectPromise", ViroFabricContainerJSI::rejectPromise),
         });
     }
 
@@ -29,7 +38,8 @@ public:
         std::shared_ptr<facebook::react::CallInvoker> jsCallInvoker)
         : javaPart_(jni::make_global(jThis)),
           runtime_(runtime),
-          jsCallInvoker_(std::move(jsCallInvoker)) {}
+          jsCallInvoker_(std::move(jsCallInvoker)),
+          promiseCounter_(0) {}
 
 private:
     friend HybridBase;
@@ -704,24 +714,42 @@ private:
                 float y = pointArray.getValueAtIndex(rt, 1).getNumber();
                 float z = pointArray.getValueAtIndex(rt, 2).getNumber();
                 
-                // Call the Java method (which will handle the async promise resolution)
-                static const auto projectPointMethod = 
-                    javaPart_->getClass()->getMethod<void(jstring, jfloat, jfloat, jfloat)>("projectPoint");
-                projectPointMethod(
-                    javaPart_.get(),
-                    jni::make_jstring(nodeId).get(),
-                    x, y, z);
-                
-                // Return a resolved promise with placeholder coordinates for now
-                // The actual implementation would need to handle async callbacks
+                // Create a new Promise with proper async handling
                 auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
-                auto resolveMethod = promiseConstructor.getPropertyAsFunction(rt, "resolve");
-                auto resultArray = jsi::Array(rt, 3);
-                resultArray.setValueAtIndex(rt, 0, jsi::Value(0.0)); // placeholder
-                resultArray.setValueAtIndex(rt, 1, jsi::Value(0.0)); // placeholder
-                resultArray.setValueAtIndex(rt, 2, jsi::Value(0.0)); // placeholder
-                
-                return resolveMethod.callWithThis(rt, promiseConstructor, resultArray);
+                return promiseConstructor.callAsConstructor(rt, jsi::Function::createFromHostFunction(
+                    rt,
+                    jsi::PropNameID::forAscii(rt, "projectPromiseExecutor"),
+                    2,
+                    [this, nodeId, x, y, z](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                        if (count != 2) {
+                            return jsi::Value::undefined();
+                        }
+                        
+                        // Generate unique promise ID
+                        std::string promiseId = generatePromiseId();
+                        
+                        // Store promise resolve/reject functions
+                        {
+                            std::lock_guard<std::mutex> lock(promisesMutex_);
+                            pendingPromises_[promiseId] = {
+                                std::shared_ptr<jsi::Runtime>(&rt, [](jsi::Runtime*){}), // Non-owning shared_ptr
+                                std::make_shared<jsi::Function>(args[0].getObject(rt).getFunction(rt)),
+                                std::make_shared<jsi::Function>(args[1].getObject(rt).getFunction(rt))
+                            };
+                        }
+                        
+                        // Call the Java method with promise ID for async resolution
+                        static const auto projectPointAsyncMethod = 
+                            javaPart_->getClass()->getMethod<void(jstring, jfloat, jfloat, jfloat, jstring)>("projectPointAsync");
+                        projectPointAsyncMethod(
+                            javaPart_.get(),
+                            jni::make_jstring(nodeId).get(),
+                            x, y, z,
+                            jni::make_jstring(promiseId).get());
+                        
+                        return jsi::Value::undefined();
+                    }
+                ));
             }
         ));
         
@@ -762,24 +790,42 @@ private:
                 float y = pointArray.getValueAtIndex(rt, 1).getNumber();
                 float z = pointArray.size(rt) > 2 ? pointArray.getValueAtIndex(rt, 2).getNumber() : 0.0f;
                 
-                // Call the Java method (which will handle the async promise resolution)
-                static const auto unprojectPointMethod = 
-                    javaPart_->getClass()->getMethod<void(jstring, jfloat, jfloat, jfloat)>("unprojectPoint");
-                unprojectPointMethod(
-                    javaPart_.get(),
-                    jni::make_jstring(nodeId).get(),
-                    x, y, z);
-                
-                // Return a resolved promise with placeholder coordinates for now
-                // The actual implementation would need to handle async callbacks
+                // Create a new Promise with proper async handling
                 auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
-                auto resolveMethod = promiseConstructor.getPropertyAsFunction(rt, "resolve");
-                auto resultArray = jsi::Array(rt, 3);
-                resultArray.setValueAtIndex(rt, 0, jsi::Value(0.0)); // placeholder
-                resultArray.setValueAtIndex(rt, 1, jsi::Value(0.0)); // placeholder
-                resultArray.setValueAtIndex(rt, 2, jsi::Value(0.0)); // placeholder
-                
-                return resolveMethod.callWithThis(rt, promiseConstructor, resultArray);
+                return promiseConstructor.callAsConstructor(rt, jsi::Function::createFromHostFunction(
+                    rt,
+                    jsi::PropNameID::forAscii(rt, "unprojectPromiseExecutor"),
+                    2,
+                    [this, nodeId, x, y, z](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                        if (count != 2) {
+                            return jsi::Value::undefined();
+                        }
+                        
+                        // Generate unique promise ID
+                        std::string promiseId = generatePromiseId();
+                        
+                        // Store promise resolve/reject functions
+                        {
+                            std::lock_guard<std::mutex> lock(promisesMutex_);
+                            pendingPromises_[promiseId] = {
+                                std::shared_ptr<jsi::Runtime>(&rt, [](jsi::Runtime*){}), // Non-owning shared_ptr
+                                std::make_shared<jsi::Function>(args[0].getObject(rt).getFunction(rt)),
+                                std::make_shared<jsi::Function>(args[1].getObject(rt).getFunction(rt))
+                            };
+                        }
+                        
+                        // Call the Java method with promise ID for async resolution
+                        static const auto unprojectPointAsyncMethod = 
+                            javaPart_->getClass()->getMethod<void(jstring, jfloat, jfloat, jfloat, jstring)>("unprojectPointAsync");
+                        unprojectPointAsyncMethod(
+                            javaPart_.get(),
+                            jni::make_jstring(nodeId).get(),
+                            x, y, z,
+                            jni::make_jstring(promiseId).get());
+                        
+                        return jsi::Value::undefined();
+                    }
+                ));
             }
         ));
         
@@ -821,7 +867,51 @@ private:
             }
         ));
         
+        // Test function for async Promise system
+        nativeViro.setProperty(runtime, "testAsyncPromises", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "testAsyncPromises"),
+            0,  // no arguments
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                // Create a new Promise to test the async system
+                auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                return promiseConstructor.callAsConstructor(rt, jsi::Function::createFromHostFunction(
+                    rt,
+                    jsi::PropNameID::forAscii(rt, "testPromiseExecutor"),
+                    2,
+                    [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                        if (count != 2) {
+                            return jsi::Value::undefined();
+                        }
+                        
+                        // Generate unique promise ID for testing
+                        std::string promiseId = generatePromiseId();
+                        
+                        // Store promise resolve/reject functions
+                        {
+                            std::lock_guard<std::mutex> lock(promisesMutex_);
+                            pendingPromises_[promiseId] = {
+                                std::shared_ptr<jsi::Runtime>(&rt, [](jsi::Runtime*){}), // Non-owning shared_ptr
+                                std::make_shared<jsi::Function>(args[0].getObject(rt).getFunction(rt)),
+                                std::make_shared<jsi::Function>(args[1].getObject(rt).getFunction(rt))
+                            };
+                        }
+                        
+                        // Call the Java test method
+                        static const auto testAsyncPromiseSystemMethod = 
+                            javaPart_->getClass()->getMethod<void(jstring)>("testAsyncPromiseSystem");
+                        testAsyncPromiseSystemMethod(
+                            javaPart_.get(),
+                            jni::make_jstring(promiseId).get());
+                        
+                        return jsi::Value::undefined();
+                    }
+                ));
+            }
+        ));
+        
         __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "JSI bindings installed successfully");
+        __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Async Promise system ready for testing");
     }
 
     // Helper method to convert JSI values to ReadableMap
@@ -882,6 +972,98 @@ private:
             __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Fallback logging for callback: %s", callbackIdStr.c_str());
         }
     }
+
+    // Promise callback handling
+    void resolvePromise(jni::alias_ref<jstring> promiseId, jni::alias_ref<jstring> result) {
+        std::string promiseIdStr = promiseId->toStdString();
+        std::string resultStr = result->toStdString();
+        
+        __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Resolving promise: %s with result: %s", promiseIdStr.c_str(), resultStr.c_str());
+        
+        std::lock_guard<std::mutex> lock(promisesMutex_);
+        auto it = pendingPromises_.find(promiseIdStr);
+        if (it != pendingPromises_.end()) {
+            auto& promiseData = it->second;
+            
+            if (jsCallInvoker_) {
+                jsCallInvoker_->invokeAsync([promiseData, resultStr]() {
+                    try {
+                        // Parse result as JSON array for projection coordinates
+                        auto& runtime = *promiseData.runtime;
+                        
+                        if (resultStr.front() == '[' && resultStr.back() == ']') {
+                            // Parse as coordinate array
+                            std::string content = resultStr.substr(1, resultStr.length() - 2);
+                            std::vector<double> coords;
+                            std::stringstream ss(content);
+                            std::string item;
+                            
+                            while (std::getline(ss, item, ',')) {
+                                coords.push_back(std::stod(item));
+                            }
+                            
+                            auto resultArray = jsi::Array(runtime, coords.size());
+                            for (size_t i = 0; i < coords.size(); i++) {
+                                resultArray.setValueAtIndex(runtime, i, jsi::Value(coords[i]));
+                            }
+                            
+                            promiseData.resolve->call(runtime, resultArray);
+                        } else {
+                            // Parse as simple string
+                            promiseData.resolve->call(runtime, jsi::String::createFromUtf8(runtime, resultStr));
+                        }
+                    } catch (const std::exception& e) {
+                        __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Error resolving promise: %s", e.what());
+                    }
+                });
+            }
+            
+            pendingPromises_.erase(it);
+        }
+    }
+    
+    void rejectPromise(jni::alias_ref<jstring> promiseId, jni::alias_ref<jstring> error) {
+        std::string promiseIdStr = promiseId->toStdString();
+        std::string errorStr = error->toStdString();
+        
+        __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Rejecting promise: %s with error: %s", promiseIdStr.c_str(), errorStr.c_str());
+        
+        std::lock_guard<std::mutex> lock(promisesMutex_);
+        auto it = pendingPromises_.find(promiseIdStr);
+        if (it != pendingPromises_.end()) {
+            auto& promiseData = it->second;
+            
+            if (jsCallInvoker_) {
+                jsCallInvoker_->invokeAsync([promiseData, errorStr]() {
+                    try {
+                        auto& runtime = *promiseData.runtime;
+                        auto error = jsi::Object(runtime);
+                        error.setProperty(runtime, "message", jsi::String::createFromUtf8(runtime, errorStr));
+                        promiseData.reject->call(runtime, error);
+                    } catch (const std::exception& e) {
+                        __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Error rejecting promise: %s", e.what());
+                    }
+                });
+            }
+            
+            pendingPromises_.erase(it);
+        }
+    }
+    
+    std::string generatePromiseId() {
+        return "promise_" + std::to_string(++promiseCounter_) + "_" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
+
+    // Promise management structures
+    struct PromiseData {
+        std::shared_ptr<jsi::Runtime> runtime;
+        std::shared_ptr<jsi::Function> resolve;
+        std::shared_ptr<jsi::Function> reject;
+    };
+    
+    std::map<std::string, PromiseData> pendingPromises_;
+    std::mutex promisesMutex_;
+    std::atomic<uint64_t> promiseCounter_;
 
     jni::global_ref<ViroFabricContainerJSI::javaobject> javaPart_;
     jsi::Runtime* runtime_;

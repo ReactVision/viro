@@ -121,4 +121,38 @@ typedef NS_ENUM(NSInteger, ViroFabricSceneState) {
  */
 - (void)registerManagedNode:(id)node;
 
+/**
+ * Initialize with configuration options
+ */
+- (void)initializeWithConfig:(NSDictionary *)config;
+
+/**
+ * Configure AR plane detection
+ */
+- (void)configureARPlaneDetection:(NSDictionary *)config;
+
+/**
+ * Configure AR image targets
+ */
+- (void)configureARImageTargets:(NSDictionary *)targets;
+
+/**
+ * Project 3D point to 2D screen coordinates
+ */
+- (void)projectPoint:(NSArray *)point 
+             forNode:(NSString *)nodeId 
+          completion:(void (^)(NSArray *screenPoint))completion;
+
+/**
+ * Unproject 2D screen coordinates to 3D world coordinates
+ */
+- (void)unprojectPoint:(NSArray *)point 
+               forNode:(NSString *)nodeId 
+            completion:(void (^)(NSArray *worldPoint))completion;
+
+/**
+ * Recenter AR tracking for a given node
+ */
+- (void)recenterTrackingForNode:(NSString *)nodeId;
+
 @end

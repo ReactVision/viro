@@ -9,6 +9,7 @@
 #import "ViroFabricJSI.h"
 #import "ViroFabricSceneManager.h"
 #import "ViroFabricManager.h"
+#import "ViroEventsTurboModule.h"
 #import <React/RCTLog.h>
 #import <React/RCTBridge+Private.h>
 #import "../ViroReact/Views/VRTNode.h"
@@ -66,33 +67,39 @@ using namespace facebook::jsi;
 - (void)installJSIFunctions:(Runtime &)runtime {
     RCTLogInfo(@"[ViroFabricJSI] Installing JSI functions");
     
+    // Create the NativeViro object to hold all our functions
+    auto nativeViro = Object(runtime);
+    
     // Node Management Functions
-    [self installNodeManagementFunctions:runtime];
+    [self installNodeManagementFunctions:runtime nativeViro:nativeViro];
     
     // Scene Management Functions
-    [self installSceneManagementFunctions:runtime];
+    [self installSceneManagementFunctions:runtime nativeViro:nativeViro];
     
     // Event Management Functions
-    [self installEventManagementFunctions:runtime];
+    [self installEventManagementFunctions:runtime nativeViro:nativeViro];
     
     // Material Management Functions
-    [self installMaterialManagementFunctions:runtime];
+    [self installMaterialManagementFunctions:runtime nativeViro:nativeViro];
     
     // Animation Management Functions
-    [self installAnimationManagementFunctions:runtime];
+    [self installAnimationManagementFunctions:runtime nativeViro:nativeViro];
     
     // Memory Management Functions
-    [self installMemoryManagementFunctions:runtime];
+    [self installMemoryManagementFunctions:runtime nativeViro:nativeViro];
     
     // Utility Functions
-    [self installUtilityFunctions:runtime];
+    [self installUtilityFunctions:runtime nativeViro:nativeViro];
     
-    RCTLogInfo(@"[ViroFabricJSI] All JSI functions installed successfully");
+    // Attach the NativeViro object to global scope
+    runtime.global().setProperty(runtime, "NativeViro", std::move(nativeViro));
+    
+    RCTLogInfo(@"[ViroFabricJSI] All JSI functions installed successfully under global.NativeViro");
 }
 
 #pragma mark - Node Management Functions
 
-- (void)installNodeManagementFunctions:(Runtime &)runtime {
+- (void)installNodeManagementFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
     // generateNodeId
     auto generateNodeId = Function::createFromHostFunction(
         runtime,
@@ -103,7 +110,7 @@ using namespace facebook::jsi;
             return String::createFromUtf8(runtime, [nodeId UTF8String]);
         }
     );
-    runtime.global().setProperty(runtime, "generateNodeId", generateNodeId);
+    nativeViro.setProperty(runtime, "generateNodeId", generateNodeId);
     
     // generateCallbackId
     auto generateCallbackId = Function::createFromHostFunction(
@@ -115,12 +122,12 @@ using namespace facebook::jsi;
             return String::createFromUtf8(runtime, [callbackId UTF8String]);
         }
     );
-    runtime.global().setProperty(runtime, "generateCallbackId", generateCallbackId);
+    nativeViro.setProperty(runtime, "generateCallbackId", generateCallbackId);
     
-    // createNode
-    auto createNode = Function::createFromHostFunction(
+    // createViroNode - renamed to match JavaScript expectations
+    auto createViroNode = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "createNode"),
+        PropNameID::forAscii(runtime, "createViroNode"),
         3,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 3) return Value::undefined();
@@ -136,12 +143,12 @@ using namespace facebook::jsi;
             return [self createNativeNode:nodeId nodeType:nodeType props:props] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "createNode", createNode);
+    nativeViro.setProperty(runtime, "createViroNode", createViroNode);
     
-    // updateNode
-    auto updateNode = Function::createFromHostFunction(
+    // updateViroNode - renamed to match JavaScript expectations
+    auto updateViroNode = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "updateNode"),
+        PropNameID::forAscii(runtime, "updateViroNode"),
         2,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 2) return Value::undefined();
@@ -155,12 +162,12 @@ using namespace facebook::jsi;
             return [self updateNativeNode:nodeId props:props] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "updateNode", updateNode);
+    nativeViro.setProperty(runtime, "updateViroNode", updateViroNode);
     
-    // deleteNode
-    auto deleteNode = Function::createFromHostFunction(
+    // deleteViroNode - renamed to match JavaScript expectations
+    auto deleteViroNode = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "deleteNode"),
+        PropNameID::forAscii(runtime, "deleteViroNode"),
         1,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 1) return Value::undefined();
@@ -171,12 +178,12 @@ using namespace facebook::jsi;
             return [self deleteNativeNode:nodeId] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "deleteNode", deleteNode);
+    nativeViro.setProperty(runtime, "deleteViroNode", deleteViroNode);
     
-    // addChild
-    auto addChild = Function::createFromHostFunction(
+    // addViroNodeChild - renamed to match JavaScript expectations
+    auto addViroNodeChild = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "addChild"),
+        PropNameID::forAscii(runtime, "addViroNodeChild"),
         2,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 2) return Value::undefined();
@@ -190,12 +197,12 @@ using namespace facebook::jsi;
             return [self addChildNode:parentId childId:childId] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "addChild", addChild);
+    nativeViro.setProperty(runtime, "addViroNodeChild", addViroNodeChild);
     
-    // removeChild
-    auto removeChild = Function::createFromHostFunction(
+    // removeViroNodeChild - renamed to match JavaScript expectations
+    auto removeViroNodeChild = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "removeChild"),
+        PropNameID::forAscii(runtime, "removeViroNodeChild"),
         2,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 2) return Value::undefined();
@@ -209,16 +216,16 @@ using namespace facebook::jsi;
             return [self removeChildNode:parentId childId:childId] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "removeChild", removeChild);
+    nativeViro.setProperty(runtime, "removeViroNodeChild", removeViroNodeChild);
 }
 
 #pragma mark - Scene Management Functions
 
-- (void)installSceneManagementFunctions:(Runtime &)runtime {
-    // createScene
-    auto createScene = Function::createFromHostFunction(
+- (void)installSceneManagementFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
+    // createViroScene - renamed to match JavaScript expectations
+    auto createViroScene = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "createScene"),
+        PropNameID::forAscii(runtime, "createViroScene"),
         3,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 3) return Value::undefined();
@@ -235,12 +242,12 @@ using namespace facebook::jsi;
             return scene ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "createScene", createScene);
+    nativeViro.setProperty(runtime, "createViroScene", createViroScene);
     
-    // activateScene
-    auto activateScene = Function::createFromHostFunction(
+    // activateViroScene - renamed to match JavaScript expectations
+    auto activateViroScene = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "activateScene"),
+        PropNameID::forAscii(runtime, "activateViroScene"),
         1,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 1) return Value::undefined();
@@ -251,12 +258,28 @@ using namespace facebook::jsi;
             return [self.sceneManager activateScene:sceneId] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "activateScene", activateScene);
+    nativeViro.setProperty(runtime, "activateViroScene", activateViroScene);
     
-    // destroyScene
-    auto destroyScene = Function::createFromHostFunction(
+    // deactivateViroScene - added missing function
+    auto deactivateViroScene = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "destroyScene"),
+        PropNameID::forAscii(runtime, "deactivateViroScene"),
+        1,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 1) return Value::undefined();
+            
+            std::string sceneIdStr = arguments[0].getString(runtime).utf8(runtime);
+            NSString *sceneId = [NSString stringWithUTF8String:sceneIdStr.c_str()];
+            
+            return [self.sceneManager deactivateScene:sceneId] ? Value(true) : Value(false);
+        }
+    );
+    nativeViro.setProperty(runtime, "deactivateViroScene", deactivateViroScene);
+    
+    // destroyViroScene - renamed to match JavaScript expectations
+    auto destroyViroScene = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "destroyViroScene"),
         1,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 1) return Value::undefined();
@@ -267,59 +290,48 @@ using namespace facebook::jsi;
             return [self.sceneManager destroyScene:sceneId] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "destroyScene", destroyScene);
+    nativeViro.setProperty(runtime, "destroyViroScene", destroyViroScene);
     
-    // getActiveSceneId
-    auto getActiveSceneId = Function::createFromHostFunction(
+    // getViroSceneState - added missing function
+    auto getViroSceneState = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "getActiveSceneId"),
-        0,
+        PropNameID::forAscii(runtime, "getViroSceneState"),
+        1,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
-            NSString *activeSceneId = [self.sceneManager getActiveSceneId];
-            if (activeSceneId) {
-                return String::createFromUtf8(runtime, [activeSceneId UTF8String]);
+            if (count < 1) return Value::null();
+            
+            std::string sceneIdStr = arguments[0].getString(runtime).utf8(runtime);
+            NSString *sceneId = [NSString stringWithUTF8String:sceneIdStr.c_str()];
+            
+            ViroFabricSceneState state = [self.sceneManager getSceneState:sceneId];
+            switch (state) {
+                case ViroFabricSceneStateCreated:
+                    return String::createFromUtf8(runtime, "created");
+                case ViroFabricSceneStateLoading:
+                    return String::createFromUtf8(runtime, "loading");
+                case ViroFabricSceneStateLoaded:
+                    return String::createFromUtf8(runtime, "loaded");
+                case ViroFabricSceneStateActive:
+                    return String::createFromUtf8(runtime, "active");
+                case ViroFabricSceneStatePaused:
+                    return String::createFromUtf8(runtime, "paused");
+                case ViroFabricSceneStateDestroyed:
+                    return String::createFromUtf8(runtime, "destroyed");
+                default:
+                    return String::createFromUtf8(runtime, "unknown");
             }
-            return Value::null();
         }
     );
-    runtime.global().setProperty(runtime, "getActiveSceneId", getActiveSceneId);
+    nativeViro.setProperty(runtime, "getViroSceneState", getViroSceneState);
 }
 
 #pragma mark - Event Management Functions
 
-- (void)installEventManagementFunctions:(Runtime &)runtime {
-    // registerEventListener
-    auto registerEventListener = Function::createFromHostFunction(
+- (void)installEventManagementFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
+    // registerEventCallback - renamed to match JavaScript expectations
+    auto registerEventCallback = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "registerEventListener"),
-        3,
-        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
-            if (count < 3) return Value::undefined();
-            
-            std::string nodeIdStr = arguments[0].getString(runtime).utf8(runtime);
-            std::string eventNameStr = arguments[1].getString(runtime).utf8(runtime);
-            Function callback = arguments[2].getObject(runtime).getFunction(runtime);
-            
-            NSString *nodeId = [NSString stringWithUTF8String:nodeIdStr.c_str()];
-            NSString *eventName = [NSString stringWithUTF8String:eventNameStr.c_str()];
-            
-            // Store the callback function
-            NSString *callbackId = [NSString stringWithFormat:@"%@_%@_%@", nodeId, eventName, [[NSUUID UUID] UUIDString]];
-            NSValue *callbackValue = [NSValue valueWithPointer:new Function(std::move(callback))];
-            self.eventCallbacks[callbackId] = callbackValue;
-            
-            // Register with native node
-            [self registerNativeEventListener:nodeId eventName:eventName callbackId:callbackId];
-            
-            return String::createFromUtf8(runtime, [callbackId UTF8String]);
-        }
-    );
-    runtime.global().setProperty(runtime, "registerEventListener", registerEventListener);
-    
-    // unregisterEventListener
-    auto unregisterEventListener = Function::createFromHostFunction(
-        runtime,
-        PropNameID::forAscii(runtime, "unregisterEventListener"),
+        PropNameID::forAscii(runtime, "registerEventCallback"),
         3,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 3) return Value::undefined();
@@ -332,13 +344,32 @@ using namespace facebook::jsi;
             NSString *eventName = [NSString stringWithUTF8String:eventNameStr.c_str()];
             NSString *callbackId = [NSString stringWithUTF8String:callbackIdStr.c_str()];
             
-            // Remove callback from registry
-            NSValue *callbackValue = self.eventCallbacks[callbackId];
-            if (callbackValue) {
-                Function *callback = (Function *)[callbackValue pointerValue];
-                delete callback;
-                [self.eventCallbacks removeObjectForKey:callbackId];
-            }
+            // Register with native node using callback ID (no function storage needed)
+            [self registerNativeEventListener:nodeId eventName:eventName callbackId:callbackId];
+            
+            return Value(true);
+        }
+    );
+    nativeViro.setProperty(runtime, "registerEventCallback", registerEventCallback);
+    
+    // unregisterEventCallback - renamed to match JavaScript expectations
+    auto unregisterEventCallback = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "unregisterEventCallback"),
+        3,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 3) return Value::undefined();
+            
+            std::string nodeIdStr = arguments[0].getString(runtime).utf8(runtime);
+            std::string eventNameStr = arguments[1].getString(runtime).utf8(runtime);
+            std::string callbackIdStr = arguments[2].getString(runtime).utf8(runtime);
+            
+            NSString *nodeId = [NSString stringWithUTF8String:nodeIdStr.c_str()];
+            NSString *eventName = [NSString stringWithUTF8String:eventNameStr.c_str()];
+            NSString *callbackId = [NSString stringWithUTF8String:callbackIdStr.c_str()];
+            
+            // Remove callback from registry if it exists
+            [self.eventCallbacks removeObjectForKey:callbackId];
             
             // Unregister from native node
             [self unregisterNativeEventListener:nodeId eventName:eventName callbackId:callbackId];
@@ -346,16 +377,16 @@ using namespace facebook::jsi;
             return Value(true);
         }
     );
-    runtime.global().setProperty(runtime, "unregisterEventListener", unregisterEventListener);
+    nativeViro.setProperty(runtime, "unregisterEventCallback", unregisterEventCallback);
 }
 
 #pragma mark - Material Management Functions
 
-- (void)installMaterialManagementFunctions:(Runtime &)runtime {
-    // createMaterial
-    auto createMaterial = Function::createFromHostFunction(
+- (void)installMaterialManagementFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
+    // createViroMaterial - renamed to match JavaScript expectations
+    auto createViroMaterial = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "createMaterial"),
+        PropNameID::forAscii(runtime, "createViroMaterial"),
         2,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 2) return Value::undefined();
@@ -372,12 +403,12 @@ using namespace facebook::jsi;
             return Value(true);
         }
     );
-    runtime.global().setProperty(runtime, "createMaterial", createMaterial);
+    nativeViro.setProperty(runtime, "createViroMaterial", createViroMaterial);
     
-    // updateMaterial
-    auto updateMaterial = Function::createFromHostFunction(
+    // updateViroMaterial - renamed to match JavaScript expectations
+    auto updateViroMaterial = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "updateMaterial"),
+        PropNameID::forAscii(runtime, "updateViroMaterial"),
         2,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 2) return Value::undefined();
@@ -400,34 +431,16 @@ using namespace facebook::jsi;
             return Value(true);
         }
     );
-    runtime.global().setProperty(runtime, "updateMaterial", updateMaterial);
-    
-    // deleteMaterial
-    auto deleteMaterial = Function::createFromHostFunction(
-        runtime,
-        PropNameID::forAscii(runtime, "deleteMaterial"),
-        1,
-        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
-            if (count < 1) return Value::undefined();
-            
-            std::string materialIdStr = arguments[0].getString(runtime).utf8(runtime);
-            NSString *materialId = [NSString stringWithUTF8String:materialIdStr.c_str()];
-            
-            [self.materialRegistry removeObjectForKey:materialId];
-            
-            return Value(true);
-        }
-    );
-    runtime.global().setProperty(runtime, "deleteMaterial", deleteMaterial);
+    nativeViro.setProperty(runtime, "updateViroMaterial", updateViroMaterial);
 }
 
 #pragma mark - Animation Management Functions
 
-- (void)installAnimationManagementFunctions:(Runtime &)runtime {
-    // createAnimation
-    auto createAnimation = Function::createFromHostFunction(
+- (void)installAnimationManagementFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
+    // createViroAnimation - renamed to match JavaScript expectations
+    auto createViroAnimation = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "createAnimation"),
+        PropNameID::forAscii(runtime, "createViroAnimation"),
         2,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 2) return Value::undefined();
@@ -444,12 +457,12 @@ using namespace facebook::jsi;
             return Value(true);
         }
     );
-    runtime.global().setProperty(runtime, "createAnimation", createAnimation);
+    nativeViro.setProperty(runtime, "createViroAnimation", createViroAnimation);
     
-    // executeAnimation
-    auto executeAnimation = Function::createFromHostFunction(
+    // executeViroAnimation - renamed to match JavaScript expectations
+    auto executeViroAnimation = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "executeAnimation"),
+        PropNameID::forAscii(runtime, "executeViroAnimation"),
         3,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             if (count < 3) return Value::undefined();
@@ -465,50 +478,372 @@ using namespace facebook::jsi;
             return [self executeNativeAnimation:nodeId animationId:animationId options:options] ? Value(true) : Value(false);
         }
     );
-    runtime.global().setProperty(runtime, "executeAnimation", executeAnimation);
+    nativeViro.setProperty(runtime, "executeViroAnimation", executeViroAnimation);
 }
 
 #pragma mark - Memory Management Functions
 
-- (void)installMemoryManagementFunctions:(Runtime &)runtime {
-    // getMemoryStats
-    auto getMemoryStats = Function::createFromHostFunction(
+- (void)installMemoryManagementFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
+    // getViroMemoryStats - renamed to match JavaScript expectations
+    auto getViroMemoryStats = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "getMemoryStats"),
+        PropNameID::forAscii(runtime, "getViroMemoryStats"),
         0,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             NSDictionary *stats = [self.sceneManager getMemoryStats];
             return [self convertNSDictionaryToJSObject:stats runtime:runtime];
         }
     );
-    runtime.global().setProperty(runtime, "getMemoryStats", getMemoryStats);
+    nativeViro.setProperty(runtime, "getViroMemoryStats", getViroMemoryStats);
     
-    // performMemoryCleanup
-    auto performMemoryCleanup = Function::createFromHostFunction(
+    // performViroMemoryCleanup - renamed to match JavaScript expectations
+    auto performViroMemoryCleanup = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "performMemoryCleanup"),
+        PropNameID::forAscii(runtime, "performViroMemoryCleanup"),
         0,
         [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
             [self.sceneManager performMemoryCleanup];
             return Value(true);
         }
     );
-    runtime.global().setProperty(runtime, "performMemoryCleanup", performMemoryCleanup);
+    nativeViro.setProperty(runtime, "performViroMemoryCleanup", performViroMemoryCleanup);
 }
 
 #pragma mark - Utility Functions
 
-- (void)installUtilityFunctions:(Runtime &)runtime {
-    // isJSIAvailable
-    auto isJSIAvailable = Function::createFromHostFunction(
+- (void)installUtilityFunctions:(Runtime &)runtime nativeViro:(Object &)nativeViro {
+    // initialize - initialize Viro with optional configuration
+    auto initialize = Function::createFromHostFunction(
         runtime,
-        PropNameID::forAscii(runtime, "isJSIAvailable"),
-        0,
-        [](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
-            return Value(true);
+        PropNameID::forAscii(runtime, "initialize"),
+        1,  // Optional config parameter
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            // Parse configuration options (optional)
+            bool debug = false;
+            bool arEnabled = false;
+            std::string worldAlignment = "Gravity";
+            
+            if (count > 0 && arguments[0].isObject()) {
+                auto config = arguments[0].getObject(runtime);
+                
+                if (config.hasProperty(runtime, "debug")) {
+                    debug = config.getProperty(runtime, "debug").getBool();
+                }
+                if (config.hasProperty(runtime, "arEnabled")) {
+                    arEnabled = config.getProperty(runtime, "arEnabled").getBool();
+                }
+                if (config.hasProperty(runtime, "worldAlignment")) {
+                    worldAlignment = config.getProperty(runtime, "worldAlignment").getString(runtime).utf8(runtime);
+                }
+            }
+            
+            // Apply initialization with configuration if scene manager is available
+            if (self.sceneManager) {
+                NSDictionary *configDict = @{
+                    @"debug": @(debug),
+                    @"arEnabled": @(arEnabled),
+                    @"worldAlignment": [NSString stringWithUTF8String:worldAlignment.c_str()]
+                };
+                
+                [self.sceneManager initializeWithConfig:configDict];
+                RCTLogInfo(@"[ViroFabricJSI] Viro initialized with config: debug=%@, arEnabled=%@, worldAlignment=%@", 
+                          @(debug), @(arEnabled), [NSString stringWithUTF8String:worldAlignment.c_str()]);
+            } else {
+                RCTLogInfo(@"[ViroFabricJSI] Viro initialization called (scene manager not available)");
+            }
+            
+            // Return a resolved promise
+            auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+            auto resolveMethod = promiseConstructor.getPropertyAsFunction(runtime, "resolve");
+            return resolveMethod.callWithThis(runtime, promiseConstructor, Value(true));
         }
     );
-    runtime.global().setProperty(runtime, "isJSIAvailable", isJSIAvailable);
+    nativeViro.setProperty(runtime, "initialize", initialize);
+    
+    // setViroARPlaneDetection - configure AR plane detection
+    auto setViroARPlaneDetection = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "setViroARPlaneDetection"),
+        1,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 1) return Value::undefined();
+            
+            if (!arguments[0].isObject()) {
+                RCTLogWarn(@"[ViroFabricJSI] setViroARPlaneDetection requires an object parameter");
+                return Value(false);
+            }
+            
+            auto config = arguments[0].getObject(runtime);
+            
+            // Parse configuration options
+            bool enabled = true;
+            bool horizontal = true;
+            bool vertical = false;
+            std::string alignment = "Gravity";
+            
+            if (config.hasProperty(runtime, "enabled")) {
+                enabled = config.getProperty(runtime, "enabled").getBool();
+            }
+            if (config.hasProperty(runtime, "horizontal")) {
+                horizontal = config.getProperty(runtime, "horizontal").getBool();
+            }
+            if (config.hasProperty(runtime, "vertical")) {
+                vertical = config.getProperty(runtime, "vertical").getBool();
+            }
+            if (config.hasProperty(runtime, "alignment")) {
+                alignment = config.getProperty(runtime, "alignment").getString(runtime).utf8(runtime);
+            }
+            
+            // Call the scene manager to configure AR plane detection
+            if (self.sceneManager) {
+                NSDictionary *configDict = @{
+                    @"enabled": @(enabled),
+                    @"horizontal": @(horizontal),
+                    @"vertical": @(vertical),
+                    @"alignment": [NSString stringWithUTF8String:alignment.c_str()]
+                };
+                
+                [self.sceneManager configureARPlaneDetection:configDict];
+                RCTLogInfo(@"[ViroFabricJSI] AR plane detection configured: enabled=%@, horizontal=%@, vertical=%@, alignment=%@", 
+                          @(enabled), @(horizontal), @(vertical), [NSString stringWithUTF8String:alignment.c_str()]);
+                return Value(true);
+            } else {
+                RCTLogWarn(@"[ViroFabricJSI] Scene manager not available for AR plane detection");
+                return Value(false);
+            }
+        }
+    );
+    nativeViro.setProperty(runtime, "setViroARPlaneDetection", setViroARPlaneDetection);
+    
+    // setViroARImageTargets - configure AR image targets
+    auto setViroARImageTargets = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "setViroARImageTargets"),
+        1,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 1) return Value::undefined();
+            
+            if (!arguments[0].isObject()) {
+                RCTLogWarn(@"[ViroFabricJSI] setViroARImageTargets requires an object parameter");
+                return Value(false);
+            }
+            
+            auto targets = arguments[0].getObject(runtime);
+            
+            // Convert JSI object to NSDictionary
+            NSMutableDictionary *targetDict = [NSMutableDictionary dictionary];
+            
+            auto propertyNames = targets.getPropertyNames(runtime);
+            for (size_t i = 0; i < propertyNames.size(runtime); i++) {
+                auto propName = propertyNames.getValueAtIndex(runtime, i).getString(runtime);
+                auto propValue = targets.getProperty(runtime, propName);
+                
+                NSString *key = [NSString stringWithUTF8String:propName.utf8(runtime).c_str()];
+                
+                if (propValue.isObject()) {
+                    auto targetObj = propValue.getObject(runtime);
+                    NSMutableDictionary *targetInfo = [NSMutableDictionary dictionary];
+                    
+                    // Extract common AR image target properties
+                    if (targetObj.hasProperty(runtime, "source")) {
+                        auto source = targetObj.getProperty(runtime, "source");
+                        if (source.isString()) {
+                            targetInfo[@"source"] = [NSString stringWithUTF8String:source.getString(runtime).utf8(runtime).c_str()];
+                        }
+                    }
+                    if (targetObj.hasProperty(runtime, "orientation")) {
+                        auto orientation = targetObj.getProperty(runtime, "orientation");
+                        if (orientation.isString()) {
+                            targetInfo[@"orientation"] = [NSString stringWithUTF8String:orientation.getString(runtime).utf8(runtime).c_str()];
+                        }
+                    }
+                    if (targetObj.hasProperty(runtime, "physicalWidth")) {
+                        auto physicalWidth = targetObj.getProperty(runtime, "physicalWidth");
+                        if (physicalWidth.isNumber()) {
+                            targetInfo[@"physicalWidth"] = @(physicalWidth.getNumber());
+                        }
+                    }
+                    
+                    targetDict[key] = targetInfo;
+                }
+            }
+            
+            // Call the scene manager to configure AR image targets
+            if (self.sceneManager) {
+                [self.sceneManager configureARImageTargets:targetDict];
+                RCTLogInfo(@"[ViroFabricJSI] AR image targets configured with %lu targets", (unsigned long)targetDict.count);
+                return Value(true);
+            } else {
+                RCTLogWarn(@"[ViroFabricJSI] Scene manager not available for AR image targets");
+                return Value(false);
+            }
+        }
+    );
+    nativeViro.setProperty(runtime, "setViroARImageTargets", setViroARImageTargets);
+    
+    // AR Utility Functions
+    // recenterTracking - recenter AR tracking for a given node
+    auto recenterTracking = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "recenterTracking"),
+        1,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 1) return Value::undefined();
+            
+            NSString *nodeId = [NSString stringWithUTF8String:arguments[0].getString(runtime).utf8(runtime).c_str()];
+            
+            // Call the scene manager to recenter tracking
+            if (self.sceneManager) {
+                [self.sceneManager recenterTrackingForNode:nodeId];
+                RCTLogInfo(@"[ViroFabricJSI] Recentered tracking for node: %@", nodeId);
+            } else {
+                RCTLogWarn(@"[ViroFabricJSI] Scene manager not available for recenterTracking");
+            }
+            
+            return Value::undefined();
+        }
+    );
+    nativeViro.setProperty(runtime, "recenterTracking", recenterTracking);
+    
+    // project - convert 3D world coordinates to 2D screen coordinates
+    auto project = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "project"),
+        2,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 2) {
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                auto rejectMethod = promiseConstructor.getPropertyAsFunction(runtime, "reject");
+                auto error = Object(runtime);
+                error.setProperty(runtime, "message", String::createFromUtf8(runtime, "project requires 2 arguments: nodeId and point"));
+                return rejectMethod.callWithThis(runtime, promiseConstructor, error);
+            }
+            
+            NSString *nodeId = [NSString stringWithUTF8String:arguments[0].getString(runtime).utf8(runtime).c_str()];
+            
+            // Parse the 3D point array
+            auto pointArray = arguments[1].getObject(runtime).getArray(runtime);
+            if (pointArray.size(runtime) < 3) {
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                auto rejectMethod = promiseConstructor.getPropertyAsFunction(runtime, "reject");
+                auto error = Object(runtime);
+                error.setProperty(runtime, "message", String::createFromUtf8(runtime, "point must be a 3-element array [x, y, z]"));
+                return rejectMethod.callWithThis(runtime, promiseConstructor, error);
+            }
+            
+            float x = pointArray.getValueAtIndex(runtime, 0).getNumber();
+            float y = pointArray.getValueAtIndex(runtime, 1).getNumber();
+            float z = pointArray.getValueAtIndex(runtime, 2).getNumber();
+            
+            // Call the scene manager to project the point
+            if (self.sceneManager) {
+                [self.sceneManager projectPoint:@[@(x), @(y), @(z)] 
+                                         forNode:nodeId 
+                                      completion:^(NSArray *screenPoint) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        // Create a resolved promise with the screen coordinates
+                        auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                        auto resolveMethod = promiseConstructor.getPropertyAsFunction(runtime, "resolve");
+                        
+                        auto resultArray = Array(runtime, 3);
+                        resultArray.setValueAtIndex(runtime, 0, Value([screenPoint[0] doubleValue]));
+                        resultArray.setValueAtIndex(runtime, 1, Value([screenPoint[1] doubleValue]));
+                        resultArray.setValueAtIndex(runtime, 2, Value([screenPoint[2] doubleValue]));
+                        
+                        resolveMethod.callWithThis(runtime, promiseConstructor, resultArray);
+                    });
+                }];
+                
+                // Return a pending promise (will be resolved in the completion block)
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                return promiseConstructor.callAsConstructor(runtime, 
+                    Function::createFromHostFunction(runtime, PropNameID::forAscii(runtime, ""), 2,
+                        [](Runtime &rt, const Value &thisVal, const Value *args, size_t count) -> Value {
+                            // This executor will be called, but we handle resolution in the completion block
+                            return Value::undefined();
+                        }
+                    )
+                );
+            } else {
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                auto rejectMethod = promiseConstructor.getPropertyAsFunction(runtime, "reject");
+                auto error = Object(runtime);
+                error.setProperty(runtime, "message", String::createFromUtf8(runtime, "Scene manager not available"));
+                return rejectMethod.callWithThis(runtime, promiseConstructor, error);
+            }
+        }
+    );
+    nativeViro.setProperty(runtime, "project", project);
+    
+    // unproject - convert 2D screen coordinates to 3D world coordinates
+    auto unproject = Function::createFromHostFunction(
+        runtime,
+        PropNameID::forAscii(runtime, "unproject"),
+        2,
+        [self](Runtime &runtime, const Value &thisValue, const Value *arguments, size_t count) -> Value {
+            if (count < 2) {
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                auto rejectMethod = promiseConstructor.getPropertyAsFunction(runtime, "reject");
+                auto error = Object(runtime);
+                error.setProperty(runtime, "message", String::createFromUtf8(runtime, "unproject requires 2 arguments: nodeId and point"));
+                return rejectMethod.callWithThis(runtime, promiseConstructor, error);
+            }
+            
+            NSString *nodeId = [NSString stringWithUTF8String:arguments[0].getString(runtime).utf8(runtime).c_str()];
+            
+            // Parse the 2D/3D point array
+            auto pointArray = arguments[1].getObject(runtime).getArray(runtime);
+            if (pointArray.size(runtime) < 2) {
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                auto rejectMethod = promiseConstructor.getPropertyAsFunction(runtime, "reject");
+                auto error = Object(runtime);
+                error.setProperty(runtime, "message", String::createFromUtf8(runtime, "point must be at least a 2-element array [x, y] or [x, y, z]"));
+                return rejectMethod.callWithThis(runtime, promiseConstructor, error);
+            }
+            
+            float x = pointArray.getValueAtIndex(runtime, 0).getNumber();
+            float y = pointArray.getValueAtIndex(runtime, 1).getNumber();
+            float z = pointArray.size(runtime) > 2 ? pointArray.getValueAtIndex(runtime, 2).getNumber() : 0.0f;
+            
+            // Call the scene manager to unproject the point
+            if (self.sceneManager) {
+                [self.sceneManager unprojectPoint:@[@(x), @(y), @(z)] 
+                                           forNode:nodeId 
+                                        completion:^(NSArray *worldPoint) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        // Create a resolved promise with the world coordinates
+                        auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                        auto resolveMethod = promiseConstructor.getPropertyAsFunction(runtime, "resolve");
+                        
+                        auto resultArray = Array(runtime, 3);
+                        resultArray.setValueAtIndex(runtime, 0, Value([worldPoint[0] doubleValue]));
+                        resultArray.setValueAtIndex(runtime, 1, Value([worldPoint[1] doubleValue]));
+                        resultArray.setValueAtIndex(runtime, 2, Value([worldPoint[2] doubleValue]));
+                        
+                        resolveMethod.callWithThis(runtime, promiseConstructor, resultArray);
+                    });
+                }];
+                
+                // Return a pending promise (will be resolved in the completion block)
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                return promiseConstructor.callAsConstructor(runtime, 
+                    Function::createFromHostFunction(runtime, PropNameID::forAscii(runtime, ""), 2,
+                        [](Runtime &rt, const Value &thisVal, const Value *args, size_t count) -> Value {
+                            // This executor will be called, but we handle resolution in the completion block
+                            return Value::undefined();
+                        }
+                    )
+                );
+            } else {
+                auto promiseConstructor = runtime.global().getPropertyAsObject(runtime, "Promise");
+                auto rejectMethod = promiseConstructor.getPropertyAsFunction(runtime, "reject");
+                auto error = Object(runtime);
+                error.setProperty(runtime, "message", String::createFromUtf8(runtime, "Scene manager not available"));
+                return rejectMethod.callWithThis(runtime, promiseConstructor, error);
+            }
+        }
+    );
+    nativeViro.setProperty(runtime, "unproject", unproject);
 }
 
 #pragma mark - Native Implementation Methods
@@ -743,18 +1078,32 @@ using namespace facebook::jsi;
     Function *callback = (Function *)[callbackValue pointerValue];
     if (!callback) return;
     
-    // Execute callback on JavaScript thread
-    dispatch_async(dispatch_get_main_queue(), ^{
-        @try {
-            Runtime *runtime = &self.bridge.jsCallInvoker->getRuntime();
-            if (runtime) {
-                Object eventObj = [self convertNSDictionaryToJSObject:eventData runtime:*runtime];
-                callback->call(*runtime, eventObj);
+    // Use ViroEventsTurboModule for proper event emission in React Native 0.76+
+    // This provides New Architecture-compatible event handling
+    
+    @try {
+        ViroEventsTurboModule *eventModule = [ViroEventsTurboModule sharedInstance];
+        
+        if ([eventModule isEventSystemReady]) {
+            // Emit the JSI callback through the TurboModule
+            [eventModule emitJSICallback:callbackId eventData:eventData];
+            
+            RCTLogInfo(@"[ViroFabricJSI] Event callback emitted via TurboModule: %@", callbackId);
+        } else {
+            // Fallback to logging if no listeners are active
+            RCTLogWarn(@"[ViroFabricJSI] No active listeners, logging event callback: %@", callbackId);
+            
+            if (eventData && eventData.count > 0) {
+                RCTLogInfo(@"[ViroFabricJSI] Event data: %@", eventData);
             }
-        } @catch (NSException *exception) {
-            RCTLogError(@"[ViroFabricJSI] Error triggering event callback %@: %@", callbackId, exception.reason);
         }
-    });
+        
+    } @catch (NSException *exception) {
+        RCTLogError(@"[ViroFabricJSI] Error emitting event callback %@: %@", callbackId, exception.reason);
+        
+        // Fallback to logging on error
+        RCTLogInfo(@"[ViroFabricJSI] Fallback logging for callback: %@ with data: %@", callbackId, eventData);
+    }
 }
 
 - (Class)getNodeClassForType:(NSString *)nodeType {

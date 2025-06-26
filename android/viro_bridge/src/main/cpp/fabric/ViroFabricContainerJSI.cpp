@@ -209,8 +209,8 @@ private:
                     javaPart_->getClass()->getMethod<void(jstring, jstring)>("addChild");
                 addChildMethod(
                     javaPart_.get(),
-                    jni::make_jstring(childId).get(),
-                    jni::make_jstring(parentId).get());
+                    jni::make_jstring(parentId).get(),
+                    jni::make_jstring(childId).get());
                 
                 return jsi::Value::undefined();
             }
@@ -233,8 +233,8 @@ private:
                     javaPart_->getClass()->getMethod<void(jstring, jstring)>("removeChild");
                 removeChildMethod(
                     javaPart_.get(),
-                    jni::make_jstring(childId).get(),
-                    jni::make_jstring(parentId).get());
+                    jni::make_jstring(parentId).get(),
+                    jni::make_jstring(childId).get());
                 
                 return jsi::Value::undefined();
             }
@@ -259,9 +259,9 @@ private:
                     javaPart_->getClass()->getMethod<void(jstring, jstring, jstring)>("registerEventCallback");
                 registerEventCallbackMethod(
                     javaPart_.get(),
-                    jni::make_jstring(callbackId).get(),
+                    jni::make_jstring(nodeId).get(),
                     jni::make_jstring(eventName).get(),
-                    jni::make_jstring(nodeId).get());
+                    jni::make_jstring(callbackId).get());
                 
                 return jsi::Value::undefined();
             }
@@ -285,9 +285,9 @@ private:
                     javaPart_->getClass()->getMethod<void(jstring, jstring, jstring)>("unregisterEventCallback");
                 unregisterEventCallbackMethod(
                     javaPart_.get(),
-                    jni::make_jstring(callbackId).get(),
+                    jni::make_jstring(nodeId).get(),
                     jni::make_jstring(eventName).get(),
-                    jni::make_jstring(nodeId).get());
+                    jni::make_jstring(callbackId).get());
                 
                 return jsi::Value::undefined();
             }
@@ -333,6 +333,161 @@ private:
                 auto promise = resolveMethod.callWithThis(rt, promiseConstructor, jsi::Value(true));
                 
                 return promise;
+            }
+        ));
+        
+        // Scene management functions
+        nativeViro.setProperty(runtime, "createViroScene", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "createViroScene"),
+            3,  // sceneId, sceneType, props
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 3) {
+                    throw jsi::JSError(rt, "createViroScene requires 3 arguments");
+                }
+                
+                auto sceneId = args[0].getString(rt).utf8(rt);
+                auto sceneType = args[1].getString(rt).utf8(rt);
+                auto propsValue = args[2];
+                auto propsMap = convertJSIValueToReadableMap(rt, propsValue);
+                
+                // Call the Java method
+                static const auto createSceneMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, jstring, ReadableNativeMap::javaobject)>("createScene");
+                createSceneMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(sceneId).get(),
+                    jni::make_jstring(sceneType).get(),
+                    propsMap.get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "activateViroScene", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "activateViroScene"),
+            1,  // sceneId
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    throw jsi::JSError(rt, "activateViroScene requires 1 argument");
+                }
+                
+                auto sceneId = args[0].getString(rt).utf8(rt);
+                
+                // Call the Java method
+                static const auto activateSceneMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring)>("activateScene");
+                activateSceneMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(sceneId).get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "deactivateViroScene", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "deactivateViroScene"),
+            1,  // sceneId
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    throw jsi::JSError(rt, "deactivateViroScene requires 1 argument");
+                }
+                
+                auto sceneId = args[0].getString(rt).utf8(rt);
+                
+                // Call the Java method
+                static const auto deactivateSceneMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring)>("deactivateScene");
+                deactivateSceneMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(sceneId).get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "destroyViroScene", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "destroyViroScene"),
+            1,  // sceneId
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    throw jsi::JSError(rt, "destroyViroScene requires 1 argument");
+                }
+                
+                auto sceneId = args[0].getString(rt).utf8(rt);
+                
+                // Call the Java method
+                static const auto destroySceneMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring)>("destroyScene");
+                destroySceneMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(sceneId).get());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "getViroSceneState", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "getViroSceneState"),
+            1,  // sceneId
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    return jsi::Value::null();
+                }
+                
+                auto sceneId = args[0].getString(rt).utf8(rt);
+                
+                // Call the Java method
+                static const auto getSceneStateMethod = 
+                    javaPart_->getClass()->getMethod<jstring(jstring)>("getSceneState");
+                auto state = getSceneStateMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(sceneId).get());
+                
+                if (state) {
+                    std::string stateStr = state->toStdString();
+                    return jsi::String::createFromUtf8(rt, stateStr);
+                }
+                
+                return jsi::Value::null();
+            }
+        ));
+        
+        // Memory management functions
+        nativeViro.setProperty(runtime, "getViroMemoryStats", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "getViroMemoryStats"),
+            0,  // no arguments
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                // Call the Java method
+                static const auto getMemoryStatsMethod = 
+                    javaPart_->getClass()->getMethod<ReadableNativeMap::javaobject()>("getMemoryStats");
+                auto stats = getMemoryStatsMethod(javaPart_.get());
+                
+                if (stats) {
+                    // Convert ReadableMap to JSI Object
+                    return convertReadableMapToJSIValue(rt, stats);
+                }
+                
+                return jsi::Object(rt);
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "performViroMemoryCleanup", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "performViroMemoryCleanup"),
+            0,  // no arguments
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                // Call the Java method
+                static const auto performMemoryCleanupMethod = 
+                    javaPart_->getClass()->getMethod<void()>("performMemoryCleanup");
+                performMemoryCleanupMethod(javaPart_.get());
+                
+                return jsi::Value::undefined();
             }
         ));
         
@@ -487,6 +642,147 @@ private:
             }
         ));
         
+        // AR Utility Functions
+        nativeViro.setProperty(runtime, "recenterTracking", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "recenterTracking"),
+            1,  // nodeId
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 1) {
+                    return jsi::Value::undefined();
+                }
+                
+                auto nodeId = args[0].getString(rt).utf8(rt);
+                
+                // Call the Java method
+                static const auto recenterTrackingMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring)>("recenterTracking");
+                recenterTrackingMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(nodeId).get());
+                
+                __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Recentered tracking for node: %s", nodeId.c_str());
+                
+                return jsi::Value::undefined();
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "project", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "project"),
+            2,  // nodeId, point
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 2) {
+                    auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                    auto rejectMethod = promiseConstructor.getPropertyAsFunction(rt, "reject");
+                    auto error = jsi::Object(rt);
+                    error.setProperty(rt, "message", jsi::String::createFromUtf8(rt, "project requires 2 arguments: nodeId and point"));
+                    return rejectMethod.callWithThis(rt, promiseConstructor, error);
+                }
+                
+                auto nodeId = args[0].getString(rt).utf8(rt);
+                
+                // Parse the 3D point array
+                if (!args[1].isObject() || !args[1].getObject(rt).isArray(rt)) {
+                    auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                    auto rejectMethod = promiseConstructor.getPropertyAsFunction(rt, "reject");
+                    auto error = jsi::Object(rt);
+                    error.setProperty(rt, "message", jsi::String::createFromUtf8(rt, "point must be a 3-element array [x, y, z]"));
+                    return rejectMethod.callWithThis(rt, promiseConstructor, error);
+                }
+                
+                auto pointArray = args[1].getObject(rt).getArray(rt);
+                if (pointArray.size(rt) < 3) {
+                    auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                    auto rejectMethod = promiseConstructor.getPropertyAsFunction(rt, "reject");
+                    auto error = jsi::Object(rt);
+                    error.setProperty(rt, "message", jsi::String::createFromUtf8(rt, "point must be a 3-element array [x, y, z]"));
+                    return rejectMethod.callWithThis(rt, promiseConstructor, error);
+                }
+                
+                float x = pointArray.getValueAtIndex(rt, 0).getNumber();
+                float y = pointArray.getValueAtIndex(rt, 1).getNumber();
+                float z = pointArray.getValueAtIndex(rt, 2).getNumber();
+                
+                // Call the Java method (which will handle the async promise resolution)
+                static const auto projectPointMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, jfloat, jfloat, jfloat)>("projectPoint");
+                projectPointMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(nodeId).get(),
+                    x, y, z);
+                
+                // Return a resolved promise with placeholder coordinates for now
+                // The actual implementation would need to handle async callbacks
+                auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                auto resolveMethod = promiseConstructor.getPropertyAsFunction(rt, "resolve");
+                auto resultArray = jsi::Array(rt, 3);
+                resultArray.setValueAtIndex(rt, 0, jsi::Value(0.0)); // placeholder
+                resultArray.setValueAtIndex(rt, 1, jsi::Value(0.0)); // placeholder
+                resultArray.setValueAtIndex(rt, 2, jsi::Value(0.0)); // placeholder
+                
+                return resolveMethod.callWithThis(rt, promiseConstructor, resultArray);
+            }
+        ));
+        
+        nativeViro.setProperty(runtime, "unproject", jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "unproject"),
+            2,  // nodeId, point
+            [this](jsi::Runtime& rt, const jsi::Value& thisValue, const jsi::Value* args, size_t count) -> jsi::Value {
+                if (count < 2) {
+                    auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                    auto rejectMethod = promiseConstructor.getPropertyAsFunction(rt, "reject");
+                    auto error = jsi::Object(rt);
+                    error.setProperty(rt, "message", jsi::String::createFromUtf8(rt, "unproject requires 2 arguments: nodeId and point"));
+                    return rejectMethod.callWithThis(rt, promiseConstructor, error);
+                }
+                
+                auto nodeId = args[0].getString(rt).utf8(rt);
+                
+                // Parse the 2D/3D point array
+                if (!args[1].isObject() || !args[1].getObject(rt).isArray(rt)) {
+                    auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                    auto rejectMethod = promiseConstructor.getPropertyAsFunction(rt, "reject");
+                    auto error = jsi::Object(rt);
+                    error.setProperty(rt, "message", jsi::String::createFromUtf8(rt, "point must be at least a 2-element array [x, y] or [x, y, z]"));
+                    return rejectMethod.callWithThis(rt, promiseConstructor, error);
+                }
+                
+                auto pointArray = args[1].getObject(rt).getArray(rt);
+                if (pointArray.size(rt) < 2) {
+                    auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                    auto rejectMethod = promiseConstructor.getPropertyAsFunction(rt, "reject");
+                    auto error = jsi::Object(rt);
+                    error.setProperty(rt, "message", jsi::String::createFromUtf8(rt, "point must be at least a 2-element array [x, y] or [x, y, z]"));
+                    return rejectMethod.callWithThis(rt, promiseConstructor, error);
+                }
+                
+                float x = pointArray.getValueAtIndex(rt, 0).getNumber();
+                float y = pointArray.getValueAtIndex(rt, 1).getNumber();
+                float z = pointArray.size(rt) > 2 ? pointArray.getValueAtIndex(rt, 2).getNumber() : 0.0f;
+                
+                // Call the Java method (which will handle the async promise resolution)
+                static const auto unprojectPointMethod = 
+                    javaPart_->getClass()->getMethod<void(jstring, jfloat, jfloat, jfloat)>("unprojectPoint");
+                unprojectPointMethod(
+                    javaPart_.get(),
+                    jni::make_jstring(nodeId).get(),
+                    x, y, z);
+                
+                // Return a resolved promise with placeholder coordinates for now
+                // The actual implementation would need to handle async callbacks
+                auto promiseConstructor = rt.global().getPropertyAsObject(rt, "Promise");
+                auto resolveMethod = promiseConstructor.getPropertyAsFunction(rt, "resolve");
+                auto resultArray = jsi::Array(rt, 3);
+                resultArray.setValueAtIndex(rt, 0, jsi::Value(0.0)); // placeholder
+                resultArray.setValueAtIndex(rt, 1, jsi::Value(0.0)); // placeholder
+                resultArray.setValueAtIndex(rt, 2, jsi::Value(0.0)); // placeholder
+                
+                return resolveMethod.callWithThis(rt, promiseConstructor, resultArray);
+            }
+        ));
+        
         // Attach the NativeViro object to the global object
         runtime.global().setProperty(runtime, "NativeViro", std::move(nativeViro));
         
@@ -538,49 +834,53 @@ private:
         auto obj = value.getObject(runtime);
         return ReadableNativeMap::createWithContents(runtime, std::move(obj));
     }
-
-    // Method to dispatch events to JavaScript
-    void dispatchEventToJS(jni::alias_ref<jstring> callbackId, jni::alias_ref<ReadableNativeMap::javaobject> data) {
-        if (!runtime_ || !jsCallInvoker_) {
-            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Cannot dispatch event: runtime or call invoker is null");
-            return;
+    
+    // Helper method to convert ReadableMap to JSI value
+    jsi::Value convertReadableMapToJSIValue(jsi::Runtime& runtime, jni::local_ref<ReadableNativeMap::javaobject> map) {
+        if (!map) {
+            return jsi::Object(runtime);
         }
         
+        // Convert ReadableMap to JSI Object
+        return ReadableNativeMap::convertToValue(runtime, map);
+    }
+
+    // Method to dispatch events to JavaScript using TurboModule
+    void dispatchEventToJS(jni::alias_ref<jstring> callbackId, jni::alias_ref<ReadableNativeMap::javaobject> data) {
         std::string callbackIdStr = callbackId->toStdString();
         
-        // Convert ReadableMap to JSI value
-        auto dataMap = data->cthis()->consume();
-        
-        // Use the jsCallInvoker to ensure we're on the JS thread
-        jsCallInvoker_->invokeAsync([this, callbackIdStr, dataMap = std::move(dataMap)]() {
-            if (!runtime_) return;
+        try {
+            // Get the ViroEventsTurboModule instance
+            auto turboModuleClass = jni::findClassLocal("com/viromedia/bridge/fabric/ViroEventsTurboModule");
+            auto getInstanceMethod = turboModuleClass->getStaticMethod<jobject()>("getInstance");
+            auto turboModuleInstance = getInstanceMethod(turboModuleClass);
             
-            auto& rt = *runtime_;
-            
-            try {
-                // Find the callback in the global registry
-                auto callbackRegistry = rt.global().getProperty(rt, "eventCallbacks");
-                if (!callbackRegistry.isObject()) {
-                    return;
+            if (turboModuleInstance != nullptr) {
+                // Check if the event system is ready
+                auto isReadyMethod = turboModuleClass->getMethod<jboolean()>("isEventSystemReady");
+                bool isReady = isReadyMethod(turboModuleInstance);
+                
+                if (isReady) {
+                    // Emit the JSI callback through the TurboModule
+                    auto emitCallbackMethod = turboModuleClass->getMethod<void(jstring, ReadableNativeMap::javaobject)>("emitJSICallbackInternal");
+                    emitCallbackMethod(turboModuleInstance, callbackId, data);
+                    
+                    __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Event callback emitted via TurboModule: %s", callbackIdStr.c_str());
+                } else {
+                    // Fallback to logging if no listeners are active
+                    __android_log_print(ANDROID_LOG_WARN, "ViroFabricJSI", "No active listeners, logging event callback: %s", callbackIdStr.c_str());
                 }
-                
-                auto callbackRegistryObj = callbackRegistry.getObject(rt);
-                auto callback = callbackRegistryObj.getProperty(rt, callbackIdStr.c_str());
-                
-                if (!callback.isObject() || !callback.getObject(rt).isFunction(rt)) {
-                    return;
-                }
-                
-                // Convert the data map to a JSI object
-                auto eventData = jsi::valueFromDynamic(rt, dataMap);
-                
-                // Call the callback with the event
-                auto callbackFunc = callback.getObject(rt).getFunction(rt);
-                callbackFunc.call(rt, eventData);
-            } catch (const std::exception& e) {
-                __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Error dispatching event: %s", e.what());
+            } else {
+                // Fallback to logging if TurboModule is not available
+                __android_log_print(ANDROID_LOG_WARN, "ViroFabricJSI", "TurboModule not available, logging event callback: %s", callbackIdStr.c_str());
             }
-        });
+            
+        } catch (const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "ViroFabricJSI", "Error emitting event callback %s: %s", callbackIdStr.c_str(), e.what());
+            
+            // Final fallback to logging
+            __android_log_print(ANDROID_LOG_INFO, "ViroFabricJSI", "Fallback logging for callback: %s", callbackIdStr.c_str());
+        }
     }
 
     jni::global_ref<ViroFabricContainerJSI::javaobject> javaPart_;

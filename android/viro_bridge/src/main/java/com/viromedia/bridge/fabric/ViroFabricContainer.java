@@ -872,6 +872,123 @@ public class ViroFabricContainer extends FrameLayout implements ViroFabricSceneM
         }
     }
 
+    // ======================== Scene Management Methods ========================
+    
+    /**
+     * Create a scene with the scene manager.
+     */
+    @DoNotStrip
+    public void createScene(String sceneId, String sceneType, ReadableMap props) {
+        Log.d(TAG, "Creating scene: " + sceneId + " of type: " + sceneType);
+        
+        if (mSceneManager != null) {
+            mSceneManager.createScene(sceneId, sceneType, props);
+        } else {
+            Log.e(TAG, "Scene manager not available");
+        }
+    }
+    
+    /**
+     * Activate a scene.
+     */
+    @DoNotStrip
+    public void activateScene(String sceneId) {
+        Log.d(TAG, "Activating scene: " + sceneId);
+        
+        if (mSceneManager != null) {
+            mSceneManager.activateScene(sceneId);
+        } else {
+            Log.e(TAG, "Scene manager not available");
+        }
+    }
+    
+    /**
+     * Deactivate a scene.
+     */
+    @DoNotStrip
+    public void deactivateScene(String sceneId) {
+        Log.d(TAG, "Deactivating scene: " + sceneId);
+        
+        if (mSceneManager != null) {
+            mSceneManager.deactivateScene(sceneId);
+        } else {
+            Log.e(TAG, "Scene manager not available");
+        }
+    }
+    
+    /**
+     * Destroy a scene.
+     */
+    @DoNotStrip
+    public void destroyScene(String sceneId) {
+        Log.d(TAG, "Destroying scene: " + sceneId);
+        
+        if (mSceneManager != null) {
+            mSceneManager.destroyScene(sceneId);
+        } else {
+            Log.e(TAG, "Scene manager not available");
+        }
+    }
+    
+    /**
+     * Get the state of a scene.
+     */
+    @DoNotStrip
+    public String getSceneState(String sceneId) {
+        if (mSceneManager != null) {
+            ViroFabricSceneManager.SceneState state = mSceneManager.getSceneState(sceneId);
+            if (state != null) {
+                switch (state) {
+                    case CREATED:
+                        return "created";
+                    case LOADING:
+                        return "loading";
+                    case LOADED:
+                        return "loaded";
+                    case ACTIVE:
+                        return "active";
+                    case PAUSED:
+                        return "paused";
+                    case DESTROYED:
+                        return "destroyed";
+                    default:
+                        return "unknown";
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Get memory statistics.
+     */
+    @DoNotStrip
+    public WritableMap getMemoryStats() {
+        if (mSceneManager != null) {
+            return mSceneManager.getMemoryStats();
+        } else {
+            WritableMap stats = Arguments.createMap();
+            stats.putString("error", "Scene manager not available");
+            return stats;
+        }
+    }
+    
+    /**
+     * Perform memory cleanup.
+     */
+    @DoNotStrip
+    public void performMemoryCleanup() {
+        Log.d(TAG, "Performing memory cleanup");
+        
+        if (mSceneManager != null) {
+            mSceneManager.performMemoryCleanup();
+        } else {
+            Log.w(TAG, "Scene manager not available for memory cleanup");
+        }
+    }
+    
+    // ======================== AR Configuration Methods ========================
+    
     /**
      * Set AR plane detection configuration.
      */

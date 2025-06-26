@@ -101,3 +101,7 @@ export {
 
 // Also export the original names for backward compatibility
 export { executeAnimation, updateMaterial } from "./NativeViro";
+
+// Export event management utilities
+export { default as ViroEventsManager } from "./ViroEventsManager";
+export type { Spec as ViroEventsTurboModuleSpec } from "./specs/ViroEventsTurboModule";

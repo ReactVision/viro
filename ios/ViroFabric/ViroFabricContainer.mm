@@ -231,14 +231,56 @@ public:
         return;
     }
     
-    // Minimalist approach - don't try to get direct JSI access
-    RCTLogInfo(@"Using event emitter approach for communication with JavaScript");
+    // Install JSI bindings for direct JavaScript communication
+    if (_jsiBridge) {
+        // Get the JSI runtime from the bridge
+        RCTBridge *internalBridge = [cxxBridge valueForKey:@"_parentBridge"];
+        if (!internalBridge) {
+            internalBridge = cxxBridge;
+        }
+        
+        // Try to get runtime executor
+        if ([internalBridge respondsToSelector:@selector(jsCallInvoker)]) {
+            auto callInvoker = [internalBridge performSelector:@selector(jsCallInvoker)];
+            if (callInvoker) {
+                // Install JSI functions on the next tick
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self installJSIFunctionsWithRuntime];
+                });
+            }
+        }
+    }
     
-    // Set runtime executor to nullptr - we'll use the event emitter instead
-    _runtimeExecutor = nullptr;
-    
-    // We're not using JSI directly, so we don't need to install JSI bindings
-    RCTLogInfo(@"Using event emitter for communication with JavaScript");
+    RCTLogInfo(@"JSI bindings scheduled for installation");
+}
+
+- (void)installJSIFunctionsWithRuntime {
+    @try {
+        // In React Native 0.76+, we need to use a different approach to get the JSI runtime
+        // Since direct JSI access is more restricted, we'll rely on TurboModules for most functionality
+        
+        if (_jsiBridge && _bridge) {
+            // Get the runtime from the bridge using private APIs (this is for compatibility)
+            RCTCxxBridge *cxxBridge = (RCTCxxBridge *)_bridge;
+            if ([cxxBridge respondsToSelector:@selector(runtime)]) {
+                // Try to get the runtime
+                void *runtimePtr = [cxxBridge performSelector:@selector(runtime)];
+                if (runtimePtr) {
+                    facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(runtimePtr);
+                    if (runtime) {
+                        [_jsiBridge installJSIFunctions:*runtime];
+                        RCTLogInfo(@"[ViroFabricContainer] JSI functions installed successfully");
+                        return;
+                    }
+                }
+            }
+        }
+        
+        RCTLogWarn(@"[ViroFabricContainer] Could not install JSI functions - falling back to TurboModule approach");
+        
+    } @catch (NSException *exception) {
+        RCTLogWarn(@"[ViroFabricContainer] JSI installation failed: %@ - using TurboModule fallback", exception.reason);
+    }
 }
 
 - (void)layoutSubviews {

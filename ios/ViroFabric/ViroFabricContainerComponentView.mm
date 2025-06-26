@@ -10,6 +10,7 @@
 #import "ViroFabricContainer.h"
 
 #import <React/RCTConversions.h>
+#import <React/RCTViewComponentView.h>
 
 // Forward declarations for Fabric types
 namespace facebook {

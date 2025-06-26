@@ -221,6 +221,7 @@
 		E139A8F32E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */; };
 		E139A8F42E0B9C6A0050EC9A /* ViroFabricManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E62E0B9C6A0050EC9A /* ViroFabricManager.mm */; };
 		E139A8F52E0B9C6A0050EC9A /* ViroFabricContainerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8DD2E0B9C6A0050EC9A /* ViroFabricContainerManager.mm */; };
+		E139A9402E0BAF2D0050EC9A /* ViroEventsTurboModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A93F2E0BAF2D0050EC9A /* ViroEventsTurboModule.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1020,6 +1021,8 @@
 		E139A8E72E0B9C6A0050EC9A /* ViroFabricSceneManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViroFabricSceneManager.h; sourceTree = "<group>"; };
 		E139A8E82E0B9C6A0050EC9A /* ViroFabricSceneManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViroFabricSceneManager.mm; sourceTree = "<group>"; };
 		E139A8E92E0B9C6A0050EC9A /* VRTManagedAnimation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VRTManagedAnimation.h; sourceTree = "<group>"; };
+		E139A93E2E0BAF2D0050EC9A /* ViroEventsTurboModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViroEventsTurboModule.h; sourceTree = "<group>"; };
+		E139A93F2E0BAF2D0050EC9A /* ViroEventsTurboModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViroEventsTurboModule.mm; sourceTree = "<group>"; };
 		F76FE680D1AD7C7B52D6C9A8 /* Pods-ViroReact.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ViroReact.release.xcconfig"; path = "Pods/Target Support Files/Pods-ViroReact/Pods-ViroReact.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1474,6 +1477,8 @@
 				E139A8DD2E0B9C6A0050EC9A /* ViroFabricContainerManager.mm */,
 				E139A8DF2E0B9C6A0050EC9A /* ViroFabricEventDelegate.h */,
 				E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */,
+				E139A93E2E0BAF2D0050EC9A /* ViroEventsTurboModule.h */,
+				E139A93F2E0BAF2D0050EC9A /* ViroEventsTurboModule.mm */,
 				E139A8E12E0B9C6A0050EC9A /* ViroFabricEvents.h */,
 				E139A8E22E0B9C6A0050EC9A /* ViroFabricEvents.m */,
 				E139A8E32E0B9C6A0050EC9A /* ViroFabricJSI.h */,
@@ -2106,6 +2111,7 @@
 				E139A8F02E0B9C6A0050EC9A /* ViroFabricContainer.mm in Sources */,
 				E139A8F22E0B9C6A0050EC9A /* ViroFabricSceneManager.mm in Sources */,
 				E139A8F32E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm in Sources */,
+				E139A9402E0BAF2D0050EC9A /* ViroEventsTurboModule.mm in Sources */,
 				E139A8F42E0B9C6A0050EC9A /* ViroFabricManager.mm in Sources */,
 				E139A8F52E0B9C6A0050EC9A /* ViroFabricContainerManager.mm in Sources */,
 				8A31CFB41E2705EC00550CFE /* VRTQuad.mm in Sources */,

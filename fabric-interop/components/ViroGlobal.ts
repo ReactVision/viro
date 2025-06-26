@@ -93,7 +93,11 @@ export interface NativeViroType {
   ) => Promise<[number, number, number]>;
 
   // Initialization
-  initialize: () => Promise<boolean>;
+  initialize: (config?: {
+    debug?: boolean;
+    arEnabled?: boolean;
+    worldAlignment?: string;
+  }) => Promise<boolean>;
 }
 
 // Get the NativeViro object with type safety

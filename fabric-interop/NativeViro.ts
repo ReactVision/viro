@@ -128,10 +128,14 @@ export function unregisterEventListener(
 }
 
 // Initialize the Viro platform
-export function initializeViro(): Promise<boolean> {
+export function initializeViro(config?: {
+  debug?: boolean;
+  arEnabled?: boolean;
+  worldAlignment?: string;
+}): Promise<boolean> {
   const nativeViro = getNativeViro();
   if (nativeViro) {
-    return nativeViro.initialize();
+    return nativeViro.initialize(config);
   }
   return Promise.reject(new Error("NativeViro not available"));
 }

@@ -15,14 +15,17 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '12.0'
   
   # Base source files (always included)
-  s.source_files        = 'ViroReact/**/*.{h,m,mm}', 'ViroFabric/**/*.{h,m,mm}'
-  s.public_header_files = 'ViroReact/**/*.h', 'ViroFabric/**/*.h'
+  source_files_array = ['ViroReact/**/*.{h,m,mm}', 'ViroFabric/**/*.{h,m,mm}']
+  header_files_array = ['ViroReact/**/*.h', 'ViroFabric/**/*.h']
   
   # Include dist files if they exist (for release builds)
   if File.exist?(File.join(__dir__, 'dist/include'))
-    s.source_files += ', dist/include'
-    s.public_header_files += ', dist/include/*.h'
+    source_files_array << 'dist/include/**/*.{h,m,mm}'
+    header_files_array << 'dist/include/*.h'
   end
+  
+  s.source_files        = source_files_array
+  s.public_header_files = header_files_array
   
   if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
     s.vendored_libraries = 'dist/lib/libViroReact.a'

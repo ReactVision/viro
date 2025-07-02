@@ -3,7 +3,7 @@
   "main": "fabric-interop/dist/index.js",
   "module": "fabric-interop/dist/index.js",
   "types": "fabric-interop/dist/index.d.ts",
-  "version": "2.43.1",
+  "version": "2.43.2",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"

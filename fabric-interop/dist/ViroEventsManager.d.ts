@@ -100,3 +100,4 @@ declare class ViroEventsManager {
 }
 declare const _default: ViroEventsManager;
 export default _default;
+//# sourceMappingURL=ViroEventsManager.d.ts.map

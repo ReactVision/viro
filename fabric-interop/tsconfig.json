@@ -27,7 +27,9 @@
     "index.ts",
     "ViroFabricContainer.tsx",
     "NativeViro.ts",
+    "ViroEventsManager.ts",
     "components/**/*",
+    "specs/**/*",
     "global.d.ts"
   ],
   "exclude": [

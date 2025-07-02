@@ -13,9 +13,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const react_native_1 = require("react-native");
 const ViroEventsTurboModule_1 = __importDefault(require("./specs/ViroEventsTurboModule"));
 class ViroEventsManager {
-    eventEmitter;
-    listeners;
-    callbackRegistry;
     constructor() {
         this.eventEmitter = new react_native_1.NativeEventEmitter(ViroEventsTurboModule_1.default);
         this.listeners = new Map();
@@ -217,3 +214,4 @@ class ViroEventsManager {
 }
 // Export singleton instance
 exports.default = new ViroEventsManager();
+//# sourceMappingURL=ViroEventsManager.js.map

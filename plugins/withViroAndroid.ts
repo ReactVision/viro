@@ -196,10 +196,10 @@ const withViroProjectBuildGradle = (config: ExpoConfig) =>
     );
 
     // Ensure New Architecture is enabled
-    if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
-      newConfig.modResults.contents +=
-        "\n# ViroReact requires New Architecture\nnewArchEnabled=true\n";
-    }
+    //if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
+    //  newConfig.modResults.contents +=
+    //    "\n// ViroReact requires New Architecture\nnewArchEnabled=true\n";
+    //}
 
     newConfig.modResults.contents = newConfig.modResults.contents.replace(
       /classpath\("com.android.tools.build:gradle.*/,

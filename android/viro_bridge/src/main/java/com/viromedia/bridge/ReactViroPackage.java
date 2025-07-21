@@ -116,6 +116,11 @@ import com.viromedia.bridge.fabric.ViroPolylineViewManager;
 import com.viromedia.bridge.fabric.ViroSurfaceViewManager;
 import com.viromedia.bridge.fabric.ViroSoundFieldViewManager;
 import com.viromedia.bridge.fabric.ViroSpatialSoundViewManager;
+import com.viromedia.bridge.fabric.ViroPortalViewManager;
+import com.viromedia.bridge.fabric.ViroPortalSceneViewManager;
+import com.viromedia.bridge.fabric.ViroLightingEnvironmentViewManager;
+import com.viromedia.bridge.fabric.ViroControllerViewManager;
+import com.viromedia.bridge.fabric.ViroVRSceneNavigatorViewManager;
 
 import java.util.Arrays;
 import java.util.List;
@@ -192,6 +197,11 @@ public class ReactViroPackage implements ReactPackage {
                 new ViroSurfaceViewManager(),
                 new ViroSoundFieldViewManager(),
                 new ViroSpatialSoundViewManager(),
+                new ViroPortalViewManager(),
+                new ViroPortalSceneViewManager(),
+                new ViroLightingEnvironmentViewManager(),
+                new ViroControllerViewManager(),
+                new ViroVRSceneNavigatorViewManager(),
                 // Legacy ViewManagers
                 new VRTSceneNavigatorManager(reactContext, mViroPlatform),
                 new VRTVRSceneNavigatorManager(reactContext, mViroPlatform),

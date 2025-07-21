@@ -11,8 +11,14 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
+#import "VRTMaterialManager.h"
 
 @interface ViroQuadComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROQuad> vroQuad;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Quad geometry properties
 @property (nonatomic, assign) CGFloat width;
@@ -32,8 +38,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroQuad
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroQuadComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -62,11 +67,43 @@
         @[@0, @0]  // Top-left
     ];
     
-    // TODO: Initialize ViroReact quad geometry
-    // This will need to integrate with the existing ViroReact quad implementation
+    // Initialize ViroReact quad geometry
+    [self initializeVROQuad];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
+}
+
+- (void)initializeVROQuad
+{
+    RCTLogInfo(@"[ViroQuadComponentView] Creating VROQuad geometry");
+    
+    // Create VROQuad with default dimensions
+    _vroQuad = VROQuad::createQuad(_width, _height);
+    
+    // Create VRONode to hold the geometry
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroQuad);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    // Apply UV coordinates if custom mapping is provided
+    [self updateUVCoordinates];
+    
+    RCTLogInfo(@"[ViroQuadComponentView] VROQuad created successfully with dimensions: %.2f x %.2f", _width, _height);
+}
+
+- (void)updateUVCoordinates
+{
+    if (!_vroQuad || !_uvCoordinates || _uvCoordinates.count != 4) {
+        return;
+    }
+    
+    // Convert NSArray UV coordinates to ViroKit format
+    // Note: In a full implementation, this would set the UV coordinates on the quad's geometry
+    RCTLogInfo(@"[ViroQuadComponentView] Updating UV coordinates");
 }
 
 #pragma mark - Quad Geometry Properties

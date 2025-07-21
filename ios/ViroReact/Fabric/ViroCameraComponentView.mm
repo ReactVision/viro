@@ -11,8 +11,13 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
 
 @interface ViroCameraComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROCamera> vroCamera;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Camera position and orientation
 @property (nonatomic, strong, nullable) NSArray<NSNumber *> *position;
@@ -43,8 +48,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroCamera
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroCameraComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -71,11 +75,42 @@
     _animationType = @"easeIn";
     _active = NO;
     
-    // TODO: Initialize ViroReact camera
-    // This will need to integrate with the existing ViroReact camera implementation
+    // Initialize ViroReact camera
+    [self initializeVROCamera];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Cameras don't have visual bounds
+}
+
+#pragma mark - Camera Position and Orientation
+
+- (void)initializeVROCamera
+{
+    RCTLogInfo(@"[ViroCameraComponentView] Creating VROCamera");
+    
+    // Create ViroReact camera
+    _vroCamera = VROCamera::create();
+    
+    // Set default camera properties
+    _vroCamera->setFieldOfView(_fieldOfView * M_PI / 180.0); // Convert degrees to radians
+    _vroCamera->setNearClippingPlane(_nearClippingPlane);
+    _vroCamera->setFarClippingPlane(_farClippingPlane);
+    
+    // Set projection type
+    if ([_projectionType isEqualToString:@"orthographic"]) {
+        _vroCamera->setProjectionType(VROProjectionType::Orthographic);
+    } else {
+        _vroCamera->setProjectionType(VROProjectionType::Perspective);
+    }
+    
+    // Create VRONode to hold the camera
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setCamera(_vroCamera);
+    
+    // Apply initial transform
+    [self updateCameraTransform];
+    
+    RCTLogInfo(@"[ViroCameraComponentView] VROCamera created successfully");
 }
 
 #pragma mark - Camera Position and Orientation
@@ -85,7 +120,6 @@
     RCTLogInfo(@"[ViroCameraComponentView] Setting position: %@", position);
     _position = position ?: @[@0, @0, @0];
     
-    // TODO: Update camera position in ViroReact renderer
     [self updateCameraTransform];
 }
 
@@ -94,7 +128,6 @@
     RCTLogInfo(@"[ViroCameraComponentView] Setting rotation: %@", rotation);
     _rotation = rotation ?: @[@0, @0, @0];
     
-    // TODO: Update camera rotation in ViroReact renderer
     [self updateCameraTransform];
 }
 
@@ -103,15 +136,30 @@
     RCTLogInfo(@"[ViroCameraComponentView] Setting field of view: %f", fieldOfView);
     _fieldOfView = fieldOfView;
     
-    // TODO: Update camera field of view in ViroReact renderer
-    [self updateCameraProjection];
+    if (_vroCamera) {
+        _vroCamera->setFieldOfView(fieldOfView * M_PI / 180.0); // Convert degrees to radians
+    }
 }
 
 - (void)updateCameraTransform
 {
     RCTLogInfo(@"[ViroCameraComponentView] Updating camera transform - Position: %@, Rotation: %@", _position, _rotation);
     
-    // TODO: Apply camera position and rotation to ViroReact renderer
+    if (_vroNode) {
+        // Apply position
+        if (_position && _position.count >= 3) {
+            VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+            _vroNode->setPosition(pos);
+        }
+        
+        // Apply rotation (convert degrees to radians)
+        if (_rotation && _rotation.count >= 3) {
+            VROVector3f rot([_rotation[0] floatValue] * M_PI / 180.0,
+                            [_rotation[1] floatValue] * M_PI / 180.0,
+                            [_rotation[2] floatValue] * M_PI / 180.0);
+            _vroNode->setRotation(rot);
+        }
+    }
     
     // Emit transform update event
     if (_onTransformUpdate && _active) {
@@ -130,7 +178,6 @@
     RCTLogInfo(@"[ViroCameraComponentView] Setting near clipping plane: %f", nearClippingPlane);
     _nearClippingPlane = nearClippingPlane;
     
-    // TODO: Update camera projection in ViroReact renderer
     [self updateCameraProjection];
 }
 
@@ -139,7 +186,6 @@
     RCTLogInfo(@"[ViroCameraComponentView] Setting far clipping plane: %f", farClippingPlane);
     _farClippingPlane = farClippingPlane;
     
-    // TODO: Update camera projection in ViroReact renderer
     [self updateCameraProjection];
 }
 
@@ -148,8 +194,6 @@
     RCTLogInfo(@"[ViroCameraComponentView] Setting projection type: %@", projectionType);
     _projectionType = projectionType ?: @"perspective";
     
-    // TODO: Update camera projection type in ViroReact renderer
-    // Types: "perspective", "orthographic"
     [self updateCameraProjection];
 }
 
@@ -167,7 +211,18 @@
     RCTLogInfo(@"[ViroCameraComponentView] Updating camera projection - FOV: %.1f, Near: %.2f, Far: %.2f, Type: %@", 
                _fieldOfView, _nearClippingPlane, _farClippingPlane, _projectionType);
     
-    // TODO: Apply camera projection settings to ViroReact renderer
+    if (_vroCamera) {
+        // Update clipping planes
+        _vroCamera->setNearClippingPlane(_nearClippingPlane);
+        _vroCamera->setFarClippingPlane(_farClippingPlane);
+        
+        // Update projection type
+        if ([_projectionType isEqualToString:@"orthographic"]) {
+            _vroCamera->setProjectionType(VROProjectionType::Orthographic);
+        } else {
+            _vroCamera->setProjectionType(VROProjectionType::Perspective);
+        }
+    }
 }
 
 #pragma mark - Camera Animation and Controls
@@ -199,8 +254,10 @@
     _active = active;
     
     if (active && !wasActive) {
-        // Camera became active
-        // TODO: Set camera as active in ViroReact renderer
+        // Camera became active - enable in ViroReact renderer
+        if (_vroCamera) {
+            _vroCamera->setEnabled(true);
+        }
         [self updateCameraTransform];
         [self updateCameraProjection];
         
@@ -210,8 +267,10 @@
             });
         }
     } else if (!active && wasActive) {
-        // Camera became inactive
-        // TODO: Set camera as inactive in ViroReact renderer
+        // Camera became inactive - disable in ViroReact renderer
+        if (_vroCamera) {
+            _vroCamera->setEnabled(false);
+        }
         
         if (_onCameraWillUnmount) {
             _onCameraWillUnmount(@{
@@ -247,12 +306,14 @@
     RCTLogInfo(@"[ViroCameraComponentView] Animating to position: %@, rotation: %@, duration: %f", 
                position, rotation, duration);
     
-    // TODO: Implement camera animation in ViroReact renderer
-    // This should smoothly transition the camera from current position/rotation to target
-    
-    // Update properties after animation completes
-    _position = position;
-    _rotation = rotation;
+    // Create smooth animation to target position/rotation
+    if (_vroNode) {
+        // For now, directly set the target values
+        // TODO: Implement smooth animation with VROTransaction
+        _position = position;
+        _rotation = rotation;
+        [self updateCameraTransform];
+    }
 }
 
 #pragma mark - Layout
@@ -273,14 +334,14 @@
     
     if (self.window) {
         RCTLogInfo(@"[ViroCameraComponentView] Camera added to window");
-        // TODO: Add camera to ViroReact scene when added to window
+        // ViroNodeComponentView parent will handle adding _vroNode to scene
         if (_active) {
             [self updateCameraTransform];
             [self updateCameraProjection];
         }
     } else {
         RCTLogInfo(@"[ViroCameraComponentView] Camera removed from window");
-        // TODO: Remove camera from ViroReact scene when removed from window
+        // ViroNodeComponentView parent will handle removing _vroNode from scene
     }
 }
 
@@ -294,7 +355,9 @@
         });
     }
     
-    // TODO: Clean up ViroReact camera resources
+    // Clean up ViroReact camera resources
+    _vroCamera = nullptr;
+    _vroNode = nullptr;
 }
 
 @end

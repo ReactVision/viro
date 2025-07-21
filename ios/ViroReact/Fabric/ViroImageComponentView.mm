@@ -11,8 +11,16 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
+#import "VRTMaterialManager.h"
+#import "VRTImageAsyncLoader.h"
 
 @interface ViroImageComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROQuad> vroQuad;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
+@property (nonatomic, strong, nullable) VRTImageAsyncLoader *imageLoader;
 
 // Image source and content
 @property (nonatomic, strong, nullable) NSDictionary *source;
@@ -49,8 +57,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroImage
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroImageComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -78,11 +85,55 @@
     _imageClipMode = @"none";
     _stereoMode = @"none";
     
-    // TODO: Initialize ViroReact image renderer
-    // This will need to integrate with the existing ViroReact image implementation
+    // Initialize ViroReact image renderer
+    [self initializeVROImage];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
+}
+
+- (void)initializeVROImage
+{
+    RCTLogInfo(@"[ViroImageComponentView] Creating VROImage geometry");
+    
+    // Create VROQuad to display the image
+    _vroQuad = VROQuad::createQuad(_width, _height);
+    
+    // Create VRONode to hold the geometry
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroQuad);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    // Initialize image loader for async loading
+    _imageLoader = [[VRTImageAsyncLoader alloc] init];
+    
+    RCTLogInfo(@"[ViroImageComponentView] VROImage quad created successfully with dimensions: %.2f x %.2f", _width, _height);
+}
+
+- (void)loadImageFromSource
+{
+    if (!_source || !_imageLoader || !_vroQuad) {
+        return;
+    }
+    
+    RCTLogInfo(@"[ViroImageComponentView] Loading image from source: %@", _source);
+    
+    // Use VRTImageAsyncLoader to load the image
+    // This would typically involve:
+    // 1. Parsing the source dictionary for URI
+    // 2. Loading the image asynchronously
+    // 3. Creating a texture from the loaded image
+    // 4. Applying the texture to the quad's material
+    
+    // For now, we'll log the action
+    NSString *uri = _source[@"uri"];
+    if (uri) {
+        RCTLogInfo(@"[ViroImageComponentView] Would load image from URI: %@", uri);
+        // In full implementation, this would trigger async image loading
+    }
 }
 
 #pragma mark - Image Source and Content

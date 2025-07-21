@@ -10,560 +10,1038 @@ package com.viromedia.bridge.fabric;
 
 import android.content.Context;
 import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.viro.core.EventDelegate;
+import com.viro.core.Geometry;
+import com.viro.core.Material;
+import com.viro.core.Node;
+import com.viro.core.Polyline;
+import com.viro.core.Vector;
+import com.viro.core.ViroContext;
+import com.viromedia.bridge.component.VRTComponent;
+import com.viromedia.bridge.utility.ComponentEventDelegate;
 import com.viromedia.bridge.utility.ViroLog;
 
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * ViroPolylineView - Line Geometry View
- * 
- * This view represents a polyline geometry component that can be used to create
- * complex line shapes with thickness, styling, and advanced line effects.
- * 
- * Key capabilities:
- * - Multi-point line definition with custom points
- * - Thickness control for volumetric lines
- * - Line styling (solid, dashed, dotted) with custom patterns
- * - Smooth line interpolation with curve support
- * - Closed/open polyline modes
- * - Line caps and joins (round, square, miter)
- * - Gradient and multi-color support
- * - UV mapping for texture application
- * - Touch interaction and event handling
- * - Performance optimization for complex lines
- * - Integration with ViroReact scene graph
- * - Cross-platform consistent behavior
+ * Native Android view for ViroPolyline component.
+ * ViroPolyline provides comprehensive line geometry functionality with ViroReact 3D integration,
+ * supporting multi-point line definition, thickness control, styling, smooth interpolation, and material system integration.
  */
 public class ViroPolylineView extends View {
     
     private static final String TAG = ViroLog.getTag(ViroPolylineView.class);
     
+    private ReactContext mReactContext;
+    
+    // ViroReact Integration
+    private Node mNodeJni;
+    private Polyline mPolylineJni;
+    private Geometry mGeometryJni;
+    private Material mMaterialJni;
+    private List<Material> mMaterialsJni = new ArrayList<>();
+    private ViroContext mViroContext;
+    private EventDelegate mEventDelegateJni;
+    private ComponentEventDelegate mComponentEventDelegate;
+    
     // Polyline geometry properties
-    private ReadableArray points;
-    private float thickness = 0.01f;
-    private ReadableArray colors;
-    private boolean closed = false;
+    private ReadableArray mPoints;
+    private float mThickness = 0.01f;
+    private ReadableArray mColors;
+    private boolean mClosed = false;
     
     // Line style properties
-    private String lineType = "solid";
-    private float dashLength = 0.1f;
-    private float gapLength = 0.05f;
-    private String capType = "round";
-    private String joinType = "round";
+    private String mLineType = "solid"; // "solid", "dashed", "dotted", "custom"
+    private float mDashLength = 0.1f;
+    private float mGapLength = 0.05f;
+    private String mCapType = "round"; // "round", "square", "butt"
+    private String mJoinType = "round"; // "round", "miter", "bevel"
+    private float mMiterLimit = 4.0f;
     
-    // Segment properties
-    private int segments = 10;
-    private boolean smooth = false;
-    private float smoothness = 0.5f;
+    // Interpolation properties
+    private int mSegments = 10;
+    private boolean mSmooth = false;
+    private float mSmoothness = 0.5f;
+    private String mInterpolationType = "linear"; // "linear", "bezier", "catmullrom", "hermite"
+    
+    // UV mapping properties
+    private String mUvMode = "stretch"; // "stretch", "repeat", "distance"
+    private float mUvScale = 1.0f;
+    private float mUvOffset = 0.0f;
     
     // Material properties
-    private ReadableArray materials;
-    
-    // Rendering properties
-    private boolean visible = true;
-    private float opacity = 1.0f;
-    private int renderingOrder = 0;
+    private ReadableArray mMaterials;
+    private ReadableMap mMaterial;
+    private boolean mUnlit = false;
     
     // Transform properties
-    private ReadableArray position;
-    private ReadableArray rotation;
-    private ReadableArray scale;
-    private ReadableArray transformBehaviors;
+    private Vector mPosition = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mScale = new Vector(1.0f, 1.0f, 1.0f);
+    private Vector mRotation = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mRotationPivot;
+    private Vector mScalePivot;
+    private List<String> mTransformBehaviors;
     
-    // Animation properties
-    private ReadableMap animation;
-    
-    // Physics properties
-    private ReadableMap physicsBody;
-    private String viroTag;
-    
-    // Interaction properties
-    private boolean highAccuracyEvents = false;
-    private boolean onHover = false;
-    private boolean onClick = false;
-    private boolean onTouch = false;
-    private boolean onDrag = false;
-    private boolean onPinch = false;
-    private boolean onRotate = false;
-    private boolean onFuse = false;
-    private boolean onCollision = false;
+    // Visibility and interaction
+    private boolean mVisible = true;
+    private float mOpacity = 1.0f;
+    private int mRenderingOrder = 0;
+    private boolean mIgnoreEventHandling = false;
+    private String mDragType;
     
     // Lighting properties
-    private int lightReceivingBitMask = 1;
-    private int shadowCastingBitMask = 1;
+    private int mLightReceivingBitMask = 1;
+    private int mShadowCastingBitMask = 1;
     
-    // Quality properties
-    private boolean ignoreEventHandling = false;
-    private String dragType;
-    private ReadableMap dragPlane;
+    // Physics and animation
+    private ReadableMap mPhysicsBody;
+    private boolean mHighAccuracyEvents = false;
+    private ReadableMap mAnimation;
+    
+    // Line drawing properties
+    private float mLineWidth = 1.0f;
+    private boolean mAntialias = true;
+    private boolean mBillboard = false;
     
     // Internal state
-    private boolean geometryDirty = true;
-    private boolean stylesDirty = true;
-    private float totalLength = 0.0f;
+    private boolean mGeometryDirty = true;
+    private boolean mMaterialsDirty = true;
+    private float mTotalLength = 0.0f;
+    private List<Float> mSegmentLengths = new ArrayList<>();
     
     public ViroPolylineView(@NonNull Context context) {
         super(context);
-        ViroLog.debug(TAG, "ViroPolylineView created");
+        mReactContext = (ReactContext) context;
+        
+        ViroLog.debug(TAG, "ViroPolylineView initialized with ViroReact Polyline integration");
+        
         initializePolyline();
     }
     
     private void initializePolyline() {
-        ViroLog.debug(TAG, "Initializing polyline geometry");
-        updateGeometry();
+        ViroLog.debug(TAG, "Initializing ViroReact polyline with default properties");
+        
+        // Create ViroReact Node for the polyline
+        mNodeJni = new Node();
+        
+        // Create Polyline geometry
+        mPolylineJni = new Polyline(mViroContext);
+        
+        // Create default Material for the polyline
+        mMaterialJni = new Material(mViroContext);
+        
+        // Configure initial polyline properties
+        applyPolylineProperties();
+        
+        // Attach geometry and material to node
+        mNodeJni.setGeometry(mPolylineJni);
+        mPolylineJni.setMaterials(java.util.Arrays.asList(mMaterialJni));
+        
+        // Create and attach event callbacks
+        mComponentEventDelegate = new ComponentEventDelegate(new VRTComponentWrapper(this));
+        mEventDelegateJni = new EventDelegate();
+        mEventDelegateJni.setEventDelegateCallback(mComponentEventDelegate);
+        mNodeJni.setEventDelegate(mEventDelegateJni);
+        
+        // Polyline views are typically transparent for 3D content
+        setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        
+        ViroLog.debug(TAG, "ViroReact Polyline initialized successfully");
     }
     
-    // Polyline Geometry Setters
+    /**
+     * Wrapper class to make ViroPolylineView compatible with ComponentEventDelegate
+     */
+    private static class VRTComponentWrapper extends VRTComponent {
+        private WeakReference<ViroPolylineView> mPolylineView;
+        
+        public VRTComponentWrapper(ViroPolylineView polylineView) {
+            super(polylineView.getContext(), null, -1, -1, polylineView.mReactContext);
+            mPolylineView = new WeakReference<>(polylineView);
+        }
+        
+        @Override
+        public void emitEvent(String eventName, WritableMap eventData) {
+            ViroPolylineView polylineView = mPolylineView.get();
+            if (polylineView != null) {
+                polylineView.emitPolylineEvent(eventName, eventData);
+            }
+        }
+    }
+    
+    /**
+     * Get the underlying ViroReact Node object
+     */
+    public Node getNodeJni() {
+        return mNodeJni;
+    }
+    
+    /**
+     * Get the underlying ViroReact Polyline object
+     */
+    public Polyline getPolylineJni() {
+        return mPolylineJni;
+    }
+    
+    /**
+     * Get the underlying ViroReact Geometry object
+     */
+    public Geometry getGeometryJni() {
+        return mGeometryJni;
+    }
+    
+    /**
+     * Set the ViroContext for this polyline
+     */
+    public void setViroContext(ViroContext context) {
+        mViroContext = context;
+        // Recreate polyline components with ViroContext if needed
+        if (mPolylineJni != null) {
+            mPolylineJni.dispose();
+            mPolylineJni = new Polyline(mViroContext);
+            mMaterialJni.dispose();
+            mMaterialJni = new Material(mViroContext);
+            applyPolylineProperties();
+            updateGeometry();
+            if (mNodeJni != null) {
+                mNodeJni.setGeometry(mPolylineJni);
+            }
+        }
+    }
+    
+    // Polyline geometry setters
+    
     public void setPoints(@Nullable ReadableArray points) {
-        this.points = points;
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting points: " + points);
+        mPoints = points;
+        mGeometryDirty = true;
         updateGeometry();
     }
     
     public void setThickness(float thickness) {
-        this.thickness = thickness;
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting thickness: " + thickness);
+        mThickness = Math.max(0.001f, thickness);
+        mGeometryDirty = true;
         updateGeometry();
     }
     
     public void setColors(@Nullable ReadableArray colors) {
-        this.colors = colors;
-        this.stylesDirty = true;
-        updateStyles();
-    }
-    
-    public void setClosed(boolean closed) {
-        this.closed = closed;
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting colors: " + colors);
+        mColors = colors;
+        mGeometryDirty = true;
         updateGeometry();
     }
     
-    // Line Style Setters
+    public void setClosed(boolean closed) {
+        ViroLog.debug(TAG, "Setting closed: " + closed);
+        mClosed = closed;
+        mGeometryDirty = true;
+        updateGeometry();
+    }
+    
+    // Line style setters
+    
     public void setLineType(@Nullable String lineType) {
-        this.lineType = lineType != null ? lineType : "solid";
-        this.stylesDirty = true;
-        updateStyles();
+        ViroLog.debug(TAG, "Setting line type: " + lineType);
+        mLineType = lineType != null ? lineType : "solid";
+        mGeometryDirty = true;
+        updateGeometry();
     }
     
     public void setDashLength(float dashLength) {
-        this.dashLength = dashLength;
-        this.stylesDirty = true;
-        updateStyles();
+        ViroLog.debug(TAG, "Setting dash length: " + dashLength);
+        mDashLength = Math.max(0.01f, dashLength);
+        mGeometryDirty = true;
+        updateGeometry();
     }
     
     public void setGapLength(float gapLength) {
-        this.gapLength = gapLength;
-        this.stylesDirty = true;
-        updateStyles();
+        ViroLog.debug(TAG, "Setting gap length: " + gapLength);
+        mGapLength = Math.max(0.01f, gapLength);
+        mGeometryDirty = true;
+        updateGeometry();
     }
     
     public void setCapType(@Nullable String capType) {
-        this.capType = capType != null ? capType : "round";
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting cap type: " + capType);
+        mCapType = capType != null ? capType : "round";
+        mGeometryDirty = true;
         updateGeometry();
     }
     
     public void setJoinType(@Nullable String joinType) {
-        this.joinType = joinType != null ? joinType : "round";
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting join type: " + joinType);
+        mJoinType = joinType != null ? joinType : "round";
+        mGeometryDirty = true;
         updateGeometry();
     }
     
-    // Segment Setters
+    public void setMiterLimit(float miterLimit) {
+        ViroLog.debug(TAG, "Setting miter limit: " + miterLimit);
+        mMiterLimit = Math.max(1.0f, miterLimit);
+        mGeometryDirty = true;
+        updateGeometry();
+    }
+    
+    // Interpolation setters
+    
     public void setSegments(int segments) {
-        this.segments = segments;
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting segments: " + segments);
+        mSegments = Math.max(1, Math.min(100, segments));
+        mGeometryDirty = true;
         updateGeometry();
     }
     
     public void setSmooth(boolean smooth) {
-        this.smooth = smooth;
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting smooth: " + smooth);
+        mSmooth = smooth;
+        mGeometryDirty = true;
         updateGeometry();
     }
     
     public void setSmoothness(float smoothness) {
-        this.smoothness = smoothness;
-        this.geometryDirty = true;
+        ViroLog.debug(TAG, "Setting smoothness: " + smoothness);
+        mSmoothness = Math.max(0.0f, Math.min(1.0f, smoothness));
+        mGeometryDirty = true;
         updateGeometry();
     }
     
-    // Material Setters
-    public void setMaterials(@Nullable ReadableArray materials) {
-        this.materials = materials;
-        this.stylesDirty = true;
-        updateStyles();
+    public void setInterpolationType(@Nullable String interpolationType) {
+        ViroLog.debug(TAG, "Setting interpolation type: " + interpolationType);
+        mInterpolationType = interpolationType != null ? interpolationType : "linear";
+        mGeometryDirty = true;
+        updateGeometry();
     }
     
-    // Rendering Setters
+    // UV mapping setters
+    
+    public void setUvMode(@Nullable String uvMode) {
+        ViroLog.debug(TAG, "Setting UV mode: " + uvMode);
+        mUvMode = uvMode != null ? uvMode : "stretch";
+        mGeometryDirty = true;
+        updateGeometry();
+    }
+    
+    public void setUvScale(float uvScale) {
+        ViroLog.debug(TAG, "Setting UV scale: " + uvScale);
+        mUvScale = Math.max(0.1f, uvScale);
+        mGeometryDirty = true;
+        updateGeometry();
+    }
+    
+    public void setUvOffset(float uvOffset) {
+        ViroLog.debug(TAG, "Setting UV offset: " + uvOffset);
+        mUvOffset = uvOffset;
+        mGeometryDirty = true;
+        updateGeometry();
+    }
+    
+    // Material setters
+    
+    public void setMaterials(@Nullable ReadableArray materials) {
+        ViroLog.debug(TAG, "Setting materials: " + materials);
+        mMaterials = materials;
+        mMaterialsDirty = true;
+        updateMaterials();
+    }
+    
+    public void setMaterial(@Nullable ReadableMap material) {
+        ViroLog.debug(TAG, "Setting material: " + material);
+        mMaterial = material;
+        mMaterialsDirty = true;
+        updateMaterials();
+    }
+    
+    public void setUnlit(boolean unlit) {
+        ViroLog.debug(TAG, "Setting unlit: " + unlit);
+        mUnlit = unlit;
+        mMaterialsDirty = true;
+        updateMaterials();
+    }
+    
+    // Transform setters
+    
+    public void setPosition(@Nullable ReadableArray position) {
+        ViroLog.debug(TAG, "Setting position: " + position);
+        
+        if (position != null && position.size() >= 3) {
+            try {
+                float x = (float) position.getDouble(0);
+                float y = (float) position.getDouble(1);
+                float z = (float) position.getDouble(2);
+                mPosition = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing position: " + e.getMessage());
+                mPosition = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mPosition = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        applyTransformProperties();
+    }
+    
+    public void setScale(@Nullable ReadableArray scale) {
+        ViroLog.debug(TAG, "Setting scale: " + scale);
+        
+        if (scale != null && scale.size() >= 3) {
+            try {
+                float x = (float) scale.getDouble(0);
+                float y = (float) scale.getDouble(1);
+                float z = (float) scale.getDouble(2);
+                mScale = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing scale: " + e.getMessage());
+                mScale = new Vector(1.0f, 1.0f, 1.0f);
+            }
+        } else {
+            mScale = new Vector(1.0f, 1.0f, 1.0f);
+        }
+        
+        applyTransformProperties();
+    }
+    
+    public void setRotation(@Nullable ReadableArray rotation) {
+        ViroLog.debug(TAG, "Setting rotation: " + rotation);
+        
+        if (rotation != null && rotation.size() >= 3) {
+            try {
+                float x = (float) Math.toRadians(rotation.getDouble(0)); // Convert to radians
+                float y = (float) Math.toRadians(rotation.getDouble(1));
+                float z = (float) Math.toRadians(rotation.getDouble(2));
+                mRotation = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing rotation: " + e.getMessage());
+                mRotation = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mRotation = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        applyTransformProperties();
+    }
+    
+    // Visibility and interaction setters
+    
     public void setVisible(boolean visible) {
-        this.visible = visible;
-        setVisibility(visible ? VISIBLE : GONE);
+        ViroLog.debug(TAG, "Setting visible: " + visible);
+        mVisible = visible;
+        
+        if (mNodeJni != null) {
+            mNodeJni.setVisible(visible);
+        }
+        setVisibility(visible ? VISIBLE : INVISIBLE);
     }
     
     public void setOpacity(float opacity) {
-        this.opacity = opacity;
+        ViroLog.debug(TAG, "Setting opacity: " + opacity);
+        mOpacity = opacity;
+        
+        if (mNodeJni != null) {
+            mNodeJni.setOpacity(opacity);
+        }
         setAlpha(opacity);
     }
     
     public void setRenderingOrder(int renderingOrder) {
-        this.renderingOrder = renderingOrder;
-        updateRenderingOrder();
+        ViroLog.debug(TAG, "Setting rendering order: " + renderingOrder);
+        mRenderingOrder = renderingOrder;
+        
+        if (mNodeJni != null) {
+            mNodeJni.setRenderingOrder(renderingOrder);
+        }
     }
     
-    // Transform Setters
-    public void setPosition(@Nullable ReadableArray position) {
-        this.position = position;
-        updateTransform();
+    // Lighting setters
+    
+    public void setLightReceivingBitMask(int bitMask) {
+        ViroLog.debug(TAG, "Setting light receiving bit mask: " + bitMask);
+        mLightReceivingBitMask = bitMask;
+        
+        if (mNodeJni != null) {
+            mNodeJni.setLightReceivingBitMask(bitMask);
+        }
     }
     
-    public void setRotation(@Nullable ReadableArray rotation) {
-        this.rotation = rotation;
-        updateTransform();
+    public void setShadowCastingBitMask(int bitMask) {
+        ViroLog.debug(TAG, "Setting shadow casting bit mask: " + bitMask);
+        mShadowCastingBitMask = bitMask;
+        
+        if (mNodeJni != null) {
+            mNodeJni.setShadowCastingBitMask(bitMask);
+        }
     }
     
-    public void setScale(@Nullable ReadableArray scale) {
-        this.scale = scale;
-        updateTransform();
+    // Line drawing setters
+    
+    public void setLineWidth(float lineWidth) {
+        ViroLog.debug(TAG, "Setting line width: " + lineWidth);
+        mLineWidth = Math.max(0.1f, lineWidth);
+        
+        if (mPolylineJni != null) {
+            mPolylineJni.setLineWidth(mLineWidth);
+        }
     }
     
-    public void setTransformBehaviors(@Nullable ReadableArray transformBehaviors) {
-        this.transformBehaviors = transformBehaviors;
-        updateTransform();
+    public void setAntialias(boolean antialias) {
+        ViroLog.debug(TAG, "Setting antialias: " + antialias);
+        mAntialias = antialias;
+        
+        if (mPolylineJni != null) {
+            mPolylineJni.setAntialias(mAntialias);
+        }
     }
     
-    // Animation Setters
-    public void setAnimation(@Nullable ReadableMap animation) {
-        this.animation = animation;
-        updateAnimation();
+    public void setBillboard(boolean billboard) {
+        ViroLog.debug(TAG, "Setting billboard: " + billboard);
+        mBillboard = billboard;
+        
+        if (mPolylineJni != null) {
+            mPolylineJni.setBillboard(mBillboard);
+        }
     }
     
-    // Physics Setters
-    public void setPhysicsBody(@Nullable ReadableMap physicsBody) {
-        this.physicsBody = physicsBody;
-        updatePhysics();
+    // ViroReact-specific methods
+    
+    private void applyPolylineProperties() {
+        if (mPolylineJni != null) {
+            ViroLog.debug(TAG, "Applying polyline properties to ViroReact Polyline");
+            
+            // Apply polyline-specific properties
+            mPolylineJni.setThickness(mThickness);
+            mPolylineJni.setClosed(mClosed);
+            mPolylineJni.setLineWidth(mLineWidth);
+            mPolylineJni.setAntialias(mAntialias);
+            mPolylineJni.setBillboard(mBillboard);
+            
+            // Apply line style properties
+            mPolylineJni.setCapType(getCapTypeEnum(mCapType));
+            mPolylineJni.setJoinType(getJoinTypeEnum(mJoinType));
+            mPolylineJni.setMiterLimit(mMiterLimit);
+            
+            // Apply interpolation properties
+            mPolylineJni.setSegments(mSegments);
+            mPolylineJni.setSmooth(mSmooth);
+            mPolylineJni.setSmoothness(mSmoothness);
+            
+            ViroLog.debug(TAG, "Polyline properties applied successfully");
+        }
     }
     
-    public void setViroTag(@Nullable String viroTag) {
-        this.viroTag = viroTag;
+    private void applyTransformProperties() {
+        if (mNodeJni != null) {
+            ViroLog.debug(TAG, "Applying transform properties to ViroReact Node");
+            
+            // Apply position, rotation, and scale to the node
+            mNodeJni.setPosition(mPosition);
+            mNodeJni.setRotation(mRotation);
+            mNodeJni.setScale(mScale);
+            
+            // Apply pivot points if set
+            if (mRotationPivot != null) {
+                mNodeJni.setRotationPivot(mRotationPivot);
+            }
+            if (mScalePivot != null) {
+                mNodeJni.setScalePivot(mScalePivot);
+            }
+            
+            ViroLog.debug(TAG, "Transform properties applied successfully");
+        }
     }
     
-    // Interaction Setters
-    public void setHighAccuracyEvents(boolean highAccuracyEvents) {
-        this.highAccuracyEvents = highAccuracyEvents;
-    }
-    
-    public void setOnHover(boolean onHover) {
-        this.onHover = onHover;
-    }
-    
-    public void setOnClick(boolean onClick) {
-        this.onClick = onClick;
-    }
-    
-    public void setOnTouch(boolean onTouch) {
-        this.onTouch = onTouch;
-    }
-    
-    public void setOnDrag(boolean onDrag) {
-        this.onDrag = onDrag;
-    }
-    
-    public void setOnPinch(boolean onPinch) {
-        this.onPinch = onPinch;
-    }
-    
-    public void setOnRotate(boolean onRotate) {
-        this.onRotate = onRotate;
-    }
-    
-    public void setOnFuse(boolean onFuse) {
-        this.onFuse = onFuse;
-    }
-    
-    public void setOnCollision(boolean onCollision) {
-        this.onCollision = onCollision;
-    }
-    
-    // Lighting Setters
-    public void setLightReceivingBitMask(int lightReceivingBitMask) {
-        this.lightReceivingBitMask = lightReceivingBitMask;
-        updateLighting();
-    }
-    
-    public void setShadowCastingBitMask(int shadowCastingBitMask) {
-        this.shadowCastingBitMask = shadowCastingBitMask;
-        updateLighting();
-    }
-    
-    // Quality Setters
-    public void setIgnoreEventHandling(boolean ignoreEventHandling) {
-        this.ignoreEventHandling = ignoreEventHandling;
-    }
-    
-    public void setDragType(@Nullable String dragType) {
-        this.dragType = dragType;
-    }
-    
-    public void setDragPlane(@Nullable ReadableMap dragPlane) {
-        this.dragPlane = dragPlane;
-    }
-    
-    // Update Methods
     private void updateGeometry() {
-        if (!geometryDirty) return;
+        if (mGeometryDirty && mPolylineJni != null) {
+            ViroLog.debug(TAG, "Updating polyline geometry");
+            
+            if (mPoints != null) {
+                // Convert points to native format
+                List<Vector> points = convertPointsArray(mPoints);
+                if (!points.isEmpty()) {
+                    // Apply smoothing if enabled
+                    if (mSmooth && points.size() > 2) {
+                        points = applySmoothingToPoints(points);
+                    }
+                    
+                    // Set points to polyline
+                    mPolylineJni.setPoints(points);
+                    
+                    // Apply line type styling
+                    applyLineTypeStyle();
+                    
+                    // Set vertex colors if provided
+                    if (mColors != null) {
+                        List<Integer> colors = convertColorsArray(mColors);
+                        mPolylineJni.setVertexColors(colors);
+                    }
+                    
+                    // Calculate segment lengths and total length
+                    calculateSegmentLengths(points);
+                    
+                    // Apply UV mapping
+                    applyUVMapping();
+                    
+                    // Apply polyline properties
+                    applyPolylineProperties();
+                    
+                    mGeometryDirty = false;
+                    ViroLog.debug(TAG, "Polyline geometry updated successfully");
+                }
+            }
+        }
+    }
+    
+    private void updateMaterials() {
+        if (mMaterialsDirty && mPolylineJni != null) {
+            ViroLog.debug(TAG, "Updating polyline materials");
+            
+            // Clear existing materials
+            mMaterialsJni.clear();
+            
+            if (mMaterials != null) {
+                // Handle multiple materials
+                for (int i = 0; i < mMaterials.size(); i++) {
+                    ReadableMap materialData = mMaterials.getMap(i);
+                    if (materialData != null) {
+                        Material material = createMaterialFromData(materialData);
+                        mMaterialsJni.add(material);
+                    }
+                }
+            } else if (mMaterial != null) {
+                // Handle single material
+                Material material = createMaterialFromData(mMaterial);
+                mMaterialsJni.add(material);
+            } else {
+                // Use default material
+                if (mUnlit) {
+                    mMaterialJni.setLightingModel(Material.LightingModel.CONSTANT);
+                }
+                mMaterialsJni.add(mMaterialJni);
+            }
+            
+            // Apply materials to polyline
+            mPolylineJni.setMaterials(mMaterialsJni);
+            
+            mMaterialsDirty = false;
+            ViroLog.debug(TAG, "Polyline materials updated successfully");
+        }
+    }
+    
+    // Helper methods
+    
+    private List<Vector> convertPointsArray(ReadableArray points) {
+        List<Vector> result = new ArrayList<>();
         
-        ViroLog.debug(TAG, "Updating polyline geometry");
-        
-        // Process points
-        if (points != null) {
-            processPoints();
+        try {
+            for (int i = 0; i < points.size(); i++) {
+                ReadableArray point = points.getArray(i);
+                if (point != null && point.size() >= 2) {
+                    float x = (float) point.getDouble(0);
+                    float y = (float) point.getDouble(1);
+                    float z = point.size() > 2 ? (float) point.getDouble(2) : 0.0f;
+                    result.add(new Vector(x, y, z));
+                }
+            }
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error converting points array: " + e.getMessage());
         }
         
-        // Generate line geometry
-        generateLineGeometry();
-        
-        // Apply caps and joins
-        applyCapAndJoin();
-        
-        // Create final geometry
-        createGeometry();
-        
-        geometryDirty = false;
+        return result;
     }
     
-    private void processPoints() {
-        ViroLog.debug(TAG, "Processing points: " + points.size());
+    private List<Integer> convertColorsArray(ReadableArray colors) {
+        List<Integer> result = new ArrayList<>();
         
-        // Reset total length
-        totalLength = 0.0f;
+        try {
+            for (int i = 0; i < colors.size(); i++) {
+                ReadableArray color = colors.getArray(i);
+                if (color != null && color.size() >= 3) {
+                    float r = (float) color.getDouble(0);
+                    float g = (float) color.getDouble(1);
+                    float b = (float) color.getDouble(2);
+                    float a = color.size() > 3 ? (float) color.getDouble(3) : 1.0f;
+                    
+                    int colorInt = android.graphics.Color.argb(
+                        (int) (a * 255),
+                        (int) (r * 255),
+                        (int) (g * 255),
+                        (int) (b * 255)
+                    );
+                    result.add(colorInt);
+                }
+            }
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error converting colors array: " + e.getMessage());
+        }
         
-        // Process input points and calculate total length
+        return result;
+    }
+    
+    private List<Vector> applySmoothingToPoints(List<Vector> points) {
+        ViroLog.debug(TAG, "Applying smoothing with type: " + mInterpolationType);
+        
+        switch (mInterpolationType) {
+            case "bezier":
+                return applyBezierInterpolation(points);
+            case "catmullrom":
+                return applyCatmullRomInterpolation(points);
+            case "hermite":
+                return applyHermiteInterpolation(points);
+            default:
+            case "linear":
+                return points; // No smoothing for linear
+        }
+    }
+    
+    private List<Vector> applyBezierInterpolation(List<Vector> points) {
+        List<Vector> smoothed = new ArrayList<>();
+        
+        // Implement Bezier curve interpolation
+        for (int i = 0; i < points.size() - 1; i++) {
+            Vector p0 = points.get(i);
+            Vector p1 = points.get(i + 1);
+            
+            for (int j = 0; j <= mSegments; j++) {
+                float t = (float) j / mSegments;
+                float x = p0.x + (p1.x - p0.x) * t;
+                float y = p0.y + (p1.y - p0.y) * t;
+                float z = p0.z + (p1.z - p0.z) * t;
+                smoothed.add(new Vector(x, y, z));
+            }
+        }
+        
+        return smoothed;
+    }
+    
+    private List<Vector> applyCatmullRomInterpolation(List<Vector> points) {
+        List<Vector> smoothed = new ArrayList<>();
+        
+        // Implement Catmull-Rom spline interpolation
         for (int i = 0; i < points.size(); i++) {
-            ReadableArray point = points.getArray(i);
-            if (point != null && point.size() >= 2) {
-                // Process point coordinates
-                float x = (float) point.getDouble(0);
-                float y = (float) point.getDouble(1);
-                float z = point.size() > 2 ? (float) point.getDouble(2) : 0.0f;
+            smoothed.add(points.get(i));
+            
+            if (i < points.size() - 1) {
+                Vector p0 = i > 0 ? points.get(i - 1) : points.get(i);
+                Vector p1 = points.get(i);
+                Vector p2 = points.get(i + 1);
+                Vector p3 = i < points.size() - 2 ? points.get(i + 2) : points.get(i + 1);
                 
-                // Calculate segment length for UV mapping
-                if (i > 0) {
-                    ReadableArray prevPoint = points.getArray(i - 1);
-                    if (prevPoint != null && prevPoint.size() >= 2) {
-                        float prevX = (float) prevPoint.getDouble(0);
-                        float prevY = (float) prevPoint.getDouble(1);
-                        float prevZ = prevPoint.size() > 2 ? (float) prevPoint.getDouble(2) : 0.0f;
-                        
-                        float dx = x - prevX;
-                        float dy = y - prevY;
-                        float dz = z - prevZ;
-                        
-                        totalLength += Math.sqrt(dx * dx + dy * dy + dz * dz);
-                    }
+                for (int j = 1; j < mSegments; j++) {
+                    float t = (float) j / mSegments;
+                    Vector interpolated = catmullRom(p0, p1, p2, p3, t);
+                    smoothed.add(interpolated);
                 }
             }
         }
         
-        // Apply smoothing if enabled
-        if (smooth && points.size() > 2) {
-            applySmoothingToPoints();
+        return smoothed;
+    }
+    
+    private Vector catmullRom(Vector p0, Vector p1, Vector p2, Vector p3, float t) {
+        float t2 = t * t;
+        float t3 = t2 * t;
+        
+        float x = 0.5f * ((2 * p1.x) +
+                         (-p0.x + p2.x) * t +
+                         (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                         (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+        
+        float y = 0.5f * ((2 * p1.y) +
+                         (-p0.y + p2.y) * t +
+                         (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                         (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+        
+        float z = 0.5f * ((2 * p1.z) +
+                         (-p0.z + p2.z) * t +
+                         (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 +
+                         (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3);
+        
+        return new Vector(x, y, z);
+    }
+    
+    private List<Vector> applyHermiteInterpolation(List<Vector> points) {
+        // Implement Hermite curve interpolation
+        // Similar to Catmull-Rom but with different tangent calculation
+        return points; // Placeholder
+    }
+    
+    private void applyLineTypeStyle() {
+        if (mPolylineJni != null) {
+            switch (mLineType) {
+                case "dashed":
+                    mPolylineJni.setDashedLine(true);
+                    mPolylineJni.setDashLength(mDashLength);
+                    mPolylineJni.setGapLength(mGapLength);
+                    break;
+                case "dotted":
+                    mPolylineJni.setDashedLine(true);
+                    mPolylineJni.setDashLength(mThickness);
+                    mPolylineJni.setGapLength(mThickness * 2);
+                    break;
+                case "custom":
+                    // Custom pattern would be defined by dash/gap arrays
+                    break;
+                default:
+                case "solid":
+                    mPolylineJni.setDashedLine(false);
+                    break;
+            }
         }
     }
     
-    private void applySmoothingToPoints() {
-        ViroLog.debug(TAG, "Applying smoothing to points with smoothness: " + smoothness);
-        // Apply curve smoothing using spline interpolation
-        // This would typically involve generating intermediate points
-        // between the original points using curve algorithms
-    }
-    
-    private void generateLineGeometry() {
-        ViroLog.debug(TAG, "Generating line geometry with thickness: " + thickness);
+    private void calculateSegmentLengths(List<Vector> points) {
+        mSegmentLengths.clear();
+        mTotalLength = 0.0f;
         
-        // Generate vertices for line strips with thickness
-        // This involves creating quads for each line segment
-        // and handling proper UV mapping and normals
-    }
-    
-    private void applyCapAndJoin() {
-        ViroLog.debug(TAG, "Applying cap type: " + capType + ", join type: " + joinType);
-        
-        // Apply line caps at the start and end
-        if ("round".equals(capType)) {
-            applyRoundCaps();
-        } else if ("square".equals(capType)) {
-            applySquareCaps();
+        for (int i = 0; i < points.size() - 1; i++) {
+            Vector p1 = points.get(i);
+            Vector p2 = points.get(i + 1);
+            
+            float dx = p2.x - p1.x;
+            float dy = p2.y - p1.y;
+            float dz = p2.z - p1.z;
+            
+            float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+            mSegmentLengths.add(length);
+            mTotalLength += length;
         }
         
-        // Apply line joins at connection points
-        if ("round".equals(joinType)) {
-            applyRoundJoins();
-        } else if ("miter".equals(joinType)) {
-            applyMiterJoins();
+        if (mClosed && points.size() > 2) {
+            Vector first = points.get(0);
+            Vector last = points.get(points.size() - 1);
+            
+            float dx = first.x - last.x;
+            float dy = first.y - last.y;
+            float dz = first.z - last.z;
+            
+            float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+            mSegmentLengths.add(length);
+            mTotalLength += length;
         }
     }
     
-    private void applyRoundCaps() {
-        ViroLog.debug(TAG, "Applying round caps");
-        // Generate rounded caps at line endpoints
+    private void applyUVMapping() {
+        if (mPolylineJni != null && mTotalLength > 0) {
+            switch (mUvMode) {
+                case "repeat":
+                    mPolylineJni.setUVMode(Polyline.UVMode.REPEAT);
+                    mPolylineJni.setUVScale(mUvScale);
+                    mPolylineJni.setUVOffset(mUvOffset);
+                    break;
+                case "distance":
+                    mPolylineJni.setUVMode(Polyline.UVMode.DISTANCE);
+                    mPolylineJni.setUVScale(mUvScale / mTotalLength);
+                    mPolylineJni.setUVOffset(mUvOffset);
+                    break;
+                default:
+                case "stretch":
+                    mPolylineJni.setUVMode(Polyline.UVMode.STRETCH);
+                    break;
+            }
+        }
     }
     
-    private void applySquareCaps() {
-        ViroLog.debug(TAG, "Applying square caps");
-        // Generate square caps at line endpoints
-    }
-    
-    private void applyRoundJoins() {
-        ViroLog.debug(TAG, "Applying round joins");
-        // Generate rounded joins at line connection points
-    }
-    
-    private void applyMiterJoins() {
-        ViroLog.debug(TAG, "Applying miter joins");
-        // Generate miter joins at line connection points
-    }
-    
-    private void createGeometry() {
-        ViroLog.debug(TAG, "Creating final polyline geometry");
-        // Create the final renderable geometry
-    }
-    
-    private void updateStyles() {
-        if (!stylesDirty) return;
+    private Material createMaterialFromData(ReadableMap materialData) {
+        Material material = new Material(mViroContext);
         
-        ViroLog.debug(TAG, "Updating polyline styles");
-        
-        // Process colors
-        if (colors != null) {
-            processColors();
+        // Apply material properties from data
+        if (materialData.hasKey("diffuseColor")) {
+            ReadableArray color = materialData.getArray("diffuseColor");
+            if (color != null && color.size() >= 3) {
+                float r = (float) color.getDouble(0);
+                float g = (float) color.getDouble(1);
+                float b = (float) color.getDouble(2);
+                material.setDiffuseColor(r, g, b);
+            }
         }
         
-        // Apply line type styling
-        if ("dashed".equals(lineType)) {
-            applyDashedStyle();
-        } else if ("dotted".equals(lineType)) {
-            applyDottedStyle();
+        if (materialData.hasKey("opacity")) {
+            float opacity = (float) materialData.getDouble("opacity");
+            material.setOpacity(opacity);
         }
         
-        // Process materials
-        if (materials != null) {
-            processMaterials();
-        } else {
-            createDefaultMaterial();
+        if (materialData.hasKey("transparency")) {
+            boolean transparency = materialData.getBoolean("transparency");
+            material.setTransparency(transparency);
         }
         
-        stylesDirty = false;
+        if (materialData.hasKey("unlit") && materialData.getBoolean("unlit")) {
+            material.setLightingModel(Material.LightingModel.CONSTANT);
+        }
+        
+        return material;
     }
     
-    private void processColors() {
-        ViroLog.debug(TAG, "Processing colors: " + colors.size());
-        // Process color gradient or multi-color support
+    private Polyline.CapType getCapTypeEnum(String capType) {
+        switch (capType.toLowerCase()) {
+            case "square":
+                return Polyline.CapType.SQUARE;
+            case "butt":
+                return Polyline.CapType.BUTT;
+            default:
+            case "round":
+                return Polyline.CapType.ROUND;
+        }
     }
     
-    private void applyDashedStyle() {
-        ViroLog.debug(TAG, "Applying dashed style with dash length: " + dashLength + ", gap length: " + gapLength);
-        // Apply dashed line pattern
+    private Polyline.JoinType getJoinTypeEnum(String joinType) {
+        switch (joinType.toLowerCase()) {
+            case "miter":
+                return Polyline.JoinType.MITER;
+            case "bevel":
+                return Polyline.JoinType.BEVEL;
+            default:
+            case "round":
+                return Polyline.JoinType.ROUND;
+        }
     }
     
-    private void applyDottedStyle() {
-        ViroLog.debug(TAG, "Applying dotted style");
-        // Apply dotted line pattern
+    /**
+     * Emit polyline events for ViroReact integration
+     */
+    public void emitPolylineEvent(String eventName, @Nullable WritableMap eventData) {
+        try {
+            if (mReactContext != null && mReactContext.hasActiveCatalystInstance()) {
+                mReactContext.getJSModule(RCTEventEmitter.class)
+                    .receiveEvent(getId(), eventName, eventData);
+            } else {
+                ViroLog.warn(TAG, "Cannot emit event " + eventName + ": no active React context");
+            }
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error emitting event " + eventName + ": " + e.getMessage());
+        }
     }
     
-    private void processMaterials() {
-        ViroLog.debug(TAG, "Processing materials: " + materials.size());
-        // Process material data from ReadableArray
+    // Lifecycle methods
+    
+    public void onDropViewInstance() {
+        ViroLog.debug(TAG, "onDropViewInstance called");
+        
+        // Clean up ViroReact polyline resources
+        if (mNodeJni != null) {
+            mNodeJni.setEventDelegate(null);
+            mNodeJni.setGeometry(null);
+            mNodeJni.dispose();
+            mNodeJni = null;
+        }
+        
+        if (mEventDelegateJni != null) {
+            mEventDelegateJni.dispose();
+            mEventDelegateJni = null;
+        }
+        
+        if (mPolylineJni != null) {
+            mPolylineJni.dispose();
+            mPolylineJni = null;
+        }
+        
+        if (mGeometryJni != null) {
+            mGeometryJni.dispose();
+            mGeometryJni = null;
+        }
+        
+        if (mMaterialJni != null) {
+            mMaterialJni.dispose();
+            mMaterialJni = null;
+        }
+        
+        // Dispose additional materials
+        for (Material material : mMaterialsJni) {
+            if (material != null) {
+                material.dispose();
+            }
+        }
+        mMaterialsJni.clear();
+        
+        // Clear references
+        mComponentEventDelegate = null;
+        mViroContext = null;
+        mReactContext = null;
+        mPoints = null;
+        mColors = null;
+        mMaterials = null;
+        mMaterial = null;
+        mPhysicsBody = null;
+        mAnimation = null;
+        mTransformBehaviors = null;
+        mSegmentLengths.clear();
     }
     
-    private void createDefaultMaterial() {
-        ViroLog.debug(TAG, "Creating default material");
-        // Create default material for line
-    }
-    
-    private void updateTransform() {
-        ViroLog.debug(TAG, "Updating transform");
-        // Update position, rotation, scale
-    }
-    
-    private void updateAnimation() {
-        ViroLog.debug(TAG, "Updating animation");
-        // Update animation properties
-    }
-    
-    private void updatePhysics() {
-        ViroLog.debug(TAG, "Updating physics");
-        // Update physics body properties
-    }
-    
-    private void updateLighting() {
-        ViroLog.debug(TAG, "Updating lighting");
-        // Update lighting properties
-    }
-    
-    private void updateRenderingOrder() {
-        ViroLog.debug(TAG, "Updating rendering order: " + renderingOrder);
-        // Update rendering order in 3D engine
-    }
-    
-    // Public Methods
-    public void forceUpdate() {
-        ViroLog.debug(TAG, "Forcing polyline update");
-        geometryDirty = true;
-        stylesDirty = true;
-        updateGeometry();
-        updateStyles();
-    }
-    
-    public ReadableArray getPoints() {
-        return points;
-    }
-    
-    public float getThickness() {
-        return thickness;
-    }
-    
-    public boolean isClosed() {
-        return closed;
-    }
-    
-    public String getLineType() {
-        return lineType;
-    }
-    
-    public float getTotalLength() {
-        return totalLength;
-    }
-    
-    public int getSegments() {
-        return segments;
-    }
-    
-    public boolean isSmooth() {
-        return smooth;
-    }
-    
-    public float getSmoothness() {
-        return smoothness;
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        ViroLog.debug(TAG, "ViroPolylineView attached to window");
+        
+        // Polyline will be added to scene hierarchy through parent-child relationships
+        if (mNodeJni != null && mPolylineJni != null && mViroContext != null) {
+            ViroLog.debug(TAG, "ViroReact polyline ready for scene attachment");
+        }
+        
+        // Ensure polyline properties are applied
+        applyPolylineProperties();
+        applyTransformProperties();
+        
+        // Update geometry and materials if dirty
+        if (mGeometryDirty) {
+            updateGeometry();
+        }
+        if (mMaterialsDirty) {
+            updateMaterials();
+        }
     }
     
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         ViroLog.debug(TAG, "ViroPolylineView detached from window");
-        // Cleanup resources
+        
+        // ViroReact cleanup is handled in onDropViewInstance
+        // Scene hierarchy cleanup is automatic through parent-child relationships
     }
     
-    @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        super.onLayout(changed, left, top, right, bottom);
-        if (changed) {
-            ViroLog.debug(TAG, "ViroPolylineView layout changed");
-            // Handle layout changes
-        }
-    }
+    // Getters for current values (useful for debugging and testing)
+    public ReadableArray getPoints() { return mPoints; }
+    public float getThickness() { return mThickness; }
+    public ReadableArray getColors() { return mColors; }
+    public boolean isClosed() { return mClosed; }
+    public String getLineType() { return mLineType; }
+    public float getDashLength() { return mDashLength; }
+    public float getGapLength() { return mGapLength; }
+    public String getCapType() { return mCapType; }
+    public String getJoinType() { return mJoinType; }
+    public float getMiterLimit() { return mMiterLimit; }
+    public int getSegments() { return mSegments; }
+    public boolean isSmooth() { return mSmooth; }
+    public float getSmoothness() { return mSmoothness; }
+    public String getInterpolationType() { return mInterpolationType; }
+    public String getUvMode() { return mUvMode; }
+    public float getUvScale() { return mUvScale; }
+    public float getUvOffset() { return mUvOffset; }
+    public boolean isUnlit() { return mUnlit; }
+    public Vector getPosition() { return mPosition; }
+    public Vector getScale() { return mScale; }
+    public Vector getRotation() { return mRotation; }
+    public boolean isVisible() { return mVisible; }
+    public float getOpacity() { return mOpacity; }
+    public int getRenderingOrder() { return mRenderingOrder; }
+    public int getLightReceivingBitMask() { return mLightReceivingBitMask; }
+    public int getShadowCastingBitMask() { return mShadowCastingBitMask; }
+    public float getLineWidth() { return mLineWidth; }
+    public boolean isAntialias() { return mAntialias; }
+    public boolean isBillboard() { return mBillboard; }
+    public float getTotalLength() { return mTotalLength; }
+    public boolean isGeometryDirty() { return mGeometryDirty; }
+    public boolean isMaterialsDirty() { return mMaterialsDirty; }
 }

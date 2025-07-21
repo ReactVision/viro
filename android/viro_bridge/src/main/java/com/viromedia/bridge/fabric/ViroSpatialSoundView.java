@@ -10,968 +10,1013 @@ package com.viromedia.bridge.fabric;
 
 import android.content.Context;
 import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.viro.core.EventDelegate;
+import com.viro.core.Node;
+import com.viro.core.Sound;
+import com.viro.core.SpatialSound;
+import com.viro.core.Vector;
+import com.viro.core.ViroContext;
+import com.viromedia.bridge.component.VRTComponent;
+import com.viromedia.bridge.utility.ComponentEventDelegate;
 import com.viromedia.bridge.utility.ViroLog;
 
+import java.lang.ref.WeakReference;
+
 /**
- * ViroSpatialSoundView - 3D Spatial Audio View
- * 
- * This view represents a 3D spatial audio component that provides precise audio positioning
- * in 3D space with support for directional audio, distance attenuation, environmental effects,
- * and advanced spatial audio processing.
- * 
- * Key capabilities:
- * - Precise 3D audio positioning
- * - Directional audio with cone parameters
- * - Distance-based attenuation models
- * - Environmental audio effects
- * - Real-time spatial audio processing
- * - Doppler effect simulation
- * - Occlusion and obstruction handling
- * - Interactive audio manipulation
- * - Performance optimized 3D audio
+ * Native Android view for ViroSpatialSound component.
+ * ViroSpatialSound provides comprehensive 3D spatial audio functionality with ViroReact 3D integration,
+ * supporting precise 3D positioning, directional audio cones, distance attenuation, Doppler effects, and environmental audio.
  */
 public class ViroSpatialSoundView extends View {
     
     private static final String TAG = ViroLog.getTag(ViroSpatialSoundView.class);
     
+    private ReactContext mReactContext;
+    
+    // ViroReact Integration
+    private Node mNodeJni;
+    private SpatialSound mSpatialSoundJni;
+    private Sound mSoundJni;
+    private ViroContext mViroContext;
+    private EventDelegate mEventDelegateJni;
+    private ComponentEventDelegate mComponentEventDelegate;
+    
     // Audio source properties
-    private ReadableMap source;
-    private String uri;
-    private String local;
-    private String resource;
-    private String audioFormat = "auto";
+    private ReadableMap mSource;
+    private String mUri = "";
+    private String mLocal = "";
+    private String mResource = "";
+    private String mAudioFormat = "auto"; // "auto", "wav", "mp3", "ogg", "aac", "m4a"
     
     // Playback control properties
-    private boolean paused = false;
-    private boolean loop = false;
-    private boolean muted = false;
-    private float volume = 1.0f;
-    private float rate = 1.0f;
-    private float pitch = 1.0f;
-    private float seekTime = 0.0f;
+    private boolean mPaused = false;
+    private boolean mLoop = false;
+    private boolean mMuted = false;
+    private float mVolume = 1.0f;
+    private float mRate = 1.0f;
+    private float mPitch = 1.0f;
+    private float mSeekTime = 0.0f;
     
     // 3D position properties
-    private ReadableArray position;
-    private ReadableArray rotation;
-    private ReadableArray scale;
-    private ReadableArray velocity;
-    private ReadableArray direction;
-    private ReadableArray up;
+    private Vector mPosition = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mRotation = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mScale = new Vector(1.0f, 1.0f, 1.0f);
+    private Vector mVelocity = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mDirection = new Vector(0.0f, 0.0f, -1.0f);
+    private Vector mUp = new Vector(0.0f, 1.0f, 0.0f);
     
     // Spatial audio properties
-    private boolean spatialAudioEnabled = true;
-    private String spatialAudioQuality = "high";
-    private float spatialBlend = 1.0f;
-    private float stereoPan = 0.0f;
+    private boolean mSpatialAudioEnabled = true;
+    private String mSpatialAudioQuality = "high"; // "low", "medium", "high", "ultra"
+    private float mSpatialBlend = 1.0f; // 0.0 = 2D, 1.0 = 3D
+    private float mStereoPan = 0.0f; // -1.0 (left) to 1.0 (right)
     
     // Distance and attenuation properties
-    private String distanceModel = "inverse";
-    private float maxDistance = 1000.0f;
-    private float referenceDistance = 1.0f;
-    private float rolloffFactor = 1.0f;
-    private ReadableArray attenuationCurve;
-    private ReadableArray volumeRolloffCurve;
+    private String mDistanceModel = "inverse"; // "inverse", "linear", "exponential"
+    private float mMaxDistance = 1000.0f;
+    private float mReferenceDistance = 1.0f;
+    private float mRolloffFactor = 1.0f;
+    private float mMinDistance = 0.5f;
     
     // Directional audio properties
-    private boolean directional = false;
-    private float coneInnerAngle = 360.0f;
-    private float coneOuterAngle = 360.0f;
-    private float coneOuterGain = 0.0f;
-    private float coneOuterGainHF = 0.0f;
-    private String directionalityPattern = "cone";
+    private boolean mDirectional = false;
+    private float mConeInnerAngle = 360.0f; // degrees
+    private float mConeOuterAngle = 360.0f; // degrees
+    private float mConeOuterGain = 0.0f; // 0.0 to 1.0
+    private float mConeOuterGainHF = 0.0f; // High frequency outer gain
+    private String mDirectionalityPattern = "cone"; // "cone", "cardioid", "bidirectional"
     
     // Doppler effect properties
-    private boolean dopplerEnabled = false;
-    private float dopplerLevel = 1.0f;
-    private float dopplerFactor = 1.0f;
+    private boolean mDopplerEnabled = false;
+    private float mDopplerLevel = 1.0f;
+    private float mDopplerFactor = 1.0f;
+    private float mSpeedOfSound = 343.3f; // meters per second
     
     // Environmental audio properties
-    private ReadableMap environmentalAudio;
-    private ReadableMap reverb;
-    private ReadableMap reverbZone;
-    private float airAbsorption = 0.0f;
+    private ReadableMap mEnvironmentalAudio;
+    private ReadableMap mReverb;
+    private ReadableMap mReverbZone;
+    private float mAirAbsorption = 0.0f;
+    private float mWetness = 0.0f; // Reverb wetness
+    private float mRoomSize = 10.0f;
     
     // Occlusion and obstruction properties
-    private boolean occlusionEnabled = false;
-    private float occlusionStrength = 1.0f;
-    private float occlusionDirectRatio = 0.0f;
-    private boolean obstructionEnabled = false;
-    private float obstructionStrength = 1.0f;
-    private float obstructionDirectRatio = 0.0f;
+    private boolean mOcclusionEnabled = false;
+    private float mOcclusionStrength = 1.0f;
+    private boolean mObstructionEnabled = false;
+    private float mObstructionStrength = 1.0f;
+    private float mOcclusionLFDamp = 1.0f; // Low frequency damping
+    private float mOcclusionHFDamp = 1.0f; // High frequency damping
     
     // Audio effects properties
-    private ReadableArray effects;
-    private ReadableArray filters;
-    private ReadableMap equalizer;
-    private ReadableMap lowPassFilter;
-    private ReadableMap highPassFilter;
+    private ReadableArray mEffects;
+    private ReadableMap mLowPassFilter;
+    private ReadableMap mHighPassFilter;
+    private ReadableMap mBandPassFilter;
+    private ReadableMap mDistortion;
+    private ReadableMap mChorus;
+    private ReadableMap mEcho;
     
     // Performance properties
-    private int priority = 128;
-    private String processingQuality = "high";
-    private boolean bypassEffects = false;
-    private boolean bypassListenerEffects = false;
-    private boolean bypassReverbZones = false;
+    private String mProcessingQuality = "high"; // "low", "medium", "high", "ultra"
+    private boolean mOptimizationEnabled = true;
+    private int mMaxVoices = 8;
+    private String mPriorityLevel = "normal"; // "low", "normal", "high", "critical"
     
-    // Animation properties
-    private ReadableMap animation;
-    private ReadableArray transformBehaviors;
-    private String viroTag;
-    
-    // Interaction properties
-    private boolean onHover = false;
-    private boolean onClick = false;
-    private boolean onTouch = false;
-    private boolean onDrag = false;
+    // Animation and interaction
+    private ReadableMap mAnimation;
+    private ReadableArray mTransformBehaviors;
+    private String mViroTag;
     
     // Internal state
-    private boolean audioDirty = true;
-    private boolean spatialDirty = true;
-    private boolean positionDirty = true;
-    private boolean effectsDirty = true;
+    private boolean mAudioDirty = true;
+    private boolean mSpatialDirty = true;
+    private boolean mDirectionalDirty = true;
+    private boolean mEffectsDirty = true;
     
     public ViroSpatialSoundView(@NonNull Context context) {
         super(context);
-        ViroLog.debug(TAG, "ViroSpatialSoundView created");
+        mReactContext = (ReactContext) context;
+        
+        ViroLog.debug(TAG, "ViroSpatialSoundView initialized with ViroReact 3D Spatial Audio integration");
+        
         initializeSpatialSound();
     }
     
     private void initializeSpatialSound() {
-        ViroLog.debug(TAG, "Initializing spatial sound");
-        // Initialize default state
-        updateAudio();
-        updateSpatialAudio();
-        updatePosition();
+        ViroLog.debug(TAG, "Initializing ViroReact spatial sound with default properties");
+        
+        // Create ViroReact Node for the spatial sound
+        mNodeJni = new Node();
+        
+        // Create SpatialSound for 3D positioned audio
+        mSpatialSoundJni = new SpatialSound(mViroContext);
+        
+        // Create Sound for audio playback
+        mSoundJni = new Sound(mViroContext, mUri, Sound.VolumeRolloff.LINEAR, new Sound.LoadCallback() {
+            @Override
+            public void onSoundLoaded(Sound sound) {
+                handleSoundLoaded();
+            }
+            
+            @Override
+            public void onSoundFailed(String error) {
+                handleSoundError("Sound loading failed: " + error);
+            }
+        });
+        
+        // Configure initial spatial sound properties
+        applySpatialSoundProperties();
+        
+        // Attach spatial sound to node
+        mNodeJni.setSpatialSound(mSpatialSoundJni);
+        mSpatialSoundJni.setSound(mSoundJni);
+        
+        // Create and attach event callbacks
+        mComponentEventDelegate = new ComponentEventDelegate(new VRTComponentWrapper(this));
+        mEventDelegateJni = new EventDelegate();
+        mEventDelegateJni.setEventDelegateCallback(mComponentEventDelegate);
+        mNodeJni.setEventDelegate(mEventDelegateJni);
+        
+        // Spatial sound views are typically transparent for 3D content
+        setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        
+        ViroLog.debug(TAG, "ViroReact Spatial Sound initialized successfully");
     }
     
-    // Audio Source Setters
+    /**
+     * Wrapper class to make ViroSpatialSoundView compatible with ComponentEventDelegate
+     */
+    private static class VRTComponentWrapper extends VRTComponent {
+        private WeakReference<ViroSpatialSoundView> mSpatialSoundView;
+        
+        public VRTComponentWrapper(ViroSpatialSoundView spatialSoundView) {
+            super(spatialSoundView.getContext(), null, -1, -1, spatialSoundView.mReactContext);
+            mSpatialSoundView = new WeakReference<>(spatialSoundView);
+        }
+        
+        @Override
+        public void emitEvent(String eventName, WritableMap eventData) {
+            ViroSpatialSoundView spatialSoundView = mSpatialSoundView.get();
+            if (spatialSoundView != null) {
+                spatialSoundView.emitSpatialSoundEvent(eventName, eventData);
+            }
+        }
+    }
+    
+    /**
+     * Get the underlying ViroReact Node object
+     */
+    public Node getNodeJni() {
+        return mNodeJni;
+    }
+    
+    /**
+     * Get the underlying ViroReact SpatialSound object
+     */
+    public SpatialSound getSpatialSoundJni() {
+        return mSpatialSoundJni;
+    }
+    
+    /**
+     * Get the underlying ViroReact Sound object
+     */
+    public Sound getSoundJni() {
+        return mSoundJni;
+    }
+    
+    /**
+     * Set the ViroContext for this spatial sound
+     */
+    public void setViroContext(ViroContext context) {
+        mViroContext = context;
+        // Recreate spatial sound components with ViroContext if needed
+        if (mSpatialSoundJni != null) {
+            mSpatialSoundJni.dispose();
+            mSpatialSoundJni = new SpatialSound(mViroContext);
+            if (mSoundJni != null) {
+                mSoundJni.dispose();
+            }
+            mSoundJni = new Sound(mViroContext, mUri, Sound.VolumeRolloff.LINEAR, new Sound.LoadCallback() {
+                @Override
+                public void onSoundLoaded(Sound sound) {
+                    handleSoundLoaded();
+                }
+                
+                @Override
+                public void onSoundFailed(String error) {
+                    handleSoundError("Sound loading failed: " + error);
+                }
+            });
+            applySpatialSoundProperties();
+            if (mNodeJni != null) {
+                mNodeJni.setSpatialSound(mSpatialSoundJni);
+                mSpatialSoundJni.setSound(mSoundJni);
+            }
+        }
+    }
+    
+    // Audio source setters
+    
     public void setSource(@Nullable ReadableMap source) {
-        this.source = source;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting spatial sound source: " + source);
+        mSource = source;
+        
+        if (source != null) {
+            if (source.hasKey("uri")) {
+                mUri = source.getString("uri");
+            }
+            if (source.hasKey("local")) {
+                mLocal = source.getString("local");
+            }
+            if (source.hasKey("resource")) {
+                mResource = source.getString("resource");
+            }
+            loadSpatialSoundAudio();
+        }
     }
     
     public void setUri(@Nullable String uri) {
-        this.uri = uri;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting URI: " + uri);
+        mUri = uri != null ? uri : "";
+        mAudioDirty = true;
+        loadSpatialSoundAudio();
     }
     
     public void setLocal(@Nullable String local) {
-        this.local = local;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting local: " + local);
+        mLocal = local != null ? local : "";
+        mAudioDirty = true;
+        loadSpatialSoundAudio();
     }
     
     public void setResource(@Nullable String resource) {
-        this.resource = resource;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting resource: " + resource);
+        mResource = resource != null ? resource : "";
+        mAudioDirty = true;
+        loadSpatialSoundAudio();
     }
     
     public void setAudioFormat(@Nullable String audioFormat) {
-        this.audioFormat = audioFormat != null ? audioFormat : "auto";
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting audio format: " + audioFormat);
+        mAudioFormat = audioFormat != null ? audioFormat : "auto";
+        mAudioDirty = true;
+        loadSpatialSoundAudio();
     }
     
-    // Playback Control Setters
+    // Playback control setters
+    
     public void setPaused(boolean paused) {
-        this.paused = paused;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting paused: " + paused);
+        mPaused = paused;
+        
+        if (mSoundJni != null) {
+            if (paused) {
+                pauseSpatialSound();
+            } else {
+                playSpatialSound();
+            }
+        }
     }
     
     public void setLoop(boolean loop) {
-        this.loop = loop;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting loop: " + loop);
+        mLoop = loop;
+        
+        if (mSoundJni != null) {
+            mSoundJni.setLoop(loop);
+        }
     }
     
     public void setMuted(boolean muted) {
-        this.muted = muted;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting muted: " + muted);
+        mMuted = muted;
+        
+        if (mSoundJni != null) {
+            mSoundJni.setMuted(muted);
+        }
     }
     
     public void setVolume(float volume) {
-        this.volume = volume;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting volume: " + volume);
+        mVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        
+        if (mSoundJni != null) {
+            mSoundJni.setVolume(mVolume);
+        }
     }
     
     public void setRate(float rate) {
-        this.rate = rate;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting playback rate: " + rate);
+        mRate = Math.max(0.1f, Math.min(3.0f, rate));
+        
+        if (mSoundJni != null) {
+            mSoundJni.setPlaybackRate(mRate);
+        }
     }
     
     public void setPitch(float pitch) {
-        this.pitch = pitch;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting pitch: " + pitch);
+        mPitch = Math.max(0.1f, Math.min(3.0f, pitch));
+        
+        if (mSpatialSoundJni != null) {
+            mSpatialSoundJni.setPitch(mPitch);
+        }
     }
     
     public void setSeekTime(float seekTime) {
-        this.seekTime = seekTime;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting seek time: " + seekTime);
+        mSeekTime = seekTime;
+        
+        if (mSoundJni != null) {
+            mSoundJni.seekToTime(seekTime);
+        }
     }
     
-    // 3D Position Setters
+    // 3D position setters
+    
     public void setPosition(@Nullable ReadableArray position) {
-        this.position = position;
-        this.positionDirty = true;
-        updatePosition();
+        ViroLog.debug(TAG, "Setting position: " + position);
+        
+        if (position != null && position.size() >= 3) {
+            try {
+                float x = (float) position.getDouble(0);
+                float y = (float) position.getDouble(1);
+                float z = (float) position.getDouble(2);
+                mPosition = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing position: " + e.getMessage());
+                mPosition = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mPosition = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        applyTransformProperties();
     }
     
     public void setRotation(@Nullable ReadableArray rotation) {
-        this.rotation = rotation;
-        this.positionDirty = true;
-        updatePosition();
+        ViroLog.debug(TAG, "Setting rotation: " + rotation);
+        
+        if (rotation != null && rotation.size() >= 3) {
+            try {
+                float x = (float) Math.toRadians(rotation.getDouble(0));
+                float y = (float) Math.toRadians(rotation.getDouble(1));
+                float z = (float) Math.toRadians(rotation.getDouble(2));
+                mRotation = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing rotation: " + e.getMessage());
+                mRotation = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mRotation = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        applyTransformProperties();
     }
     
     public void setScale(@Nullable ReadableArray scale) {
-        this.scale = scale;
-        this.positionDirty = true;
-        updatePosition();
+        ViroLog.debug(TAG, "Setting scale: " + scale);
+        
+        if (scale != null && scale.size() >= 3) {
+            try {
+                float x = (float) scale.getDouble(0);
+                float y = (float) scale.getDouble(1);
+                float z = (float) scale.getDouble(2);
+                mScale = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing scale: " + e.getMessage());
+                mScale = new Vector(1.0f, 1.0f, 1.0f);
+            }
+        } else {
+            mScale = new Vector(1.0f, 1.0f, 1.0f);
+        }
+        
+        applyTransformProperties();
     }
     
     public void setVelocity(@Nullable ReadableArray velocity) {
-        this.velocity = velocity;
-        this.positionDirty = true;
-        updatePosition();
-    }
-    
-    public void setDirection(@Nullable ReadableArray direction) {
-        this.direction = direction;
-        this.positionDirty = true;
-        updatePosition();
-    }
-    
-    public void setUp(@Nullable ReadableArray up) {
-        this.up = up;
-        this.positionDirty = true;
-        updatePosition();
-    }
-    
-    // Spatial Audio Setters
-    public void setSpatialAudioEnabled(boolean spatialAudioEnabled) {
-        this.spatialAudioEnabled = spatialAudioEnabled;
-        this.spatialDirty = true;
+        ViroLog.debug(TAG, "Setting velocity: " + velocity);
+        
+        if (velocity != null && velocity.size() >= 3) {
+            try {
+                float x = (float) velocity.getDouble(0);
+                float y = (float) velocity.getDouble(1);
+                float z = (float) velocity.getDouble(2);
+                mVelocity = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing velocity: " + e.getMessage());
+                mVelocity = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mVelocity = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setSpatialAudioQuality(@Nullable String spatialAudioQuality) {
-        this.spatialAudioQuality = spatialAudioQuality != null ? spatialAudioQuality : "high";
-        this.spatialDirty = true;
+    public void setDirection(@Nullable ReadableArray direction) {
+        ViroLog.debug(TAG, "Setting direction: " + direction);
+        
+        if (direction != null && direction.size() >= 3) {
+            try {
+                float x = (float) direction.getDouble(0);
+                float y = (float) direction.getDouble(1);
+                float z = (float) direction.getDouble(2);
+                mDirection = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing direction: " + e.getMessage());
+                mDirection = new Vector(0.0f, 0.0f, -1.0f);
+            }
+        } else {
+            mDirection = new Vector(0.0f, 0.0f, -1.0f);
+        }
+        
+        mDirectionalDirty = true;
+        updateDirectionalAudio();
+    }
+    
+    // Spatial audio setters
+    
+    public void setSpatialAudioEnabled(boolean enabled) {
+        ViroLog.debug(TAG, "Setting spatial audio enabled: " + enabled);
+        mSpatialAudioEnabled = enabled;
+        mSpatialDirty = true;
+        updateSpatialAudio();
+    }
+    
+    public void setSpatialAudioQuality(@Nullable String quality) {
+        ViroLog.debug(TAG, "Setting spatial audio quality: " + quality);
+        mSpatialAudioQuality = quality != null ? quality : "high";
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
     public void setSpatialBlend(float spatialBlend) {
-        this.spatialBlend = spatialBlend;
-        this.spatialDirty = true;
+        ViroLog.debug(TAG, "Setting spatial blend: " + spatialBlend);
+        mSpatialBlend = Math.max(0.0f, Math.min(1.0f, spatialBlend));
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
     public void setStereoPan(float stereoPan) {
-        this.stereoPan = stereoPan;
-        this.spatialDirty = true;
+        ViroLog.debug(TAG, "Setting stereo pan: " + stereoPan);
+        mStereoPan = Math.max(-1.0f, Math.min(1.0f, stereoPan));
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    // Distance and Attenuation Setters
-    public void setDistanceModel(@Nullable String distanceModel) {
-        this.distanceModel = distanceModel != null ? distanceModel : "inverse";
-        this.spatialDirty = true;
+    // Distance and attenuation setters
+    
+    public void setDistanceModel(@Nullable String model) {
+        ViroLog.debug(TAG, "Setting distance model: " + model);
+        mDistanceModel = model != null ? model : "inverse";
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setMaxDistance(float maxDistance) {
-        this.maxDistance = maxDistance;
-        this.spatialDirty = true;
+    public void setMaxDistance(float distance) {
+        ViroLog.debug(TAG, "Setting max distance: " + distance);
+        mMaxDistance = Math.max(mReferenceDistance, distance);
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setReferenceDistance(float referenceDistance) {
-        this.referenceDistance = referenceDistance;
-        this.spatialDirty = true;
+    public void setReferenceDistance(float distance) {
+        ViroLog.debug(TAG, "Setting reference distance: " + distance);
+        mReferenceDistance = Math.max(0.1f, distance);
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setRolloffFactor(float rolloffFactor) {
-        this.rolloffFactor = rolloffFactor;
-        this.spatialDirty = true;
+    public void setRolloffFactor(float factor) {
+        ViroLog.debug(TAG, "Setting rolloff factor: " + factor);
+        mRolloffFactor = Math.max(0.1f, factor);
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setAttenuationCurve(@Nullable ReadableArray attenuationCurve) {
-        this.attenuationCurve = attenuationCurve;
-        this.spatialDirty = true;
+    public void setMinDistance(float distance) {
+        ViroLog.debug(TAG, "Setting min distance: " + distance);
+        mMinDistance = Math.max(0.1f, distance);
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setVolumeRolloffCurve(@Nullable ReadableArray volumeRolloffCurve) {
-        this.volumeRolloffCurve = volumeRolloffCurve;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
+    // Directional audio setters
     
-    // Directional Audio Setters
     public void setDirectional(boolean directional) {
-        this.directional = directional;
-        this.spatialDirty = true;
+        ViroLog.debug(TAG, "Setting directional: " + directional);
+        mDirectional = directional;
+        mDirectionalDirty = true;
+        updateDirectionalAudio();
+    }
+    
+    public void setConeInnerAngle(float angle) {
+        ViroLog.debug(TAG, "Setting cone inner angle: " + angle);
+        mConeInnerAngle = Math.max(0.0f, Math.min(360.0f, angle));
+        mDirectionalDirty = true;
+        updateDirectionalAudio();
+    }
+    
+    public void setConeOuterAngle(float angle) {
+        ViroLog.debug(TAG, "Setting cone outer angle: " + angle);
+        mConeOuterAngle = Math.max(mConeInnerAngle, Math.min(360.0f, angle));
+        mDirectionalDirty = true;
+        updateDirectionalAudio();
+    }
+    
+    public void setConeOuterGain(float gain) {
+        ViroLog.debug(TAG, "Setting cone outer gain: " + gain);
+        mConeOuterGain = Math.max(0.0f, Math.min(1.0f, gain));
+        mDirectionalDirty = true;
+        updateDirectionalAudio();
+    }
+    
+    public void setDirectionalityPattern(@Nullable String pattern) {
+        ViroLog.debug(TAG, "Setting directionality pattern: " + pattern);
+        mDirectionalityPattern = pattern != null ? pattern : "cone";
+        mDirectionalDirty = true;
+        updateDirectionalAudio();
+    }
+    
+    // Doppler effect setters
+    
+    public void setDopplerEnabled(boolean enabled) {
+        ViroLog.debug(TAG, "Setting doppler enabled: " + enabled);
+        mDopplerEnabled = enabled;
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setConeInnerAngle(float coneInnerAngle) {
-        this.coneInnerAngle = coneInnerAngle;
-        this.spatialDirty = true;
+    public void setDopplerLevel(float level) {
+        ViroLog.debug(TAG, "Setting doppler level: " + level);
+        mDopplerLevel = Math.max(0.0f, Math.min(5.0f, level));
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setConeOuterAngle(float coneOuterAngle) {
-        this.coneOuterAngle = coneOuterAngle;
-        this.spatialDirty = true;
+    public void setDopplerFactor(float factor) {
+        ViroLog.debug(TAG, "Setting doppler factor: " + factor);
+        mDopplerFactor = Math.max(0.0f, Math.min(5.0f, factor));
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setConeOuterGain(float coneOuterGain) {
-        this.coneOuterGain = coneOuterGain;
-        this.spatialDirty = true;
-        updateSpatialAudio();
+    // ViroReact-specific methods
+    
+    private void applySpatialSoundProperties() {
+        if (mSpatialSoundJni != null) {
+            ViroLog.debug(TAG, "Applying spatial sound properties to ViroReact SpatialSound");
+            
+            // Apply spatial audio properties
+            mSpatialSoundJni.setSpatialBlend(mSpatialBlend);
+            mSpatialSoundJni.setStereoPan(mStereoPan);
+            
+            // Apply directional properties if enabled
+            if (mDirectional) {
+                mSpatialSoundJni.setDirectional(true);
+                mSpatialSoundJni.setConeInnerAngle(mConeInnerAngle);
+                mSpatialSoundJni.setConeOuterAngle(mConeOuterAngle);
+                mSpatialSoundJni.setConeOuterGain(mConeOuterGain);
+                mSpatialSoundJni.setDirection(mDirection);
+                
+                SpatialSound.DirectionalityPattern pattern = getDirectionalityPatternEnum(mDirectionalityPattern);
+                mSpatialSoundJni.setDirectionalityPattern(pattern);
+            }
+            
+            // Apply Doppler effect if enabled
+            if (mDopplerEnabled) {
+                mSpatialSoundJni.setDopplerEnabled(true);
+                mSpatialSoundJni.setDopplerLevel(mDopplerLevel);
+                mSpatialSoundJni.setDopplerFactor(mDopplerFactor);
+                mSpatialSoundJni.setVelocity(mVelocity);
+            }
+            
+            // Apply environmental audio
+            if (mRoomSize > 0) {
+                mSpatialSoundJni.setRoomSize(mRoomSize);
+            }
+            if (mWetness > 0) {
+                mSpatialSoundJni.setReverbWetness(mWetness);
+            }
+            if (mAirAbsorption > 0) {
+                mSpatialSoundJni.setAirAbsorption(mAirAbsorption);
+            }
+            
+            // Apply occlusion and obstruction
+            if (mOcclusionEnabled) {
+                mSpatialSoundJni.setOcclusionEnabled(true);
+                mSpatialSoundJni.setOcclusionStrength(mOcclusionStrength);
+                mSpatialSoundJni.setOcclusionLFDamp(mOcclusionLFDamp);
+                mSpatialSoundJni.setOcclusionHFDamp(mOcclusionHFDamp);
+            }
+            
+            ViroLog.debug(TAG, "Spatial sound properties applied successfully");
+        }
     }
     
-    public void setConeOuterGainHF(float coneOuterGainHF) {
-        this.coneOuterGainHF = coneOuterGainHF;
-        this.spatialDirty = true;
-        updateSpatialAudio();
+    private void applyTransformProperties() {
+        if (mNodeJni != null) {
+            ViroLog.debug(TAG, "Applying transform properties to ViroReact Node");
+            
+            // Apply position, rotation, and scale to the node
+            mNodeJni.setPosition(mPosition);
+            mNodeJni.setRotation(mRotation);
+            mNodeJni.setScale(mScale);
+            
+            ViroLog.debug(TAG, "Transform properties applied successfully");
+        }
     }
     
-    public void setDirectionalityPattern(@Nullable String directionalityPattern) {
-        this.directionalityPattern = directionalityPattern != null ? directionalityPattern : "cone";
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    // Doppler Effect Setters
-    public void setDopplerEnabled(boolean dopplerEnabled) {
-        this.dopplerEnabled = dopplerEnabled;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setDopplerLevel(float dopplerLevel) {
-        this.dopplerLevel = dopplerLevel;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setDopplerFactor(float dopplerFactor) {
-        this.dopplerFactor = dopplerFactor;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    // Environmental Audio Setters
-    public void setEnvironmentalAudio(@Nullable ReadableMap environmentalAudio) {
-        this.environmentalAudio = environmentalAudio;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setReverb(@Nullable ReadableMap reverb) {
-        this.reverb = reverb;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setReverbZone(@Nullable ReadableMap reverbZone) {
-        this.reverbZone = reverbZone;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setAirAbsorption(float airAbsorption) {
-        this.airAbsorption = airAbsorption;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    // Occlusion and Obstruction Setters
-    public void setOcclusionEnabled(boolean occlusionEnabled) {
-        this.occlusionEnabled = occlusionEnabled;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setOcclusionStrength(float occlusionStrength) {
-        this.occlusionStrength = occlusionStrength;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setOcclusionDirectRatio(float occlusionDirectRatio) {
-        this.occlusionDirectRatio = occlusionDirectRatio;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setObstructionEnabled(boolean obstructionEnabled) {
-        this.obstructionEnabled = obstructionEnabled;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setObstructionStrength(float obstructionStrength) {
-        this.obstructionStrength = obstructionStrength;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setObstructionDirectRatio(float obstructionDirectRatio) {
-        this.obstructionDirectRatio = obstructionDirectRatio;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    // Audio Effects Setters
-    public void setEffects(@Nullable ReadableArray effects) {
-        this.effects = effects;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setFilters(@Nullable ReadableArray filters) {
-        this.filters = filters;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setEqualizer(@Nullable ReadableMap equalizer) {
-        this.equalizer = equalizer;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setLowPassFilter(@Nullable ReadableMap lowPassFilter) {
-        this.lowPassFilter = lowPassFilter;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setHighPassFilter(@Nullable ReadableMap highPassFilter) {
-        this.highPassFilter = highPassFilter;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    // Performance Setters
-    public void setPriority(int priority) {
-        this.priority = priority;
-        updatePerformance();
-    }
-    
-    public void setProcessingQuality(@Nullable String processingQuality) {
-        this.processingQuality = processingQuality != null ? processingQuality : "high";
-        updatePerformance();
-    }
-    
-    public void setBypassEffects(boolean bypassEffects) {
-        this.bypassEffects = bypassEffects;
-        updatePerformance();
-    }
-    
-    public void setBypassListenerEffects(boolean bypassListenerEffects) {
-        this.bypassListenerEffects = bypassListenerEffects;
-        updatePerformance();
-    }
-    
-    public void setBypassReverbZones(boolean bypassReverbZones) {
-        this.bypassReverbZones = bypassReverbZones;
-        updatePerformance();
-    }
-    
-    // Animation Setters
-    public void setAnimation(@Nullable ReadableMap animation) {
-        this.animation = animation;
-        updateAnimation();
-    }
-    
-    public void setTransformBehaviors(@Nullable ReadableArray transformBehaviors) {
-        this.transformBehaviors = transformBehaviors;
-        updateAnimation();
-    }
-    
-    public void setViroTag(@Nullable String viroTag) {
-        this.viroTag = viroTag;
-    }
-    
-    // Interaction Setters
-    public void setOnHover(boolean onHover) {
-        this.onHover = onHover;
-    }
-    
-    public void setOnClick(boolean onClick) {
-        this.onClick = onClick;
-    }
-    
-    public void setOnTouch(boolean onTouch) {
-        this.onTouch = onTouch;
-    }
-    
-    public void setOnDrag(boolean onDrag) {
-        this.onDrag = onDrag;
-    }
-    
-    // Update Methods
-    private void updateAudio() {
-        if (!audioDirty) return;
-        
-        ViroLog.debug(TAG, "Updating audio");
-        
-        // Load audio source
-        if (source != null) {
-            processAudioSource();
-        } else if (uri != null) {
-            loadAudioFromUri();
-        } else if (local != null) {
-            loadAudioFromLocal();
-        } else if (resource != null) {
-            loadAudioFromResource();
+    private void loadSpatialSoundAudio() {
+        if (mUri.isEmpty() && mLocal.isEmpty() && mResource.isEmpty()) {
+            ViroLog.debug(TAG, "No spatial sound audio source provided");
+            return;
         }
         
-        // Configure audio format
-        configureAudioFormat();
+        String audioSource = !mUri.isEmpty() ? mUri : (!mLocal.isEmpty() ? mLocal : mResource);
+        ViroLog.debug(TAG, "Loading spatial sound audio in ViroReact: " + audioSource);
         
-        audioDirty = false;
-    }
-    
-    private void processAudioSource() {
-        ViroLog.debug(TAG, "Processing audio source: " + source);
-        // Process audio source from ReadableMap
-    }
-    
-    private void loadAudioFromUri() {
-        ViroLog.debug(TAG, "Loading audio from URI: " + uri);
-        // Load audio from URI
-    }
-    
-    private void loadAudioFromLocal() {
-        ViroLog.debug(TAG, "Loading audio from local: " + local);
-        // Load audio from local file
-    }
-    
-    private void loadAudioFromResource() {
-        ViroLog.debug(TAG, "Loading audio from resource: " + resource);
-        // Load audio from resource
-    }
-    
-    private void configureAudioFormat() {
-        ViroLog.debug(TAG, "Configuring audio format: " + audioFormat);
-        // Configure audio format
-    }
-    
-    private void updatePlaybackControl() {
-        ViroLog.debug(TAG, "Updating playback control");
-        
-        // Update playback state
-        if (paused) {
-            pausePlayback();
+        if (mViroContext != null && mSpatialSoundJni != null) {
+            // Dispose existing sound if any
+            if (mSoundJni != null) {
+                mSoundJni.dispose();
+            }
+            
+            // Create new sound with proper rolloff model
+            Sound.VolumeRolloff rolloff = getVolumeRolloffEnum(mDistanceModel);
+            mSoundJni = new Sound(mViroContext, audioSource, rolloff, new Sound.LoadCallback() {
+                @Override
+                public void onSoundLoaded(Sound sound) {
+                    handleSoundLoaded();
+                }
+                
+                @Override
+                public void onSoundFailed(String error) {
+                    handleSoundError("Spatial sound audio failed: " + error);
+                }
+            });
+            
+            // Configure sound properties
+            mSoundJni.setLoop(mLoop);
+            mSoundJni.setMuted(mMuted);
+            mSoundJni.setVolume(mVolume);
+            mSoundJni.setPlaybackRate(mRate);
+            
+            // Apply spatial audio properties
+            mSoundJni.setMinDistance(mMinDistance);
+            mSoundJni.setMaxDistance(mMaxDistance);
+            mSoundJni.setRolloffFactor(mRolloffFactor);
+            
+            // Set sound to spatial sound
+            mSpatialSoundJni.setSound(mSoundJni);
+            
+            // Apply spatial sound properties
+            applySpatialSoundProperties();
         } else {
-            startPlayback();
+            handleSoundError("ViroContext not available for spatial sound audio loading");
         }
-        
-        // Update audio properties
-        updateAudioProperties();
     }
     
-    private void pausePlayback() {
-        ViroLog.debug(TAG, "Pausing playback");
-        // Pause audio playback
-    }
-    
-    private void startPlayback() {
-        ViroLog.debug(TAG, "Starting playback");
-        // Start audio playback
-    }
-    
-    private void updateAudioProperties() {
-        ViroLog.debug(TAG, "Updating audio properties");
-        // Update volume, rate, pitch, seek time, etc.
-    }
-    
-    private void updatePosition() {
-        if (!positionDirty) return;
-        
-        ViroLog.debug(TAG, "Updating 3D position");
-        
-        // Update position
-        if (position != null) {
-            updateAudioPosition();
+    private void playSpatialSound() {
+        if (mSoundJni != null) {
+            ViroLog.debug(TAG, "Playing spatial sound");
+            mSoundJni.play();
+            emitSpatialSoundEvent("onPlay", createSoundEventData());
         }
-        
-        // Update rotation
-        if (rotation != null) {
-            updateAudioRotation();
+    }
+    
+    private void pauseSpatialSound() {
+        if (mSoundJni != null) {
+            ViroLog.debug(TAG, "Pausing spatial sound");
+            mSoundJni.pause();
+            emitSpatialSoundEvent("onPause", createSoundEventData());
         }
-        
-        // Update scale
-        if (scale != null) {
-            updateAudioScale();
-        }
-        
-        // Update velocity (for Doppler effect)
-        if (velocity != null) {
-            updateAudioVelocity();
-        }
-        
-        // Update direction
-        if (direction != null) {
-            updateAudioDirection();
-        }
-        
-        // Update up vector
-        if (up != null) {
-            updateAudioUp();
-        }
-        
-        positionDirty = false;
-    }
-    
-    private void updateAudioPosition() {
-        ViroLog.debug(TAG, "Updating audio position: " + position);
-        // Update 3D position
-    }
-    
-    private void updateAudioRotation() {
-        ViroLog.debug(TAG, "Updating audio rotation: " + rotation);
-        // Update 3D rotation
-    }
-    
-    private void updateAudioScale() {
-        ViroLog.debug(TAG, "Updating audio scale: " + scale);
-        // Update 3D scale
-    }
-    
-    private void updateAudioVelocity() {
-        ViroLog.debug(TAG, "Updating audio velocity: " + velocity);
-        // Update velocity for Doppler effect
-    }
-    
-    private void updateAudioDirection() {
-        ViroLog.debug(TAG, "Updating audio direction: " + direction);
-        // Update audio direction
-    }
-    
-    private void updateAudioUp() {
-        ViroLog.debug(TAG, "Updating audio up vector: " + up);
-        // Update audio up vector
     }
     
     private void updateSpatialAudio() {
-        if (!spatialDirty) return;
+        if (mSpatialDirty && mSpatialSoundJni != null && mSoundJni != null) {
+            ViroLog.debug(TAG, "Updating spatial audio properties");
+            
+            // Apply spatial audio settings
+            mSpatialSoundJni.setSpatialBlend(mSpatialBlend);
+            mSpatialSoundJni.setStereoPan(mStereoPan);
+            
+            // Apply distance and attenuation settings
+            mSoundJni.setMinDistance(mMinDistance);
+            mSoundJni.setMaxDistance(mMaxDistance);
+            mSoundJni.setRolloffFactor(mRolloffFactor);
+            
+            // Update volume rolloff model
+            Sound.VolumeRolloff rolloff = getVolumeRolloffEnum(mDistanceModel);
+            mSoundJni.setVolumeRolloff(rolloff);
+            
+            // Apply Doppler effect if enabled
+            if (mDopplerEnabled) {
+                mSpatialSoundJni.setDopplerEnabled(true);
+                mSpatialSoundJni.setDopplerLevel(mDopplerLevel);
+                mSpatialSoundJni.setDopplerFactor(mDopplerFactor);
+                mSpatialSoundJni.setVelocity(mVelocity);
+            } else {
+                mSpatialSoundJni.setDopplerEnabled(false);
+            }
+            
+            mSpatialDirty = false;
+            ViroLog.debug(TAG, "Spatial audio properties updated successfully");
+        }
+    }
+    
+    private void updateDirectionalAudio() {
+        if (mDirectionalDirty && mSpatialSoundJni != null) {
+            ViroLog.debug(TAG, "Updating directional audio properties");
+            
+            if (mDirectional) {
+                mSpatialSoundJni.setDirectional(true);
+                mSpatialSoundJni.setConeInnerAngle(mConeInnerAngle);
+                mSpatialSoundJni.setConeOuterAngle(mConeOuterAngle);
+                mSpatialSoundJni.setConeOuterGain(mConeOuterGain);
+                mSpatialSoundJni.setDirection(mDirection);
+                
+                SpatialSound.DirectionalityPattern pattern = getDirectionalityPatternEnum(mDirectionalityPattern);
+                mSpatialSoundJni.setDirectionalityPattern(pattern);
+            } else {
+                mSpatialSoundJni.setDirectional(false);
+            }
+            
+            mDirectionalDirty = false;
+            ViroLog.debug(TAG, "Directional audio properties updated successfully");
+        }
+    }
+    
+    // Event handlers
+    
+    private void handleSoundLoaded() {
+        ViroLog.debug(TAG, "Spatial sound audio loaded");
+        emitSpatialSoundEvent("onLoad", createSoundEventData());
         
-        ViroLog.debug(TAG, "Updating spatial audio");
+        // Auto-play if not paused
+        if (!mPaused) {
+            playSpatialSound();
+        }
+    }
+    
+    private void handleSoundError(String errorMessage) {
+        ViroLog.error(TAG, "Spatial sound error: " + errorMessage);
         
-        if (spatialAudioEnabled) {
-            configureSpatialAudio();
-        } else {
-            disableSpatialAudio();
+        WritableMap eventData = createSoundEventData();
+        eventData.putString("error", errorMessage);
+        emitSpatialSoundEvent("onError", eventData);
+    }
+    
+    private WritableMap createSoundEventData() {
+        WritableMap eventData = Arguments.createMap();
+        eventData.putString("uri", mUri);
+        eventData.putBoolean("paused", mPaused);
+        eventData.putBoolean("loop", mLoop);
+        eventData.putBoolean("muted", mMuted);
+        eventData.putDouble("volume", mVolume);
+        eventData.putDouble("rate", mRate);
+        eventData.putDouble("pitch", mPitch);
+        eventData.putBoolean("spatialAudioEnabled", mSpatialAudioEnabled);
+        eventData.putDouble("spatialBlend", mSpatialBlend);
+        eventData.putBoolean("directional", mDirectional);
+        eventData.putBoolean("dopplerEnabled", mDopplerEnabled);
+        eventData.putDouble("maxDistance", mMaxDistance);
+        eventData.putDouble("referenceDistance", mReferenceDistance);
+        return eventData;
+    }
+    
+    /**
+     * Emit spatial sound events for ViroReact integration
+     */
+    public void emitSpatialSoundEvent(String eventName, @Nullable WritableMap eventData) {
+        try {
+            if (mReactContext != null && mReactContext.hasActiveCatalystInstance()) {
+                mReactContext.getJSModule(RCTEventEmitter.class)
+                    .receiveEvent(getId(), eventName, eventData);
+            } else {
+                ViroLog.warn(TAG, "Cannot emit event " + eventName + ": no active React context");
+            }
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error emitting event " + eventName + ": " + e.getMessage());
+        }
+    }
+    
+    // Helper methods to convert string properties to enum values
+    
+    private SpatialSound.DirectionalityPattern getDirectionalityPatternEnum(String pattern) {
+        switch (pattern.toLowerCase()) {
+            case "cardioid":
+                return SpatialSound.DirectionalityPattern.CARDIOID;
+            case "bidirectional":
+                return SpatialSound.DirectionalityPattern.BIDIRECTIONAL;
+            default:
+            case "cone":
+                return SpatialSound.DirectionalityPattern.CONE;
+        }
+    }
+    
+    private Sound.VolumeRolloff getVolumeRolloffEnum(String distanceModel) {
+        switch (distanceModel.toLowerCase()) {
+            case "linear":
+                return Sound.VolumeRolloff.LINEAR;
+            case "exponential":
+                return Sound.VolumeRolloff.EXPONENTIAL;
+            default:
+            case "inverse":
+                return Sound.VolumeRolloff.LOGARITHMIC;
+        }
+    }
+    
+    // Lifecycle methods
+    
+    public void onDropViewInstance() {
+        ViroLog.debug(TAG, "onDropViewInstance called");
+        
+        // Stop sound playback
+        if (mSoundJni != null) {
+            mSoundJni.pause();
         }
         
-        // Update distance and attenuation
-        configureDistanceAttenuation();
-        
-        // Update directional audio
-        if (directional) {
-            configureDirectionalAudio();
+        // Clean up ViroReact spatial sound resources
+        if (mNodeJni != null) {
+            mNodeJni.setEventDelegate(null);
+            mNodeJni.setSpatialSound(null);
+            mNodeJni.dispose();
+            mNodeJni = null;
         }
         
-        // Update Doppler effect
-        if (dopplerEnabled) {
-            configureDopplerEffect();
+        if (mEventDelegateJni != null) {
+            mEventDelegateJni.dispose();
+            mEventDelegateJni = null;
         }
         
-        // Update occlusion and obstruction
-        configureOcclusionObstruction();
-        
-        spatialDirty = false;
-    }
-    
-    private void configureSpatialAudio() {
-        ViroLog.debug(TAG, "Configuring spatial audio: quality=" + spatialAudioQuality);
-        // Configure spatial audio processing
-    }
-    
-    private void disableSpatialAudio() {
-        ViroLog.debug(TAG, "Disabling spatial audio");
-        // Disable spatial audio processing
-    }
-    
-    private void configureDistanceAttenuation() {
-        ViroLog.debug(TAG, "Configuring distance attenuation: model=" + distanceModel);
-        // Configure distance-based attenuation
-    }
-    
-    private void configureDirectionalAudio() {
-        ViroLog.debug(TAG, "Configuring directional audio: pattern=" + directionalityPattern);
-        // Configure directional audio with cone parameters
-    }
-    
-    private void configureDopplerEffect() {
-        ViroLog.debug(TAG, "Configuring Doppler effect: level=" + dopplerLevel);
-        // Configure Doppler effect
-    }
-    
-    private void configureOcclusionObstruction() {
-        ViroLog.debug(TAG, "Configuring occlusion/obstruction");
-        // Configure occlusion and obstruction effects
-    }
-    
-    private void updateEffects() {
-        if (!effectsDirty) return;
-        
-        ViroLog.debug(TAG, "Updating effects");
-        
-        // Configure environmental audio
-        if (environmentalAudio != null) {
-            configureEnvironmentalAudio();
+        if (mSpatialSoundJni != null) {
+            mSpatialSoundJni.dispose();
+            mSpatialSoundJni = null;
         }
         
-        // Configure reverb
-        if (reverb != null) {
-            configureReverb();
+        if (mSoundJni != null) {
+            mSoundJni.dispose();
+            mSoundJni = null;
         }
         
-        // Configure reverb zone
-        if (reverbZone != null) {
-            configureReverbZone();
+        // Clear references
+        mComponentEventDelegate = null;
+        mViroContext = null;
+        mReactContext = null;
+        mSource = null;
+        mEnvironmentalAudio = null;
+        mReverb = null;
+        mReverbZone = null;
+        mEffects = null;
+        mLowPassFilter = null;
+        mHighPassFilter = null;
+        mBandPassFilter = null;
+        mDistortion = null;
+        mChorus = null;
+        mEcho = null;
+        mTransformBehaviors = null;
+        mAnimation = null;
+    }
+    
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        ViroLog.debug(TAG, "ViroSpatialSoundView attached to window");
+        
+        // Spatial sound will be added to scene hierarchy through parent-child relationships
+        if (mNodeJni != null && mSpatialSoundJni != null && mViroContext != null) {
+            ViroLog.debug(TAG, "ViroReact spatial sound ready for scene attachment");
         }
         
-        // Configure audio effects
-        if (effects != null) {
-            configureAudioEffects();
-        }
+        // Ensure spatial sound properties are applied
+        applySpatialSoundProperties();
+        applyTransformProperties();
         
-        // Configure filters
-        if (filters != null) {
-            configureAudioFilters();
+        // Update audio and spatial audio if dirty
+        if (mAudioDirty) {
+            loadSpatialSoundAudio();
         }
-        
-        // Configure equalizer
-        if (equalizer != null) {
-            configureEqualizer();
+        if (mSpatialDirty) {
+            updateSpatialAudio();
         }
-        
-        // Configure low pass filter
-        if (lowPassFilter != null) {
-            configureLowPassFilter();
+        if (mDirectionalDirty) {
+            updateDirectionalAudio();
         }
-        
-        // Configure high pass filter
-        if (highPassFilter != null) {
-            configureHighPassFilter();
-        }
-        
-        effectsDirty = false;
-    }
-    
-    private void configureEnvironmentalAudio() {
-        ViroLog.debug(TAG, "Configuring environmental audio");
-        // Configure environmental audio effects
-    }
-    
-    private void configureReverb() {
-        ViroLog.debug(TAG, "Configuring reverb");
-        // Configure reverb effects
-    }
-    
-    private void configureReverbZone() {
-        ViroLog.debug(TAG, "Configuring reverb zone");
-        // Configure reverb zone effects
-    }
-    
-    private void configureAudioEffects() {
-        ViroLog.debug(TAG, "Configuring audio effects: " + effects.size());
-        // Configure audio effects
-    }
-    
-    private void configureAudioFilters() {
-        ViroLog.debug(TAG, "Configuring audio filters: " + filters.size());
-        // Configure audio filters
-    }
-    
-    private void configureEqualizer() {
-        ViroLog.debug(TAG, "Configuring equalizer");
-        // Configure equalizer
-    }
-    
-    private void configureLowPassFilter() {
-        ViroLog.debug(TAG, "Configuring low pass filter");
-        // Configure low pass filter
-    }
-    
-    private void configureHighPassFilter() {
-        ViroLog.debug(TAG, "Configuring high pass filter");
-        // Configure high pass filter
-    }
-    
-    private void updatePerformance() {
-        ViroLog.debug(TAG, "Updating performance settings");
-        // Update performance-related settings
-    }
-    
-    private void updateAnimation() {
-        ViroLog.debug(TAG, "Updating animation");
-        // Update animation properties
-    }
-    
-    // Public Methods
-    public void forceUpdate() {
-        ViroLog.debug(TAG, "Forcing spatial sound update");
-        audioDirty = true;
-        spatialDirty = true;
-        positionDirty = true;
-        effectsDirty = true;
-        updateAudio();
-        updateSpatialAudio();
-        updatePosition();
-        updateEffects();
-    }
-    
-    public ReadableMap getSource() {
-        return source;
-    }
-    
-    public String getUri() {
-        return uri;
-    }
-    
-    public String getLocal() {
-        return local;
-    }
-    
-    public String getResource() {
-        return resource;
-    }
-    
-    public String getAudioFormat() {
-        return audioFormat;
-    }
-    
-    public boolean getPaused() {
-        return paused;
-    }
-    
-    public boolean getLoop() {
-        return loop;
-    }
-    
-    public boolean getMuted() {
-        return muted;
-    }
-    
-    public float getVolume() {
-        return volume;
-    }
-    
-    public float getRate() {
-        return rate;
-    }
-    
-    public float getPitch() {
-        return pitch;
-    }
-    
-    public ReadableArray getPosition() {
-        return position;
-    }
-    
-    public ReadableArray getRotation() {
-        return rotation;
-    }
-    
-    public ReadableArray getVelocity() {
-        return velocity;
-    }
-    
-    public boolean getSpatialAudioEnabled() {
-        return spatialAudioEnabled;
-    }
-    
-    public String getSpatialAudioQuality() {
-        return spatialAudioQuality;
-    }
-    
-    public float getSpatialBlend() {
-        return spatialBlend;
-    }
-    
-    public String getDistanceModel() {
-        return distanceModel;
-    }
-    
-    public float getMaxDistance() {
-        return maxDistance;
-    }
-    
-    public float getReferenceDistance() {
-        return referenceDistance;
-    }
-    
-    public float getRolloffFactor() {
-        return rolloffFactor;
-    }
-    
-    public boolean getDirectional() {
-        return directional;
-    }
-    
-    public float getConeInnerAngle() {
-        return coneInnerAngle;
-    }
-    
-    public float getConeOuterAngle() {
-        return coneOuterAngle;
-    }
-    
-    public boolean getDopplerEnabled() {
-        return dopplerEnabled;
-    }
-    
-    public float getDopplerLevel() {
-        return dopplerLevel;
-    }
-    
-    public boolean getOcclusionEnabled() {
-        return occlusionEnabled;
-    }
-    
-    public boolean getObstructionEnabled() {
-        return obstructionEnabled;
-    }
-    
-    public int getPriority() {
-        return priority;
-    }
-    
-    public String getProcessingQuality() {
-        return processingQuality;
     }
     
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         ViroLog.debug(TAG, "ViroSpatialSoundView detached from window");
-        // Cleanup resources
+        
+        // Pause sound when detached
+        if (mSoundJni != null) {
+            mSoundJni.pause();
+        }
+        
+        // ViroReact cleanup is handled in onDropViewInstance
+        // Scene hierarchy cleanup is automatic through parent-child relationships
     }
     
-    @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        super.onLayout(changed, left, top, right, bottom);
-        if (changed) {
-            ViroLog.debug(TAG, "ViroSpatialSoundView layout changed");
-            // Handle layout changes
-        }
-    }
+    // Getters for current values (useful for debugging and testing)
+    public String getUri() { return mUri; }
+    public String getLocal() { return mLocal; }
+    public String getResource() { return mResource; }
+    public String getAudioFormat() { return mAudioFormat; }
+    public boolean isPaused() { return mPaused; }
+    public boolean isLoop() { return mLoop; }
+    public boolean isMuted() { return mMuted; }
+    public float getVolume() { return mVolume; }
+    public float getRate() { return mRate; }
+    public float getPitch() { return mPitch; }
+    public float getSeekTime() { return mSeekTime; }
+    public Vector getPosition() { return mPosition; }
+    public Vector getRotation() { return mRotation; }
+    public Vector getScale() { return mScale; }
+    public Vector getVelocity() { return mVelocity; }
+    public Vector getDirection() { return mDirection; }
+    public Vector getUp() { return mUp; }
+    public boolean isSpatialAudioEnabled() { return mSpatialAudioEnabled; }
+    public String getSpatialAudioQuality() { return mSpatialAudioQuality; }
+    public float getSpatialBlend() { return mSpatialBlend; }
+    public float getStereoPan() { return mStereoPan; }
+    public String getDistanceModel() { return mDistanceModel; }
+    public float getMaxDistance() { return mMaxDistance; }
+    public float getReferenceDistance() { return mReferenceDistance; }
+    public float getRolloffFactor() { return mRolloffFactor; }
+    public float getMinDistance() { return mMinDistance; }
+    public boolean isDirectional() { return mDirectional; }
+    public float getConeInnerAngle() { return mConeInnerAngle; }
+    public float getConeOuterAngle() { return mConeOuterAngle; }
+    public float getConeOuterGain() { return mConeOuterGain; }
+    public String getDirectionalityPattern() { return mDirectionalityPattern; }
+    public boolean isDopplerEnabled() { return mDopplerEnabled; }
+    public float getDopplerLevel() { return mDopplerLevel; }
+    public float getDopplerFactor() { return mDopplerFactor; }
+    public float getSpeedOfSound() { return mSpeedOfSound; }
+    public float getAirAbsorption() { return mAirAbsorption; }
+    public float getWetness() { return mWetness; }
+    public float getRoomSize() { return mRoomSize; }
+    public boolean isOcclusionEnabled() { return mOcclusionEnabled; }
+    public float getOcclusionStrength() { return mOcclusionStrength; }
+    public String getProcessingQuality() { return mProcessingQuality; }
+    public boolean isAudioDirty() { return mAudioDirty; }
+    public boolean isSpatialDirty() { return mSpatialDirty; }
+    public boolean isDirectionalDirty() { return mDirectionalDirty; }
+    public boolean isEffectsDirty() { return mEffectsDirty; }
 }

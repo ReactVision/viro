@@ -13,6 +13,17 @@ import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.viro.core.Box;
+import com.viro.core.EventDelegate;
+import com.viro.core.Geometry;
+import com.viro.core.Material;
+import com.viro.core.Node;
+import com.viro.core.Vector;
+import com.viro.core.ViroContext;
+import com.viromedia.bridge.component.VRTComponent;
+import com.viromedia.bridge.utility.ComponentEventDelegate;
+
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +36,13 @@ public class ViroBoxView extends View {
     private static final String TAG = "ViroBoxView";
     
     private ReactContext mReactContext;
+    
+    // ViroReact Integration
+    private Node mNodeJni;
+    private Box mBoxGeometry;
+    private ViroContext mViroContext;
+    private EventDelegate mEventDelegateJni;
+    private ComponentEventDelegate mComponentEventDelegate;
     
     // Box geometry properties
     private float mWidth = 1.0f;
@@ -41,13 +59,62 @@ public class ViroBoxView extends View {
     }
     
     private void initializeView() {
-        Log.d(TAG, "Initializing ViroBoxView");
+        Log.d(TAG, "Initializing ViroBoxView with ViroReact Box integration");
         
-        // TODO: Initialize ViroReact box geometry
-        // This will need to integrate with the existing ViroReact box implementation
+        // Create ViroReact Node for the box
+        mNodeJni = new Node();
+        
+        // Create Box geometry
+        mBoxGeometry = new Box(mWidth, mHeight, mLength);
+        
+        // Attach geometry to node
+        mNodeJni.setGeometry(mBoxGeometry);
+        
+        // Create and attach event callbacks
+        mComponentEventDelegate = new ComponentEventDelegate(new VRTComponentWrapper(this));
+        mEventDelegateJni = new EventDelegate();
+        mEventDelegateJni.setEventDelegateCallback(mComponentEventDelegate);
+        mNodeJni.setEventDelegate(mEventDelegateJni);
         
         // Box views are typically transparent since they represent 3D geometry
         setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        
+        Log.d(TAG, "ViroReact Box initialized successfully");
+    }
+    
+    /**
+     * Wrapper class to make ViroBoxView compatible with ComponentEventDelegate
+     */
+    private static class VRTComponentWrapper extends VRTComponent {
+        private WeakReference<ViroBoxView> mBoxView;
+        
+        public VRTComponentWrapper(ViroBoxView boxView) {
+            super(boxView.getContext(), null, -1, -1, boxView.mReactContext);
+            mBoxView = new WeakReference<>(boxView);
+        }
+        
+        @Override
+        public void emitEvent(String eventName, WritableMap eventData) {
+            ViroBoxView boxView = mBoxView.get();
+            if (boxView != null) {
+                boxView.emitBoxEvent(eventName, eventData);
+            }
+        }
+    }
+    
+    /**
+     * Get the underlying ViroReact Node object
+     */
+    public Node getNodeJni() {
+        return mNodeJni;
+    }
+    
+    /**
+     * Set the ViroContext for this box
+     */
+    public void setViroContext(ViroContext context) {
+        mViroContext = context;
+        // Apply any pending configurations that require ViroContext
     }
     
     @Override
@@ -87,8 +154,15 @@ public class ViroBoxView extends View {
     private void updateBoxGeometry() {
         Log.d(TAG, "Updating box geometry: " + mWidth + " x " + mHeight + " x " + mLength);
         
-        // TODO: Apply box dimensions to ViroReact renderer
-        // This should update the underlying 3D box mesh with new dimensions
+        if (mBoxGeometry != null) {
+            // Create new box geometry with updated dimensions
+            mBoxGeometry = new Box(mWidth, mHeight, mLength);
+            
+            // Update the node's geometry
+            if (mNodeJni != null) {
+                mNodeJni.setGeometry(mBoxGeometry);
+            }
+        }
     }
     
     // Material setters
@@ -108,11 +182,38 @@ public class ViroBoxView extends View {
         
         Log.d(TAG, "Setting materials: " + mMaterials);
         
-        // TODO: Apply materials to ViroReact box
-        // Materials can be applied to different faces of the box
-        // If only one material is provided, it applies to all faces
-        // If 6 materials are provided, they apply to each face in order:
-        // [front, right, back, left, top, bottom]
+        if (mBoxGeometry != null && mMaterials != null) {
+            List<Material> materialList = new ArrayList<>();
+            
+            // Convert material names to Material objects
+            for (String materialName : mMaterials) {
+                // TODO: Look up material by name from MaterialManager
+                // For now, create a basic material
+                Material material = new Material();
+                // Apply material properties based on materialName
+                materialList.add(material);
+            }
+            
+            // Apply materials to the box geometry
+            if (materialList.size() == 1) {
+                // Single material applies to all faces
+                Material[] materials = new Material[6];
+                for (int i = 0; i < 6; i++) {
+                    materials[i] = materialList.get(0);
+                }
+                mBoxGeometry.setMaterials(materials);
+            } else if (materialList.size() == 6) {
+                // Six materials apply to individual faces: [front, right, back, left, top, bottom]
+                mBoxGeometry.setMaterials(materialList.toArray(new Material[0]));
+            } else if (materialList.size() > 0) {
+                // Use first material for all faces if count doesn't match
+                Material[] materials = new Material[6];
+                for (int i = 0; i < 6; i++) {
+                    materials[i] = materialList.get(0);
+                }
+                mBoxGeometry.setMaterials(materials);
+            }
+        }
     }
     
     // Event emission (inherited from ViroNode behavior)
@@ -148,9 +249,27 @@ public class ViroBoxView extends View {
     
     public void onDropViewInstance() {
         Log.d(TAG, "onDropViewInstance called");
-        // TODO: Clean up ViroReact box resources
+        
+        // Clean up ViroReact box resources
+        if (mNodeJni != null) {
+            mNodeJni.setEventDelegate(null);
+            mNodeJni.dispose();
+            mNodeJni = null;
+        }
+        
+        if (mEventDelegateJni != null) {
+            mEventDelegateJni.dispose();
+            mEventDelegateJni = null;
+        }
+        
+        if (mBoxGeometry != null) {
+            mBoxGeometry.dispose();
+            mBoxGeometry = null;
+        }
         
         // Clear references
+        mComponentEventDelegate = null;
+        mViroContext = null;
         mMaterials = null;
         mReactContext = null;
     }
@@ -160,7 +279,10 @@ public class ViroBoxView extends View {
         super.onAttachedToWindow();
         Log.d(TAG, "ViroBoxView attached to window");
         
-        // TODO: Add box to ViroReact scene when attached
+        // Box will be added to scene hierarchy through parent-child relationships
+        if (mNodeJni != null && mViroContext != null) {
+            Log.d(TAG, "ViroReact box ready for scene attachment");
+        }
         updateBoxGeometry();
     }
     
@@ -168,6 +290,8 @@ public class ViroBoxView extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         Log.d(TAG, "ViroBoxView detached from window");
-        // TODO: Remove box from ViroReact scene when detached
+        
+        // Box cleanup is handled in onDropViewInstance
+        // Scene hierarchy cleanup is automatic through parent-child relationships
     }
 }

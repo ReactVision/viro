@@ -11,8 +11,14 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
+#import "VRTMaterialManager.h"
 
 @interface ViroTextComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROText> vroText;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Text content
 @property (nonatomic, strong, nullable) NSString *text;
@@ -44,8 +50,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroText
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroTextComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -72,11 +77,56 @@
     _extrusionDepth = 0.0;
     _color = @"#FFFFFF";
     
-    // TODO: Initialize ViroReact text renderer
-    // This will need to integrate with the existing ViroReact text implementation
+    // Initialize ViroReact text renderer
+    [self initializeVROText];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D text to extend beyond bounds
+}
+
+- (void)initializeVROText
+{
+    RCTLogInfo(@"[ViroTextComponentView] Creating VROText renderer");
+    
+    // Create VROText with default content
+    NSString *initialText = _text ?: @"";
+    _vroText = std::make_shared<VROText>(std::string([initialText UTF8String]), 
+                                        std::string([_fontFamily ?: @"Helvetica" UTF8String]),
+                                        _fontSize,
+                                        VROFontStyle::Normal,
+                                        VROFontWeight::Regular,
+                                        VROColor::colorWithHexString([_color UTF8String]),
+                                        _width, _height,
+                                        VROTextHorizontalAlignment::Left,
+                                        VROTextVerticalAlignment::Top,
+                                        VROLineBreakMode::WordWrap,
+                                        VROTextClipMode::ClipToBounds,
+                                        0); // maxLines
+    
+    // Create VRONode to hold the text
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroText);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    // Apply extrusion if specified
+    if (_extrusionDepth > 0) {
+        _vroText->setExtrusionDepth(_extrusionDepth);
+    }
+    
+    RCTLogInfo(@"[ViroTextComponentView] VROText created successfully");
+}
+
+- (void)updateTextContent
+{
+    if (!_vroText || !_text) {
+        return;
+    }
+    
+    RCTLogInfo(@"[ViroTextComponentView] Updating text content");
+    _vroText->setText(std::string([_text UTF8String]));
 }
 
 #pragma mark - Text Content
@@ -86,8 +136,8 @@
     RCTLogInfo(@"[ViroTextComponentView] Setting text: %@", text);
     _text = text;
     
-    // TODO: Update text content in ViroReact renderer
-    [self updateTextDisplay];
+    // Update text content in ViroReact renderer
+    [self updateTextContent];
 }
 
 #pragma mark - Text Styling

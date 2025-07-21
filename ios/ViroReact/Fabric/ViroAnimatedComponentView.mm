@@ -11,9 +11,15 @@
 #import "ViroLog.h"
 #import <React/RCTConversions.h>
 #import <React/RCTLog.h>
+#import <ViroKit/ViroKit.h>
 #import <QuartzCore/QuartzCore.h>
 
 @implementation ViroAnimatedComponentView {
+    // ViroReact Integration
+    std::shared_ptr<VROAnimationGroup> _vroAnimationGroup;
+    std::shared_ptr<VRONode> _vroNode;
+    std::shared_ptr<VROTransaction> _vroTransaction;
+    
     // Animation properties
     NSDictionary *_animation;
     NSString *_animationName;
@@ -108,6 +114,9 @@
         // Initialize animation arrays
         _animations = [NSMutableArray array];
         
+        // Initialize ViroReact animation system
+        [self initializeVROAnimation];
+        
         VRTLogDebug(@"ViroAnimatedComponent initialized");
     }
     return self;
@@ -130,6 +139,63 @@
     // TODO: Update properties from viroProps
     // This will be implemented when Fabric code generation is complete
     VRTLogDebug(@"ViroAnimatedComponent props updated");
+}
+
+#pragma mark - ViroReact Integration
+
+- (void)initializeVROAnimation
+{
+    VRTLogDebug(@"Initializing VROAnimation");
+    
+    // Create VROAnimationGroup
+    _vroAnimationGroup = VROAnimationGroup::create();
+    
+    // Set default properties
+    _vroAnimationGroup->setDuration(_duration);
+    _vroAnimationGroup->setDelay(_delay);
+    _vroAnimationGroup->setLoop(_loop);
+    _vroAnimationGroup->setSpeed(1.0f);
+    
+    // Create VRONode to hold the animated component
+    _vroNode = std::make_shared<VRONode>();
+    
+    VRTLogDebug(@"VROAnimation initialized successfully");
+}
+
+- (void)updateVROAnimation
+{
+    if (!_vroAnimationGroup) {
+        return;
+    }
+    
+    // Update animation group properties
+    _vroAnimationGroup->setDuration(_duration);
+    _vroAnimationGroup->setDelay(_delay);
+    _vroAnimationGroup->setLoop(_loop);
+    
+    // Set iteration count
+    if (_iterationCount > 0) {
+        _vroAnimationGroup->setRepeatCount(_iterationCount);
+    }
+    
+    // Apply easing function
+    VROTimingFunction timingFunction = [self vroTimingFunctionForEasing:_easing];
+    _vroAnimationGroup->setTimingFunction(timingFunction);
+}
+
+- (VROTimingFunction)vroTimingFunctionForEasing:(NSString *)easing
+{
+    if ([easing isEqualToString:@"linear"]) {
+        return VROTimingFunction::Linear;
+    } else if ([easing isEqualToString:@"ease-in"]) {
+        return VROTimingFunction::EaseIn;
+    } else if ([easing isEqualToString:@"ease-out"]) {
+        return VROTimingFunction::EaseOut;
+    } else if ([easing isEqualToString:@"ease-in-out"]) {
+        return VROTimingFunction::EaseInOut;
+    } else {
+        return VROTimingFunction::Linear;
+    }
 }
 
 #pragma mark - Animation Properties
@@ -225,24 +291,45 @@
 - (void)setLoop:(BOOL)loop {
     VRTLogDebug(@"Setting loop: %d", loop);
     _loop = loop;
+    
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->setLoop(loop);
+    }
+    
     [self updateAnimation];
 }
 
 - (void)setDelay:(NSTimeInterval)delay {
     VRTLogDebug(@"Setting delay: %.2f", delay);
     _delay = delay;
+    
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->setDelay(delay);
+    }
+    
     [self updateAnimation];
 }
 
 - (void)setDuration:(NSTimeInterval)duration {
     VRTLogDebug(@"Setting duration: %.2f", duration);
     _duration = duration;
+    
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->setDuration(duration);
+    }
+    
     [self updateAnimation];
 }
 
 - (void)setEasing:(nullable NSString *)easing {
     VRTLogDebug(@"Setting easing: %@", easing);
     _easing = easing;
+    
+    if (_vroAnimationGroup) {
+        VROTimingFunction timingFunction = [self vroTimingFunctionForEasing:easing];
+        _vroAnimationGroup->setTimingFunction(timingFunction);
+    }
+    
     [self updateAnimation];
 }
 
@@ -463,8 +550,17 @@
         // Add animation to layer
         [self.layer addAnimation:_animationGroup forKey:@"ViroAnimatedComponent"];
         
-        // TODO: Start animation in ViroReact scene
-        // This will integrate with the ViroReact animation system
+        // Start ViroReact animation
+        if (_vroAnimationGroup && _vroNode) {
+            [self buildVROAnimations];
+            _vroAnimationGroup->execute(_vroNode, [self]() {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (self->_onFinish) {
+                        self->_onFinish(@{});
+                    }
+                });
+            });
+        }
     }
 }
 
@@ -484,7 +580,10 @@
     self.layer.speed = 0.0;
     self.layer.timeOffset = pausedTime;
     
-    // TODO: Pause animation in ViroReact scene
+    // Pause ViroReact animation
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->pause();
+    }
 }
 
 - (void)resumeAnimation {
@@ -505,7 +604,10 @@
     CFTimeInterval timeSincePause = [self.layer convertTime:CACurrentMediaTime() fromLayer:nil] - pausedTime;
     self.layer.beginTime = timeSincePause;
     
-    // TODO: Resume animation in ViroReact scene
+    // Resume ViroReact animation
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->resume();
+    }
 }
 
 - (void)stopAnimation {
@@ -527,7 +629,10 @@
     self.layer.timeOffset = 0.0;
     self.layer.beginTime = 0.0;
     
-    // TODO: Stop animation in ViroReact scene
+    // Stop ViroReact animation
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->terminate();
+    }
     
     // Fire onCancel event
     if (_onCancel) {
@@ -541,7 +646,10 @@
     [self stopAnimation];
     _currentTime = 0.0;
     
-    // TODO: Reset animation in ViroReact scene to initial state
+    // Reset ViroReact animation to initial state
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->reset();
+    }
 }
 
 #pragma mark - Animation State
@@ -645,6 +753,60 @@
     }
 }
 
+- (void)buildVROAnimations
+{
+    if (!_vroAnimationGroup) {
+        return;
+    }
+    
+    // Clear existing animations
+    _vroAnimationGroup->removeAllAnimations();
+    
+    // Build position animation
+    if (_positionFrom && _positionTo && _positionFrom.count >= 3 && _positionTo.count >= 3) {
+        VROVector3f fromPos([_positionFrom[0] floatValue], [_positionFrom[1] floatValue], [_positionFrom[2] floatValue]);
+        VROVector3f toPos([_positionTo[0] floatValue], [_positionTo[1] floatValue], [_positionTo[2] floatValue]);
+        
+        auto positionAnimation = VROAnimationVector3f::create(fromPos, toPos);
+        positionAnimation->setDuration(_duration);
+        _vroAnimationGroup->addAnimation("position", positionAnimation);
+    }
+    
+    // Build scale animation
+    if (_scaleFrom && _scaleTo && _scaleFrom.count >= 3 && _scaleTo.count >= 3) {
+        VROVector3f fromScale([_scaleFrom[0] floatValue], [_scaleFrom[1] floatValue], [_scaleFrom[2] floatValue]);
+        VROVector3f toScale([_scaleTo[0] floatValue], [_scaleTo[1] floatValue], [_scaleTo[2] floatValue]);
+        
+        auto scaleAnimation = VROAnimationVector3f::create(fromScale, toScale);
+        scaleAnimation->setDuration(_duration);
+        _vroAnimationGroup->addAnimation("scale", scaleAnimation);
+    }
+    
+    // Build rotation animation
+    if (_rotationFrom && _rotationTo && _rotationFrom.count >= 3 && _rotationTo.count >= 3) {
+        VROVector3f fromRot([_rotationFrom[0] floatValue] * M_PI / 180.0,
+                            [_rotationFrom[1] floatValue] * M_PI / 180.0,
+                            [_rotationFrom[2] floatValue] * M_PI / 180.0);
+        VROVector3f toRot([_rotationTo[0] floatValue] * M_PI / 180.0,
+                          [_rotationTo[1] floatValue] * M_PI / 180.0,
+                          [_rotationTo[2] floatValue] * M_PI / 180.0);
+        
+        auto rotationAnimation = VROAnimationVector3f::create(fromRot, toRot);
+        rotationAnimation->setDuration(_duration);
+        _vroAnimationGroup->addAnimation("rotation", rotationAnimation);
+    }
+    
+    // Build opacity animation
+    if (_opacityFrom && _opacityTo) {
+        float fromOpacity = [_opacityFrom floatValue];
+        float toOpacity = [_opacityTo floatValue];
+        
+        auto opacityAnimation = VROAnimationFloat::create(fromOpacity, toOpacity);
+        opacityAnimation->setDuration(_duration);
+        _vroAnimationGroup->addAnimation("opacity", opacityAnimation);
+    }
+}
+
 - (CABasicAnimation *)createBasicAnimationForKeyPath:(NSString *)keyPath
                                            fromValue:(id)fromValue
                                              toValue:(id)toValue {
@@ -706,6 +868,19 @@
     if (_isAnimating) {
         [self updateAnimation];
     }
+}
+
+- (void)dealloc
+{
+    VRTLogDebug(@"ViroAnimatedComponent deallocating");
+    
+    // Clean up ViroReact resources
+    if (_vroAnimationGroup) {
+        _vroAnimationGroup->terminate();
+        _vroAnimationGroup = nullptr;
+    }
+    _vroNode = nullptr;
+    _vroTransaction = nullptr;
 }
 
 @end

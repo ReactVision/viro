@@ -10,9 +10,15 @@
 #import <React/RCTAssert.h>
 #import <React/RCTUtils.h>
 #import <React/RCTLog.h>
+#import <ViroKit/ViroKit.h>
 #import <SceneKit/SceneKit.h>
 
 @interface ViroPolylineComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROGeometry> vroGeometry;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
+@property (nonatomic, strong) std::shared_ptr<VROGeometrySource> vroGeometrySource;
 
 // SceneKit components
 @property (nonatomic, strong) SCNNode *polylineNode;
@@ -34,6 +40,13 @@
 @end
 
 @implementation ViroPolylineComponentView
+
+#pragma mark - RCTComponentViewProtocol
+
++ (ComponentDescriptorProvider)componentDescriptorProvider
+{
+    return concreteComponentDescriptorProvider<facebook::react::ViroPolylineComponentDescriptor>();
+}
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
@@ -73,6 +86,9 @@
     _stylesDirty = YES;
     _totalLength = 0.0f;
     
+    // Initialize ViroReact polyline
+    [self initializeVROPolyline];
+    
     // Setup SceneKit components
     [self setupSceneKitComponents];
 }
@@ -86,6 +102,77 @@
     [self updateGeometry];
 }
 
+#pragma mark - ViroReact Integration
+
+- (void)initializeVROPolyline
+{
+    RCTLogInfo(@"[ViroPolylineComponentView] Creating VROGeometry");
+    
+    // Create VROGeometry for polyline
+    _vroGeometry = VROGeometry::create();
+    
+    // Create VRONode to hold the polyline
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroGeometry);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    RCTLogInfo(@"[ViroPolylineComponentView] VROGeometry created successfully");
+}
+
+- (void)updateVROPolyline
+{
+    if (!_vroGeometry || _points.count < 2) {
+        return;
+    }
+    
+    RCTLogInfo(@"[ViroPolylineComponentView] Updating VROPolyline with %lu points", (unsigned long)_points.count);
+    
+    // Build polyline geometry from points
+    [self buildPolylineVROGeometry];
+}
+
+- (void)buildPolylineVROGeometry
+{
+    if (_points.count < 2) {
+        RCTLogWarn(@"[ViroPolylineComponentView] Need at least 2 points for polyline");
+        return;
+    }
+    
+    // Convert line vertices to ViroKit format
+    std::vector<VROVector3f> vertices;
+    for (NSValue *vertexValue in _lineVertices) {
+        SCNVector3 vertex = [vertexValue SCNVector3Value];
+        vertices.push_back(VROVector3f(vertex.x, vertex.y, vertex.z));
+    }
+    
+    // Convert line indices to ViroKit format
+    std::vector<int> indices;
+    for (NSNumber *indexNumber in _lineIndices) {
+        indices.push_back([indexNumber intValue]);
+    }
+    
+    // Generate normals for line segments
+    std::vector<VROVector3f> normals;
+    for (NSValue *normalValue in _lineNormals) {
+        SCNVector3 normal = [normalValue SCNVector3Value];
+        normals.push_back(VROVector3f(normal.x, normal.y, normal.z));
+    }
+    
+    // Generate UV coordinates for line segments
+    std::vector<VROVector3f> texcoords;
+    for (NSValue *uvValue in _lineUVs) {
+        CGPoint uv = [uvValue CGPointValue];
+        texcoords.push_back(VROVector3f(uv.x, uv.y, 0.0f));
+    }
+    
+    // Create VROGeometrySource and apply to geometry
+    _vroGeometrySource = VROGeometrySource::create(vertices, normals, texcoords, indices);
+    _vroGeometry->setGeometrySources({ _vroGeometrySource });
+}
+
 #pragma mark - Property Setters
 
 - (void)setPoints:(NSArray<NSArray<NSNumber *> *> *)points
@@ -93,6 +180,9 @@
     _points = points;
     _geometryDirty = YES;
     [self updateGeometry];
+    
+    // Update ViroReact geometry
+    [self updateVROPolyline];
 }
 
 - (void)setThickness:(CGFloat)thickness
@@ -100,6 +190,9 @@
     _thickness = thickness;
     _geometryDirty = YES;
     [self updateGeometry];
+    
+    // Update ViroReact geometry
+    [self updateVROPolyline];
 }
 
 - (void)setColors:(NSArray<NSNumber *> *)colors
@@ -196,6 +289,9 @@
     
     // Apply line styles
     [self applyLineStyle];
+    
+    // Update ViroReact geometry after SceneKit generation
+    [self updateVROPolyline];
     
     _geometryDirty = NO;
 }
@@ -584,6 +680,16 @@
     _geometryDirty = YES;
     _stylesDirty = YES;
     [self updateGeometry];
+}
+
+- (void)dealloc
+{
+    RCTLogInfo(@"[ViroPolylineComponentView] Deallocating");
+    
+    // Clean up ViroReact resources
+    _vroGeometry = nullptr;
+    _vroNode = nullptr;
+    _vroGeometrySource = nullptr;
 }
 
 @end

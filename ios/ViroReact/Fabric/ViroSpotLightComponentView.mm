@@ -11,8 +11,13 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
 
 @interface ViroSpotLightComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROLight> vroLight;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Light color and intensity
 @property (nonatomic, strong, nullable) NSString *color;
@@ -48,8 +53,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroSpotLight
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroSpotLightComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -89,8 +93,8 @@
     
     _influenceBitMask = 1; // Default influence mask
     
-    // TODO: Initialize ViroReact spot light
-    // This will need to integrate with the existing ViroReact lighting system
+    // Initialize ViroReact spot light integration
+    [self initializeVROSpotLight];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Lights don't have visual bounds
@@ -103,8 +107,10 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting color: %@", color);
     _color = color ?: @"#FFFFFF";
     
-    // TODO: Update spot light color in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+        _vroLight->setColor(lightColor);
+    }
 }
 
 - (void)setIntensity:(CGFloat)intensity
@@ -112,8 +118,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting intensity: %f", intensity);
     _intensity = intensity;
     
-    // TODO: Update spot light intensity in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setIntensity(intensity);
+    }
 }
 
 - (void)setTemperature:(CGFloat)temperature
@@ -121,9 +128,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting temperature: %f", temperature);
     _temperature = temperature;
     
-    // TODO: Update spot light temperature in ViroReact renderer
-    // Temperature affects the color tint (warm/cool)
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setTemperature(temperature);
+    }
 }
 
 #pragma mark - Light Position and Direction
@@ -133,8 +140,10 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting position: %@", position);
     _position = position ?: @[@0, @2, @0];
     
-    // TODO: Update spot light position in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroLight->setPosition(pos);
+    }
 }
 
 - (void)setDirection:(nullable NSArray<NSNumber *> *)direction
@@ -142,8 +151,10 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting direction: %@", direction);
     _direction = direction ?: @[@0, @-1, @0];
     
-    // TODO: Update spot light direction in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight && _direction.count >= 3) {
+        VROVector3f dir([_direction[0] floatValue], [_direction[1] floatValue], [_direction[2] floatValue]);
+        _vroLight->setDirection(dir);
+    }
 }
 
 #pragma mark - Spotlight Cone Properties
@@ -153,9 +164,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting inner angle: %f", innerAngle);
     _innerAngle = innerAngle;
     
-    // TODO: Update spot light inner cone angle in ViroReact renderer
-    // Inner angle defines the cone where light has full intensity
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setSpotInnerAngle(innerAngle * M_PI / 180.0); // Convert degrees to radians
+    }
 }
 
 - (void)setOuterAngle:(CGFloat)outerAngle
@@ -163,9 +174,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting outer angle: %f", outerAngle);
     _outerAngle = outerAngle;
     
-    // TODO: Update spot light outer cone angle in ViroReact renderer
-    // Outer angle defines the cone where light falls off to zero
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setSpotOuterAngle(outerAngle * M_PI / 180.0); // Convert degrees to radians
+    }
 }
 
 #pragma mark - Light Attenuation
@@ -175,8 +186,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting attenuation start distance: %f", attenuationStartDistance);
     _attenuationStartDistance = attenuationStartDistance;
     
-    // TODO: Update attenuation start distance in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setAttenuationStartDistance(attenuationStartDistance);
+    }
 }
 
 - (void)setAttenuationEndDistance:(CGFloat)attenuationEndDistance
@@ -184,8 +196,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting attenuation end distance: %f", attenuationEndDistance);
     _attenuationEndDistance = attenuationEndDistance;
     
-    // TODO: Update attenuation end distance in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setAttenuationEndDistance(attenuationEndDistance);
+    }
 }
 
 #pragma mark - Shadow Properties
@@ -195,8 +208,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting casts shadow: %@", castsShadow ? @"YES" : @"NO");
     _castsShadow = castsShadow;
     
-    // TODO: Update shadow casting in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setCastsShadow(castsShadow);
+    }
 }
 
 - (void)setShadowOpacity:(CGFloat)shadowOpacity
@@ -204,8 +218,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting shadow opacity: %f", shadowOpacity);
     _shadowOpacity = shadowOpacity;
     
-    // TODO: Update shadow opacity in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setShadowOpacity(shadowOpacity);
+    }
 }
 
 - (void)setShadowMapSize:(NSInteger)shadowMapSize
@@ -213,9 +228,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting shadow map size: %ld", (long)shadowMapSize);
     _shadowMapSize = shadowMapSize;
     
-    // TODO: Update shadow map resolution in ViroReact renderer
-    // Common sizes: 512, 1024, 2048, 4096
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setShadowMapSize((int)shadowMapSize);
+    }
 }
 
 - (void)setShadowBias:(CGFloat)shadowBias
@@ -223,9 +238,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting shadow bias: %f", shadowBias);
     _shadowBias = shadowBias;
     
-    // TODO: Update shadow bias in ViroReact renderer
-    // Bias helps prevent shadow acne
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setShadowBias(shadowBias);
+    }
 }
 
 - (void)setShadowNearZ:(CGFloat)shadowNearZ
@@ -233,8 +248,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting shadow near Z: %f", shadowNearZ);
     _shadowNearZ = shadowNearZ;
     
-    // TODO: Update shadow camera near plane in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setShadowNearZ(shadowNearZ);
+    }
 }
 
 - (void)setShadowFarZ:(CGFloat)shadowFarZ
@@ -242,8 +258,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting shadow far Z: %f", shadowFarZ);
     _shadowFarZ = shadowFarZ;
     
-    // TODO: Update shadow camera far plane in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setShadowFarZ(shadowFarZ);
+    }
 }
 
 #pragma mark - Light Influence
@@ -253,8 +270,9 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Setting influence bit mask: %ld", (long)influenceBitMask);
     _influenceBitMask = influenceBitMask;
     
-    // TODO: Update spot light influence in ViroReact renderer
-    [self updateSpotLight];
+    if (_vroLight) {
+        _vroLight->setInfluenceBitMask((int)influenceBitMask);
+    }
 }
 
 #pragma mark - Light Update
@@ -264,11 +282,41 @@
     RCTLogInfo(@"[ViroSpotLightComponentView] Updating spot light - Color: %@, Intensity: %.1f, Position: %@, Direction: %@, Angles: %.1f°-%.1f°, Shadows: %@", 
                _color, _intensity, _position, _direction, _innerAngle, _outerAngle, _castsShadow ? @"YES" : @"NO");
     
-    // TODO: Apply spot light settings to ViroReact renderer
-    // Spot light emits light in a cone from a specific position and direction
-    // Light intensity decreases with distance and angle from the light's direction
-    // Inner angle defines full intensity cone, outer angle defines falloff cone
-    // Can cast shadows using shadow mapping techniques
+    if (!_vroLight) {
+        return;
+    }
+    
+    // Apply all current settings to the light
+    VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+    _vroLight->setColor(lightColor);
+    _vroLight->setIntensity(_intensity);
+    _vroLight->setTemperature(_temperature);
+    
+    if (_position && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroLight->setPosition(pos);
+    }
+    
+    if (_direction && _direction.count >= 3) {
+        VROVector3f dir([_direction[0] floatValue], [_direction[1] floatValue], [_direction[2] floatValue]);
+        _vroLight->setDirection(dir);
+    }
+    
+    // Set spotlight cone angles (convert degrees to radians)
+    _vroLight->setSpotInnerAngle(_innerAngle * M_PI / 180.0);
+    _vroLight->setSpotOuterAngle(_outerAngle * M_PI / 180.0);
+    
+    _vroLight->setAttenuationStartDistance(_attenuationStartDistance);
+    _vroLight->setAttenuationEndDistance(_attenuationEndDistance);
+    
+    _vroLight->setCastsShadow(_castsShadow);
+    _vroLight->setShadowOpacity(_shadowOpacity);
+    _vroLight->setShadowMapSize((int)_shadowMapSize);
+    _vroLight->setShadowBias(_shadowBias);
+    _vroLight->setShadowNearZ(_shadowNearZ);
+    _vroLight->setShadowFarZ(_shadowFarZ);
+    
+    _vroLight->setInfluenceBitMask((int)_influenceBitMask);
 }
 
 #pragma mark - Helper Methods
@@ -342,19 +390,74 @@
     
     if (self.window) {
         RCTLogInfo(@"[ViroSpotLightComponentView] Spot light added to window");
-        // TODO: Add spot light to ViroReact scene when added to window
         [self updateSpotLight];
+        // Parent ViroNodeComponentView will handle adding _vroNode to scene
     } else {
         RCTLogInfo(@"[ViroSpotLightComponentView] Spot light removed from window");
-        // TODO: Remove spot light from ViroReact scene when removed from window
+        // Parent ViroNodeComponentView will handle removing _vroNode from scene
     }
 }
 
 - (void)dealloc
 {
     RCTLogInfo(@"[ViroSpotLightComponentView] Deallocating");
-    // TODO: Clean up ViroReact spot light resources
+    _vroLight = nullptr;
+    _vroNode = nullptr;
 }
+
+#pragma mark - ViroReact Integration
+
+- (void)initializeVROSpotLight
+{
+    RCTLogInfo(@"[ViroSpotLightComponentView] Creating VROLight (Spot)");
+    
+    // Create spot light
+    _vroLight = std::make_shared<VROLight>(VROLightType::Spot);
+    
+    // Set default properties
+    VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+    _vroLight->setColor(lightColor);
+    _vroLight->setIntensity(_intensity);
+    _vroLight->setTemperature(_temperature);
+    
+    // Set position
+    if (_position && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroLight->setPosition(pos);
+    }
+    
+    // Set direction
+    if (_direction && _direction.count >= 3) {
+        VROVector3f dir([_direction[0] floatValue], [_direction[1] floatValue], [_direction[2] floatValue]);
+        _vroLight->setDirection(dir);
+    }
+    
+    // Set spotlight cone angles (convert degrees to radians)
+    _vroLight->setSpotInnerAngle(_innerAngle * M_PI / 180.0);
+    _vroLight->setSpotOuterAngle(_outerAngle * M_PI / 180.0);
+    
+    // Set attenuation
+    _vroLight->setAttenuationStartDistance(_attenuationStartDistance);
+    _vroLight->setAttenuationEndDistance(_attenuationEndDistance);
+    
+    // Configure shadows
+    _vroLight->setCastsShadow(_castsShadow);
+    _vroLight->setShadowOpacity(_shadowOpacity);
+    _vroLight->setShadowMapSize((int)_shadowMapSize);
+    _vroLight->setShadowBias(_shadowBias);
+    _vroLight->setShadowNearZ(_shadowNearZ);
+    _vroLight->setShadowFarZ(_shadowFarZ);
+    
+    // Set influence mask
+    _vroLight->setInfluenceBitMask((int)_influenceBitMask);
+    
+    // Create VRONode to hold the light
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->addLight(_vroLight);
+    
+    RCTLogInfo(@"[ViroSpotLightComponentView] VROLight created successfully");
+}
+
 
 @end
 

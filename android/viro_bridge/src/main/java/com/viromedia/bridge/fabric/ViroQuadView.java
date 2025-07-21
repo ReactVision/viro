@@ -18,6 +18,10 @@ import com.facebook.react.bridge.Arguments;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.viro.core.Geometry;
+import com.viro.core.Material;
+import com.viro.core.Quad;
+
 import com.viromedia.bridge.utility.ViroLog;
 
 import java.util.ArrayList;
@@ -40,6 +44,9 @@ import java.util.List;
 public class ViroQuadView extends ViroNodeView {
 
     private static final String TAG = ViroLog.getTag(ViroQuadView.class);
+
+    // ViroReact Quad Integration
+    private Quad mQuadGeometry;
 
     // Quad geometry properties
     private float mWidth = 1.0f;
@@ -68,11 +75,20 @@ public class ViroQuadView extends ViroNodeView {
     }
 
     private void initializeQuadGeometry() {
-        ViroLog.debug(TAG, "Initializing quad geometry with default properties");
+        ViroLog.debug(TAG, "Initializing quad geometry with ViroReact Quad integration");
         
-        // TODO: Set up ViroReact quad with default properties
-        // This should create the underlying 3D quad mesh
-        updateQuadGeometry();
+        // Create ViroReact Quad geometry
+        mQuadGeometry = new Quad(mWidth, mHeight, mWidthSegmentCount, mHeightSegmentCount);
+        
+        // Apply UV coordinates to the quad
+        applyUvCoordinatesToQuad();
+        
+        // Attach geometry to the inherited node from ViroNodeView
+        if (getNodeJni() != null) {
+            getNodeJni().setGeometry(mQuadGeometry);
+        }
+        
+        ViroLog.debug(TAG, "ViroReact Quad geometry initialized successfully");
     }
 
     // Quad Geometry Properties
@@ -105,10 +121,18 @@ public class ViroQuadView extends ViroNodeView {
             "Updating quad geometry: %.2f x %.2f, segments: %dx%d",
             mWidth, mHeight, mWidthSegmentCount, mHeightSegmentCount));
         
-        // TODO: Apply quad parameters to ViroReact renderer
-        // This should update the underlying 3D quad mesh with new dimensions and segments
-        // - width/height: size of the quad
-        // - widthSegmentCount/heightSegmentCount: mesh resolution for displacement/normal mapping
+        if (mQuadGeometry != null) {
+            // Create new quad geometry with updated parameters
+            mQuadGeometry = new Quad(mWidth, mHeight, mWidthSegmentCount, mHeightSegmentCount);
+            
+            // Reapply UV coordinates
+            applyUvCoordinatesToQuad();
+            
+            // Update the node's geometry
+            if (getNodeJni() != null) {
+                getNodeJni().setGeometry(mQuadGeometry);
+            }
+        }
         
         // Emit geometry update event for React Native
         emitQuadGeometryUpdateEvent();
@@ -172,10 +196,22 @@ public class ViroQuadView extends ViroNodeView {
 
     private void updateQuadUVMapping() {
         ViroLog.debug(TAG, "Updating quad UV mapping");
-        
-        // TODO: Apply UV coordinates to ViroReact renderer
-        // This affects how textures and materials are applied to the quad surface
-        // UV coordinates define the mapping from 2D texture space to 3D quad surface
+        applyUvCoordinatesToQuad();
+    }
+    
+    private void applyUvCoordinatesToQuad() {
+        if (mQuadGeometry != null && mUvCoordinates != null) {
+            // Convert 2D UV array to flat list for ViroReact
+            List<Float> uvList = getUvCoordinatesFlattened();
+            
+            // Apply UV coordinates to the quad geometry
+            float[] uvArray = new float[uvList.size()];
+            for (int i = 0; i < uvList.size(); i++) {
+                uvArray[i] = uvList.get(i);
+            }
+            
+            mQuadGeometry.setUvCoordinates(uvArray);
+        }
     }
 
     // Material Properties
@@ -183,8 +219,26 @@ public class ViroQuadView extends ViroNodeView {
         ViroLog.debug(TAG, "Setting materials: " + materials);
         mMaterials = materials;
         
-        // TODO: Apply materials to ViroReact quad
-        // Quads typically use a single material, but can support front/back materials
+        if (mQuadGeometry != null && materials != null && materials.size() > 0) {
+            List<Material> materialList = new ArrayList<>();
+            
+            // Convert material names to Material objects
+            for (int i = 0; i < materials.size(); i++) {
+                String materialName = materials.getString(i);
+                if (materialName != null) {
+                    // TODO: Look up material by name from MaterialManager
+                    // For now, create a basic material
+                    Material material = new Material();
+                    // Apply material properties based on materialName
+                    materialList.add(material);
+                }
+            }
+            
+            // Apply material to the quad geometry
+            if (materialList.size() > 0) {
+                mQuadGeometry.setMaterial(materialList.get(0));
+            }
+        }
     }
 
     // Helper Methods
@@ -224,11 +278,28 @@ public class ViroQuadView extends ViroNodeView {
     }
 
     @Override
+    public void onDropViewInstance() {
+        ViroLog.debug(TAG, "onDropViewInstance called for ViroQuad");
+        
+        // Clean up quad geometry
+        if (mQuadGeometry != null) {
+            mQuadGeometry.dispose();
+            mQuadGeometry = null;
+        }
+        
+        // Call parent cleanup (handles node and event delegate cleanup)
+        super.onDropViewInstance();
+    }
+
+    @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         ViroLog.debug(TAG, "Quad attached to window");
         
-        // TODO: Add quad to ViroReact scene when attached to window
+        // Quad geometry is attached through the inherited node from ViroNodeView
+        if (getNodeJni() != null && getViroContext() != null) {
+            ViroLog.debug(TAG, "ViroReact quad ready for scene attachment");
+        }
         updateQuadGeometry();
         updateQuadUVMapping();
     }
@@ -238,7 +309,8 @@ public class ViroQuadView extends ViroNodeView {
         super.onDetachedFromWindow();
         ViroLog.debug(TAG, "Quad detached from window");
         
-        // TODO: Remove quad from ViroReact scene when detached from window
+        // Quad cleanup is handled in onDropViewInstance
+        // Scene hierarchy cleanup is automatic through parent-child relationships
     }
 
     // Getters for current values (useful for debugging and testing)

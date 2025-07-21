@@ -11,8 +11,14 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
+#import "VRTMaterialManager.h"
 
 @interface ViroBoxComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROBox> vroBox;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Box geometry properties
 @property (nonatomic, assign) CGFloat width;
@@ -28,8 +34,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroBox
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroBoxComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -49,11 +54,29 @@
     _height = 1.0;
     _length = 1.0;
     
-    // TODO: Initialize ViroReact box geometry
-    // This will need to integrate with the existing ViroReact box implementation
+    // Initialize ViroReact box geometry
+    [self initializeVROBox];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
+}
+
+- (void)initializeVROBox
+{
+    RCTLogInfo(@"[ViroBoxComponentView] Creating VROBox geometry");
+    
+    // Create VROBox geometry with default dimensions
+    _vroBox = VROBox::createBox(_width, _height, _length);
+    
+    // Create VRONode to hold the geometry
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroBox);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    RCTLogInfo(@"[ViroBoxComponentView] VROBox created successfully with dimensions: %.2f x %.2f x %.2f", _width, _height, _length);
 }
 
 #pragma mark - Box Geometry Properties
@@ -63,8 +86,10 @@
     RCTLogInfo(@"[ViroBoxComponentView] Setting width: %f", width);
     _width = width;
     
-    // TODO: Update box geometry in ViroReact renderer
-    [self updateBoxGeometry];
+    // Update box geometry in ViroReact renderer
+    if (_vroBox) {
+        _vroBox->setWidth(width);
+    }
 }
 
 - (void)setHeight:(CGFloat)height
@@ -72,8 +97,10 @@
     RCTLogInfo(@"[ViroBoxComponentView] Setting height: %f", height);
     _height = height;
     
-    // TODO: Update box geometry in ViroReact renderer
-    [self updateBoxGeometry];
+    // Update box geometry in ViroReact renderer
+    if (_vroBox) {
+        _vroBox->setHeight(height);
+    }
 }
 
 - (void)setLength:(CGFloat)length
@@ -81,8 +108,10 @@
     RCTLogInfo(@"[ViroBoxComponentView] Setting length: %f", length);
     _length = length;
     
-    // TODO: Update box geometry in ViroReact renderer
-    [self updateBoxGeometry];
+    // Update box geometry in ViroReact renderer
+    if (_vroBox) {
+        _vroBox->setLength(length);
+    }
 }
 
 - (void)updateBoxGeometry

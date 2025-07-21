@@ -10,10 +10,16 @@
 #import <React/RCTAssert.h>
 #import <React/RCTUtils.h>
 #import <React/RCTLog.h>
+#import <ViroKit/ViroKit.h>
 #import <SceneKit/SceneKit.h>
 #import <ModelIO/ModelIO.h>
 
 @interface ViroPolygonComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROGeometry> vroGeometry;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
+@property (nonatomic, strong) std::shared_ptr<VROGeometrySource> vroGeometrySource;
 
 // SceneKit components
 @property (nonatomic, strong) SCNNode *polygonNode;
@@ -33,6 +39,13 @@
 @end
 
 @implementation ViroPolygonComponentView
+
+#pragma mark - RCTComponentViewProtocol
+
++ (ComponentDescriptorProvider)componentDescriptorProvider
+{
+    return concreteComponentDescriptorProvider<facebook::react::ViroPolygonComponentDescriptor>();
+}
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
@@ -67,8 +80,176 @@
     _needsRetessellation = YES;
     _geometryDirty = YES;
     
+    // Initialize ViroReact polygon
+    [self initializeVROPolygon];
+    
     // Setup SceneKit components
     [self setupSceneKitComponents];
+}
+
+#pragma mark - ViroReact Integration
+
+- (void)initializeVROPolygon
+{
+    RCTLogInfo(@"[ViroPolygonComponentView] Creating VROGeometry");
+    
+    // Create VROGeometry for polygon
+    _vroGeometry = VROGeometry::create();
+    
+    // Create VRONode to hold the polygon
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroGeometry);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    RCTLogInfo(@"[ViroPolygonComponentView] VROGeometry created successfully");
+}
+
+- (void)updateVROPolygon
+{
+    if (!_vroGeometry || _vertices.count < 3) {
+        return;
+    }
+    
+    RCTLogInfo(@"[ViroPolygonComponentView] Updating VROPolygon with %lu vertices", (unsigned long)_vertices.count);
+    
+    // Build polygon geometry from vertices
+    [self buildPolygonVROGeometry];
+    
+    // Apply thickness if specified
+    if (_thickness > 0.0f) {
+        [self applyPolygonThickness];
+    }
+}
+
+- (void)buildPolygonVROGeometry
+{
+    if (_vertices.count < 3) {
+        RCTLogWarn(@"[ViroPolygonComponentView] Need at least 3 vertices for polygon");
+        return;
+    }
+    
+    // Convert vertices to ViroKit format
+    std::vector<VROVector3f> vertices;
+    for (NSArray<NSNumber *> *vertex in _vertices) {
+        if (vertex.count >= 2) {
+            float x = [vertex[0] floatValue];
+            float y = [vertex[1] floatValue];
+            float z = vertex.count > 2 ? [vertex[2] floatValue] : 0.0f;
+            vertices.push_back(VROVector3f(x, y, z));
+        }
+    }
+    
+    // Tessellate polygon into triangles
+    std::vector<int> indices = [self tessellatePolygon:vertices];
+    
+    // Generate normals
+    std::vector<VROVector3f> normals;
+    if (_normals.count > 0) {
+        // Use provided normals
+        for (int i = 0; i < _normals.count; i += 3) {
+            if (i + 2 < _normals.count) {
+                float nx = [_normals[i] floatValue];
+                float ny = [_normals[i + 1] floatValue];
+                float nz = [_normals[i + 2] floatValue];
+                normals.push_back(VROVector3f(nx, ny, nz));
+            }
+        }
+    } else {
+        // Generate normals automatically
+        normals = [self generateNormals:vertices indices:indices];
+    }
+    
+    // Generate UV coordinates
+    std::vector<VROVector3f> texcoords;
+    if (_uvCoordinates.count > 0) {
+        // Use provided UV coordinates
+        for (int i = 0; i < _uvCoordinates.count; i += 2) {
+            if (i + 1 < _uvCoordinates.count) {
+                float u = [_uvCoordinates[i] floatValue];
+                float v = [_uvCoordinates[i + 1] floatValue];
+                texcoords.push_back(VROVector3f(u, v, 0.0f));
+            }
+        }
+    } else {
+        // Generate UV coordinates automatically
+        texcoords = [self generateUVCoordinates:vertices];
+    }
+    
+    // Create VROGeometrySource and apply to geometry
+    _vroGeometrySource = VROGeometrySource::create(vertices, normals, texcoords, indices);
+    _vroGeometry->setGeometrySources({ _vroGeometrySource });
+}
+
+- (std::vector<int>)tessellatePolygon:(const std::vector<VROVector3f>&)vertices
+{
+    std::vector<int> indices;
+    
+    // Simple fan triangulation for convex polygons
+    // For complex polygons, this should use a proper tessellation library
+    for (int i = 1; i < vertices.size() - 1; i++) {
+        indices.push_back(0);
+        indices.push_back(i);
+        indices.push_back(i + 1);
+    }
+    
+    return indices;
+}
+
+- (std::vector<VROVector3f>)generateNormals:(const std::vector<VROVector3f>&)vertices indices:(const std::vector<int>&)indices
+{
+    std::vector<VROVector3f> normals(vertices.size(), VROVector3f(0, 0, 1));
+    
+    // For a flat polygon, all normals point in the same direction
+    VROVector3f normal = _facesOutward ? VROVector3f(0, 0, 1) : VROVector3f(0, 0, -1);
+    
+    for (int i = 0; i < normals.size(); i++) {
+        normals[i] = normal;
+    }
+    
+    return normals;
+}
+
+- (std::vector<VROVector3f>)generateUVCoordinates:(const std::vector<VROVector3f>&)vertices
+{
+    std::vector<VROVector3f> uvs;
+    
+    // Find bounding box for UV mapping
+    float minX = INFINITY, maxX = -INFINITY;
+    float minY = INFINITY, maxY = -INFINITY;
+    
+    for (const auto& vertex : vertices) {
+        minX = std::min(minX, vertex.x);
+        maxX = std::max(maxX, vertex.x);
+        minY = std::min(minY, vertex.y);
+        maxY = std::max(maxY, vertex.y);
+    }
+    
+    float width = maxX - minX;
+    float height = maxY - minY;
+    
+    // Generate UV coordinates based on vertex positions
+    for (const auto& vertex : vertices) {
+        float u = width > 0 ? (vertex.x - minX) / width : 0.0f;
+        float v = height > 0 ? (vertex.y - minY) / height : 0.0f;
+        uvs.push_back(VROVector3f(u, v, 0.0f));
+    }
+    
+    return uvs;
+}
+
+- (void)applyPolygonThickness
+{
+    if (_thickness <= 0.0f) {
+        return;
+    }
+    
+    RCTLogInfo(@"[ViroPolygonComponentView] Applying thickness: %.2f", _thickness);
+    
+    // TODO: Implement polygon extrusion for thickness
+    // This would create additional geometry to give the polygon depth
 }
 
 - (void)setupSceneKitComponents
@@ -88,6 +269,9 @@
     _geometryDirty = YES;
     _needsRetessellation = YES;
     [self updateGeometry];
+    
+    // Update ViroReact geometry
+    [self updateVROPolygon];
 }
 
 - (void)setHoles:(NSArray<NSArray<NSNumber *> *> *)holes
@@ -124,6 +308,9 @@
     _thickness = thickness;
     _geometryDirty = YES;
     [self updateGeometry];
+    
+    // Update ViroReact geometry
+    [self updateVROPolygon];
 }
 
 - (void)setFacesOutward:(BOOL)facesOutward
@@ -131,6 +318,9 @@
     _facesOutward = facesOutward;
     _geometryDirty = YES;
     [self updateGeometry];
+    
+    // Update ViroReact geometry
+    [self updateVROPolygon];
 }
 
 - (void)setTessellationFactor:(NSInteger)tessellationFactor
@@ -525,6 +715,16 @@
     _geometryDirty = YES;
     _needsRetessellation = YES;
     [self updateGeometry];
+}
+
+- (void)dealloc
+{
+    RCTLogInfo(@"[ViroPolygonComponentView] Deallocating");
+    
+    // Clean up ViroReact resources
+    _vroGeometry = nullptr;
+    _vroNode = nullptr;
+    _vroGeometrySource = nullptr;
 }
 
 @end

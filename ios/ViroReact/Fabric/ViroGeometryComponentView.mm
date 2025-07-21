@@ -11,9 +11,15 @@
 #import "ViroLog.h"
 #import <React/RCTConversions.h>
 #import <React/RCTLog.h>
+#import <ViroKit/ViroKit.h>
 #import <GLKit/GLKit.h>
 
 @implementation ViroGeometryComponentView {
+    // ViroReact Integration
+    std::shared_ptr<VROGeometry> _vroGeometry;
+    std::shared_ptr<VRONode> _vroNode;
+    std::shared_ptr<VROGeometrySource> _vroGeometrySource;
+    
     // Geometry definition
     NSArray<NSArray<NSNumber *> *> *_vertices;
     NSArray<NSArray<NSNumber *> *> *_normals;
@@ -110,6 +116,9 @@
         _vertexCount = 0;
         _triangleCount = 0;
         
+        // Initialize ViroReact geometry
+        [self initializeVROGeometry];
+        
         VRTLogDebug(@"ViroGeometry initialized");
     }
     return self;
@@ -132,6 +141,154 @@
     // TODO: Update properties from viroProps
     // This will be implemented when Fabric code generation is complete
     VRTLogDebug(@"ViroGeometry props updated");
+}
+
+#pragma mark - ViroReact Integration
+
+- (void)initializeVROGeometry
+{
+    VRTLogDebug(@"Initializing VROGeometry");
+    
+    // Create VROGeometry
+    _vroGeometry = VROGeometry::create();
+    
+    // Create VRONode to hold the geometry
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroGeometry);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    _vroNode->setLightReceivingBitMask(_lightReceivingBitMask);
+    _vroNode->setShadowCastingBitMask(_shadowCastingBitMask);
+    
+    VRTLogDebug(@"VROGeometry initialized successfully");
+}
+
+- (void)updateVROGeometry
+{
+    if (!_vroGeometry || !_geometryNeedsUpdate) {
+        return;
+    }
+    
+    VRTLogDebug(@"Updating VROGeometry with type: %@", _geometryType);
+    
+    // Build geometry based on type
+    if ([_geometryType isEqualToString:@"custom"]) {
+        [self buildCustomVROGeometry];
+    } else if ([_geometryType isEqualToString:@"sphere"]) {
+        [self buildSphereVROGeometry];
+    } else if ([_geometryType isEqualToString:@"box"]) {
+        [self buildBoxVROGeometry];
+    } else if ([_geometryType isEqualToString:@"cylinder"]) {
+        [self buildCylinderVROGeometry];
+    }
+    
+    _geometryNeedsUpdate = NO;
+    _isGeometryReady = YES;
+    
+    if (_onGeometryReady) {
+        _onGeometryReady(@{
+            @"vertexCount": @(_vertexCount),
+            @"triangleCount": @(_triangleCount)
+        });
+    }
+}
+
+- (void)buildCustomVROGeometry
+{
+    if (!_vertices || _vertices.count == 0) {
+        VRTLogWarn(@"No vertices provided for custom geometry");
+        return;
+    }
+    
+    VRTLogDebug(@"Building custom VROGeometry with %lu vertices", (unsigned long)_vertices.count);
+    
+    // Convert vertices to VROGeometrySource format
+    std::vector<VROVector3f> vertices;
+    for (NSArray<NSNumber *> *vertex in _vertices) {
+        if (vertex.count >= 3) {
+            vertices.push_back(VROVector3f([vertex[0] floatValue], [vertex[1] floatValue], [vertex[2] floatValue]));
+        }
+    }
+    
+    // Convert normals if provided
+    std::vector<VROVector3f> normals;
+    if (_normals && _normals.count > 0) {
+        for (NSArray<NSNumber *> *normal in _normals) {
+            if (normal.count >= 3) {
+                normals.push_back(VROVector3f([normal[0] floatValue], [normal[1] floatValue], [normal[2] floatValue]));
+            }
+        }
+    }
+    
+    // Convert texture coordinates if provided
+    std::vector<VROVector3f> texcoords;
+    if (_texcoords && _texcoords.count > 0) {
+        for (NSArray<NSNumber *> *texcoord in _texcoords) {
+            if (texcoord.count >= 2) {
+                float u = [texcoord[0] floatValue];
+                float v = [texcoord[1] floatValue];
+                texcoords.push_back(VROVector3f(u, v, 0.0f));
+            }
+        }
+    }
+    
+    // Convert triangle indices if provided
+    std::vector<int> indices;
+    if (_triangleIndices && _triangleIndices.count > 0) {
+        for (NSArray<NSNumber *> *triangle in _triangleIndices) {
+            if (triangle.count >= 3) {
+                indices.push_back([triangle[0] intValue]);
+                indices.push_back([triangle[1] intValue]);
+                indices.push_back([triangle[2] intValue]);
+            }
+        }
+    }
+    
+    // Create VROGeometrySource and update geometry
+    _vroGeometrySource = VROGeometrySource::create(vertices, normals, texcoords, indices);
+    _vroGeometry->setGeometrySources({ _vroGeometrySource });
+    
+    _vertexCount = (NSInteger)vertices.size();
+    _triangleCount = (NSInteger)(indices.size() > 0 ? indices.size() / 3 : vertices.size() / 3);
+}
+
+- (void)buildSphereVROGeometry
+{
+    VRTLogDebug(@"Building sphere VROGeometry - radius: %.2f, segments: %ld", _sphereRadius, (long)_sphereSegments);
+    
+    // Use ViroKit's built-in sphere geometry
+    auto sphere = VROSphere::createSphere(_sphereRadius, _sphereSegments, _sphereSegments, true, 0, 2 * M_PI, 0, M_PI);
+    _vroNode->setGeometry(sphere);
+    
+    _vertexCount = _sphereSegments * _sphereSegments * 4;
+    _triangleCount = _sphereSegments * _sphereSegments * 2;
+}
+
+- (void)buildBoxVROGeometry
+{
+    VRTLogDebug(@"Building box VROGeometry - dimensions: %.2f x %.2f x %.2f", _boxWidth, _boxHeight, _boxLength);
+    
+    // Use ViroKit's built-in box geometry
+    auto box = VROBox::createBox(_boxWidth, _boxHeight, _boxLength);
+    _vroNode->setGeometry(box);
+    
+    _vertexCount = 24; // 8 vertices * 3 duplicates for face normals
+    _triangleCount = 12; // 6 faces * 2 triangles per face
+}
+
+- (void)buildCylinderVROGeometry
+{
+    VRTLogDebug(@"Building cylinder VROGeometry - radius: %.2f, height: %.2f, segments: %ld", 
+                _cylinderRadius, _cylinderHeight, (long)_cylinderSegments);
+    
+    // Use ViroKit's built-in cylinder geometry (using cone with equal radii)
+    auto cylinder = VROCone::createCone(0, _cylinderRadius, _cylinderHeight, _cylinderSegments, 1, true, true);
+    _vroNode->setGeometry(cylinder);
+    
+    _vertexCount = _cylinderSegments * 4 + 2; // Side vertices + top/bottom centers
+    _triangleCount = _cylinderSegments * 4; // Side triangles + top/bottom triangles
 }
 
 #pragma mark - Geometry Definition
@@ -399,6 +556,10 @@
     VRTLogDebug(@"Updating geometry (type: %@)", _geometryType);
     
     @try {
+        // Use ViroReact integration for geometry creation
+        [self updateVROGeometry];
+        
+        // Legacy geometry generation for non-VRO cases
         [self generateGeometry];
         [self optimizeGeometry];
         
@@ -600,6 +761,15 @@
     if (_geometryNeedsUpdate) {
         [self updateGeometry];
     }
+}
+
+- (void)dealloc {
+    VRTLogDebug(@"ViroGeometry deallocating");
+    
+    // Clean up ViroReact resources
+    _vroGeometry = nullptr;
+    _vroNode = nullptr;
+    _vroGeometrySource = nullptr;
 }
 
 @end

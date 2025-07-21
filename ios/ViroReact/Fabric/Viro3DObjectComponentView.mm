@@ -11,8 +11,14 @@
 #import "ViroLog.h"
 #import <React/RCTConversions.h>
 #import <React/RCTLog.h>
+#import <ViroKit/ViroKit.h>
 
 @implementation Viro3DObjectComponentView {
+    // ViroReact Integration
+    std::shared_ptr<VRO3DObject> _vro3DObject;
+    std::shared_ptr<VRONode> _vroNode;
+    std::shared_ptr<VROLoader> _vroLoader;
+    
     // 3D Model properties
     NSDictionary *_source;
     NSString *_uri;
@@ -69,6 +75,9 @@
         _morphTargetWeights = [NSMutableDictionary dictionary];
         _animationStates = [NSMutableDictionary dictionary];
         
+        // Initialize ViroReact 3D object
+        [self initializeVRO3DObject];
+        
         VRTLogDebug(@"Viro3DObject initialized");
     }
     return self;
@@ -95,6 +104,29 @@
 
 #pragma mark - 3D Model Source Properties
 
+- (void)initializeVRO3DObject
+{
+    VRTLogDebug(@"Initializing VRO3DObject");
+    
+    // Create VRO3DObject
+    _vro3DObject = VRO3DObject::create();
+    
+    // Create VRONode to hold the 3D object
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vro3DObject);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    _vroNode->setLightReceivingBitMask(_lightReceivingBitMask);
+    _vroNode->setShadowCastingBitMask(_shadowCastingBitMask);
+    
+    // Apply default transform
+    [self updateTransform];
+    
+    VRTLogDebug(@"VRO3DObject initialized successfully");
+}
+
 - (void)setSource:(nullable NSDictionary *)source {
     VRTLogDebug(@"Setting 3D object source: %@", source);
     _source = source;
@@ -106,9 +138,10 @@
         
         if (uri) {
             [self setUri:uri];
-        }
-        if (type) {
-            [self setType:type];
+            if (type) {
+                [self setType:type];
+            }
+            
         }
     } else {
         // Clear the 3D object
@@ -354,18 +387,26 @@
         _onLoadStart(@{});
     }
     
-    // TODO: Implement actual 3D object loading
-    // This will need to:
-    // 1. Download the model file if it's a URL
-    // 2. Parse the model based on the type (OBJ, FBX, GLTF, etc.)
-    // 3. Create ViroReact geometry and materials
-    // 4. Set up animations if present
-    // 5. Apply transformations and materials
+    if (!_vroLoader) {
+        _vroLoader = VROLoader::create();
+    }
     
-    // Simulate successful loading for now
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self handle3DObjectLoaded];
-    });
+    // Create loading callback
+    std::function<void(std::shared_ptr<VRONode>, bool)> callback = [self](std::shared_ptr<VRONode> node, bool success) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self handle3DObjectLoaded:node success:success];
+        });
+    };
+    
+    // Load the 3D model based on type
+    VROResourceType resourceType = [self getResourceTypeFromURI:uri];
+    NSURL *modelURL = [NSURL URLWithString:uri];
+    
+    if (modelURL) {
+        _vroLoader->loadAsync(modelURL, resourceType, _vroNode, callback);
+    } else {
+        [self handle3DObjectLoaded:nullptr success:false];
+    }
 }
 
 - (void)handle3DObjectLoaded {
@@ -467,6 +508,85 @@
     
     // 3D objects don't have traditional 2D layout,
     // but we may need to update the scene graph here
+}
+
+- (void)handle3DObjectLoaded:(std::shared_ptr<VRONode>)node success:(BOOL)success {
+    _isLoading = NO;
+    _isLoaded = success;
+    
+    if (success && node) {
+        VRTLogDebug(@"3D object loaded successfully");
+        
+        // Replace the geometry in our node with the loaded model
+        _vroNode = node;
+        [self updateTransform];
+        [self applyResourcesToLoadedModel];
+        
+        // Fire onLoad event
+        if (_onLoad) {
+            _onLoad(@{
+                @"success": @YES
+            });
+        }
+    } else {
+        VRTLogError(@"Failed to load 3D object");
+        [self fireErrorEvent:@"Failed to load 3D object"];
+    }
+}
+
+- (VROResourceType)getResourceTypeFromURI:(NSString *)uri {
+    NSString *extension = [[uri pathExtension] lowercaseString];
+    
+    if ([extension isEqualToString:@"obj"]) {
+        return VROResourceType::OBJ;
+    } else if ([extension isEqualToString:@"fbx"]) {
+        return VROResourceType::FBX;
+    } else if ([extension isEqualToString:@"gltf"]) {
+        return VROResourceType::GLTF;
+    } else if ([extension isEqualToString:@"glb"]) {
+        return VROResourceType::GLB;
+    } else if ([extension isEqualToString:@"dae"]) {
+        return VROResourceType::DAE;
+    } else {
+        // Default to OBJ
+        return VROResourceType::OBJ;
+    }
+}
+
+- (void)updateTransform {
+    if (!_vroNode) {
+        return;
+    }
+    
+    // Apply position
+    if (_position && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroNode->setPosition(pos);
+    }
+    
+    // Apply rotation (convert degrees to radians)
+    if (_rotation && _rotation.count >= 3) {
+        VROVector3f rot([_rotation[0] floatValue] * M_PI / 180.0,
+                        [_rotation[1] floatValue] * M_PI / 180.0,
+                        [_rotation[2] floatValue] * M_PI / 180.0);
+        _vroNode->setRotation(rot);
+    }
+    
+    // Apply scale
+    if (_scale && _scale.count >= 3) {
+        VROVector3f scl([_scale[0] floatValue], [_scale[1] floatValue], [_scale[2] floatValue]);
+        _vroNode->setScale(scl);
+    }
+}
+
+- (void)fireErrorEvent:(NSString *)errorMessage {
+    VRTLogError(@"3D Object error: %@", errorMessage);
+    
+    if (_onError) {
+        _onError(@{
+            @"error": errorMessage
+        });
+    }
 }
 
 @end

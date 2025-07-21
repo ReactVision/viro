@@ -11,8 +11,15 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
+#import "VRTNode.h"
 
 @interface ViroNodeComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
+@property (nonatomic, strong) std::shared_ptr<VROEventDelegateiOS> eventDelegate;
+@property (nonatomic, strong) std::shared_ptr<VROTransformDelegateiOS> transformDelegate;
 
 // Transform properties
 @property (nonatomic, strong, nullable) NSArray<NSNumber *> *position;
@@ -51,8 +58,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroNode
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroNodeComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -79,11 +85,62 @@
     _scale = @[@1, @1, @1];
     _rotation = @[@0, @0, @0];
     
-    // TODO: Initialize ViroReact node
-    // This will need to integrate with the existing ViroReact node implementation
+    // Initialize ViroReact node
+    [self initializeVRONode];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
+}
+
+- (void)initializeVRONode
+{
+    RCTLogInfo(@"[ViroNodeComponentView] Creating VRONode");
+    
+    // Create VRONode - the core 3D node object
+    _vroNode = std::make_shared<VRONode>();
+    
+    // Set default properties
+    _vroNode->setOpacity(_opacity);
+    _vroNode->setVisible(_visible);
+    _vroNode->setRenderingOrder(_renderingOrder);
+    
+    // Apply default transform
+    [self updateVRONodeTransform];
+    
+    // Create event delegate for handling user interactions
+    _eventDelegate = std::make_shared<VROEventDelegateiOS>((__bridge void *)self);
+    _vroNode->setEventDelegate(_eventDelegate);
+    
+    // Create transform delegate for transform updates
+    _transformDelegate = std::make_shared<VROTransformDelegateiOS>((__bridge void *)self);
+    _vroNode->setTransformDelegate(_transformDelegate);
+    
+    RCTLogInfo(@"[ViroNodeComponentView] VRONode created successfully");
+}
+
+- (void)updateVRONodeTransform
+{
+    if (!_vroNode) {
+        return;
+    }
+    
+    // Apply position
+    if (_position && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroNode->setPosition(pos);
+    }
+    
+    // Apply scale
+    if (_scale && _scale.count >= 3) {
+        VROVector3f scl([_scale[0] floatValue], [_scale[1] floatValue], [_scale[2] floatValue]);
+        _vroNode->setScale(scl);
+    }
+    
+    // Apply rotation (Euler angles in radians)
+    if (_rotation && _rotation.count >= 3) {
+        VROVector3f rot([_rotation[0] floatValue], [_rotation[1] floatValue], [_rotation[2] floatValue]);
+        _vroNode->setRotation(rot);
+    }
 }
 
 #pragma mark - Transform Methods
@@ -93,7 +150,11 @@
     RCTLogInfo(@"[ViroNodeComponentView] Setting position: %@", position);
     _position = position ?: @[@0, @0, @0];
     
-    // TODO: Apply position transform to ViroReact node
+    // Apply position transform to ViroReact node
+    if (_vroNode && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroNode->setPosition(pos);
+    }
 }
 
 - (void)setScale:(nullable NSArray<NSNumber *> *)scale
@@ -101,7 +162,11 @@
     RCTLogInfo(@"[ViroNodeComponentView] Setting scale: %@", scale);
     _scale = scale ?: @[@1, @1, @1];
     
-    // TODO: Apply scale transform to ViroReact node
+    // Apply scale transform to ViroReact node
+    if (_vroNode && _scale.count >= 3) {
+        VROVector3f scl([_scale[0] floatValue], [_scale[1] floatValue], [_scale[2] floatValue]);
+        _vroNode->setScale(scl);
+    }
 }
 
 - (void)setRotation:(nullable NSArray<NSNumber *> *)rotation
@@ -109,7 +174,11 @@
     RCTLogInfo(@"[ViroNodeComponentView] Setting rotation: %@", rotation);
     _rotation = rotation ?: @[@0, @0, @0];
     
-    // TODO: Apply rotation transform to ViroReact node
+    // Apply rotation transform to ViroReact node
+    if (_vroNode && _rotation.count >= 3) {
+        VROVector3f rot([_rotation[0] floatValue], [_rotation[1] floatValue], [_rotation[2] floatValue]);
+        _vroNode->setRotation(rot);
+    }
 }
 
 - (void)setRotationPivot:(nullable NSArray<NSNumber *> *)rotationPivot
@@ -144,7 +213,10 @@
     RCTLogInfo(@"[ViroNodeComponentView] Setting visible: %@", visible ? @"YES" : @"NO");
     _visible = visible;
     
-    // TODO: Apply visibility to ViroReact node
+    // Apply visibility to ViroReact node
+    if (_vroNode) {
+        _vroNode->setVisible(visible);
+    }
     self.hidden = !visible;
 }
 
@@ -153,7 +225,10 @@
     RCTLogInfo(@"[ViroNodeComponentView] Setting opacity: %f", opacity);
     _opacity = opacity;
     
-    // TODO: Apply opacity to ViroReact node
+    // Apply opacity to ViroReact node
+    if (_vroNode) {
+        _vroNode->setOpacity(opacity);
+    }
     self.alpha = opacity;
 }
 
@@ -162,7 +237,10 @@
     RCTLogInfo(@"[ViroNodeComponentView] Setting rendering order: %ld", (long)renderingOrder);
     _renderingOrder = renderingOrder;
     
-    // TODO: Apply rendering order to ViroReact node
+    // Apply rendering order to ViroReact node
+    if (_vroNode) {
+        _vroNode->setRenderingOrder((int)renderingOrder);
+    }
 }
 
 - (void)setIgnoreEventHandling:(BOOL)ignoreEventHandling

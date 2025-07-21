@@ -12,8 +12,15 @@
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
 #import <AVFoundation/AVFoundation.h>
+#import <ViroKit/ViroKit.h>
 
 @interface ViroVideoComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROVideoTexture> vroVideoTexture;
+@property (nonatomic, strong) std::shared_ptr<VROQuad> vroQuad;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
+@property (nonatomic, strong) std::shared_ptr<VROMaterial> vroMaterial;
 
 // Video source properties
 @property (nonatomic, strong, nullable) NSDictionary *source;
@@ -57,8 +64,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroVideo
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroVideoComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -85,8 +91,8 @@
     _playbackRate = 1.0;
     _stereoMode = @"none";
     
-    // TODO: Initialize ViroReact video
-    // This will need to integrate with the existing ViroReact video system
+    // Initialize ViroReact video integration
+    [self initializeVROVideo];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
@@ -122,12 +128,42 @@
 
 #pragma mark - Video Playback Control
 
+- (void)initializeVROVideo
+{
+    RCTLogInfo(@"[ViroVideoComponentView] Creating VROVideo components");
+    
+    // Create video texture (will be connected to AVPlayer later)
+    _vroVideoTexture = VROVideoTexture::create();
+    
+    // Create material for video texture
+    _vroMaterial = VROMaterial::create();
+    _vroMaterial->setDiffuseTexture(_vroVideoTexture);
+    _vroMaterial->setLightingModel(VROLightingModel::Lambert);
+    
+    // Create quad geometry for video display
+    _vroQuad = VROQuad::createQuad(_width, _height);
+    
+    // Create VRONode to hold everything
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroQuad);
+    _vroNode->setMaterials({_vroMaterial});
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    RCTLogInfo(@"[ViroVideoComponentView] VROVideo components created successfully");
+}
+
 - (void)setLoop:(BOOL)loop
 {
     RCTLogInfo(@"[ViroVideoComponentView] Setting loop: %@", loop ? @"YES" : @"NO");
     _loop = loop;
     
-    // TODO: Update video loop setting in ViroReact renderer
+    if (_vroVideoTexture) {
+        _vroVideoTexture->setLoop(loop);
+    }
+    
     [self updateVideoPlayback];
 }
 
@@ -163,8 +199,14 @@
     if (_player) {
         if (paused) {
             [_player pause];
+            if (_vroVideoTexture) {
+                _vroVideoTexture->pause();
+            }
         } else {
             [_player play];
+            if (_vroVideoTexture) {
+                _vroVideoTexture->play();
+            }
         }
     }
 }
@@ -176,7 +218,13 @@
     RCTLogInfo(@"[ViroVideoComponentView] Setting width: %f", width);
     _width = width;
     
-    // TODO: Update video dimensions in ViroReact renderer
+    if (_vroQuad) {
+        _vroQuad = VROQuad::createQuad(_width, _height);
+        if (_vroNode) {
+            _vroNode->setGeometry(_vroQuad);
+        }
+    }
+    
     [self updateVideoGeometry];
 }
 
@@ -185,7 +233,13 @@
     RCTLogInfo(@"[ViroVideoComponentView] Setting height: %f", height);
     _height = height;
     
-    // TODO: Update video dimensions in ViroReact renderer
+    if (_vroQuad) {
+        _vroQuad = VROQuad::createQuad(_width, _height);
+        if (_vroNode) {
+            _vroNode->setGeometry(_vroQuad);
+        }
+    }
+    
     [self updateVideoGeometry];
 }
 
@@ -194,8 +248,17 @@
     RCTLogInfo(@"[ViroVideoComponentView] Setting resize mode: %@", resizeMode);
     _resizeMode = resizeMode ?: @"scaleAspectFit";
     
-    // TODO: Update video resize mode in ViroReact renderer
-    // Modes: scaleAspectFit, scaleAspectFill, scaleToFill
+    if (_vroVideoTexture) {
+        // Map resize modes to ViroKit
+        if ([_resizeMode isEqualToString:@"scaleAspectFit"]) {
+            _vroVideoTexture->setScaleType(VROVideoScaleType::Fit);
+        } else if ([_resizeMode isEqualToString:@"scaleAspectFill"]) {
+            _vroVideoTexture->setScaleType(VROVideoScaleType::Fill);
+        } else if ([_resizeMode isEqualToString:@"scaleToFill"]) {
+            _vroVideoTexture->setScaleType(VROVideoScaleType::Stretch);
+        }
+    }
+    
     [self updateVideoGeometry];
 }
 
@@ -204,7 +267,13 @@
     RCTLogInfo(@"[ViroVideoComponentView] Setting rotation: %@", rotation);
     _rotation = rotation ?: @[@0, @0, @0];
     
-    // TODO: Update video rotation in ViroReact renderer
+    if (_vroNode && _rotation.count >= 3) {
+        VROVector3f rotationVector([_rotation[0] floatValue] * M_PI / 180.0,
+                                   [_rotation[1] floatValue] * M_PI / 180.0,
+                                   [_rotation[2] floatValue] * M_PI / 180.0);
+        _vroNode->setRotation(rotationVector);
+    }
+    
     [self updateVideoGeometry];
 }
 
@@ -230,6 +299,10 @@
         _player.rate = _paused ? 0.0 : playbackRate;
     }
     
+    if (_vroVideoTexture) {
+        _vroVideoTexture->setPlaybackRate(playbackRate);
+    }
+    
     [self updateVideoPlayback];
 }
 
@@ -238,8 +311,21 @@
     RCTLogInfo(@"[ViroVideoComponentView] Setting stereo mode: %@", stereoMode);
     _stereoMode = stereoMode ?: @"none";
     
-    // TODO: Update stereo mode in ViroReact renderer
-    // Modes: none, leftRight, rightLeft, topBottom, bottomTop
+    if (_vroVideoTexture) {
+        // Map stereo modes to ViroKit
+        if ([_stereoMode isEqualToString:@"leftRight"]) {
+            _vroVideoTexture->setStereoMode(VROStereoMode::LeftRight);
+        } else if ([_stereoMode isEqualToString:@"rightLeft"]) {
+            _vroVideoTexture->setStereoMode(VROStereoMode::RightLeft);
+        } else if ([_stereoMode isEqualToString:@"topBottom"]) {
+            _vroVideoTexture->setStereoMode(VROStereoMode::TopBottom);
+        } else if ([_stereoMode isEqualToString:@"bottomTop"]) {
+            _vroVideoTexture->setStereoMode(VROStereoMode::BottomTop);
+        } else {
+            _vroVideoTexture->setStereoMode(VROStereoMode::None);
+        }
+    }
+    
     [self updateVideoPlayback];
 }
 
@@ -252,6 +338,10 @@
     if (_player && _playerItem) {
         CMTime seekTime = CMTimeMakeWithSeconds(seconds, NSEC_PER_SEC);
         [_player seekToTime:seekTime toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero];
+        
+        if (_vroVideoTexture) {
+            _vroVideoTexture->seekToTime(seconds);
+        }
     }
 }
 
@@ -315,12 +405,21 @@
     // Add observers
     [self addPlayerObservers];
     
-    // TODO: Connect AVPlayer to ViroReact video surface
-    // This should render the video as texture in 3D space
+    // Connect AVPlayer to ViroReact video texture
+    if (_vroVideoTexture) {
+        _vroVideoTexture->setPlayer(_player);
+        _vroVideoTexture->setPlaybackRate(_playbackRate);
+        _vroVideoTexture->setLoop(_loop);
+        _vroVideoTexture->setMuted(_muted);
+        _vroVideoTexture->setVolume(_volume);
+    }
     
     // Auto-play if not paused
     if (!_paused) {
         [_player play];
+        if (_vroVideoTexture) {
+            _vroVideoTexture->play();
+        }
     }
 }
 
@@ -365,6 +464,11 @@
     
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     
+    // Disconnect from ViroReact video texture
+    if (_vroVideoTexture) {
+        _vroVideoTexture->setPlayer(nullptr);
+    }
+    
     _player = nil;
     _playerItem = nil;
 }
@@ -374,7 +478,10 @@
     RCTLogInfo(@"[ViroVideoComponentView] Stopping video");
     [self cleanupPlayer];
     
-    // TODO: Remove video texture from ViroReact surface
+    // Clear video texture from ViroReact surface
+    if (_vroVideoTexture) {
+        _vroVideoTexture->pause();
+    }
 }
 
 #pragma mark - Video Updates
@@ -384,8 +491,12 @@
     RCTLogInfo(@"[ViroVideoComponentView] Updating video playback - Loop: %@, Muted: %@, Volume: %.2f, Rate: %.2f", 
                _loop ? @"YES" : @"NO", _muted ? @"YES" : @"NO", _volume, _playbackRate);
     
-    // TODO: Apply video playback settings to ViroReact renderer
-    // This should update the video texture properties and playback state
+    if (_vroVideoTexture) {
+        _vroVideoTexture->setLoop(_loop);
+        _vroVideoTexture->setMuted(_muted);
+        _vroVideoTexture->setVolume(_volume);
+        _vroVideoTexture->setPlaybackRate(_playbackRate);
+    }
 }
 
 - (void)updateVideoGeometry
@@ -393,8 +504,21 @@
     RCTLogInfo(@"[ViroVideoComponentView] Updating video geometry - Size: %.2fx%.2f, Mode: %@, Rotation: %@", 
                _width, _height, _resizeMode, _rotation);
     
-    // TODO: Apply video geometry settings to ViroReact renderer
-    // This should update the 3D surface dimensions and orientation
+    if (_vroQuad) {
+        // Update quad dimensions
+        _vroQuad = VROQuad::createQuad(_width, _height);
+        if (_vroNode) {
+            _vroNode->setGeometry(_vroQuad);
+        }
+    }
+    
+    if (_vroNode && _rotation.count >= 3) {
+        // Update rotation
+        VROVector3f rotationVector([_rotation[0] floatValue] * M_PI / 180.0,
+                                   [_rotation[1] floatValue] * M_PI / 180.0,
+                                   [_rotation[2] floatValue] * M_PI / 180.0);
+        _vroNode->setRotation(rotationVector);
+    }
 }
 
 #pragma mark - Event Handling
@@ -492,12 +616,12 @@
     
     if (self.window) {
         RCTLogInfo(@"[ViroVideoComponentView] Video added to window");
-        // TODO: Add video to ViroReact scene when added to window
         [self updateVideoGeometry];
         [self updateVideoPlayback];
+        // Parent ViroNodeComponentView will handle adding _vroNode to scene
     } else {
         RCTLogInfo(@"[ViroVideoComponentView] Video removed from window");
-        // TODO: Remove video from ViroReact scene when removed from window
+        // Parent ViroNodeComponentView will handle removing _vroNode from scene
     }
 }
 
@@ -505,7 +629,12 @@
 {
     RCTLogInfo(@"[ViroVideoComponentView] Deallocating");
     [self cleanupPlayer];
-    // TODO: Clean up ViroReact video resources
+    
+    // Clean up ViroReact video resources
+    _vroVideoTexture = nullptr;
+    _vroMaterial = nullptr;
+    _vroQuad = nullptr;
+    _vroNode = nullptr;
 }
 
 @end

@@ -11,8 +11,13 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
 
 @interface ViroAmbientLightComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROLight> vroLight;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Light color and intensity
 @property (nonatomic, strong, nullable) NSString *color;
@@ -28,8 +33,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroAmbientLight
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroAmbientLightComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -50,11 +54,36 @@
     _temperature = 6500.0; // Kelvin (daylight)
     _influenceBitMask = 1; // Default influence mask
     
-    // TODO: Initialize ViroReact ambient light
-    // This will need to integrate with the existing ViroReact lighting system
+    // Initialize ViroReact ambient light
+    [self initializeVROAmbientLight];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Lights don't have visual bounds
+}
+
+#pragma mark - Light Color and Intensity
+
+- (void)initializeVROAmbientLight
+{
+    RCTLogInfo(@"[ViroAmbientLightComponentView] Creating VROLight (Ambient)");
+    
+    // Create ambient light
+    _vroLight = std::make_shared<VROLight>(VROLightType::Ambient);
+    
+    // Set default properties
+    VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+    _vroLight->setColor(lightColor);
+    _vroLight->setIntensity(_intensity);
+    _vroLight->setTemperature(_temperature);
+    
+    // Set influence mask
+    _vroLight->setInfluenceBitMask(_influenceBitMask);
+    
+    // Create VRONode to hold the light
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->addLight(_vroLight);
+    
+    RCTLogInfo(@"[ViroAmbientLightComponentView] VROLight created successfully");
 }
 
 #pragma mark - Light Color and Intensity
@@ -64,8 +93,10 @@
     RCTLogInfo(@"[ViroAmbientLightComponentView] Setting color: %@", color);
     _color = color ?: @"#FFFFFF";
     
-    // TODO: Update ambient light color in ViroReact renderer
-    [self updateAmbientLight];
+    if (_vroLight) {
+        VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+        _vroLight->setColor(lightColor);
+    }
 }
 
 - (void)setIntensity:(CGFloat)intensity
@@ -73,8 +104,9 @@
     RCTLogInfo(@"[ViroAmbientLightComponentView] Setting intensity: %f", intensity);
     _intensity = intensity;
     
-    // TODO: Update ambient light intensity in ViroReact renderer
-    [self updateAmbientLight];
+    if (_vroLight) {
+        _vroLight->setIntensity(intensity);
+    }
 }
 
 - (void)setTemperature:(CGFloat)temperature
@@ -82,9 +114,9 @@
     RCTLogInfo(@"[ViroAmbientLightComponentView] Setting temperature: %f", temperature);
     _temperature = temperature;
     
-    // TODO: Update ambient light temperature in ViroReact renderer
-    // Temperature affects the color tint (warm/cool)
-    [self updateAmbientLight];
+    if (_vroLight) {
+        _vroLight->setTemperature(temperature);
+    }
 }
 
 #pragma mark - Light Influence
@@ -94,9 +126,9 @@
     RCTLogInfo(@"[ViroAmbientLightComponentView] Setting influence bit mask: %ld", (long)influenceBitMask);
     _influenceBitMask = influenceBitMask;
     
-    // TODO: Update ambient light influence in ViroReact renderer
-    // Influence bit mask determines which objects are affected by this light
-    [self updateAmbientLight];
+    if (_vroLight) {
+        _vroLight->setInfluenceBitMask((int)influenceBitMask);
+    }
 }
 
 #pragma mark - Light Update
@@ -106,9 +138,16 @@
     RCTLogInfo(@"[ViroAmbientLightComponentView] Updating ambient light - Color: %@, Intensity: %.1f, Temperature: %.1f, Influence: %ld", 
                _color, _intensity, _temperature, (long)_influenceBitMask);
     
-    // TODO: Apply ambient light settings to ViroReact renderer
-    // Ambient light provides uniform illumination to all objects in the scene
-    // It doesn't have position or direction - it affects everything equally
+    if (!_vroLight) {
+        return;
+    }
+    
+    // Apply all current settings to the light
+    VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+    _vroLight->setColor(lightColor);
+    _vroLight->setIntensity(_intensity);
+    _vroLight->setTemperature(_temperature);
+    _vroLight->setInfluenceBitMask((int)_influenceBitMask);
 }
 
 #pragma mark - Helper Methods
@@ -160,18 +199,19 @@
     
     if (self.window) {
         RCTLogInfo(@"[ViroAmbientLightComponentView] Ambient light added to window");
-        // TODO: Add ambient light to ViroReact scene when added to window
         [self updateAmbientLight];
+        // Parent ViroNodeComponentView will handle adding _vroNode to scene
     } else {
         RCTLogInfo(@"[ViroAmbientLightComponentView] Ambient light removed from window");
-        // TODO: Remove ambient light from ViroReact scene when removed from window
+        // Parent ViroNodeComponentView will handle removing _vroNode from scene
     }
 }
 
 - (void)dealloc
 {
     RCTLogInfo(@"[ViroAmbientLightComponentView] Deallocating");
-    // TODO: Clean up ViroReact ambient light resources
+    _vroLight = nullptr;
+    _vroNode = nullptr;
 }
 
 @end

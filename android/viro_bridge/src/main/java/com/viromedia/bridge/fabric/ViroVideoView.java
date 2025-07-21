@@ -9,24 +9,34 @@
 package com.viromedia.bridge.fabric;
 
 import android.content.Context;
-import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.Surface;
+import android.util.Log;
+import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.bridge.Arguments;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 
-import com.viromedia.bridge.utility.ViroLog;
+import com.viro.core.EventDelegate;
+import com.viro.core.Material;
+import com.viro.core.Node;
+import com.viro.core.Quad;
+import com.viro.core.Texture;
+import com.viro.core.Vector;
+import com.viro.core.VideoTexture;
+import com.viro.core.ViroContext;
+import com.viromedia.bridge.component.VRTComponent;
+import com.viromedia.bridge.utility.ComponentEventDelegate;
 
-import java.io.IOException;
+import java.lang.ref.WeakReference;
 
 /**
  * ViroVideo - Video Playback Component
@@ -46,12 +56,21 @@ import java.io.IOException;
  * - Progress and state event callbacks
  * - Integration with ViroReact material system
  */
-public class ViroVideoView extends ViroNodeView implements MediaPlayer.OnPreparedListener,
-        MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener, MediaPlayer.OnBufferingUpdateListener,
-        MediaPlayer.OnSeekCompleteListener, MediaPlayer.OnVideoSizeChangedListener {
+public class ViroVideoView extends View {
 
-    private static final String TAG = ViroLog.getTag(ViroVideoView.class);
+    private static final String TAG = "ViroVideoView";
+    
+    private ReactContext mReactContext;
 
+    // ViroReact Integration
+    private Node mNodeJni;
+    private VideoTexture mVideoTextureJni;
+    private Quad mQuadJni;
+    private Material mMaterialJni;
+    private ViroContext mViroContext;
+    private EventDelegate mEventDelegateJni;
+    private ComponentEventDelegate mComponentEventDelegate;
+    
     // Video source properties
     private ReadableMap mSource;
     private String mUri;
@@ -66,7 +85,9 @@ public class ViroVideoView extends ViroNodeView implements MediaPlayer.OnPrepare
     private float mWidth = 1.0f;
     private float mHeight = 1.0f;
     private String mResizeMode = "scaleAspectFit";
-    private float[] mRotation = {0.0f, 0.0f, 0.0f};
+    private Vector mPosition = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mRotation = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mScale = new Vector(1.0f, 1.0f, 1.0f);
 
     // Video material properties
     private ReadableArray mMaterials;
@@ -75,19 +96,19 @@ public class ViroVideoView extends ViroNodeView implements MediaPlayer.OnPrepare
     private float mPlaybackRate = 1.0f;
     private String mStereoMode = "none";
 
-    // Internal video player
-    private MediaPlayer mMediaPlayer;
+    // Internal video state
     private Handler mProgressUpdateHandler;
     private Runnable mProgressUpdateRunnable;
     private boolean mIsLoading = false;
     private boolean mIsReady = false;
-    private int mVideoDuration = 0;
+    private float mVideoDuration = 0.0f;
     private int mVideoWidth = 0;
     private int mVideoHeight = 0;
 
-    public ViroVideoView(@NonNull ThemedReactContext context) {
+    public ViroVideoView(@NonNull Context context) {
         super(context);
-        ViroLog.debug(TAG, "ViroVideoView initialized");
+        mReactContext = (ReactContext) context;
+        Log.d(TAG, "ViroVideoView initialized with ViroReact VideoTexture integration");
         
         // Initialize progress update handler
         mProgressUpdateHandler = new Handler(Looper.getMainLooper());
@@ -95,23 +116,40 @@ public class ViroVideoView extends ViroNodeView implements MediaPlayer.OnPrepare
             @Override
             public void run() {
                 updateProgress();
-                if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
+                if (mVideoTextureJni != null && mVideoTextureJni.isPlaying()) {
                     mProgressUpdateHandler.postDelayed(this, 250); // Update 4 times per second
                 }
             }
         };
         
-        // TODO: Initialize ViroReact video
-        // This will need to integrate with the existing ViroReact video system
         initializeVideo();
     }
 
     private void initializeVideo() {
-        ViroLog.debug(TAG, "Initializing video with default properties");
+        Log.d(TAG, "Initializing ViroReact video with default properties");
         
-        // TODO: Set up ViroReact video with default properties
-        // This should create the underlying video surface in 3D space
+        // Create ViroReact Node for the video
+        mNodeJni = new Node();
+        
+        // Create Quad geometry for video surface
+        mQuadJni = new Quad(mWidth, mHeight);
+        
+        // Create Material for video texture
+        mMaterialJni = new Material();
+        
+        // Configure initial geometry and material
         updateVideoGeometry();
+        
+        // Create and attach event callbacks
+        mComponentEventDelegate = new ComponentEventDelegate(new VRTComponentWrapper(this));
+        mEventDelegateJni = new EventDelegate();
+        mEventDelegateJni.setEventDelegateCallback(mComponentEventDelegate);
+        mNodeJni.setEventDelegate(mEventDelegateJni);
+        
+        // Video views are typically transparent
+        setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        
+        Log.d(TAG, "ViroReact video initialized successfully");
     }
 
     // Video Source Properties

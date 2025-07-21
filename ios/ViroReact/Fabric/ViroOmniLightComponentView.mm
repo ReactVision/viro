@@ -11,8 +11,13 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
 
 @interface ViroOmniLightComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROLight> vroLight;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Light color and intensity
 @property (nonatomic, strong, nullable) NSString *color;
@@ -35,8 +40,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroOmniLight
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroOmniLightComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -63,11 +67,46 @@
     
     _influenceBitMask = 1; // Default influence mask
     
-    // TODO: Initialize ViroReact omni light
-    // This will need to integrate with the existing ViroReact lighting system
+    // Initialize ViroReact omni light
+    [self initializeVROOmniLight];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Lights don't have visual bounds
+}
+
+#pragma mark - Light Color and Intensity
+
+- (void)initializeVROOmniLight
+{
+    RCTLogInfo(@"[ViroOmniLightComponentView] Creating VROLight (Omni)");
+    
+    // Create omni (point) light
+    _vroLight = std::make_shared<VROLight>(VROLightType::Omni);
+    
+    // Set default properties
+    VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+    _vroLight->setColor(lightColor);
+    _vroLight->setIntensity(_intensity);
+    _vroLight->setTemperature(_temperature);
+    
+    // Set position
+    if (_position && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroLight->setPosition(pos);
+    }
+    
+    // Set attenuation
+    _vroLight->setAttenuationStartDistance(_attenuationStartDistance);
+    _vroLight->setAttenuationEndDistance(_attenuationEndDistance);
+    
+    // Set influence mask
+    _vroLight->setInfluenceBitMask(_influenceBitMask);
+    
+    // Create VRONode to hold the light
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->addLight(_vroLight);
+    
+    RCTLogInfo(@"[ViroOmniLightComponentView] VROLight created successfully");
 }
 
 #pragma mark - Light Color and Intensity
@@ -77,8 +116,10 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting color: %@", color);
     _color = color ?: @"#FFFFFF";
     
-    // TODO: Update omni light color in ViroReact renderer
-    [self updateOmniLight];
+    if (_vroLight) {
+        VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+        _vroLight->setColor(lightColor);
+    }
 }
 
 - (void)setIntensity:(CGFloat)intensity
@@ -86,8 +127,9 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting intensity: %f", intensity);
     _intensity = intensity;
     
-    // TODO: Update omni light intensity in ViroReact renderer
-    [self updateOmniLight];
+    if (_vroLight) {
+        _vroLight->setIntensity(intensity);
+    }
 }
 
 - (void)setTemperature:(CGFloat)temperature
@@ -95,9 +137,9 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting temperature: %f", temperature);
     _temperature = temperature;
     
-    // TODO: Update omni light temperature in ViroReact renderer
-    // Temperature affects the color tint (warm/cool)
-    [self updateOmniLight];
+    if (_vroLight) {
+        _vroLight->setTemperature(temperature);
+    }
 }
 
 #pragma mark - Light Position
@@ -107,8 +149,10 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting position: %@", position);
     _position = position ?: @[@0, @0, @0];
     
-    // TODO: Update omni light position in ViroReact renderer
-    [self updateOmniLight];
+    if (_vroLight && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroLight->setPosition(pos);
+    }
 }
 
 #pragma mark - Light Attenuation
@@ -118,8 +162,9 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting attenuation start distance: %f", attenuationStartDistance);
     _attenuationStartDistance = attenuationStartDistance;
     
-    // TODO: Update attenuation start distance in ViroReact renderer
-    [self updateOmniLight];
+    if (_vroLight) {
+        _vroLight->setAttenuationStartDistance(attenuationStartDistance);
+    }
 }
 
 - (void)setAttenuationEndDistance:(CGFloat)attenuationEndDistance
@@ -127,8 +172,9 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting attenuation end distance: %f", attenuationEndDistance);
     _attenuationEndDistance = attenuationEndDistance;
     
-    // TODO: Update attenuation end distance in ViroReact renderer
-    [self updateOmniLight];
+    if (_vroLight) {
+        _vroLight->setAttenuationEndDistance(attenuationEndDistance);
+    }
 }
 
 #pragma mark - Light Influence
@@ -138,8 +184,9 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Setting influence bit mask: %ld", (long)influenceBitMask);
     _influenceBitMask = influenceBitMask;
     
-    // TODO: Update omni light influence in ViroReact renderer
-    [self updateOmniLight];
+    if (_vroLight) {
+        _vroLight->setInfluenceBitMask((int)influenceBitMask);
+    }
 }
 
 #pragma mark - Light Update
@@ -149,10 +196,24 @@
     RCTLogInfo(@"[ViroOmniLightComponentView] Updating omni light - Color: %@, Intensity: %.1f, Position: %@, Attenuation: %.1f-%.1f", 
                _color, _intensity, _position, _attenuationStartDistance, _attenuationEndDistance);
     
-    // TODO: Apply omni light settings to ViroReact renderer
-    // Omni light (point light) emits light in all directions from a single point
-    // Light intensity decreases with distance based on attenuation settings
-    // Unlike directional lights, omni lights have a specific position in 3D space
+    if (!_vroLight) {
+        return;
+    }
+    
+    // Apply all current settings to the light
+    VROColor lightColor = VROColor::colorWithHexString([_color UTF8String]);
+    _vroLight->setColor(lightColor);
+    _vroLight->setIntensity(_intensity);
+    _vroLight->setTemperature(_temperature);
+    
+    if (_position && _position.count >= 3) {
+        VROVector3f pos([_position[0] floatValue], [_position[1] floatValue], [_position[2] floatValue]);
+        _vroLight->setPosition(pos);
+    }
+    
+    _vroLight->setAttenuationStartDistance(_attenuationStartDistance);
+    _vroLight->setAttenuationEndDistance(_attenuationEndDistance);
+    _vroLight->setInfluenceBitMask((int)_influenceBitMask);
 }
 
 #pragma mark - Helper Methods
@@ -209,18 +270,19 @@
     
     if (self.window) {
         RCTLogInfo(@"[ViroOmniLightComponentView] Omni light added to window");
-        // TODO: Add omni light to ViroReact scene when added to window
         [self updateOmniLight];
+        // Parent ViroNodeComponentView will handle adding _vroNode to scene
     } else {
         RCTLogInfo(@"[ViroOmniLightComponentView] Omni light removed from window");
-        // TODO: Remove omni light from ViroReact scene when removed from window
+        // Parent ViroNodeComponentView will handle removing _vroNode from scene
     }
 }
 
 - (void)dealloc
 {
     RCTLogInfo(@"[ViroOmniLightComponentView] Deallocating");
-    // TODO: Clean up ViroReact omni light resources
+    _vroLight = nullptr;
+    _vroNode = nullptr;
 }
 
 @end

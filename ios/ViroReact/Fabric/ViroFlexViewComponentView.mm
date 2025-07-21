@@ -11,8 +11,13 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
 
 @interface ViroFlexViewComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROFlexView> vroFlexView;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // FlexView layout properties
 @property (nonatomic, assign) CGFloat width;
@@ -43,8 +48,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroFlexView
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroFlexViewComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -73,8 +77,8 @@
     _flexBasis = 0.0;
     _alignSelf = @"auto";
     
-    // TODO: Initialize ViroReact flex view
-    // This will need to integrate with the existing ViroReact flex layout system
+    // Initialize ViroReact flex view
+    [self initializeVROFlexView];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
@@ -82,12 +86,40 @@
 
 #pragma mark - FlexView Layout Properties
 
+- (void)initializeVROFlexView
+{
+    RCTLogInfo(@"[ViroFlexViewComponentView] Creating VROFlexView");
+    
+    // Create flex view with default dimensions
+    _vroFlexView = VROFlexView::create(_width, _height);
+    
+    // Set default flex properties
+    _vroFlexView->setFlexDirection(VROFlexDirection::Column);
+    _vroFlexView->setJustifyContent(VROJustifyContent::FlexStart);
+    _vroFlexView->setAlignItems(VROAlignItems::Stretch);
+    _vroFlexView->setAlignContent(VROAlignContent::Stretch);
+    _vroFlexView->setFlexWrap(VROFlexWrap::NoWrap);
+    
+    // Create VRONode to hold the flex view
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setFlexView(_vroFlexView);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    RCTLogInfo(@"[ViroFlexViewComponentView] VROFlexView created successfully");
+}
+
 - (void)setWidth:(CGFloat)width
 {
     RCTLogInfo(@"[ViroFlexViewComponentView] Setting width: %f", width);
     _width = width;
     
-    // TODO: Update flex view dimensions in ViroReact renderer
+    if (_vroFlexView) {
+        _vroFlexView->setWidth(width);
+    }
+    
     [self updateFlexLayout];
 }
 
@@ -96,7 +128,10 @@
     RCTLogInfo(@"[ViroFlexViewComponentView] Setting height: %f", height);
     _height = height;
     
-    // TODO: Update flex view dimensions in ViroReact renderer
+    if (_vroFlexView) {
+        _vroFlexView->setHeight(height);
+    }
+    
     [self updateFlexLayout];
 }
 
@@ -105,8 +140,18 @@
     RCTLogInfo(@"[ViroFlexViewComponentView] Setting flex direction: %@", flexDirection);
     _flexDirection = flexDirection ?: @"column";
     
-    // TODO: Update flex direction in ViroReact renderer
-    // Values: "row", "row-reverse", "column", "column-reverse"
+    if (_vroFlexView) {
+        if ([_flexDirection isEqualToString:@"row"]) {
+            _vroFlexView->setFlexDirection(VROFlexDirection::Row);
+        } else if ([_flexDirection isEqualToString:@"row-reverse"]) {
+            _vroFlexView->setFlexDirection(VROFlexDirection::RowReverse);
+        } else if ([_flexDirection isEqualToString:@"column-reverse"]) {
+            _vroFlexView->setFlexDirection(VROFlexDirection::ColumnReverse);
+        } else {
+            _vroFlexView->setFlexDirection(VROFlexDirection::Column);
+        }
+    }
+    
     [self updateFlexLayout];
 }
 

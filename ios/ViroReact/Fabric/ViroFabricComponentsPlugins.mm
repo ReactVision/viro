@@ -39,6 +39,20 @@
 #import "ViroSurfaceComponentView.h"
 #import "ViroSoundFieldComponentView.h"
 #import "ViroSpatialSoundComponentView.h"
+#import "ViroPortalComponentView.h"
+#import "ViroPortalSceneComponentView.h"
+#import "ViroLightingEnvironmentComponentView.h"
+#import "ViroControllerComponentView.h"
+#import "ViroOrbitCameraComponentView.h"
+#import "ViroVRSceneNavigatorComponentView.h"
+#import "Viro3DSceneNavigatorComponentView.h"
+#import "ViroARSceneNavigatorComponentView.h"
+#import "ViroARSceneComponentView.h"
+#import "ViroARCameraComponentView.h"
+#import "ViroARPlaneComponentView.h"
+#import "ViroARPlaneSelectorComponentView.h"
+#import "ViroARImageMarkerComponentView.h"
+#import "ViroARObjectMarkerComponentView.h"
 #import <React/RCTLog.h>
 
 // For now, we'll implement ViroSceneNavigator and provide placeholders for others
@@ -53,23 +67,17 @@ Class<RCTComponentViewProtocol> ViroSceneNavigatorCls(void)
 
 Class<RCTComponentViewProtocol> ViroARSceneNavigatorCls(void)
 {
-    // TODO: Implement ViroARSceneNavigatorComponentView
-    RCTLogWarn(@"ViroARSceneNavigator Fabric component not yet implemented");
-    return nil;
+    return ViroARSceneNavigatorComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> ViroVRSceneNavigatorCls(void)
 {
-    // TODO: Implement ViroVRSceneNavigatorComponentView
-    RCTLogWarn(@"ViroVRSceneNavigator Fabric component not yet implemented");
-    return nil;
+    return ViroVRSceneNavigatorComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> Viro3DSceneNavigatorCls(void)
 {
-    // TODO: Implement Viro3DSceneNavigatorComponentView
-    RCTLogWarn(@"Viro3DSceneNavigator Fabric component not yet implemented");
-    return nil;
+    return Viro3DSceneNavigatorComponentView.class;
 }
 
 #pragma mark - Scene Components
@@ -81,16 +89,12 @@ Class<RCTComponentViewProtocol> ViroSceneCls(void)
 
 Class<RCTComponentViewProtocol> ViroARSceneCls(void)
 {
-    // TODO: Implement ViroARSceneComponentView
-    RCTLogWarn(@"ViroARScene Fabric component not yet implemented");
-    return nil;
+    return ViroARSceneComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> ViroPortalSceneCls(void)
 {
-    // TODO: Implement ViroPortalSceneComponentView
-    RCTLogWarn(@"ViroPortalScene Fabric component not yet implemented");
-    return nil;
+    return ViroPortalSceneComponentView.class;
 }
 
 #pragma mark - Node Components
@@ -220,9 +224,7 @@ Class<RCTComponentViewProtocol> ViroSpotLightCls(void)
 
 Class<RCTComponentViewProtocol> ViroLightingEnvironmentCls(void)
 {
-    // TODO: Implement ViroLightingEnvironmentComponentView
-    RCTLogWarn(@"ViroLightingEnvironment Fabric component not yet implemented");
-    return nil;
+    return ViroLightingEnvironmentComponentView.class;
 }
 
 #pragma mark - Camera Components
@@ -234,16 +236,12 @@ Class<RCTComponentViewProtocol> ViroCameraCls(void)
 
 Class<RCTComponentViewProtocol> ViroARCameraCls(void)
 {
-    // TODO: Implement ViroARCameraComponentView
-    RCTLogWarn(@"ViroARCamera Fabric component not yet implemented");
-    return nil;
+    return ViroARCameraComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> ViroOrbitCameraCls(void)
 {
-    // TODO: Implement ViroOrbitCameraComponentView
-    RCTLogWarn(@"ViroOrbitCamera Fabric component not yet implemented");
-    return nil;
+    return ViroOrbitCameraComponentView.class;
 }
 
 #pragma mark - Environment Components
@@ -260,9 +258,7 @@ Class<RCTComponentViewProtocol> ViroSurfaceCls(void)
 
 Class<RCTComponentViewProtocol> ViroPortalCls(void)
 {
-    // TODO: Implement ViroPortalComponentView
-    RCTLogWarn(@"ViroPortal Fabric component not yet implemented");
-    return nil;
+    return ViroPortalComponentView.class;
 }
 
 #pragma mark - Audio Components
@@ -293,37 +289,27 @@ Class<RCTComponentViewProtocol> ViroParticleEmitterCls(void)
 
 Class<RCTComponentViewProtocol> ViroARPlaneCls(void)
 {
-    // TODO: Implement ViroARPlaneComponentView
-    RCTLogWarn(@"ViroARPlane Fabric component not yet implemented");
-    return nil;
+    return ViroARPlaneComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> ViroARPlaneSelectorCls(void)
 {
-    // TODO: Implement ViroARPlaneSelectorComponentView
-    RCTLogWarn(@"ViroARPlaneSelector Fabric component not yet implemented");
-    return nil;
+    return ViroARPlaneSelectorComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> ViroARImageMarkerCls(void)
 {
-    // TODO: Implement ViroARImageMarkerComponentView
-    RCTLogWarn(@"ViroARImageMarker Fabric component not yet implemented");
-    return nil;
+    return ViroARImageMarkerComponentView.class;
 }
 
 Class<RCTComponentViewProtocol> ViroARObjectMarkerCls(void)
 {
-    // TODO: Implement ViroARObjectMarkerComponentView
-    RCTLogWarn(@"ViroARObjectMarker Fabric component not yet implemented");
-    return nil;
+    return ViroARObjectMarkerComponentView.class;
 }
 
 #pragma mark - VR/Input Components
 
 Class<RCTComponentViewProtocol> ViroControllerCls(void)
 {
-    // TODO: Implement ViroControllerComponentView
-    RCTLogWarn(@"ViroController Fabric component not yet implemented");
-    return nil;
+    return ViroControllerComponentView.class;
 }

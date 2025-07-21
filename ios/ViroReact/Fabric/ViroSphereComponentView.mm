@@ -11,8 +11,14 @@
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
+#import <ViroKit/ViroKit.h>
+#import "VRTMaterialManager.h"
 
 @interface ViroSphereComponentView ()
+
+// ViroReact Integration
+@property (nonatomic, strong) std::shared_ptr<VROSphere> vroSphere;
+@property (nonatomic, strong) std::shared_ptr<VRONode> vroNode;
 
 // Sphere geometry properties
 @property (nonatomic, assign) CGFloat radius;
@@ -32,8 +38,7 @@
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    // TODO: Return proper component descriptor for ViroSphere
-    return nullptr;
+    return concreteComponentDescriptorProvider<facebook::react::ViroSphereComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -57,11 +62,29 @@
     _thetaStart = 0.0;
     _thetaLength = M_PI; // Half circle (full sphere)
     
-    // TODO: Initialize ViroReact sphere geometry
-    // This will need to integrate with the existing ViroReact sphere implementation
+    // Initialize ViroReact sphere geometry
+    [self initializeVROSphere];
     
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = NO; // Allow 3D content to extend beyond bounds
+}
+
+- (void)initializeVROSphere
+{
+    RCTLogInfo(@"[ViroSphereComponentView] Creating VROSphere geometry");
+    
+    // Create VROSphere geometry with default parameters
+    _vroSphere = VROSphere::createSphere(_radius, _widthSegmentCount, _heightSegmentCount, true, _phiStart, _phiLength, _thetaStart, _thetaLength);
+    
+    // Create VRONode to hold the geometry
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setGeometry(_vroSphere);
+    
+    // Set default properties
+    _vroNode->setVisible(true);
+    _vroNode->setOpacity(1.0);
+    
+    RCTLogInfo(@"[ViroSphereComponentView] VROSphere created successfully with radius: %.2f", _radius);
 }
 
 #pragma mark - Sphere Geometry Properties

@@ -11,6 +11,7 @@
 #import "ViroLog.h"
 #import <React/RCTConversions.h>
 #import <React/RCTLog.h>
+#import <ViroKit/ViroKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import <SceneKit/SceneKit.h>
 
@@ -31,6 +32,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
 };
 
 @implementation ViroParticleEmitterComponentView {
+    // ViroReact Integration
+    std::shared_ptr<VROParticleEmitter> _vroParticleEmitter;
+    std::shared_ptr<VRONode> _vroNode;
+    
     // Particle emission
     CGFloat _emissionRate;
     NSInteger _burstCount;
@@ -226,6 +231,9 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
         _activeParticleCount = 0;
         _systemAge = 0.0f;
         
+        // Initialize ViroReact particle emitter
+        [self initializeVROParticleEmitter];
+        
         // Create particle system
         [self createParticleSystem];
         
@@ -253,12 +261,49 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"ViroParticleEmitter props updated");
 }
 
+#pragma mark - ViroReact Integration
+
+- (void)initializeVROParticleEmitter
+{
+    VRTLogDebug(@"Initializing VROParticleEmitter");
+    
+    // Create VROParticleEmitter
+    _vroParticleEmitter = VROParticleEmitter::create();
+    
+    // Set default properties
+    _vroParticleEmitter->setEmissionRate(_emissionRate);
+    _vroParticleEmitter->setParticleLifetime(_lifetime);
+    _vroParticleEmitter->setMaxParticles(_maxParticles);
+    _vroParticleEmitter->setLoop(_looping);
+    
+    // Set default particle size
+    _vroParticleEmitter->setParticleSize(_size);
+    
+    // Set default velocity
+    VROVector3f velocity([_velocity[0] floatValue], [_velocity[1] floatValue], [_velocity[2] floatValue]);
+    _vroParticleEmitter->setParticleVelocity(velocity);
+    
+    // Set default gravity
+    VROVector3f gravity([_gravity[0] floatValue], [_gravity[1] floatValue], [_gravity[2] floatValue]);
+    _vroParticleEmitter->setGravity(gravity);
+    
+    // Create VRONode to hold the particle emitter
+    _vroNode = std::make_shared<VRONode>();
+    _vroNode->setParticleEmitter(_vroParticleEmitter);
+    
+    VRTLogDebug(@"VROParticleEmitter initialized successfully");
+}
+
 #pragma mark - Particle Emission
 
 - (void)setEmissionRate:(CGFloat)emissionRate {
     VRTLogDebug(@"Setting emission rate: %.1f", emissionRate);
     _emissionRate = emissionRate;
     _particleSystem.birthRate = emissionRate;
+    
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->setEmissionRate(emissionRate);
+    }
 }
 
 - (void)setBurstCount:(NSInteger)burstCount {
@@ -270,6 +315,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"Setting duration: %.2f", duration);
     _duration = duration;
     _particleSystem.emissionDuration = duration;
+    
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->setDuration(duration);
+    }
 }
 
 - (void)setDelay:(CGFloat)delay {
@@ -282,6 +331,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"Setting looping: %d", looping);
     _looping = looping;
     _particleSystem.loops = looping;
+    
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->setLoop(looping);
+    }
 }
 
 - (void)setPrewarm:(BOOL)prewarm {
@@ -293,8 +346,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
 - (void)setMaxParticles:(NSInteger)maxParticles {
     VRTLogDebug(@"Setting max particles: %ld", (long)maxParticles);
     _maxParticles = maxParticles;
-    // SceneKit doesn't have a direct maxParticles property
-    // We'll implement this in our update logic
+    
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->setMaxParticles((int)maxParticles);
+    }
 }
 
 #pragma mark - Particle Appearance
@@ -340,6 +395,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"Setting size: %.2f", size);
     _size = size;
     _particleSystem.particleSize = size;
+    
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->setParticleSize(size);
+    }
 }
 
 - (void)setSizeVariation:(CGFloat)sizeVariation {
@@ -366,6 +425,11 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"Setting velocity: %@", velocity);
     _velocity = velocity ?: @[@(0.0), @(1.0), @(0.0)];
     _particleSystem.particleVelocity = [self vector3FromArray:_velocity];
+    
+    if (_vroParticleEmitter) {
+        VROVector3f vel([_velocity[0] floatValue], [_velocity[1] floatValue], [_velocity[2] floatValue]);
+        _vroParticleEmitter->setParticleVelocity(vel);
+    }
 }
 
 - (void)setVelocityVariation:(nullable NSArray<NSNumber *> *)velocityVariation {
@@ -385,6 +449,11 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     _gravity = gravity ?: @[@(0.0), @(-9.8), @(0.0)];
     // SceneKit uses acceleration for gravity
     _particleSystem.acceleration = [self vector3FromArray:_gravity];
+    
+    if (_vroParticleEmitter) {
+        VROVector3f grav([_gravity[0] floatValue], [_gravity[1] floatValue], [_gravity[2] floatValue]);
+        _vroParticleEmitter->setGravity(grav);
+    }
 }
 
 - (void)setDamping:(CGFloat)damping {
@@ -411,6 +480,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"Setting lifetime: %.2f", lifetime);
     _lifetime = lifetime;
     _particleSystem.particleLifeSpan = lifetime;
+    
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->setParticleLifetime(lifetime);
+    }
 }
 
 - (void)setLifetimeVariation:(CGFloat)lifetimeVariation {
@@ -734,6 +807,11 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     [_particleSystem reset];
     _particleSystem.birthRate = _emissionRate;
     
+    // Start ViroReact particle emitter
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->start();
+    }
+    
     // Start update timer
     [self startUpdateTimer];
     
@@ -757,6 +835,11 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     // Stop the particle system
     _particleSystem.birthRate = 0.0f;
     
+    // Stop ViroReact particle emitter
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->stop();
+    }
+    
     // Stop update timer
     [self stopUpdateTimer];
     
@@ -777,6 +860,11 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     _isPaused = YES;
     _particleSystem.birthRate = 0.0f;
     
+    // Pause ViroReact particle emitter
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->pause();
+    }
+    
     // Pause update timer
     [self stopUpdateTimer];
 }
@@ -792,6 +880,11 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     _isPaused = NO;
     _particleSystem.birthRate = _emissionRate;
     
+    // Resume ViroReact particle emitter
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->resume();
+    }
+    
     // Resume update timer
     [self startUpdateTimer];
 }
@@ -800,6 +893,12 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
     VRTLogDebug(@"Resetting particle system");
     
     [_particleSystem reset];
+    
+    // Reset ViroReact particle emitter
+    if (_vroParticleEmitter) {
+        _vroParticleEmitter->reset();
+    }
+    
     _systemAge = 0.0f;
     _activeParticleCount = 0;
     _startTime = [NSDate date];
@@ -1081,6 +1180,10 @@ typedef NS_ENUM(NSInteger, ViroParticleBlendMode) {
 
 - (void)dealloc {
     [self stopUpdateTimer];
+    
+    // Clean up ViroReact resources
+    _vroParticleEmitter = nullptr;
+    _vroNode = nullptr;
 }
 
 @end

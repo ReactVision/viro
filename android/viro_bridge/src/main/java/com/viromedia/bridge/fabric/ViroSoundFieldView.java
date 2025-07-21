@@ -10,797 +10,1044 @@ package com.viromedia.bridge.fabric;
 
 import android.content.Context;
 import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.viro.core.AmbientSound;
+import com.viro.core.EventDelegate;
+import com.viro.core.Node;
+import com.viro.core.Sound;
+import com.viro.core.SoundField;
+import com.viro.core.Vector;
+import com.viro.core.ViroContext;
+import com.viromedia.bridge.component.VRTComponent;
+import com.viromedia.bridge.utility.ComponentEventDelegate;
 import com.viromedia.bridge.utility.ViroLog;
 
+import java.lang.ref.WeakReference;
+
 /**
- * ViroSoundFieldView - Spatial Sound Field View
- * 
- * This view represents a spatial sound field component that creates immersive 3D audio
- * environments with support for ambisonic audio, environmental effects, and advanced
- * spatial audio processing.
- * 
- * Key capabilities:
- * - 3D spatial sound field generation
- * - Ambisonic audio support (1st, 2nd, 3rd order)
- * - Environmental audio effects and reverb
- * - Real-time audio processing
- * - Multiple audio source management
- * - Directional audio patterns
- * - Audio field visualization
- * - Interactive audio manipulation
- * - Performance optimized processing
+ * Native Android view for ViroSoundField component.
+ * ViroSoundField provides comprehensive spatial audio field functionality with ViroReact 3D integration,
+ * supporting ambisonic audio, environmental effects, 3D spatial positioning, and advanced audio processing.
  */
 public class ViroSoundFieldView extends View {
     
     private static final String TAG = ViroLog.getTag(ViroSoundFieldView.class);
     
+    private ReactContext mReactContext;
+    
+    // ViroReact Integration
+    private Node mNodeJni;
+    private SoundField mSoundFieldJni;
+    private Sound mSoundJni;
+    private AmbientSound mAmbientSoundJni;
+    private ViroContext mViroContext;
+    private EventDelegate mEventDelegateJni;
+    private ComponentEventDelegate mComponentEventDelegate;
+    
     // Audio source properties
-    private ReadableMap source;
-    private String uri;
-    private String local;
-    private String resource;
-    private String audioFormat = "auto";
+    private ReadableMap mSource;
+    private String mUri = "";
+    private String mLocal = "";
+    private String mResource = "";
+    private String mAudioFormat = "auto"; // "auto", "wav", "mp3", "ogg", "aac", "m4a"
     
     // Playback control properties
-    private boolean paused = false;
-    private boolean loop = false;
-    private boolean muted = false;
-    private float volume = 1.0f;
-    private float rate = 1.0f;
-    private float seekTime = 0.0f;
+    private boolean mPaused = false;
+    private boolean mLoop = false;
+    private boolean mMuted = false;
+    private float mVolume = 1.0f;
+    private float mRate = 1.0f;
+    private float mSeekTime = 0.0f;
     
     // Spatial audio properties
-    private ReadableArray position;
-    private ReadableArray rotation;
-    private ReadableArray scale;
-    private boolean spatialAudioEnabled = true;
-    private String spatialAudioQuality = "high";
+    private boolean mSpatialAudioEnabled = true;
+    private String mSpatialAudioQuality = "high"; // "low", "medium", "high", "ultra"
+    private float mMinDistance = 0.5f;
+    private float mMaxDistance = 1000.0f;
+    private String mDistanceModel = "inverse"; // "inverse", "linear", "exponential"
+    private float mRolloffFactor = 1.0f;
     
     // Sound field properties
-    private String fieldType = "spherical";
-    private ReadableArray fieldSize;
-    private float fieldIntensity = 1.0f;
-    private float fieldFalloff = 1.0f;
-    private ReadableArray fieldDirection;
-    private String fieldPattern = "omnidirectional";
+    private String mFieldType = "spherical"; // "spherical", "cylindrical", "directional", "ambient"
+    private Vector mFieldSize = new Vector(10.0f, 10.0f, 10.0f);
+    private float mFieldIntensity = 1.0f;
+    private float mFieldFalloff = 1.0f;
+    private Vector mFieldDirection = new Vector(0.0f, 0.0f, -1.0f);
+    private String mFieldPattern = "omnidirectional"; // "omnidirectional", "directional", "cardioid", "bidirectional"
     
     // Ambisonic audio properties
-    private boolean ambisonicEnabled = false;
-    private int ambisonicOrder = 1;
-    private String ambisonicFormat = "AmbiX";
-    private String ambisonicChannelOrder = "ACN";
-    private String ambisonicNormalization = "SN3D";
+    private boolean mAmbisonicEnabled = false;
+    private int mAmbisonicOrder = 1; // 1st, 2nd, 3rd order ambisonic
+    private String mAmbisonicFormat = "AmbiX"; // "AmbiX", "FuMA"
+    private String mAmbisonicChannelOrder = "ACN"; // "ACN", "FuMA"
+    private String mAmbisonicNormalization = "SN3D"; // "SN3D", "N3D", "FuMA"
+    private float mAmbisonicRotationX = 0.0f;
+    private float mAmbisonicRotationY = 0.0f;
+    private float mAmbisonicRotationZ = 0.0f;
     
     // Environmental audio properties
-    private ReadableMap environmentalAudio;
-    private ReadableMap reverb;
-    private ReadableArray roomSize;
-    private ReadableMap roomMaterials;
-    private ReadableMap reflections;
+    private ReadableMap mEnvironmentalAudio;
+    private ReadableMap mReverb;
+    private Vector mRoomSize = new Vector(10.0f, 3.0f, 10.0f);
+    private ReadableMap mRoomMaterials;
+    private ReadableMap mReflections;
+    private float mReverbGain = 0.3f;
+    private float mReverbDelay = 0.1f;
+    private float mReverbDecay = 1.5f;
     
     // Audio effects properties
-    private ReadableArray effects;
-    private ReadableArray filters;
-    private ReadableMap equalizer;
-    private ReadableMap compressor;
-    private ReadableMap limiter;
-    
-    // Distance and attenuation properties
-    private String distanceModel = "inverse";
-    private float maxDistance = 1000.0f;
-    private float referenceDistance = 1.0f;
-    private float rolloffFactor = 1.0f;
-    private String attenuationModel = "linear";
+    private ReadableArray mEffects;
+    private ReadableArray mFilters;
+    private ReadableMap mEqualizer;
+    private ReadableMap mCompressor;
+    private ReadableMap mLimiter;
+    private boolean mEffectsEnabled = true;
     
     // Occlusion and obstruction properties
-    private boolean occlusionEnabled = false;
-    private float occlusionStrength = 1.0f;
-    private boolean obstructionEnabled = false;
-    private float obstructionStrength = 1.0f;
+    private boolean mOcclusionEnabled = false;
+    private float mOcclusionStrength = 1.0f;
+    private boolean mObstructionEnabled = false;
+    private float mObstructionStrength = 1.0f;
     
-    // Visualization properties
-    private boolean visualizationEnabled = false;
-    private String visualizationType = "field";
-    private float visualizationOpacity = 0.5f;
-    private String visualizationColor = "#FF0000";
+    // Transform properties
+    private Vector mPosition = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mScale = new Vector(1.0f, 1.0f, 1.0f);
+    private Vector mRotation = new Vector(0.0f, 0.0f, 0.0f);
+    private Vector mRotationPivot;
+    private Vector mScalePivot;
+    private ReadableArray mTransformBehaviors;
     
     // Performance properties
-    private String processingQuality = "high";
-    private int bufferSize = 4096;
-    private int sampleRate = 44100;
-    private boolean optimizationEnabled = true;
+    private String mProcessingQuality = "high"; // "low", "medium", "high", "ultra"
+    private int mBufferSize = 4096;
+    private int mSampleRate = 44100;
+    private boolean mOptimizationEnabled = true;
     
-    // Animation properties
-    private ReadableMap animation;
-    private ReadableArray transformBehaviors;
-    private String viroTag;
+    // Animation and interaction
+    private ReadableMap mAnimation;
+    private String mViroTag;
     
     // Internal state
-    private boolean audioDirty = true;
-    private boolean spatialDirty = true;
-    private boolean fieldDirty = true;
-    private boolean effectsDirty = true;
+    private boolean mAudioDirty = true;
+    private boolean mSpatialDirty = true;
+    private boolean mFieldDirty = true;
+    private boolean mEffectsDirty = true;
     
     public ViroSoundFieldView(@NonNull Context context) {
         super(context);
-        ViroLog.debug(TAG, "ViroSoundFieldView created");
+        mReactContext = (ReactContext) context;
+        
+        ViroLog.debug(TAG, "ViroSoundFieldView initialized with ViroReact Spatial Audio Field integration");
+        
         initializeSoundField();
     }
     
     private void initializeSoundField() {
-        ViroLog.debug(TAG, "Initializing sound field");
-        // Initialize default state
-        updateAudio();
-        updateSpatialAudio();
-        updateSoundField();
+        ViroLog.debug(TAG, "Initializing ViroReact sound field with default properties");
+        
+        // Create ViroReact Node for the sound field
+        mNodeJni = new Node();
+        
+        // Create SoundField for spatial audio
+        mSoundFieldJni = new SoundField(mViroContext);
+        
+        // Create Sound for audio playback
+        mSoundJni = new Sound(mViroContext, mUri, Sound.VolumeRolloff.LINEAR, new Sound.LoadCallback() {
+            @Override
+            public void onSoundLoaded(Sound sound) {
+                handleSoundLoaded();
+            }
+            
+            @Override
+            public void onSoundFailed(String error) {
+                handleSoundError("Sound loading failed: " + error);
+            }
+        });
+        
+        // Configure initial sound field properties
+        applySoundFieldProperties();
+        
+        // Attach sound field to node
+        mNodeJni.setSoundField(mSoundFieldJni);
+        mSoundFieldJni.setSound(mSoundJni);
+        
+        // Create and attach event callbacks
+        mComponentEventDelegate = new ComponentEventDelegate(new VRTComponentWrapper(this));
+        mEventDelegateJni = new EventDelegate();
+        mEventDelegateJni.setEventDelegateCallback(mComponentEventDelegate);
+        mNodeJni.setEventDelegate(mEventDelegateJni);
+        
+        // Sound field views are typically transparent for 3D content
+        setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        
+        ViroLog.debug(TAG, "ViroReact Sound Field initialized successfully");
     }
     
-    // Audio Source Setters
+    /**
+     * Wrapper class to make ViroSoundFieldView compatible with ComponentEventDelegate
+     */
+    private static class VRTComponentWrapper extends VRTComponent {
+        private WeakReference<ViroSoundFieldView> mSoundFieldView;
+        
+        public VRTComponentWrapper(ViroSoundFieldView soundFieldView) {
+            super(soundFieldView.getContext(), null, -1, -1, soundFieldView.mReactContext);
+            mSoundFieldView = new WeakReference<>(soundFieldView);
+        }
+        
+        @Override
+        public void emitEvent(String eventName, WritableMap eventData) {
+            ViroSoundFieldView soundFieldView = mSoundFieldView.get();
+            if (soundFieldView != null) {
+                soundFieldView.emitSoundFieldEvent(eventName, eventData);
+            }
+        }
+    }
+    
+    /**
+     * Get the underlying ViroReact Node object
+     */
+    public Node getNodeJni() {
+        return mNodeJni;
+    }
+    
+    /**
+     * Get the underlying ViroReact SoundField object
+     */
+    public SoundField getSoundFieldJni() {
+        return mSoundFieldJni;
+    }
+    
+    /**
+     * Get the underlying ViroReact Sound object
+     */
+    public Sound getSoundJni() {
+        return mSoundJni;
+    }
+    
+    /**
+     * Set the ViroContext for this sound field
+     */
+    public void setViroContext(ViroContext context) {
+        mViroContext = context;
+        // Recreate sound field components with ViroContext if needed
+        if (mSoundFieldJni != null) {
+            mSoundFieldJni.dispose();
+            mSoundFieldJni = new SoundField(mViroContext);
+            if (mSoundJni != null) {
+                mSoundJni.dispose();
+            }
+            mSoundJni = new Sound(mViroContext, mUri, Sound.VolumeRolloff.LINEAR, new Sound.LoadCallback() {
+                @Override
+                public void onSoundLoaded(Sound sound) {
+                    handleSoundLoaded();
+                }
+                
+                @Override
+                public void onSoundFailed(String error) {
+                    handleSoundError("Sound loading failed: " + error);
+                }
+            });
+            applySoundFieldProperties();
+            if (mNodeJni != null) {
+                mNodeJni.setSoundField(mSoundFieldJni);
+                mSoundFieldJni.setSound(mSoundJni);
+            }
+        }
+    }
+    
+    // Audio source setters
+    
     public void setSource(@Nullable ReadableMap source) {
-        this.source = source;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting sound field source: " + source);
+        mSource = source;
+        
+        if (source != null) {
+            if (source.hasKey("uri")) {
+                mUri = source.getString("uri");
+            }
+            if (source.hasKey("local")) {
+                mLocal = source.getString("local");
+            }
+            if (source.hasKey("resource")) {
+                mResource = source.getString("resource");
+            }
+            loadSoundFieldAudio();
+        }
     }
     
     public void setUri(@Nullable String uri) {
-        this.uri = uri;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting URI: " + uri);
+        mUri = uri != null ? uri : "";
+        mAudioDirty = true;
+        loadSoundFieldAudio();
     }
     
     public void setLocal(@Nullable String local) {
-        this.local = local;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting local: " + local);
+        mLocal = local != null ? local : "";
+        mAudioDirty = true;
+        loadSoundFieldAudio();
     }
     
     public void setResource(@Nullable String resource) {
-        this.resource = resource;
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting resource: " + resource);
+        mResource = resource != null ? resource : "";
+        mAudioDirty = true;
+        loadSoundFieldAudio();
     }
     
     public void setAudioFormat(@Nullable String audioFormat) {
-        this.audioFormat = audioFormat != null ? audioFormat : "auto";
-        this.audioDirty = true;
-        updateAudio();
+        ViroLog.debug(TAG, "Setting audio format: " + audioFormat);
+        mAudioFormat = audioFormat != null ? audioFormat : "auto";
+        mAudioDirty = true;
+        loadSoundFieldAudio();
     }
     
-    // Playback Control Setters
+    // Playback control setters
+    
     public void setPaused(boolean paused) {
-        this.paused = paused;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting paused: " + paused);
+        mPaused = paused;
+        
+        if (mSoundJni != null) {
+            if (paused) {
+                pauseSoundField();
+            } else {
+                playSoundField();
+            }
+        }
     }
     
     public void setLoop(boolean loop) {
-        this.loop = loop;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting loop: " + loop);
+        mLoop = loop;
+        
+        if (mSoundJni != null) {
+            mSoundJni.setLoop(loop);
+        }
     }
     
     public void setMuted(boolean muted) {
-        this.muted = muted;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting muted: " + muted);
+        mMuted = muted;
+        
+        if (mSoundJni != null) {
+            mSoundJni.setMuted(muted);
+        }
     }
     
     public void setVolume(float volume) {
-        this.volume = volume;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting volume: " + volume);
+        mVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        
+        if (mSoundJni != null) {
+            mSoundJni.setVolume(mVolume);
+        }
     }
     
     public void setRate(float rate) {
-        this.rate = rate;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting playback rate: " + rate);
+        mRate = Math.max(0.1f, Math.min(3.0f, rate));
+        
+        if (mSoundJni != null) {
+            mSoundJni.setPlaybackRate(mRate);
+        }
     }
     
     public void setSeekTime(float seekTime) {
-        this.seekTime = seekTime;
-        updatePlaybackControl();
+        ViroLog.debug(TAG, "Setting seek time: " + seekTime);
+        mSeekTime = seekTime;
+        
+        if (mSoundJni != null) {
+            mSoundJni.seekToTime(seekTime);
+        }
     }
     
-    // Spatial Audio Setters
-    public void setPosition(@Nullable ReadableArray position) {
-        this.position = position;
-        this.spatialDirty = true;
+    // Spatial audio setters
+    
+    public void setSpatialAudioEnabled(boolean enabled) {
+        ViroLog.debug(TAG, "Setting spatial audio enabled: " + enabled);
+        mSpatialAudioEnabled = enabled;
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setRotation(@Nullable ReadableArray rotation) {
-        this.rotation = rotation;
-        this.spatialDirty = true;
+    public void setSpatialAudioQuality(@Nullable String quality) {
+        ViroLog.debug(TAG, "Setting spatial audio quality: " + quality);
+        mSpatialAudioQuality = quality != null ? quality : "high";
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setScale(@Nullable ReadableArray scale) {
-        this.scale = scale;
-        this.spatialDirty = true;
+    public void setMinDistance(float distance) {
+        ViroLog.debug(TAG, "Setting min distance: " + distance);
+        mMinDistance = Math.max(0.1f, distance);
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setSpatialAudioEnabled(boolean spatialAudioEnabled) {
-        this.spatialAudioEnabled = spatialAudioEnabled;
-        this.spatialDirty = true;
+    public void setMaxDistance(float distance) {
+        ViroLog.debug(TAG, "Setting max distance: " + distance);
+        mMaxDistance = Math.max(mMinDistance, distance);
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    public void setSpatialAudioQuality(@Nullable String spatialAudioQuality) {
-        this.spatialAudioQuality = spatialAudioQuality != null ? spatialAudioQuality : "high";
-        this.spatialDirty = true;
+    public void setDistanceModel(@Nullable String model) {
+        ViroLog.debug(TAG, "Setting distance model: " + model);
+        mDistanceModel = model != null ? model : "inverse";
+        mSpatialDirty = true;
         updateSpatialAudio();
     }
     
-    // Sound Field Setters
+    public void setRolloffFactor(float factor) {
+        ViroLog.debug(TAG, "Setting rolloff factor: " + factor);
+        mRolloffFactor = Math.max(0.1f, factor);
+        mSpatialDirty = true;
+        updateSpatialAudio();
+    }
+    
+    // Sound field setters
+    
     public void setFieldType(@Nullable String fieldType) {
-        this.fieldType = fieldType != null ? fieldType : "spherical";
-        this.fieldDirty = true;
+        ViroLog.debug(TAG, "Setting field type: " + fieldType);
+        mFieldType = fieldType != null ? fieldType : "spherical";
+        mFieldDirty = true;
         updateSoundField();
     }
     
     public void setFieldSize(@Nullable ReadableArray fieldSize) {
-        this.fieldSize = fieldSize;
-        this.fieldDirty = true;
+        ViroLog.debug(TAG, "Setting field size: " + fieldSize);
+        
+        if (fieldSize != null && fieldSize.size() >= 3) {
+            try {
+                float x = (float) fieldSize.getDouble(0);
+                float y = (float) fieldSize.getDouble(1);
+                float z = (float) fieldSize.getDouble(2);
+                mFieldSize = new Vector(Math.max(0.1f, x), Math.max(0.1f, y), Math.max(0.1f, z));
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing field size: " + e.getMessage());
+                mFieldSize = new Vector(10.0f, 10.0f, 10.0f);
+            }
+        } else {
+            mFieldSize = new Vector(10.0f, 10.0f, 10.0f);
+        }
+        
+        mFieldDirty = true;
         updateSoundField();
     }
     
-    public void setFieldIntensity(float fieldIntensity) {
-        this.fieldIntensity = fieldIntensity;
-        this.fieldDirty = true;
+    public void setFieldIntensity(float intensity) {
+        ViroLog.debug(TAG, "Setting field intensity: " + intensity);
+        mFieldIntensity = Math.max(0.0f, Math.min(2.0f, intensity));
+        mFieldDirty = true;
         updateSoundField();
     }
     
-    public void setFieldFalloff(float fieldFalloff) {
-        this.fieldFalloff = fieldFalloff;
-        this.fieldDirty = true;
+    public void setFieldFalloff(float falloff) {
+        ViroLog.debug(TAG, "Setting field falloff: " + falloff);
+        mFieldFalloff = Math.max(0.1f, Math.min(5.0f, falloff));
+        mFieldDirty = true;
         updateSoundField();
     }
     
-    public void setFieldDirection(@Nullable ReadableArray fieldDirection) {
-        this.fieldDirection = fieldDirection;
-        this.fieldDirty = true;
+    public void setFieldDirection(@Nullable ReadableArray direction) {
+        ViroLog.debug(TAG, "Setting field direction: " + direction);
+        
+        if (direction != null && direction.size() >= 3) {
+            try {
+                float x = (float) direction.getDouble(0);
+                float y = (float) direction.getDouble(1);
+                float z = (float) direction.getDouble(2);
+                mFieldDirection = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing field direction: " + e.getMessage());
+                mFieldDirection = new Vector(0.0f, 0.0f, -1.0f);
+            }
+        } else {
+            mFieldDirection = new Vector(0.0f, 0.0f, -1.0f);
+        }
+        
+        mFieldDirty = true;
         updateSoundField();
     }
     
-    public void setFieldPattern(@Nullable String fieldPattern) {
-        this.fieldPattern = fieldPattern != null ? fieldPattern : "omnidirectional";
-        this.fieldDirty = true;
+    public void setFieldPattern(@Nullable String pattern) {
+        ViroLog.debug(TAG, "Setting field pattern: " + pattern);
+        mFieldPattern = pattern != null ? pattern : "omnidirectional";
+        mFieldDirty = true;
         updateSoundField();
     }
     
-    // Ambisonic Audio Setters
-    public void setAmbisonicEnabled(boolean ambisonicEnabled) {
-        this.ambisonicEnabled = ambisonicEnabled;
-        this.spatialDirty = true;
-        updateSpatialAudio();
+    // Ambisonic setters
+    
+    public void setAmbisonicEnabled(boolean enabled) {
+        ViroLog.debug(TAG, "Setting ambisonic enabled: " + enabled);
+        mAmbisonicEnabled = enabled;
+        mFieldDirty = true;
+        updateSoundField();
     }
     
-    public void setAmbisonicOrder(int ambisonicOrder) {
-        this.ambisonicOrder = ambisonicOrder;
-        this.spatialDirty = true;
-        updateSpatialAudio();
+    public void setAmbisonicOrder(int order) {
+        ViroLog.debug(TAG, "Setting ambisonic order: " + order);
+        mAmbisonicOrder = Math.max(1, Math.min(3, order));
+        mFieldDirty = true;
+        updateSoundField();
     }
     
-    public void setAmbisonicFormat(@Nullable String ambisonicFormat) {
-        this.ambisonicFormat = ambisonicFormat != null ? ambisonicFormat : "AmbiX";
-        this.spatialDirty = true;
-        updateSpatialAudio();
+    public void setAmbisonicFormat(@Nullable String format) {
+        ViroLog.debug(TAG, "Setting ambisonic format: " + format);
+        mAmbisonicFormat = format != null ? format : "AmbiX";
+        mFieldDirty = true;
+        updateSoundField();
     }
     
-    public void setAmbisonicChannelOrder(@Nullable String ambisonicChannelOrder) {
-        this.ambisonicChannelOrder = ambisonicChannelOrder != null ? ambisonicChannelOrder : "ACN";
-        this.spatialDirty = true;
-        updateSpatialAudio();
+    public void setAmbisonicRotation(@Nullable ReadableArray rotation) {
+        ViroLog.debug(TAG, "Setting ambisonic rotation: " + rotation);
+        
+        if (rotation != null && rotation.size() >= 3) {
+            try {
+                mAmbisonicRotationX = (float) Math.toRadians(rotation.getDouble(0));
+                mAmbisonicRotationY = (float) Math.toRadians(rotation.getDouble(1));
+                mAmbisonicRotationZ = (float) Math.toRadians(rotation.getDouble(2));
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing ambisonic rotation: " + e.getMessage());
+                mAmbisonicRotationX = mAmbisonicRotationY = mAmbisonicRotationZ = 0.0f;
+            }
+        } else {
+            mAmbisonicRotationX = mAmbisonicRotationY = mAmbisonicRotationZ = 0.0f;
+        }
+        
+        mFieldDirty = true;
+        updateSoundField();
     }
     
-    public void setAmbisonicNormalization(@Nullable String ambisonicNormalization) {
-        this.ambisonicNormalization = ambisonicNormalization != null ? ambisonicNormalization : "SN3D";
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
+    // Environmental audio setters
     
-    // Environmental Audio Setters
     public void setEnvironmentalAudio(@Nullable ReadableMap environmentalAudio) {
-        this.environmentalAudio = environmentalAudio;
-        this.effectsDirty = true;
-        updateEffects();
+        ViroLog.debug(TAG, "Setting environmental audio: " + environmentalAudio);
+        mEnvironmentalAudio = environmentalAudio;
+        mFieldDirty = true;
+        updateSoundField();
     }
     
     public void setReverb(@Nullable ReadableMap reverb) {
-        this.reverb = reverb;
-        this.effectsDirty = true;
-        updateEffects();
+        ViroLog.debug(TAG, "Setting reverb: " + reverb);
+        mReverb = reverb;
+        mFieldDirty = true;
+        updateSoundField();
     }
     
     public void setRoomSize(@Nullable ReadableArray roomSize) {
-        this.roomSize = roomSize;
-        this.effectsDirty = true;
-        updateEffects();
+        ViroLog.debug(TAG, "Setting room size: " + roomSize);
+        
+        if (roomSize != null && roomSize.size() >= 3) {
+            try {
+                float x = (float) roomSize.getDouble(0);
+                float y = (float) roomSize.getDouble(1);
+                float z = (float) roomSize.getDouble(2);
+                mRoomSize = new Vector(Math.max(1.0f, x), Math.max(1.0f, y), Math.max(1.0f, z));
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing room size: " + e.getMessage());
+                mRoomSize = new Vector(10.0f, 3.0f, 10.0f);
+            }
+        } else {
+            mRoomSize = new Vector(10.0f, 3.0f, 10.0f);
+        }
+        
+        mFieldDirty = true;
+        updateSoundField();
     }
     
-    public void setRoomMaterials(@Nullable ReadableMap roomMaterials) {
-        this.roomMaterials = roomMaterials;
-        this.effectsDirty = true;
-        updateEffects();
+    // Transform setters
+    
+    public void setPosition(@Nullable ReadableArray position) {
+        ViroLog.debug(TAG, "Setting position: " + position);
+        
+        if (position != null && position.size() >= 3) {
+            try {
+                float x = (float) position.getDouble(0);
+                float y = (float) position.getDouble(1);
+                float z = (float) position.getDouble(2);
+                mPosition = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing position: " + e.getMessage());
+                mPosition = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mPosition = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        applyTransformProperties();
     }
     
-    public void setReflections(@Nullable ReadableMap reflections) {
-        this.reflections = reflections;
-        this.effectsDirty = true;
-        updateEffects();
+    public void setScale(@Nullable ReadableArray scale) {
+        ViroLog.debug(TAG, "Setting scale: " + scale);
+        
+        if (scale != null && scale.size() >= 3) {
+            try {
+                float x = (float) scale.getDouble(0);
+                float y = (float) scale.getDouble(1);
+                float z = (float) scale.getDouble(2);
+                mScale = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing scale: " + e.getMessage());
+                mScale = new Vector(1.0f, 1.0f, 1.0f);
+            }
+        } else {
+            mScale = new Vector(1.0f, 1.0f, 1.0f);
+        }
+        
+        applyTransformProperties();
     }
     
-    // Audio Effects Setters
-    public void setEffects(@Nullable ReadableArray effects) {
-        this.effects = effects;
-        this.effectsDirty = true;
-        updateEffects();
+    public void setRotation(@Nullable ReadableArray rotation) {
+        ViroLog.debug(TAG, "Setting rotation: " + rotation);
+        
+        if (rotation != null && rotation.size() >= 3) {
+            try {
+                float x = (float) Math.toRadians(rotation.getDouble(0));
+                float y = (float) Math.toRadians(rotation.getDouble(1));
+                float z = (float) Math.toRadians(rotation.getDouble(2));
+                mRotation = new Vector(x, y, z);
+            } catch (Exception e) {
+                ViroLog.error(TAG, "Error parsing rotation: " + e.getMessage());
+                mRotation = new Vector(0.0f, 0.0f, 0.0f);
+            }
+        } else {
+            mRotation = new Vector(0.0f, 0.0f, 0.0f);
+        }
+        
+        applyTransformProperties();
     }
     
-    public void setFilters(@Nullable ReadableArray filters) {
-        this.filters = filters;
-        this.effectsDirty = true;
-        updateEffects();
-    }
+    // Performance setters
     
-    public void setEqualizer(@Nullable ReadableMap equalizer) {
-        this.equalizer = equalizer;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setCompressor(@Nullable ReadableMap compressor) {
-        this.compressor = compressor;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    public void setLimiter(@Nullable ReadableMap limiter) {
-        this.limiter = limiter;
-        this.effectsDirty = true;
-        updateEffects();
-    }
-    
-    // Distance and Attenuation Setters
-    public void setDistanceModel(@Nullable String distanceModel) {
-        this.distanceModel = distanceModel != null ? distanceModel : "inverse";
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setMaxDistance(float maxDistance) {
-        this.maxDistance = maxDistance;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setReferenceDistance(float referenceDistance) {
-        this.referenceDistance = referenceDistance;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setRolloffFactor(float rolloffFactor) {
-        this.rolloffFactor = rolloffFactor;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setAttenuationModel(@Nullable String attenuationModel) {
-        this.attenuationModel = attenuationModel != null ? attenuationModel : "linear";
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    // Occlusion and Obstruction Setters
-    public void setOcclusionEnabled(boolean occlusionEnabled) {
-        this.occlusionEnabled = occlusionEnabled;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setOcclusionStrength(float occlusionStrength) {
-        this.occlusionStrength = occlusionStrength;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setObstructionEnabled(boolean obstructionEnabled) {
-        this.obstructionEnabled = obstructionEnabled;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    public void setObstructionStrength(float obstructionStrength) {
-        this.obstructionStrength = obstructionStrength;
-        this.spatialDirty = true;
-        updateSpatialAudio();
-    }
-    
-    // Visualization Setters
-    public void setVisualizationEnabled(boolean visualizationEnabled) {
-        this.visualizationEnabled = visualizationEnabled;
-        updateVisualization();
-    }
-    
-    public void setVisualizationType(@Nullable String visualizationType) {
-        this.visualizationType = visualizationType != null ? visualizationType : "field";
-        updateVisualization();
-    }
-    
-    public void setVisualizationOpacity(float visualizationOpacity) {
-        this.visualizationOpacity = visualizationOpacity;
-        updateVisualization();
-    }
-    
-    public void setVisualizationColor(@Nullable String visualizationColor) {
-        this.visualizationColor = visualizationColor != null ? visualizationColor : "#FF0000";
-        updateVisualization();
-    }
-    
-    // Performance Setters
-    public void setProcessingQuality(@Nullable String processingQuality) {
-        this.processingQuality = processingQuality != null ? processingQuality : "high";
-        updatePerformance();
+    public void setProcessingQuality(@Nullable String quality) {
+        ViroLog.debug(TAG, "Setting processing quality: " + quality);
+        mProcessingQuality = quality != null ? quality : "high";
+        mFieldDirty = true;
+        updateSoundField();
     }
     
     public void setBufferSize(int bufferSize) {
-        this.bufferSize = bufferSize;
-        updatePerformance();
+        ViroLog.debug(TAG, "Setting buffer size: " + bufferSize);
+        mBufferSize = Math.max(1024, Math.min(16384, bufferSize));
+        mAudioDirty = true;
+        loadSoundFieldAudio();
     }
     
     public void setSampleRate(int sampleRate) {
-        this.sampleRate = sampleRate;
-        updatePerformance();
+        ViroLog.debug(TAG, "Setting sample rate: " + sampleRate);
+        mSampleRate = Math.max(22050, Math.min(96000, sampleRate));
+        mAudioDirty = true;
+        loadSoundFieldAudio();
     }
     
-    public void setOptimizationEnabled(boolean optimizationEnabled) {
-        this.optimizationEnabled = optimizationEnabled;
-        updatePerformance();
+    // ViroReact-specific methods
+    
+    private void applySoundFieldProperties() {
+        if (mSoundFieldJni != null) {
+            ViroLog.debug(TAG, "Applying sound field properties to ViroReact SoundField");
+            
+            // Apply field type and size
+            SoundField.FieldType fieldType = getFieldTypeEnum(mFieldType);
+            mSoundFieldJni.setFieldType(fieldType);
+            mSoundFieldJni.setFieldSize(mFieldSize);
+            
+            // Apply field properties
+            mSoundFieldJni.setIntensity(mFieldIntensity);
+            mSoundFieldJni.setFalloff(mFieldFalloff);
+            mSoundFieldJni.setDirection(mFieldDirection);
+            
+            // Apply field pattern
+            SoundField.FieldPattern pattern = getFieldPatternEnum(mFieldPattern);
+            mSoundFieldJni.setFieldPattern(pattern);
+            
+            // Apply ambisonic properties if enabled
+            if (mAmbisonicEnabled) {
+                mSoundFieldJni.setAmbisonicEnabled(true);
+                mSoundFieldJni.setAmbisonicOrder(mAmbisonicOrder);
+                SoundField.AmbisonicFormat format = getAmbisonicFormatEnum(mAmbisonicFormat);
+                mSoundFieldJni.setAmbisonicFormat(format);
+                mSoundFieldJni.setAmbisonicRotation(mAmbisonicRotationX, mAmbisonicRotationY, mAmbisonicRotationZ);
+            }
+            
+            // Apply environmental audio
+            if (mRoomSize != null) {
+                mSoundFieldJni.setRoomSize(mRoomSize);
+            }
+            if (mReverbGain > 0) {
+                mSoundFieldJni.setReverbGain(mReverbGain);
+                mSoundFieldJni.setReverbDelay(mReverbDelay);
+                mSoundFieldJni.setReverbDecay(mReverbDecay);
+            }
+            
+            ViroLog.debug(TAG, "Sound field properties applied successfully");
+        }
     }
     
-    // Animation Setters
-    public void setAnimation(@Nullable ReadableMap animation) {
-        this.animation = animation;
-        updateAnimation();
+    private void applyTransformProperties() {
+        if (mNodeJni != null) {
+            ViroLog.debug(TAG, "Applying transform properties to ViroReact Node");
+            
+            // Apply position, rotation, and scale to the node
+            mNodeJni.setPosition(mPosition);
+            mNodeJni.setRotation(mRotation);
+            mNodeJni.setScale(mScale);
+            
+            // Apply pivot points if set
+            if (mRotationPivot != null) {
+                mNodeJni.setRotationPivot(mRotationPivot);
+            }
+            if (mScalePivot != null) {
+                mNodeJni.setScalePivot(mScalePivot);
+            }
+            
+            ViroLog.debug(TAG, "Transform properties applied successfully");
+        }
     }
     
-    public void setTransformBehaviors(@Nullable ReadableArray transformBehaviors) {
-        this.transformBehaviors = transformBehaviors;
-        updateAnimation();
-    }
-    
-    public void setViroTag(@Nullable String viroTag) {
-        this.viroTag = viroTag;
-    }
-    
-    // Update Methods
-    private void updateAudio() {
-        if (!audioDirty) return;
-        
-        ViroLog.debug(TAG, "Updating audio");
-        
-        // Load audio source
-        if (source != null) {
-            processAudioSource();
-        } else if (uri != null) {
-            loadAudioFromUri();
-        } else if (local != null) {
-            loadAudioFromLocal();
-        } else if (resource != null) {
-            loadAudioFromResource();
+    private void loadSoundFieldAudio() {
+        if (mUri.isEmpty() && mLocal.isEmpty() && mResource.isEmpty()) {
+            ViroLog.debug(TAG, "No sound field audio source provided");
+            return;
         }
         
-        // Configure audio format
-        configureAudioFormat();
+        String audioSource = !mUri.isEmpty() ? mUri : (!mLocal.isEmpty() ? mLocal : mResource);
+        ViroLog.debug(TAG, "Loading sound field audio in ViroReact: " + audioSource);
         
-        audioDirty = false;
-    }
-    
-    private void processAudioSource() {
-        ViroLog.debug(TAG, "Processing audio source: " + source);
-        // Process audio source from ReadableMap
-    }
-    
-    private void loadAudioFromUri() {
-        ViroLog.debug(TAG, "Loading audio from URI: " + uri);
-        // Load audio from URI
-    }
-    
-    private void loadAudioFromLocal() {
-        ViroLog.debug(TAG, "Loading audio from local: " + local);
-        // Load audio from local file
-    }
-    
-    private void loadAudioFromResource() {
-        ViroLog.debug(TAG, "Loading audio from resource: " + resource);
-        // Load audio from resource
-    }
-    
-    private void configureAudioFormat() {
-        ViroLog.debug(TAG, "Configuring audio format: " + audioFormat);
-        // Configure audio format
-    }
-    
-    private void updatePlaybackControl() {
-        ViroLog.debug(TAG, "Updating playback control");
-        
-        // Update playback state
-        if (paused) {
-            pausePlayback();
+        if (mViroContext != null && mSoundFieldJni != null) {
+            // Dispose existing sound if any
+            if (mSoundJni != null) {
+                mSoundJni.dispose();
+            }
+            
+            // Create new sound with proper rolloff model
+            Sound.VolumeRolloff rolloff = getVolumeRolloffEnum(mDistanceModel);
+            mSoundJni = new Sound(mViroContext, audioSource, rolloff, new Sound.LoadCallback() {
+                @Override
+                public void onSoundLoaded(Sound sound) {
+                    handleSoundLoaded();
+                }
+                
+                @Override
+                public void onSoundFailed(String error) {
+                    handleSoundError("Sound field audio failed: " + error);
+                }
+            });
+            
+            // Configure sound properties
+            mSoundJni.setLoop(mLoop);
+            mSoundJni.setMuted(mMuted);
+            mSoundJni.setVolume(mVolume);
+            mSoundJni.setPlaybackRate(mRate);
+            
+            // Apply spatial audio properties
+            mSoundJni.setMinDistance(mMinDistance);
+            mSoundJni.setMaxDistance(mMaxDistance);
+            mSoundJni.setRolloffFactor(mRolloffFactor);
+            
+            // Set sound to sound field
+            mSoundFieldJni.setSound(mSoundJni);
+            
+            // Apply sound field properties
+            applySoundFieldProperties();
         } else {
-            startPlayback();
+            handleSoundError("ViroContext not available for sound field audio loading");
         }
-        
-        // Update audio properties
-        updateAudioProperties();
     }
     
-    private void pausePlayback() {
-        ViroLog.debug(TAG, "Pausing playback");
-        // Pause audio playback
+    private void playSoundField() {
+        if (mSoundJni != null) {
+            ViroLog.debug(TAG, "Playing sound field");
+            mSoundJni.play();
+            emitSoundFieldEvent("onPlay", createSoundEventData());
+        }
     }
     
-    private void startPlayback() {
-        ViroLog.debug(TAG, "Starting playback");
-        // Start audio playback
-    }
-    
-    private void updateAudioProperties() {
-        ViroLog.debug(TAG, "Updating audio properties");
-        // Update volume, rate, seek time, etc.
+    private void pauseSoundField() {
+        if (mSoundJni != null) {
+            ViroLog.debug(TAG, "Pausing sound field");
+            mSoundJni.pause();
+            emitSoundFieldEvent("onPause", createSoundEventData());
+        }
     }
     
     private void updateSpatialAudio() {
-        if (!spatialDirty) return;
-        
-        ViroLog.debug(TAG, "Updating spatial audio");
-        
-        if (spatialAudioEnabled) {
-            configureSpatialAudio();
-        } else {
-            disableSpatialAudio();
+        if (mSpatialDirty && mSoundJni != null) {
+            ViroLog.debug(TAG, "Updating spatial audio properties");
+            
+            // Apply spatial audio settings
+            mSoundJni.setMinDistance(mMinDistance);
+            mSoundJni.setMaxDistance(mMaxDistance);
+            mSoundJni.setRolloffFactor(mRolloffFactor);
+            
+            // Update volume rolloff model
+            Sound.VolumeRolloff rolloff = getVolumeRolloffEnum(mDistanceModel);
+            mSoundJni.setVolumeRolloff(rolloff);
+            
+            mSpatialDirty = false;
+            ViroLog.debug(TAG, "Spatial audio properties updated successfully");
         }
-        
-        // Update ambisonic processing
-        if (ambisonicEnabled) {
-            configureAmbisonicAudio();
-        }
-        
-        // Update distance and attenuation
-        configureDistanceAttenuation();
-        
-        // Update occlusion and obstruction
-        configureOcclusionObstruction();
-        
-        spatialDirty = false;
-    }
-    
-    private void configureSpatialAudio() {
-        ViroLog.debug(TAG, "Configuring spatial audio");
-        // Configure spatial audio processing
-    }
-    
-    private void disableSpatialAudio() {
-        ViroLog.debug(TAG, "Disabling spatial audio");
-        // Disable spatial audio processing
-    }
-    
-    private void configureAmbisonicAudio() {
-        ViroLog.debug(TAG, "Configuring ambisonic audio: order=" + ambisonicOrder);
-        // Configure ambisonic audio processing
-    }
-    
-    private void configureDistanceAttenuation() {
-        ViroLog.debug(TAG, "Configuring distance attenuation");
-        // Configure distance-based attenuation
-    }
-    
-    private void configureOcclusionObstruction() {
-        ViroLog.debug(TAG, "Configuring occlusion/obstruction");
-        // Configure occlusion and obstruction effects
     }
     
     private void updateSoundField() {
-        if (!fieldDirty) return;
-        
-        ViroLog.debug(TAG, "Updating sound field");
-        
-        // Configure sound field type
-        configureSoundFieldType();
-        
-        // Configure field properties
-        configureSoundFieldProperties();
-        
-        // Update field visualization
-        if (visualizationEnabled) {
-            updateVisualization();
-        }
-        
-        fieldDirty = false;
-    }
-    
-    private void configureSoundFieldType() {
-        ViroLog.debug(TAG, "Configuring sound field type: " + fieldType);
-        // Configure sound field type
-    }
-    
-    private void configureSoundFieldProperties() {
-        ViroLog.debug(TAG, "Configuring sound field properties");
-        // Configure field size, intensity, falloff, etc.
-    }
-    
-    private void updateEffects() {
-        if (!effectsDirty) return;
-        
-        ViroLog.debug(TAG, "Updating effects");
-        
-        // Configure environmental audio
-        if (environmentalAudio != null) {
-            configureEnvironmentalAudio();
-        }
-        
-        // Configure reverb
-        if (reverb != null) {
-            configureReverb();
-        }
-        
-        // Configure audio effects
-        if (effects != null) {
-            configureAudioEffects();
-        }
-        
-        // Configure filters
-        if (filters != null) {
-            configureAudioFilters();
-        }
-        
-        effectsDirty = false;
-    }
-    
-    private void configureEnvironmentalAudio() {
-        ViroLog.debug(TAG, "Configuring environmental audio");
-        // Configure environmental audio effects
-    }
-    
-    private void configureReverb() {
-        ViroLog.debug(TAG, "Configuring reverb");
-        // Configure reverb effects
-    }
-    
-    private void configureAudioEffects() {
-        ViroLog.debug(TAG, "Configuring audio effects: " + effects.size());
-        // Configure audio effects
-    }
-    
-    private void configureAudioFilters() {
-        ViroLog.debug(TAG, "Configuring audio filters: " + filters.size());
-        // Configure audio filters
-    }
-    
-    private void updateVisualization() {
-        ViroLog.debug(TAG, "Updating visualization");
-        
-        if (visualizationEnabled) {
-            enableVisualization();
-        } else {
-            disableVisualization();
+        if (mFieldDirty && mSoundFieldJni != null) {
+            ViroLog.debug(TAG, "Updating sound field properties");
+            
+            applySoundFieldProperties();
+            
+            mFieldDirty = false;
+            ViroLog.debug(TAG, "Sound field properties updated successfully");
         }
     }
     
-    private void enableVisualization() {
-        ViroLog.debug(TAG, "Enabling visualization: " + visualizationType);
-        // Enable sound field visualization
+    // Event handlers
+    
+    private void handleSoundLoaded() {
+        ViroLog.debug(TAG, "Sound field audio loaded");
+        emitSoundFieldEvent("onLoad", createSoundEventData());
+        
+        // Auto-play if not paused
+        if (!mPaused) {
+            playSoundField();
+        }
     }
     
-    private void disableVisualization() {
-        ViroLog.debug(TAG, "Disabling visualization");
-        // Disable sound field visualization
+    private void handleSoundError(String errorMessage) {
+        ViroLog.error(TAG, "Sound field error: " + errorMessage);
+        
+        WritableMap eventData = createSoundEventData();
+        eventData.putString("error", errorMessage);
+        emitSoundFieldEvent("onError", eventData);
     }
     
-    private void updatePerformance() {
-        ViroLog.debug(TAG, "Updating performance settings");
-        // Update performance-related settings
+    private WritableMap createSoundEventData() {
+        WritableMap eventData = Arguments.createMap();
+        eventData.putString("uri", mUri);
+        eventData.putBoolean("paused", mPaused);
+        eventData.putBoolean("loop", mLoop);
+        eventData.putBoolean("muted", mMuted);
+        eventData.putDouble("volume", mVolume);
+        eventData.putDouble("rate", mRate);
+        eventData.putBoolean("spatialAudioEnabled", mSpatialAudioEnabled);
+        eventData.putString("fieldType", mFieldType);
+        eventData.putDouble("fieldIntensity", mFieldIntensity);
+        eventData.putBoolean("ambisonicEnabled", mAmbisonicEnabled);
+        eventData.putInt("ambisonicOrder", mAmbisonicOrder);
+        return eventData;
     }
     
-    private void updateAnimation() {
-        ViroLog.debug(TAG, "Updating animation");
-        // Update animation properties
+    /**
+     * Emit sound field events for ViroReact integration
+     */
+    public void emitSoundFieldEvent(String eventName, @Nullable WritableMap eventData) {
+        try {
+            if (mReactContext != null && mReactContext.hasActiveCatalystInstance()) {
+                mReactContext.getJSModule(RCTEventEmitter.class)
+                    .receiveEvent(getId(), eventName, eventData);
+            } else {
+                ViroLog.warn(TAG, "Cannot emit event " + eventName + ": no active React context");
+            }
+        } catch (Exception e) {
+            ViroLog.error(TAG, "Error emitting event " + eventName + ": " + e.getMessage());
+        }
     }
     
-    // Public Methods
-    public void forceUpdate() {
-        ViroLog.debug(TAG, "Forcing sound field update");
-        audioDirty = true;
-        spatialDirty = true;
-        fieldDirty = true;
-        effectsDirty = true;
-        updateAudio();
-        updateSpatialAudio();
-        updateSoundField();
-        updateEffects();
+    // Helper methods to convert string properties to enum values
+    
+    private SoundField.FieldType getFieldTypeEnum(String fieldType) {
+        switch (fieldType.toLowerCase()) {
+            case "cylindrical":
+                return SoundField.FieldType.CYLINDRICAL;
+            case "directional":
+                return SoundField.FieldType.DIRECTIONAL;
+            case "ambient":
+                return SoundField.FieldType.AMBIENT;
+            default:
+            case "spherical":
+                return SoundField.FieldType.SPHERICAL;
+        }
     }
     
-    public ReadableMap getSource() {
-        return source;
+    private SoundField.FieldPattern getFieldPatternEnum(String fieldPattern) {
+        switch (fieldPattern.toLowerCase()) {
+            case "directional":
+                return SoundField.FieldPattern.DIRECTIONAL;
+            case "cardioid":
+                return SoundField.FieldPattern.CARDIOID;
+            case "bidirectional":
+                return SoundField.FieldPattern.BIDIRECTIONAL;
+            default:
+            case "omnidirectional":
+                return SoundField.FieldPattern.OMNIDIRECTIONAL;
+        }
     }
     
-    public String getUri() {
-        return uri;
+    private SoundField.AmbisonicFormat getAmbisonicFormatEnum(String ambisonicFormat) {
+        switch (ambisonicFormat.toLowerCase()) {
+            case "fuma":
+                return SoundField.AmbisonicFormat.FUMA;
+            default:
+            case "ambix":
+                return SoundField.AmbisonicFormat.AMBIX;
+        }
     }
     
-    public String getLocal() {
-        return local;
+    private Sound.VolumeRolloff getVolumeRolloffEnum(String distanceModel) {
+        switch (distanceModel.toLowerCase()) {
+            case "linear":
+                return Sound.VolumeRolloff.LINEAR;
+            case "exponential":
+                return Sound.VolumeRolloff.EXPONENTIAL;
+            default:
+            case "inverse":
+                return Sound.VolumeRolloff.LOGARITHMIC;
+        }
     }
     
-    public String getResource() {
-        return resource;
+    // Lifecycle methods
+    
+    public void onDropViewInstance() {
+        ViroLog.debug(TAG, "onDropViewInstance called");
+        
+        // Stop sound playback
+        if (mSoundJni != null) {
+            mSoundJni.pause();
+        }
+        
+        // Clean up ViroReact sound field resources
+        if (mNodeJni != null) {
+            mNodeJni.setEventDelegate(null);
+            mNodeJni.setSoundField(null);
+            mNodeJni.dispose();
+            mNodeJni = null;
+        }
+        
+        if (mEventDelegateJni != null) {
+            mEventDelegateJni.dispose();
+            mEventDelegateJni = null;
+        }
+        
+        if (mSoundFieldJni != null) {
+            mSoundFieldJni.dispose();
+            mSoundFieldJni = null;
+        }
+        
+        if (mSoundJni != null) {
+            mSoundJni.dispose();
+            mSoundJni = null;
+        }
+        
+        if (mAmbientSoundJni != null) {
+            mAmbientSoundJni.dispose();
+            mAmbientSoundJni = null;
+        }
+        
+        // Clear references
+        mComponentEventDelegate = null;
+        mViroContext = null;
+        mReactContext = null;
+        mSource = null;
+        mEnvironmentalAudio = null;
+        mReverb = null;
+        mRoomMaterials = null;
+        mReflections = null;
+        mEffects = null;
+        mFilters = null;
+        mEqualizer = null;
+        mCompressor = null;
+        mLimiter = null;
+        mTransformBehaviors = null;
+        mAnimation = null;
     }
     
-    public String getAudioFormat() {
-        return audioFormat;
-    }
-    
-    public boolean getPaused() {
-        return paused;
-    }
-    
-    public boolean getLoop() {
-        return loop;
-    }
-    
-    public boolean getMuted() {
-        return muted;
-    }
-    
-    public float getVolume() {
-        return volume;
-    }
-    
-    public float getRate() {
-        return rate;
-    }
-    
-    public boolean getSpatialAudioEnabled() {
-        return spatialAudioEnabled;
-    }
-    
-    public String getFieldType() {
-        return fieldType;
-    }
-    
-    public float getFieldIntensity() {
-        return fieldIntensity;
-    }
-    
-    public boolean getAmbisonicEnabled() {
-        return ambisonicEnabled;
-    }
-    
-    public int getAmbisonicOrder() {
-        return ambisonicOrder;
-    }
-    
-    public boolean getVisualizationEnabled() {
-        return visualizationEnabled;
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        ViroLog.debug(TAG, "ViroSoundFieldView attached to window");
+        
+        // Sound field will be added to scene hierarchy through parent-child relationships
+        if (mNodeJni != null && mSoundFieldJni != null && mViroContext != null) {
+            ViroLog.debug(TAG, "ViroReact sound field ready for scene attachment");
+        }
+        
+        // Ensure sound field properties are applied
+        applySoundFieldProperties();
+        applyTransformProperties();
+        
+        // Update audio and spatial audio if dirty
+        if (mAudioDirty) {
+            loadSoundFieldAudio();
+        }
+        if (mSpatialDirty) {
+            updateSpatialAudio();
+        }
+        if (mFieldDirty) {
+            updateSoundField();
+        }
     }
     
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         ViroLog.debug(TAG, "ViroSoundFieldView detached from window");
-        // Cleanup resources
+        
+        // Pause sound when detached
+        if (mSoundJni != null) {
+            mSoundJni.pause();
+        }
+        
+        // ViroReact cleanup is handled in onDropViewInstance
+        // Scene hierarchy cleanup is automatic through parent-child relationships
     }
     
-    @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        super.onLayout(changed, left, top, right, bottom);
-        if (changed) {
-            ViroLog.debug(TAG, "ViroSoundFieldView layout changed");
-            // Handle layout changes
-        }
-    }
+    // Getters for current values (useful for debugging and testing)
+    public String getUri() { return mUri; }
+    public String getLocal() { return mLocal; }
+    public String getResource() { return mResource; }
+    public String getAudioFormat() { return mAudioFormat; }
+    public boolean isPaused() { return mPaused; }
+    public boolean isLoop() { return mLoop; }
+    public boolean isMuted() { return mMuted; }
+    public float getVolume() { return mVolume; }
+    public float getRate() { return mRate; }
+    public float getSeekTime() { return mSeekTime; }
+    public boolean isSpatialAudioEnabled() { return mSpatialAudioEnabled; }
+    public String getSpatialAudioQuality() { return mSpatialAudioQuality; }
+    public float getMinDistance() { return mMinDistance; }
+    public float getMaxDistance() { return mMaxDistance; }
+    public String getDistanceModel() { return mDistanceModel; }
+    public float getRolloffFactor() { return mRolloffFactor; }
+    public String getFieldType() { return mFieldType; }
+    public Vector getFieldSize() { return mFieldSize; }
+    public float getFieldIntensity() { return mFieldIntensity; }
+    public float getFieldFalloff() { return mFieldFalloff; }
+    public Vector getFieldDirection() { return mFieldDirection; }
+    public String getFieldPattern() { return mFieldPattern; }
+    public boolean isAmbisonicEnabled() { return mAmbisonicEnabled; }
+    public int getAmbisonicOrder() { return mAmbisonicOrder; }
+    public String getAmbisonicFormat() { return mAmbisonicFormat; }
+    public Vector getRoomSize() { return mRoomSize; }
+    public Vector getPosition() { return mPosition; }
+    public Vector getScale() { return mScale; }
+    public Vector getRotation() { return mRotation; }
+    public String getProcessingQuality() { return mProcessingQuality; }
+    public int getBufferSize() { return mBufferSize; }
+    public int getSampleRate() { return mSampleRate; }
+    public boolean isAudioDirty() { return mAudioDirty; }
+    public boolean isSpatialDirty() { return mSpatialDirty; }
+    public boolean isFieldDirty() { return mFieldDirty; }
+    public boolean isEffectsDirty() { return mEffectsDirty; }
 }

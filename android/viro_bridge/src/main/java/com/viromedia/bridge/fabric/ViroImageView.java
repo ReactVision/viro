@@ -14,6 +14,16 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.viro.core.EventDelegate;
+import com.viro.core.Material;
+import com.viro.core.Node;
+import com.viro.core.Quad;
+import com.viro.core.Texture;
+import com.viro.core.ViroContext;
+import com.viromedia.bridge.component.VRTComponent;
+import com.viromedia.bridge.utility.ComponentEventDelegate;
+
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +38,15 @@ public class ViroImageView extends View {
     private static final String TAG = "ViroImageView";
     
     private ReactContext mReactContext;
+    
+    // ViroReact Integration
+    private Node mNodeJni;
+    private Quad mQuadGeometry;
+    private Texture mImageTexture;
+    private Material mImageMaterial;
+    private ViroContext mViroContext;
+    private EventDelegate mEventDelegateJni;
+    private ComponentEventDelegate mComponentEventDelegate;
     
     // Image source and content
     private Map<String, Object> mSource;
@@ -60,13 +79,66 @@ public class ViroImageView extends View {
     }
     
     private void initializeView() {
-        Log.d(TAG, "Initializing ViroImageView");
+        Log.d(TAG, "Initializing ViroImageView with ViroReact integration");
         
-        // TODO: Initialize ViroReact image renderer
-        // This will need to integrate with the existing ViroReact image implementation
+        // Create ViroReact Node for the image
+        mNodeJni = new Node();
+        
+        // Create Quad geometry for image display (images are displayed on quad surfaces)
+        mQuadGeometry = new Quad(mWidth, mHeight);
+        
+        // Create material for the image
+        mImageMaterial = new Material();
+        
+        // Attach geometry and material to node
+        mNodeJni.setGeometry(mQuadGeometry);
+        mQuadGeometry.setMaterial(mImageMaterial);
+        
+        // Create and attach event callbacks
+        mComponentEventDelegate = new ComponentEventDelegate(new VRTComponentWrapper(this));
+        mEventDelegateJni = new EventDelegate();
+        mEventDelegateJni.setEventDelegateCallback(mComponentEventDelegate);
+        mNodeJni.setEventDelegate(mEventDelegateJni);
         
         // Image views are typically transparent since they represent 3D geometry
         setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        
+        Log.d(TAG, "ViroReact Image initialized successfully");
+    }
+    
+    /**
+     * Wrapper class to make ViroImageView compatible with ComponentEventDelegate
+     */
+    private static class VRTComponentWrapper extends VRTComponent {
+        private WeakReference<ViroImageView> mImageView;
+        
+        public VRTComponentWrapper(ViroImageView imageView) {
+            super(imageView.getContext(), null, -1, -1, imageView.mReactContext);
+            mImageView = new WeakReference<>(imageView);
+        }
+        
+        @Override
+        public void emitEvent(String eventName, WritableMap eventData) {
+            ViroImageView imageView = mImageView.get();
+            if (imageView != null) {
+                imageView.emitImageEvent(eventName, eventData);
+            }
+        }
+    }
+    
+    /**
+     * Get the underlying ViroReact Node object
+     */
+    public Node getNodeJni() {
+        return mNodeJni;
+    }
+    
+    /**
+     * Set the ViroContext for this image
+     */
+    public void setViroContext(ViroContext context) {
+        mViroContext = context;
+        // Apply any pending configurations that require ViroContext
     }
     
     @Override
@@ -108,21 +180,82 @@ public class ViroImageView extends View {
         // Emit load start event
         emitImageEvent("onLoadStart", Arguments.createMap());
         
-        // TODO: Implement actual image loading
-        // This should handle various source types:
-        // - { uri: "https://..." } - Network image
-        // - { uri: "file://..." } - Local file
-        // - require('./image.png') - Bundle resource
-        
         Log.d(TAG, "Loading image from source: " + mSource);
         
-        // For now, simulate successful load
-        post(() -> {
-            WritableMap event = Arguments.createMap();
-            event.putMap("source", Arguments.makeNativeMap(mSource));
-            event.putBoolean("success", true);
-            emitImageEvent("onLoadEnd", event);
-        });
+        // Create ViroReact texture from source
+        if (mViroContext != null && mImageMaterial != null) {
+            try {
+                // Get image URI from source
+                Object uriObj = mSource.get("uri");
+                String imageUri = uriObj != null ? uriObj.toString() : null;
+                
+                if (imageUri != null) {
+                    // Create texture from URI
+                    mImageTexture = new Texture(imageUri, Texture.Type.TEXTURE_2D, mMipmap, 
+                                              Texture.StereoMode.NONE);
+                    
+                    // Apply texture filtering and wrap modes
+                    applyTextureProperties();
+                    
+                    // Set texture on material
+                    mImageMaterial.setDiffuseTexture(mImageTexture);
+                    
+                    // Emit successful load event
+                    post(() -> {
+                        WritableMap event = Arguments.createMap();
+                        event.putMap("source", Arguments.makeNativeMap(mSource));
+                        event.putBoolean("success", true);
+                        emitImageEvent("onLoadEnd", event);
+                    });
+                } else {
+                    // Emit error event
+                    post(() -> {
+                        WritableMap event = Arguments.createMap();
+                        event.putString("error", "Invalid image source URI");
+                        emitImageEvent("onError", event);
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading image: " + e.getMessage(), e);
+                // Emit error event
+                post(() -> {
+                    WritableMap event = Arguments.createMap();
+                    event.putString("error", e.getMessage());
+                    emitImageEvent("onError", event);
+                });
+            }
+        }
+    }
+    
+    private void applyTextureProperties() {
+        if (mImageTexture != null) {
+            // Apply wrap modes
+            Texture.WrapMode wrapModeS = getWrapModeFromString(mWrapS);
+            Texture.WrapMode wrapModeT = getWrapModeFromString(mWrapT);
+            mImageTexture.setWrapMode(wrapModeS, wrapModeT);
+            
+            // Apply filtering
+            Texture.FilterMode minFilter = getFilterModeFromString(mMinificationFilter);
+            Texture.FilterMode magFilter = getFilterModeFromString(mMagnificationFilter);
+            mImageTexture.setFilterMode(minFilter, magFilter);
+        }
+    }
+    
+    private Texture.WrapMode getWrapModeFromString(String wrap) {
+        switch (wrap.toLowerCase()) {
+            case "repeat": return Texture.WrapMode.REPEAT;
+            case "mirror": return Texture.WrapMode.MIRRORED_REPEAT;
+            case "clamp":
+            default: return Texture.WrapMode.CLAMP_TO_EDGE;
+        }
+    }
+    
+    private Texture.FilterMode getFilterModeFromString(String filter) {
+        switch (filter.toLowerCase()) {
+            case "nearest": return Texture.FilterMode.NEAREST;
+            case "linear":
+            default: return Texture.FilterMode.LINEAR;
+        }
     }
     
     // Image dimensions setters
@@ -142,8 +275,20 @@ public class ViroImageView extends View {
     private void updateImageGeometry() {
         Log.d(TAG, "Updating image geometry: " + mWidth + " x " + mHeight);
         
-        // TODO: Apply image dimensions to ViroReact renderer
-        // This should update the image quad size
+        if (mQuadGeometry != null) {
+            // Create new quad geometry with updated dimensions
+            mQuadGeometry = new Quad(mWidth, mHeight);
+            
+            // Reapply material
+            if (mImageMaterial != null) {
+                mQuadGeometry.setMaterial(mImageMaterial);
+            }
+            
+            // Update the node's geometry
+            if (mNodeJni != null) {
+                mNodeJni.setGeometry(mQuadGeometry);
+            }
+        }
     }
     
     // Image display properties setters
@@ -160,37 +305,34 @@ public class ViroImageView extends View {
         Log.d(TAG, "Setting mipmap: " + mipmap);
         mMipmap = mipmap;
         
-        // TODO: Apply mipmap setting to ViroReact renderer
+        // Reload texture with new mipmap setting if we have a source
+        if (mSource != null) {
+            loadImageFromSource();
+        }
     }
     
     public void setWrapS(@Nullable String wrapS) {
         Log.d(TAG, "Setting wrapS: " + wrapS);
         mWrapS = wrapS != null ? wrapS : "clamp";
-        
-        // TODO: Apply texture wrap mode to ViroReact renderer
-        // Modes: clamp, repeat, mirror
+        applyTextureProperties();
     }
     
     public void setWrapT(@Nullable String wrapT) {
         Log.d(TAG, "Setting wrapT: " + wrapT);
         mWrapT = wrapT != null ? wrapT : "clamp";
-        
-        // TODO: Apply texture wrap mode to ViroReact renderer
+        applyTextureProperties();
     }
     
     public void setMinificationFilter(@Nullable String minificationFilter) {
         Log.d(TAG, "Setting minification filter: " + minificationFilter);
         mMinificationFilter = minificationFilter != null ? minificationFilter : "linear";
-        
-        // TODO: Apply texture filtering to ViroReact renderer
-        // Filters: nearest, linear
+        applyTextureProperties();
     }
     
     public void setMagnificationFilter(@Nullable String magnificationFilter) {
         Log.d(TAG, "Setting magnification filter: " + magnificationFilter);
         mMagnificationFilter = magnificationFilter != null ? magnificationFilter : "linear";
-        
-        // TODO: Apply texture filtering to ViroReact renderer
+        applyTextureProperties();
     }
     
     public void setResizeMode(@Nullable String resizeMode) {
@@ -257,9 +399,37 @@ public class ViroImageView extends View {
     
     public void onDropViewInstance() {
         Log.d(TAG, "onDropViewInstance called");
-        // TODO: Clean up ViroReact image resources
+        
+        // Clean up ViroReact image resources
+        if (mNodeJni != null) {
+            mNodeJni.setEventDelegate(null);
+            mNodeJni.dispose();
+            mNodeJni = null;
+        }
+        
+        if (mEventDelegateJni != null) {
+            mEventDelegateJni.dispose();
+            mEventDelegateJni = null;
+        }
+        
+        if (mQuadGeometry != null) {
+            mQuadGeometry.dispose();
+            mQuadGeometry = null;
+        }
+        
+        if (mImageTexture != null) {
+            mImageTexture.dispose();
+            mImageTexture = null;
+        }
+        
+        if (mImageMaterial != null) {
+            mImageMaterial.dispose();
+            mImageMaterial = null;
+        }
         
         // Clear references
+        mComponentEventDelegate = null;
+        mViroContext = null;
         mSource = null;
         mPlaceholderSource = null;
         mMaterials = null;
@@ -271,7 +441,10 @@ public class ViroImageView extends View {
         super.onAttachedToWindow();
         Log.d(TAG, "ViroImageView attached to window");
         
-        // TODO: Add image to ViroReact scene when attached
+        // Image will be added to scene hierarchy through parent-child relationships
+        if (mNodeJni != null && mViroContext != null) {
+            Log.d(TAG, "ViroReact image ready for scene attachment");
+        }
         loadImageFromSource();
     }
     
@@ -279,6 +452,7 @@ public class ViroImageView extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         Log.d(TAG, "ViroImageView detached from window");
-        // TODO: Remove image from ViroReact scene when detached
+        // Image cleanup is handled in onDropViewInstance
+        // Scene hierarchy cleanup is automatic through parent-child relationships
     }
 }

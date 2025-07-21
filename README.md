@@ -37,7 +37,7 @@ If you are starting a fresh project with ViroReact, consider cloning one of our 
 
 # Examples
 
-Check out the [examples](./examples) directory for sample code demonstrating how to use ViroReact with automatic architecture detection and other features.
+Check out the [examples](./fabric-interop/examples) directory for sample code demonstrating how to use ViroReact with automatic architecture detection and other features.
 
 You can also see our [Example projects](https://viro-community.readme.io/docs/examples) page. These are a little old (~2019) but are a great reference point for how to use bits of the library.
 

@@ -121,6 +121,13 @@ import com.viromedia.bridge.fabric.ViroPortalSceneViewManager;
 import com.viromedia.bridge.fabric.ViroLightingEnvironmentViewManager;
 import com.viromedia.bridge.fabric.ViroControllerViewManager;
 import com.viromedia.bridge.fabric.ViroVRSceneNavigatorViewManager;
+// AR Components
+import com.viromedia.bridge.fabric.ViroARSceneNavigatorViewManager;
+import com.viromedia.bridge.fabric.ViroARSceneViewManager;
+import com.viromedia.bridge.fabric.ViroARCameraViewManager;
+import com.viromedia.bridge.fabric.ViroARPlaneViewManager;
+import com.viromedia.bridge.fabric.ViroARImageMarkerViewManager;
+import com.viromedia.bridge.fabric.ViroARObjectMarkerViewManager;
 
 import java.util.Arrays;
 import java.util.List;
@@ -202,6 +209,13 @@ public class ReactViroPackage implements ReactPackage {
                 new ViroLightingEnvironmentViewManager(),
                 new ViroControllerViewManager(),
                 new ViroVRSceneNavigatorViewManager(),
+                // AR Components (New Architecture)
+                new ViroARSceneNavigatorViewManager(),
+                new ViroARSceneViewManager(),
+                new ViroARCameraViewManager(),
+                new ViroARPlaneViewManager(),
+                new ViroARImageMarkerViewManager(),
+                new ViroARObjectMarkerViewManager(),
                 // Legacy ViewManagers
                 new VRTSceneNavigatorManager(reactContext, mViroPlatform),
                 new VRTVRSceneNavigatorManager(reactContext, mViroPlatform),

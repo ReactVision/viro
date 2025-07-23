@@ -75,7 +75,7 @@ export class ViroText extends ViroBase<Props> {
         : undefined;
 
     return (
-      <VRTText
+      <ViroTextNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -122,8 +122,8 @@ export class ViroText extends ViroBase<Props> {
   }
 }
 
-var VRTText = requireNativeComponent<any>(
-  "VRTText",
+var ViroTextNative = requireNativeComponent<any>(
+  "ViroText",
   // @ts-ignore
   ViroText,
   {

@@ -147,7 +147,7 @@ export class ViroController extends React.Component<Props> {
     //checkMisnamedProps("ViroController", this.props);
 
     return (
-      <VRTController
+      <ViroControllerNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -178,8 +178,8 @@ export class ViroController extends React.Component<Props> {
   }
 }
 
-var VRTController = requireNativeComponent<any>(
-  "VRTController",
+var ViroControllerNative = requireNativeComponent<any>(
+  "ViroController",
   // @ts-ignore
   ViroController,
   {

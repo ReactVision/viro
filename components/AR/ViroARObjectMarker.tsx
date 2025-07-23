@@ -57,7 +57,7 @@ export class ViroARObjectMarker extends ViroBase<Props> {
     }
 
     return (
-      <VRTARObjectMarker
+      <ViroARObjectMarkerNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -94,8 +94,8 @@ export class ViroARObjectMarker extends ViroBase<Props> {
   }
 }
 
-var VRTARObjectMarker = requireNativeComponent<any>(
-  "VRTARObjectMarker",
+var ViroARObjectMarkerNative = requireNativeComponent<any>(
+  "ViroARObjectMarker",
   // @ts-ignore
   ViroARObjectMarker,
   {

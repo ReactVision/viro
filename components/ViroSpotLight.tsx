@@ -56,12 +56,12 @@ export class ViroSpotLight extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTSpotLight {...nativeProps} />;
+    return <ViroSpotLightNative {...nativeProps} />;
   }
 }
 
-var VRTSpotLight = requireNativeComponent(
-  "VRTSpotLight",
+var ViroSpotLightNative = requireNativeComponent(
+  "ViroSpotLight",
   // @ts-ignore
   ViroSpotLight
 );

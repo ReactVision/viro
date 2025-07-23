@@ -88,12 +88,12 @@ export class ViroQuad extends ViroBase<Props> {
       this._component = component;
     };
 
-    return <VRTQuad {...nativeProps} />;
+    return <ViroQuadNative {...nativeProps} />;
   }
 }
 
-var VRTQuad = requireNativeComponent<any>(
-  "VRTQuad",
+var ViroQuadNative = requireNativeComponent<any>(
+  "ViroQuad",
   // @ts-ignore
   ViroQuad,
   {

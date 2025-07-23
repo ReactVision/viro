@@ -195,12 +195,12 @@ export class ViroAnimatedImage extends ViroBase<Props> {
     nativeProps.ref = (component: ViroNativeRef) => {
       this._component = component;
     };
-    return <VRTAnimatedImage {...nativeProps} />;
+    return <ViroAnimatedImageNative {...nativeProps} />;
   }
 }
 
-var VRTAnimatedImage = requireNativeComponent(
-  "VRTAnimatedImage",
+var ViroAnimatedImageNative = requireNativeComponent(
+  "ViroAnimatedImage",
   // @ts-ignore
   ViroAnimatedImage,
   {

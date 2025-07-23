@@ -347,7 +347,7 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
     nativeProps.ref = (component: ViroNativeRef) => {
       this._component = component;
     };
-    return <VRTParticleEmitter {...nativeProps} />;
+    return <ViroParticleEmitterNative {...nativeProps} />;
   }
   // Set the propsPositionState on the native control if the
   // nextProps.position state differs from the nativePositionState that
@@ -371,8 +371,8 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
   }
 }
 
-var VRTParticleEmitter = requireNativeComponent(
-  "VRTParticleEmitter",
+var ViroParticleEmitterNative = requireNativeComponent(
+  "ViroParticleEmitter",
   // @ts-ignore
   ViroParticleEmitter,
   {

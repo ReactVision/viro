@@ -59,7 +59,7 @@ export class ViroARImageMarker extends ViroBase<{}> {
     }
 
     return (
-      <VRTARImageMarker
+      <ViroARImageMarkerNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -96,8 +96,8 @@ export class ViroARImageMarker extends ViroBase<{}> {
   }
 }
 
-var VRTARImageMarker = requireNativeComponent<any>(
-  "VRTARImageMarker",
+var ViroARImageMarkerNative = requireNativeComponent<any>(
+  "ViroARImageMarker",
   // @ts-ignore
   ViroARImageMarker,
   {

@@ -59,7 +59,7 @@ export class ViroGeometry extends ViroBase<Props> {
     }
 
     return (
-      <VRTGeometry
+      <ViroGeometryNative
         {...this.props}
         ref={(component: ViroNativeRef) => {
           this._component = component;
@@ -100,8 +100,8 @@ export class ViroGeometry extends ViroBase<Props> {
   }
 }
 
-var VRTGeometry = requireNativeComponent<any>(
-  "VRTGeometry",
+var ViroGeometryNative = requireNativeComponent<any>(
+  "ViroGeometry",
   // @ts-ignore
   ViroGeometry,
   {

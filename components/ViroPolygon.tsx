@@ -130,12 +130,12 @@ export class ViroPolygon extends ViroBase<Props> {
       this._component = component;
     };
 
-    return <VRTPolygon {...nativeProps} />;
+    return <ViroPolygonNative {...nativeProps} />;
   }
 }
 
-var VRTPolygon = requireNativeComponent(
-  "VRTPolygon",
+var ViroPolygonNative = requireNativeComponent(
+  "ViroPolygon",
   // @ts-ignore
   ViroPolygon,
   {

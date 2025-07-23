@@ -59,7 +59,7 @@ export class ViroBox extends ViroBase<{}> {
     }
 
     return (
-      <VRTBox
+      <ViroBoxNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -100,8 +100,8 @@ export class ViroBox extends ViroBase<{}> {
   }
 }
 
-var VRTBox = requireNativeComponent<any>(
-  "VRTBox",
+var ViroBoxNative = requireNativeComponent<any>(
+  "ViroBox",
   // @ts-ignore
   ViroBox,
   {

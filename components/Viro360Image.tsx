@@ -97,12 +97,12 @@ export class Viro360Image extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRT360Image {...nativeProps} />;
+    return <Viro360ImageNative {...nativeProps} />;
   }
 }
 
-var VRT360Image = requireNativeComponent<any>(
-  "VRT360Image",
+var Viro360ImageNative = requireNativeComponent<any>(
+  "Viro360Image",
   // @ts-ignore
   Viro360Image,
   {

@@ -88,7 +88,7 @@ export class ViroSpatialSound extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTSpatialSound {...nativeProps} />;
+    return <ViroSpatialSoundNative {...nativeProps} />;
   }
 
   getTransformAsync = async () => {
@@ -122,8 +122,8 @@ export class ViroSpatialSound extends React.Component<Props> {
   };
 }
 
-var VRTSpatialSound = requireNativeComponent(
-  "VRTSpatialSound",
+var ViroSpatialSoundNative = requireNativeComponent(
+  "ViroSpatialSound",
   // @ts-ignore
   ViroSpatialSound,
   {

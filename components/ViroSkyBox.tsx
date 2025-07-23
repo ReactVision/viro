@@ -73,12 +73,12 @@ export class ViroSkyBox extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTSkyBox {...nativeProps} />;
+    return <ViroSkyBoxNative {...nativeProps} />;
   }
 }
 
-var VRTSkyBox = requireNativeComponent(
-  "VRTSkybox",
+var ViroSkyBoxNative = requireNativeComponent(
+  "ViroSkybox",
   // @ts-ignore
   ViroSkyBox,
   {

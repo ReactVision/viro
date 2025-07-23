@@ -65,12 +65,12 @@ export class ViroAnimatedComponent extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTAnimatedComponent {...nativeProps} />;
+    return <ViroAnimatedComponentNative {...nativeProps} />;
   }
 }
 
-var VRTAnimatedComponent = requireNativeComponent(
-  "VRTAnimatedComponent",
+var ViroAnimatedComponentNative = requireNativeComponent(
+  "ViroAnimatedComponent",
   // @ts-ignore
   ViroAnimatedComponent,
   {

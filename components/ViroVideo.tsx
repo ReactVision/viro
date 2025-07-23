@@ -156,7 +156,7 @@ export class ViroVideo extends ViroBase<Props> {
     nativeProps.ref = (component: ViroNativeRef) => {
       this._component = component;
     };
-    return <VRTVideoSurface {...nativeProps} />;
+    return <ViroVideoSurfaceNative {...nativeProps} />;
   }
 
   seekToTime = (timeInSeconds: number) => {
@@ -178,8 +178,8 @@ export class ViroVideo extends ViroBase<Props> {
   };
 }
 
-var VRTVideoSurface = requireNativeComponent(
-  "VRTVideoSurface",
+var ViroVideoSurfaceNative = requireNativeComponent(
+  "ViroVideoSurface",
   // @ts-ignore
   ViroVideo,
   {

@@ -491,7 +491,7 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
       viroAppProps = {}, // Make sure viroAppProps aren't null to save us having to always check
     } = this.props;
     return (
-      <VRT3DSceneNavigator
+      <Viro3DSceneNavigatorNative
         ref={(component) => {
           this._component = component;
         }}
@@ -503,7 +503,7 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
         onExitViro={this._onExitViro}
       >
         {items}
-      </VRT3DSceneNavigator>
+      </Viro3DSceneNavigatorNative>
     );
   }
 }
@@ -516,8 +516,8 @@ var styles = StyleSheet.create({
   },
 });
 
-var VRT3DSceneNavigator = requireNativeComponent<any>(
-  "VRT3DSceneNavigator",
+var Viro3DSceneNavigatorNative = requireNativeComponent<any>(
+  "Viro3DSceneNavigator",
   // @ts-ignore
   Viro3DSceneNavigator,
   {

@@ -43,7 +43,7 @@ export class ViroNode extends ViroBase<{}> {
         : undefined;
 
     return (
-      <VRTViewContainer
+      <ViroViewContainerNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -82,8 +82,8 @@ export class ViroNode extends ViroBase<{}> {
   }
 }
 
-var VRTViewContainer = requireNativeComponent<any>(
-  "VRTViewContainer",
+var ViroViewContainerNative = requireNativeComponent<any>(
+  "ViroViewContainer",
   // @ts-ignore
   ViroNode,
   {

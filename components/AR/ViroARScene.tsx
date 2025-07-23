@@ -428,7 +428,7 @@ export class ViroARScene extends ViroBase<Props> {
           },
         }}
       >
-        <VRTARScene
+        <ViroARSceneNative
           {...this.props}
           canHover={this.props.onHover != undefined}
           canClick={
@@ -477,8 +477,8 @@ export class ViroARScene extends ViroBase<Props> {
   }
 }
 
-var VRTARScene = requireNativeComponent<any>(
-  "VRTARScene",
+var ViroARSceneNative = requireNativeComponent<any>(
+  "ViroARScene",
   // @ts-ignore
   ViroARScene,
   {

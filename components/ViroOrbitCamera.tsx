@@ -54,7 +54,7 @@ export class ViroOrbitCamera extends React.Component<Props> {
     //checkMisnamedProps("ViroOrbitCamera", this.props);
 
     return (
-      <VRTOrbitCamera
+      <ViroOrbitCameraNative
         ref={(component) => {
           this._component = component;
         }}
@@ -64,8 +64,8 @@ export class ViroOrbitCamera extends React.Component<Props> {
   }
 }
 
-var VRTOrbitCamera = requireNativeComponent(
-  "VRTOrbitCamera",
+var ViroOrbitCameraNative = requireNativeComponent(
+  "ViroOrbitCamera",
   // @ts-ignore
   ViroOrbitCamera,
   {

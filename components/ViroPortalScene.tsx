@@ -60,7 +60,7 @@ export class ViroPortalScene extends ViroBase<Props> {
         : undefined;
 
     return (
-      <VRTPortalScene
+      <ViroPortalSceneNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -101,8 +101,8 @@ export class ViroPortalScene extends ViroBase<Props> {
   }
 }
 
-var VRTPortalScene = requireNativeComponent<any>(
-  "VRTPortalScene",
+var ViroPortalSceneNative = requireNativeComponent<any>(
+  "ViroPortalScene",
   // @ts-ignore
   ViroPortalScene,
   {

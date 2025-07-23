@@ -167,7 +167,7 @@ export class ViroImage extends ViroBase<Props> {
     nativeProps.ref = (component: ViroNativeRef) => {
       this._component = component;
     };
-    return <VRTImage {...nativeProps} />;
+    return <ViroImageNative {...nativeProps} />;
   }
 
   // Used to evict a given imageSource from the cache. This is Android-only
@@ -182,8 +182,8 @@ export class ViroImage extends ViroBase<Props> {
   };
 }
 
-var VRTImage = requireNativeComponent<any>(
-  "VRTImage",
+var ViroImageNative = requireNativeComponent<any>(
+  "ViroImage",
   // @ts-ignore
   ViroImage,
   {

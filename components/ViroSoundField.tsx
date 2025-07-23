@@ -85,7 +85,7 @@ export class ViroSoundField extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTSoundField {...nativeProps} />;
+    return <ViroSoundFieldNative {...nativeProps} />;
   }
 
   seekToTime = (timeInSeconds: number) => {
@@ -107,8 +107,8 @@ export class ViroSoundField extends React.Component<Props> {
   };
 }
 
-var VRTSoundField = requireNativeComponent(
-  "VRTSoundField",
+var ViroSoundFieldNative = requireNativeComponent(
+  "ViroSoundField",
   // @ts-ignore
   ViroSoundField,
   {

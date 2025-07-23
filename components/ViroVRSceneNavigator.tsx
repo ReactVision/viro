@@ -491,7 +491,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     const { viroAppProps = {} } = this.props;
 
     return (
-      <VRTVRSceneNavigator
+      <ViroVRSceneNavigatorNative
         ref={(component) => {
           this._component = component;
         }}
@@ -503,7 +503,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
         onExitViro={this._onExitViro}
       >
         {items}
-      </VRTVRSceneNavigator>
+      </ViroVRSceneNavigatorNative>
     );
   }
 }
@@ -516,8 +516,8 @@ var styles = StyleSheet.create({
   },
 });
 
-var VRTVRSceneNavigator = requireNativeComponent<any>(
-  "VRTVRSceneNavigator",
+var ViroVRSceneNavigatorNative = requireNativeComponent<any>(
+  "ViroVRSceneNavigator",
   // @ts-ignore
   ViroVRSceneNavigator,
   {

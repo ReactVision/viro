@@ -65,7 +65,7 @@ export class ViroSphere extends ViroBase<Props> {
     }
 
     return (
-      <VRTSphere
+      <ViroSphereNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -106,8 +106,8 @@ export class ViroSphere extends ViroBase<Props> {
   }
 }
 
-var VRTSphere = requireNativeComponent<any>(
-  "VRTSphere",
+var ViroSphereNative = requireNativeComponent<any>(
+  "ViroSphere",
   // @ts-ignore
   ViroSphere,
   {

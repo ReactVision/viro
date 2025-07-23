@@ -54,12 +54,12 @@ export class ViroDirectionalLight extends React.Component<Props> {
       this._component = component;
     };
 
-    return <VRTDirectionalLight {...nativeProps} />;
+    return <ViroDirectionalLightNative {...nativeProps} />;
   }
 }
 
-var VRTDirectionalLight = requireNativeComponent(
-  "VRTDirectionalLight",
+var ViroDirectionalLightNative = requireNativeComponent(
+  "ViroDirectionalLight",
   // @ts-ignore
   ViroDirectionalLight
 );

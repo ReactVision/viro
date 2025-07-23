@@ -220,7 +220,7 @@ export class ViroScene extends ViroBase<Props> {
           },
         }}
       >
-        <VRTScene
+        <ViroSceneNative
           {...this.props}
           ref={(component) => {
             this._component = component;
@@ -258,8 +258,8 @@ export class ViroScene extends ViroBase<Props> {
   }
 }
 
-var VRTScene = requireNativeComponent<any>(
-  "VRTScene",
+var ViroSceneNative = requireNativeComponent<any>(
+  "ViroScene",
   // @ts-ignore
   ViroScene,
   {

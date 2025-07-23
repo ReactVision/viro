@@ -91,12 +91,12 @@ export class ViroSurface extends ViroBase<Props> {
       this._component = component;
     };
 
-    return <VRTSurface {...nativeProps} />;
+    return <ViroSurfaceNative {...nativeProps} />;
   }
 }
 
-var VRTSurface = requireNativeComponent(
-  "VRTSurface",
+var ViroSurfaceNative = requireNativeComponent(
+  "ViroSurface",
   // @ts-ignore
   ViroSurface,
   {

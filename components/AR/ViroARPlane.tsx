@@ -70,7 +70,7 @@ export class ViroARPlane extends ViroBase<Props> {
     }
 
     return (
-      <VRTARPlane
+      <ViroARPlaneNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -107,8 +107,8 @@ export class ViroARPlane extends ViroBase<Props> {
   }
 }
 
-var VRTARPlane = requireNativeComponent<any>(
-  "VRTARPlane",
+var ViroARPlaneNative = requireNativeComponent<any>(
+  "ViroARPlane",
   // @ts-ignore
   ViroARPlane,
   {

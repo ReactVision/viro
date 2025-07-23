@@ -63,7 +63,7 @@ export class ViroPolyline extends ViroBase<Props> {
     }
 
     return (
-      <VRTPolyline
+      <ViroPolylineNative
         {...this.props}
         ref={(component) => {
           this._component = component;
@@ -104,8 +104,8 @@ export class ViroPolyline extends ViroBase<Props> {
   }
 }
 
-var VRTPolyline = requireNativeComponent<any>(
-  "VRTPolyline",
+var ViroPolylineNative = requireNativeComponent<any>(
+  "ViroPolyline",
   // @ts-ignore
   ViroPolyline,
   {

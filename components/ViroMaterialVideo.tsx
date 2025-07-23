@@ -119,7 +119,7 @@ export class ViroMaterialVideo extends React.Component<Props> {
     nativeProps.ref = (component: ViroNativeRef) => {
       this._component = component;
     };
-    return <VRTMaterialVideo {...nativeProps} />;
+    return <ViroMaterialVideoNative {...nativeProps} />;
   }
 
   seekToTime = (timeInSeconds: number) => {
@@ -141,8 +141,8 @@ export class ViroMaterialVideo extends React.Component<Props> {
   };
 }
 
-var VRTMaterialVideo = requireNativeComponent(
-  "VRTMaterialVideo",
+var ViroMaterialVideoNative = requireNativeComponent(
+  "ViroMaterialVideo",
   // @ts-ignore
   ViroMaterialVideo,
   {

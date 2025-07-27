@@ -55,6 +55,7 @@ static NSString *const kPointCloudKey = @"pointCloud";
     std::shared_ptr<VROTexture> _pointCloudSurfaceTexture;
     std::shared_ptr<VROSurface> _pointCloudParticleSurface;
     std::set<VROAnchorDetection> _nativeDetectionTypes;
+    BOOL _hasCleanedUp;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -230,17 +231,26 @@ static NSString *const kPointCloudKey = @"pointCloud";
     });
 }
 
-- (void)removeFromSuperview {
+- (void)willMoveToSuperview:(UIView *)newSuperview {
+    // If newSuperview is nil, the view is being removed
+    if (newSuperview == nil) {
+        [self cleanupARSceneResources];
+    }
+    [super willMoveToSuperview:newSuperview];
+}
+
+- (void)cleanupARSceneResources {
+    // Only cleanup once per instance
+    if (_hasCleanedUp) {
+        return;
+    }
+    _hasCleanedUp = YES;
+    
     // Clean up AR-specific resources before removing from superview
     @try {
         if (_vroArScene) {
             // Reset point cloud surface
             _vroArScene->resetPointCloudSurface();
-            
-            // Pause and clean up the declarative session
-            if (_vroArScene->getDeclarativeSession()) {
-                _vroArScene->getDeclarativeSession()->pause();
-            }
             
             // Clear delegates to prevent callbacks after removal
             _sceneDelegate = nullptr;
@@ -262,12 +272,17 @@ static NSString *const kPointCloudKey = @"pointCloud";
     } @catch (NSException *exception) {
         NSLog(@"Error cleaning up AR scene: %@", exception.reason);
     }
-    
-    // Call super implementation
+}
+
+- (void)removeFromSuperview {
+    [self cleanupARSceneResources];
     [super removeFromSuperview];
 }
 
 - (void)dealloc {
+    // Final safety net for cleanup
+    [self cleanupARSceneResources];
+    
     // Ensure all resources are properly released
     _sceneDelegate = nullptr;
     _vroArScene = nullptr;

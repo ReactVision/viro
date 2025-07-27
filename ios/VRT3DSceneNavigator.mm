@@ -43,6 +43,7 @@
 @implementation VRT3DSceneNavigator {
   id <VROView> _vroView;
   RCTBridge *_bridge;
+  BOOL _hasCleanedUp;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -182,13 +183,54 @@
   _currentScene = sceneView;
 }
 
-- (void)removeFromSuperview {
+- (void)willMoveToSuperview:(UIView *)newSuperview {
+  // If newSuperview is nil, the view is being removed
+  if (newSuperview == nil) {
+    [self cleanup3DResources];
+  }
+  [super willMoveToSuperview:newSuperview];
+}
+
+- (void)cleanup3DResources {
+  // Only cleanup once per instance
+  if (_hasCleanedUp) {
+    return;
+  }
+  _hasCleanedUp = YES;
+  
   [self parentDidDisappear];
+  
   if (_vroView) {
     VROViewScene *viewScene = (VROViewScene *)_vroView;
-    [viewScene deleteGL];
+    @try {
+      [viewScene deleteGL];
+    } @catch (NSException *exception) {
+      NSLog(@"Error during 3D view cleanup: %@", exception.reason);
+    }
+    // Clear the view reference to prevent dangling pointer
+    _vroView = nil;
   }
+}
+
+- (void)removeFromSuperview {
+  [self cleanup3DResources];
+  
+  // Clear any pointer interactions and gestures before calling super
+  @try {
+    self.interactions = @[];
+    for (UIGestureRecognizer *gesture in self.gestureRecognizers) {
+      [self removeGestureRecognizer:gesture];
+    }
+  } @catch (NSException *exception) {
+    NSLog(@"Error clearing interactions/gestures: %@", exception.reason);
+  }
+  
   [super removeFromSuperview];
+}
+
+- (void)dealloc {
+  // Final safety net for cleanup
+  [self cleanup3DResources];
 }
 
 // Return the RCTRootView, if any, descending from the given controller

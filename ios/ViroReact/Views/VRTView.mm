@@ -169,10 +169,29 @@
     }
 }
 
+- (void)willMoveToSuperview:(UIView *)newSuperview {
+    // For React Native New Architecture (Fabric) compatibility
+    // If newSuperview is nil, prepare for removal safely
+    if (newSuperview == nil) {
+        [self prepareForRecycle];
+    }
+    [super willMoveToSuperview:newSuperview];
+}
+
+- (void)prepareForRecycle {
+    // Safely clear references before recycling
+    @try {
+        _scene = nullptr;
+        // Don't clear _childViews or _superview here as they might be needed
+    } @catch (NSException *exception) {
+        NSLog(@"VRTView: Error preparing for recycle: %@", exception.reason);
+    }
+}
+
 -(void)dealloc {
     _superview = nil;
     _childViews = nil;
-    _scene = nil;
+    _scene = nullptr;
 }
 
 - (void)setScene:(std::shared_ptr<VROScene>)scene {

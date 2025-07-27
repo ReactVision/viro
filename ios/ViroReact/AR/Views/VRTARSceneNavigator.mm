@@ -41,6 +41,7 @@
     NSInteger _currentStackPosition;
     RCTBridge *_bridge;
     VROVideoQuality _vroVideoQuality;
+    BOOL _hasCleanedUp;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -239,28 +240,48 @@
     _currentScene = sceneView;
 }
 
-- (void)removeFromSuperview{
+- (void)willMoveToSuperview:(UIView *)newSuperview {
+    // If newSuperview is nil, the view is being removed
+    if (newSuperview == nil) {
+        [self cleanupViroResources];
+        
+        // Critical: Clear pointer interactions to prevent crashes
+        @try {
+            self.interactions = @[];
+        } @catch (NSException *exception) {
+            NSLog(@"Error clearing interactions: %@", exception.reason);
+        }
+    }
+    [super willMoveToSuperview:newSuperview];
+}
+
+- (void)cleanupViroResources {
+    // Only cleanup once per instance
+    if (_hasCleanedUp) {
+        return;
+    }
+    _hasCleanedUp = YES;
+    
     [self parentDidDisappear];
+    
     if (_vroView) {
         VROViewAR *viewAR = (VROViewAR *)_vroView;
         
         // First pause the AR session
         [viewAR setPaused:YES];
         
-        // Terminate AR session explicitly
+        // Terminate AR session explicitly - synchronous cleanup for Fabric
         @try {
             std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
             if (arSession) {
                 arSession->pause();
                 
-                // Allow time for AR resources to release
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    @try {
-                        [viewAR deleteGL];
-                    } @catch (NSException *exception) {
-                        NSLog(@"Error during AR view cleanup: %@", exception.reason);
-                    }
-                });
+                // Synchronous cleanup to prevent race conditions in Fabric
+                @try {
+                    [viewAR deleteGL];
+                } @catch (NSException *exception) {
+                    NSLog(@"Error during AR view cleanup: %@", exception.reason);
+                }
             } else {
                 [viewAR deleteGL];
             }
@@ -273,9 +294,35 @@
                 NSLog(@"Error during AR view cleanup: %@", innerException.reason);
             }
         }
+        
+        // Clear the view reference to prevent dangling pointer
+        _vroView = nil;
     }
+}
 
+- (void)removeFromSuperview{
+    // Fabric may call removeFromSuperview after willMoveToSuperview
+    // So we need to handle cleanup in both places
+    [self cleanupViroResources];
+    
+    // Clear any remaining pointer interactions before calling super
+    @try {
+        self.interactions = @[];
+        
+        // Also clear any gesture recognizers that might cause issues
+        for (UIGestureRecognizer *gesture in self.gestureRecognizers) {
+            [self removeGestureRecognizer:gesture];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Error clearing interactions/gestures: %@", exception.reason);
+    }
+    
     [super removeFromSuperview];
+}
+
+- (void)dealloc {
+    // Final safety net for cleanup
+    [self cleanupViroResources];
 }
 
 - (void)setNumberOfTrackedImages:(NSInteger)numberOfTrackedImages {

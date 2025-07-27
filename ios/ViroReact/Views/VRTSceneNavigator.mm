@@ -204,6 +204,12 @@
 
 - (void)removeFromSuperview {
     [self parentDidDisappear];
+    
+    // For React Native New Architecture (Fabric) compatibility
+    if (!self.superview) {
+        return;
+    }
+    
     [super removeFromSuperview];
     
     /*

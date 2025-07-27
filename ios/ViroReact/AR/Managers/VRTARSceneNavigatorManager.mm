@@ -29,6 +29,7 @@
 #import <ViroKit/ViroKit.h>
 #import "VRTARSceneNavigatorManager.h"
 #import "VRTARSceneNavigator.h"
+#import "VRTFabricCrashFix.h"
 
 @implementation VRTARSceneNavigatorManager
 
@@ -47,7 +48,13 @@ RCT_EXPORT_VIEW_PROPERTY(multisamplingEnabled, BOOL)
 
 - (VRTARSceneNavigator *)view
 {
+    // Force install the crash fix early - add aggressive logging
+    NSLog(@"VRT: AR Scene Navigator creating view - installing crash fix NOW");
+    [VRTFabricCrashFix installFabricCrashFix];
+    NSLog(@"VRT: AR Scene Navigator crash fix installation completed");
+    
     return [[VRTARSceneNavigator alloc] initWithBridge:self.bridge];
 }
+
 
 @end

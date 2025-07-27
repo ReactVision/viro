@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v2.43.1 - 26 June 2025
+
+- Added support for React Native New Architecture (Fabric)
+- Added examples demonstrating how to use ViroReact with automatic architecture detection
+- Updated documentation with information about the New Architecture support
+- Deprecated legacy architecture support (removed completely)
+
 ## v2.42.0 - 7 February 2025
 
 - Compatibility with Expo 52

@@ -14,8 +14,26 @@ const withViroPods = (config) => {
         async (newConfig) => {
             const root = newConfig.modRequest.platformProjectRoot;
             fs_1.default.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
-                data = (0, insertLinesHelper_1.insertLinesHelper)(`  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
-                    `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'\n`, "post_install do |installer|", data, -1);
+                // Check for New Architecture environment variable
+                if (!data.includes('ENV["RCT_NEW_ARCH_ENABLED"]') &&
+                    !data.includes("RCT_NEW_ARCH_ENABLED=1")) {
+                    config_plugins_1.WarningAggregator.addWarningIOS("withViroIos", "ViroReact requires New Architecture to be enabled. " +
+                        "Please set RCT_NEW_ARCH_ENABLED=1 in your ios/.xcode.env file.");
+                }
+                // ViroReact with integrated Fabric support
+                let viroPods = `  # ViroReact with integrated New Architecture (Fabric) support\n` +
+                    `  # Automatically includes Fabric components when RCT_NEW_ARCH_ENABLED=1\n` +
+                    `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
+                    `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`;
+                // Add New Architecture enforcement
+                viroPods +=
+                    `\n\n  # Enforce New Architecture requirement\n` +
+                        `  # ViroReact 2.43.1+ requires React Native New Architecture\n` +
+                        `  if ENV['RCT_NEW_ARCH_ENABLED'] != '1'\n` +
+                        `    raise "ViroReact requires New Architecture to be enabled. Please set RCT_NEW_ARCH_ENABLED=1 in ios/.xcode.env"\n` +
+                        `  end`;
+                // Insert the pods into the Podfile
+                data = (0, insertLinesHelper_1.insertLinesHelper)(viroPods, "post_install do |installer|", data, -1);
                 fs_1.default.writeFile(`${root}/Podfile`, data, "utf-8", function (err) {
                     if (err)
                         console.log("Error writing Podfile");

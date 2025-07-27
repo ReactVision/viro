@@ -2,9 +2,18 @@ apply plugin: 'com.android.library'
 apply plugin: "kotlin-android"
 apply plugin: "com.facebook.react"
 
+// Check if the new architecture is enabled
+def isNewArchitectureEnabled() {
+    return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
+}
+
 android {
     compileSdkVersion 34
     namespace "com.viromedia.bridge"
+    
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         minSdkVersion 24
@@ -12,13 +21,54 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        
+        // Add build config for New Architecture detection
+        buildConfigField("boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString())
     }
+    
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+    
+    // Add C++ build for JSI bridge - Enable when CMake is available
+    // To enable JSI bridge compilation, uncomment the following block:
+    /*
+    if (isNewArchitectureEnabled()) {
+        externalNativeBuild {
+            cmake {
+                path "src/main/cpp/CMakeLists.txt"
+                version "3.13.0"
+            }
+        }
+        
+        defaultConfig {
+            externalNativeBuild {
+                cmake {
+                    cppFlags "-std=c++17", "-fexceptions", "-frtti", "-DWITH_INSPECTOR=1"
+                    abiFilters "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+                    arguments "-DANDROID_STL=c++_shared",
+                              "-DREACT_NATIVE_DIR=${rootProject.projectDir}/../node_modules/react-native",
+                              "-DNODE_MODULES_DIR=${rootProject.projectDir}/../node_modules"
+                }
+            }
+        }
+    }
+    */
 }
 
 dependencies {

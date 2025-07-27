@@ -5,6 +5,7 @@ import {
   withDangerousMod,
   withPlugins,
   withXcodeProject,
+  WarningAggregator,
 } from "@expo/config-plugins";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
@@ -18,9 +19,36 @@ const withViroPods = (config: ExpoConfig) => {
       const root = newConfig.modRequest.platformProjectRoot;
 
       fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
-        data = insertLinesHelper(
+        // Check for New Architecture environment variable
+        if (
+          !data.includes('ENV["RCT_NEW_ARCH_ENABLED"]') &&
+          !data.includes("RCT_NEW_ARCH_ENABLED=1")
+        ) {
+          WarningAggregator.addWarningIOS(
+            "withViroIos",
+            "ViroReact requires New Architecture to be enabled. " +
+              "Please set RCT_NEW_ARCH_ENABLED=1 in your ios/.xcode.env file."
+          );
+        }
+
+        // ViroReact with integrated Fabric support
+        let viroPods =
+          `  # ViroReact with integrated New Architecture (Fabric) support\n` +
+          `  # Automatically includes Fabric components when RCT_NEW_ARCH_ENABLED=1\n` +
           `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
-            `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'\n`,
+          `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`;
+
+        // Add New Architecture enforcement
+        viroPods +=
+          `\n\n  # Enforce New Architecture requirement\n` +
+          `  # ViroReact 2.43.1+ requires React Native New Architecture\n` +
+          `  if ENV['RCT_NEW_ARCH_ENABLED'] != '1'\n` +
+          `    raise "ViroReact requires New Architecture to be enabled. Please set RCT_NEW_ARCH_ENABLED=1 in ios/.xcode.env"\n` +
+          `  end`;
+
+        // Insert the pods into the Podfile
+        data = insertLinesHelper(
+          viroPods,
           "post_install do |installer|",
           data,
           -1

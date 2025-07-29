@@ -90,9 +90,10 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
               target +
               `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
           } else {
+            // Use proper Kotlin syntax for newer formats
             target =
               target +
-              `              packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+              `            packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
           }
         }
 
@@ -103,71 +104,40 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
             data
           );
         } else {
+          // Handle various MainApplication.kt formats
           if (data.includes("// packages.add(new MyReactNativePackage());")) {
-            // console.log("[VIRO]: \n" + target);
-            /**
-             * ================================================================
-             * HACK/EXPO PREBIULD BUG
-             * ================================================================
-             *
-             * ```
-             * // DOESN'T WORK - EXPO SDK 50 `npx expo prebuild` RESULT
-             * override fun getPackages(): List<ReactPackage> {
-             *   // Packages that cannot be autolinked yet can be added manually here, for example:
-             *   // packages.add(new MyReactNativePackage());
-             *   PackageList(this).packages.apply {
-             *     add(ReactViroPackage(ReactViroPackage.ViroPlatform.GVR))
-             *   }
-             *   return PackageList(this).packages
-             * }
-             *
-             * // DOES WORK - REACT NATIVE STARTER KIT 0.73.4
-             * override fun getPackages(): List<ReactPackage> =
-             *   PackageList(this).packages.apply {
-             *     // Packages that cannot be autolinked yet can be added manually here, for example:
-             *     // add(MyReactNativePackage())
-             *     // https://viro-community.readme.io/docs/installation-instructions#5-now-add-the-viro-package-to-your-mainapplication
-             *     // add(ReactViroPackage(ReactViroPackage.ViroPlatform.OVR_MOBILE))
-             *     add(ReactViroPackage(ReactViroPackage.ViroPlatform.GVR))
-             *     // add(ReactViroPackage(ReactViroPackage.ViroPlatform.AR))
-             *   }
-             * ```
-             */
-            /*
-            data = data.replace(
-              `override fun getPackages(): List<ReactPackage> {
-            // Packages that cannot be autolinked yet can be added manually here, for example:
-            // packages.add(new MyReactNativePackage());
-            return PackageList(this).packages
-          }`,
-              `override fun getPackages(): List<ReactPackage> =
-            PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
-            }`
-            );*/
             data = insertLinesHelper(
               target,
               "// packages.add(new MyReactNativePackage());",
               data
             );
           } else if (data.includes("// add(MyReactNativePackage())")) {
-            // console.log("[VIRO]: \n" + target);
             data = insertLinesHelper(
               target,
               "// add(MyReactNativePackage())",
               data
             );
+          } else if (data.includes("// packages.add(MyReactNativePackage())")) {
+            // Handle newer Expo format: // packages.add(MyReactNativePackage())
+            data = insertLinesHelper(
+              target,
+              "// packages.add(MyReactNativePackage())",
+              data
+            );
+          } else if (data.includes("val packages = PackageList(this).packages")) {
+            // Handle newer format where packages is declared as val
+            data = insertLinesHelper(
+              target,
+              "val packages = PackageList(this).packages",
+              data
+            );
           } else {
             throw new Error(
-              "Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message!"
+              "Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message! " +
+              "Expected to find one of: '// packages.add(new MyReactNativePackage());', '// add(MyReactNativePackage())', " +
+              "'// packages.add(MyReactNativePackage())', or 'val packages = PackageList(this).packages'"
             );
           }
-          // data = insertLinesHelper(
-          //   target,
-          //   "// packages.add(new MyReactNativePackage());",
-          //   data
-          // );
         }
 
         fs.writeFile(mainApplicationPath, data, "utf-8", function (err) {

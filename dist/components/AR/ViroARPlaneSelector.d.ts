@@ -37,7 +37,7 @@ export declare class ViroARPlaneSelector extends React.Component<Props, State> {
         arPlaneSizes: number[];
     };
     render(): React.JSX.Element;
-    _getARPlanes(): JSX.Element[];
+    _getARPlanes(): React.JSX.Element[];
     _getOnClickSurface: (index: number, event: ViroClickStateEvent) => void;
     _onARPlaneUpdated: (index: number) => (updateMap: ViroPlaneUpdatedMap) => void;
     _onPlaneSelected: (updateMap: ViroPlaneUpdatedMap) => void;

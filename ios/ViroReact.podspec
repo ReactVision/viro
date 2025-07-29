@@ -15,8 +15,8 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '12.0'
   
   # Base source files (always included)
-  source_files_array = ['ViroReact/**/*.{h,m,mm}', 'ViroFabric/**/*.{h,m,mm}']
-  header_files_array = ['ViroReact/**/*.h', 'ViroFabric/**/*.h']
+  source_files_array = ['ViroReact/**/*.{h,m,mm}']
+  header_files_array = ['ViroReact/**/*.h']
   
   # Include dist files if they exist (for release builds)
   if File.exist?(File.join(__dir__, 'dist/include'))
@@ -43,7 +43,6 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = { 
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'HEADER_SEARCH_PATHS' => [
-      '"$(PODS_TARGET_SRCROOT)/ViroFabric"',
       '"$(PODS_TARGET_SRCROOT)/ViroReact"',
       '"$(PODS_TARGET_SRCROOT)/dist/include"',
       '"$(PODS_ROOT)/Headers/Public"',
@@ -55,8 +54,4 @@ Pod::Spec.new do |s|
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'
   }
   
-  # User target configuration for consumers
-  s.user_target_xcconfig = {
-    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ViroReact/ViroFabric"'
-  }
 end

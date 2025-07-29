@@ -24,5 +24,5 @@ function validateNewArchitecture() {
 }
 // Validate New Architecture on module load
 validateNewArchitecture();
-// Export fabric-interop components directly
-module.exports = require("./fabric-interop");
+// Export main components
+module.exports = require("./index");

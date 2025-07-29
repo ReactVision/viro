@@ -54,72 +54,36 @@ const withBranchAndroid = (config) => {
                                 `      packages.add(new ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
                     }
                     else {
+                        // Use proper Kotlin syntax for newer formats
                         target =
                             target +
-                                `              packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+                                `            packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
                     }
                 }
                 if (isJava) {
                     data = (0, insertLinesHelper_1.insertLinesHelper)(target, "List<ReactPackage> packages = new PackageList(this).getPackages();", data);
                 }
                 else {
+                    // Handle various MainApplication.kt formats
                     if (data.includes("// packages.add(new MyReactNativePackage());")) {
-                        // console.log("[VIRO]: \n" + target);
-                        /**
-                         * ================================================================
-                         * HACK/EXPO PREBIULD BUG
-                         * ================================================================
-                         *
-                         * ```
-                         * // DOESN'T WORK - EXPO SDK 50 `npx expo prebuild` RESULT
-                         * override fun getPackages(): List<ReactPackage> {
-                         *   // Packages that cannot be autolinked yet can be added manually here, for example:
-                         *   // packages.add(new MyReactNativePackage());
-                         *   PackageList(this).packages.apply {
-                         *     add(ReactViroPackage(ReactViroPackage.ViroPlatform.GVR))
-                         *   }
-                         *   return PackageList(this).packages
-                         * }
-                         *
-                         * // DOES WORK - REACT NATIVE STARTER KIT 0.73.4
-                         * override fun getPackages(): List<ReactPackage> =
-                         *   PackageList(this).packages.apply {
-                         *     // Packages that cannot be autolinked yet can be added manually here, for example:
-                         *     // add(MyReactNativePackage())
-                         *     // https://viro-community.readme.io/docs/installation-instructions#5-now-add-the-viro-package-to-your-mainapplication
-                         *     // add(ReactViroPackage(ReactViroPackage.ViroPlatform.OVR_MOBILE))
-                         *     add(ReactViroPackage(ReactViroPackage.ViroPlatform.GVR))
-                         *     // add(ReactViroPackage(ReactViroPackage.ViroPlatform.AR))
-                         *   }
-                         * ```
-                         */
-                        /*
-                        data = data.replace(
-                          `override fun getPackages(): List<ReactPackage> {
-                        // Packages that cannot be autolinked yet can be added manually here, for example:
-                        // packages.add(new MyReactNativePackage());
-                        return PackageList(this).packages
-                      }`,
-                          `override fun getPackages(): List<ReactPackage> =
-                        PackageList(this).packages.apply {
-                          // Packages that cannot be autolinked yet can be added manually here, for example:
-                          // add(MyReactNativePackage())
-                        }`
-                        );*/
                         data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// packages.add(new MyReactNativePackage());", data);
                     }
                     else if (data.includes("// add(MyReactNativePackage())")) {
-                        // console.log("[VIRO]: \n" + target);
                         data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// add(MyReactNativePackage())", data);
                     }
-                    else {
-                        throw new Error("Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message!");
+                    else if (data.includes("// packages.add(MyReactNativePackage())")) {
+                        // Handle newer Expo format: // packages.add(MyReactNativePackage())
+                        data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// packages.add(MyReactNativePackage())", data);
                     }
-                    // data = insertLinesHelper(
-                    //   target,
-                    //   "// packages.add(new MyReactNativePackage());",
-                    //   data
-                    // );
+                    else if (data.includes("val packages = PackageList(this).packages")) {
+                        // Handle newer format where packages is declared as val
+                        data = (0, insertLinesHelper_1.insertLinesHelper)(target, "val packages = PackageList(this).packages", data);
+                    }
+                    else {
+                        throw new Error("Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message! " +
+                            "Expected to find one of: '// packages.add(new MyReactNativePackage());', '// add(MyReactNativePackage())', " +
+                            "'// packages.add(MyReactNativePackage())', or 'val packages = PackageList(this).packages'");
+                    }
                 }
                 fs_1.default.writeFile(mainApplicationPath, data, "utf-8", function (err) {
                     if (err)
@@ -138,10 +102,10 @@ const withViroProjectBuildGradle = (config) => (0, config_plugins_1.withProjectB
     }
     newConfig.modResults.contents = newConfig.modResults.contents.replace(/minSdkVersion.*/, `minSdkVersion = 24`);
     // Ensure New Architecture is enabled
-    if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
-        newConfig.modResults.contents +=
-            "\n# ViroReact requires New Architecture\nnewArchEnabled=true\n";
-    }
+    //if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
+    //  newConfig.modResults.contents +=
+    //    "\n// ViroReact requires New Architecture\nnewArchEnabled=true\n";
+    //}
     newConfig.modResults.contents = newConfig.modResults.contents.replace(/classpath\("com.android.tools.build:gradle.*/, `classpath('com.android.tools.build:gradle:4.1.1')`);
     return newConfig;
 });
@@ -151,7 +115,6 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
     // ========================================================================
     // ViroReact New Architecture (Fabric) Dependencies
     // https://viro-community.readme.io/docs/installation-instructions
-    implementation project(':viro_bridge')
     implementation project(':gvr_common')
     implementation project(':arcore_client')
     implementation project(path: ':react_viro')
@@ -170,12 +133,11 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
 });
 const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {
     config.modResults.contents += `
-include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer', ':viro_bridge'
+include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
 project(':arcore_client').projectDir = new File('../node_modules/@reactvision/react-viro/android/arcore_client')
 project(':gvr_common').projectDir = new File('../node_modules/@reactvision/react-viro/android/gvr_common')
 project(':viro_renderer').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_renderer')
 project(':react_viro').projectDir = new File('../node_modules/@reactvision/react-viro/android/react_viro')
-project(':viro_bridge').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_bridge')
     `;
     return config;
 });

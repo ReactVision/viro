@@ -59,7 +59,7 @@ type Props = ViewProps & {
    * describe a scene.
    */
   initialScene?: {
-    scene: () => JSX.Element;
+    scene: () => React.JSX.Element;
   };
 
   /**

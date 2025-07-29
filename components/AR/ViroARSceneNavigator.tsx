@@ -28,7 +28,6 @@ import {
   ViroSceneDictionary,
 } from "../Types/ViroUtils";
 
-
 const ViroARSceneNavigatorModule = NativeModules.VRTARSceneNavigatorModule;
 
 let mathRandomOffset = 0;
@@ -42,7 +41,7 @@ type Props = ViewProps & {
     /**
      * The React Class to render for this scene.
      */
-    scene: () => JSX.Element;
+    scene: () => React.JSX.Element;
   };
   initialSceneKey?: string;
 

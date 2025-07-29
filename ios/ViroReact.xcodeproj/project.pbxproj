@@ -13,7 +13,6 @@
 		13F6302D205761B100A74EFC /* VRT3DSceneNavigatorModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13F6302C205761B100A74EFC /* VRT3DSceneNavigatorModule.mm */; };
 		13F63033205762CB00A74EFC /* VRT3DSceneNavigatorManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13F63032205762CB00A74EFC /* VRT3DSceneNavigatorManager.mm */; };
 		13F630362057644D00A74EFC /* VRT3DSceneNavigator.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13F630352057644D00A74EFC /* VRT3DSceneNavigator.mm */; };
-		41CC06895141847A9B4E74B7 /* libPods-ViroReact.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B056639B1AB73CCCDA78D52E /* libPods-ViroReact.a */; };
 		8A04D4E02023EDDF00FD5F68 /* VRTARTrackingTargetsModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A04D4DF2023EDDF00FD5F68 /* VRTARTrackingTargetsModule.mm */; };
 		8A04D5182024F6B200FD5F68 /* VRTARImageMarkerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A04D5172024F6B200FD5F68 /* VRTARImageMarkerManager.mm */; };
 		8A04D51B2024F7AA00FD5F68 /* VRTARImageMarker.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A04D51A2024F7AA00FD5F68 /* VRTARImageMarker.mm */; };
@@ -106,7 +105,6 @@
 		8BDDA1631E5BF02E00A42870 /* VRTVideoSurface.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4EF1DFA3D9B0032AB99 /* VRTVideoSurface.h */; };
 		8BDDA1641E5BF02E00A42870 /* VRTView.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4F11DFA3D9B0032AB99 /* VRTView.h */; };
 		8BDDA1651E5BF02E00A42870 /* ViroViewManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4671DFA15880032AB99 /* ViroViewManager.h */; };
-		8BF0A1237DFA15880032AB99 /* VRTFabricCrashFix.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BF0A1235DFA15880032AB99 /* VRTFabricCrashFix.h */; };
 		8BDDA1661E5BF02E00A42870 /* VROHUDManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4761DFA15880032AB99 /* VROHUDManager.h */; };
 		8BDDA1671E5BF02E00A42870 /* VRTBundleURLProvider.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BDD9E191E453F3500A42870 /* VRTBundleURLProvider.h */; };
 		8BDDA1681E5BF02E00A42870 /* VRTControllerManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = A5F6D4031E4B179700655F60 /* VRTControllerManager.h */; };
@@ -134,7 +132,6 @@
 		8BDDA17E1E5BF02E00A42870 /* VRTViewContainerManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4F31DFA3D9B0032AB99 /* VRTViewContainerManager.h */; };
 		8BDDA1801E5BFBBF00A42870 /* libViroReact.a in Copy Files */ = {isa = PBXBuildFile; fileRef = 8BE0D4541DFA0D050032AB99 /* libViroReact.a */; };
 		8BE0D4991DFA15880032AB99 /* ViroViewManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D4681DFA15880032AB99 /* ViroViewManager.mm */; };
-		8BF0A1234DFA15880032AB99 /* VRTFabricCrashFix.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BF0A1236DFA15880032AB99 /* VRTFabricCrashFix.mm */; };
 		8BE0D49A1DFA15880032AB99 /* VRT360ImageManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D46A1DFA15880032AB99 /* VRT360ImageManager.mm */; };
 		8BE0D49B1DFA15880032AB99 /* VRT360VideoManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D46C1DFA15880032AB99 /* VRT360VideoManager.mm */; };
 		8BE0D49C1DFA15880032AB99 /* VRTAnimatedComponentManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D46E1DFA15880032AB99 /* VRTAnimatedComponentManager.mm */; };
@@ -187,6 +184,8 @@
 		8BE0D5241DFA3DEA0032AB99 /* VRTCubeMap.m in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D51E1DFA3DEA0032AB99 /* VRTCubeMap.m */; };
 		8BE0D5251DFA3DEA0032AB99 /* VRTImageAsyncLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D5201DFA3DEA0032AB99 /* VRTImageAsyncLoader.m */; };
 		8BE0D5261DFA3DEA0032AB99 /* VRTTreeNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D5231DFA3DEA0032AB99 /* VRTTreeNode.m */; };
+		8BF0A1234DFA15880032AB99 /* VRTFabricCrashFix.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BF0A1236DFA15880032AB99 /* VRTFabricCrashFix.mm */; };
+		8BF0A1237DFA15880032AB99 /* VRTFabricCrashFix.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BF0A1235DFA15880032AB99 /* VRTFabricCrashFix.h */; };
 		8F346B1B1F225559000D16B9 /* VRTManagedAnimation.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8F346B191F225559000D16B9 /* VRTManagedAnimation.mm */; };
 		8F3AB8B921485B9200DF68EA /* VRTGeometryManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8F3AB8B821485B9200DF68EA /* VRTGeometryManager.mm */; };
 		8F705DE71E8B3755008BE8F8 /* VRTPerfMonitor.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8F705DE51E8B3754008BE8F8 /* VRTPerfMonitor.mm */; };
@@ -214,17 +213,17 @@
 		A5E8F0AC1ED6B64E00729916 /* VRTSceneModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5E8F0A81ED6B64D00729916 /* VRTSceneModule.mm */; };
 		A5F6D4011E4B0DFF00655F60 /* VRTController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5F6D4001E4B0DFF00655F60 /* VRTController.mm */; };
 		A5F6D4051E4B179700655F60 /* VRTControllerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5F6D4041E4B179700655F60 /* VRTControllerManager.mm */; };
-		E139A8EB2E0B9C6A0050EC9A /* ViroFabricEvents.m in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E22E0B9C6A0050EC9A /* ViroFabricEvents.m */; };
-		E139A8EC2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8DB2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.mm */; };
-		E139A8ED2E0B9C6A0050EC9A /* ViroFabricJSI.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E42E0B9C6A0050EC9A /* ViroFabricJSI.mm */; };
-		E139A8EE2E0B9C6A0050EC9A /* Props.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E139A8D42E0B9C6A0050EC9A /* Props.cpp */; };
-		E139A8EF2E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8D62E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm */; };
-		E139A8F02E0B9C6A0050EC9A /* ViroFabricContainer.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8D92E0B9C6A0050EC9A /* ViroFabricContainer.mm */; };
-		E139A8F22E0B9C6A0050EC9A /* ViroFabricSceneManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E82E0B9C6A0050EC9A /* ViroFabricSceneManager.mm */; };
-		E139A8F32E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */; };
-		E139A8F42E0B9C6A0050EC9A /* ViroFabricManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8E62E0B9C6A0050EC9A /* ViroFabricManager.mm */; };
-		E139A8F52E0B9C6A0050EC9A /* ViroFabricContainerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A8DD2E0B9C6A0050EC9A /* ViroFabricContainerManager.mm */; };
-		E139A9402E0BAF2D0050EC9A /* ViroEventsTurboModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E139A93F2E0BAF2D0050EC9A /* ViroEventsTurboModule.mm */; };
+		E139A8EB2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8EC2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8ED2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8EE2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8EF2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8F02E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8F22E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8F32E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8F42E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8F52E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A9402E0BAF2D0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -845,8 +844,6 @@
 		8BE0D4541DFA0D050032AB99 /* libViroReact.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libViroReact.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		8BE0D4671DFA15880032AB99 /* ViroViewManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ViroViewManager.h; path = ViroReact/ViroViewManager.h; sourceTree = "<group>"; };
 		8BE0D4681DFA15880032AB99 /* ViroViewManager.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = ViroViewManager.mm; path = ViroReact/ViroViewManager.mm; sourceTree = "<group>"; };
-		8BF0A1235DFA15880032AB99 /* VRTFabricCrashFix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTFabricCrashFix.h; path = ViroReact/VRTFabricCrashFix.h; sourceTree = "<group>"; };
-		8BF0A1236DFA15880032AB99 /* VRTFabricCrashFix.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTFabricCrashFix.mm; path = ViroReact/VRTFabricCrashFix.mm; sourceTree = "<group>"; };
 		8BE0D4691DFA15880032AB99 /* VRT360ImageManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRT360ImageManager.h; path = ViroReact/VRT360ImageManager.h; sourceTree = "<group>"; };
 		8BE0D46A1DFA15880032AB99 /* VRT360ImageManager.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRT360ImageManager.mm; path = ViroReact/VRT360ImageManager.mm; sourceTree = "<group>"; };
 		8BE0D46B1DFA15880032AB99 /* VRT360VideoManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRT360VideoManager.h; path = ViroReact/VRT360VideoManager.h; sourceTree = "<group>"; };
@@ -955,6 +952,8 @@
 		8BE0D5211DFA3DEA0032AB99 /* VRTImageAsyncLoaderEventDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTImageAsyncLoaderEventDelegate.h; path = ViroReact/Utility/VRTImageAsyncLoaderEventDelegate.h; sourceTree = "<group>"; };
 		8BE0D5221DFA3DEA0032AB99 /* VRTTreeNode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTTreeNode.h; path = ViroReact/Utility/VRTTreeNode.h; sourceTree = "<group>"; };
 		8BE0D5231DFA3DEA0032AB99 /* VRTTreeNode.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = VRTTreeNode.m; path = ViroReact/Utility/VRTTreeNode.m; sourceTree = "<group>"; };
+		8BF0A1235DFA15880032AB99 /* VRTFabricCrashFix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTFabricCrashFix.h; path = ViroReact/VRTFabricCrashFix.h; sourceTree = "<group>"; };
+		8BF0A1236DFA15880032AB99 /* VRTFabricCrashFix.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTFabricCrashFix.mm; path = ViroReact/VRTFabricCrashFix.mm; sourceTree = "<group>"; };
 		8F346B181F225559000D16B9 /* VRTManagedAnimation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VRTManagedAnimation.h; sourceTree = "<group>"; };
 		8F346B191F225559000D16B9 /* VRTManagedAnimation.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = VRTManagedAnimation.mm; sourceTree = "<group>"; };
 		8F3AB8B721485B9200DF68EA /* VRTGeometryManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VRTGeometryManager.h; sourceTree = "<group>"; };
@@ -1185,7 +1184,6 @@
 		8BE0D44B1DFA0D050032AB99 = {
 			isa = PBXGroup;
 			children = (
-				E139A8EA2E0B9C6A0050EC9A /* ViroFabric */,
 				8AFCC4F920056B1700AD8B8D /* ViroRenderer */,
 				8A77437C1EEF5EB30004C17A /* AR */,
 				8BDD9F591E53A70000A42870 /* ViroReactFramework */,
@@ -1433,46 +1431,6 @@
 				AE98F54D1669EF8F4B8BA22B /* Pods-ViroReact.release.xcconfig */,
 			);
 			name = Pods;
-			sourceTree = "<group>";
-		};
-		E139A8D72E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor */ = {
-			isa = PBXGroup;
-			children = (
-				E139A8D12E0B9C6A0050EC9A /* ComponentDescriptors.h */,
-				E139A8D22E0B9C6A0050EC9A /* EventEmitters.h */,
-				E139A8D32E0B9C6A0050EC9A /* Props.h */,
-				E139A8D42E0B9C6A0050EC9A /* Props.cpp */,
-				E139A8D52E0B9C6A0050EC9A /* RCTComponentViewHelpers.h */,
-				E139A8D62E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm */,
-			);
-			path = ViroFabricContainerViewComponentDescriptor;
-			sourceTree = "<group>";
-		};
-		E139A8EA2E0B9C6A0050EC9A /* ViroFabric */ = {
-			isa = PBXGroup;
-			children = (
-				E139A8D72E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor */,
-				E139A8D82E0B9C6A0050EC9A /* ViroFabricContainer.h */,
-				E139A8D92E0B9C6A0050EC9A /* ViroFabricContainer.mm */,
-				E139A8DA2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.h */,
-				E139A8DB2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.mm */,
-				E139A8DC2E0B9C6A0050EC9A /* ViroFabricContainerManager.h */,
-				E139A8DD2E0B9C6A0050EC9A /* ViroFabricContainerManager.mm */,
-				E139A8DF2E0B9C6A0050EC9A /* ViroFabricEventDelegate.h */,
-				E139A8E02E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm */,
-				E139A93E2E0BAF2D0050EC9A /* ViroEventsTurboModule.h */,
-				E139A93F2E0BAF2D0050EC9A /* ViroEventsTurboModule.mm */,
-				E139A8E12E0B9C6A0050EC9A /* ViroFabricEvents.h */,
-				E139A8E22E0B9C6A0050EC9A /* ViroFabricEvents.m */,
-				E139A8E32E0B9C6A0050EC9A /* ViroFabricJSI.h */,
-				E139A8E42E0B9C6A0050EC9A /* ViroFabricJSI.mm */,
-				E139A8E52E0B9C6A0050EC9A /* ViroFabricManager.h */,
-				E139A8E62E0B9C6A0050EC9A /* ViroFabricManager.mm */,
-				E139A8E72E0B9C6A0050EC9A /* ViroFabricSceneManager.h */,
-				E139A8E82E0B9C6A0050EC9A /* ViroFabricSceneManager.mm */,
-				E139A8E92E0B9C6A0050EC9A /* VRTManagedAnimation.h */,
-			);
-			path = ViroFabric;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -2087,17 +2045,17 @@
 				8BE0D5021DFA3D9B0032AB99 /* VRTText.mm in Sources */,
 				8A04D5182024F6B200FD5F68 /* VRTARImageMarkerManager.mm in Sources */,
 				8BE0D5261DFA3DEA0032AB99 /* VRTTreeNode.m in Sources */,
-				E139A8EB2E0B9C6A0050EC9A /* ViroFabricEvents.m in Sources */,
-				E139A8EC2E0B9C6A0050EC9A /* ViroFabricContainerComponentView.mm in Sources */,
-				E139A8ED2E0B9C6A0050EC9A /* ViroFabricJSI.mm in Sources */,
-				E139A8EE2E0B9C6A0050EC9A /* Props.cpp in Sources */,
-				E139A8EF2E0B9C6A0050EC9A /* ViroFabricContainerViewComponentDescriptor.mm in Sources */,
-				E139A8F02E0B9C6A0050EC9A /* ViroFabricContainer.mm in Sources */,
-				E139A8F22E0B9C6A0050EC9A /* ViroFabricSceneManager.mm in Sources */,
-				E139A8F32E0B9C6A0050EC9A /* ViroFabricEventDelegate.mm in Sources */,
-				E139A9402E0BAF2D0050EC9A /* ViroEventsTurboModule.mm in Sources */,
-				E139A8F42E0B9C6A0050EC9A /* ViroFabricManager.mm in Sources */,
-				E139A8F52E0B9C6A0050EC9A /* ViroFabricContainerManager.mm in Sources */,
+				E139A8EB2E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8EC2E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8ED2E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8EE2E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8EF2E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8F02E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8F22E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8F32E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A9402E0BAF2D0050EC9A /* BuildFile in Sources */,
+				E139A8F42E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8F52E0B9C6A0050EC9A /* BuildFile in Sources */,
 				8A31CFB41E2705EC00550CFE /* VRTQuad.mm in Sources */,
 				8BE0D5101DFA3D9B0032AB99 /* VRTVideoSurface.mm in Sources */,
 				8A130D901E3BC0690050D83B /* VRTSoundManager.mm in Sources */,

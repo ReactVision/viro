@@ -38,13 +38,13 @@
 #import "VRTNode.h"
 
 // Inline Fabric crash fix implementation
-@interface ViroFabricCrashFix : NSObject
-+ (void)installFabricCrashFix;
+@interface ViroCrashFix : NSObject
++ (void)installCrashFix;
 @end
 
-@implementation ViroFabricCrashFix
+@implementation ViroCrashFix
 
-+ (void)installFabricCrashFix {
++ (void)installCrashFix {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         [self swizzleRemoveFromSuperview];
@@ -66,7 +66,7 @@
 
 @end
 
-@implementation UIView (ViroFabricCrashFix)
+@implementation UIView (ViroCrashFix)
 
 - (void)viro_safeRemoveFromSuperview {
     @try {
@@ -147,7 +147,7 @@ RCT_EXPORT_MODULE()
     // Install the Fabric crash fix on first view creation
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        [ViroFabricCrashFix installFabricCrashFix];
+        [ViroCrashFix installCrashFix];
     });
     
     VRTView *view = [VRTView new];

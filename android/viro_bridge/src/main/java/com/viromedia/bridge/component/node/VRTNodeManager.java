@@ -34,6 +34,7 @@ import com.facebook.react.uimanager.ViewProps;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.annotations.ReactPropGroup;
+import com.facebook.react.uimanager.ReactStylesDiffMap;
 import com.facebook.yoga.YogaConstants;
 import com.viro.core.Material;
 import com.viro.core.VideoTexture;
@@ -69,9 +70,21 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
         super(context);
     }
 
+    @Override
+    public void updateProperties(T viewToUpdate, ReactStylesDiffMap props) {
+        super.updateProperties(viewToUpdate, props);
+        // Force immediate commit of props for React Native 0.79+ compatibility
+        if (viewToUpdate != null && !viewToUpdate.isTornDown()) {
+            viewToUpdate.post(() -> {
+                viewToUpdate.requestLayout();
+                viewToUpdate.invalidate();
+            });
+        }
+    }
+
     @ReactProp(name = "position")
     public void setPosition(T view, ReadableArray position) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             // Skip property update for detached or torn down views
             return;
         }
@@ -84,7 +97,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "rotation")
     public void setRotation(VRTNode view, ReadableArray rotation) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -96,7 +109,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "scale")
     public void setScale(VRTNode view, ReadableArray scale) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -108,7 +121,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "rotationPivot")
     public void setRotationPivot(VRTNode view, ReadableArray scale) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -120,7 +133,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "scalePivot")
     public void setScalePivot(VRTNode view, ReadableArray scale) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -132,7 +145,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "opacity", defaultFloat = 1f)
     public void setOpacity(VRTNode view, float opacity) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -144,7 +157,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "visible", defaultBoolean = true)
     public void setVisible(VRTNode view, boolean visibility) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -156,7 +169,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "renderingOrder", defaultInt = 0)
     public void setRenderingOrder(VRTNode view, int renderingOrder) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -168,7 +181,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canHover", defaultBoolean = VRTNode.DEFAULT_CAN_HOVER)
     public void setCanHover(VRTNode view, boolean canHover) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -180,7 +193,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canClick", defaultBoolean = VRTNode.DEFAULT_CAN_CLICK)
     public void setCanClick(VRTNode view, boolean canClick) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -192,7 +205,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canTouch", defaultBoolean = VRTNode.DEFAULT_CAN_TOUCH)
     public void setCanTouch(VRTNode view, boolean canTouch) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -204,7 +217,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canScroll", defaultBoolean = VRTNode.DEFAULT_CAN_SCROLL)
     public void setCanScroll(VRTNode view, boolean canScroll) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -216,7 +229,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canSwipe", defaultBoolean = VRTNode.DEFAULT_CAN_SWIPE)
     public void setCanSwipe(VRTNode view, boolean canSwipe) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -228,7 +241,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canDrag", defaultBoolean = VRTNode.DEFAULT_CAN_DRAG)
     public void setCanDrag(VRTNode view, boolean canDrag) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -240,7 +253,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canFuse", defaultBoolean = VRTNode.DEFAULT_CAN_FUSE)
     public void setCanFuse(VRTNode view, boolean canFuse) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -252,7 +265,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canPinch", defaultBoolean = VRTNode.DEFAULT_CAN_PINCH)
     public void setCanPinch(VRTNode view, boolean canPinch) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -264,7 +277,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canRotate", defaultBoolean = VRTNode.DEFAULT_CAN_ROTATE)
     public void setCanRotate(VRTNode view, boolean canRotate) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -276,7 +289,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "timeToFuse", defaultFloat = VRTNode.DEFAULT_TIME_TO_FUSE_MILLIS)
     public void setTimeToFuse(VRTNode view, float durationMillis) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -288,7 +301,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "dragType")
     public void setDragType(VRTNode view, String dragType) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -300,7 +313,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "dragPlane")
     public void setDragPlane(VRTNode view, ReadableMap dragPlane) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -312,7 +325,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "animation")
     public void setAnimation(VRTNode view, @androidx.annotation.Nullable ReadableMap map) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -324,7 +337,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "ignoreEventHandling", defaultBoolean = VRTNode.DEFAULT_IGNORE_EVENT_HANDLING)
     public void setIgnoreEventHandling(VRTNode view, boolean ignore) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -336,7 +349,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "materials")
     public void setMaterials(VRTNode view, @Nullable ReadableArray materials) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -374,7 +387,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "transformBehaviors")
     public void setTransformBehaviors(VRTNode view, @Nullable ReadableArray transformBehaviors) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -495,7 +508,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "physicsBody")
     public void setPhysicsBody(VRTNode view, ReadableMap map) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -507,7 +520,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "canCollide", defaultBoolean = VRTNode.DEFAULT_CAN_FUSE)
     public void setCanCollide(VRTNode view, boolean canCollide) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -519,7 +532,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "viroTag")
     public void setViroTag(VRTNode view, String tag) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {
@@ -531,7 +544,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
 
     @ReactProp(name = "hasTransformDelegate", defaultBoolean = false)
     public void setViroTag(VRTNode view, boolean hasDelegate) {
-        if (view == null || view.isTornDown() || !view.isAttachedToWindow()) {
+        if (view == null || view.isTornDown()) {
             return;
         }
         try {

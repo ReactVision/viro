@@ -28,6 +28,7 @@ import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.LayoutShadowNode;
 import com.facebook.react.uimanager.ViewGroupManager;
+import com.facebook.react.uimanager.ReactStylesDiffMap;
 import com.facebook.react.uimanager.annotations.ReactProp;
 
 import java.util.Map;
@@ -45,6 +46,18 @@ public abstract class VRTViroViewGroupManager<T extends ViewGroup>
 
     public VRTViroViewGroupManager(ReactApplicationContext context) {
         mContext = context;
+    }
+
+    @Override
+    public void updateProperties(T viewToUpdate, ReactStylesDiffMap props) {
+        super.updateProperties(viewToUpdate, props);
+        // Force immediate commit of props for React Native 0.79+ compatibility
+        if (viewToUpdate != null) {
+            viewToUpdate.post(() -> {
+                viewToUpdate.requestLayout();
+                viewToUpdate.invalidate();
+            });
+        }
     }
 
     public ReactApplicationContext getContext() {

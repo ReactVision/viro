@@ -112,6 +112,9 @@ const withBranchAndroid = (config) => {
                         // console.log("[VIRO]: \n" + target);
                         data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// add(MyReactNativePackage())", data);
                     }
+                    else if (data.includes("// packages.add(MyReactNativePackage())")) {
+                        data = (0, insertLinesHelper_1.insertLinesHelper)(target, "// packages.add(MyReactNativePackage())", data);
+                    } 
                     else {
                         throw new Error("Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message!");
                     }

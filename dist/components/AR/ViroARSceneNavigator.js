@@ -110,9 +110,18 @@ class ViroARSceneNavigator extends React.Component {
      * @param point
      * @returns
      */
-    async _project(point) {
+    _project = async (point) => {
         return await ViroARSceneNavigatorModule.project((0, react_native_1.findNodeHandle)(this), point);
-    }
+    };
+    /**
+     * TODO: Document _unproject
+     *
+     * @param point
+     * @returns
+     */
+    _unproject = async (point) => {
+        return await ViroARSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
+    };
     /**
      * Gets a random tag string.
      *
@@ -402,15 +411,6 @@ class ViroARSceneNavigator extends React.Component {
         }
         // Unable to find the given sceneTag, return -1
         return -1;
-    };
-    /**
-     * TODO: Document _unproject
-     *
-     * @param point
-     * @returns
-     */
-    _unproject = async (point) => {
-        return await ViroARSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     };
     /**
      * [iOS Only]

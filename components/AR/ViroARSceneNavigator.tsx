@@ -28,7 +28,6 @@ import {
   ViroSceneDictionary,
 } from "../Types/ViroUtils";
 
-
 const ViroARSceneNavigatorModule = NativeModules.VRTARSceneNavigatorModule;
 
 let mathRandomOffset = 0;
@@ -152,12 +151,25 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param point
    * @returns
    */
-  async _project(point: Viro3DPoint) {
+  _project = async (point: Viro3DPoint) => {
     return await ViroARSceneNavigatorModule.project(
       findNodeHandle(this),
       point
     );
-  }
+  };
+
+  /**
+   * TODO: Document _unproject
+   *
+   * @param point
+   * @returns
+   */
+  _unproject = async (point: Viro3DPoint) => {
+    return await ViroARSceneNavigatorModule.unproject(
+      findNodeHandle(this),
+      point
+    );
+  };
 
   /**
    * Gets a random tag string.
@@ -504,19 +516,6 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     }
     // Unable to find the given sceneTag, return -1
     return -1;
-  };
-
-  /**
-   * TODO: Document _unproject
-   *
-   * @param point
-   * @returns
-   */
-  _unproject = async (point: Viro3DPoint) => {
-    return await ViroARSceneNavigatorModule.unproject(
-      findNodeHandle(this),
-      point
-    );
   };
 
   /**

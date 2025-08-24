@@ -83,7 +83,14 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      * @param point
      * @returns
      */
-    _project(point: Viro3DPoint): Promise<any>;
+    _project: (point: Viro3DPoint) => Promise<any>;
+    /**
+     * TODO: Document _unproject
+     *
+     * @param point
+     * @returns
+     */
+    _unproject: (point: Viro3DPoint) => Promise<any>;
     /**
      * Gets a random tag string.
      *
@@ -190,13 +197,6 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      * @returns the index of the scene
      */
     getSceneIndex: (sceneTag: string) => number;
-    /**
-     * TODO: Document _unproject
-     *
-     * @param point
-     * @returns
-     */
-    _unproject: (point: Viro3DPoint) => Promise<any>;
     /**
      * [iOS Only]
      *

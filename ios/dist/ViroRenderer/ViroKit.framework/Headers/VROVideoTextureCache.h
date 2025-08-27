@@ -27,6 +27,7 @@
 #ifndef VROVideoTextureCache_hpp
 #define VROVideoTextureCache_hpp
 
+#include <vector>
 #include <stdio.h>
 #include <memory>
 #import <AVFoundation/AVFoundation.h>

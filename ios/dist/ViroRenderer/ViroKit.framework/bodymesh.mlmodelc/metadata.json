@@ -20,6 +20,9 @@
     "specificationVersion" : 1,
     "computePrecision" : "Float16",
     "isUpdatable" : "0",
+    "stateSchema" : [
+
+    ],
     "availability" : {
       "macOS" : "10.13",
       "tvOS" : "11.0",
@@ -28,23 +31,12 @@
       "iOS" : "11.0",
       "macCatalyst" : "11.0"
     },
-    "neuralNetworkLayerTypeHistogram" : {
-      "PaddingReflection" : 1,
-      "ActivationLinear" : 68,
-      "ActivationSigmoidHard" : 34,
-      "Add" : 10,
-      "ActivationTanh" : 1,
-      "BatchNorm" : 51,
-      "Convolution" : 62,
-      "UpsampleNearestNeighbor" : 5
-    },
     "modelType" : {
       "name" : "MLModelType_neuralNetwork"
     },
     "userDefinedMetadata" : {
 
     },
-    "generatedClassName" : "bodymesh",
     "inputSchema" : [
       {
         "height" : "224",
@@ -59,6 +51,17 @@
         "name" : "image"
       }
     ],
+    "generatedClassName" : "bodymesh",
+    "neuralNetworkLayerTypeHistogram" : {
+      "PaddingReflection" : 1,
+      "ActivationLinear" : 68,
+      "ActivationSigmoidHard" : 34,
+      "Add" : 10,
+      "UpsampleINVALID" : 5,
+      "BatchNorm" : 51,
+      "Convolution" : 62,
+      "ActivationTanh" : 1
+    },
     "method" : "predict"
   }
 ]

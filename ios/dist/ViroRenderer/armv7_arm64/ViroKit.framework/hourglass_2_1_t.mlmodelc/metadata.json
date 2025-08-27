@@ -20,6 +20,9 @@
     "specificationVersion" : 1,
     "computePrecision" : "Float16",
     "isUpdatable" : "0",
+    "stateSchema" : [
+
+    ],
     "availability" : {
       "macOS" : "10.13",
       "tvOS" : "11.0",
@@ -28,21 +31,12 @@
       "iOS" : "11.0",
       "macCatalyst" : "11.0"
     },
-    "neuralNetworkLayerTypeHistogram" : {
-      "UpsampleNearestNeighbor" : 8,
-      "PoolingMax" : 9,
-      "Convolution" : 71,
-      "BatchNorm" : 68,
-      "ActivationReLU" : 67,
-      "Add" : 31
-    },
     "modelType" : {
       "name" : "MLModelType_neuralNetwork"
     },
     "userDefinedMetadata" : {
 
     },
-    "generatedClassName" : "hourglass_2_1_t",
     "inputSchema" : [
       {
         "height" : "256",
@@ -57,6 +51,15 @@
         "name" : "image"
       }
     ],
+    "generatedClassName" : "hourglass_2_1_t",
+    "neuralNetworkLayerTypeHistogram" : {
+      "UpsampleINVALID" : 8,
+      "Convolution" : 71,
+      "PoolingINVALID" : 9,
+      "BatchNorm" : 68,
+      "ActivationReLU" : 67,
+      "Add" : 31
+    },
     "method" : "predict"
   }
 ]

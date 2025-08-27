@@ -212,6 +212,17 @@ FOUNDATION_EXPORT const unsigned char ViroKitVersionString[];
 #import <ViroKit/VROARObjectTarget.h>
 #import <ViroKit/VROARObjectTargetiOS.h>
 
+// Advanced AR Features (New)
+#import <ViroKit/VROARGeospatialAnchor.h>
+#import <ViroKit/VROARLocationAnchoriOS.h>
+#import <ViroKit/VROARSceneSemantics.h>
+#import <ViroKit/VROARSceneUnderstandingiOS.h>
+#import <ViroKit/VROARAugmentedFace.h>
+#import <ViroKit/VROARFaceTrackingiOS.h>
+#import <ViroKit/VROARCloudAnchor.h>
+#import <ViroKit/VROARMemoryManager.h>
+#import <ViroKit/VROARPerformanceOptimizer.h>
+
 // Test
 #import <ViroKit/VRORendererTest.h>
 #import <ViroKit/VRORendererTestHarness.h>

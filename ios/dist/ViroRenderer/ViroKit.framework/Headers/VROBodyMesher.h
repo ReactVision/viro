@@ -27,6 +27,7 @@
 #ifndef VROBodyMesher_h
 #define VROBodyMesher_h
 
+#include <vector>
 #include "VROVisionModel.h"
 
 enum class VROCameraPosition;

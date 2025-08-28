@@ -18,7 +18,8 @@ import {
 } from "react-native";
 // @ts-ignore
 import assetRegistry from "react-native/Libraries/Image/AssetRegistry";
-const resolveAssetSource = require("react-native/Libraries/Image/resolveAssetSource");
+// @ts-ignore
+import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
 import { ViroSource } from "../Types/ViroUtils";
 
 var MaterialManager = NativeModules.VRTMaterialManager;

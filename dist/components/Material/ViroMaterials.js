@@ -18,7 +18,8 @@ exports.ViroMaterials = void 0;
 const react_native_1 = require("react-native");
 // @ts-ignore
 const AssetRegistry_1 = __importDefault(require("react-native/Libraries/Image/AssetRegistry"));
-const resolveAssetSource = require("react-native/Libraries/Image/resolveAssetSource");
+// @ts-ignore
+const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
 var MaterialManager = react_native_1.NativeModules.VRTMaterialManager;
 class ViroMaterials {
     static createMaterials(materials) {
@@ -33,13 +34,13 @@ class ViroMaterials {
                     if (prop === "ReflectiveTexture" || prop === "reflectiveTexture") {
                         var reflectiveShape = {};
                         for (var cubeMapTexture in material[prop]) {
-                            var cubeMapSource = resolveAssetSource(material[prop][cubeMapTexture]);
+                            var cubeMapSource = (0, resolveAssetSource_1.default)(material[prop][cubeMapTexture]);
                             reflectiveShape[cubeMapTexture] = cubeMapSource;
                         }
                         resultMaterial[prop] = reflectiveShape;
                     }
                     else if (material[prop].hasOwnProperty("source")) {
-                        var source = resolveAssetSource(material[prop]["source"]);
+                        var source = (0, resolveAssetSource_1.default)(material[prop]["source"]);
                         resultMaterial[prop] = material[prop];
                         resultMaterial[prop]["source"] = source;
                     }
@@ -51,7 +52,7 @@ class ViroMaterials {
                                 assetType = asset.type;
                             }
                         }
-                        var source = resolveAssetSource(material[prop]);
+                        var source = (0, resolveAssetSource_1.default)(material[prop]);
                         source["type"] = assetType;
                         resultMaterial[prop] = source;
                     }

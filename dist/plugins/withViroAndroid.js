@@ -57,7 +57,7 @@ const withBranchAndroid = (config) => {
                         // Use proper Kotlin syntax for newer formats
                         target =
                             target +
-                                `            packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+                                `            add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
                     }
                 }
                 if (isJava) {

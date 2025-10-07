@@ -29,9 +29,9 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableArray;
-import com.facebook.react.uimanager.NativeViewHierarchyManager;
-import com.facebook.react.uimanager.UIBlock;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.bridge.UIManager;
+import com.facebook.react.fabric.FabricUIManager;
+import com.facebook.react.uimanager.UIManagerHelper;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.internal.CameraCallback;
 import com.viromedia.bridge.component.node.VRTCamera;
@@ -57,11 +57,15 @@ public class CameraModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void getCameraOrientation(final int sceneTag, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneTag);
                 if (sceneView instanceof VRTScene) {
                     VRTScene scene = (VRTScene) sceneView;
 
@@ -96,12 +100,15 @@ public class CameraModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void setSceneCamera(final int sceneTag, final int cameraTag) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneTag);
-                View cameraView = nativeViewHierarchyManager.resolveView(cameraTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneTag);
+                View cameraView = viewResolver.resolveView(cameraTag);
 
                 if (!(cameraView instanceof VRTCamera)) {
                     //RCTLogError(@"Invalid view returned when setting camera: expected VRTCamera, got [%@]", cameraView);
@@ -121,12 +128,15 @@ public class CameraModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void removeSceneCamera(final int sceneTag, final int cameraTag) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneTag);
-                View cameraView = nativeViewHierarchyManager.resolveView(cameraTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneTag);
+                View cameraView = viewResolver.resolveView(cameraTag);
 
                 if (!(cameraView instanceof VRTCamera)) {
                     //RCTLogError(@"Invalid view returned when removing camera: expected VRTCamera, got [%@]", cameraView);

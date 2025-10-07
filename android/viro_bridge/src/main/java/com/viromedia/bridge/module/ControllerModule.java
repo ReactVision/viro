@@ -28,9 +28,9 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableArray;
-import com.facebook.react.uimanager.NativeViewHierarchyManager;
-import com.facebook.react.uimanager.UIBlock;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.bridge.UIManager;
+import com.facebook.react.fabric.FabricUIManager;
+import com.facebook.react.uimanager.UIManagerHelper;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.Controller;
 import com.viromedia.bridge.component.VRTController;
@@ -53,11 +53,15 @@ public class ControllerModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void getForwardVectorAsync(final int viewTag, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View controllerView = nativeViewHierarchyManager.resolveView(viewTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View controllerView = viewResolver.resolveView(viewTag);
                 if (controllerView instanceof VRTController) {
                     VRTController controller = (VRTController) controllerView;
                     controller.getForwardVectorAsync(new Controller.ControllerJniCallback() {

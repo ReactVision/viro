@@ -31,9 +31,9 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.NativeViewHierarchyManager;
-import com.facebook.react.uimanager.UIBlock;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.bridge.UIManager;
+import com.facebook.react.fabric.FabricUIManager;
+import com.facebook.react.uimanager.UIManagerHelper;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.Vector;
 import com.viromedia.bridge.component.VRTVRSceneNavigator;
@@ -58,11 +58,14 @@ public class SceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void requestExitVr(final int sceneNavTag) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneNavTag);
                 if (sceneView instanceof VRTVRSceneNavigator) {
                     VRTVRSceneNavigator scene = (VRTVRSceneNavigator) sceneView;
                     scene.userDidRequestExitVR();
@@ -73,11 +76,14 @@ public class SceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void recenterTracking(final int sceneNavTag) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View view = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTVRSceneNavigator) {
                     VRTVRSceneNavigator sceneNavigator = (VRTVRSceneNavigator) view;
                     sceneNavigator.recenterTracking();
@@ -88,11 +94,15 @@ public class SceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void project(final int sceneNavTag, final ReadableArray point, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View view = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTVRSceneNavigator) {
                     VRTVRSceneNavigator sceneNavigator = (VRTVRSceneNavigator) view;
                     float[] projectPoint = {0,0,0};
@@ -114,11 +124,15 @@ public class SceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void unproject(final int sceneNavTag, final ReadableArray point, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View view = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTVRSceneNavigator) {
                     VRTVRSceneNavigator sceneNavigator = (VRTVRSceneNavigator) view;
                     float[] unprojectPoint = {0,0,0};

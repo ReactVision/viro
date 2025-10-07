@@ -30,9 +30,9 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.uimanager.IllegalViewOperationException;
-import com.facebook.react.uimanager.NativeViewHierarchyManager;
-import com.facebook.react.uimanager.UIBlock;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.bridge.UIManager;
+import com.facebook.react.fabric.FabricUIManager;
+import com.facebook.react.uimanager.UIManagerHelper;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.Node;
 import com.viro.core.PhysicsBody;
@@ -64,11 +64,15 @@ public class SceneModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void findCollisionsWithRayAsync(final int viewTag, final ReadableArray fromPos, final ReadableArray toPos,
                                final boolean closest, final String tag, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(viewTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(viewTag);
                 if (!(sceneView instanceof VRTScene)) {
                     throw new IllegalViewOperationException("Invalid view returned when " +
                             "calling findCollisionsWithRayAsync: expected a ViroScene!");
@@ -99,11 +103,15 @@ public class SceneModule extends ReactContextBaseJavaModule {
     public void findCollisionsWithShapeAsync(final int viewTag, final ReadableArray fromPos, final ReadableArray toPos,
                                final String shapeTypeString, final ReadableArray paramsArray,
                                final String tag, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(viewTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(viewTag);
                 if (!(sceneView instanceof VRTScene)) {
                     throw new IllegalViewOperationException("Invalid view returned when " +
                             "calling findCollisionsWithShapeAsync: expected a ViroScene!");

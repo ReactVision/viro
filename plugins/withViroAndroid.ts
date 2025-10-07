@@ -93,7 +93,7 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
             // Use proper Kotlin syntax for newer formats
             target =
               target +
-              `            packages.add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
+              `            add(ReactViroPackage(ReactViroPackage.ViroPlatform.${viroConfig}))\n`;
           }
         }
 
@@ -124,7 +124,9 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
               "// packages.add(MyReactNativePackage())",
               data
             );
-          } else if (data.includes("val packages = PackageList(this).packages")) {
+          } else if (
+            data.includes("val packages = PackageList(this).packages")
+          ) {
             // Handle newer format where packages is declared as val
             data = insertLinesHelper(
               target,
@@ -134,8 +136,8 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
           } else {
             throw new Error(
               "Unable to insert Android packages into package list. Please create a new issue on GitHub and reference this message! " +
-              "Expected to find one of: '// packages.add(new MyReactNativePackage());', '// add(MyReactNativePackage())', " +
-              "'// packages.add(MyReactNativePackage())', or 'val packages = PackageList(this).packages'"
+                "Expected to find one of: '// packages.add(new MyReactNativePackage());', '// add(MyReactNativePackage())', " +
+                "'// packages.add(MyReactNativePackage())', or 'val packages = PackageList(this).packages'"
             );
           }
         }

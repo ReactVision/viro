@@ -32,9 +32,9 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.uimanager.IllegalViewOperationException;
-import com.facebook.react.uimanager.NativeViewHierarchyManager;
-import com.facebook.react.uimanager.UIBlock;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.uimanager.UIManagerHelper;
+import com.facebook.react.bridge.UIManager;
+import com.facebook.react.fabric.FabricUIManager;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.ARHitTestListener;
 import com.viro.core.ARHitTestResult;
@@ -64,14 +64,19 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void performARHitTestWithRay(final int viewTag, final ReadableArray ray,
                                         final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(viewTag);
-                if (sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Invalid view returned when " +
-                            "calling performARHitTestWithRay: expected ViroARSceneNavigator as parent");
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(viewTag);
+                if (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view returned when calling performARHitTestWithRay: expected ViroARSceneNavigator as parent");
+                    return;
                 }
 
                 VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
@@ -104,14 +109,19 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void performARHitTestWithWorldPoints(final int viewTag, final ReadableArray origin, final ReadableArray destination,
                                         final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(viewTag);
-                if (sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Invalid view returned when " +
-                            "calling performARHitTestWithRay: expected ViroARSceneNavigator as parent");
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(viewTag);
+                if (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view returned when calling performARHitTestWithRay: expected ViroARSceneNavigator as parent");
+                    return;
                 }
 
                 VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
@@ -149,14 +159,19 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void performARHitTestWithPosition(final int viewTag, final ReadableArray position,
                                         final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(viewTag);
-                if (sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Invalid view returned when " +
-                            "calling performARHitTestWithPosition: expected ViroARSceneNavigator as parent");
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(viewTag);
+                if (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view returned when calling performARHitTestWithPosition: expected ViroARSceneNavigator as parent");
+                    return;
                 }
 
                 VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
@@ -189,14 +204,19 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void performARHitTestWithPoint(final int viewTag, final int x, final int y,
                                              final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(viewTag);
-                if (sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Invalid view returned when " +
-                            "calling performARHitTestWithPoint: expected ViroARSceneNavigator as parent");
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(viewTag);
+                if (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view returned when calling performARHitTestWithPoint: expected ViroARSceneNavigator as parent");
+                    return;
                 }
 
                 VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();

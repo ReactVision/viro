@@ -42,9 +42,9 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.PermissionListener;
 import com.facebook.react.uimanager.IllegalViewOperationException;
-import com.facebook.react.uimanager.NativeViewHierarchyManager;
-import com.facebook.react.uimanager.UIBlock;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.bridge.UIManager;
+import com.facebook.react.fabric.FabricUIManager;
+import com.facebook.react.uimanager.UIManagerHelper;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.Vector;
 import com.viro.core.ViroMediaRecorder;
@@ -80,11 +80,15 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void startVideoRecording(final int sceneNavTag, final String fileName,
                                     final boolean saveToCameraRool, final Callback reactErrorDelegate) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            reactErrorDelegate.invoke(UNSUPPORTED_PLATFORM_ERROR);
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
                     throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
                 }
@@ -119,11 +123,19 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void stopVideoRecording(final int sceneNavTag, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            WritableMap returnMap = Arguments.createMap();
+            returnMap.putBoolean(RECORDING_SUCCESS_KEY, false);
+            returnMap.putInt(RECORDING_ERROR_KEY, UNSUPPORTED_PLATFORM_ERROR);
+            returnMap.putString(RECORDING_URL_KEY, null);
+            promise.resolve(returnMap);
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
                     throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
                 }
@@ -177,11 +189,19 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void takeScreenshot(final int sceneNavTag, final String fileName,
                                final boolean saveToCameraRool, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            WritableMap returnMap = Arguments.createMap();
+            returnMap.putBoolean(RECORDING_SUCCESS_KEY, false);
+            returnMap.putInt(RECORDING_ERROR_KEY, UNSUPPORTED_PLATFORM_ERROR);
+            returnMap.putString(RECORDING_URL_KEY, null);
+            promise.resolve(returnMap);
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View sceneView = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View sceneView = viewResolver.resolveView(sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
                     throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
                 }
@@ -233,11 +253,14 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void resetARSession(final int sceneNavTag, final boolean resetTracking, final boolean removeAnchors) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View view = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     sceneNavigator.resetARSession();
@@ -253,11 +276,15 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void project(final int sceneNavTag, final ReadableArray point, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View view = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     float[] projectPoint = {0,0,0};
@@ -279,11 +306,15 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void unproject(final int sceneNavTag, final ReadableArray point, final Promise promise) {
-        UIManagerModule uiManager = getReactApplicationContext().getNativeModule(UIManagerModule.class);
-        uiManager.addUIBlock(new UIBlock() {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
-            public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                View view = nativeViewHierarchyManager.resolveView(sceneNavTag);
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     float[] unprojectPoint = {0,0,0};

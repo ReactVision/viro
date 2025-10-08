@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v2.43.5 - Unreleased
+## v2.43.5 - 07 October 2025
 
 ### iOS Improvements
 

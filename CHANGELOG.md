@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## v2.43.5 - Unreleased
+
+### iOS Improvements
+
+- **Fixed pod install issues**: Rebuilt ViroCore framework for iOS
+  - Resolved pod installation failures
+  - Improved compatibility with modern CocoaPods versions
+  - Fixed framework architecture issues
+
+### Fabric Architecture Improvements
+
+- **Enhanced Fabric compatibility**: Migrated 30 methods across 8 Java modules to use Fabric's `UIBlock` pattern
+  - Fixed `ReactNoCrashBridgeNotAllowedSoftException` errors in production
+  - Replaced deprecated `getNativeModule(UIManagerModule.class)` with `UIManagerHelper.getUIManager()`
+  - Updated to use `com.facebook.react.fabric.interop.UIBlock` and `UIBlockViewResolver`
+  - Modules updated: ARSceneModule, ARSceneNavigatorModule, CameraModule, ControllerModule, NodeModule, SceneModule, SceneNavigatorModule, VRT3DSceneNavigatorModule
+
+- **Improved prop handling**: Added Fabric-aware error recovery system in VRTNodeManager
+  - Removed `isAttachedToWindow()` checks that blocked prop updates in Fabric's pre-attachment phase
+  - Implemented `safelyApplyProp()` pattern with automatic retry on transient failures
+  - Enhanced error logging for better debugging
+  - Refactored 28 @ReactProp methods for consistent error handling
+  - Reduced boilerplate code by ~250 lines
+
+- **Better resilience**: Automatic prop retry handles GL context initialization timing issues
+  - Prevents props from being silently lost during scene transitions
+  - Recovers from view state timing issues on low-end devices
+  - Improved stability during AR session interruptions
+
 ## v2.43.1 - 26 June 2025
 
 - Added support for React Native New Architecture (Fabric)

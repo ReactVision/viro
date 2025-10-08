@@ -82,277 +82,171 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
         }
     }
 
-    @ReactProp(name = "position")
-    public void setPosition(T view, ReadableArray position) {
+    /**
+     * Safely apply a prop update with Fabric-aware error handling.
+     * This method provides automatic retry on transient failures (e.g., GL context not ready)
+     * and consistent error logging across all props.
+     *
+     * @param view The view to update
+     * @param propName The name of the property (for logging)
+     * @param setter The lambda that applies the property
+     */
+    protected void safelyApplyProp(T view, String propName, PropSetter<T> setter) {
         if (view == null || view.isTornDown()) {
-            // Skip property update for detached or torn down views
             return;
         }
+
         try {
-            view.setPosition(Helper.toFloatArray(position, DEFAULT_ZERO_VEC));
+            setter.apply(view);
+        } catch (IllegalStateException e) {
+            // View state not ready (e.g., GL context initializing) - retry on next frame
+            ViroLog.warn(TAG, "Deferring " + propName + " update - view not ready: " + e.getMessage());
+            view.post(() -> {
+                if (!view.isTornDown()) {
+                    try {
+                        setter.apply(view);
+                    } catch (Exception retryError) {
+                        ViroLog.error(TAG, "Failed to apply " + propName + " after retry: " + retryError.getMessage());
+                    }
+                }
+            });
         } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating position property: " + e.getMessage());
+            ViroLog.error(TAG, "Error applying " + propName + ": " + e.getMessage());
         }
+    }
+
+    /**
+     * Functional interface for applying a prop to a view.
+     * Allows passing prop application logic as a lambda to safelyApplyProp().
+     */
+    @FunctionalInterface
+    protected interface PropSetter<T> {
+        void apply(T view) throws Exception;
+    }
+
+    @ReactProp(name = "position")
+    public void setPosition(T view, ReadableArray position) {
+        safelyApplyProp(view, "position", v ->
+            v.setPosition(Helper.toFloatArray(position, DEFAULT_ZERO_VEC))
+        );
     }
 
     @ReactProp(name = "rotation")
-    public void setRotation(VRTNode view, ReadableArray rotation) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setRotation(Helper.toFloatArray(rotation, DEFAULT_ZERO_VEC));
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating rotation property: " + e.getMessage());
-        }
+    public void setRotation(T view, ReadableArray rotation) {
+        safelyApplyProp(view, "rotation", v ->
+            v.setRotation(Helper.toFloatArray(rotation, DEFAULT_ZERO_VEC))
+        );
     }
 
     @ReactProp(name = "scale")
-    public void setScale(VRTNode view, ReadableArray scale) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setScale(Helper.toFloatArray(scale, new float[]{1,1,1}));
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating scale property: " + e.getMessage());
-        }
+    public void setScale(T view, ReadableArray scale) {
+        safelyApplyProp(view, "scale", v ->
+            v.setScale(Helper.toFloatArray(scale, new float[]{1,1,1}))
+        );
     }
 
     @ReactProp(name = "rotationPivot")
-    public void setRotationPivot(VRTNode view, ReadableArray scale) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setRotationPivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC));
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating rotationPivot property: " + e.getMessage());
-        }
+    public void setRotationPivot(T view, ReadableArray scale) {
+        safelyApplyProp(view, "rotationPivot", v ->
+            v.setRotationPivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC))
+        );
     }
 
     @ReactProp(name = "scalePivot")
-    public void setScalePivot(VRTNode view, ReadableArray scale) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setScalePivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC));
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating scalePivot property: " + e.getMessage());
-        }
+    public void setScalePivot(T view, ReadableArray scale) {
+        safelyApplyProp(view, "scalePivot", v ->
+            v.setScalePivot(Helper.toFloatArray(scale, DEFAULT_ZERO_VEC))
+        );
     }
 
     @ReactProp(name = "opacity", defaultFloat = 1f)
-    public void setOpacity(VRTNode view, float opacity) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setOpacity(opacity);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating opacity property: " + e.getMessage());
-        }
+    public void setOpacity(T view, float opacity) {
+        safelyApplyProp(view, "opacity", v -> v.setOpacity(opacity));
     }
 
     @ReactProp(name = "visible", defaultBoolean = true)
-    public void setVisible(VRTNode view, boolean visibility) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setVisible(visibility);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating visible property: " + e.getMessage());
-        }
+    public void setVisible(T view, boolean visibility) {
+        safelyApplyProp(view, "visible", v -> v.setVisible(visibility));
     }
 
     @ReactProp(name = "renderingOrder", defaultInt = 0)
-    public void setRenderingOrder(VRTNode view, int renderingOrder) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setRenderingOrder(renderingOrder);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating renderingOrder property: " + e.getMessage());
-        }
+    public void setRenderingOrder(T view, int renderingOrder) {
+        safelyApplyProp(view, "renderingOrder", v -> v.setRenderingOrder(renderingOrder));
     }
 
     @ReactProp(name = "canHover", defaultBoolean = VRTNode.DEFAULT_CAN_HOVER)
-    public void setCanHover(VRTNode view, boolean canHover) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanHover(canHover);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canHover property: " + e.getMessage());
-        }
+    public void setCanHover(T view, boolean canHover) {
+        safelyApplyProp(view, "canHover", v -> v.setCanHover(canHover));
     }
 
     @ReactProp(name = "canClick", defaultBoolean = VRTNode.DEFAULT_CAN_CLICK)
-    public void setCanClick(VRTNode view, boolean canClick) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanClick(canClick);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canClick property: " + e.getMessage());
-        }
+    public void setCanClick(T view, boolean canClick) {
+        safelyApplyProp(view, "canClick", v -> v.setCanClick(canClick));
     }
 
     @ReactProp(name = "canTouch", defaultBoolean = VRTNode.DEFAULT_CAN_TOUCH)
-    public void setCanTouch(VRTNode view, boolean canTouch) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanTouch(canTouch);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canTouch property: " + e.getMessage());
-        }
+    public void setCanTouch(T view, boolean canTouch) {
+        safelyApplyProp(view, "canTouch", v -> v.setCanTouch(canTouch));
     }
 
     @ReactProp(name = "canScroll", defaultBoolean = VRTNode.DEFAULT_CAN_SCROLL)
-    public void setCanScroll(VRTNode view, boolean canScroll) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanScroll(canScroll);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canScroll property: " + e.getMessage());
-        }
+    public void setCanScroll(T view, boolean canScroll) {
+        safelyApplyProp(view, "canScroll", v -> v.setCanScroll(canScroll));
     }
 
     @ReactProp(name = "canSwipe", defaultBoolean = VRTNode.DEFAULT_CAN_SWIPE)
-    public void setCanSwipe(VRTNode view, boolean canSwipe) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanSwipe(canSwipe);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canSwipe property: " + e.getMessage());
-        }
+    public void setCanSwipe(T view, boolean canSwipe) {
+        safelyApplyProp(view, "canSwipe", v -> v.setCanSwipe(canSwipe));
     }
 
     @ReactProp(name = "canDrag", defaultBoolean = VRTNode.DEFAULT_CAN_DRAG)
-    public void setCanDrag(VRTNode view, boolean canDrag) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanDrag(canDrag);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canDrag property: " + e.getMessage());
-        }
+    public void setCanDrag(T view, boolean canDrag) {
+        safelyApplyProp(view, "canDrag", v -> v.setCanDrag(canDrag));
     }
 
     @ReactProp(name = "canFuse", defaultBoolean = VRTNode.DEFAULT_CAN_FUSE)
-    public void setCanFuse(VRTNode view, boolean canFuse) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanFuse(canFuse);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canFuse property: " + e.getMessage());
-        }
+    public void setCanFuse(T view, boolean canFuse) {
+        safelyApplyProp(view, "canFuse", v -> v.setCanFuse(canFuse));
     }
 
     @ReactProp(name = "canPinch", defaultBoolean = VRTNode.DEFAULT_CAN_PINCH)
-    public void setCanPinch(VRTNode view, boolean canPinch) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanPinch(canPinch);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canPinch property: " + e.getMessage());
-        }
+    public void setCanPinch(T view, boolean canPinch) {
+        safelyApplyProp(view, "canPinch", v -> v.setCanPinch(canPinch));
     }
 
     @ReactProp(name = "canRotate", defaultBoolean = VRTNode.DEFAULT_CAN_ROTATE)
-    public void setCanRotate(VRTNode view, boolean canRotate) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanRotate(canRotate);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canRotate property: " + e.getMessage());
-        }
+    public void setCanRotate(T view, boolean canRotate) {
+        safelyApplyProp(view, "canRotate", v -> v.setCanRotate(canRotate));
     }
 
     @ReactProp(name = "timeToFuse", defaultFloat = VRTNode.DEFAULT_TIME_TO_FUSE_MILLIS)
-    public void setTimeToFuse(VRTNode view, float durationMillis) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setTimeToFuse(durationMillis);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating timeToFuse property: " + e.getMessage());
-        }
+    public void setTimeToFuse(T view, float durationMillis) {
+        safelyApplyProp(view, "timeToFuse", v -> v.setTimeToFuse(durationMillis));
     }
 
     @ReactProp(name = "dragType")
-    public void setDragType(VRTNode view, String dragType) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setDragType(dragType);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating dragType property: " + e.getMessage());
-        }
+    public void setDragType(T view, String dragType) {
+        safelyApplyProp(view, "dragType", v -> v.setDragType(dragType));
     }
 
     @ReactProp(name = "dragPlane")
-    public void setDragPlane(VRTNode view, ReadableMap dragPlane) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setDragPlane(dragPlane);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating dragPlane property: " + e.getMessage());
-        }
+    public void setDragPlane(T view, ReadableMap dragPlane) {
+        safelyApplyProp(view, "dragPlane", v -> v.setDragPlane(dragPlane));
     }
 
     @ReactProp(name = "animation")
-    public void setAnimation(VRTNode view, @androidx.annotation.Nullable ReadableMap map) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setAnimation(map);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating animation property: " + e.getMessage());
-        }
+    public void setAnimation(T view, @androidx.annotation.Nullable ReadableMap map) {
+        safelyApplyProp(view, "animation", v -> v.setAnimation(map));
     }
 
     @ReactProp(name = "ignoreEventHandling", defaultBoolean = VRTNode.DEFAULT_IGNORE_EVENT_HANDLING)
-    public void setIgnoreEventHandling(VRTNode view, boolean ignore) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setIgnoreEventHandling(ignore);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating ignoreEventHandling property: " + e.getMessage());
-        }
+    public void setIgnoreEventHandling(T view, boolean ignore) {
+        safelyApplyProp(view, "ignoreEventHandling", v -> v.setIgnoreEventHandling(ignore));
     }
 
     @ReactProp(name = "materials")
-    public void setMaterials(VRTNode view, @Nullable ReadableArray materials) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
+    public void setMaterials(T view, @Nullable ReadableArray materials) {
+        safelyApplyProp(view, "materials", v -> {
             // get material manager
             MaterialManager materialManager = getContext().getNativeModule(MaterialManager.class);
 
@@ -363,9 +257,9 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                     if (materialManager.isVideoMaterial(materials.getString(i))) {
                         if (!(nativeMaterial.getDiffuseTexture() instanceof VideoTexture)) {
                             // Recreate the material with the proper context.
-                            if (view.getViroContext() != null) {
+                            if (v.getViroContext() != null) {
                                 MaterialWrapper materialWrapper = materialManager.getMaterialWrapper(materials.getString(i));
-                                VideoTexture videoTexture = new VideoTexture(view.getViroContext(), materialWrapper.getVideoTextureURI());
+                                VideoTexture videoTexture = new VideoTexture(v.getViroContext(), materialWrapper.getVideoTextureURI());
                                 materialWrapper.recreate(videoTexture);
                                 nativeMaterial = materialWrapper.getNativeMaterial();
                             }
@@ -379,18 +273,13 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                     nativeMaterials.add(nativeMaterial);
                 }
             }
-            view.setMaterials(nativeMaterials);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating materials property: " + e.getMessage());
-        }
+            v.setMaterials(nativeMaterials);
+        });
     }
 
     @ReactProp(name = "transformBehaviors")
-    public void setTransformBehaviors(VRTNode view, @Nullable ReadableArray transformBehaviors) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
+    public void setTransformBehaviors(T view, @Nullable ReadableArray transformBehaviors) {
+        safelyApplyProp(view, "transformBehaviors", v -> {
             String[] behaviors = new String[0];
             if (transformBehaviors != null) {
                 behaviors = new String[transformBehaviors.size()];
@@ -398,10 +287,8 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                     behaviors[i] = transformBehaviors.getString(i);
                 }
             }
-            view.setTransformBehaviors(behaviors);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating transformBehaviors property: " + e.getMessage());
-        }
+            v.setTransformBehaviors(behaviors);
+        });
     }
 
     @Override
@@ -507,51 +394,23 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
     }
 
     @ReactProp(name = "physicsBody")
-    public void setPhysicsBody(VRTNode view, ReadableMap map) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setPhysicsBody(map);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating physicsBody property: " + e.getMessage());
-        }
+    public void setPhysicsBody(T view, ReadableMap map) {
+        safelyApplyProp(view, "physicsBody", v -> v.setPhysicsBody(map));
     }
 
     @ReactProp(name = "canCollide", defaultBoolean = VRTNode.DEFAULT_CAN_FUSE)
-    public void setCanCollide(VRTNode view, boolean canCollide) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setCanCollide(canCollide);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating canCollide property: " + e.getMessage());
-        }
+    public void setCanCollide(T view, boolean canCollide) {
+        safelyApplyProp(view, "canCollide", v -> v.setCanCollide(canCollide));
     }
 
     @ReactProp(name = "viroTag")
-    public void setViroTag(VRTNode view, String tag) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setViroTag(tag);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating viroTag property: " + e.getMessage());
-        }
+    public void setViroTag(T view, String tag) {
+        safelyApplyProp(view, "viroTag", v -> v.setViroTag(tag));
     }
 
     @ReactProp(name = "hasTransformDelegate", defaultBoolean = false)
-    public void setViroTag(VRTNode view, boolean hasDelegate) {
-        if (view == null || view.isTornDown()) {
-            return;
-        }
-        try {
-            view.setOnNativeTransformDelegate(hasDelegate);
-        } catch (Exception e) {
-            ViroLog.error(TAG, "Error updating hasTransformDelegate property: " + e.getMessage());
-        }
+    public void setHasTransformDelegate(T view, boolean hasDelegate) {
+        safelyApplyProp(view, "hasTransformDelegate", v -> v.setOnNativeTransformDelegate(hasDelegate));
     }
 
 }

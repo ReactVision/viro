@@ -34,7 +34,6 @@ import com.viro.core.Vector;
 public class ARUtils {
 
     public static WritableMap mapFromARAnchor(ARAnchor anchor) {
-        android.util.Log.d("ViroAR", "[DEBUG] mapFromARAnchor called for anchor: " + anchor.getAnchorId());
         WritableMap returnMap = Arguments.createMap();
         returnMap.putString("anchorId", anchor.getAnchorId());
         returnMap.putArray("position", Arguments.makeNativeArray(anchor.getPosition().toArray()));
@@ -43,18 +42,13 @@ public class ARUtils {
         returnMap.putArray("rotation", arrayFromRotationArray(anchor.getRotation().toArray()));
         returnMap.putString("type", anchor.getType().getStringValue());
 
-        android.util.Log.d("ViroAR", "[DEBUG] Anchor type: " + anchor.getType().getStringValue());
         if (anchor.getType() == ARAnchor.Type.PLANE) {
-            android.util.Log.d("ViroAR", "[DEBUG] Anchor is a PLANE, casting to ARPlaneAnchor");
             ARPlaneAnchor plane = (ARPlaneAnchor) anchor;
             returnMap.putArray("center", Arguments.makeNativeArray(plane.getCenter().toArray()));
             returnMap.putDouble("width", plane.getExtent().x);
             returnMap.putDouble("height", plane.getExtent().z);
             returnMap.putString("alignment", plane.getAlignment().getStringValue());
-
-            String classificationStr = plane.getClassification().getStringValue();
-            android.util.Log.d("ViroAR", "[DEBUG] Plane classification: " + classificationStr);
-            returnMap.putString("classification", classificationStr);
+            returnMap.putString("classification", plane.getClassification().getStringValue());
 
             WritableArray polygonPointsArray = Arguments.createArray();
             for (Vector point : plane.getVertices()){

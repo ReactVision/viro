@@ -52,17 +52,11 @@ const react_native_1 = require("react-native");
  */
 class ViroARPlane extends ViroBase_1.ViroBase {
     _onAnchorFound = (event) => {
-        console.log('[ViroARPlane DEBUG] onAnchorFound - Full event:', JSON.stringify(event.nativeEvent.anchorFoundMap, null, 2));
-        console.log('[ViroARPlane DEBUG] Classification value:', event.nativeEvent.anchorFoundMap.classification);
-        console.log('[ViroARPlane DEBUG] Classification type:', typeof event.nativeEvent.anchorFoundMap.classification);
         if (this.props.onAnchorFound) {
             this.props.onAnchorFound(event.nativeEvent.anchorFoundMap);
         }
     };
     _onAnchorUpdated = (event) => {
-        console.log('[ViroARPlane DEBUG] onAnchorUpdated - Full event:', JSON.stringify(event.nativeEvent.anchorUpdatedMap, null, 2));
-        console.log('[ViroARPlane DEBUG] Classification value:', event.nativeEvent.anchorUpdatedMap.classification);
-        console.log('[ViroARPlane DEBUG] Classification type:', typeof event.nativeEvent.anchorUpdatedMap.classification);
         if (this.props.onAnchorUpdated) {
             this.props.onAnchorUpdated(event.nativeEvent.anchorUpdatedMap);
         }

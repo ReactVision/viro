@@ -57,24 +57,16 @@
 
 #pragma mark - VROARNodeDelegateProtocol Implementation
 - (void)onARAnchorAttached:(std::shared_ptr<VROARAnchor>) anchor {
-    NSLog(@"[ViroAR DEBUG] onARAnchorAttached called, anchor=%p", anchor.get());
     self.isAnchored = true;
     [self handleAppearanceChange];
     if (_onAnchorFoundViro) {
-        NSLog(@"[ViroAR DEBUG] Calling createDictionaryFromAnchor for attached anchor");
         _onAnchorFoundViro(@{ @"anchorFoundMap" : [VRTARUtils createDictionaryFromAnchor:anchor]});
-    } else {
-        NSLog(@"[ViroAR DEBUG] _onAnchorFoundViro is NULL - callback not registered!");
     }
 }
 
 - (void)onARAnchorUpdated:(std::shared_ptr<VROARAnchor>) anchor {
-    NSLog(@"[ViroAR DEBUG] onARAnchorUpdated called, anchor=%p", anchor.get());
     if (_onAnchorUpdatedViro) {
-        NSLog(@"[ViroAR DEBUG] Calling createDictionaryFromAnchor for updated anchor");
         _onAnchorUpdatedViro(@{ @"anchorUpdatedMap" : [VRTARUtils createDictionaryFromAnchor:anchor]});
-    } else {
-        NSLog(@"[ViroAR DEBUG] _onAnchorUpdatedViro is NULL - callback not registered!");
     }
 }
 

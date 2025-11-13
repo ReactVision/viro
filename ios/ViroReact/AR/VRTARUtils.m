@@ -37,26 +37,55 @@ RCT_EXPORT_METHOD(isARSupported:(RCTResponseSenderBlock)callback)
   callback(@[[NSNull null], props]);
 }
 
+// Helper function to convert plane classification enum to string
++ (NSString *)stringFromPlaneClassification:(VROARPlaneClassification)classification {
+    switch (classification) {
+        case VROARPlaneClassification::Wall:
+            return @"Wall";
+        case VROARPlaneClassification::Floor:
+            return @"Floor";
+        case VROARPlaneClassification::Ceiling:
+            return @"Ceiling";
+        case VROARPlaneClassification::Table:
+            return @"Table";
+        case VROARPlaneClassification::Seat:
+            return @"Seat";
+        case VROARPlaneClassification::Door:
+            return @"Door";
+        case VROARPlaneClassification::Window:
+            return @"Window";
+        case VROARPlaneClassification::Unknown:
+            return @"Unknown";
+        case VROARPlaneClassification::None:
+        default:
+            return @"None";
+    }
+}
+
 + (NSDictionary *)createDictionaryFromAnchor:(std::shared_ptr<VROARAnchor>) anchor {
-    
+    NSLog(@"[ViroAR DEBUG] createDictionaryFromAnchor called, anchor=%p", anchor.get());
+
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
-    
+
     [dict setObject:[NSString stringWithUTF8String:anchor->getId().c_str()] forKey:@"anchorId"];
-    
+
     VROMatrix4f transform =  anchor->getTransform();
     VROVector3f position = transform.extractTranslation();
     VROVector3f scale = transform.extractScale();
     VROVector3f rotation = transform.extractRotation(scale).toEuler();
-    
+
     [dict setObject:@[@(position.x), @(position.y), @(position.z)] forKey:@"position"];
     [dict setObject:@[@(scale.x), @(scale.y), @(scale.z)] forKey:@"scale"];
     [dict setObject:@[@(toDegrees(rotation.x)), @(toDegrees(rotation.y)), @(toDegrees(rotation.z))] forKey:@"rotation"];
 
     // default type is "anchor", override below.
     [dict setObject:@"anchor" forKey:@"type"];
-    
+
+    NSLog(@"[ViroAR DEBUG] Attempting dynamic_pointer_cast to VROARPlaneAnchor...");
     std::shared_ptr<VROARPlaneAnchor> planeAnchor = std::dynamic_pointer_cast<VROARPlaneAnchor>(anchor);
+    NSLog(@"[ViroAR DEBUG] Cast result: %p (success=%d)", planeAnchor.get(), planeAnchor != nullptr);
     if (planeAnchor) {
+        NSLog(@"[ViroAR DEBUG] Successfully cast to VROARPlaneAnchor!");
         [dict setObject:@"plane" forKey:@"type"];
         [dict setObject:@[@(planeAnchor->getCenter().x), @(planeAnchor->getCenter().y), @(planeAnchor->getCenter().z)] forKey:@"center"];
         [dict setObject:@(planeAnchor->getExtent().x) forKey:@"width"];
@@ -79,8 +108,28 @@ RCT_EXPORT_METHOD(isARSupported:(RCTResponseSenderBlock)callback)
                 [dict setObject:@"Horizontal" forKey:@"alignment"];
                 break;
         }
+
+        // Add plane classification (iOS 12+, basic inference on Android)
+        NSLog(@"[ViroAR DEBUG] About to get classification from planeAnchor...");
+        VROARPlaneClassification classification = planeAnchor->getClassification();
+        NSLog(@"[ViroAR DEBUG] Got classification raw value: %d", (int)classification);
+        NSString *classificationString = [VRTARUtils stringFromPlaneClassification:classification];
+        NSLog(@"[ViroAR DEBUG] Converted to string: %@", classificationString);
+
+        // DEBUG: Log classification to console
+        NSLog(@"[ViroAR] Plane %@ - Classification: %@ (raw: %d)",
+              [NSString stringWithUTF8String:planeAnchor->getId().c_str()],
+              classificationString,
+              (int)classification);
+
+        NSLog(@"[ViroAR DEBUG] Adding classification to dictionary with key 'classification'");
+        [dict setObject:classificationString forKey:@"classification"];
+        NSLog(@"[ViroAR DEBUG] Classification added to dictionary: %@", classificationString);
+        NSLog(@"[ViroAR DEBUG] Dictionary now contains: %@", dict);
+    } else {
+        NSLog(@"[ViroAR DEBUG] Failed to cast to VROARPlaneAnchor - anchor is not a plane!");
     }
-    
+
     return dict;
 }
 

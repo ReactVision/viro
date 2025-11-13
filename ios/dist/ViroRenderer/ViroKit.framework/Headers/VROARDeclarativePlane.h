@@ -46,14 +46,31 @@ public:
     
     /*
      Returns whether or not the given VROARAnchor fulfills this plane's requirements.
+
+     NOTE: This uses hysteresis for CONSTRAINT MATCHING only - it doesn't affect the
+     precision of plane data from ARCore/ARKit. Hysteresis prevents nodes from rapidly
+     attaching/detaching when plane dimensions fluctuate near the app's minimum requirements.
+
+     This is application-level logic and does not filter or modify ARCore/ARKit plane data.
      */
     bool hasRequirementsFulfilled(std::shared_ptr<VROARAnchor> candidate) {
         std::shared_ptr<VROARPlaneAnchor> planeAnchor = std::dynamic_pointer_cast<VROARPlaneAnchor>(candidate->getAnchorForTrackable());
         if (!planeAnchor) {
             return false;
         }
-        
-        if (planeAnchor->getExtent().x < _minWidth || planeAnchor->getExtent().z < _minHeight) {
+
+        // Apply hysteresis: if the plane is already attached to this anchor,
+        // allow it to be 10% smaller before detaching. This prevents flickering
+        // when plane dimensions fluctuate near the application's size threshold.
+        // This does NOT affect the precision of the plane data itself.
+        bool isCurrentlyAttached = (getAnchor() == candidate);
+        float hysteresisMargin = isCurrentlyAttached ? 0.90f : 1.0f;
+
+        float effectiveMinWidth = _minWidth * hysteresisMargin;
+        float effectiveMinHeight = _minHeight * hysteresisMargin;
+
+        if (planeAnchor->getExtent().x < effectiveMinWidth ||
+            planeAnchor->getExtent().z < effectiveMinHeight) {
             return false;
         }
 
@@ -98,10 +115,12 @@ public:
                     && _alignment != VROARPlaneAlignment::HorizontalDownward) {
                     return false;
                 }
+                break;
             case VROARPlaneAlignment::Vertical:
                 if (_alignment != VROARPlaneAlignment::Vertical) {
                     return false;
                 }
+                break;
             default:
                 break;
         }

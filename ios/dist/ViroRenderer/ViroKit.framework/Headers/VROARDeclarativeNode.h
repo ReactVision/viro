@@ -95,17 +95,25 @@ public:
      Invoked internally by the VROARConstraintMatcher.
      */
     virtual void onARAnchorAttached() {
+        pinfo("[ViroAR DEBUG] VROARDeclarativeNode::onARAnchorAttached called");
         setAttached(true);
         std::shared_ptr<VROARDeclarativeNodeDelegate> delegate = getARNodeDelegate();
         if (delegate) {
+            pinfo("[ViroAR DEBUG] Calling delegate->onARAnchorAttached");
             delegate->onARAnchorAttached(getAnchor());
+        } else {
+            pinfo("[ViroAR DEBUG] No delegate set for ARDeclarativeNode!");
         }
     }
-    
+
     virtual void onARAnchorUpdated() {
+        pinfo("[ViroAR DEBUG] VROARDeclarativeNode::onARAnchorUpdated called");
         std::shared_ptr<VROARDeclarativeNodeDelegate> delegate = getARNodeDelegate();
         if (delegate) {
+            pinfo("[ViroAR DEBUG] Calling delegate->onARAnchorUpdated");
             delegate->onARAnchorUpdated(getAnchor());
+        } else {
+            pinfo("[ViroAR DEBUG] No delegate set for ARDeclarativeNode!");
         }
     }
     

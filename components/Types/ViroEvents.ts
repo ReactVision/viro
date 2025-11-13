@@ -212,6 +212,55 @@ export type ViroAnimatedComponentFinishEvent = {};
 /** ===========================================================================
  * Viro AR Anchor Events
  * ============================================================================ */
+
+/**
+ * Classification of detected planes.
+ * iOS 12+ provides ML-based classification via ARKit.
+ * Android provides basic inference from plane orientation.
+ */
+export type ViroARPlaneClassification =
+  | "None"
+  | "Wall"
+  | "Floor"
+  | "Ceiling"
+  | "Table"
+  | "Seat"
+  | "Door"
+  | "Window"
+  | "Unknown";
+
+/**
+ * Alignment of detected planes with respect to gravity.
+ */
+export type ViroARPlaneAlignment =
+  | "Horizontal"
+  | "HorizontalUpward"
+  | "HorizontalDownward"
+  | "Vertical";
+
+/**
+ * Represents an AR anchor detected in the real world.
+ */
+export type ViroAnchor = {
+  anchorId: string;
+  type: "anchor" | "plane" | "image";
+  position: [number, number, number];
+  rotation: [number, number, number]; // In degrees
+  scale: [number, number, number];
+  // Plane-specific properties (present when type === "plane")
+  center?: [number, number, number];
+  width?: number;
+  height?: number;
+  alignment?: ViroARPlaneAlignment;
+  classification?: ViroARPlaneClassification;
+  vertices?: Array<[number, number, number]>;
+  // Image-specific properties (present when type === "image")
+  trackingMethod?: string;
+};
+
+export type ViroAnchorFoundMap = ViroAnchor;
+export type ViroAnchorUpdatedMap = ViroAnchor;
+
 export type ViroARAnchorRemovedEvent = {
   anchor: ViroAnchor;
 };
@@ -223,15 +272,11 @@ export type ViroARAnchorFoundEvent = {
   anchorFoundMap: ViroAnchorFoundMap;
   anchor: ViroAnchor;
 };
-export type ViroAnchor = any;
-
-export type ViroAnchorFoundMap = any;
-export type ViroAnchorUpdatedMap = any;
 
 /** ===========================================================================
  * Viro AR Plane Events
  * ============================================================================ */
-export type ViroPlaneUpdatedMap = any;
+export type ViroPlaneUpdatedMap = ViroAnchor;
 export type ViroPlaneUpdatedEvent = any;
 export type ViroARPlaneSizes = any;
 

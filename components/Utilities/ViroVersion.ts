@@ -1,1 +1,1 @@
-export const VIRO_VERSION = "2.44.0";
+export const VIRO_VERSION = "2.44.1";

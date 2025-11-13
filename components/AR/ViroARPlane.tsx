@@ -36,6 +36,9 @@ type Props = {
  */
 export class ViroARPlane extends ViroBase<Props> {
   _onAnchorFound = (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => {
+    console.log('[ViroARPlane DEBUG] onAnchorFound - Full event:', JSON.stringify(event.nativeEvent.anchorFoundMap, null, 2));
+    console.log('[ViroARPlane DEBUG] Classification value:', event.nativeEvent.anchorFoundMap.classification);
+    console.log('[ViroARPlane DEBUG] Classification type:', typeof event.nativeEvent.anchorFoundMap.classification);
     if (this.props.onAnchorFound) {
       this.props.onAnchorFound(event.nativeEvent.anchorFoundMap);
     }
@@ -44,6 +47,9 @@ export class ViroARPlane extends ViroBase<Props> {
   _onAnchorUpdated = (
     event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>
   ) => {
+    console.log('[ViroARPlane DEBUG] onAnchorUpdated - Full event:', JSON.stringify(event.nativeEvent.anchorUpdatedMap, null, 2));
+    console.log('[ViroARPlane DEBUG] Classification value:', event.nativeEvent.anchorUpdatedMap.classification);
+    console.log('[ViroARPlane DEBUG] Classification type:', typeof event.nativeEvent.anchorUpdatedMap.classification);
     if (this.props.onAnchorUpdated) {
       this.props.onAnchorUpdated(event.nativeEvent.anchorUpdatedMap);
     }

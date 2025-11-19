@@ -71,6 +71,37 @@ android {
     */
 }
 
+react {
+    // Configure node executable with full path to avoid PATH issues
+    def nodeExec = project.hasProperty('nodeExecutable') ? project.property('nodeExecutable') : null
+    if (nodeExec != null && !nodeExec.isEmpty()) {
+        nodeExecutableAndArgs.set([nodeExec])
+    } else {
+        // Try to find node in common locations as fallback
+        def nodePath = ["/usr/local/bin/node", "/usr/bin/node",
+                        System.getProperty("user.home") + "/.local/share/fnm/node-versions/v20.19.5/installation/bin/node"]
+                        .find { new File(it).exists() }
+        if (nodePath != null) {
+            nodeExecutableAndArgs.set([nodePath])
+        }
+    }
+}
+
+// Also configure the tasks directly to ensure the setting is applied
+// This is necessary because the React plugin creates tasks before the react {} block is evaluated
+afterEvaluate {
+    def nodeExec = project.hasProperty('nodeExecutable') ? project.property('nodeExecutable') : null
+    if (nodeExec != null && !nodeExec.isEmpty()) {
+        // Configure all React Native codegen tasks with the full path to node
+        tasks.withType(com.facebook.react.tasks.GenerateCodegenSchemaTask).configureEach {
+            nodeExecutableAndArgs.set([nodeExec])
+        }
+        tasks.withType(com.facebook.react.tasks.GenerateCodegenArtifactsTask).configureEach {
+            nodeExecutableAndArgs.set([nodeExec])
+        }
+    }
+}
+
 dependencies {
     androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0', {
         exclude group: 'com.android.support', module: 'support-annotations'

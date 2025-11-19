@@ -30,9 +30,20 @@ rm -f android/viro_bridge/build/outputs/aar/*.aar
 echo '========================================================================='
 echo 'Building the React-Viro library'
 echo '========================================================================='
+
+# Generate React Native autolinking config before ANY gradle command
+# This avoids the issue with Gradle not being able to find npx
+# Store it in .gradle directory so it won't be cleaned by gradle clean
+echo 'Generating autolinking configuration...'
+mkdir -p android/.gradle
+npx react-native config > android/.gradle/autolinking.json
+
+# Get the full path to node for Gradle to avoid PATH issues
+NODE_PATH="$(command -v node)"
+
 cd android
-./gradlew :viro_bridge:clean
-./gradlew :viro_bridge:assembleRelease
+./gradlew -PnodeExecutable="$NODE_PATH" :viro_bridge:clean
+./gradlew -PnodeExecutable="$NODE_PATH" :viro_bridge:assembleRelease
 cd ..
 
 echo '========================================================================='

@@ -3,7 +3,15 @@ pluginManagement {
     includeBuild("../node_modules/expo-modules-core/expo-module-gradle-plugin")
 }
 plugins { id("com.facebook.react.settings") }
-extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex ->
+    // Use a config file outside the build directory to avoid it being cleaned
+    def autolinkConfigFile = new File(rootDir, ".gradle/autolinking.json")
+    if (autolinkConfigFile.exists()) {
+        ex.autolinkLibrariesFromConfigFile(autolinkConfigFile)
+    } else {
+        ex.autolinkLibrariesFromCommand()
+    }
+}
 includeBuild("../node_modules/@react-native/gradle-plugin")
 includeBuild("../node_modules/expo-modules-core/expo-module-gradle-plugin")
 include ':gvr_common', ':viro_bridge', ':viro_renderer', ':arcore_client'

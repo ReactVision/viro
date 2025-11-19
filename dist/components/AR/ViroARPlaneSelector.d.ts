@@ -8,21 +8,22 @@
  *
  * @providesModule ViroARPlaneSelector
  */
-import { ViroARPlaneSizes, ViroClickStateEvent, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
+import { ViroClickStateEvent, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
 import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
 import * as React from "react";
-import { ViroCommonProps, ViroObjectProps } from "./ViroCommonProps";
-type Props = ViroCommonProps & ViroObjectProps & {
-    maxPlanes?: number;
+type Props = {
     minHeight?: number;
     minWidth?: number;
-    alignment?: "Horizontal" | "HorizontalUpward" | "HorizontalDownward" | "Vertical";
+    alignment?: "Horizontal" | "HorizontalUpward" | "HorizontalDownward" | "Vertical" | "Both";
     onPlaneSelected?: (updateMap: ViroPlaneUpdatedMap) => void;
+    onPlaneDetected?: (updateMap: ViroPlaneUpdatedMap) => boolean;
+    disableClickSelection?: boolean;
+    useActualShape?: boolean;
+    children?: React.ReactNode;
 };
 type State = {
-    selectedSurface: number;
-    foundARPlanes: ViroARPlaneType[];
-    arPlaneSizes: ViroARPlaneSizes;
+    selectedPlaneId: string | null;
+    foundARPlanes: Map<string, ViroARPlaneType>;
 };
 /**
  * This component wraps the logic required to enable user selection
@@ -31,16 +32,15 @@ type State = {
  */
 export declare class ViroARPlaneSelector extends React.Component<Props, State> {
     _component: ViroNativeRef;
-    state: {
-        selectedSurface: number;
-        foundARPlanes: ViroARPlaneType[];
-        arPlaneSizes: number[];
-    };
+    state: State;
     render(): React.JSX.Element;
     _getARPlanes(): React.JSX.Element[];
-    _getOnClickSurface: (index: number, event: ViroClickStateEvent) => void;
-    _onARPlaneUpdated: (index: number) => (updateMap: ViroPlaneUpdatedMap) => void;
+    _getOnClickSurface: (anchorId: string, event: ViroClickStateEvent) => void;
+    _onARPlaneUpdated: (anchor: any) => void;
     _onPlaneSelected: (updateMap: ViroPlaneUpdatedMap) => void;
+    /**
+     * This function allows the user to reset the surface and select a new plane.
+     */
     reset: () => void;
 }
 export {};

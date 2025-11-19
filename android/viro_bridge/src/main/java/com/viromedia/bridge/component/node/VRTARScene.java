@@ -128,15 +128,30 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
     }
 
     public void setAnchorDetectionTypes(ReadableArray types) {
+        // DEBUG LOGGING - START
+        android.util.Log.d("ViroAR", "=== setAnchorDetectionTypes called ===");
+        if (types != null) {
+            for (int i = 0; i < types.size(); i++) {
+                android.util.Log.d("ViroAR", "  Prop value[" + i + "]: " + types.getString(i));
+            }
+        } else {
+            android.util.Log.d("ViroAR", "  types is NULL!");
+        }
+        // DEBUG LOGGING - END
+
         EnumSet<ViroViewARCore.AnchorDetectionType> typesList = EnumSet.noneOf(ViroViewARCore.AnchorDetectionType.class);
         if (types != null) {
             for (int i = 0; i < types.size(); i++) {
                 ViroViewARCore.AnchorDetectionType type = ViroViewARCore.AnchorDetectionType.valueFromString(types.getString(i));
                 if (type != null) {
+                    android.util.Log.d("ViroAR", "  Parsed type: " + type);
                     typesList.add(type);
+                } else {
+                    android.util.Log.e("ViroAR", "  FAILED to parse: " + types.getString(i));
                 }
             }
         }
+        android.util.Log.d("ViroAR", "  Final typesList size: " + typesList.size());
         ((ARScene) mNativeScene).setAnchorDetectionTypes(typesList);
     }
 
@@ -152,6 +167,9 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
 
     @Override
     public void onTrackingUpdated(ARScene.TrackingState state, ARScene.TrackingStateReason reason) {
+        // DEBUG LOGGING
+        android.util.Log.d("ViroAR", "📍 Tracking updated: state=" + state + " (" + state.getId() + "), reason=" + reason + " (" + reason.getId() + ")");
+
         WritableMap returnMap = Arguments.createMap();
         returnMap.putInt("state", state.getId());
         returnMap.putInt("reason", reason.getId());

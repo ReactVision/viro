@@ -25,7 +25,7 @@ ViroReact is a library for developers to rapidly build augmented reality (AR) an
 
 # Documentation
 
-[Documentation can be found here](https://viro-community.readme.io/docs/overview). While we do our best to keep all documentation up to date you may come across issues with broken links or outdated code samples If you do come across any issues please do let us know by either submitting an edit or [get in touch on Discord.](https://discord.gg/H3ksm5NhzT)
+[Documentation can be found here](https://viro-community.readme.io/docs/overview). While we do our best to keep all documentation up to date you may come across issues with broken links or outdated code samples If you do come across any issues please do let us know by either submitting an edit or [get in touch on Discord.](https://discord.gg/A6TaFNqwVc)
 
 ## Getting Started
 
@@ -45,7 +45,7 @@ You can also see our [Example projects](https://viro-community.readme.io/docs/ex
 
 Whether you're looking for support with building your AR or VR application or you want to contribute to ViroReact, the best way to contact our team and connect with the ReactVision Community is via Discord. 
 
-<a href="https://discord.gg/yqqEGUjK">
+<a href="https://discord.gg/A6TaFNqwVc">
    <img src="https://discordapp.com/api/guilds/774471080713781259/widget.png?style=banner2" alt="Discord Banner 2"/>
 </a>
 

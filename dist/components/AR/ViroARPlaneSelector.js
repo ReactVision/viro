@@ -70,6 +70,11 @@ class ViroARPlaneSelector extends React.Component {
     _getARPlanes() {
         const arPlanes = [];
         const detectBothAlignments = this.props.alignment === "Both" || !this.props.alignment;
+            // Since materials can be either a string or an array, convert the string to a 1-element array
+        const materials =
+        typeof this.props.materials === "string"
+            ? new Array(this.props.materials)
+            : this.props.materials;
         // Determine which alignments to detect
         const alignmentsToDetect = [];
         if (detectBothAlignments) {
@@ -132,13 +137,13 @@ class ViroARPlaneSelector extends React.Component {
                         vertices2D &&
                         vertices2D.length >= 3;
                     const finalOpacity = isSelected ? 0 : isVisible ? 1 : 0;
-                    visualElement = useActualShape ? (<ViroPolygon_1.ViroPolygon key={`polygon-${anchorId}`} vertices={vertices2D} holes={[]} materials={["ViroARPlaneSelector_Translucent"]} {...(!this.props.disableClickSelection && {
+                    visualElement = useActualShape ? (<ViroPolygon_1.ViroPolygon key={`polygon-${anchorId}`} vertices={vertices2D} holes={[]} materials={!!materials ? materials : ["ViroARPlaneSelector_Translucent"]} {...(!this.props.disableClickSelection && {
                         onClickState: (clickState, position, source) => this._getOnClickSurface(anchorId, {
                             clickState,
                             position,
                             source,
                         }),
-                    })} position={[0, 0, 0]} rotation={polygonRotation} opacity={finalOpacity}/>) : (<ViroQuad_1.ViroQuad key={`quad-${anchorId}`} materials={["ViroARPlaneSelector_Translucent"]} {...(!this.props.disableClickSelection && {
+                    })} position={[0, 0, 0]} rotation={polygonRotation} opacity={finalOpacity}/>) : (<ViroQuad_1.ViroQuad key={`quad-${anchorId}`} materials={!!materials ? materials : ["ViroARPlaneSelector_Translucent"]} {...(!this.props.disableClickSelection && {
                         onClickState: (clickState, position, source) => this._getOnClickSurface(anchorId, {
                             clickState,
                             position,

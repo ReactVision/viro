@@ -15,7 +15,7 @@ import {
   ViroClickStateEvent,
   ViroPlaneUpdatedMap,
 } from "../Types/ViroEvents";
-import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
+import { ViroARPlaneType, ViroNativeRef, ViroSource } from "../Types/ViroUtils";
 
 type ViroARPlaneClassification =
   | "None"
@@ -50,6 +50,7 @@ type Props = {
   disableClickSelection?: boolean; // Disable click-based selection, only show planes visually
   useActualShape?: boolean; // Use boundary vertices for accurate shape (default: true)
   children?: React.ReactNode;
+  materials?: ViroSource[] | string | string[];
 };
 
 type State = {
@@ -80,6 +81,12 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
     const arPlanes: React.JSX.Element[] = [];
     const detectBothAlignments =
       this.props.alignment === "Both" || !this.props.alignment;
+    
+    // Since materials can be either a string or an array, convert the string to a 1-element array
+    const materials =
+      typeof this.props.materials === "string"
+        ? new Array(this.props.materials)
+        : this.props.materials;
 
     // Determine which alignments to detect
     const alignmentsToDetect: Array<
@@ -172,7 +179,7 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
               key={`polygon-${anchorId}`}
               vertices={vertices2D!}
               holes={[]}
-              materials={["ViroARPlaneSelector_Translucent"]}
+              materials={!!materials ? materials : ["ViroARPlaneSelector_Translucent"]}
               {...(!this.props.disableClickSelection && {
                 onClickState: (clickState, position, source) =>
                   this._getOnClickSurface(anchorId, {
@@ -188,7 +195,7 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
           ) : (
             <ViroQuad
               key={`quad-${anchorId}`}
-              materials={["ViroARPlaneSelector_Translucent"]}
+              materials={!!materials ? materials : ["ViroARPlaneSelector_Translucent"]}
               {...(!this.props.disableClickSelection && {
                 onClickState: (clickState, position, source) =>
                   this._getOnClickSurface(anchorId, {

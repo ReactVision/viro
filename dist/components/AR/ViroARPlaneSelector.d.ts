@@ -9,7 +9,7 @@
  * @providesModule ViroARPlaneSelector
  */
 import { ViroClickStateEvent, ViroPlaneUpdatedMap } from "../Types/ViroEvents";
-import { ViroARPlaneType, ViroNativeRef } from "../Types/ViroUtils";
+import { ViroARPlaneType, ViroNativeRef, ViroSource } from "../Types/ViroUtils";
 import * as React from "react";
 type Props = {
     minHeight?: number;
@@ -20,6 +20,7 @@ type Props = {
     disableClickSelection?: boolean;
     useActualShape?: boolean;
     children?: React.ReactNode;
+    materials?: ViroSource[] | string | string[];
 };
 type State = {
     selectedPlaneId: string | null;

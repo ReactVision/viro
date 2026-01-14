@@ -145,8 +145,7 @@ import {
   ViroCreateGeospatialAnchorResult,
   // Monocular Depth Estimation Types
   ViroMonocularDepthSupportResult,
-  ViroMonocularDepthModelDownloadedResult,
-  ViroMonocularDepthDownloadResult,
+  ViroMonocularDepthModelAvailableResult,
   ViroMonocularDepthPreferenceResult,
 } from "./components/Types/ViroEvents";
 import { ViroSurface } from "./components/ViroSurface";
@@ -296,7 +295,6 @@ export {
   ViroCreateGeospatialAnchorResult,
   // Monocular Depth Estimation Types
   ViroMonocularDepthSupportResult,
-  ViroMonocularDepthModelDownloadedResult,
-  ViroMonocularDepthDownloadResult,
+  ViroMonocularDepthModelAvailableResult,
   ViroMonocularDepthPreferenceResult,
 };

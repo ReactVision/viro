@@ -34,20 +34,37 @@ static NSString *const kVRTARHitTestTransformKey = @"transform";
 static NSString *const kVRTARHitTestPositionKey = @"position";
 static NSString *const kVRTARHitTestRotationKey = @"rotation";
 static NSString *const kVRTARHitTestScaleKey = @"scale";
+static NSString *const kVRTARHitTestHasDepthDataKey = @"hasDepthData";
+static NSString *const kVRTARHitTestDepthValueKey = @"depthValue";
+static NSString *const kVRTARHitTestDepthConfidenceKey = @"depthConfidence";
+static NSString *const kVRTARHitTestDepthSourceKey = @"depthSource";
 
 + (NSDictionary *)dictForARHitResult:(std::shared_ptr<VROARHitTestResult> &)result {
     NSMutableDictionary *resultDict = [[NSMutableDictionary alloc] init];
     [resultDict setObject:[VRTARHitTestUtil stringForResultType:result->getType()] forKey:kVRTARHitTestTypeKey];
-    
+
     VROMatrix4f worldTransform = result->getWorldTransform();
     VROVector3f scale = worldTransform.extractScale();
-    
+
     NSMutableDictionary *transformDict = [[NSMutableDictionary alloc] init];
     [transformDict setObject:[VRTARHitTestUtil arrayFromVector:worldTransform.extractTranslation()] forKey:kVRTARHitTestPositionKey];
     [transformDict setObject:[VRTARHitTestUtil arrayFromVector:scale] forKey:kVRTARHitTestScaleKey];
     [transformDict setObject:[VRTARHitTestUtil rotationFromVector:worldTransform.extractRotation(scale).toEuler()]
                       forKey:kVRTARHitTestRotationKey];
     [resultDict setObject:transformDict forKey:kVRTARHitTestTransformKey];
+
+    // Add depth data if available
+    [resultDict setObject:@(result->hasDepthData()) forKey:kVRTARHitTestHasDepthDataKey];
+    if (result->hasDepthData()) {
+        [resultDict setObject:@(result->getDepthValue()) forKey:kVRTARHitTestDepthValueKey];
+
+        if (result->getDepthConfidence() >= 0) {
+            [resultDict setObject:@(result->getDepthConfidence()) forKey:kVRTARHitTestDepthConfidenceKey];
+        }
+
+        [resultDict setObject:@(result->getDepthSource().c_str()) forKey:kVRTARHitTestDepthSourceKey];
+    }
+
     return resultDict;
 }
 
@@ -61,6 +78,8 @@ static NSString *const kVRTARHitTestScaleKey = @"scale";
             return @"EstimatedHorizontalPlane";
         case VROARHitTestResultType::FeaturePoint:
             return @"FeaturePoint";
+        case VROARHitTestResultType::DepthPoint:
+            return @"DepthPoint";
     }
 }
 

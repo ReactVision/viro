@@ -32,23 +32,26 @@
 
 /*
  Types of hit test results:
- 
+
  ExistingPlaneUsingExtent: Hit test found a plane for which we have an anchor,
                            and the hit location was within the plane's estimated
                            extent.
  ExistingPlane: Hit test found a plane for which we have an anchor, but our hit
                 test did not take into account the estimated extent. The hit point
                 may be outside the actual extent of the surface.
- EstimatedHorizontalPlane: Hit test found a plane, but one for which we have no 
+ EstimatedHorizontalPlane: Hit test found a plane, but one for which we have no
                            anchor.
- Feature Point: Hit test found a point that the AR session believes is part of a
+ FeaturePoint: Hit test found a point that the AR session believes is part of a
                 continuous surface. This surface may not be horizontal.
+ DepthPoint: Hit test found a point using depth data. The orientation is perpendicular
+             to the 3D surface at the hit location. Requires depth mode to be enabled.
  */
 enum class VROARHitTestResultType {
     ExistingPlaneUsingExtent,
     ExistingPlane,
     EstimatedHorizontalPlane,
     FeaturePoint,
+    DepthPoint,
 };
 
 /*
@@ -57,50 +60,88 @@ enum class VROARHitTestResultType {
  */
 class VROARHitTestResult {
 public:
-    
+
     VROARHitTestResult(VROARHitTestResultType type, std::shared_ptr<VROARAnchor> anchor, float distance,
                        VROMatrix4f worldTransform, VROMatrix4f localTransform) :
-        _type(type), _anchor(anchor), _distance(distance), _worldTransform(worldTransform), _localTransform(localTransform) {
+        _type(type), _anchor(anchor), _distance(distance), _worldTransform(worldTransform), _localTransform(localTransform),
+        _hasDepthData(false), _depthValue(0.0f), _depthConfidence(-1.0f), _depthSource("none") {
     }
     virtual ~VROARHitTestResult() {}
-    
+
     /*
      Get the type of hit test result.
      */
     VROARHitTestResultType getType() const { return _type; }
-    
+
     /*
      Return the anchor associated with the hit test, if any.
      */
     const std::shared_ptr<VROARAnchor> getAnchor() const { return _anchor.lock(); }
-    
+
     /*
      Get the distance from the camera to the hit test result.
      */
     float getDistance() const { return _distance; }
-    
+
     /*
      Get the position and orientation of the hit test result surface, in world coordinates.
      */
     VROMatrix4f getWorldTransform() const { return _worldTransform; }
-    
+
     /*
      Get the position and orientation of the hit test result surface, in the coordinate
      space of the anchor. Undefined if there is no anchor associated with this result.
      */
     VROMatrix4f getLocalTransform() const { return _localTransform; }
 
+    /*
+     Returns true if depth data is available for this hit test result.
+     */
+    bool hasDepthData() const { return _hasDepthData; }
+
+    /*
+     Get the depth value at the hit point in meters. Only valid if hasDepthData() returns true.
+     */
+    float getDepthValue() const { return _depthValue; }
+
+    /*
+     Get the depth confidence value (0-1). Returns -1 if confidence data is not available.
+     Only valid if hasDepthData() returns true. iOS LiDAR provides confidence, ARCore may not.
+     */
+    float getDepthConfidence() const { return _depthConfidence; }
+
+    /*
+     Get the source of depth data: "lidar", "monocular", "arcore", or "none".
+     */
+    std::string getDepthSource() const { return _depthSource; }
+
+    /*
+     Set depth data for this hit test result.
+     */
+    void setDepthData(float depthValue, float depthConfidence, std::string depthSource) {
+        _hasDepthData = true;
+        _depthValue = depthValue;
+        _depthConfidence = depthConfidence;
+        _depthSource = depthSource;
+    }
+
 protected:
 
     std::weak_ptr<VROARAnchor> _anchor;
 
 private:
-    
+
     VROARHitTestResultType _type;
     float _distance;
     VROMatrix4f _worldTransform;
     VROMatrix4f _localTransform;
-    
+
+    // Depth-related fields
+    bool _hasDepthData;
+    float _depthValue;
+    float _depthConfidence;
+    std::string _depthSource;
+
 };
 
 #endif /* VROARHitTestResult_h */

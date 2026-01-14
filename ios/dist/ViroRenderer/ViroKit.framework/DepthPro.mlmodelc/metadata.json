@@ -1,0 +1,82 @@
+[
+  {
+    "shortDescription" : "Depth Anything V2 vits",
+    "metadataOutputVersion" : "3.0",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float32",
+        "formattedType" : "MultiArray (Float32 1 × 518 × 518)",
+        "shortDescription" : "",
+        "shape" : "[1, 518, 518]",
+        "name" : "depth",
+        "type" : "MultiArray"
+      }
+    ],
+    "version" : "2.0",
+    "modelParameters" : [
+
+    ],
+    "author" : "TikTok \/ Depth Anything Team",
+    "specificationVersion" : 6,
+    "storagePrecision" : "Float16",
+    "mlProgramOperationTypeHistogram" : {
+      "Concat" : 1,
+      "Linear" : 48,
+      "SliceByIndex" : 40,
+      "LayerNorm" : 28,
+      "Transpose" : 29,
+      "Matmul" : 24,
+      "Gelu" : 12,
+      "UpsampleBilinear" : 5,
+      "Softmax" : 12,
+      "Mul" : 37,
+      "Cast" : 2,
+      "Reshape" : 29,
+      "Add" : 36,
+      "ConvTranspose" : 2,
+      "Relu" : 16,
+      "Squeeze" : 1,
+      "Conv" : 31
+    },
+    "computePrecision" : "Mixed (Float16, Float32, Int32)",
+    "stateSchema" : [
+
+    ],
+    "isUpdatable" : "0",
+    "availability" : {
+      "macOS" : "12.0",
+      "tvOS" : "15.0",
+      "visionOS" : "1.0",
+      "watchOS" : "8.0",
+      "iOS" : "15.0",
+      "macCatalyst" : "15.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_mlProgram"
+    },
+    "inputSchema" : [
+      {
+        "height" : "518",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "518",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 518 × 518)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "",
+        "name" : "image"
+      }
+    ],
+    "userDefinedMetadata" : {
+      "com.github.apple.coremltools.conversion_date" : "2026-01-04",
+      "com.github.apple.coremltools.source" : "torch==2.7.0",
+      "com.github.apple.coremltools.version" : "9.0",
+      "com.github.apple.coremltools.source_dialect" : "TorchScript"
+    },
+    "generatedClassName" : "DepthAnythingV2_S_Metrics",
+    "method" : "predict"
+  }
+]

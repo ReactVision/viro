@@ -822,23 +822,23 @@ RCT_EXPORT_METHOD(isMonocularDepthSupported:(nonnull NSNumber *)reactTag
     }];
 }
 
-RCT_EXPORT_METHOD(isMonocularDepthModelDownloaded:(nonnull NSNumber *)reactTag
-                                          resolve:(RCTPromiseResolveBlock)resolve
-                                           reject:(RCTPromiseRejectBlock)reject) {
+RCT_EXPORT_METHOD(isMonocularDepthModelAvailable:(nonnull NSNumber *)reactTag
+                                        resolve:(RCTPromiseResolveBlock)resolve
+                                         reject:(RCTPromiseRejectBlock)reject) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
                                         NSDictionary<NSNumber *, UIView *> *viewRegistry) {
         @try {
             VRTView *view = (VRTView *)viewRegistry[reactTag];
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@{@"downloaded": @NO, @"error": @"Invalid view type"});
+                resolve(@{@"available": @NO, @"error": @"Invalid view type"});
                 return;
             }
 
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-            BOOL downloaded = [component isMonocularDepthModelDownloaded];
-            resolve(@{@"downloaded": @(downloaded)});
+            BOOL available = [component isMonocularDepthModelAvailable];
+            resolve(@{@"available": @(available)});
         } @catch (NSException *exception) {
-            resolve(@{@"downloaded": @NO, @"error": exception.reason});
+            resolve(@{@"available": @NO, @"error": exception.reason});
         }
     }];
 }
@@ -851,92 +851,6 @@ RCT_EXPORT_METHOD(setMonocularDepthEnabled:(nonnull NSNumber *)reactTag
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
             [component setMonocularDepthEnabled:enabled];
-        }
-    }];
-}
-
-RCT_EXPORT_METHOD(setMonocularDepthModelURL:(nonnull NSNumber *)reactTag
-                                    baseURL:(NSString *)baseURL) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
-        if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
-            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-            [component setMonocularDepthModelURL:baseURL];
-        }
-    }];
-}
-
-RCT_EXPORT_METHOD(downloadMonocularDepthModel:(nonnull NSNumber *)reactTag
-                                      resolve:(RCTPromiseResolveBlock)resolve
-                                       reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
-            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@{@"success": @NO, @"error": @"Invalid view type"});
-                return;
-            }
-
-            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-
-            if (!component.rootVROView) {
-                resolve(@{@"success": @NO, @"error": @"AR view has been unmounted"});
-                return;
-            }
-
-            [component downloadMonocularDepthModelWithProgress:nil
-                                             completionHandler:^(BOOL success, NSString *error) {
-                NSMutableDictionary *result = [NSMutableDictionary new];
-                [result setObject:@(success) forKey:@"success"];
-                if (error) {
-                    [result setObject:error forKey:@"error"];
-                }
-                resolve(result);
-            }];
-        } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
-        }
-    }];
-}
-
-RCT_EXPORT_METHOD(downloadMonocularDepthModelWithProgress:(nonnull NSNumber *)reactTag
-                                                  resolve:(RCTPromiseResolveBlock)resolve
-                                                   reject:(RCTPromiseRejectBlock)reject) {
-    // Note: This method downloads the model and periodically sends progress events
-    // For simplicity, we resolve with final result. Progress can be sent via events if needed.
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
-            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@{@"success": @NO, @"progress": @0.0, @"error": @"Invalid view type"});
-                return;
-            }
-
-            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-
-            if (!component.rootVROView) {
-                resolve(@{@"success": @NO, @"progress": @0.0, @"error": @"AR view has been unmounted"});
-                return;
-            }
-
-            __block float lastProgress = 0.0f;
-            [component downloadMonocularDepthModelWithProgress:^(float progress) {
-                lastProgress = progress;
-                // Progress events could be sent here via RCTEventEmitter if needed
-            } completionHandler:^(BOOL success, NSString *error) {
-                NSMutableDictionary *result = [NSMutableDictionary new];
-                [result setObject:@(success) forKey:@"success"];
-                [result setObject:@(lastProgress) forKey:@"progress"];
-                if (error) {
-                    [result setObject:error forKey:@"error"];
-                }
-                resolve(result);
-            }];
-        } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"progress": @0.0, @"error": exception.reason});
         }
     }];
 }
@@ -970,6 +884,69 @@ RCT_EXPORT_METHOD(isPreferMonocularDepth:(nonnull NSNumber *)reactTag
             resolve(@{@"preferred": @(preferred)});
         } @catch (NSException *exception) {
             resolve(@{@"preferred": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
+#pragma mark - Debugging & Validation Methods
+
+RCT_EXPORT_METHOD(isDepthOcclusionSupported:(nonnull NSNumber *)reactTag
+                                   resolve:(RCTPromiseResolveBlock)resolve
+                                    reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"supported": @NO, @"error": @"Invalid view type - component not found or not initialized"});
+                return;
+            }
+
+            // On iOS, depth occlusion is always supported (via monocular depth or LiDAR)
+            resolve(@{@"supported": @YES});
+        } @catch (NSException *exception) {
+            resolve(@{@"supported": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(getGeospatialSetupStatus:(nonnull NSNumber *)reactTag
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{
+                    @"geospatialSupported": @NO,
+                    @"locationServicesAvailable": @NO,
+                    @"apiKeyConfigured": @YES,
+                    @"error": @"Invalid view type"
+                });
+                return;
+            }
+
+            // On iOS:
+            // - Geospatial is supported on iOS 15+
+            // - Location services must be enabled by user
+            // - No API key configuration needed (uses Apple's location services)
+            
+            BOOL geospatialSupported = [NSProcessInfo processInfo].operatingSystemVersion.majorVersion >= 15;
+            BOOL locationServicesAvailable = [CLLocationManager locationServicesEnabled];
+            
+            resolve(@{
+                @"geospatialSupported": @(geospatialSupported),
+                @"locationServicesAvailable": @(locationServicesAvailable),
+                @"apiKeyConfigured": @YES  // Always true on iOS
+            });
+        } @catch (NSException *exception) {
+            resolve(@{
+                @"geospatialSupported": @NO,
+                @"locationServicesAvailable": @NO,
+                @"apiKeyConfigured": @YES,
+                @"error": exception.reason
+            });
         }
     }];
 }

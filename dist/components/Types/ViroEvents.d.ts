@@ -485,18 +485,10 @@ export type ViroMonocularDepthSupportResult = {
     error?: string;
 };
 /**
- * Result of checking if monocular depth model is downloaded.
+ * Result of checking if monocular depth model is available (bundled).
  */
-export type ViroMonocularDepthModelDownloadedResult = {
-    downloaded: boolean;
-    error?: string;
-};
-/**
- * Result of downloading the monocular depth model.
- */
-export type ViroMonocularDepthDownloadResult = {
-    success: boolean;
-    progress?: number;
+export type ViroMonocularDepthModelAvailableResult = {
+    available: boolean;
     error?: string;
 };
 /**
@@ -504,5 +496,23 @@ export type ViroMonocularDepthDownloadResult = {
  */
 export type ViroMonocularDepthPreferenceResult = {
     preferred: boolean;
+    error?: string;
+};
+/**
+ * Result of checking if depth occlusion is supported on this device.
+ */
+export type ViroDepthOcclusionSupportResult = {
+    supported: boolean;
+    minARCoreVersion?: string;
+    error?: string;
+};
+/**
+ * Result of checking geospatial setup prerequisites.
+ */
+export type ViroGeospatialSetupStatusResult = {
+    geospatialSupported: boolean;
+    locationServicesAvailable: boolean;
+    apiKeyConfigured: boolean;
+    arCoreVersion?: string;
     error?: string;
 };

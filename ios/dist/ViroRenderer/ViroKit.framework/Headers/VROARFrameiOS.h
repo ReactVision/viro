@@ -116,6 +116,12 @@ private:
     mutable std::shared_ptr<VROTexture> _depthTexture;
     mutable std::shared_ptr<VROTexture> _depthConfidenceTexture;
 
+    /*
+     Sample depth texture at normalized UV coordinates (0-1 range).
+     Returns depth value in meters, or 0.0 if invalid.
+     */
+    float sampleDepthTextureAtUV(std::shared_ptr<VROTexture> texture, float u, float v) const;
+
 };
 
 #endif

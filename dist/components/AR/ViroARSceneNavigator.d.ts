@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroCloudAnchorProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialAnchorProvider, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthSupportResult, ViroMonocularDepthModelDownloadedResult, ViroMonocularDepthDownloadResult, ViroMonocularDepthPreferenceResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroCloudAnchorProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialAnchorProvider, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthSupportResult, ViroMonocularDepthModelAvailableResult, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -433,35 +433,21 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _isMonocularDepthSupported: () => Promise<ViroMonocularDepthSupportResult>;
     /**
-     * Check if the monocular depth model has been downloaded.
+     * Check if the monocular depth model is available (bundled in framework or app).
      *
-     * @returns Promise resolving to download status
+     * @returns Promise resolving to availability status
      */
-    _isMonocularDepthModelDownloaded: () => Promise<ViroMonocularDepthModelDownloadedResult>;
+    _isMonocularDepthModelAvailable: () => Promise<ViroMonocularDepthModelAvailableResult>;
     /**
      * Enable or disable monocular depth estimation.
      * When enabled, depth will be estimated from the camera image using a neural network.
      * This provides depth-based occlusion on devices without LiDAR.
      *
-     * Note: The model must be downloaded first using downloadMonocularDepthModel().
+     * Note: The model must be bundled in the app as DepthPro.mlmodelc.
      *
      * @param enabled - Whether to enable monocular depth estimation
      */
     _setMonocularDepthEnabled: (enabled: boolean) => void;
-    /**
-     * Set the base URL for downloading the monocular depth model.
-     * The full URL will be: baseURL/DepthPro.mlmodelc.zip
-     *
-     * @param baseURL - The base URL where the model is hosted
-     */
-    _setMonocularDepthModelURL: (baseURL: string) => void;
-    /**
-     * Download the monocular depth model if not already downloaded.
-     * This is an asynchronous operation that downloads ~200MB.
-     *
-     * @returns Promise resolving to download result
-     */
-    _downloadMonocularDepthModel: () => Promise<ViroMonocularDepthDownloadResult>;
     /**
      * Set whether to prefer monocular depth estimation over LiDAR.
      * When enabled, monocular depth will be used even on devices with LiDAR.
@@ -479,6 +465,25 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      * @returns Promise resolving to preference status
      */
     _isPreferMonocularDepth: () => Promise<ViroMonocularDepthPreferenceResult>;
+    /**
+     * Check if depth-based occlusion is supported on this device.
+     * Requires:
+     * - Android: ARCore 1.18+ with depth support
+     * - iOS: Always supported (uses monocular depth + LiDAR)
+     *
+     * @returns Promise resolving to depth occlusion support status and requirements
+     */
+    _isDepthOcclusionSupported: () => Promise<ViroDepthOcclusionSupportResult>;
+    /**
+     * Check geospatial mode setup status and prerequisites.
+     * Validates:
+     * - Geospatial API support on device
+     * - Location services availability
+     * - Google Cloud API key configuration (Android)
+     *
+     * @returns Promise resolving to geospatial setup status with error details
+     */
+    _getGeospatialSetupStatus: () => Promise<ViroGeospatialSetupStatusResult>;
     /**
      * Renders the Scene Views in the stack.
      *
@@ -515,12 +520,12 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;
         getSemanticLabelFraction: (label: ViroSemanticLabel) => Promise<ViroSemanticLabelFractionResult>;
         isMonocularDepthSupported: () => Promise<ViroMonocularDepthSupportResult>;
-        isMonocularDepthModelDownloaded: () => Promise<ViroMonocularDepthModelDownloadedResult>;
+        isMonocularDepthModelAvailable: () => Promise<ViroMonocularDepthModelAvailableResult>;
         setMonocularDepthEnabled: (enabled: boolean) => void;
-        setMonocularDepthModelURL: (baseURL: string) => void;
-        downloadMonocularDepthModel: () => Promise<ViroMonocularDepthDownloadResult>;
         setPreferMonocularDepth: (prefer: boolean) => void;
         isPreferMonocularDepth: () => Promise<ViroMonocularDepthPreferenceResult>;
+        isDepthOcclusionSupported: () => Promise<ViroDepthOcclusionSupportResult>;
+        getGeospatialSetupStatus: () => Promise<ViroGeospatialSetupStatusResult>;
         viroAppProps: any;
     };
     sceneNavigator: {
@@ -553,12 +558,12 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;
         getSemanticLabelFraction: (label: ViroSemanticLabel) => Promise<ViroSemanticLabelFractionResult>;
         isMonocularDepthSupported: () => Promise<ViroMonocularDepthSupportResult>;
-        isMonocularDepthModelDownloaded: () => Promise<ViroMonocularDepthModelDownloadedResult>;
+        isMonocularDepthModelAvailable: () => Promise<ViroMonocularDepthModelAvailableResult>;
         setMonocularDepthEnabled: (enabled: boolean) => void;
-        setMonocularDepthModelURL: (baseURL: string) => void;
-        downloadMonocularDepthModel: () => Promise<ViroMonocularDepthDownloadResult>;
         setPreferMonocularDepth: (prefer: boolean) => void;
         isPreferMonocularDepth: () => Promise<ViroMonocularDepthPreferenceResult>;
+        isDepthOcclusionSupported: () => Promise<ViroDepthOcclusionSupportResult>;
+        getGeospatialSetupStatus: () => Promise<ViroGeospatialSetupStatusResult>;
         viroAppProps: any;
     };
     render(): React.JSX.Element;

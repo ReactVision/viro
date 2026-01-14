@@ -29,6 +29,8 @@ import com.viro.core.ARHitTestResult;
 import com.viro.core.ARImageAnchor;
 import com.viro.core.ARPlaneAnchor;
 import com.viro.core.ARPointCloud;
+import com.viro.core.Matrix;
+import com.viro.core.Quaternion;
 import com.viro.core.Vector;
 
 public class ARUtils {
@@ -72,6 +74,17 @@ public class ARUtils {
         // rotation values come as radians, we need to convert to degrees
         transformMap.putArray("rotation", ARUtils.arrayFromRotationArray(result.getRotation().toArray()));
         returnMap.putMap("transform", transformMap);
+
+        // Add depth data if available
+        returnMap.putBoolean("hasDepthData", result.hasDepthData());
+        if (result.hasDepthData()) {
+            returnMap.putDouble("depthValue", result.getDepthValue());
+            if (result.getDepthConfidence() >= 0) {
+                returnMap.putDouble("depthConfidence", result.getDepthConfidence());
+            }
+            returnMap.putString("depthSource", result.getDepthSource());
+        }
+
         return returnMap;
     }
 
@@ -98,6 +111,32 @@ public class ARUtils {
         returnMap.putArray("points", pointsArray);
         returnMap.putArray("identifiers", idsArray);
         return returnMap;
+    }
+
+    /**
+     * Convert a Matrix to a WritableMap with position, rotation, and scale.
+     * Used for returning transform data from anchored nodes.
+     */
+    public static WritableMap mapFromMatrix(Matrix matrix) {
+        WritableMap transformMap = Arguments.createMap();
+
+        Vector position = matrix.extractTranslation();
+        Vector scale = matrix.extractScale();
+        Quaternion rotation = matrix.extractRotation(scale);
+
+        transformMap.putArray("position", arrayFromVector(position));
+
+        // Quaternion rotation (x, y, z, w)
+        WritableArray rotationArray = Arguments.createArray();
+        rotationArray.pushDouble(rotation.x);
+        rotationArray.pushDouble(rotation.y);
+        rotationArray.pushDouble(rotation.z);
+        rotationArray.pushDouble(rotation.w);
+        transformMap.putArray("rotation", rotationArray);
+
+        transformMap.putArray("scale", arrayFromVector(scale));
+
+        return transformMap;
     }
 
     /*

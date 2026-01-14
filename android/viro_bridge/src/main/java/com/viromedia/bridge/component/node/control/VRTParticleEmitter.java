@@ -423,27 +423,49 @@ public class VRTParticleEmitter extends VRTControl {
             for (int i = 0; i < burstArray.size(); i++) {
                 ReadableMap burstmap = burstArray.getMap(i);
 
+                // Validate required fields
+                if (!burstmap.hasKey("min") || !burstmap.hasKey("max")) {
+                    onError("Viro: emissionBurst[" + i + "] is missing required 'min' and/or 'max' fields, skipping.");
+                    continue;
+                }
+
                 ParticleEmitter.Factor referenceFactor;
                 float valueStart;
                 float coolPeriod;
                 int min, max;
                 int cycles;
+
+                // Handle time-based or distance-based burst
                 if (burstmap.hasKey("time")) {
                     referenceFactor = ParticleEmitter.Factor.TIME;
                     valueStart = (float) burstmap.getDouble("time");
+                    // cooldownPeriod is optional, defaults to 0
                     coolPeriod = (float) (burstmap.hasKey("cooldownPeriod") ? burstmap.getDouble("cooldownPeriod") : 0);
                 } else if (burstmap.hasKey("distance")) {
                     referenceFactor = ParticleEmitter.Factor.DISTANCE;
                     valueStart = (float) burstmap.getDouble("distance");
+                    // cooldownDistance is optional, defaults to 0
                     coolPeriod = (float) (burstmap.hasKey("cooldownDistance") ? burstmap.getDouble("cooldownDistance") : 0);
                 } else {
-                    onError("Invalid Burst parameters provided!");
-                    return;
+                    onError("Viro: emissionBurst[" + i + "] must specify either 'time' or 'distance', skipping.");
+                    continue;
                 }
 
-                min = burstmap.hasKey("min") ? burstmap.getInt("min") : 0;
-                max = burstmap.hasKey("max") ? burstmap.getInt("max") : 0;
-                cycles = burstmap.hasKey("cycles") ? burstmap.getInt("cycles") : 0;
+                // Get min/max particle count
+                min = burstmap.getInt("min");
+                max = burstmap.getInt("max");
+
+                // Validate min/max range
+                if (min < 0 || max < 0 || min > max) {
+                    onError("Viro: emissionBurst[" + i + "] has invalid min/max values (min: " + min + ", max: " + max + "). Min and max must be >= 0 and min <= max, skipping.");
+                    continue;
+                }
+
+                // cycles is optional, defaults to 1
+                cycles = burstmap.hasKey("cycles") ? burstmap.getInt("cycles") : 1;
+                if (cycles <= 0) {
+                    cycles = 1; // Ensure at least 1 cycle
+                }
 
                 ParticleEmitter.EmissionBurst burst = new ParticleEmitter.EmissionBurst(referenceFactor,
                         valueStart, min, max, cycles, coolPeriod);

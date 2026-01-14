@@ -629,45 +629,64 @@ class ViroARSceneNavigator extends React.Component {
      * @returns Promise resolving to support status
      */
     _isMonocularDepthSupported = async () => {
-        return await ViroARSceneNavigatorModule.isMonocularDepthSupported((0, react_native_1.findNodeHandle)(this));
+        try {
+            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+            if (!nodeHandle) {
+                return {
+                    supported: false,
+                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
+                };
+            }
+            const result = await ViroARSceneNavigatorModule.isMonocularDepthSupported(nodeHandle);
+            return result;
+        }
+        catch (error) {
+            return {
+                supported: false,
+                error: `Failed to check monocular depth support: ${error}`,
+            };
+        }
     };
     /**
-     * Check if the monocular depth model has been downloaded.
+     * Check if the monocular depth model is available (bundled in framework or app).
      *
-     * @returns Promise resolving to download status
+     * @returns Promise resolving to availability status
      */
-    _isMonocularDepthModelDownloaded = async () => {
-        return await ViroARSceneNavigatorModule.isMonocularDepthModelDownloaded((0, react_native_1.findNodeHandle)(this));
+    _isMonocularDepthModelAvailable = async () => {
+        try {
+            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+            if (!nodeHandle) {
+                return {
+                    available: false,
+                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
+                };
+            }
+            const result = await ViroARSceneNavigatorModule.isMonocularDepthModelAvailable(nodeHandle);
+            return result;
+        }
+        catch (error) {
+            return {
+                available: false,
+                error: `Failed to check monocular depth model availability: ${error}`,
+            };
+        }
     };
     /**
      * Enable or disable monocular depth estimation.
      * When enabled, depth will be estimated from the camera image using a neural network.
      * This provides depth-based occlusion on devices without LiDAR.
      *
-     * Note: The model must be downloaded first using downloadMonocularDepthModel().
+     * Note: The model must be bundled in the app as DepthPro.mlmodelc.
      *
      * @param enabled - Whether to enable monocular depth estimation
      */
     _setMonocularDepthEnabled = (enabled) => {
-        ViroARSceneNavigatorModule.setMonocularDepthEnabled((0, react_native_1.findNodeHandle)(this), enabled);
-    };
-    /**
-     * Set the base URL for downloading the monocular depth model.
-     * The full URL will be: baseURL/DepthPro.mlmodelc.zip
-     *
-     * @param baseURL - The base URL where the model is hosted
-     */
-    _setMonocularDepthModelURL = (baseURL) => {
-        ViroARSceneNavigatorModule.setMonocularDepthModelURL((0, react_native_1.findNodeHandle)(this), baseURL);
-    };
-    /**
-     * Download the monocular depth model if not already downloaded.
-     * This is an asynchronous operation that downloads ~200MB.
-     *
-     * @returns Promise resolving to download result
-     */
-    _downloadMonocularDepthModel = async () => {
-        return await ViroARSceneNavigatorModule.downloadMonocularDepthModel((0, react_native_1.findNodeHandle)(this));
+        const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+        if (!nodeHandle) {
+            console.warn("Cannot set monocular depth: Component not mounted - ensure ViroARSceneNavigator is rendered and visible");
+            return;
+        }
+        ViroARSceneNavigatorModule.setMonocularDepthEnabled(nodeHandle, enabled);
     };
     /**
      * Set whether to prefer monocular depth estimation over LiDAR.
@@ -680,7 +699,12 @@ class ViroARSceneNavigator extends React.Component {
      * @param prefer - Whether to prefer monocular depth over LiDAR
      */
     _setPreferMonocularDepth = (prefer) => {
-        ViroARSceneNavigatorModule.setPreferMonocularDepth((0, react_native_1.findNodeHandle)(this), prefer);
+        const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+        if (!nodeHandle) {
+            console.warn("Cannot set monocular depth preference: Component not mounted - ensure ViroARSceneNavigator is rendered and visible");
+            return;
+        }
+        ViroARSceneNavigatorModule.setPreferMonocularDepth(nodeHandle, prefer);
     };
     /**
      * Check if monocular depth is preferred over LiDAR.
@@ -688,7 +712,85 @@ class ViroARSceneNavigator extends React.Component {
      * @returns Promise resolving to preference status
      */
     _isPreferMonocularDepth = async () => {
-        return await ViroARSceneNavigatorModule.isPreferMonocularDepth((0, react_native_1.findNodeHandle)(this));
+        try {
+            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+            if (!nodeHandle) {
+                return {
+                    preferred: false,
+                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
+                };
+            }
+            const result = await ViroARSceneNavigatorModule.isPreferMonocularDepth(nodeHandle);
+            return result;
+        }
+        catch (error) {
+            return {
+                preferred: false,
+                error: `Failed to check monocular depth preference: ${error}`,
+            };
+        }
+    };
+    // ===========================================================================
+    // Debugging & Validation Methods
+    // ===========================================================================
+    /**
+     * Check if depth-based occlusion is supported on this device.
+     * Requires:
+     * - Android: ARCore 1.18+ with depth support
+     * - iOS: Always supported (uses monocular depth + LiDAR)
+     *
+     * @returns Promise resolving to depth occlusion support status and requirements
+     */
+    _isDepthOcclusionSupported = async () => {
+        try {
+            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+            if (!nodeHandle) {
+                return {
+                    supported: false,
+                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
+                };
+            }
+            const result = await ViroARSceneNavigatorModule.isDepthOcclusionSupported(nodeHandle);
+            return result;
+        }
+        catch (error) {
+            return {
+                supported: false,
+                error: `Failed to check depth occlusion support: ${error}`,
+            };
+        }
+    };
+    /**
+     * Check geospatial mode setup status and prerequisites.
+     * Validates:
+     * - Geospatial API support on device
+     * - Location services availability
+     * - Google Cloud API key configuration (Android)
+     *
+     * @returns Promise resolving to geospatial setup status with error details
+     */
+    _getGeospatialSetupStatus = async () => {
+        try {
+            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+            if (!nodeHandle) {
+                return {
+                    geospatialSupported: false,
+                    locationServicesAvailable: false,
+                    apiKeyConfigured: false,
+                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
+                };
+            }
+            const result = await ViroARSceneNavigatorModule.getGeospatialSetupStatus(nodeHandle);
+            return result;
+        }
+        catch (error) {
+            return {
+                geospatialSupported: false,
+                locationServicesAvailable: false,
+                apiKeyConfigured: false,
+                error: `Failed to check geospatial setup: ${error}`,
+            };
+        }
     };
     /**
      * Renders the Scene Views in the stack.
@@ -740,12 +842,13 @@ class ViroARSceneNavigator extends React.Component {
         getSemanticLabelFraction: this._getSemanticLabelFraction,
         // Monocular Depth Estimation API
         isMonocularDepthSupported: this._isMonocularDepthSupported,
-        isMonocularDepthModelDownloaded: this._isMonocularDepthModelDownloaded,
+        isMonocularDepthModelAvailable: this._isMonocularDepthModelAvailable,
         setMonocularDepthEnabled: this._setMonocularDepthEnabled,
-        setMonocularDepthModelURL: this._setMonocularDepthModelURL,
-        downloadMonocularDepthModel: this._downloadMonocularDepthModel,
         setPreferMonocularDepth: this._setPreferMonocularDepth,
         isPreferMonocularDepth: this._isPreferMonocularDepth,
+        // Debugging & Validation API
+        isDepthOcclusionSupported: this._isDepthOcclusionSupported,
+        getGeospatialSetupStatus: this._getGeospatialSetupStatus,
         viroAppProps: {},
     };
     sceneNavigator = {
@@ -781,12 +884,13 @@ class ViroARSceneNavigator extends React.Component {
         getSemanticLabelFraction: this._getSemanticLabelFraction,
         // Monocular Depth Estimation API
         isMonocularDepthSupported: this._isMonocularDepthSupported,
-        isMonocularDepthModelDownloaded: this._isMonocularDepthModelDownloaded,
+        isMonocularDepthModelAvailable: this._isMonocularDepthModelAvailable,
         setMonocularDepthEnabled: this._setMonocularDepthEnabled,
-        setMonocularDepthModelURL: this._setMonocularDepthModelURL,
-        downloadMonocularDepthModel: this._downloadMonocularDepthModel,
         setPreferMonocularDepth: this._setPreferMonocularDepth,
         isPreferMonocularDepth: this._isPreferMonocularDepth,
+        // Debugging & Validation API
+        isDepthOcclusionSupported: this._isDepthOcclusionSupported,
+        getGeospatialSetupStatus: this._getGeospatialSetupStatus,
         viroAppProps: {},
     };
     render() {

@@ -126,7 +126,6 @@ public:
      Set the base URL from which to download the depth model.
      The full URL will be: baseURL/DepthPro.mlmodelc.zip
      */
-    void setMonocularDepthModelURL(NSURL *baseURL);
 
     // Geospatial API
     void setGeospatialAnchorProvider(VROGeospatialAnchorProvider provider) override;
@@ -165,6 +164,11 @@ public:
     void addAnchor(ARAnchor *anchor);
     void updateAnchor(ARAnchor *anchor);
     void removeAnchor(ARAnchor *anchor);
+
+    /*
+     Get the native ARSession object for anchor creation.
+     */
+    ARSession *getARSession() const { return _session; }
 
 private:
     
@@ -262,7 +266,6 @@ private:
     std::shared_ptr<VROMonocularDepthEstimator> _monocularDepthEstimator;
     bool _monocularDepthEnabled;
     bool _preferMonocularDepth;  // When true, use monocular even on LiDAR devices
-    NSURL *_monocularDepthModelURL;
     std::shared_ptr<VRODriver> _driver;
 
     void updateTrackingType(VROTrackingType trackingType);

@@ -312,27 +312,79 @@ const int kDefaultMaxParticles = 500;
         std::vector<VROParticleEmitter::VROParticleBurst> bursts;
         NSArray *burstArray = [_spawnBehavior objectForKey:@"emissionBurst"];
 
+        // Validate that emissionBurst is an array
+        if (![burstArray isKindOfClass:[NSArray class]]) {
+            RCTLogError(@"Viro: emissionBurst must be an array of burst configurations.");
+            _emitter->setParticleBursts(std::vector<VROParticleEmitter::VROParticleBurst>());
+            return;
+        }
+
         // Process each burst
         for (int i = 0; i < [burstArray count]; i ++) {
+            id burstObject = [burstArray objectAtIndex:i];
+
+            // Validate that each burst is a dictionary
+            if (![burstObject isKindOfClass:[NSDictionary class]]) {
+                RCTLogError(@"Viro: emissionBurst[%d] is not a valid dictionary, skipping.", i);
+                continue;
+            }
+
+            NSDictionary *burstDictionary = (NSDictionary *)burstObject;
+
+            // Validate required fields exist
+            if (![burstDictionary objectForKey:@"min"] || ![burstDictionary objectForKey:@"max"]) {
+                RCTLogError(@"Viro: emissionBurst[%d] is missing required 'min' and/or 'max' fields, skipping.", i);
+                continue;
+            }
+
             VROParticleEmitter::VROParticleBurst burst;
-            NSDictionary *burstDictionary = [burstArray objectAtIndex:i];
+
+            // Handle time-based or distance-based burst
             if ([burstDictionary objectForKey:@"time"]) {
                 burst.referenceFactor = VROParticleModifier::VROModifierFactor::Time;
                 burst.referenceValueStart = [[burstDictionary objectForKey:@"time"] doubleValue];
-                burst.referenceValueInterval = [[burstDictionary objectForKey:@"cooldownPeriod"] doubleValue];
+
+                // cooldownPeriod is optional, defaults to 0
+                if ([burstDictionary objectForKey:@"cooldownPeriod"]) {
+                    burst.referenceValueInterval = [[burstDictionary objectForKey:@"cooldownPeriod"] doubleValue];
+                } else {
+                    burst.referenceValueInterval = 0.0;
+                }
             } else if ([burstDictionary objectForKey:@"distance"]) {
                 burst.referenceFactor = VROParticleModifier::VROModifierFactor::Distance;
                 burst.referenceValueStart = [[burstDictionary objectForKey:@"distance"] doubleValue];
-                burst.referenceValueInterval = [[burstDictionary objectForKey:@"cooldownDistance"] doubleValue];
+
+                // cooldownDistance is optional, defaults to 0
+                if ([burstDictionary objectForKey:@"cooldownDistance"]) {
+                    burst.referenceValueInterval = [[burstDictionary objectForKey:@"cooldownDistance"] doubleValue];
+                } else {
+                    burst.referenceValueInterval = 0.0;
+                }
             } else {
-                RCTLogError(@"Viro: Unsupported interpolation factor provided! Must specify either time or distance.");
+                RCTLogError(@"Viro: emissionBurst[%d] must specify either 'time' or 'distance'.", i);
                 continue;
             }
-            
+
+            // Get min/max particle count
             int min = [[burstDictionary objectForKey:@"min"] intValue];
             int max = [[burstDictionary objectForKey:@"max"] intValue];
-            burst.numberOfParticles = std::pair<int, int>(min,max);
-            burst.cycles = [[burstDictionary objectForKey:@"cycles"] intValue];
+
+            // Validate min/max range
+            if (min < 0 || max < 0 || min > max) {
+                RCTLogError(@"Viro: emissionBurst[%d] has invalid min/max values (min: %d, max: %d). Min and max must be >= 0 and min <= max.", i, min, max);
+                continue;
+            }
+
+            burst.numberOfParticles = std::pair<int, int>(min, max);
+
+            // cycles is optional, defaults to 1
+            if ([burstDictionary objectForKey:@"cycles"]) {
+                int cycles = [[burstDictionary objectForKey:@"cycles"] intValue];
+                burst.cycles = cycles > 0 ? cycles : 1;
+            } else {
+                burst.cycles = 1;
+            }
+
             bursts.push_back(burst);
         }
         _emitter->setParticleBursts(bursts);

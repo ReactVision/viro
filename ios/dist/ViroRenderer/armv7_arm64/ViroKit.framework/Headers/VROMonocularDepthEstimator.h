@@ -214,6 +214,24 @@ public:
      */
     float getAverageLatencyMs() const;
 
+    /**
+     * Get the CPU-side depth buffer data for direct sampling.
+     * Returns nullptr if no depth data is available.
+     * The buffer contains depth values in meters, stored row-major.
+     * Thread-safe.
+     */
+    const float* getDepthBufferData() const;
+
+    /**
+     * Get the width of the depth buffer.
+     */
+    int getDepthBufferWidth() const { return _depthWidth; }
+
+    /**
+     * Get the height of the depth buffer.
+     */
+    int getDepthBufferHeight() const { return _depthHeight; }
+
 private:
     // Graphics driver
     std::weak_ptr<VRODriver> _driver;
@@ -226,8 +244,8 @@ private:
 
     // Threading
     dispatch_queue_t _depthQueue;
-    std::mutex _imageMutex;
-    std::mutex _depthMutex;
+    mutable std::mutex _imageMutex;
+    mutable std::mutex _depthMutex;
 
     // Frame management (pattern from VROVisionEngine)
     CVPixelBufferRef _processingImage;

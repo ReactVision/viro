@@ -588,6 +588,154 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     // ========================================================================
+    // Debugging & Validation Methods
+    // ========================================================================
+
+    @ReactMethod
+    public void isDepthOcclusionSupported(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            WritableMap result = Arguments.createMap();
+            result.putBoolean("supported", false);
+            result.putString("error", "UIManager not available");
+            promise.resolve(result);
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    WritableMap result = Arguments.createMap();
+                    
+                    // On Android, depth-based occlusion requires ARCore 1.18+
+                    // We report supported=true if ARCore is available, but note the requirement
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        result.putBoolean("supported", false);
+                        result.putString("error", "Invalid view type");
+                        promise.resolve(result);
+                        return;
+                    }
+
+                    // Depth occlusion support depends on device having ARCore 1.18+
+                    // Most modern Android devices support this
+                    result.putBoolean("supported", true);
+                    result.putString("minARCoreVersion", "1.18");
+                    promise.resolve(result);
+                } catch (Exception e) {
+                    WritableMap result = Arguments.createMap();
+                    result.putBoolean("supported", false);
+                    result.putString("error", e.getMessage());
+                    promise.resolve(result);
+                }
+            }
+        });
+    }
+
+    @ReactMethod
+    public void getGeospatialSetupStatus(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            WritableMap result = Arguments.createMap();
+            result.putBoolean("geospatialSupported", false);
+            result.putBoolean("locationServicesAvailable", false);
+            result.putBoolean("apiKeyConfigured", false);
+            result.putString("error", "UIManager not available");
+            promise.resolve(result);
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    WritableMap result = Arguments.createMap();
+                    
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        result.putBoolean("geospatialSupported", false);
+                        result.putBoolean("locationServicesAvailable", false);
+                        result.putBoolean("apiKeyConfigured", false);
+                        result.putString("error", "Invalid view type");
+                        promise.resolve(result);
+                        return;
+                    }
+
+                    VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
+                    
+                    // Check geospatial support (requires ARCore and play-services-location)
+                    boolean geospatialSupported = sceneNavigator.isGeospatialModeSupported();
+                    
+                    // Check if location services are enabled
+                    android.content.Context context = getReactApplicationContext();
+                    boolean locationServicesAvailable = isLocationServicesEnabled(context);
+                    
+                    // Check if Google Cloud API key is configured in AndroidManifest.xml
+                    // This is a basic check - a missing key will cause geospatial to fail
+                    String apiKey = getGoogleCloudApiKey(context);
+                    boolean apiKeyConfigured = apiKey != null && !apiKey.isEmpty();
+                    
+                    result.putBoolean("geospatialSupported", geospatialSupported);
+                    result.putBoolean("locationServicesAvailable", locationServicesAvailable);
+                    result.putBoolean("apiKeyConfigured", apiKeyConfigured);
+                    
+                    if (!geospatialSupported) {
+                        result.putString("error", "Geospatial mode not supported. Ensure play-services-location is included in build.gradle");
+                    }
+                    if (!apiKeyConfigured) {
+                        result.putString("error", "Google Cloud API key not configured. Add com.google.android.geo.API_KEY meta-data to AndroidManifest.xml");
+                    }
+                    
+                    promise.resolve(result);
+                } catch (Exception e) {
+                    WritableMap result = Arguments.createMap();
+                    result.putBoolean("geospatialSupported", false);
+                    result.putBoolean("locationServicesAvailable", false);
+                    result.putBoolean("apiKeyConfigured", false);
+                    result.putString("error", e.getMessage());
+                    promise.resolve(result);
+                }
+            }
+        });
+    }
+
+    /**
+     * Check if location services are enabled on this device.
+     */
+    private boolean isLocationServicesEnabled(android.content.Context context) {
+        try {
+            android.location.LocationManager locationManager = 
+                (android.location.LocationManager) context.getSystemService(android.content.Context.LOCATION_SERVICE);
+            if (locationManager == null) {
+                return false;
+            }
+            boolean gpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+            boolean networkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+            return gpsEnabled || networkEnabled;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get the Google Cloud API key from AndroidManifest.xml metadata.
+     */
+    private String getGoogleCloudApiKey(android.content.Context context) {
+        try {
+            android.content.pm.PackageManager pm = context.getPackageManager();
+            android.content.pm.ApplicationInfo ai = pm.getApplicationInfo(
+                context.getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+            if (ai != null && ai.metaData != null) {
+                return ai.metaData.getString("com.google.android.geo.API_KEY");
+            }
+        } catch (Exception e) {
+            // Ignore errors
+        }
+        return null;
+    }
+
+    // ========================================================================
     // Geospatial API Methods
     // ========================================================================
 

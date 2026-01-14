@@ -1292,13 +1292,13 @@
     return [viewAR isMonocularDepthSupported];
 }
 
-- (BOOL)isMonocularDepthModelDownloaded {
+- (BOOL)isMonocularDepthModelAvailable {
     if (!_vroView) {
         return NO;
     }
 
     VROViewAR *viewAR = (VROViewAR *) _vroView;
-    return [viewAR isMonocularDepthModelDownloaded];
+    return [viewAR isMonocularDepthModelAvailable];
 }
 
 - (void)setMonocularDepthEnabled:(BOOL)enabled {
@@ -1310,43 +1310,6 @@
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     [viewAR setMonocularDepthEnabled:enabled];
     RCTLogInfo(@"[ViroAR] Monocular depth estimation %@", enabled ? @"enabled" : @"disabled");
-}
-
-- (void)setMonocularDepthModelURL:(NSString *)baseURL {
-    if (!_vroView) {
-        RCTLogWarn(@"[ViroAR] Cannot set monocular depth model URL: AR view not initialized");
-        return;
-    }
-
-    VROViewAR *viewAR = (VROViewAR *) _vroView;
-    NSURL *url = [NSURL URLWithString:baseURL];
-    [viewAR setMonocularDepthModelURL:url];
-    RCTLogInfo(@"[ViroAR] Monocular depth model URL set to: %@", baseURL);
-}
-
-- (void)downloadMonocularDepthModelWithProgress:(MonocularDepthDownloadProgressHandler)progressHandler
-                              completionHandler:(MonocularDepthDownloadCompletionHandler)completionHandler {
-    if (!_vroView) {
-        if (completionHandler) {
-            completionHandler(NO, @"AR view not initialized");
-        }
-        return;
-    }
-
-    VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR downloadMonocularDepthModelWithProgress:^(float progress) {
-        if (progressHandler) {
-            progressHandler(progress);
-        }
-    } completion:^(BOOL success, NSError *error) {
-        if (completionHandler) {
-            if (success) {
-                completionHandler(YES, nil);
-            } else {
-                completionHandler(NO, error.localizedDescription ?: @"Download failed");
-            }
-        }
-    }];
 }
 
 - (void)setPreferMonocularDepth:(BOOL)prefer {

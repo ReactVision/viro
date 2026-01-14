@@ -136,9 +136,7 @@ enum class VROCameraPosition;
  When enabled, the system will use a neural network to estimate depth from
  the camera image. This provides depth-based occlusion on older devices.
 
- Note: The depth model must be either bundled with the app or downloaded
- using downloadMonocularDepthModel. Call setMonocularDepthModelURL first
- if using on-demand download.
+ Note: The depth model must be bundled with the app as DepthPro.mlmodelc.
 
  @param enabled Whether to enable monocular depth estimation
  */
@@ -153,29 +151,11 @@ enum class VROCameraPosition;
 - (BOOL)isMonocularDepthSupported;
 
 /*
- Check if the monocular depth model has been downloaded.
+ Check if the monocular depth model is available (bundled in framework or app).
 
- @return YES if the model is available locally, NO otherwise
+ @return YES if the model is available, NO otherwise
  */
-- (BOOL)isMonocularDepthModelDownloaded;
-
-/*
- Set the base URL for downloading the depth model.
- The full URL will be: baseURL/DepthPro.mlmodelc.zip
-
- @param baseURL The base URL where the model is hosted
- */
-- (void)setMonocularDepthModelURL:(NSURL *)baseURL;
-
-/*
- Download the monocular depth model if not already downloaded.
- This is an asynchronous operation.
-
- @param progressBlock Called periodically with download progress (0.0-1.0)
- @param completionBlock Called when download completes or fails
- */
-- (void)downloadMonocularDepthModelWithProgress:(void (^)(float progress))progressBlock
-                                     completion:(void (^)(BOOL success, NSError *error))completionBlock;
+- (BOOL)isMonocularDepthModelAvailable;
 
 /*
  When enabled, monocular depth estimation will be used even on devices with LiDAR.

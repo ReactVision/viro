@@ -517,7 +517,13 @@ const int kDefaultMaxParticles = 500;
     if (!modDictionary) {
         return nullptr;
     }
-    
+
+    // Validate that modDictionary is actually a dictionary
+    if (![modDictionary isKindOfClass:[NSDictionary class]]) {
+        RCTLogError(@"Viro: Particle modifier must be a dictionary with 'interpolation' and 'initialRange' keys, not a plain array. Received: %@", [modDictionary class]);
+        return nullptr;
+    }
+
     NSArray *intervalsDictArray = [modDictionary objectForKey:@"interpolation"];
     VROParticleModifier::VROModifierFactor factor = VROParticleModifier::VROModifierFactor::Time;
 

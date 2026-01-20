@@ -27,11 +27,11 @@
 
 #import <React/RCTUIManager.h>
 #import <React/RCTUIManagerUtils.h>
+#import <ViroKit/ViroKit.h>
 #import "VRTARScene.h"
 #import "VRTARSceneModule.h"
 #import "VRTARSceneNavigator.h"
 #import "VRTARHitTestUtil.h"
-#import "VROARHitTestResultiOS.h"
 #import "VRTARAnchorNode.h"
 
 @interface VRTARSceneModule ()
@@ -239,6 +239,7 @@ RCT_EXPORT_METHOD(createAnchoredNodeFromHitResult:(NSString *)hitResultId
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
 
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
     std::shared_ptr<VROARHitTestResult> hitResult = [self getStoredHitResult:hitResultId];
 
     if (!hitResult) {
@@ -299,7 +300,7 @@ RCT_EXPORT_METHOD(createAnchoredNodeFromHitResult:(NSString *)hitResultId
 
             NSMutableDictionary *transformDict = [NSMutableDictionary dictionary];
             transformDict[@"position"] = @[@(position.x), @(position.y), @(position.z)];
-            transformDict[@"rotation"] = @[@(rotation.x), @(rotation.y), @(rotation.z), @(rotation.w)];
+            transformDict[@"rotation"] = @[@(rotation.X), @(rotation.Y), @(rotation.Z), @(rotation.W)];
             transformDict[@"scale"] = @[@(scale.x), @(scale.y), @(scale.z)];
 
             nodeRef[@"transform"] = transformDict;
@@ -307,6 +308,11 @@ RCT_EXPORT_METHOD(createAnchoredNodeFromHitResult:(NSString *)hitResultId
 
         resolve(nodeRef);
     }];
+#else
+    reject(@"NOT_SUPPORTED",
+           @"AR anchor creation requires iOS 11.0 or later",
+           nil);
+#endif
 }
 
 

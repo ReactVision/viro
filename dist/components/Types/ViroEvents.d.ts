@@ -229,7 +229,38 @@ export type ViroCameraARHitTest = {
         up: Viro3DPoint;
     };
 };
-export type ViroARHitTestResult = any;
+export type ViroARHitTestResult = {
+    type: "ExistingPlaneUsingExtent" | "ExistingPlane" | "EstimatedHorizontalPlane" | "FeaturePoint" | "DepthPoint";
+    transform: {
+        position: Viro3DPoint;
+        rotation: ViroRotation;
+        scale: Viro3DPoint;
+    };
+    hasDepthData: boolean;
+    depthValue?: number;
+    depthConfidence?: number;
+    depthSource?: "lidar" | "monocular" | "arcore" | "none";
+    /** @internal - Hit result ID for anchor creation, auto-generated */
+    _hitResultId?: string;
+};
+/**
+ * Reference to an AR node created from a hit test result.
+ * Used to track anchored nodes and access their properties.
+ */
+export type ViroARNodeReference = {
+    /** Unique identifier for the node */
+    nodeId: string;
+    /** React tag for the native view */
+    reactTag: number;
+    /** ID of the associated AR anchor */
+    anchorId?: string;
+    /** Current transform of the anchored node */
+    transform?: {
+        position: Viro3DPoint;
+        rotation: ViroRotation;
+        scale: Viro3DPoint;
+    };
+};
 export type ViroARPointCloudUpdateEvent = {
     pointCloud: ViroARPointCloud;
 };

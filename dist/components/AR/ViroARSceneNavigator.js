@@ -808,7 +808,7 @@ class ViroARSceneNavigator extends React.Component {
         const { viroAppProps = {} } = this.props;
         return (<VRTARSceneNavigator ref={(component) => {
                 this._component = component;
-            }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)}>
+            }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={[this.props.style, styles.container]}>
         {items}
       </VRTARSceneNavigator>);
     }

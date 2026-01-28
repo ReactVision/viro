@@ -1167,7 +1167,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
         {...this.props}
         viroAppProps={viroAppProps}
         currentSceneIndex={this.state.currentSceneIndex}
-        style={(this.props.style, styles.container)}
+        style={[this.props.style, styles.container]}
       >
         {items}
       </VRTARSceneNavigator>

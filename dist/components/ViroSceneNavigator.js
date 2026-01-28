@@ -388,7 +388,7 @@ class ViroSceneNavigator extends React.Component {
          } = this.props;
         return (<VRTSceneNavigator ref={(component) => {
                 this._component = component;
-            }} {...this.props} vrModeEnabled={vrModeEnabled} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} hasOnExitViroCallback={this.props.onExitViro != undefined} onExitViro={this._onExitViro}>
+            }} {...this.props} vrModeEnabled={vrModeEnabled} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={[this.props.style, styles.container]} hasOnExitViroCallback={this.props.onExitViro != undefined} onExitViro={this._onExitViro}>
         {items}
       </VRTSceneNavigator>);
     }

@@ -497,7 +497,7 @@ export class ViroSceneNavigator extends React.Component<Props, State> {
         vrModeEnabled={vrModeEnabled}
         viroAppProps={viroAppProps}
         currentSceneIndex={this.state.currentSceneIndex}
-        style={(this.props.style, styles.container)}
+        style={[this.props.style, styles.container]}
         hasOnExitViroCallback={this.props.onExitViro != undefined}
         onExitViro={this._onExitViro}
       >

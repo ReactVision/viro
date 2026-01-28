@@ -73,6 +73,19 @@ class ViroARSceneNavigator extends React.Component {
             currentSceneIndex: 0,
         };
     }
+    componentDidMount() {
+        // Apply initial prefer monocular depth setting if provided
+        if (this.props.preferMonocularDepth !== undefined) {
+            this._setPreferMonocularDepth(this.props.preferMonocularDepth);
+        }
+    }
+    componentDidUpdate(prevProps) {
+        // Handle monocular depth preference prop changes
+        if (this.props.preferMonocularDepth !== undefined &&
+            prevProps.preferMonocularDepth !== this.props.preferMonocularDepth) {
+            this._setPreferMonocularDepth(this.props.preferMonocularDepth);
+        }
+    }
     componentWillUnmount() {
         // Explicitly trigger native cleanup to prevent memory leaks
         // This ensures ARSession is properly paused and GL resources are released
@@ -623,72 +636,6 @@ class ViroARSceneNavigator extends React.Component {
     // Monocular Depth Estimation API Methods
     // ===========================================================================
     /**
-     * Check if monocular depth estimation is supported on this device.
-     * Requires iOS 14.0+ with Neural Engine capabilities.
-     *
-     * @returns Promise resolving to support status
-     */
-    _isMonocularDepthSupported = async () => {
-        try {
-            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
-            if (!nodeHandle) {
-                return {
-                    supported: false,
-                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
-                };
-            }
-            const result = await ViroARSceneNavigatorModule.isMonocularDepthSupported(nodeHandle);
-            return result;
-        }
-        catch (error) {
-            return {
-                supported: false,
-                error: `Failed to check monocular depth support: ${error}`,
-            };
-        }
-    };
-    /**
-     * Check if the monocular depth model is available (bundled in framework or app).
-     *
-     * @returns Promise resolving to availability status
-     */
-    _isMonocularDepthModelAvailable = async () => {
-        try {
-            const nodeHandle = (0, react_native_1.findNodeHandle)(this);
-            if (!nodeHandle) {
-                return {
-                    available: false,
-                    error: "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
-                };
-            }
-            const result = await ViroARSceneNavigatorModule.isMonocularDepthModelAvailable(nodeHandle);
-            return result;
-        }
-        catch (error) {
-            return {
-                available: false,
-                error: `Failed to check monocular depth model availability: ${error}`,
-            };
-        }
-    };
-    /**
-     * Enable or disable monocular depth estimation.
-     * When enabled, depth will be estimated from the camera image using a neural network.
-     * This provides depth-based occlusion on devices without LiDAR.
-     *
-     * Note: The model must be bundled in the app as DepthPro.mlmodelc.
-     *
-     * @param enabled - Whether to enable monocular depth estimation
-     */
-    _setMonocularDepthEnabled = (enabled) => {
-        const nodeHandle = (0, react_native_1.findNodeHandle)(this);
-        if (!nodeHandle) {
-            console.warn("Cannot set monocular depth: Component not mounted - ensure ViroARSceneNavigator is rendered and visible");
-            return;
-        }
-        ViroARSceneNavigatorModule.setMonocularDepthEnabled(nodeHandle, enabled);
-    };
-    /**
      * Set whether to prefer monocular depth estimation over LiDAR.
      * When enabled, monocular depth will be used even on devices with LiDAR.
      * Useful for:
@@ -841,9 +788,6 @@ class ViroARSceneNavigator extends React.Component {
         getSemanticLabelFractions: this._getSemanticLabelFractions,
         getSemanticLabelFraction: this._getSemanticLabelFraction,
         // Monocular Depth Estimation API
-        isMonocularDepthSupported: this._isMonocularDepthSupported,
-        isMonocularDepthModelAvailable: this._isMonocularDepthModelAvailable,
-        setMonocularDepthEnabled: this._setMonocularDepthEnabled,
         setPreferMonocularDepth: this._setPreferMonocularDepth,
         isPreferMonocularDepth: this._isPreferMonocularDepth,
         // Debugging & Validation API
@@ -883,9 +827,6 @@ class ViroARSceneNavigator extends React.Component {
         getSemanticLabelFractions: this._getSemanticLabelFractions,
         getSemanticLabelFraction: this._getSemanticLabelFraction,
         // Monocular Depth Estimation API
-        isMonocularDepthSupported: this._isMonocularDepthSupported,
-        isMonocularDepthModelAvailable: this._isMonocularDepthModelAvailable,
-        setMonocularDepthEnabled: this._setMonocularDepthEnabled,
         setPreferMonocularDepth: this._setPreferMonocularDepth,
         isPreferMonocularDepth: this._isPreferMonocularDepth,
         // Debugging & Validation API

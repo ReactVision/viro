@@ -1279,39 +1279,6 @@
 
 #pragma mark - Monocular Depth Estimation API Methods
 
-- (BOOL)isMonocularDepthSupported {
-    if (!_vroView) {
-        // Check static support without needing the view
-        if (@available(iOS 14.0, *)) {
-            return [VROViewAR isARSupported];
-        }
-        return NO;
-    }
-
-    VROViewAR *viewAR = (VROViewAR *) _vroView;
-    return [viewAR isMonocularDepthSupported];
-}
-
-- (BOOL)isMonocularDepthModelAvailable {
-    if (!_vroView) {
-        return NO;
-    }
-
-    VROViewAR *viewAR = (VROViewAR *) _vroView;
-    return [viewAR isMonocularDepthModelAvailable];
-}
-
-- (void)setMonocularDepthEnabled:(BOOL)enabled {
-    if (!_vroView) {
-        RCTLogWarn(@"[ViroAR] Cannot set monocular depth: AR view not initialized");
-        return;
-    }
-
-    VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR setMonocularDepthEnabled:enabled];
-    RCTLogInfo(@"[ViroAR] Monocular depth estimation %@", enabled ? @"enabled" : @"disabled");
-}
-
 - (void)setPreferMonocularDepth:(BOOL)prefer {
     if (!_vroView) {
         RCTLogWarn(@"[ViroAR] Cannot set prefer monocular depth: AR view not initialized");

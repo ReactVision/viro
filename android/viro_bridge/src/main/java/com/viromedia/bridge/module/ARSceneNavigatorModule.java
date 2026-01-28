@@ -1401,6 +1401,69 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     // ========================================================================
+    // Monocular Depth Estimation Methods (iOS Only)
+    // ========================================================================
+
+    /**
+     * Check if monocular depth estimation is supported.
+     * Note: Monocular depth estimation is iOS-only (requires Apple CoreML).
+     * On Android, use ARCore Depth API instead.
+     */
+    @ReactMethod
+    public void isMonocularDepthSupported(final int sceneNavTag, final Promise promise) {
+        WritableMap result = Arguments.createMap();
+        result.putBoolean("supported", false);
+        result.putString("error", "Monocular depth estimation is iOS-only (requires Apple CoreML). " +
+                "Use ARCore Depth API for depth sensing on Android.");
+        promise.resolve(result);
+    }
+
+    /**
+     * Check if monocular depth model is available.
+     * Note: Monocular depth estimation is iOS-only.
+     */
+    @ReactMethod
+    public void isMonocularDepthModelAvailable(final int sceneNavTag, final Promise promise) {
+        WritableMap result = Arguments.createMap();
+        result.putBoolean("available", false);
+        result.putString("error", "Monocular depth estimation is iOS-only (requires DepthPro CoreML model). " +
+                "Use ARCore Depth API for depth sensing on Android.");
+        promise.resolve(result);
+    }
+
+    /**
+     * Enable/disable monocular depth estimation.
+     * Note: No-op on Android (iOS-only feature).
+     */
+    @ReactMethod
+    public void setMonocularDepthEnabled(final int sceneNavTag, final boolean enabled) {
+        // No-op on Android
+        Log.w("ARSceneNavigatorModule", "setMonocularDepthEnabled is iOS-only. Use ARCore Depth API on Android.");
+    }
+
+    /**
+     * Set whether to prefer monocular depth over LiDAR.
+     * Note: No-op on Android (iOS-only feature).
+     */
+    @ReactMethod
+    public void setPreferMonocularDepth(final int sceneNavTag, final boolean prefer) {
+        // No-op on Android
+        Log.w("ARSceneNavigatorModule", "setPreferMonocularDepth is iOS-only.");
+    }
+
+    /**
+     * Check if monocular depth is preferred over LiDAR.
+     * Note: Monocular depth estimation is iOS-only.
+     */
+    @ReactMethod
+    public void isPreferMonocularDepth(final int sceneNavTag, final Promise promise) {
+        WritableMap result = Arguments.createMap();
+        result.putBoolean("preferred", false);
+        result.putString("error", "Monocular depth estimation is iOS-only.");
+        promise.resolve(result);
+    }
+
+    // ========================================================================
     // Cleanup Methods
     // ========================================================================
 

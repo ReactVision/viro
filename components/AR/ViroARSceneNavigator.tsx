@@ -118,6 +118,28 @@ type Props = ViewProps & {
   depthDebugEnabled?: boolean;
 
   /**
+   * [iOS Only] Prefer monocular depth estimation over LiDAR.
+   * When true, monocular depth will be used even on devices with LiDAR.
+   *
+   * Monocular depth is automatically used on non-LiDAR devices when depth-based
+   * occlusion is enabled. This prop allows forcing monocular depth on LiDAR devices.
+   *
+   * Useful for:
+   * - Consistency across all device types (same depth method)
+   * - Testing/comparison purposes
+   * - Extended range beyond LiDAR's ~5m limit
+   *
+   * Requires:
+   * - iOS 14.0+
+   * - Neural Engine (A12 Bionic or newer)
+   * - DepthPro.mlmodelc bundled in ViroKit
+   *
+   * @default false
+   * @platform ios
+   */
+  preferMonocularDepth?: boolean;
+
+  /**
    * Enable cloud anchors for cross-platform anchor sharing.
    * When set to 'arcore', the ARCore Cloud Anchors SDK will be used.
    * Requires a valid Google Cloud API key configured in the native project.
@@ -200,6 +222,23 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       sceneHistory: [scene.tag],
       currentSceneIndex: 0,
     };
+  }
+
+  componentDidMount() {
+    // Apply initial prefer monocular depth setting if provided
+    if (this.props.preferMonocularDepth !== undefined) {
+      this._setPreferMonocularDepth(this.props.preferMonocularDepth);
+    }
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    // Handle monocular depth preference prop changes
+    if (
+      this.props.preferMonocularDepth !== undefined &&
+      prevProps.preferMonocularDepth !== this.props.preferMonocularDepth
+    ) {
+      this._setPreferMonocularDepth(this.props.preferMonocularDepth);
+    }
   }
 
   componentWillUnmount() {
@@ -942,85 +981,6 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   // ===========================================================================
 
   /**
-   * Check if monocular depth estimation is supported on this device.
-   * Requires iOS 14.0+ with Neural Engine capabilities.
-   *
-   * @returns Promise resolving to support status
-   */
-  _isMonocularDepthSupported =
-    async (): Promise<ViroMonocularDepthSupportResult> => {
-      try {
-        const nodeHandle = findNodeHandle(this);
-        if (!nodeHandle) {
-          return {
-            supported: false,
-            error:
-              "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
-          };
-        }
-        const result =
-          await ViroARSceneNavigatorModule.isMonocularDepthSupported(
-            nodeHandle
-          );
-        return result;
-      } catch (error) {
-        return {
-          supported: false,
-          error: `Failed to check monocular depth support: ${error}`,
-        };
-      }
-    };
-
-  /**
-   * Check if the monocular depth model is available (bundled in framework or app).
-   *
-   * @returns Promise resolving to availability status
-   */
-  _isMonocularDepthModelAvailable =
-    async (): Promise<ViroMonocularDepthModelAvailableResult> => {
-      try {
-        const nodeHandle = findNodeHandle(this);
-        if (!nodeHandle) {
-          return {
-            available: false,
-            error:
-              "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
-          };
-        }
-        const result =
-          await ViroARSceneNavigatorModule.isMonocularDepthModelAvailable(
-            nodeHandle
-          );
-        return result;
-      } catch (error) {
-        return {
-          available: false,
-          error: `Failed to check monocular depth model availability: ${error}`,
-        };
-      }
-    };
-
-  /**
-   * Enable or disable monocular depth estimation.
-   * When enabled, depth will be estimated from the camera image using a neural network.
-   * This provides depth-based occlusion on devices without LiDAR.
-   *
-   * Note: The model must be bundled in the app as DepthPro.mlmodelc.
-   *
-   * @param enabled - Whether to enable monocular depth estimation
-   */
-  _setMonocularDepthEnabled = (enabled: boolean) => {
-    const nodeHandle = findNodeHandle(this);
-    if (!nodeHandle) {
-      console.warn(
-        "Cannot set monocular depth: Component not mounted - ensure ViroARSceneNavigator is rendered and visible"
-      );
-      return;
-    }
-    ViroARSceneNavigatorModule.setMonocularDepthEnabled(nodeHandle, enabled);
-  };
-
-  /**
    * Set whether to prefer monocular depth estimation over LiDAR.
    * When enabled, monocular depth will be used even on devices with LiDAR.
    * Useful for:
@@ -1057,9 +1017,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
               "Component not mounted - ensure ViroARSceneNavigator is rendered and visible",
           };
         }
-        const result = await ViroARSceneNavigatorModule.isPreferMonocularDepth(
-          nodeHandle
-        );
+        const result =
+          await ViroARSceneNavigatorModule.isPreferMonocularDepth(nodeHandle);
         return result;
       } catch (error) {
         return {
@@ -1198,9 +1157,6 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getSemanticLabelFractions: this._getSemanticLabelFractions,
     getSemanticLabelFraction: this._getSemanticLabelFraction,
     // Monocular Depth Estimation API
-    isMonocularDepthSupported: this._isMonocularDepthSupported,
-    isMonocularDepthModelAvailable: this._isMonocularDepthModelAvailable,
-    setMonocularDepthEnabled: this._setMonocularDepthEnabled,
     setPreferMonocularDepth: this._setPreferMonocularDepth,
     isPreferMonocularDepth: this._isPreferMonocularDepth,
     // Debugging & Validation API
@@ -1240,9 +1196,6 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getSemanticLabelFractions: this._getSemanticLabelFractions,
     getSemanticLabelFraction: this._getSemanticLabelFraction,
     // Monocular Depth Estimation API
-    isMonocularDepthSupported: this._isMonocularDepthSupported,
-    isMonocularDepthModelAvailable: this._isMonocularDepthModelAvailable,
-    setMonocularDepthEnabled: this._setMonocularDepthEnabled,
     setPreferMonocularDepth: this._setPreferMonocularDepth,
     isPreferMonocularDepth: this._isPreferMonocularDepth,
     // Debugging & Validation API

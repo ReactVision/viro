@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroCloudAnchorProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialAnchorProvider, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthSupportResult, ViroMonocularDepthModelAvailableResult, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroCloudAnchorProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialAnchorProvider, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -67,6 +67,27 @@ type Props = ViewProps & {
      * @default false
      */
     depthDebugEnabled?: boolean;
+    /**
+     * [iOS Only] Prefer monocular depth estimation over LiDAR.
+     * When true, monocular depth will be used even on devices with LiDAR.
+     *
+     * Monocular depth is automatically used on non-LiDAR devices when depth-based
+     * occlusion is enabled. This prop allows forcing monocular depth on LiDAR devices.
+     *
+     * Useful for:
+     * - Consistency across all device types (same depth method)
+     * - Testing/comparison purposes
+     * - Extended range beyond LiDAR's ~5m limit
+     *
+     * Requires:
+     * - iOS 14.0+
+     * - Neural Engine (A12 Bionic or newer)
+     * - DepthPro.mlmodelc bundled in ViroKit
+     *
+     * @default false
+     * @platform ios
+     */
+    preferMonocularDepth?: boolean;
     /**
      * Enable cloud anchors for cross-platform anchor sharing.
      * When set to 'arcore', the ARCore Cloud Anchors SDK will be used.
@@ -125,6 +146,8 @@ type State = {
 export declare class ViroARSceneNavigator extends React.Component<Props, State> {
     _component: ViroNativeRef;
     constructor(props: Props);
+    componentDidMount(): void;
+    componentDidUpdate(prevProps: Props): void;
     componentWillUnmount(): void;
     /**
      * Starts recording video of the Viro renderer and external audio
@@ -426,29 +449,6 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _getSemanticLabelFraction: (label: ViroSemanticLabel) => Promise<ViroSemanticLabelFractionResult>;
     /**
-     * Check if monocular depth estimation is supported on this device.
-     * Requires iOS 14.0+ with Neural Engine capabilities.
-     *
-     * @returns Promise resolving to support status
-     */
-    _isMonocularDepthSupported: () => Promise<ViroMonocularDepthSupportResult>;
-    /**
-     * Check if the monocular depth model is available (bundled in framework or app).
-     *
-     * @returns Promise resolving to availability status
-     */
-    _isMonocularDepthModelAvailable: () => Promise<ViroMonocularDepthModelAvailableResult>;
-    /**
-     * Enable or disable monocular depth estimation.
-     * When enabled, depth will be estimated from the camera image using a neural network.
-     * This provides depth-based occlusion on devices without LiDAR.
-     *
-     * Note: The model must be bundled in the app as DepthPro.mlmodelc.
-     *
-     * @param enabled - Whether to enable monocular depth estimation
-     */
-    _setMonocularDepthEnabled: (enabled: boolean) => void;
-    /**
      * Set whether to prefer monocular depth estimation over LiDAR.
      * When enabled, monocular depth will be used even on devices with LiDAR.
      * Useful for:
@@ -519,9 +519,6 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         setSemanticModeEnabled: (enabled: boolean) => void;
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;
         getSemanticLabelFraction: (label: ViroSemanticLabel) => Promise<ViroSemanticLabelFractionResult>;
-        isMonocularDepthSupported: () => Promise<ViroMonocularDepthSupportResult>;
-        isMonocularDepthModelAvailable: () => Promise<ViroMonocularDepthModelAvailableResult>;
-        setMonocularDepthEnabled: (enabled: boolean) => void;
         setPreferMonocularDepth: (prefer: boolean) => void;
         isPreferMonocularDepth: () => Promise<ViroMonocularDepthPreferenceResult>;
         isDepthOcclusionSupported: () => Promise<ViroDepthOcclusionSupportResult>;
@@ -557,9 +554,6 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         setSemanticModeEnabled: (enabled: boolean) => void;
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;
         getSemanticLabelFraction: (label: ViroSemanticLabel) => Promise<ViroSemanticLabelFractionResult>;
-        isMonocularDepthSupported: () => Promise<ViroMonocularDepthSupportResult>;
-        isMonocularDepthModelAvailable: () => Promise<ViroMonocularDepthModelAvailableResult>;
-        setMonocularDepthEnabled: (enabled: boolean) => void;
         setPreferMonocularDepth: (prefer: boolean) => void;
         isPreferMonocularDepth: () => Promise<ViroMonocularDepthPreferenceResult>;
         isDepthOcclusionSupported: () => Promise<ViroDepthOcclusionSupportResult>;

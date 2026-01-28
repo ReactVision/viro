@@ -125,6 +125,13 @@ public:
         _depthSource = depthSource;
     }
 
+    /*
+     Set the type of hit test result. Used to upgrade results to DepthPoint when depth data is available.
+     */
+    void setType(VROARHitTestResultType type) {
+        _type = type;
+    }
+
 protected:
 
     std::weak_ptr<VROARAnchor> _anchor;

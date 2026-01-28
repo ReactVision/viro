@@ -266,6 +266,7 @@ private:
     std::shared_ptr<VROMonocularDepthEstimator> _monocularDepthEstimator;
     bool _monocularDepthEnabled;
     bool _preferMonocularDepth;  // When true, use monocular even on LiDAR devices
+    bool _monocularDepthLoading;
     std::shared_ptr<VRODriver> _driver;
 
     void updateTrackingType(VROTrackingType trackingType);

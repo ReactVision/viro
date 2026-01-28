@@ -169,17 +169,6 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 
 #pragma mark - Monocular Depth Estimation API Methods
 
-
-// Check if monocular depth estimation is supported on this device (iOS 14.0+)
-- (BOOL)isMonocularDepthSupported;
-
-// Check if the monocular depth model is available (bundled in framework or app)
-- (BOOL)isMonocularDepthModelAvailable;
-
-// Enable or disable monocular depth estimation for non-LiDAR devices
-// Note: Model must be bundled as DepthPro.mlmodelc
-- (void)setMonocularDepthEnabled:(BOOL)enabled;
-
 // When enabled, monocular depth will be used even on devices with LiDAR
 // This allows consistency across device types, testing, or depth beyond LiDAR's ~5m range
 - (void)setPreferMonocularDepth:(BOOL)prefer;

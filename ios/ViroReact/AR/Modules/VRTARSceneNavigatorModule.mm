@@ -801,60 +801,6 @@ RCT_EXPORT_METHOD(getSemanticLabelFraction:(nonnull NSNumber *)reactTag
 
 #pragma mark - Monocular Depth Estimation API Methods
 
-RCT_EXPORT_METHOD(isMonocularDepthSupported:(nonnull NSNumber *)reactTag
-                                    resolve:(RCTPromiseResolveBlock)resolve
-                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
-            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@{@"supported": @NO, @"error": @"Invalid view type"});
-                return;
-            }
-
-            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-            BOOL supported = [component isMonocularDepthSupported];
-            resolve(@{@"supported": @(supported)});
-        } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
-        }
-    }];
-}
-
-RCT_EXPORT_METHOD(isMonocularDepthModelAvailable:(nonnull NSNumber *)reactTag
-                                        resolve:(RCTPromiseResolveBlock)resolve
-                                         reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
-            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@{@"available": @NO, @"error": @"Invalid view type"});
-                return;
-            }
-
-            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-            BOOL available = [component isMonocularDepthModelAvailable];
-            resolve(@{@"available": @(available)});
-        } @catch (NSException *exception) {
-            resolve(@{@"available": @NO, @"error": exception.reason});
-        }
-    }];
-}
-
-RCT_EXPORT_METHOD(setMonocularDepthEnabled:(nonnull NSNumber *)reactTag
-                                   enabled:(BOOL)enabled) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
-        if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
-            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
-            [component setMonocularDepthEnabled:enabled];
-        }
-    }];
-}
-
 RCT_EXPORT_METHOD(setPreferMonocularDepth:(nonnull NSNumber *)reactTag
                                    prefer:(BOOL)prefer) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,

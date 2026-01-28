@@ -179,10 +179,42 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        
+        // Re-enable rotation listener when view is reattached
+        if (mRotationListener != null) {
+            mRotationListener.enable();
+        }
+        
+        // Resume AR session when view is reattached (e.g., switching back to tab)
+        // This ensures camera texture is reinitialized
+        ViroViewARCore arView = getARView();
+        if (arView != null && mGLInitialized) {
+            android.app.Activity activity = mReactContext.getCurrentActivity();
+            if (activity != null) {
+                arView.onActivityResumed(activity);
+            }
+        }
+    }
+
+    @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        
+        // Disable rotation listener
         if (mRotationListener != null) {
             mRotationListener.disable();
+        }
+        
+        // Pause AR session when view is detached (e.g., switching away from tab)
+        // This releases camera resources properly
+        ViroViewARCore arView = getARView();
+        if (arView != null) {
+            android.app.Activity activity = mReactContext.getCurrentActivity();
+            if (activity != null) {
+                arView.onActivityPaused(activity);
+            }
         }
     }
 

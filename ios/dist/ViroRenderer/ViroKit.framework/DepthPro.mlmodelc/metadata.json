@@ -1,6 +1,6 @@
 [
   {
-    "shortDescription" : "Depth Anything V2 vits",
+    "shortDescription" : "Depth Anything V2 vits (with ImageNet normalization)",
     "metadataOutputVersion" : "3.0",
     "outputSchema" : [
       {
@@ -28,13 +28,14 @@
       "LayerNorm" : 28,
       "Transpose" : 29,
       "Matmul" : 24,
+      "Sub" : 1,
       "Gelu" : 12,
       "UpsampleBilinear" : 5,
       "Softmax" : 12,
-      "Mul" : 37,
+      "Mul" : 38,
       "Cast" : 2,
       "Reshape" : 29,
-      "Add" : 36,
+      "Add" : 35,
       "ConvTranspose" : 2,
       "Relu" : 16,
       "Squeeze" : 1,
@@ -71,12 +72,12 @@
       }
     ],
     "userDefinedMetadata" : {
-      "com.github.apple.coremltools.conversion_date" : "2026-01-04",
+      "com.github.apple.coremltools.conversion_date" : "2026-01-30",
       "com.github.apple.coremltools.source" : "torch==2.7.0",
       "com.github.apple.coremltools.version" : "9.0",
       "com.github.apple.coremltools.source_dialect" : "TorchScript"
     },
-    "generatedClassName" : "DepthAnythingV2_S_Metrics",
+    "generatedClassName" : "DepthAnythingV2",
     "method" : "predict"
   }
 ]

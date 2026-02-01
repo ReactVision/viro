@@ -71,6 +71,7 @@ class ViroARSceneNavigator extends React.Component {
             sceneDictionary: sceneDict,
             sceneHistory: [scene.tag],
             currentSceneIndex: 0,
+            internalRemountKey: 0,
         };
     }
     componentDidMount() {
@@ -86,6 +87,20 @@ class ViroARSceneNavigator extends React.Component {
             this._setPreferMonocularDepth(this.props.preferMonocularDepth);
         }
     }
+    /**
+     * [Android Only - Internal]
+     * Handle tab switch detection from native side.
+     * This is called automatically when the native view detects it was reattached
+     * to the window after being detached (tab switching scenario).
+     */
+    _onTabSwitch = () => {
+        if (require('react-native').Platform.OS === 'android') {
+            // Increment internal key to force a remount with fresh GL context
+            this.setState((prevState) => ({
+                internalRemountKey: prevState.internalRemountKey + 1,
+            }));
+        }
+    };
     componentWillUnmount() {
         // Explicitly trigger native cleanup to prevent memory leaks
         // This ensures ARSession is properly paused and GL resources are released
@@ -853,7 +868,7 @@ class ViroARSceneNavigator extends React.Component {
         const { viroAppProps = {} } = this.props;
         return (<VRTARSceneNavigator ref={(component) => {
                 this._component = component;
-            }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)}>
+            }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} key={this.state.internalRemountKey} onTabSwitch={this._onTabSwitch}>
         {items}
       </VRTARSceneNavigator>);
     }

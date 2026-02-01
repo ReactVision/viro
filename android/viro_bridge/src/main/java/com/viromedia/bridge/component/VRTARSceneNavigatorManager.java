@@ -25,8 +25,11 @@ import android.util.Log;
 
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.annotations.ReactProp;
+
+import java.util.Map;
 
 /**
  * ARSceneNavigatorManager for building a {@link VRTARSceneNavigator}
@@ -112,5 +115,19 @@ public class VRTARSceneNavigatorManager extends VRTViroViewGroupManager<VRTARSce
     @ReactProp(name = "worldMeshConfig")
     public void setWorldMeshConfig(VRTARSceneNavigator navigator, ReadableMap config) {
         navigator.setWorldMeshConfig(config);
+    }
+
+    @Override
+    public Map<String, Object> getExportedCustomDirectEventTypeConstants() {
+        Map<String, Object> events = super.getExportedCustomDirectEventTypeConstants();
+        if (events == null) {
+            events = MapBuilder.newHashMap();
+        }
+
+        // Export the onTabSwitch event so React can listen to it
+        // This event is emitted when a tab switch is detected (window reattach after detach)
+        events.put("onTabSwitch", MapBuilder.of("registrationName", "onTabSwitch"));
+
+        return events;
     }
 }

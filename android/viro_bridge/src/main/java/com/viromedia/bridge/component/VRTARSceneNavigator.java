@@ -30,6 +30,7 @@ import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.viro.core.ARAnchor;
 import com.viro.core.ARNode;
 import com.viro.core.ARScene;
@@ -59,6 +60,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private boolean mNeedsSemanticModeToggle = false;
     private boolean mGeospatialModeEnabled = false;
     private boolean mNeedsGeospatialModeToggle = false;
+
+    // Track if we were detached from window (for tab switching detection)
+    // This is separate from VRTComponent's mDetached which tracks React tree detachment
+    private boolean mWasDetachedFromWindow = false;
 
     private static class StartupListenerARCore implements ViroViewARCore.StartupListener {
 
@@ -180,66 +185,99 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
     @Override
     protected void onAttachedToWindow() {
+        android.util.Log.i(TAG, "=== onAttachedToWindow START ===");
+        android.util.Log.i(TAG, "  mWasDetachedFromWindow: " + mWasDetachedFromWindow);
+        android.util.Log.i(TAG, "  mViroView: " + (mViroView != null ? "NOT NULL" : "NULL"));
+
+        // Detect tab switch scenario: we were detached before and ViroView was disposed
+        if (mWasDetachedFromWindow && mViroView == null) {
+            android.util.Log.i(TAG, "  TAB SWITCH DETECTED - Emitting event to React");
+
+            // Emit event to React side to trigger remount
+            emitTabSwitchEvent();
+
+            // Reset flag
+            mWasDetachedFromWindow = false;
+
+            // Don't call super - React will remount us with a fresh key
+            android.util.Log.i(TAG, "=== onAttachedToWindow END (waiting for React remount) ===");
+            return;
+        }
+
+        // Normal attach (first time or after resume without disposal)
         super.onAttachedToWindow();
-        
+
         // Re-enable rotation listener when view is reattached
         if (mRotationListener != null) {
             mRotationListener.enable();
+            android.util.Log.i(TAG, "  Rotation listener enabled");
         }
-        
-        // Resume AR session when view is reattached (e.g., switching back to tab)
-        // This ensures camera texture is reinitialized
-        ViroViewARCore arView = getARView();
-        if (arView != null && mGLInitialized) {
-            android.app.Activity activity = mReactContext.getCurrentActivity();
-            if (activity != null) {
-                arView.onActivityResumed(activity);
-            }
-        }
+
+        android.util.Log.i(TAG, "=== onAttachedToWindow END (normal) ===");
     }
 
     @Override
     protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        
+        android.util.Log.i(TAG, "=== onDetachedFromWindow START ===");
+        android.util.Log.i(TAG, "  mViroView: " + (mViroView != null ? "NOT NULL" : "NULL"));
+
+        // Mark that we were detached - used to detect tab switches
+        mWasDetachedFromWindow = true;
+
         // Disable rotation listener
         if (mRotationListener != null) {
             mRotationListener.disable();
+            android.util.Log.i(TAG, "  Rotation listener disabled");
         }
-        
-        // Pause AR session when view is detached (e.g., switching away from tab)
-        // This releases camera resources properly
+
+        // Pause AR session before disposal
         ViroViewARCore arView = getARView();
         if (arView != null) {
             android.app.Activity activity = mReactContext.getCurrentActivity();
             if (activity != null) {
+                android.util.Log.i(TAG, "  Pausing AR session");
                 arView.onActivityPaused(activity);
+                arView.onActivityStopped(activity);
             }
         }
+
+        // Call parent to dispose ViroView normally
+        // This is correct for both tab switching and component unmount
+        super.onDetachedFromWindow();
+
+        android.util.Log.i(TAG, "=== onDetachedFromWindow END ===");
     }
 
     /**
-     * Explicitly dispose of AR resources. Called from componentWillUnmount to ensure
-     * proper cleanup even if onDetachedFromWindow is delayed or not called.
-     * This method can be called multiple times safely.
+     * Emit an event to the React side indicating a tab switch was detected.
+     * The React component will listen for this event and trigger a remount.
      */
+    private void emitTabSwitchEvent() {
+        WritableMap event = Arguments.createMap();
+        event.putString("type", "tabSwitch");
+
+        try {
+            mReactContext
+                .getJSModule(RCTEventEmitter.class)
+                .receiveEvent(getId(), "onTabSwitch", event);
+            android.util.Log.i(TAG, "  Tab switch event emitted to React");
+        } catch (Exception e) {
+            android.util.Log.e(TAG, "  Failed to emit tab switch event: " + e.getMessage());
+        }
+    }
+
     public void dispose() {
+        // Clear the window detachment flag since this is a permanent disposal
+        mWasDetachedFromWindow = false;
+
         // Disable rotation listener
         if (mRotationListener != null) {
             mRotationListener.disable();
             mRotationListener = null;
         }
 
-        // Get AR view and pause the session
-        ViroViewARCore arView = getARView();
-        if (arView != null) {
-            // Pause the AR session to release camera and other resources
-            arView.onActivityPaused(null);
-        }
-
-        // Trigger parent class cleanup which handles scene teardown and ViroView disposal
-        // This is the same logic as onDetachedFromWindow in VRT3DSceneNavigator
-        // but can be called proactively from React Native
+        // The parent's onDetachedFromWindow() will be called by the view system
+        // when the component is actually removed, so we don't need to call it here
     }
 
     public void setAutoFocusEnabled(boolean enabled) {

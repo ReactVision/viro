@@ -139,6 +139,7 @@ type State = {
     sceneDictionary: ViroSceneDictionary;
     sceneHistory: string[];
     currentSceneIndex: number;
+    internalRemountKey: number;
 };
 /**
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
@@ -148,6 +149,13 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
     constructor(props: Props);
     componentDidMount(): void;
     componentDidUpdate(prevProps: Props): void;
+    /**
+     * [Android Only - Internal]
+     * Handle tab switch detection from native side.
+     * This is called automatically when the native view detects it was reattached
+     * to the window after being detached (tab switching scenario).
+     */
+    _onTabSwitch: () => void;
     componentWillUnmount(): void;
     /**
      * Starts recording video of the Viro renderer and external audio

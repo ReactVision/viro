@@ -1,6 +1,7 @@
 import { ViroAnimation } from "../Animation/ViroAnimations";
 import { ViroAnchor, ViroAnchorFoundMap, ViroAnchorUpdatedMap, ViroClickState, ViroErrorEvent, ViroPinchState, ViroRotateState } from "../Types/ViroEvents";
 import { ViroPhysicsBody, Viro3DPoint, ViroRotation, ViroScale, ViroSource } from "../Types/ViroUtils";
+import { ViroShaderModifiers, ViroShaderUniform } from "../Material/ViroMaterials";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 export type ViroCommonProps = ViewProps & {
     target?: string;
@@ -52,6 +53,10 @@ export type ViroObjectProps = {
     transformBehaviors?: string | string[];
     lightReceivingBitMask?: number;
     shadowCastingBitMask?: number;
+    shaderModifiers?: ViroShaderModifiers;
+    materialUniforms?: {
+        [key: string]: any;
+    } | ViroShaderUniform[];
     onTransformUpdate?: (position: Viro3DPoint) => void;
     /**
      * Enables high accuracy event collision checks for this object.

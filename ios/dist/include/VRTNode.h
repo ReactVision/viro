@@ -67,6 +67,10 @@ extern const int k2DPointsPerSpatialUnit;
 @property (nonatomic, assign) int renderingOrder;
 @property (nonatomic, assign) BOOL visible;
 
+// Custom shader properties
+@property (nonatomic, copy, nullable) NSDictionary *shaderModifiers;
+@property (nonatomic, copy, nullable) NSDictionary *materialUniforms;
+
 // Event properties
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onHoverViro;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onClickViro;

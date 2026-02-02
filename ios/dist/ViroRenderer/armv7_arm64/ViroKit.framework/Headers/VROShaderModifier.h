@@ -205,6 +205,7 @@ public:
      are automatically separated out from the body of the input code.
      */
     VROShaderModifier(VROShaderEntryPoint entryPoint, std::vector<std::string> input);
+    VROShaderModifier(VROShaderEntryPoint entryPoint, std::string body);
     virtual ~VROShaderModifier();
     
     VROShaderEntryPoint getEntryPoint() const {

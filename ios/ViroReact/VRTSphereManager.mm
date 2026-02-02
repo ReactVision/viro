@@ -73,6 +73,8 @@ RCT_EXPORT_VIEW_PROPERTY(shadowCastingBitMask, int)
 RCT_EXPORT_VIEW_PROPERTY(ignoreEventHandling, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(dragType, NSString)
 RCT_EXPORT_VIEW_PROPERTY(dragPlane, NSDictionary)
+RCT_EXPORT_VIEW_PROPERTY(shaderModifiers, NSDictionary)
+RCT_EXPORT_VIEW_PROPERTY(materialUniforms, NSDictionary)
 - (VRTView *)view
 {
     return [[VRTSphere alloc] initWithBridge:self.bridge];

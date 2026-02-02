@@ -29,6 +29,13 @@
 
 #include <memory>
 #include <functional>
+#include <map>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include "VROVector3f.h"
+#include "VROVector4f.h"
+#include "VROMatrix4f.h"
 #include "VROMaterialVisual.h"
 #include "VROAnimatable.h"
 #include "VROStringUtil.h"
@@ -76,6 +83,7 @@ class VRODriver;
 class VROSortKey;
 class VROMaterialSubstrate;
 class VROShaderModifier;
+class VROTexture;
 
 /*
  Manages the lighting and shading attributes associated with the surface of a geometry that
@@ -369,12 +377,50 @@ public:
         _renderingOrder = renderingOrder;
     }
 
+    void setShaderUniform(std::string name, float value) {
+        _shaderUniformFloats[name] = value;
+    }
+    void setShaderUniform(std::string name, VROVector3f value) {
+        _shaderUniformVec3s[name] = value;
+    }
+    void setShaderUniform(std::string name, VROVector4f value) {
+        _shaderUniformVec4s[name] = value;
+    }
+    void setShaderUniform(std::string name, VROMatrix4f value) {
+        _shaderUniformMat4s[name] = value;
+    }
+    void setShaderUniform(std::string name, std::shared_ptr<VROTexture> texture) {
+        _shaderUniformTextures[name] = texture;
+    }
+
+    const std::map<std::string, float> &getShaderUniformFloats() const { return _shaderUniformFloats; }
+    const std::map<std::string, VROVector3f> &getShaderUniformVec3s() const { return _shaderUniformVec3s; }
+    const std::map<std::string, VROVector4f> &getShaderUniformVec4s() const { return _shaderUniformVec4s; }
+    const std::map<std::string, VROMatrix4f> &getShaderUniformMat4s() const { return _shaderUniformMat4s; }
+    const std::map<std::string, std::shared_ptr<VROTexture>> &getShaderUniformTextures() const { return _shaderUniformTextures; }
+
     /*
      Shader modifiers.
      */
-    void addShaderModifier(std::shared_ptr<VROShaderModifier> modifier);
-    void removeShaderModifier(std::shared_ptr<VROShaderModifier> modifier);
-    bool hasShaderModifier(std::shared_ptr<VROShaderModifier> modifier);
+    void addShaderModifier(std::shared_ptr<VROShaderModifier> modifier) {
+        _shaderModifiers.push_back(modifier);
+        updateSubstrate();
+    }
+    void removeShaderModifier(std::shared_ptr<VROShaderModifier> modifier) {
+        _shaderModifiers.erase(std::remove_if(_shaderModifiers.begin(), _shaderModifiers.end(),
+                                     [modifier](std::shared_ptr<VROShaderModifier> candidate) {
+                                         return candidate == modifier;
+                                     }), _shaderModifiers.end());
+        updateSubstrate();
+    }
+    bool hasShaderModifier(std::shared_ptr<VROShaderModifier> modifier) {
+        for (std::shared_ptr<VROShaderModifier> &candidate : _shaderModifiers) {
+            if (modifier == candidate) {
+                return true;
+            }
+        }
+        return false;
+    }
     const std::vector<std::shared_ptr<VROShaderModifier>> &getShaderModifiers() const {
         return _shaderModifiers;
     }
@@ -610,6 +656,12 @@ private:
      concerns.
      */
     int _renderingOrder;
+
+    std::map<std::string, float> _shaderUniformFloats;
+    std::map<std::string, VROVector3f> _shaderUniformVec3s;
+    std::map<std::string, VROVector4f> _shaderUniformVec4s;
+    std::map<std::string, VROMatrix4f> _shaderUniformMat4s;
+    std::map<std::string, std::shared_ptr<VROTexture>> _shaderUniformTextures;
     
     /*
      Representation of this material in the underlying graphics hardware.

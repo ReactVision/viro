@@ -15,6 +15,10 @@ import {
   ViroScale,
   ViroSource,
 } from "../Types/ViroUtils";
+import {
+  ViroShaderModifiers,
+  ViroShaderUniform,
+} from "../Material/ViroMaterials";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 
 export type ViroCommonProps = ViewProps & {
@@ -97,6 +101,9 @@ export type ViroObjectProps = {
   transformBehaviors?: string | string[];
   lightReceivingBitMask?: number;
   shadowCastingBitMask?: number;
+
+  shaderModifiers?: ViroShaderModifiers;
+  materialUniforms?: { [key: string]: any } | ViroShaderUniform[];
 
   onTransformUpdate?: (position: Viro3DPoint) => void;
 

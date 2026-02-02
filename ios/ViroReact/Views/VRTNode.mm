@@ -459,6 +459,88 @@ const double kTransformDelegateDistanceFilter = 0.01;
     [self applyMaterials];
 }
 
+- (void)setMaterialUniforms:(NSDictionary *)uniforms {
+    _materialUniforms = uniforms;
+    std::shared_ptr<VROGeometry> geometry = [self node]->getGeometry();
+    if (!geometry || geometry->getMaterials().empty()) {
+        return;
+    }
+
+    // For now apply to the first material. Ideally we'd have a way to specify which material.
+    std::shared_ptr<VROMaterial> material = geometry->getMaterials()[0];
+
+    for (NSString *name in uniforms) {
+        id value = uniforms[name];
+        if ([value isKindOfClass:[NSNumber class]]) {
+            material->setShaderUniform(std::string([name UTF8String]), [value floatValue]);
+        } else if ([value isKindOfClass:[NSArray class]]) {
+            NSArray *arr = (NSArray *)value;
+            if (arr.count == 3) {
+                material->setShaderUniform(std::string([name UTF8String]), VROVector3f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue]));
+            } else if (arr.count == 4) {
+                material->setShaderUniform(std::string([name UTF8String]), VROVector4f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue], [arr[3] floatValue]));
+            }
+        }
+    }
+}
+
+- (void)setShaderModifiers:(NSDictionary *)modifiers {
+    _shaderModifiers = modifiers;
+    std::shared_ptr<VROGeometry> geometry = [self node]->getGeometry();
+    if (!geometry || geometry->getMaterials().empty()) {
+        return;
+    }
+
+    std::shared_ptr<VROMaterial> material = geometry->getMaterials()[0];
+    material->removeAllShaderModifiers();
+
+    for (id entryPointKey in modifiers) {
+        NSString *entryPointName = (NSString *)entryPointKey;
+        id modifierValue = modifiers[entryPointKey];
+        
+        // Handle both string and dictionary formats
+        NSString *modifierCode;
+        if ([modifierValue isKindOfClass:[NSString class]]) {
+            modifierCode = (NSString *)modifierValue;
+        } else if ([modifierValue isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *modifierDict = (NSDictionary *)modifierValue;
+            modifierCode = modifierDict[@"body"];
+            if (!modifierCode) {
+                RCTLogError(@"Shader modifier dictionary must contain 'body' key");
+                continue;
+            }
+        } else {
+            RCTLogError(@"Shader modifier must be string or dictionary with 'body' key");
+            continue;
+        }
+        
+        VROShaderEntryPoint entryPoint = [self convertEntryPoint:entryPointName];
+        NSArray *lines = [modifierCode componentsSeparatedByString:@"\n"];
+        std::vector<std::string> linesVec;
+        for (NSString *line in lines) {
+            linesVec.push_back(std::string([line UTF8String]));
+        }
+        
+        auto modifier = std::make_shared<VROShaderModifier>(entryPoint, linesVec);
+        material->addShaderModifier(modifier);
+    }
+}
+
+- (VROShaderEntryPoint)convertEntryPoint:(NSString *)name {
+    if ([@"geometry" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Geometry;
+    } else if ([@"vertex" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Vertex;
+    } else if ([@"surface" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Surface;
+    } else if ([@"fragment" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Fragment;
+    } else if ([@"lightingModel" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::LightingModel;
+    }
+    return VROShaderEntryPoint::Fragment;
+}
+
 // Apply materials to the underlying geometry if materials were explicitly set
 // via the materials prop
 - (void)applyMaterials {

@@ -31,6 +31,10 @@
 #import "VRTUIImageWrapper.h"
 #import <React/RCTUtils.h>
 #import <React/RCTImageSource.h>
+#import <ViroKit/VROShaderModifier.h>
+#import <ViroKit/VROTextureUtil.h>
+#import <ViroKit/VROVideoTextureiOS.h>
+#import <ViroKit/VROImageiOS.h>
 
 @implementation RCTBridge (VRTMaterialManager)
 
@@ -366,6 +370,58 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
                 vroMaterial->getMetalness().setColor({ [material[key] floatValue], 1.0, 1.0, 1.0 });
             } else if ([@"roughness" caseInsensitiveCompare:materialPropertyName]  == NSOrderedSame){
                 vroMaterial->getRoughness().setColor({ [material[key] floatValue], 1.0, 1.0, 1.0 });
+            } else if ([@"shaderModifiers" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
+                NSDictionary *modifiers = material[key];
+                for (id entryPointKey in modifiers) {
+                    NSString *entryPointName = (NSString *)entryPointKey;
+                    id modifierValue = shaderModifiers[entryPointKey];
+                    
+                    // Handle both string and dictionary formats
+                    NSString *modifierCode;
+                    if ([modifierValue isKindOfClass:[NSString class]]) {
+                        modifierCode = (NSString *)modifierValue;
+                    } else if ([modifierValue isKindOfClass:[NSDictionary class]]) {
+                        NSDictionary *modifierDict = (NSDictionary *)modifierValue;
+                        modifierCode = modifierDict[@"body"];
+                        if (!modifierCode) {
+                            RCTLogError(@"Shader modifier dictionary must contain 'body' key");
+                            continue;
+                        }
+                    } else {
+                        RCTLogError(@"Shader modifier must be string or dictionary with 'body' key");
+                        continue;
+                    }
+                    
+                    VROShaderEntryPoint entryPoint = [self convertEntryPoint:entryPointName];
+                    NSArray *lines = [modifierCode componentsSeparatedByString:@"\n"];
+                    std::vector<std::string> linesVec;
+                    for (NSString *line in lines) {
+                        linesVec.push_back(std::string([line UTF8String]));
+                    }
+                    
+                    auto modifier = std::make_shared<VROShaderModifier>(entryPoint, linesVec);
+                    vroMaterial->addShaderModifier(modifier);
+                }
+            } else if ([@"materialUniforms" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
+                NSArray *uniforms = material[key];
+                for (NSDictionary *uniform in uniforms) {
+                    NSString *name = uniform[@"name"];
+                    NSString *type = uniform[@"type"];
+                    id value = uniform[@"value"];
+                    
+                    if ([type isEqualToString:@"float"]) {
+                        vroMaterial->setShaderUniform(std::string([name UTF8String]), [value floatValue]);
+                    } else if ([type isEqualToString:@"vec3"] || [type isEqualToString:@"vec4"]) {
+                        NSArray *arr = (NSArray *)value;
+                        if (arr.count == 3) {
+                             vroMaterial->setShaderUniform(std::string([name UTF8String]), VROVector3f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue]));
+                        } else if (arr.count == 4) {
+                             vroMaterial->setShaderUniform(std::string([name UTF8String]), VROVector4f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue], [arr[3] floatValue]));
+                        }
+                    } else if ([type isEqualToString:@"mat4"]) {
+                         // TODO: parse matrix
+                    }
+                }
             }
         }
     }
@@ -458,6 +514,21 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
     }
     //return default if nothing else matches
     return VROLightingModel::Blinn;
+}
+
+- (VROShaderEntryPoint)convertEntryPoint:(NSString *)name {
+    if ([@"geometry" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Geometry;
+    } else if ([@"vertex" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Vertex;
+    } else if ([@"surface" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Surface;
+    } else if ([@"fragment" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::Fragment;
+    } else if ([@"lightingModel" caseInsensitiveCompare:name] == NSOrderedSame) {
+        return VROShaderEntryPoint::LightingModel;
+    }
+    return VROShaderEntryPoint::Fragment;
 }
 
 - (VROFilterMode)convertFilterMode:(NSString *)name {

@@ -31,7 +31,13 @@ import { ViroFlexView } from "./components/ViroFlexView";
 import { ViroGeometry } from "./components/ViroGeometry";
 import { ViroLightingEnvironment } from "./components/ViroLightingEnvironment";
 import { ViroImage } from "./components/ViroImage";
-import { ViroMaterials } from "./components/Material/ViroMaterials";
+import {
+  ViroMaterials,
+  ViroMaterial,
+  ViroShaderModifiers,
+  ViroShaderUniform,
+  ViroShaderModifier,
+} from "./components/Material/ViroMaterials";
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
@@ -272,6 +278,10 @@ export {
   ViroSoundFinishEvent,
   ViroTextStyle,
   ViroStyle,
+  ViroMaterial,
+  ViroShaderModifiers,
+  ViroShaderUniform,
+  ViroShaderModifier,
   VIRO_VERSION,
   // Cloud Anchor Types
   ViroCloudAnchorState,

@@ -29,6 +29,9 @@
 
 #include <memory>
 #include <functional>
+#include <string>
+#include <vector>
+#include <map>
 #include "VROMaterialVisual.h"
 #include "VROAnimatable.h"
 #include "VROStringUtil.h"
@@ -76,6 +79,7 @@ class VRODriver;
 class VROSortKey;
 class VROMaterialSubstrate;
 class VROShaderModifier;
+class VROTexture;
 
 /*
  Manages the lighting and shading attributes associated with the surface of a geometry that
@@ -369,6 +373,18 @@ public:
         _renderingOrder = renderingOrder;
     }
 
+    void setShaderUniform(std::string name, float value);
+    void setShaderUniform(std::string name, VROVector3f value);
+    void setShaderUniform(std::string name, VROVector4f value);
+    void setShaderUniform(std::string name, VROMatrix4f value);
+    void setShaderUniform(std::string name, std::shared_ptr<VROTexture> texture);
+
+    const std::map<std::string, float> &getShaderUniformFloats() const { return _shaderUniformFloats; }
+    const std::map<std::string, VROVector3f> &getShaderUniformVec3s() const { return _shaderUniformVec3s; }
+    const std::map<std::string, VROVector4f> &getShaderUniformVec4s() const { return _shaderUniformVec4s; }
+    const std::map<std::string, VROMatrix4f> &getShaderUniformMat4s() const { return _shaderUniformMat4s; }
+    const std::map<std::string, std::shared_ptr<VROTexture>> &getShaderUniformTextures() const { return _shaderUniformTextures; }
+
     /*
      Shader modifiers.
      */
@@ -610,6 +626,12 @@ private:
      concerns.
      */
     int _renderingOrder;
+
+    std::map<std::string, float> _shaderUniformFloats;
+    std::map<std::string, VROVector3f> _shaderUniformVec3s;
+    std::map<std::string, VROVector4f> _shaderUniformVec4s;
+    std::map<std::string, VROMatrix4f> _shaderUniformMat4s;
+    std::map<std::string, std::shared_ptr<VROTexture>> _shaderUniformTextures;
     
     /*
      Representation of this material in the underlying graphics hardware.

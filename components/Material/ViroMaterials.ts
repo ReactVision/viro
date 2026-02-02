@@ -47,6 +47,25 @@ export type ViroResolvedCubeMap = {
   pz: ImageResolvedAssetSource;
 };
 
+export type ViroShaderModifier = {
+  body?: string;
+  uniforms?: string;
+};
+
+export type ViroShaderModifiers = {
+  geometry?: string | ViroShaderModifier;
+  vertex?: string | ViroShaderModifier;
+  surface?: string | ViroShaderModifier;
+  fragment?: string | ViroShaderModifier;
+  lightingModel?: string | ViroShaderModifier;
+};
+
+export type ViroShaderUniform = {
+  name: string;
+  type: "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D";
+  value: any;
+};
+
 export type ViroMaterial = {
   shininess?: number;
   fresnelExponent?: number;
@@ -74,6 +93,8 @@ export type ViroMaterial = {
   metalness?: number;
   metalnessTexture?: any; // TODO: types
   ambientOcclusionTexture?: any; // TODO: types
+  shaderModifiers?: ViroShaderModifiers;
+  materialUniforms?: ViroShaderUniform[];
 };
 
 export type ViroMaterialDict = {

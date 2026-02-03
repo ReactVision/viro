@@ -20,7 +20,9 @@ const react_native_1 = require("react-native");
 const AssetRegistry_1 = require("react-native/Libraries/Image/AssetRegistry");
 // @ts-ignore
 const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
-var MaterialManager = react_native_1.NativeModules.VRTMaterialManager;
+var MaterialManager = react_native_1.NativeModules.VRTMaterialManager ||
+    react_native_1.TurboModuleRegistry.get("VRTMaterialManager");
+console.log("VRTMaterialManager lookup:", MaterialManager ? "FOUND" : "NOT FOUND");
 class ViroMaterials {
     static createMaterials(materials) {
         var result = {};
@@ -53,8 +55,10 @@ class ViroMaterials {
                             }
                         }
                         var source = (0, resolveAssetSource_1.default)(material[prop]);
-                        source["type"] = assetType;
-                        resultMaterial[prop] = source;
+                        if (source) {
+                            source["type"] = assetType;
+                            resultMaterial[prop] = source;
+                        }
                     }
                 }
                 else if (prop.endsWith("color") || prop.endsWith("Color")) {
@@ -65,10 +69,16 @@ class ViroMaterials {
                     //just apply material property directly.
                     resultMaterial[prop] = material[prop];
                 }
-                result[key] = resultMaterial;
             }
+            result[key] = resultMaterial;
         }
-        MaterialManager.setJSMaterials(result);
+        if (MaterialManager) {
+            console.log("ViroMaterials: Sending materials to native:", Object.keys(result));
+            MaterialManager.setJSMaterials(result);
+        }
+        else {
+            console.error("ViroMaterials: MaterialManager (NativeModules.VRTMaterialManager) is not available!");
+        }
     }
     /*
     This function tells the platform to delete/release the given materials from
@@ -79,6 +89,30 @@ class ViroMaterials {
      */
     static deleteMaterials(materials) {
         MaterialManager.deleteMaterials(materials);
+    }
+    /**
+     * Update a shader uniform value for a specific material.
+     * This allows runtime animation of shader modifiers.
+     *
+     * @param materialName - The name of the material to update
+     * @param uniformName - The name of the uniform variable (e.g., "time")
+     * @param uniformType - The type of the uniform ("float", "vec2", "vec3", "vec4", "mat4")
+     * @param value - The new value (number for float, array for vectors/matrices)
+     *
+     * @example
+     * // Update time uniform for animation
+     * ViroMaterials.updateShaderUniform("wobblySphere", "time", "float", Date.now());
+     *
+     * @example
+     * // Update color uniform
+     * ViroMaterials.updateShaderUniform("myMaterial", "glowColor", "vec3", [1.0, 0.5, 0.0]);
+     */
+    static updateShaderUniform(materialName, uniformName, uniformType, value) {
+        if (!MaterialManager) {
+            console.error("ViroMaterials: MaterialManager is not available for uniform update");
+            return;
+        }
+        MaterialManager.updateShaderUniform(materialName, uniformName, uniformType, value);
     }
 }
 exports.ViroMaterials = ViroMaterials;

@@ -201,11 +201,12 @@
         if (success && strongSelf) {
             strongSelf->_modelLoaded = YES;
             [strongSelf setMorphTargets:strongSelf->_morphTargets];
-            
+
             if (strongSelf.materials) {
-                [strongSelf applyMaterials];
+                // Apply materials recursively to all child geometries in the loaded model
+                [strongSelf applyMaterialsRecursive:YES];
             }
-            
+
             [weakSelf updateAnimation];
         }
 

@@ -290,6 +290,11 @@ private:
     void addModifierUniforms();
 
     /*
+     Parse custom uniforms from shader modifier uniform source code.
+     */
+    void parseCustomUniforms(const std::string &uniformsSource);
+
+    /*
      Compile and link the shader. Returns true on success.
      */
     bool compileAndLink();

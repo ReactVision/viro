@@ -373,11 +373,26 @@ public:
         _renderingOrder = renderingOrder;
     }
 
-    void setShaderUniform(std::string name, float value);
-    void setShaderUniform(std::string name, VROVector3f value);
-    void setShaderUniform(std::string name, VROVector4f value);
-    void setShaderUniform(std::string name, VROMatrix4f value);
-    void setShaderUniform(std::string name, std::shared_ptr<VROTexture> texture);
+    void setShaderUniform(std::string name, float value) {
+        _shaderUniformFloats[name] = value;
+        updateSubstrate();
+    }
+    void setShaderUniform(std::string name, VROVector3f value) {
+        _shaderUniformVec3s[name] = value;
+        updateSubstrate();
+    }
+    void setShaderUniform(std::string name, VROVector4f value) {
+        _shaderUniformVec4s[name] = value;
+        updateSubstrate();
+    }
+    void setShaderUniform(std::string name, VROMatrix4f value) {
+        _shaderUniformMat4s[name] = value;
+        updateSubstrate();
+    }
+    void setShaderUniform(std::string name, std::shared_ptr<VROTexture> texture) {
+        _shaderUniformTextures[name] = texture;
+        updateSubstrate();
+    }
 
     const std::map<std::string, float> &getShaderUniformFloats() const { return _shaderUniformFloats; }
     const std::map<std::string, VROVector3f> &getShaderUniformVec3s() const { return _shaderUniformVec3s; }
@@ -388,14 +403,23 @@ public:
     /*
      Shader modifiers.
      */
-    void addShaderModifier(std::shared_ptr<VROShaderModifier> modifier);
-    void removeShaderModifier(std::shared_ptr<VROShaderModifier> modifier);
-    bool hasShaderModifier(std::shared_ptr<VROShaderModifier> modifier);
+    void addShaderModifier(std::shared_ptr<VROShaderModifier> modifier) {
+        _shaderModifiers.push_back(modifier);
+        updateSubstrate();
+    }
+    void removeShaderModifier(std::shared_ptr<VROShaderModifier> modifier) {
+        _shaderModifiers.erase(std::remove(_shaderModifiers.begin(), _shaderModifiers.end(), modifier), _shaderModifiers.end());
+        updateSubstrate();
+    }
+    bool hasShaderModifier(std::shared_ptr<VROShaderModifier> modifier) {
+        return std::find(_shaderModifiers.begin(), _shaderModifiers.end(), modifier) != _shaderModifiers.end();
+    }
     const std::vector<std::shared_ptr<VROShaderModifier>> &getShaderModifiers() const {
         return _shaderModifiers;
     }
     void removeAllShaderModifiers() {
         _shaderModifiers.clear();
+        updateSubstrate();
     }
     
     /*

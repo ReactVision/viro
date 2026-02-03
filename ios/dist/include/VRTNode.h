@@ -135,6 +135,10 @@ extern const int k2DPointsPerSpatialUnit;
 // Apply materials stored in _materials property to current node geometry if geometry is not null.
 - (void)applyMaterials;
 
+// Apply materials recursively to all child nodes in the hierarchy.
+// Used for 3D models (Viro3DObject) that have nested geometries.
+- (void)applyMaterialsRecursive:(BOOL)recursive;
+
 // VROEventDelegateProtocol
 - (void) onHover:(int)source node:(std::shared_ptr<VRONode>)node isHovering:(bool)isHovering hoverLocation:(std::vector<float>)location;
 - (void) onClick:(int)source node:(std::shared_ptr<VRONode>)node clickState:(VROEventDelegate::ClickState)clickState clickLocation:(std::vector<float>)location;

@@ -79,4 +79,22 @@ export type ViroMaterialDict = {
 export declare class ViroMaterials {
     static createMaterials(materials: ViroMaterialDict): void;
     static deleteMaterials(materials: any): void;
+    /**
+     * Update a shader uniform value for a specific material.
+     * This allows runtime animation of shader modifiers.
+     *
+     * @param materialName - The name of the material to update
+     * @param uniformName - The name of the uniform variable (e.g., "time")
+     * @param uniformType - The type of the uniform ("float", "vec2", "vec3", "vec4", "mat4")
+     * @param value - The new value (number for float, array for vectors/matrices)
+     *
+     * @example
+     * // Update time uniform for animation
+     * ViroMaterials.updateShaderUniform("wobblySphere", "time", "float", Date.now());
+     *
+     * @example
+     * // Update color uniform
+     * ViroMaterials.updateShaderUniform("myMaterial", "glowColor", "vec3", [1.0, 0.5, 0.0]);
+     */
+    static updateShaderUniform(materialName: string, uniformName: string, uniformType: "float" | "vec2" | "vec3" | "vec4" | "mat4", value: number | number[]): void;
 }

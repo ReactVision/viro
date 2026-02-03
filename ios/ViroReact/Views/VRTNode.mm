@@ -504,9 +504,16 @@ const double kTransformDelegateDistanceFilter = 0.01;
             modifierCode = (NSString *)modifierValue;
         } else if ([modifierValue isKindOfClass:[NSDictionary class]]) {
             NSDictionary *modifierDict = (NSDictionary *)modifierValue;
-            modifierCode = modifierDict[@"body"];
+            NSString *uniforms = modifierDict[@"uniforms"];
+            NSString *body = modifierDict[@"body"];
+            if (uniforms && uniforms.length > 0) {
+                modifierCode = [NSString stringWithFormat:@"%@\n%@", uniforms, body ? body : @""];
+            } else {
+                modifierCode = body;
+            }
+            
             if (!modifierCode) {
-                RCTLogError(@"Shader modifier dictionary must contain 'body' key");
+                RCTLogError(@"Shader modifier dictionary must contain 'body' or 'uniforms' key");
                 continue;
             }
         } else {
@@ -544,42 +551,101 @@ const double kTransformDelegateDistanceFilter = 0.01;
 // Apply materials to the underlying geometry if materials were explicitly set
 // via the materials prop
 - (void)applyMaterials {
+    [self applyMaterialsRecursive:NO];
+}
+
+// Apply materials recursively to all child nodes in the hierarchy.
+// Used for 3D models (Viro3DObject) that have nested geometries.
+- (void)applyMaterialsRecursive:(BOOL)recursive {
     if (!self.node) {
         return;
     }
-    
+
     std::shared_ptr<VROGeometry> geometry = self.node->getGeometry();
-    if (!geometry) {
-        return;
-    }
-    
-    if (!self.materials) {
-        // If materials were removed from object, then reset the materials array.
-        std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
-        tempMaterials.push_back(std::make_shared<VROMaterial>());
-        geometry->setMaterials(tempMaterials);
-        return;
-    }
-    
-    VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
-    
-    std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
-    for (int i = 0; i < self.materials.count; i++) {
-        NSString *materialName = [self.materials objectAtIndex:i];
-        
-        std::shared_ptr<VROMaterial> material = [materialManager getMaterialByName:materialName];
-        if (material == NULL) {
-            RCTLogError(@"Unknown Material Name: \"%@\"", materialName);
-            return;
+    if (geometry) {
+        if (!self.materials) {
+            // If materials were removed from object, then reset the materials array.
+            std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
+            tempMaterials.push_back(std::make_shared<VROMaterial>());
+            geometry->setMaterials(tempMaterials);
+        } else {
+            VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
+
+            std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
+            for (int i = 0; i < self.materials.count; i++) {
+                NSString *materialName = [self.materials objectAtIndex:i];
+
+                std::shared_ptr<VROMaterial> material = [materialManager getMaterialByName:materialName];
+                if (material == NULL) {
+                    RCTLogError(@"Unknown Material Name: \"%@\"", materialName);
+                    return;
+                }
+
+                // For materials with shader modifiers, use shared reference instead of copying
+                // so that uniform updates via updateShaderUniform() propagate to rendered materials
+                if (material->getShaderModifiers().size() > 0) {
+                    tempMaterials.push_back(material);
+                } else {
+                    // Copy materials without shader modifiers, as they may be
+                    // modified by animations, etc. and we don't want these changes to
+                    // propagate to the reference material held by the material manager
+                    tempMaterials.push_back(std::make_shared<VROMaterial>(material));
+                }
+            }
+            geometry->setMaterials(tempMaterials);
         }
-        
-        // Always copy materials from the material manager, as they may be
-        // modified by animations, etc. and we don't want these changes to
-        // propagate to the reference material held by the material manager
-        tempMaterials.push_back(std::make_shared<VROMaterial>(material));
     }
-    geometry->setMaterials(tempMaterials);
+
     [self updateVideoTextures];
+
+    // Recursively apply materials to all child nodes if requested
+    if (recursive) {
+        VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
+        std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
+
+        if (self.materials) {
+            // Build materials list from material names
+            for (int i = 0; i < self.materials.count; i++) {
+                NSString *materialName = [self.materials objectAtIndex:i];
+                std::shared_ptr<VROMaterial> material = [materialManager getMaterialByName:materialName];
+                if (material) {
+                    // Use shared reference for shader materials, copy for others
+                    if (material->getShaderModifiers().size() > 0) {
+                        tempMaterials.push_back(material);
+                    } else {
+                        tempMaterials.push_back(std::make_shared<VROMaterial>(material));
+                    }
+                }
+            }
+        } else {
+            // No materials - use default empty material for cleanup
+            tempMaterials.push_back(std::make_shared<VROMaterial>());
+        }
+
+        // Apply to all child nodes recursively
+        std::function<void(std::shared_ptr<VRONode>)> applyToChildren = [&](std::shared_ptr<VRONode> node) {
+            for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
+                std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
+                if (childGeometry) {
+                    // For shader materials, use same shared references to allow uniform updates
+                    // For non-shader materials, create fresh copies for each child geometry
+                    std::vector<std::shared_ptr<VROMaterial>> childMaterials;
+                    for (const auto &mat : tempMaterials) {
+                        if (mat->getShaderModifiers().size() > 0) {
+                            childMaterials.push_back(mat); // Shared reference
+                        } else {
+                            childMaterials.push_back(std::make_shared<VROMaterial>(mat)); // Copy
+                        }
+                    }
+                    childGeometry->setMaterials(childMaterials);
+                }
+                // Recurse to grandchildren
+                applyToChildren(child);
+            }
+        };
+
+        applyToChildren(self.node);
+    }
 }
 
 #pragma mark - Animation

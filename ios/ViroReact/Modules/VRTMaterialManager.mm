@@ -137,7 +137,11 @@ RCT_EXPORT_MODULE()
 // for the renderer. We add to self.materials so that we can reload all
 // materials at once if we move to a new EGL context
 RCT_EXPORT_METHOD(setJSMaterials:(NSDictionary *)materials) {
-    [self.materials addEntriesFromDictionary:materials];
+    NSLog(@"VRTMaterialManager: setJSMaterials called with %lu materials: %@", (unsigned long)materials.count, materials.allKeys);
+    if (!_materials) {
+        _materials = [[NSMutableDictionary alloc] init];
+    }
+    [_materials addEntriesFromDictionary:materials];
     [self loadMaterials:materials];
 }
 
@@ -147,6 +151,22 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
             [_materialDictionary removeObjectForKey:material];
         }
     }
+}
+
+RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
+                  uniformName:(NSString *)uniformName
+                  uniformType:(NSString *)uniformType
+                  value:(id)value) {
+    std::shared_ptr<VROMaterial> vroMaterial = [self getMaterialByName:materialName];
+    if (!vroMaterial) {
+        NSLog(@"VRTMaterialManager: ERROR - Material '%@' not found for uniform update", materialName);
+        return;
+    }
+
+    [self setUniformForMaterial:vroMaterial name:uniformName type:uniformType value:value];
+
+    // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
+    // The uniforms will be bound automatically during rendering via bindMaterialUniforms()
 }
 
 // Clear all materials and images to release memory
@@ -164,6 +184,7 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
 - (instancetype)init {
     self = [super init];
     if (self) {
+        NSLog(@"VRTMaterialManager: Initialized");
         _materials = [[NSMutableDictionary alloc] init];
         _imageDictionary = [[NSMutableDictionary alloc] init];
         _materialDictionary = [[NSMutableDictionary alloc] init];
@@ -185,6 +206,7 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
 }
 
 - (void)loadMaterials:(NSDictionary *)materials {
+    NSLog(@"VRTMaterialManager: loadMaterials: processing %lu items", (unsigned long)materials.count);
     for (id key in materials) {
         NSDictionary *dictionary = [materials objectForKey:key];
         MaterialWrapper *materialWrapper = [self createMaterial:dictionary name:key];
@@ -294,6 +316,7 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
 }
 
 - (MaterialWrapper *)createMaterial:(NSDictionary *)material name:(NSString *)materialName {
+    NSLog(@"VRTMaterialManager: Creating material [%@]. Keys in dict: %@", materialName, material.allKeys);
     std::shared_ptr<VROMaterial> vroMaterial = std::make_shared<VROMaterial>();
     vroMaterial->setName([materialName cStringUsingEncoding:NSASCIIStringEncoding]);
     MaterialWrapper *materialWrapper = [[MaterialWrapper alloc] initWithMaterial:vroMaterial];
@@ -372,9 +395,10 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
                 vroMaterial->getRoughness().setColor({ [material[key] floatValue], 1.0, 1.0, 1.0 });
             } else if ([@"shaderModifiers" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSDictionary *modifiers = material[key];
+                NSLog(@"VRTMaterialManager: Processing shaderModifiers for material: %@", materialName);
                 for (id entryPointKey in modifiers) {
                     NSString *entryPointName = (NSString *)entryPointKey;
-                    id modifierValue = shaderModifiers[entryPointKey];
+                    id modifierValue = modifiers[entryPointKey];
                     
                     // Handle both string and dictionary formats
                     NSString *modifierCode;
@@ -382,9 +406,16 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
                         modifierCode = (NSString *)modifierValue;
                     } else if ([modifierValue isKindOfClass:[NSDictionary class]]) {
                         NSDictionary *modifierDict = (NSDictionary *)modifierValue;
-                        modifierCode = modifierDict[@"body"];
+                        NSString *uniforms = modifierDict[@"uniforms"];
+                        NSString *body = modifierDict[@"body"];
+                        if (uniforms && uniforms.length > 0) {
+                            modifierCode = [NSString stringWithFormat:@"%@\n%@", uniforms, body ? body : @""];
+                        } else {
+                            modifierCode = body;
+                        }
+                        
                         if (!modifierCode) {
-                            RCTLogError(@"Shader modifier dictionary must contain 'body' key");
+                            RCTLogError(@"Shader modifier dictionary must contain 'body' or 'uniforms' key");
                             continue;
                         }
                     } else {
@@ -393,6 +424,7 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
                     }
                     
                     VROShaderEntryPoint entryPoint = [self convertEntryPoint:entryPointName];
+                    NSLog(@"VRTMaterialManager: Adding modifier for entryPoint: %@, code length: %lu", entryPointName, (unsigned long)modifierCode.length);
                     NSArray *lines = [modifierCode componentsSeparatedByString:@"\n"];
                     std::vector<std::string> linesVec;
                     for (NSString *line in lines) {
@@ -402,30 +434,50 @@ RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
                     auto modifier = std::make_shared<VROShaderModifier>(entryPoint, linesVec);
                     vroMaterial->addShaderModifier(modifier);
                 }
-            } else if ([@"materialUniforms" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
-                NSArray *uniforms = material[key];
-                for (NSDictionary *uniform in uniforms) {
-                    NSString *name = uniform[@"name"];
-                    NSString *type = uniform[@"type"];
-                    id value = uniform[@"value"];
-                    
-                    if ([type isEqualToString:@"float"]) {
-                        vroMaterial->setShaderUniform(std::string([name UTF8String]), [value floatValue]);
-                    } else if ([type isEqualToString:@"vec3"] || [type isEqualToString:@"vec4"]) {
-                        NSArray *arr = (NSArray *)value;
-                        if (arr.count == 3) {
-                             vroMaterial->setShaderUniform(std::string([name UTF8String]), VROVector3f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue]));
-                        } else if (arr.count == 4) {
-                             vroMaterial->setShaderUniform(std::string([name UTF8String]), VROVector4f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue], [arr[3] floatValue]));
-                        }
-                    } else if ([type isEqualToString:@"mat4"]) {
-                         // TODO: parse matrix
+            } else if ([@"materialUniforms" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame ||
+                       [@"shaderUniforms" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
+                id uniformsData = material[key];
+                
+                if ([uniformsData isKindOfClass:[NSArray class]]) {
+                    NSArray *uniforms = (NSArray *)uniformsData;
+                    for (NSDictionary *uniform in uniforms) {
+                        NSString *name = uniform[@"name"];
+                        NSString *type = uniform[@"type"];
+                        id value = uniform[@"value"];
+                        [self setUniformForMaterial:vroMaterial name:name type:type value:value];
+                    }
+                } else if ([uniformsData isKindOfClass:[NSDictionary class]]) {
+                    NSDictionary *uniforms = (NSDictionary *)uniformsData;
+                    for (NSString *name in uniforms) {
+                        NSDictionary *uniform = uniforms[name];
+                        NSString *type = uniform[@"type"];
+                        id value = uniform[@"value"];
+                        [self setUniformForMaterial:vroMaterial name:name type:type value:value];
                     }
                 }
             }
         }
     }
     return materialWrapper;
+}
+
+- (void)setUniformForMaterial:(std::shared_ptr<VROMaterial>)vroMaterial
+                         name:(NSString *)name
+                         type:(NSString *)type
+                        value:(id)value {
+    if ([type isEqualToString:@"float"]) {
+        float floatValue = [value floatValue];
+        vroMaterial->setShaderUniform(std::string([name UTF8String]), floatValue);
+    } else if ([type isEqualToString:@"vec3"] || [type isEqualToString:@"vec4"]) {
+        NSArray *arr = (NSArray *)value;
+        if (arr.count == 3) {
+            vroMaterial->setShaderUniform(std::string([name UTF8String]), VROVector3f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue]));
+        } else if (arr.count == 4) {
+            vroMaterial->setShaderUniform(std::string([name UTF8String]), VROVector4f([arr[0] floatValue], [arr[1] floatValue], [arr[2] floatValue], [arr[3] floatValue]));
+        }
+    } else if ([type isEqualToString:@"mat4"]) {
+        // TODO: parse matrix
+    }
 }
 
 - (void) setPbrPropertyForMaterial:(VROMaterialVisual &)materialVisual

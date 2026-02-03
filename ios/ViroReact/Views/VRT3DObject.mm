@@ -207,6 +207,11 @@
                 [strongSelf applyMaterialsRecursive:YES];
             }
 
+            // Apply shader overrides if specified (preserves textures)
+            if (strongSelf.shaderOverrides) {
+                [strongSelf applyShaderOverridesRecursive:YES];
+            }
+
             [weakSelf updateAnimation];
         }
 

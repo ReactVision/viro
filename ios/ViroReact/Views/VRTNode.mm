@@ -87,7 +87,31 @@ const double kTransformDelegateDistanceFilter = 0.01;
 
 #pragma mark - Node Class
 
+@interface VRTNode ()
+// Track shader override materials and their clones for uniform updates
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *shaderOverrideMap;
+@end
+
+// Static registry to track all nodes with shader overrides (weak references)
+static NSHashTable *shaderOverrideNodesRegistry = nil;
+
 @implementation VRTNode
+
++ (void)initialize {
+    if (self == [VRTNode class]) {
+        // NSHashTable with weak references
+        shaderOverrideNodesRegistry = [NSHashTable weakObjectsHashTable];
+    }
+}
+
++ (void)updateShaderOverridesForMaterial:(NSString *)materialName {
+    // Iterate through all registered nodes and update those using this material
+    for (VRTNode *node in shaderOverrideNodesRegistry) {
+        if (node.shaderOverrideMap[materialName]) {
+            [node updateShaderOverrideUniformsForMaterial:materialName];
+        }
+    }
+}
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge  {
     self = [super initWithBridge:bridge];
@@ -99,6 +123,7 @@ const double kTransformDelegateDistanceFilter = 0.01;
         _visible = YES; // default to visible.
         _opacity = 1.0; //default opacity to 1.0
         _highAccuracyEvents = NO;
+        _shaderOverrideMap = [[NSMutableDictionary alloc] init];
         _lightReceivingBitMask = 1;
         _shadowCastingBitMask = 1;
         _shouldIgnoreEventHandling = NO; // default is NO
@@ -645,6 +670,210 @@ const double kTransformDelegateDistanceFilter = 0.01;
         };
 
         applyToChildren(self.node);
+    }
+}
+
+- (void)setShaderOverrides:(NSArray<NSString *> *)shaderOverrides {
+    _shaderOverrides = shaderOverrides;
+
+    // If clearing shader overrides, unregister from global registry
+    if (!shaderOverrides || shaderOverrides.count == 0) {
+        [shaderOverrideNodesRegistry removeObject:self];
+        [self.shaderOverrideMap removeAllObjects];
+    } else {
+        [self applyShaderOverrides];
+    }
+}
+
+- (void)applyShaderOverrides {
+    [self applyShaderOverridesRecursive:NO];
+}
+
+// Update uniforms on cloned materials from shader override source materials
+- (void)updateShaderOverrideUniforms {
+    for (NSString *shaderMaterialName in self.shaderOverrideMap) {
+        [self updateShaderOverrideUniformsForMaterial:shaderMaterialName];
+    }
+}
+
+// Update uniforms for a specific shader override material
+- (void)updateShaderOverrideUniformsForMaterial:(NSString *)materialName {
+    if (!self.shaderOverrideMap || !self.shaderOverrideMap[materialName]) {
+        return;
+    }
+
+    VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
+    std::shared_ptr<VROMaterial> shaderMaterial = [materialManager getMaterialByName:materialName];
+    if (!shaderMaterial) {
+        return;
+    }
+
+    NSArray *clonedMaterialsArray = self.shaderOverrideMap[materialName];
+
+    for (NSValue *materialPtr in clonedMaterialsArray) {
+        VROMaterial *clonedMaterial = (VROMaterial *)[materialPtr pointerValue];
+
+        // Update all uniform types from source material to cloned material
+        for (const auto &uniform : shaderMaterial->getShaderUniformFloats()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+        for (const auto &uniform : shaderMaterial->getShaderUniformVec3s()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+        for (const auto &uniform : shaderMaterial->getShaderUniformVec4s()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+        for (const auto &uniform : shaderMaterial->getShaderUniformMat4s()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+    }
+}
+
+// Apply shader modifiers to existing materials without replacing textures.
+// Clones the geometry's current materials and merges shader modifiers from the override materials.
+- (void)applyShaderOverridesRecursive:(BOOL)recursive {
+    if (!self.node || !self.shaderOverrides) {
+        return;
+    }
+
+    // Clear existing tracking
+    [self.shaderOverrideMap removeAllObjects];
+
+    std::shared_ptr<VROGeometry> geometry = self.node->getGeometry();
+    if (geometry) {
+        // Get original embedded materials from the geometry
+        std::vector<std::shared_ptr<VROMaterial>> originalMaterials = geometry->getMaterials();
+
+        if (originalMaterials.empty()) {
+            // No materials to merge with, skip
+            return;
+        }
+
+        VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
+
+        // For each shader override material, extract shader modifiers and uniforms
+        for (NSString *shaderMaterialName in self.shaderOverrides) {
+            std::shared_ptr<VROMaterial> shaderMaterial = [materialManager getMaterialByName:shaderMaterialName];
+            if (!shaderMaterial) {
+                RCTLogError(@"Unknown Shader Material: \"%@\"", shaderMaterialName);
+                continue;
+            }
+
+            // Track cloned materials for this shader override
+            NSMutableArray *clonedMaterialsArray = [[NSMutableArray alloc] init];
+
+            // Clone original materials and merge shader modifiers
+            std::vector<std::shared_ptr<VROMaterial>> mergedMaterials;
+            for (const auto &originalMat : originalMaterials) {
+                // Create a new material copying the original (preserves textures)
+                std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
+
+                // Copy shader modifiers from shader material to merged material
+                for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
+                    mergedMat->addShaderModifier(modifier);
+                }
+
+                // Copy shader uniforms (floats)
+                for (const auto &uniform : shaderMaterial->getShaderUniformFloats()) {
+                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                }
+                // Copy shader uniforms (vec3)
+                for (const auto &uniform : shaderMaterial->getShaderUniformVec3s()) {
+                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                }
+                // Copy shader uniforms (vec4)
+                for (const auto &uniform : shaderMaterial->getShaderUniformVec4s()) {
+                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                }
+                // Copy shader uniforms (mat4)
+                for (const auto &uniform : shaderMaterial->getShaderUniformMat4s()) {
+                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                }
+
+                mergedMaterials.push_back(mergedMat);
+
+                // Store pointer to track for uniform updates
+                [clonedMaterialsArray addObject:[NSValue valueWithPointer:mergedMat.get()]];
+            }
+
+            // Store in map for later uniform updates
+            self.shaderOverrideMap[shaderMaterialName] = clonedMaterialsArray;
+
+            // Apply merged materials to geometry
+            geometry->setMaterials(mergedMaterials);
+        }
+    }
+
+    // Recursively apply to child nodes if requested (for 3D models with nested geometries)
+    if (recursive) {
+        VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
+
+        std::function<void(std::shared_ptr<VRONode>)> applyToChildren = [&](std::shared_ptr<VRONode> node) {
+            for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
+                std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
+                if (childGeometry) {
+                    // Get original materials from child
+                    std::vector<std::shared_ptr<VROMaterial>> childOriginalMaterials = childGeometry->getMaterials();
+
+                    if (!childOriginalMaterials.empty()) {
+                        // Apply shader overrides to child materials
+                        for (NSString *shaderMaterialName in self.shaderOverrides) {
+                            std::shared_ptr<VROMaterial> shaderMaterial = [materialManager getMaterialByName:shaderMaterialName];
+                            if (!shaderMaterial) {
+                                continue;
+                            }
+
+                            // Get or create tracking array for this shader material
+                            NSMutableArray *clonedMaterialsArray = self.shaderOverrideMap[shaderMaterialName];
+                            if (!clonedMaterialsArray) {
+                                clonedMaterialsArray = [[NSMutableArray alloc] init];
+                                self.shaderOverrideMap[shaderMaterialName] = clonedMaterialsArray;
+                            }
+
+                            std::vector<std::shared_ptr<VROMaterial>> mergedChildMaterials;
+                            for (const auto &originalMat : childOriginalMaterials) {
+                                std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
+
+                                // Copy shader modifiers
+                                for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
+                                    mergedMat->addShaderModifier(modifier);
+                                }
+
+                                // Copy all uniforms
+                                for (const auto &uniform : shaderMaterial->getShaderUniformFloats()) {
+                                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                                }
+                                for (const auto &uniform : shaderMaterial->getShaderUniformVec3s()) {
+                                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                                }
+                                for (const auto &uniform : shaderMaterial->getShaderUniformVec4s()) {
+                                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                                }
+                                for (const auto &uniform : shaderMaterial->getShaderUniformMat4s()) {
+                                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                                }
+
+                                mergedChildMaterials.push_back(mergedMat);
+
+                                // Track this cloned material for uniform updates
+                                [clonedMaterialsArray addObject:[NSValue valueWithPointer:mergedMat.get()]];
+                            }
+
+                            childGeometry->setMaterials(mergedChildMaterials);
+                        }
+                    }
+                }
+                // Recurse to grandchildren
+                applyToChildren(child);
+            }
+        };
+
+        applyToChildren(self.node);
+    }
+
+    // Register this node in the global registry if it has shader overrides
+    if (self.shaderOverrideMap.count > 0) {
+        [shaderOverrideNodesRegistry addObject:self];
     }
 }
 
@@ -1533,6 +1762,9 @@ const double kTransformDelegateDistanceFilter = 0.01;
 
     // Clear animation references
     _nodeAnimation = nil;
+
+    // Unregister from shader override registry
+    [shaderOverrideNodesRegistry removeObject:self];
 }
 
 @end

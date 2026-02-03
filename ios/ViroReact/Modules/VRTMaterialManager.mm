@@ -35,6 +35,7 @@
 #import <ViroKit/VROTextureUtil.h>
 #import <ViroKit/VROVideoTextureiOS.h>
 #import <ViroKit/VROImageiOS.h>
+#import "VRTNode.h"
 
 @implementation RCTBridge (VRTMaterialManager)
 
@@ -164,6 +165,9 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
     }
 
     [self setUniformForMaterial:vroMaterial name:uniformName type:uniformType value:value];
+
+    // Propagate uniform updates to nodes using this material as a shader override
+    [VRTNode updateShaderOverridesForMaterial:materialName];
 
     // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
     // The uniforms will be bound automatically during rendering via bindMaterialUniforms()

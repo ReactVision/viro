@@ -50,6 +50,9 @@ extern const int k2DPointsPerSpatialUnit;
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 
+// Class method to update shader overrides for a specific material across all nodes
++ (void)updateShaderOverridesForMaterial:(NSString *)materialName;
+
 @property (readwrite, nonatomic) std::shared_ptr<VRONode> node;
 @property (readwrite, nonatomic) std::shared_ptr<VROEventDelegateiOS> eventDelegate;
 @property (readwrite, nonatomic) std::shared_ptr<VROPhysicsBodyDelegateiOS> physicsDelegate;
@@ -57,6 +60,7 @@ extern const int k2DPointsPerSpatialUnit;
 
 // Rendering properties
 @property (nonatomic, copy, nullable) NSArray<NSString *> *materials;
+@property (nonatomic, copy, nullable) NSArray<NSString *> *shaderOverrides;
 @property (nonatomic, copy, nullable) NSArray<NSNumber *> *position;
 @property (nonatomic, copy, nullable) NSArray<NSNumber *> *rotation;
 @property (nonatomic, copy, nullable) NSArray<NSNumber *> *scale;
@@ -135,9 +139,16 @@ extern const int k2DPointsPerSpatialUnit;
 // Apply materials stored in _materials property to current node geometry if geometry is not null.
 - (void)applyMaterials;
 
+// Apply shader overrides stored in _shaderOverrides property to current node geometry.
+- (void)applyShaderOverrides;
+
 // Apply materials recursively to all child nodes in the hierarchy.
 // Used for 3D models (Viro3DObject) that have nested geometries.
 - (void)applyMaterialsRecursive:(BOOL)recursive;
+
+// Apply shader overrides to existing materials without replacing textures.
+// Clones materials and merges shader modifiers. Used for 3D models.
+- (void)applyShaderOverridesRecursive:(BOOL)recursive;
 
 // VROEventDelegateProtocol
 - (void) onHover:(int)source node:(std::shared_ptr<VRONode>)node isHovering:(bool)isHovering hoverLocation:(std::vector<float>)location;

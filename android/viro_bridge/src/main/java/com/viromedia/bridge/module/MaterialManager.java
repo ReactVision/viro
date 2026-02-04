@@ -208,12 +208,17 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             }
         }
 
-        // Efficiently propagate ONLY this uniform update to cloned materials
-        // This is much faster than copying all uniforms every frame
+        // Propagate uniform updates to:
+        // 1. Shader override clones (for shaderOverrides on 3D models)
+        // 2. All geometries using this material directly (for materials prop)
         if (uniformValue != null) {
             com.viromedia.bridge.component.node.VRTNode.updateShaderOverrideUniform(
                 materialName, uniformName, uniformType, uniformValue);
         }
+
+        // Refresh all nodes using this material directly (materials={["name"]} prop)
+        // This re-applies the material with updated uniforms to the geometry
+        com.viromedia.bridge.component.node.VRTNode.refreshNodesUsingMaterial(materialName);
     }
 
     private void loadMaterials(ReadableMap newMaterials) {

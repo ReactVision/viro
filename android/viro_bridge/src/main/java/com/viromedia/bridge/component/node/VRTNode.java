@@ -295,6 +295,10 @@ public class VRTNode extends VRTComponent {
     private static final long UNIFORM_UPDATE_THROTTLE_MS = 30; // Limit to ~33fps max
     private static java.util.Map<String, Long> sLastUniformUpdateTime = new java.util.HashMap<>();
     private static java.util.Map<String, Boolean> sLastUniformUpdateSuccess = new java.util.HashMap<>();
+
+    // Track all nodes using each material (for direct material updates, not shader overrides)
+    private static java.util.Map<String, java.util.Set<WeakReference<VRTNode>>> sMaterialUsageRegistry =
+        new java.util.concurrent.ConcurrentHashMap<>();
     protected EventDelegate mEventDelegateJni;
     private ComponentEventDelegate mComponentEventDelegate;
     private NodeTransformDelegate mTransformDelegate;
@@ -412,6 +416,19 @@ public class VRTNode extends VRTComponent {
             if (mShaderOverrideMap != null) {
                 mShaderOverrideMap.clear();
                 mShaderOverrideMap = null;
+            }
+
+            // Clean up material usage registry
+            if (mMaterials != null) {
+                for (Material mat : mMaterials) {
+                    String matName = mat.getName();
+                    if (matName != null) {
+                        java.util.Set<WeakReference<VRTNode>> nodes = sMaterialUsageRegistry.get(matName);
+                        if (nodes != null) {
+                            nodes.removeIf(ref -> ref.get() == this);
+                        }
+                    }
+                }
             }
 
             // Clean up node
@@ -909,6 +926,49 @@ public class VRTNode extends VRTComponent {
         mMaterials = materials;
         if (mNodeJni.getGeometry() != null) {
             mNodeJni.getGeometry().copyAndSetMaterials(materials);
+        }
+
+        // Register this node for each material it uses (for uniform updates)
+        if (materials != null) {
+            for (Material mat : materials) {
+                String matName = mat.getName();
+                if (matName != null && !matName.isEmpty()) {
+                    sMaterialUsageRegistry
+                        .computeIfAbsent(matName, k -> java.util.Collections.newSetFromMap(
+                            new java.util.concurrent.ConcurrentHashMap<>()))
+                        .add(new WeakReference<>(this));
+                }
+            }
+        }
+    }
+
+    /**
+     * Refresh materials from current mMaterials list.
+     * Called when shader uniforms are updated to propagate changes to geometry.
+     */
+    private void refreshMaterialsOnGeometry() {
+        if (mMaterials != null && mNodeJni != null && mNodeJni.getGeometry() != null) {
+            mNodeJni.getGeometry().copyAndSetMaterials(mMaterials);
+        }
+    }
+
+    /**
+     * Static method to refresh all nodes using a specific material.
+     * Called from MaterialManager when shader uniforms are updated.
+     */
+    public static void refreshNodesUsingMaterial(String materialName) {
+        java.util.Set<WeakReference<VRTNode>> nodes = sMaterialUsageRegistry.get(materialName);
+        if (nodes == null) {
+            return;
+        }
+
+        // Clean up stale references and refresh live nodes
+        nodes.removeIf(ref -> ref.get() == null);
+        for (WeakReference<VRTNode> nodeRef : nodes) {
+            VRTNode node = nodeRef.get();
+            if (node != null && !node.isTornDown()) {
+                node.refreshMaterialsOnGeometry();
+            }
         }
     }
 

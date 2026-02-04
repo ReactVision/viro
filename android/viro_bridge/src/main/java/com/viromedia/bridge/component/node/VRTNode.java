@@ -287,8 +287,14 @@ public class VRTNode extends VRTComponent {
     protected List<Material> mMaterials;
     protected List<String> mShaderOverrides;
     protected java.util.HashMap<String, java.util.ArrayList<Material>> mShaderOverrideMap;
-    private static java.util.Set<WeakReference<VRTNode>> sShaderOverrideNodesRegistry =
-        java.util.Collections.newSetFromMap(new java.util.WeakHashMap<WeakReference<VRTNode>, Boolean>());
+    // Use ConcurrentHashMap for thread-safe access, values are WeakReferences to nodes
+    private static java.util.Map<Integer, WeakReference<VRTNode>> sShaderOverrideNodesRegistry =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    // Throttle mechanism for uniform updates (prevent async queue overflow at high fps)
+    private static final long UNIFORM_UPDATE_THROTTLE_MS = 30; // Limit to ~33fps max
+    private static java.util.Map<String, Long> sLastUniformUpdateTime = new java.util.HashMap<>();
+    private static java.util.Map<String, Boolean> sLastUniformUpdateSuccess = new java.util.HashMap<>();
     protected EventDelegate mEventDelegateJni;
     private ComponentEventDelegate mComponentEventDelegate;
     private NodeTransformDelegate mTransformDelegate;
@@ -396,7 +402,18 @@ public class VRTNode extends VRTComponent {
                 mMaterials.clear();
                 mMaterials = null;
             }
-            
+
+            // Clean up shader overrides
+            if (mShaderOverrides != null && !mShaderOverrides.isEmpty()) {
+                // Remove this node from the global registry
+                sShaderOverrideNodesRegistry.remove(getId());
+                mShaderOverrides = null;
+            }
+            if (mShaderOverrideMap != null) {
+                mShaderOverrideMap.clear();
+                mShaderOverrideMap = null;
+            }
+
             // Clean up node
             if (mNodeJni != null) {
                 mNodeJni.dispose();
@@ -904,15 +921,15 @@ public class VRTNode extends VRTComponent {
         // If clearing shader overrides, unregister from global registry
         if (shaderOverrides == null || shaderOverrides.isEmpty()) {
             Log.d(TAG, "Clearing shader overrides");
-            // Remove this node from registry
-            sShaderOverrideNodesRegistry.removeIf(ref -> ref.get() == this);
+            // Remove this node from registry using its ID
+            sShaderOverrideNodesRegistry.remove(getId());
             if (mShaderOverrideMap != null) {
                 mShaderOverrideMap.clear();
             }
         } else {
             Log.d(TAG, "Setting shader overrides: " + shaderOverrides);
-            // Register this node for uniform updates
-            sShaderOverrideNodesRegistry.add(new WeakReference<>(this));
+            // Register this node for uniform updates (replace any existing entry)
+            sShaderOverrideNodesRegistry.put(getId(), new WeakReference<>(this));
             applyShaderOverrides();
         }
     }
@@ -1084,7 +1101,7 @@ public class VRTNode extends VRTComponent {
 
     public static void updateShaderOverridesForMaterial(String materialName) {
         // Update all nodes that have shader overrides with this material
-        for (WeakReference<VRTNode> nodeRef : sShaderOverrideNodesRegistry) {
+        for (WeakReference<VRTNode> nodeRef : sShaderOverrideNodesRegistry.values()) {
             VRTNode node = nodeRef.get();
             if (node != null && node.mShaderOverrides != null &&
                 node.mShaderOverrides.contains(materialName)) {
@@ -1098,15 +1115,50 @@ public class VRTNode extends VRTComponent {
      */
     public static void updateShaderOverrideUniform(String materialName, String uniformName,
                                                    String uniformType, Object value) {
+        // Throttle mechanism: Only throttle if last update was successful (had materials)
+        String throttleKey = materialName + "_" + uniformName;
+        long currentTime = System.currentTimeMillis();
+        Long lastUpdate = sLastUniformUpdateTime.get(throttleKey);
+        Boolean lastSuccess = sLastUniformUpdateSuccess.get(throttleKey);
+
+        // Only apply throttle if the last update actually succeeded
+        if (lastUpdate != null && Boolean.TRUE.equals(lastSuccess) &&
+            (currentTime - lastUpdate) < UNIFORM_UPDATE_THROTTLE_MS) {
+            // Skip this update - too soon since last successful update
+            Log.d(TAG, "THROTTLED: " + materialName + "." + uniformName + " (last update " + (currentTime - lastUpdate) + "ms ago)");
+            return;
+        }
+
+        Log.d(TAG, "updateShaderOverrideUniform: " + materialName + "." + uniformName + " = " + value + " (lastSuccess=" + lastSuccess + ")");
+
+        int totalUpdated = 0;
+        int totalNodesInRegistry = 0;
+        int totalNodesWithMaterial = 0;
+
+        // Clean up stale references while iterating (prevent memory leak)
+        sShaderOverrideNodesRegistry.values().removeIf(ref -> ref.get() == null);
+
         // Directly update the uniform on all cloned materials
-        for (WeakReference<VRTNode> nodeRef : sShaderOverrideNodesRegistry) {
+        for (WeakReference<VRTNode> nodeRef : sShaderOverrideNodesRegistry.values()) {
             VRTNode node = nodeRef.get();
-            if (node == null || node.mShaderOverrides == null ||
-                !node.mShaderOverrides.contains(materialName)) {
+            if (node == null) {
+                continue; // Node was garbage collected
+            }
+
+            totalNodesInRegistry++;
+
+            if (node.mShaderOverrides == null || !node.mShaderOverrides.contains(materialName)) {
+                if (node.mShaderOverrides != null) {
+                    Log.d(TAG, "  Node has overrides " + node.mShaderOverrides + " but not " + materialName);
+                }
                 continue;
             }
 
+            totalNodesWithMaterial++;
+
             if (node.mShaderOverrideMap == null || !node.mShaderOverrideMap.containsKey(materialName)) {
+                Log.d(TAG, "  Node has material in list but not in map! map=" +
+                      (node.mShaderOverrideMap == null ? "null" : node.mShaderOverrideMap.keySet()));
                 continue;
             }
 
@@ -1119,16 +1171,32 @@ public class VRTNode extends VRTComponent {
             for (Material clonedMaterial : clonedMaterialsList) {
                 if ("float".equalsIgnoreCase(uniformType)) {
                     clonedMaterial.setShaderUniform(uniformName, (Float) value);
+                    totalUpdated++;
                 } else if ("vec3".equalsIgnoreCase(uniformType)) {
                     float[] vec = (float[]) value;
                     clonedMaterial.setShaderUniform(uniformName, vec[0], vec[1], vec[2]);
+                    totalUpdated++;
                 } else if ("vec4".equalsIgnoreCase(uniformType)) {
                     float[] vec = (float[]) value;
                     clonedMaterial.setShaderUniform(uniformName, vec[0], vec[1], vec[2], vec[3]);
+                    totalUpdated++;
                 } else if ("mat4".equalsIgnoreCase(uniformType)) {
                     clonedMaterial.setShaderUniform(uniformName, (float[]) value);
+                    totalUpdated++;
                 }
             }
+        }
+
+        // Record timestamp and success status
+        if (totalUpdated > 0) {
+            sLastUniformUpdateTime.put(throttleKey, currentTime);
+            sLastUniformUpdateSuccess.put(throttleKey, Boolean.TRUE);
+            Log.d(TAG, "Updated uniform '" + uniformName + "' on " + totalUpdated + " cloned materials for " + materialName +
+                  " (registry=" + totalNodesInRegistry + ", withMaterial=" + totalNodesWithMaterial + ")");
+        } else {
+            sLastUniformUpdateSuccess.put(throttleKey, Boolean.FALSE);
+            Log.d(TAG, "NO materials found for " + materialName + "." + uniformName +
+                  " (registry=" + totalNodesInRegistry + ", withMaterial=" + totalNodesWithMaterial + ")");
         }
     }
 

@@ -285,6 +285,10 @@ public class VRTNode extends VRTComponent {
     protected int mShadowCastingBitMask = 1;
 
     protected List<Material> mMaterials;
+    protected List<String> mShaderOverrides;
+    protected java.util.HashMap<String, java.util.ArrayList<Material>> mShaderOverrideMap;
+    private static java.util.Set<WeakReference<VRTNode>> sShaderOverrideNodesRegistry =
+        java.util.Collections.newSetFromMap(new java.util.WeakHashMap<WeakReference<VRTNode>, Boolean>());
     protected EventDelegate mEventDelegateJni;
     private ComponentEventDelegate mComponentEventDelegate;
     private NodeTransformDelegate mTransformDelegate;
@@ -888,6 +892,243 @@ public class VRTNode extends VRTComponent {
         mMaterials = materials;
         if (mNodeJni.getGeometry() != null) {
             mNodeJni.getGeometry().copyAndSetMaterials(materials);
+        }
+    }
+
+    public void setShaderOverrides(List<String> shaderOverrides) {
+        Log.d(TAG, "VRTNode.setShaderOverrides called with: " +
+              (shaderOverrides != null ? shaderOverrides.size() + " overrides" : "null"));
+
+        mShaderOverrides = shaderOverrides;
+
+        // If clearing shader overrides, unregister from global registry
+        if (shaderOverrides == null || shaderOverrides.isEmpty()) {
+            Log.d(TAG, "Clearing shader overrides");
+            // Remove this node from registry
+            sShaderOverrideNodesRegistry.removeIf(ref -> ref.get() == this);
+            if (mShaderOverrideMap != null) {
+                mShaderOverrideMap.clear();
+            }
+        } else {
+            Log.d(TAG, "Setting shader overrides: " + shaderOverrides);
+            // Register this node for uniform updates
+            sShaderOverrideNodesRegistry.add(new WeakReference<>(this));
+            applyShaderOverrides();
+        }
+    }
+
+    protected void applyShaderOverrides() {
+        applyShaderOverridesRecursive(false);
+    }
+
+    protected void applyShaderOverridesRecursive(boolean recursive) {
+        Log.d(TAG, "applyShaderOverridesRecursive called, recursive=" + recursive);
+
+        if (mNodeJni == null || mShaderOverrides == null || mShaderOverrides.isEmpty()) {
+            Log.d(TAG, "applyShaderOverridesRecursive: early return - mNodeJni=" +
+                  (mNodeJni != null) + ", mShaderOverrides=" +
+                  (mShaderOverrides != null ? mShaderOverrides.size() : "null"));
+            return;
+        }
+
+        Log.d(TAG, "Applying shader overrides: " + mShaderOverrides);
+
+        // Initialize shader override map if needed
+        if (mShaderOverrideMap == null) {
+            mShaderOverrideMap = new java.util.HashMap<>();
+        }
+        mShaderOverrideMap.clear();
+
+        // Apply to this node's geometry
+        Geometry geometry = mNodeJni.getGeometry();
+        Log.d(TAG, "Node geometry: " + (geometry != null ? "found" : "null"));
+        if (geometry != null) {
+            List<Material> originalMaterials = geometry.getMaterials();
+            Log.d(TAG, "Original materials count: " + (originalMaterials != null ? originalMaterials.size() : "null"));
+            if (originalMaterials != null && !originalMaterials.isEmpty()) {
+                MaterialManager materialManager = getReactContext().getNativeModule(MaterialManager.class);
+
+                // For each shader override material, extract shader modifiers and uniforms
+                for (String shaderMaterialName : mShaderOverrides) {
+                    Log.d(TAG, "Processing shader override: " + shaderMaterialName);
+                    Material shaderMaterial = materialManager.getMaterial(shaderMaterialName);
+                    if (shaderMaterial == null) {
+                        Log.e(TAG, "Unknown Shader Material: \"" + shaderMaterialName + "\"");
+                        continue;
+                    }
+                    Log.d(TAG, "Found shader material: " + shaderMaterialName);
+
+                    // Track cloned materials for this shader override
+                    java.util.ArrayList<Material> clonedMaterialsList = new java.util.ArrayList<>();
+
+                    // Clone original materials and merge shader modifiers
+                    java.util.ArrayList<Material> mergedMaterials = new java.util.ArrayList<>();
+                    Log.d(TAG, "Creating merged materials for " + originalMaterials.size() + " original materials");
+                    for (Material originalMat : originalMaterials) {
+                        // Create a new material copying the original (preserves textures)
+                        Log.d(TAG, "Copying material via Material(originalMat) constructor");
+                        Material mergedMat = new Material(originalMat);
+                        Log.d(TAG, "Material copied successfully");
+
+                        // Copy shader modifiers from shader material
+                        // Note: Material class doesn't expose getShaderModifiers in Java,
+                        // so we rely on C++ copy constructor handling this
+                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat);
+
+                        mergedMaterials.add(mergedMat);
+                        clonedMaterialsList.add(mergedMat);
+                    }
+
+                    Log.d(TAG, "Created " + mergedMaterials.size() + " merged materials");
+
+                    // Store cloned materials for uniform updates
+                    mShaderOverrideMap.put(shaderMaterialName, clonedMaterialsList);
+
+                    // Apply merged materials to geometry
+                    Log.d(TAG, "Applying merged materials to geometry");
+                    geometry.setMaterials(mergedMaterials);
+                    Log.d(TAG, "Merged materials applied successfully");
+                }
+            }
+        }
+
+        // Recursively apply to children if requested
+        if (recursive) {
+            for (Node child : mNodeJni.getChildNodes()) {
+                applyShaderOverridesToNode(child);
+            }
+        }
+    }
+
+    private void applyShaderOverridesToNode(Node node) {
+        Geometry geometry = node.getGeometry();
+        if (geometry != null) {
+            List<Material> originalMaterials = geometry.getMaterials();
+            if (originalMaterials != null && !originalMaterials.isEmpty()) {
+                MaterialManager materialManager = getReactContext().getNativeModule(MaterialManager.class);
+
+                for (String shaderMaterialName : mShaderOverrides) {
+                    Material shaderMaterial = materialManager.getMaterial(shaderMaterialName);
+                    if (shaderMaterial == null) {
+                        continue;
+                    }
+
+                    java.util.ArrayList<Material> clonedMaterialsList =
+                        mShaderOverrideMap.get(shaderMaterialName);
+                    if (clonedMaterialsList == null) {
+                        clonedMaterialsList = new java.util.ArrayList<>();
+                        mShaderOverrideMap.put(shaderMaterialName, clonedMaterialsList);
+                    }
+
+                    java.util.ArrayList<Material> mergedMaterials = new java.util.ArrayList<>();
+                    for (Material originalMat : originalMaterials) {
+                        Material mergedMat = new Material(originalMat);
+                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat);
+                        mergedMaterials.add(mergedMat);
+                        clonedMaterialsList.add(mergedMat);
+                    }
+
+                    geometry.setMaterials(mergedMaterials);
+                }
+            }
+        }
+
+        // Recurse to children
+        for (Node child : node.getChildNodes()) {
+            applyShaderOverridesToNode(child);
+        }
+    }
+
+    private void copyShaderModifiersAndUniforms(Material source, Material dest) {
+        // Copy shader modifiers and uniforms from source (shader override material)
+        // to destination (cloned original material that already has textures)
+        Log.d(TAG, "Copying shader modifiers and uniforms from source to dest");
+        dest.copyShaderModifiers(source);
+        Log.d(TAG, "Shader modifiers copied successfully");
+    }
+
+    public void updateShaderOverrideUniforms() {
+        if (mShaderOverrideMap == null || mShaderOverrideMap.isEmpty()) {
+            return;
+        }
+
+        for (String shaderMaterialName : mShaderOverrideMap.keySet()) {
+            updateShaderOverrideUniformsForMaterial(shaderMaterialName);
+        }
+    }
+
+    private void updateShaderOverrideUniformsForMaterial(String materialName) {
+        if (mShaderOverrideMap == null || !mShaderOverrideMap.containsKey(materialName)) {
+            return;
+        }
+
+        MaterialManager materialManager = getReactContext().getNativeModule(MaterialManager.class);
+        Material shaderMaterial = materialManager.getMaterial(materialName);
+        if (shaderMaterial == null) {
+            return;
+        }
+
+        java.util.ArrayList<Material> clonedMaterialsList = mShaderOverrideMap.get(materialName);
+        if (clonedMaterialsList == null) {
+            return;
+        }
+
+        // Copy all uniforms from source material to cloned materials
+        for (Material clonedMaterial : clonedMaterialsList) {
+            clonedMaterial.copyShaderUniforms(shaderMaterial);
+        }
+
+        Log.d(TAG, "Updated shader override uniforms for material: " + materialName +
+                   ", propagated to " + clonedMaterialsList.size() + " cloned materials");
+    }
+
+    public static void updateShaderOverridesForMaterial(String materialName) {
+        // Update all nodes that have shader overrides with this material
+        for (WeakReference<VRTNode> nodeRef : sShaderOverrideNodesRegistry) {
+            VRTNode node = nodeRef.get();
+            if (node != null && node.mShaderOverrides != null &&
+                node.mShaderOverrides.contains(materialName)) {
+                node.updateShaderOverrideUniformsForMaterial(materialName);
+            }
+        }
+    }
+
+    /**
+     * Update a specific uniform on shader overrides (efficient for real-time animation).
+     */
+    public static void updateShaderOverrideUniform(String materialName, String uniformName,
+                                                   String uniformType, Object value) {
+        // Directly update the uniform on all cloned materials
+        for (WeakReference<VRTNode> nodeRef : sShaderOverrideNodesRegistry) {
+            VRTNode node = nodeRef.get();
+            if (node == null || node.mShaderOverrides == null ||
+                !node.mShaderOverrides.contains(materialName)) {
+                continue;
+            }
+
+            if (node.mShaderOverrideMap == null || !node.mShaderOverrideMap.containsKey(materialName)) {
+                continue;
+            }
+
+            java.util.ArrayList<Material> clonedMaterialsList = node.mShaderOverrideMap.get(materialName);
+            if (clonedMaterialsList == null) {
+                continue;
+            }
+
+            // Update only this specific uniform on each cloned material
+            for (Material clonedMaterial : clonedMaterialsList) {
+                if ("float".equalsIgnoreCase(uniformType)) {
+                    clonedMaterial.setShaderUniform(uniformName, (Float) value);
+                } else if ("vec3".equalsIgnoreCase(uniformType)) {
+                    float[] vec = (float[]) value;
+                    clonedMaterial.setShaderUniform(uniformName, vec[0], vec[1], vec[2]);
+                } else if ("vec4".equalsIgnoreCase(uniformType)) {
+                    float[] vec = (float[]) value;
+                    clonedMaterial.setShaderUniform(uniformName, vec[0], vec[1], vec[2], vec[3]);
+                } else if ("mat4".equalsIgnoreCase(uniformType)) {
+                    clonedMaterial.setShaderUniform(uniformName, (float[]) value);
+                }
+            }
         }
     }
 

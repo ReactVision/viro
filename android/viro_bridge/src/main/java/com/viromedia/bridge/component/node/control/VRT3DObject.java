@@ -205,6 +205,17 @@ public class VRT3DObject extends VRTControl {
                     setMaterials(mMaterials);
                 }
 
+                // Apply shader overrides if specified (preserves textures)
+                Log.d(TAG, "VRT3DObject loaded, mShaderOverrides: " +
+                      (mShaderOverrides != null ? mShaderOverrides.size() + " overrides" : "null"));
+                if (mShaderOverrides != null && !mShaderOverrides.isEmpty()) {
+                    Log.d(TAG, "Applying shader overrides recursively: " + mShaderOverrides);
+                    vrt3DObject.applyShaderOverridesRecursive(true);
+                    Log.d(TAG, "Shader overrides applied");
+                } else {
+                    Log.d(TAG, "No shader overrides to apply");
+                }
+
                 // Set the bitmasks recursively now that the tree is loaded
                 object.setLightReceivingBitMask(mLightReceivingBitMask);
                 object.setShadowCastingBitMask(mShadowCastingBitMask);

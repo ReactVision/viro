@@ -104,6 +104,23 @@ public class VRT3DObjectManager extends VRTControlManager<VRT3DObject> {
         object3d.setMorphTargets(targetList);
     }
 
+    @ReactProp(name = "shaderOverrides")
+    public void setShaderOverrides(VRT3DObject object3d, @Nullable ReadableArray shaderOverrides) {
+        if (shaderOverrides == null || shaderOverrides.size() <= 0) {
+            object3d.setShaderOverrides(null);
+            return;
+        }
+
+        List<String> shaderOverridesList = new ArrayList<>();
+        for (int i = 0; i < shaderOverrides.size(); i++) {
+            String materialName = shaderOverrides.getString(i);
+            if (materialName != null && !materialName.isEmpty()) {
+                shaderOverridesList.add(materialName);
+            }
+        }
+        object3d.setShaderOverrides(shaderOverridesList);
+    }
+
     @ReactProp(name = "type")
     public void setType(VRT3DObject object3d, @Nullable String type) {
         object3d.setType(type);

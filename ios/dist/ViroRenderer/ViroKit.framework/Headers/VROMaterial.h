@@ -375,23 +375,24 @@ public:
 
     void setShaderUniform(std::string name, float value) {
         _shaderUniformFloats[name] = value;
-        updateSubstrate();
+        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
+        // Uniforms are bound automatically during rendering via bindMaterialUniforms()
     }
     void setShaderUniform(std::string name, VROVector3f value) {
         _shaderUniformVec3s[name] = value;
-        updateSubstrate();
+        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
     }
     void setShaderUniform(std::string name, VROVector4f value) {
         _shaderUniformVec4s[name] = value;
-        updateSubstrate();
+        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
     }
     void setShaderUniform(std::string name, VROMatrix4f value) {
         _shaderUniformMat4s[name] = value;
-        updateSubstrate();
+        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
     }
     void setShaderUniform(std::string name, std::shared_ptr<VROTexture> texture) {
         _shaderUniformTextures[name] = texture;
-        updateSubstrate();
+        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
     }
 
     const std::map<std::string, float> &getShaderUniformFloats() const { return _shaderUniformFloats; }

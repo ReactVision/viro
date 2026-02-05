@@ -1841,14 +1841,14 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
          collision:(VROPhysicsBody::VROCollision)collision {
 
     NSMutableArray *coordinate = [NSMutableArray array];
-    [coordinate insertObject:[NSNumber numberWithFloat:collision.collidedPoint.x] atIndex:0];
-    [coordinate insertObject:[NSNumber numberWithFloat:collision.collidedPoint.y] atIndex:1];
-    [coordinate insertObject:[NSNumber numberWithFloat:collision.collidedPoint.z] atIndex:2];
+    [coordinate addObject:[NSNumber numberWithFloat:collision.collidedPoint.x]];
+    [coordinate addObject:[NSNumber numberWithFloat:collision.collidedPoint.y]];
+    [coordinate addObject:[NSNumber numberWithFloat:collision.collidedPoint.z]];
 
     NSMutableArray *normal = [NSMutableArray array];
-    [normal insertObject:[NSNumber numberWithFloat:collision.collidedNormal.x] atIndex:0];
-    [normal insertObject:[NSNumber numberWithFloat:collision.collidedNormal.y] atIndex:1];
-    [normal insertObject:[NSNumber numberWithFloat:collision.collidedNormal.z] atIndex:2];
+    [normal addObject:[NSNumber numberWithFloat:collision.collidedNormal.x]];
+    [normal addObject:[NSNumber numberWithFloat:collision.collidedNormal.y]];
+    [normal addObject:[NSNumber numberWithFloat:collision.collidedNormal.z]];
 
     self.onCollisionViro(@{@"viroTag": @(collision.collidedBodyTag.c_str()), @"collidedPoint":coordinate, @"collidedNormal":normal});
 }

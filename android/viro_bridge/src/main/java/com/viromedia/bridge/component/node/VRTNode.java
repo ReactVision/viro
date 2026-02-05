@@ -287,6 +287,9 @@ public class VRTNode extends VRTComponent {
     protected List<Material> mMaterials;
     protected List<String> mShaderOverrides;
     protected java.util.HashMap<String, java.util.ArrayList<Material>> mShaderOverrideMap;
+    // Store original embedded materials from GLB before any shader overrides
+    // This allows us to always start from the true baseline when switching shaders
+    protected java.util.ArrayList<Material> mOriginalEmbeddedMaterials;
     // Use ConcurrentHashMap for thread-safe access, values are WeakReferences to nodes
     private static java.util.Map<Integer, WeakReference<VRTNode>> sShaderOverrideNodesRegistry =
         new java.util.concurrent.ConcurrentHashMap<>();
@@ -417,6 +420,8 @@ public class VRTNode extends VRTComponent {
                 mShaderOverrideMap.clear();
                 mShaderOverrideMap = null;
             }
+            // Clear stored original materials
+            mOriginalEmbeddedMaterials = null;
 
             // Clean up material usage registry
             if (mMaterials != null) {
@@ -986,6 +991,17 @@ public class VRTNode extends VRTComponent {
             if (mShaderOverrideMap != null) {
                 mShaderOverrideMap.clear();
             }
+
+            // Restore original embedded materials when removing all shader overrides
+            if (mOriginalEmbeddedMaterials != null && mNodeJni != null) {
+                Geometry geometry = mNodeJni.getGeometry();
+                if (geometry != null) {
+                    geometry.setMaterials(mOriginalEmbeddedMaterials);
+                    geometry.updateSubstrate();
+                }
+                // Clear stored materials
+                mOriginalEmbeddedMaterials = null;
+            }
         } else {
             Log.d(TAG, "Setting shader overrides: " + shaderOverrides);
             // Register this node for uniform updates (replace any existing entry)
@@ -995,7 +1011,9 @@ public class VRTNode extends VRTComponent {
     }
 
     protected void applyShaderOverrides() {
-        applyShaderOverridesRecursive(false);
+        // CRITICAL: Use recursive=true because GLB/VRX models have geometry on child nodes
+        // Without this, shader changes only affect root node (which has no geometry)
+        applyShaderOverridesRecursive(true);
     }
 
     protected void applyShaderOverridesRecursive(boolean recursive) {
@@ -1017,12 +1035,29 @@ public class VRTNode extends VRTComponent {
         mShaderOverrideMap.clear();
 
         // Apply to this node's geometry
+        // For 3D models (GLB/FBX/VRX), geometry is often on child nodes, not the root
         Geometry geometry = mNodeJni.getGeometry();
         Log.d(TAG, "Node geometry: " + (geometry != null ? "found" : "null"));
         if (geometry != null) {
-            List<Material> originalMaterials = geometry.getMaterials();
-            Log.d(TAG, "Original materials count: " + (originalMaterials != null ? originalMaterials.size() : "null"));
-            if (originalMaterials != null && !originalMaterials.isEmpty()) {
+            // Get materials from geometry
+            List<Material> currentMaterials = geometry.getMaterials();
+            Log.d(TAG, "Current materials count: " + (currentMaterials != null ? currentMaterials.size() : "null"));
+
+            // Check if we have materials to work with
+            if (currentMaterials == null || currentMaterials.isEmpty()) {
+                // Model hasn't loaded yet or has no materials, skip for now
+                Log.d(TAG, "No materials yet, skipping root node");
+            } else {
+                // Store original embedded materials on first call (only if non-empty!)
+                // This ensures we always start from the true GLB materials, not previously modified ones
+                if (mOriginalEmbeddedMaterials == null) {
+                    mOriginalEmbeddedMaterials = new java.util.ArrayList<>(currentMaterials);
+                    Log.d(TAG, "Stored " + mOriginalEmbeddedMaterials.size() + " original materials");
+                }
+
+                // Always use the stored original embedded materials as the baseline
+                List<Material> originalMaterials = mOriginalEmbeddedMaterials;
+                Log.d(TAG, "Using " + originalMaterials.size() + " original materials as baseline");
                 MaterialManager materialManager = getReactContext().getNativeModule(MaterialManager.class);
 
                 // For each shader override material, extract shader modifiers and uniforms
@@ -1065,6 +1100,9 @@ public class VRTNode extends VRTComponent {
                     Log.d(TAG, "Applying merged materials to geometry");
                     geometry.setMaterials(mergedMaterials);
                     Log.d(TAG, "Merged materials applied successfully");
+
+                    // Force geometry substrate to reset after shader override materials are applied
+                    geometry.updateSubstrate();
                 }
             }
         }
@@ -1106,6 +1144,9 @@ public class VRTNode extends VRTComponent {
                     }
 
                     geometry.setMaterials(mergedMaterials);
+
+                    // Force geometry substrate to reset
+                    geometry.updateSubstrate();
                 }
             }
         }
@@ -1120,6 +1161,10 @@ public class VRTNode extends VRTComponent {
         // Copy shader modifiers and uniforms from source (shader override material)
         // to destination (cloned original material that already has textures)
         Log.d(TAG, "Copying shader modifiers and uniforms from source to dest");
+
+        // CRITICAL: Clear existing shader modifiers first to REPLACE instead of STACK
+        dest.removeAllShaderModifiers();
+
         dest.copyShaderModifiers(source);
         Log.d(TAG, "Shader modifiers copied successfully");
     }

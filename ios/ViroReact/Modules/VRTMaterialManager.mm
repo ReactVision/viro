@@ -138,7 +138,6 @@ RCT_EXPORT_MODULE()
 // for the renderer. We add to self.materials so that we can reload all
 // materials at once if we move to a new EGL context
 RCT_EXPORT_METHOD(setJSMaterials:(NSDictionary *)materials) {
-    NSLog(@"VRTMaterialManager: setJSMaterials called with %lu materials: %@", (unsigned long)materials.count, materials.allKeys);
     if (!_materials) {
         _materials = [[NSMutableDictionary alloc] init];
     }
@@ -160,7 +159,7 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                   value:(id)value) {
     std::shared_ptr<VROMaterial> vroMaterial = [self getMaterialByName:materialName];
     if (!vroMaterial) {
-        NSLog(@"VRTMaterialManager: ERROR - Material '%@' not found for uniform update", materialName);
+        RCTLogError(@"Material '%@' not found for uniform update", materialName);
         return;
     }
 
@@ -188,7 +187,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
 - (instancetype)init {
     self = [super init];
     if (self) {
-        NSLog(@"VRTMaterialManager: Initialized");
         _materials = [[NSMutableDictionary alloc] init];
         _imageDictionary = [[NSMutableDictionary alloc] init];
         _materialDictionary = [[NSMutableDictionary alloc] init];
@@ -210,7 +208,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
 }
 
 - (void)loadMaterials:(NSDictionary *)materials {
-    NSLog(@"VRTMaterialManager: loadMaterials: processing %lu items", (unsigned long)materials.count);
     for (id key in materials) {
         NSDictionary *dictionary = [materials objectForKey:key];
         MaterialWrapper *materialWrapper = [self createMaterial:dictionary name:key];
@@ -320,7 +317,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
 }
 
 - (MaterialWrapper *)createMaterial:(NSDictionary *)material name:(NSString *)materialName {
-    NSLog(@"VRTMaterialManager: Creating material [%@]. Keys in dict: %@", materialName, material.allKeys);
     std::shared_ptr<VROMaterial> vroMaterial = std::make_shared<VROMaterial>();
     vroMaterial->setName([materialName cStringUsingEncoding:NSASCIIStringEncoding]);
     MaterialWrapper *materialWrapper = [[MaterialWrapper alloc] initWithMaterial:vroMaterial];
@@ -339,7 +335,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             if (path != nil) {
                 if ([self isVideoTexture:path]) {
                      std::shared_ptr<VROVideoTextureiOS> texture = std::make_shared<VROVideoTextureiOS>(VROStereoMode::None);
-                    NSLog(@"Create material for video texture: %p for mat name: %@", texture.get(), materialName);
                     [materialWrapper setVideoTexturePathForMaterialProp:materialPropertyName path:path];
                     [self setTextureForMaterial:vroMaterial texture:texture name:materialPropertyName];
                     [self loadProperties:material forTexture:texture];
@@ -399,7 +394,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                 vroMaterial->getRoughness().setColor({ [material[key] floatValue], 1.0, 1.0, 1.0 });
             } else if ([@"shaderModifiers" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSDictionary *modifiers = material[key];
-                NSLog(@"VRTMaterialManager: Processing shaderModifiers for material: %@", materialName);
                 for (id entryPointKey in modifiers) {
                     NSString *entryPointName = (NSString *)entryPointKey;
                     id modifierValue = modifiers[entryPointKey];
@@ -428,7 +422,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                     }
                     
                     VROShaderEntryPoint entryPoint = [self convertEntryPoint:entryPointName];
-                    NSLog(@"VRTMaterialManager: Adding modifier for entryPoint: %@, code length: %lu", entryPointName, (unsigned long)modifierCode.length);
                     NSArray *lines = [modifierCode componentsSeparatedByString:@"\n"];
                     std::vector<std::string> linesVec;
                     for (NSString *line in lines) {
@@ -747,7 +740,7 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
     MaterialWrapper *materialWrapper = _materialDictionary[materialName];
     NSDictionary *videoTextureDict = [materialWrapper getVideoTextures];
     if ([videoTextureDict count] == 0) {
-        NSLog(@"Warning: VRTMaterialManager: No video textures found for mat name: %@", materialName);
+        RCTLogWarn(@"No video textures found for material: %@", materialName);
         return;
     }
     
@@ -758,7 +751,6 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
         NSURL *videoURL = imageSource.request.URL;
         std::string url = std::string([[videoURL description] UTF8String]);
         videoTexture->loadVideo(url, context->getFrameSynchronizer(), driver);
-        NSLog(@"VRTMaterialManager: Updating video texture, %p for mat name: %@", videoTexture.get(), materialName);
         // update video texture listeners.
         WeakMaterialChangeListenerContainer *weakMaterialChangeListener = _materialChangeListeners[materialName];
     if (weakMaterialChangeListener != nil && weakMaterialChangeListener.listener != nil) {

@@ -33,6 +33,7 @@
 RCT_EXPORT_MODULE()
 
 RCT_EXPORT_VIEW_PROPERTY(source, NSDictionary)
+RCT_EXPORT_VIEW_PROPERTY(resources, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(animation, NSDictionary)
 RCT_EXPORT_VIEW_PROPERTY(morphTargets, NSArray<NSDictionary *>)
 RCT_EXPORT_VIEW_PROPERTY(onAnimationStartViro, RCTDirectEventBlock)

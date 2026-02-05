@@ -73,11 +73,12 @@
 @end
 
 @implementation VRT3DObject {
-    
+
     NSURL *_url;
     std::shared_ptr<VROMaterial> _objMaterial;
     BOOL _sourceChanged;
     BOOL _modelLoaded;
+    NSArray *_resources;
 
 }
 
@@ -104,6 +105,16 @@
 
 - (void)setSource:(NSDictionary *)source {
     _source = source;
+    _sourceChanged = YES;
+}
+
+- (void)setResources:(NSArray *)resources {
+    NSLog(@"[VRX DEBUG] setResources called with %lu resources", (unsigned long)resources.count);
+    for (int i = 0; i < resources.count; i++) {
+        NSDictionary *resource = resources[i];
+        NSLog(@"[VRX DEBUG]   Resource %d: %@", i, resource);
+    }
+    _resources = resources;
     _sourceChanged = YES;
 }
 
@@ -238,7 +249,56 @@
     if ([_type caseInsensitiveCompare:@"OBJ"] == NSOrderedSame) {
         VROOBJLoader::loadOBJFromResource(url, VROResourceType::URL, self.node, self.driver, onFinish);
     } else if ([_type caseInsensitiveCompare:@"VRX"] == NSOrderedSame) {
-        VROFBXLoader::loadFBXFromResource(url, VROResourceType::URL, self.node, self.driver, onFinish);
+        if (_resources && _resources.count > 0) {
+            // Convert NSArray of resource dictionaries to std::map<std::string, std::string>
+            // Each resource is a dictionary with {uri: "...", name: "..."} from resolveAssetSource
+            std::map<std::string, std::string> resourceMap;
+            for (NSDictionary *resource in _resources) {
+                if ([resource isKindOfClass:[NSDictionary class]]) {
+                    NSString *uri = resource[@"uri"];
+                    NSString *filename = nil;
+
+                    // Extract filename from URI
+                    NSURL *url = [NSURL URLWithString:uri];
+
+                    // For Metro bundler URLs, the filename is in the unstable_path query parameter
+                    if (url && url.query) {
+                        NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+                        for (NSURLQueryItem *item in components.queryItems) {
+                            if ([item.name isEqualToString:@"unstable_path"]) {
+                                // unstable_path contains the relative path like "./assets/models/cloud_anim/file.png?platform=ios&hash=..."
+                                NSString *unstablePath = [item.value stringByRemovingPercentEncoding];
+
+                                // Strip any query parameters from the unstable_path itself
+                                NSRange queryStart = [unstablePath rangeOfString:@"?"];
+                                if (queryStart.location != NSNotFound) {
+                                    unstablePath = [unstablePath substringToIndex:queryStart.location];
+                                }
+
+                                filename = [unstablePath lastPathComponent];
+                                break;
+                            }
+                        }
+                    }
+
+                    // Fallback: extract from URL path (for file:// URLs)
+                    if (!filename || filename.length == 0) {
+                        NSString *path = url.path ?: uri;
+                        filename = [[path lastPathComponent] stringByRemovingPercentEncoding];
+                    }
+
+                    if (uri && filename && filename.length > 0) {
+                        resourceMap[std::string([filename UTF8String])] = std::string([uri UTF8String]);
+                        NSLog(@"[VRX RESOURCES] Mapped texture '%@' -> '%@'", filename, uri);
+                    }
+                }
+            }
+            NSLog(@"[VRX RESOURCES] Loading VRX with %lu resources", (unsigned long)resourceMap.size());
+            VROFBXLoader::loadFBXFromResources(url, VROResourceType::URL, self.node, resourceMap, self.driver, onFinish);
+        } else {
+            NSLog(@"[VRX RESOURCES] Loading VRX without resources (textures may not load)");
+            VROFBXLoader::loadFBXFromResource(url, VROResourceType::URL, self.node, self.driver, onFinish);
+        }
     } else if ([_type caseInsensitiveCompare:@"GLTF"] == NSOrderedSame) {
         VROGLTFLoader::loadGLTFFromResource(url, {},  VROResourceType::URL, self.node, false, self.driver, onFinish);
     } else if ([_type caseInsensitiveCompare:@"GLB"] == NSOrderedSame) {

@@ -146,7 +146,7 @@
                 break;
             }
         }
-        if (!childFound) {
+        if (!childFound && self.vroSubview.node) {
             supernodeView.node->addChildNode(self.vroSubview.node);
         }
     }

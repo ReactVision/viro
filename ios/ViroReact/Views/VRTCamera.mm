@@ -46,7 +46,9 @@ static NSArray *const kDefaultCameraPosition  = @[@0, @0, @0];
         _nodeCamera->setRefNodeToCopyRotation(self.node);
         self.position = kDefaultCameraPosition;
         _nodeRootTransformCamera->setCamera(_nodeCamera);
-        _nodeRootTransformCamera->addChildNode(self.node);
+        if (self.node) {
+            _nodeRootTransformCamera->addChildNode(self.node);
+        }
         self.nodeAnimation.node = _nodeRootTransformCamera;
     }
     return self;

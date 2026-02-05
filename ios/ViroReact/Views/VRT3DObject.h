@@ -35,6 +35,7 @@
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 
 @property (readwrite, nonatomic) NSDictionary *source;
+@property (readwrite, nonatomic) NSArray *resources;
 @property (nonatomic, readwrite, strong) NSArray<NSDictionary *> *morphTargets;
 @property (readwrite, nonatomic) NSString *type;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onLoadStartViro;

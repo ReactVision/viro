@@ -177,12 +177,16 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         self.node->addLight([light light]);
     } else if ([child isKindOfClass:[VRTCamera class]]) {
         VRTCamera *cameraView = (VRTCamera *)child;
-        self.node->addChildNode(cameraView.nodeRootTransformCamera);
+        if (cameraView.nodeRootTransformCamera) {
+            self.node->addChildNode(cameraView.nodeRootTransformCamera);
+        }
     } else if ([child isKindOfClass:[VRTPortal class]]) {
         // Ignore, this is only handled by VRTPortal
     } else if ([child isKindOfClass:[VRTNode class]]) {
         VRTNode *nodeView = (VRTNode *)child;
-        self.node->addChildNode(nodeView.node);
+        if (nodeView.node) {
+            self.node->addChildNode(nodeView.node);
+        }
     } else if ([child isKindOfClass:[VRTAnimatedComponent class]]) {
         /*
          Add all children (the targets of the animation) to the node.
@@ -205,7 +209,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 }
             }
             
-            if(!childFound){
+            if(!childFound && subsubNodeView.node){
                 self.node->addChildNode(subsubNodeView.node);
             }
         }
@@ -839,16 +843,27 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         // Get materials from geometry
         std::vector<std::shared_ptr<VROMaterial>> currentMaterials = geometry->getMaterials();
 
+        NSLog(@"[SHADER OVERRIDE] Current materials count: %zu", currentMaterials.size());
+        for (size_t i = 0; i < currentMaterials.size(); i++) {
+            auto mat = currentMaterials[i];
+            bool hasDiffuseTex = mat->getDiffuse().getTexture() != nullptr;
+            NSLog(@"[SHADER OVERRIDE]   Material %zu: has diffuse texture = %@", i, hasDiffuseTex ? @"YES" : @"NO");
+        }
+
         // Check if we have materials to work with
         if (currentMaterials.empty()) {
             // Model hasn't loaded yet or has no materials, skip for now
+            NSLog(@"[SHADER OVERRIDE] No materials found, skipping");
             return;
         }
 
         // Store original embedded materials on first call (only if non-empty!)
         // This ensures we always start from the true GLB materials, not previously modified ones
         if (_originalEmbeddedMaterials.empty()) {
+            NSLog(@"[SHADER OVERRIDE] Storing %zu original materials", currentMaterials.size());
             _originalEmbeddedMaterials = currentMaterials;
+        } else {
+            NSLog(@"[SHADER OVERRIDE] Using %zu stored original materials", _originalEmbeddedMaterials.size());
         }
 
         // Always use the stored original embedded materials as the baseline

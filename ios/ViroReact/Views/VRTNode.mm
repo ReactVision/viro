@@ -648,6 +648,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                     if (!clonedMaterialsArray) {
                         clonedMaterialsArray = [[NSMutableArray alloc] init];
                         self.shaderMaterialsMap[materialName] = clonedMaterialsArray;
+                    } else {
+                        // CRITICAL: Clear array from previous runs to prevent accumulation
+                        [clonedMaterialsArray removeAllObjects];
                     }
 
                     // Store raw pointer (material is owned by geometry)
@@ -938,6 +941,10 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             if (!clonedMaterialsArray) {
                                 clonedMaterialsArray = [[NSMutableArray alloc] init];
                                 self.shaderOverrideMap[shaderMaterialName] = clonedMaterialsArray;
+                            } else {
+                                // CRITICAL: Clear array from previous scene runs to prevent accumulation
+                                // Without this, arrays grow on each rerun, causing "index beyond bounds" crashes
+                                [clonedMaterialsArray removeAllObjects];
                             }
 
                             std::vector<std::shared_ptr<VROMaterial>> mergedChildMaterials;

@@ -1,6 +1,7 @@
 #version 300 es
 #include constant_functions_fsh_adreno
 
+uniform highp vec3 camera_position;
 uniform highp vec4 material_diffuse_surface_color;
 uniform highp float material_diffuse_intensity;
 uniform lowp float material_alpha;
@@ -22,6 +23,7 @@ void main() {
     _surface_alpha = material_alpha;
     _surface_normal = v_tbn[2];
     _surface_position = v_surface_position;
+    _surface_view = normalize(camera_position - _surface_position);
 
 #pragma surface_modifier_body
 

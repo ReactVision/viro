@@ -87,13 +87,21 @@ const double kTransformDelegateDistanceFilter = 0.01;
 
 #pragma mark - Node Class
 
-@interface VRTNode ()
+@interface VRTNode () {
+    // Store original embedded materials from GLB before any shader overrides
+    // This allows us to always start from the true baseline when switching shaders
+    std::vector<std::shared_ptr<VROMaterial>> _originalEmbeddedMaterials;
+}
 // Track shader override materials and their clones for uniform updates
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *shaderOverrideMap;
+// Track regular materials with shader modifiers for uniform propagation
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *shaderMaterialsMap;
 @end
 
 // Static registry to track all nodes with shader overrides (weak references)
 static NSHashTable *shaderOverrideNodesRegistry = nil;
+// Static registry to track all nodes with shader materials (weak references)
+static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
 @implementation VRTNode
 
@@ -101,6 +109,7 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     if (self == [VRTNode class]) {
         // NSHashTable with weak references
         shaderOverrideNodesRegistry = [NSHashTable weakObjectsHashTable];
+        shaderMaterialsNodesRegistry = [NSHashTable weakObjectsHashTable];
     }
 }
 
@@ -109,6 +118,13 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     for (VRTNode *node in shaderOverrideNodesRegistry) {
         if (node.shaderOverrideMap[materialName]) {
             [node updateShaderOverrideUniformsForMaterial:materialName];
+        }
+    }
+
+    // Also update nodes using this material via the materials prop
+    for (VRTNode *node in shaderMaterialsNodesRegistry) {
+        if (node.shaderMaterialsMap[materialName]) {
+            [node updateShaderMaterialUniformsForMaterial:materialName];
         }
     }
 }
@@ -124,6 +140,7 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
         _opacity = 1.0; //default opacity to 1.0
         _highAccuracyEvents = NO;
         _shaderOverrideMap = [[NSMutableDictionary alloc] init];
+        _shaderMaterialsMap = [[NSMutableDictionary alloc] init];
         _lightReceivingBitMask = 1;
         _shadowCastingBitMask = 1;
         _shouldIgnoreEventHandling = NO; // default is NO
@@ -522,7 +539,7 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     for (id entryPointKey in modifiers) {
         NSString *entryPointName = (NSString *)entryPointKey;
         id modifierValue = modifiers[entryPointKey];
-        
+
         // Handle both string and dictionary formats
         NSString *modifierCode;
         if ([modifierValue isKindOfClass:[NSString class]]) {
@@ -536,7 +553,7 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
             } else {
                 modifierCode = body;
             }
-            
+
             if (!modifierCode) {
                 RCTLogError(@"Shader modifier dictionary must contain 'body' or 'uniforms' key");
                 continue;
@@ -545,17 +562,20 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
             RCTLogError(@"Shader modifier must be string or dictionary with 'body' key");
             continue;
         }
-        
+
         VROShaderEntryPoint entryPoint = [self convertEntryPoint:entryPointName];
         NSArray *lines = [modifierCode componentsSeparatedByString:@"\n"];
         std::vector<std::string> linesVec;
         for (NSString *line in lines) {
             linesVec.push_back(std::string([line UTF8String]));
         }
-        
+
         auto modifier = std::make_shared<VROShaderModifier>(entryPoint, linesVec);
         material->addShaderModifier(modifier);
     }
+
+    // Force geometry substrate to reset - critical for geometry shaders that modify vertex data
+    geometry->updateSubstrate();
 }
 
 - (VROShaderEntryPoint)convertEntryPoint:(NSString *)name {
@@ -586,38 +606,68 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
         return;
     }
 
+    // Clear existing shader material tracking for this node
+    [self.shaderMaterialsMap removeAllObjects];
+
     std::shared_ptr<VROGeometry> geometry = self.node->getGeometry();
     if (geometry) {
         if (!self.materials) {
             // If materials were removed from object, then reset the materials array.
+            // This ensures a clean slate when materials are cleared
             std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
             tempMaterials.push_back(std::make_shared<VROMaterial>());
             geometry->setMaterials(tempMaterials);
+
+            // Remove from tracking registry since no shader materials
+            [shaderMaterialsNodesRegistry removeObject:self];
         } else {
             VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
 
             std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
+            BOOL hasShaderMaterials = NO;
+
             for (int i = 0; i < self.materials.count; i++) {
                 NSString *materialName = [self.materials objectAtIndex:i];
 
-                std::shared_ptr<VROMaterial> material = [materialManager getMaterialByName:materialName];
-                if (material == NULL) {
+                std::shared_ptr<VROMaterial> sourceMaterial = [materialManager getMaterialByName:materialName];
+                if (sourceMaterial == NULL) {
                     RCTLogError(@"Unknown Material Name: \"%@\"", materialName);
                     return;
                 }
 
-                // For materials with shader modifiers, use shared reference instead of copying
-                // so that uniform updates via updateShaderUniform() propagate to rendered materials
-                if (material->getShaderModifiers().size() > 0) {
-                    tempMaterials.push_back(material);
-                } else {
-                    // Copy materials without shader modifiers, as they may be
-                    // modified by animations, etc. and we don't want these changes to
-                    // propagate to the reference material held by the material manager
-                    tempMaterials.push_back(std::make_shared<VROMaterial>(material));
+                // ALWAYS copy materials to prevent state persistence bugs
+                // This ensures each object has its own independent material instance
+                std::shared_ptr<VROMaterial> materialCopy = std::make_shared<VROMaterial>(sourceMaterial);
+
+                // Track materials with shader modifiers for uniform propagation
+                if (sourceMaterial->getShaderModifiers().size() > 0) {
+                    hasShaderMaterials = YES;
+
+                    // Track this cloned material for uniform updates
+                    NSMutableArray *clonedMaterialsArray = self.shaderMaterialsMap[materialName];
+                    if (!clonedMaterialsArray) {
+                        clonedMaterialsArray = [[NSMutableArray alloc] init];
+                        self.shaderMaterialsMap[materialName] = clonedMaterialsArray;
+                    }
+
+                    // Store raw pointer (material is owned by geometry)
+                    [clonedMaterialsArray addObject:[NSValue valueWithPointer:materialCopy.get()]];
                 }
+
+                tempMaterials.push_back(materialCopy);
             }
             geometry->setMaterials(tempMaterials);
+
+            // Force geometry substrate to reset when materials change
+            // This is critical for geometry shaders that modify vertex data
+            geometry->updateSubstrate();
+
+            // Register this node if it has shader materials for uniform propagation
+            if (hasShaderMaterials) {
+                [shaderMaterialsNodesRegistry addObject:self];
+            } else {
+                [shaderMaterialsNodesRegistry removeObject:self];
+            }
         }
     }
 
@@ -629,17 +679,13 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
         std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
 
         if (self.materials) {
-            // Build materials list from material names
+            // Build materials list from material names - always copy
             for (int i = 0; i < self.materials.count; i++) {
                 NSString *materialName = [self.materials objectAtIndex:i];
-                std::shared_ptr<VROMaterial> material = [materialManager getMaterialByName:materialName];
-                if (material) {
-                    // Use shared reference for shader materials, copy for others
-                    if (material->getShaderModifiers().size() > 0) {
-                        tempMaterials.push_back(material);
-                    } else {
-                        tempMaterials.push_back(std::make_shared<VROMaterial>(material));
-                    }
+                std::shared_ptr<VROMaterial> sourceMaterial = [materialManager getMaterialByName:materialName];
+                if (sourceMaterial) {
+                    // Always copy to prevent state persistence
+                    tempMaterials.push_back(std::make_shared<VROMaterial>(sourceMaterial));
                 }
             }
         } else {
@@ -652,17 +698,14 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
             for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
                 std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
                 if (childGeometry) {
-                    // For shader materials, use same shared references to allow uniform updates
-                    // For non-shader materials, create fresh copies for each child geometry
+                    // Always create fresh copies for each child geometry
                     std::vector<std::shared_ptr<VROMaterial>> childMaterials;
                     for (const auto &mat : tempMaterials) {
-                        if (mat->getShaderModifiers().size() > 0) {
-                            childMaterials.push_back(mat); // Shared reference
-                        } else {
-                            childMaterials.push_back(std::make_shared<VROMaterial>(mat)); // Copy
-                        }
+                        childMaterials.push_back(std::make_shared<VROMaterial>(mat));
                     }
                     childGeometry->setMaterials(childMaterials);
+                    // Force geometry substrate to reset
+                    childGeometry->updateSubstrate();
                 }
                 // Recurse to grandchildren
                 applyToChildren(child);
@@ -680,13 +723,26 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     if (!shaderOverrides || shaderOverrides.count == 0) {
         [shaderOverrideNodesRegistry removeObject:self];
         [self.shaderOverrideMap removeAllObjects];
+
+        // Restore original embedded materials when removing all shader overrides
+        if (!_originalEmbeddedMaterials.empty() && self.node) {
+            std::shared_ptr<VROGeometry> geometry = self.node->getGeometry();
+            if (geometry) {
+                geometry->setMaterials(_originalEmbeddedMaterials);
+                geometry->updateSubstrate();
+            }
+            // Clear stored materials
+            _originalEmbeddedMaterials.clear();
+        }
     } else {
         [self applyShaderOverrides];
     }
 }
 
 - (void)applyShaderOverrides {
-    [self applyShaderOverridesRecursive:NO];
+    // CRITICAL: Use recursive=YES because GLB/VRX models have geometry on child nodes
+    // Without this, shader changes only affect root node (which has no geometry)
+    [self applyShaderOverridesRecursive:YES];
 }
 
 // Update uniforms on cloned materials from shader override source materials
@@ -729,6 +785,39 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     }
 }
 
+// Update uniforms for materials applied via the materials prop (not shaderOverrides)
+- (void)updateShaderMaterialUniformsForMaterial:(NSString *)materialName {
+    if (!self.shaderMaterialsMap || !self.shaderMaterialsMap[materialName]) {
+        return;
+    }
+
+    VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
+    std::shared_ptr<VROMaterial> sourceMaterial = [materialManager getMaterialByName:materialName];
+    if (!sourceMaterial) {
+        return;
+    }
+
+    NSArray *clonedMaterialsArray = self.shaderMaterialsMap[materialName];
+
+    for (NSValue *materialPtr in clonedMaterialsArray) {
+        VROMaterial *clonedMaterial = (VROMaterial *)[materialPtr pointerValue];
+
+        // Update all uniform types from source material to cloned material
+        for (const auto &uniform : sourceMaterial->getShaderUniformFloats()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+        for (const auto &uniform : sourceMaterial->getShaderUniformVec3s()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+        for (const auto &uniform : sourceMaterial->getShaderUniformVec4s()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+        for (const auto &uniform : sourceMaterial->getShaderUniformMat4s()) {
+            clonedMaterial->setShaderUniform(uniform.first, uniform.second);
+        }
+    }
+}
+
 // Apply shader modifiers to existing materials without replacing textures.
 // Clones the geometry's current materials and merges shader modifiers from the override materials.
 - (void)applyShaderOverridesRecursive:(BOOL)recursive {
@@ -740,14 +829,27 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     [self.shaderOverrideMap removeAllObjects];
 
     std::shared_ptr<VROGeometry> geometry = self.node->getGeometry();
-    if (geometry) {
-        // Get original embedded materials from the geometry
-        std::vector<std::shared_ptr<VROMaterial>> originalMaterials = geometry->getMaterials();
 
-        if (originalMaterials.empty()) {
-            // No materials to merge with, skip
+    // For 3D models (GLB/FBX/VRX), geometry is often on child nodes, not the root
+    // So we need to proceed with recursive application even if root has no geometry
+    if (geometry) {
+        // Get materials from geometry
+        std::vector<std::shared_ptr<VROMaterial>> currentMaterials = geometry->getMaterials();
+
+        // Check if we have materials to work with
+        if (currentMaterials.empty()) {
+            // Model hasn't loaded yet or has no materials, skip for now
             return;
         }
+
+        // Store original embedded materials on first call (only if non-empty!)
+        // This ensures we always start from the true GLB materials, not previously modified ones
+        if (_originalEmbeddedMaterials.empty()) {
+            _originalEmbeddedMaterials = currentMaterials;
+        }
+
+        // Always use the stored original embedded materials as the baseline
+        std::vector<std::shared_ptr<VROMaterial>> originalMaterials = _originalEmbeddedMaterials;
 
         VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
 
@@ -767,6 +869,10 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
             for (const auto &originalMat : originalMaterials) {
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
+
+                // Clear any existing shader modifiers from the cloned material
+                // This ensures we REPLACE shader modifiers instead of STACKING them
+                mergedMat->removeAllShaderModifiers();
 
                 // Copy shader modifiers from shader material to merged material
                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -802,9 +908,13 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
             // Apply merged materials to geometry
             geometry->setMaterials(mergedMaterials);
         }
+
+        // Force geometry substrate to reset after shader override materials are applied
+        geometry->updateSubstrate();
     }
 
     // Recursively apply to child nodes if requested (for 3D models with nested geometries)
+    // This is CRITICAL for GLB/VRX models where geometry is on child nodes
     if (recursive) {
         VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
 
@@ -834,6 +944,10 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
+                                // Clear any existing shader modifiers from the cloned material
+                                // This ensures we REPLACE shader modifiers instead of STACKING them
+                                mergedMat->removeAllShaderModifiers();
+
                                 // Copy shader modifiers
                                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
                                     mergedMat->addShaderModifier(modifier);
@@ -860,6 +974,8 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
                             }
 
                             childGeometry->setMaterials(mergedChildMaterials);
+                            // Force geometry substrate to reset
+                            childGeometry->updateSubstrate();
                         }
                     }
                 }
@@ -1763,8 +1879,9 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
     // Clear animation references
     _nodeAnimation = nil;
 
-    // Unregister from shader override registry
+    // Unregister from shader registries
     [shaderOverrideNodesRegistry removeObject:self];
+    [shaderMaterialsNodesRegistry removeObject:self];
 }
 
 @end

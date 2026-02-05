@@ -267,7 +267,13 @@ public:
         _geometryElements = elements;
         updateSubstrate();
     }
-    
+
+    /*
+     Force geometry substrate to reset. This is necessary when shader modifiers change
+     to clear cached rendering state (especially for geometry shaders that modify vertices).
+     */
+    void updateSubstrate();
+
 private:
     /*
      User-assigned name of this geometry.
@@ -332,12 +338,6 @@ private:
      then returns false.
      */
     bool isRenderable() const;
-    
-    /*
-     Invoke when the substrate needs to be refreshed (typically when underlying
-     geometry sources or elements change).
-     */
-    void updateSubstrate();
 
     /*
      If set, this geometry is instanced rendered with the configurations set by this

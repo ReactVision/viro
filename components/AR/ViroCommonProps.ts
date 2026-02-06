@@ -103,6 +103,7 @@ export type ViroObjectProps = {
   shadowCastingBitMask?: number;
 
   shaderModifiers?: ViroShaderModifiers;
+  shaderOverrides?: string[];
   materialUniforms?: { [key: string]: any } | ViroShaderUniform[];
 
   onTransformUpdate?: (position: Viro3DPoint) => void;

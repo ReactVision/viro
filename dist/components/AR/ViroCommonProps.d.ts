@@ -54,6 +54,7 @@ export type ViroObjectProps = {
     lightReceivingBitMask?: number;
     shadowCastingBitMask?: number;
     shaderModifiers?: ViroShaderModifiers;
+    shaderOverrides?: string[];
     materialUniforms?: {
         [key: string]: any;
     } | ViroShaderUniform[];

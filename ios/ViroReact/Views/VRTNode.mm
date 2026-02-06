@@ -747,6 +747,12 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 }
 
 - (void)applyShaderOverrides {
+    // Don't apply shader overrides if node doesn't exist yet
+    // The model loading callback will apply them after the model loads
+    if (!self.node) {
+        return;
+    }
+
     // CRITICAL: Use recursive=YES because GLB/VRX models have geometry on child nodes
     // Without this, shader changes only affect root node (which has no geometry)
     [self applyShaderOverridesRecursive:YES];
@@ -858,12 +864,40 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         }
 
         // Store original embedded materials on first call (only if non-empty!)
-        // This ensures we always start from the true GLB materials, not previously modified ones
+        // For VRX/FBX with async textures, we'll update this when textures finish loading
         if (_originalEmbeddedMaterials.empty()) {
             NSLog(@"[SHADER OVERRIDE] Storing %zu original materials", currentMaterials.size());
             _originalEmbeddedMaterials = currentMaterials;
         } else {
-            NSLog(@"[SHADER OVERRIDE] Using %zu stored original materials", _originalEmbeddedMaterials.size());
+            // Check if we should UPDATE stored materials (for VRX with async textures)
+            // If current materials have textures but stored ones don't, update
+            bool currentHasTextures = false;
+            bool storedHasTextures = false;
+
+            for (const auto &mat : currentMaterials) {
+                if (mat->getDiffuse().getTexture() != nullptr ||
+                    mat->getRoughness().getTexture() != nullptr ||
+                    mat->getMetalness().getTexture() != nullptr) {
+                    currentHasTextures = true;
+                    break;
+                }
+            }
+
+            for (const auto &mat : _originalEmbeddedMaterials) {
+                if (mat->getDiffuse().getTexture() != nullptr ||
+                    mat->getRoughness().getTexture() != nullptr ||
+                    mat->getMetalness().getTexture() != nullptr) {
+                    storedHasTextures = true;
+                    break;
+                }
+            }
+
+            if (currentHasTextures && !storedHasTextures) {
+                NSLog(@"[SHADER OVERRIDE] Updating stored materials with textures");
+                _originalEmbeddedMaterials = currentMaterials;
+            } else {
+                NSLog(@"[SHADER OVERRIDE] Using %zu stored original materials", _originalEmbeddedMaterials.size());
+            }
         }
 
         // Always use the stored original embedded materials as the baseline

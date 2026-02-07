@@ -302,7 +302,6 @@
 - (void)willMoveToSuperview:(UIView *)newSuperview {
     if (newSuperview == nil) {
         // View is being removed
-        NSLog(@"[ViroMemory] VRTARSceneNavigator willMoveToSuperview:nil - view being REMOVED");
         [self cleanupViroResources];
 
         // Critical: Clear pointer interactions to prevent crashes
@@ -313,7 +312,6 @@
         }
     } else {
         // View is being added - reset cleanup flag for potential reuse (Paper architecture)
-        NSLog(@"[ViroMemory] VRTARSceneNavigator willMoveToSuperview - view being ADDED, resetting cleanup flag");
         _hasCleanedUp = NO;
     }
     [super willMoveToSuperview:newSuperview];
@@ -322,16 +320,12 @@
 - (void)cleanupViroResources {
     // Only cleanup once per instance
     if (_hasCleanedUp) {
-        NSLog(@"[ViroMemory] cleanupViroResources SKIPPED - already cleaned");
         return;
     }
     _hasCleanedUp = YES;
 
-    NSLog(@"[ViroMemory] cleanupViroResources STARTING");
-
     // CRITICAL: Clear currentViews to break retain cycle
     if (_currentViews) {
-        NSLog(@"[ViroMemory] Clearing %lu scenes from currentViews", (unsigned long)[_currentViews count]);
         [_currentViews removeAllObjects];
         _currentViews = nil;
     }
@@ -345,7 +339,6 @@
 
     // Clear bridge reference (was strong, creating cycle)
     if (_bridge) {
-        NSLog(@"[ViroMemory] Clearing bridge reference to break retain cycle");
         VRTMaterialManager *materialManager = [_bridge materialManager];
         [materialManager clearAllMaterials];
         _bridge = nil;
@@ -356,7 +349,6 @@
     // Clear render delegate to break potential cycles
     if (_vroView) {
         _vroView.renderDelegate = nil;
-        NSLog(@"[ViroMemory] Cleared renderDelegate");
     }
 
     if (_vroView) {
@@ -364,7 +356,6 @@
 
         // First pause the AR session
         [viewAR setPaused:YES];
-        NSLog(@"[ViroMemory] Paused AR session");
 
         // Terminate AR session explicitly - synchronous cleanup for Fabric
         @try {
@@ -406,10 +397,7 @@
             [EAGLContext setCurrentContext:nil];
         }
         _eaglContext = nil;
-        NSLog(@"[ViroMemory] Cleared EAGLContext");
     }
-
-    NSLog(@"[ViroMemory] cleanupViroResources COMPLETED");
 }
 
 - (void)removeFromSuperview{
@@ -433,10 +421,8 @@
 }
 
 - (void)dealloc {
-    NSLog(@"[ViroMemory] VRTARSceneNavigator dealloc CALLED - instance %p being destroyed", self);
     // Final safety net for cleanup
     [self cleanupViroResources];
-    NSLog(@"[ViroMemory] VRTARSceneNavigator dealloc COMPLETED");
 }
 
 #pragma mark - Fabric Compatibility

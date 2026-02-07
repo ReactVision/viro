@@ -91,6 +91,9 @@ const double kTransformDelegateDistanceFilter = 0.01;
     // Store original embedded materials from GLB before any shader overrides
     // This allows us to always start from the true baseline when switching shaders
     std::vector<std::shared_ptr<VROMaterial>> _originalEmbeddedMaterials;
+    // Store original materials for child nodes (to preserve skinning modifiers, etc.)
+    // Maps node pointer to its original materials vector
+    std::unordered_map<VRONode*, std::vector<std::shared_ptr<VROMaterial>>> _childNodeOriginalMaterials;
 }
 // Track shader override materials and their clones for uniform updates
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *shaderOverrideMap;
@@ -538,7 +541,8 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     }
 
     std::shared_ptr<VROMaterial> material = geometry->getMaterials()[0];
-    material->removeAllShaderModifiers();
+    // NOTE: Commenting out to preserve system modifiers (e.g., skinning)
+    // material->removeAllShaderModifiers();
 
     for (id entryPointKey in modifiers) {
         NSString *entryPointName = (NSString *)entryPointKey;
@@ -741,6 +745,12 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
             // Clear stored materials
             _originalEmbeddedMaterials.clear();
         }
+
+        // Restore original materials for all child nodes
+        if (!_childNodeOriginalMaterials.empty() && self.node) {
+            [self restoreChildNodeMaterials:self.node];
+            _childNodeOriginalMaterials.clear();
+        }
     } else {
         [self applyShaderOverrides];
     }
@@ -922,9 +932,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                // Clear any existing shader modifiers from the cloned material
-                // This ensures we REPLACE shader modifiers instead of STACKING them
-                mergedMat->removeAllShaderModifiers();
+                // NOTE: We DON'T clear existing shader modifiers because:
+                // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
+                // 2. Clearing would remove critical system modifiers like skinning
+                // 3. No accumulation occurs since each shader change starts from stored originals
+                // mergedMat->removeAllShaderModifiers(); // ← REMOVED to preserve skinning modifiers
 
                 // Copy shader modifiers from shader material to merged material
                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -974,8 +986,22 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
             for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
                 std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
                 if (childGeometry) {
-                    // Get original materials from child
-                    std::vector<std::shared_ptr<VROMaterial>> childOriginalMaterials = childGeometry->getMaterials();
+                    // Store original materials for this child node on first call
+                    std::vector<std::shared_ptr<VROMaterial>> childOriginalMaterials;
+                    VRONode* childPtr = child.get();
+
+                    if (_childNodeOriginalMaterials.find(childPtr) == _childNodeOriginalMaterials.end()) {
+                        // First time - save original materials (with skinning modifiers, textures, etc.)
+                        childOriginalMaterials = childGeometry->getMaterials();
+                        if (!childOriginalMaterials.empty()) {
+                            _childNodeOriginalMaterials[childPtr] = childOriginalMaterials;
+                            NSLog(@"[SHADER OVERRIDE] Stored %zu original materials for child node", childOriginalMaterials.size());
+                        }
+                    } else {
+                        // Use stored original materials as baseline
+                        childOriginalMaterials = _childNodeOriginalMaterials[childPtr];
+                        NSLog(@"[SHADER OVERRIDE] Using %zu stored original materials for child node", childOriginalMaterials.size());
+                    }
 
                     if (!childOriginalMaterials.empty()) {
                         // Apply shader overrides to child materials
@@ -1000,9 +1026,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Clear any existing shader modifiers from the cloned material
-                                // This ensures we REPLACE shader modifiers instead of STACKING them
-                                mergedMat->removeAllShaderModifiers();
+                                // NOTE: We DON'T clear existing shader modifiers because:
+                                // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
+                                // 2. Clearing would remove critical system modifiers like skinning
+                                // 3. No accumulation occurs since each shader change starts from stored originals
+                                // mergedMat->removeAllShaderModifiers(); // ← REMOVED to preserve skinning modifiers
 
                                 // Copy shader modifiers
                                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -1046,6 +1074,24 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     // Register this node in the global registry if it has shader overrides
     if (self.shaderOverrideMap.count > 0) {
         [shaderOverrideNodesRegistry addObject:self];
+    }
+}
+
+- (void)restoreChildNodeMaterials:(std::shared_ptr<VRONode>)node {
+    // Recursively restore original materials for all child nodes
+    for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
+        std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
+        if (childGeometry) {
+            VRONode* childPtr = child.get();
+            auto it = _childNodeOriginalMaterials.find(childPtr);
+            if (it != _childNodeOriginalMaterials.end()) {
+                childGeometry->setMaterials(it->second);
+                childGeometry->updateSubstrate();
+                NSLog(@"[SHADER OVERRIDE] Restored %zu original materials for child node", it->second.size());
+            }
+        }
+        // Recurse to grandchildren
+        [self restoreChildNodeMaterials:child];
     }
 }
 

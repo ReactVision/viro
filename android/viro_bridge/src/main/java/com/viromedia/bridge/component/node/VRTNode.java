@@ -290,6 +290,9 @@ public class VRTNode extends VRTComponent {
     // Store original embedded materials from GLB before any shader overrides
     // This allows us to always start from the true baseline when switching shaders
     protected java.util.ArrayList<Material> mOriginalEmbeddedMaterials;
+    // Store original materials for child nodes (to preserve skinning modifiers, etc.)
+    // Maps node reference to its original materials list
+    protected java.util.HashMap<Node, java.util.ArrayList<Material>> mChildNodeOriginalMaterials;
     // Use ConcurrentHashMap for thread-safe access, values are WeakReferences to nodes
     private static java.util.Map<Integer, WeakReference<VRTNode>> sShaderOverrideNodesRegistry =
         new java.util.concurrent.ConcurrentHashMap<>();
@@ -422,6 +425,10 @@ public class VRTNode extends VRTComponent {
             }
             // Clear stored original materials
             mOriginalEmbeddedMaterials = null;
+            if (mChildNodeOriginalMaterials != null) {
+                mChildNodeOriginalMaterials.clear();
+                mChildNodeOriginalMaterials = null;
+            }
 
             // Clean up material usage registry
             if (mMaterials != null) {
@@ -1002,6 +1009,13 @@ public class VRTNode extends VRTComponent {
                 // Clear stored materials
                 mOriginalEmbeddedMaterials = null;
             }
+
+            // Restore original materials for all child nodes
+            if (mChildNodeOriginalMaterials != null && !mChildNodeOriginalMaterials.isEmpty() && mNodeJni != null) {
+                restoreChildNodeMaterials(mNodeJni);
+                mChildNodeOriginalMaterials.clear();
+                mChildNodeOriginalMaterials = null;
+            }
         } else {
             Log.d(TAG, "Setting shader overrides: " + shaderOverrides);
             // Register this node for uniform updates (replace any existing entry)
@@ -1118,7 +1132,29 @@ public class VRTNode extends VRTComponent {
     private void applyShaderOverridesToNode(Node node) {
         Geometry geometry = node.getGeometry();
         if (geometry != null) {
-            List<Material> originalMaterials = geometry.getMaterials();
+            // Initialize child node materials map if needed
+            if (mChildNodeOriginalMaterials == null) {
+                mChildNodeOriginalMaterials = new java.util.HashMap<>();
+            }
+
+            // Store original materials for this child node on first call
+            java.util.ArrayList<Material> originalMaterials;
+            if (!mChildNodeOriginalMaterials.containsKey(node)) {
+                List<Material> currentMaterials = geometry.getMaterials();
+                if (currentMaterials != null && !currentMaterials.isEmpty()) {
+                    // Save a copy of the original materials (with skinning modifiers, textures, etc.)
+                    originalMaterials = new java.util.ArrayList<>(currentMaterials);
+                    mChildNodeOriginalMaterials.put(node, originalMaterials);
+                    Log.d(TAG, "Stored " + originalMaterials.size() + " original materials for child node");
+                } else {
+                    return; // No materials to work with
+                }
+            } else {
+                // Use the stored original materials as baseline
+                originalMaterials = mChildNodeOriginalMaterials.get(node);
+                Log.d(TAG, "Using " + originalMaterials.size() + " stored original materials for child node");
+            }
+
             if (originalMaterials != null && !originalMaterials.isEmpty()) {
                 MaterialManager materialManager = getReactContext().getNativeModule(MaterialManager.class);
 
@@ -1157,16 +1193,46 @@ public class VRTNode extends VRTComponent {
         }
     }
 
+    private void restoreChildNodeMaterials(Node node) {
+        // Recursively restore original materials for all child nodes
+        for (Node child : node.getChildNodes()) {
+            Geometry geometry = child.getGeometry();
+            if (geometry != null && mChildNodeOriginalMaterials != null) {
+                List<Material> originalMaterials = mChildNodeOriginalMaterials.get(child);
+                if (originalMaterials != null) {
+                    geometry.setMaterials(originalMaterials);
+                    geometry.updateSubstrate();
+                    Log.d(TAG, "Restored " + originalMaterials.size() + " original materials for child node");
+                }
+            }
+            // Recurse to grandchildren
+            restoreChildNodeMaterials(child);
+        }
+    }
+
     private void copyShaderModifiersAndUniforms(Material source, Material dest) {
         // Copy shader modifiers and uniforms from source (shader override material)
         // to destination (cloned original material that already has textures)
-        Log.d(TAG, "Copying shader modifiers and uniforms from source to dest");
+        Log.d(TAG, "=== copyShaderModifiersAndUniforms START ===");
+        Log.d(TAG, "Source material name: " + (source != null ? source.getName() : "null"));
+        Log.d(TAG, "Dest material name: " + (dest != null ? dest.getName() : "null"));
 
-        // CRITICAL: Clear existing shader modifiers first to REPLACE instead of STACK
-        dest.removeAllShaderModifiers();
+        // CRITICAL: Copy lighting model from shader override to override PBR
+        // This allows "Constant" lighting to override the VRX model's "PhysicallyBased" lighting
+        if (source.getLightingModel() != null) {
+            Log.d(TAG, "Setting lighting model: " + source.getLightingModel());
+            dest.setLightingModel(source.getLightingModel());
+        }
 
+        // NOTE: We DON'T clear existing shader modifiers because:
+        // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
+        // 2. Clearing would remove critical system modifiers like skinning
+        // 3. No accumulation occurs since each shader change starts from stored originals
+        // dest.removeAllShaderModifiers(); // ← REMOVED to preserve skinning modifiers
+
+        Log.d(TAG, "Calling copyShaderModifiers...");
         dest.copyShaderModifiers(source);
-        Log.d(TAG, "Shader modifiers copied successfully");
+        Log.d(TAG, "=== copyShaderModifiersAndUniforms END ===");
     }
 
     public void updateShaderOverrideUniforms() {

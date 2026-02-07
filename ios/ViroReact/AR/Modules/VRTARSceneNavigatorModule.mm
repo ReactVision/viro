@@ -30,6 +30,7 @@
 #import "VRTARSceneNavigator.h"
 #import <React/RCTUIManagerUtils.h>
 #import "VRTUtils.h"
+#import <CoreLocation/CoreLocation.h>
 
 @implementation VRTARSceneNavigatorModule
 @synthesize bridge = _bridge;
@@ -902,19 +903,48 @@ RCT_EXPORT_METHOD(getGeospatialSetupStatus:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(cleanup:(nonnull NSNumber *)reactTag) {
     // This method is called from componentWillUnmount to ensure proper cleanup
     // of AR resources before the native view is deallocated.
+
+    // Detect which React Native architecture we're running
+    NSString *architecture = @"Unknown";
+    #ifdef RCT_NEW_ARCH_ENABLED
+        architecture = @"Fabric (New Architecture)";
+    #else
+        architecture = @"Paper (Old Architecture)";
+    #endif
+
+    NSLog(@"[ViroMemory] Module cleanup called from componentWillUnmount - Architecture: %@", architecture);
+
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
                                         NSDictionary<NSNumber *, UIView *> *viewRegistry) {
         @try {
             VRTView *view = (VRTView *)viewRegistry[reactTag];
             if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
                 VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+                NSLog(@"[ViroMemory] Found VRTARSceneNavigator instance %p, calling cleanupViroResources", component);
+
                 // Trigger explicit cleanup to prevent memory leaks
                 // This ensures ARSession is paused and GL resources are released
                 // even if willMoveToSuperview: is not called (e.g., in Fabric)
                 [component cleanupViroResources];
+
+                // RADICAL: Force removal from superview to trigger deallocation
+                NSLog(@"[ViroMemory] Forcing removeFromSuperview to trigger deallocation");
+                if (component.superview) {
+                    [component removeFromSuperview];
+                    NSLog(@"[ViroMemory] View removed from superview");
+                }
+
+                // Try to manually call invalidate
+                [component invalidate];
+                NSLog(@"[ViroMemory] Called invalidate on component");
+
+            } else if (view) {
+                NSLog(@"[ViroMemory] WARNING: View found but wrong type: %@", NSStringFromClass([view class]));
+            } else {
+                NSLog(@"[ViroMemory] WARNING: No view found for reactTag %@ - may have already been deallocated", reactTag);
             }
         } @catch (NSException *exception) {
-            NSLog(@"VRTARSceneNavigatorModule: Error during cleanup: %@", exception.reason);
+            NSLog(@"[ViroMemory] ERROR during cleanup: %@", exception.reason);
         }
     }];
 }

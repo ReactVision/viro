@@ -18,10 +18,9 @@
 + (void)installFabricCrashFix {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        // Swizzle UIView's removeFromSuperview method to add safety checks
+        NSLog(@"[ViroMemory] VRTFabricCrashFix - ENABLED (needed to prevent crashes)");
+        // Re-enabled because it's needed to prevent Fabric crashes
         [self swizzleRemoveFromSuperview];
-        
-        // Also swizzle _containsView: which is where the crash originates
         [self swizzleContainsView];
     });
 }
@@ -115,38 +114,29 @@
 }
 
 - (void)vrt_safeRemoveFromSuperview {
-    // Log when our swizzled method is called (with throttling for Viro views)
-    static NSTimeInterval lastViroLogTime = 0;
-    NSTimeInterval currentTime = [[NSDate date] timeIntervalSince1970];
-    
-    BOOL isViroView = [NSStringFromClass([self class]) containsString:@"VRT"] || 
-                      [NSStringFromClass([self class]) containsString:@"Viro"];
-    
-    if (isViroView || (currentTime - lastViroLogTime > 10.0)) {
-        if (!isViroView) {
-            lastViroLogTime = currentTime;
-        }
-    }
-    
+    // Apply crash fix logic to ALL views including VRTARSceneNavigator
+    NSString *className = NSStringFromClass([self class]);
+    BOOL isViroView = [className containsString:@"VRT"] || [className containsString:@"Viro"];
+
     @try {
         // Check if view is valid before removal
         if (!self) {
             return;
         }
-        
+
         // Clear pointer interactions that cause the crash
         if ([self respondsToSelector:@selector(interactions)]) {
             @try {
                 NSUInteger interactionCount = self.interactions.count;
                 if (interactionCount > 0) {
-                    
+
                 }
                 self.interactions = @[];
             } @catch (NSException *exception) {
                 NSLog(@"VRT: Error clearing interactions: %@", exception.reason);
             }
         }
-        
+
         // Clear gesture recognizers that might hold references
         @try {
             NSArray *gestures = [self.gestureRecognizers copy];
@@ -158,15 +148,15 @@
         } @catch (NSException *exception) {
             NSLog(@"VRT: Error clearing gesture recognizers: %@", exception.reason);
         }
-        
+
         // Check if superview is still valid
         if (!self.superview) {
             return; // Already removed
         }
-        
+
         // Perform the actual removal
         [self vrt_safeRemoveFromSuperview]; // This calls the original method
-        
+
     } @catch (NSException *exception) {
         NSLog(@"VRT: Critical error in removeFromSuperview: %@", exception.reason);
         NSLog(@"VRT: Stack trace: %@", [exception callStackSymbols]);

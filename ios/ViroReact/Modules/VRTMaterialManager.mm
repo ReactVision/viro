@@ -148,7 +148,12 @@ RCT_EXPORT_METHOD(setJSMaterials:(NSDictionary *)materials) {
 RCT_EXPORT_METHOD(deleteMaterials:(NSArray *)materials) {
     if (_materialDictionary && materials) {
         for (NSString *material in materials) {
+            // Remove material wrapper (RAII will handle cleanup)
             [_materialDictionary removeObjectForKey:material];
+        }
+        // Also remove change listeners for deleted materials
+        for (NSString *material in materials) {
+            [_materialChangeListeners removeObjectForKey:material];
         }
     }
 }
@@ -799,6 +804,30 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
         return uiImageWrapper.image;
     }
     return nil;
+}
+
+#pragma mark - Memory Management
+
+// Called when React Native bridge is invalidated
+- (void)invalidate {
+    [self clearAllMaterials];
+}
+
+// Dealloc to ensure cleanup if module is deallocated
+- (void)dealloc {
+    // Clear all caches to release GPU memory
+    // RAII will handle cleanup of materials and textures
+    [_materialDictionary removeAllObjects];
+    _materialDictionary = nil;
+
+    [_imageDictionary removeAllObjects];
+    _imageDictionary = nil;
+
+    [_materialChangeListeners removeAllObjects];
+    _materialChangeListeners = nil;
+
+    [_materials removeAllObjects];
+    _materials = nil;
 }
 
 @end

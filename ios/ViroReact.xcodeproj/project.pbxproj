@@ -42,11 +42,11 @@
 		8A5CDE221F68D5470093F43B /* VRTPolyline.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8AFC1C351EC1001C0000F7EB /* VRTPolyline.h */; };
 		8A5CDE231F68D5470093F43B /* VRTPortalScene.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8FEF00631F37ACCC006AE4B1 /* VRTPortalScene.h */; };
 		8A5CDE241F68D5470093F43B /* VRTPortal.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8FEF00841F37D04F006AE4B1 /* VRTPortal.h */; };
-		8A5CDE251F68D5470093F43B /* BuildFile in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; };
+		8A5CDE251F68D5470093F43B /* (null) in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; };
 		8A5CDE261F68D5470093F43B /* VRTPolylineManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8A56302D1EBBFF5F009E71A7 /* VRTPolylineManager.h */; };
 		8A5CDE271F68D5470093F43B /* VRTPortalSceneManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8FEF00821F37CAEF006AE4B1 /* VRTPortalSceneManager.h */; };
 		8A5CDE281F68D5470093F43B /* VRTPortalManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8FEF00871F37D0C0006AE4B1 /* VRTPortalManager.h */; };
-		8A5CDE291F68D5470093F43B /* BuildFile in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; };
+		8A5CDE291F68D5470093F43B /* (null) in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; };
 		8A5CDE2A1F68D56F0093F43B /* VRTNodeModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = A50A310C1ECE1E8800DEBE9B /* VRTNodeModule.h */; };
 		8A5CDE2B1F68D56F0093F43B /* VRTSceneModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = A5E8F0A71ED6B64D00729916 /* VRTSceneModule.h */; };
 		8A5CDE2C1F68D56F0093F43B /* VRTControllerModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = A533596D1E9E0169005B3EC5 /* VRTControllerModule.h */; };
@@ -213,17 +213,17 @@
 		A5E8F0AC1ED6B64E00729916 /* VRTSceneModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5E8F0A81ED6B64D00729916 /* VRTSceneModule.mm */; };
 		A5F6D4011E4B0DFF00655F60 /* VRTController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5F6D4001E4B0DFF00655F60 /* VRTController.mm */; };
 		A5F6D4051E4B179700655F60 /* VRTControllerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5F6D4041E4B179700655F60 /* VRTControllerManager.mm */; };
-		E139A8EB2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8EC2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8ED2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8EE2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8EF2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8F02E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8F22E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8F32E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8F42E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A8F52E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
-		E139A9402E0BAF2D0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		E139A8EB2E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8EC2E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8ED2E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8EE2E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8EF2E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8F02E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8F22E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8F32E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8F42E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A8F52E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E139A9402E0BAF2D0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -388,6 +388,76 @@
 			remoteGlobalIDString = 65D0A19C165FA1126B1360680FE6DB12;
 			remoteInfo = Yoga;
 		};
+		E1CFA8A52F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = F7E9FAA723F6F1C87E4B641CD8262E7A;
+			remoteInfo = "React-jsinspectorcdp";
+		};
+		E1CFA8A72F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 31EE265B422EF829FDE6DBCF58350EE5;
+			remoteInfo = "React-jsinspectornetwork";
+		};
+		E1CFA8A92F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = BB923053DC5F30A7467A5365DB7F1DAA;
+			remoteInfo = "React-jsinspectortracing";
+		};
+		E1CFA8AB2F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 2676BCA60AFDD7A6C3CAAF70FEE0CABF;
+			remoteInfo = "React-jsitooling";
+		};
+		E1CFA8AD2F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 862FCE564BB443BC51C8A9DA1585FC47;
+			remoteInfo = "React-oscompat";
+		};
+		E1CFA8AF2F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 35C3D0A253BFD77715619C419AC17056;
+			remoteInfo = "React-RCTFBReactNativeSpec";
+		};
+		E1CFA8B12F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 2279FA17021BAED5E637313F05A115AA;
+			remoteInfo = "React-RCTRuntime";
+		};
+		E1CFA8B32F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = FB33A97A9CD948F4200E399C0DA5C060;
+			remoteInfo = "React-renderercss";
+		};
+		E1CFA8B52F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 6BF9B7CB106BE14548245FD0550627ED;
+			remoteInfo = "React-runtimeexecutor";
+		};
+		E1CFA8B72F371641004BC18F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = C07C429E887D0FBD7D457208EF1B14CD;
+			remoteInfo = ReactAppDependencyProvider;
+		};
 		E1E0D3252D544C9E00FDFE35 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
@@ -542,13 +612,6 @@
 			remoteGlobalIDString = 1F0939C33C744C7CAFAC370CE03481E4;
 			remoteInfo = "React-microtasksnativemodule";
 		};
-		E1E0D3512D544C9E00FDFE35 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 60D5A56E763D6E7C4FBE797565062EEA;
-			remoteInfo = "React-nativeconfig";
-		};
 		E1E0D3532D544C9E00FDFE35 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8BDD9D9E1E09F39B00A42870 /* Pods.xcodeproj */;
@@ -660,11 +723,11 @@
 				8A5CDE221F68D5470093F43B /* VRTPolyline.h in Copy Headers to ios/dist/include */,
 				8A5CDE231F68D5470093F43B /* VRTPortalScene.h in Copy Headers to ios/dist/include */,
 				8A5CDE241F68D5470093F43B /* VRTPortal.h in Copy Headers to ios/dist/include */,
-				8A5CDE251F68D5470093F43B /* BuildFile in Copy Headers to ios/dist/include */,
+				8A5CDE251F68D5470093F43B /* (null) in Copy Headers to ios/dist/include */,
 				8A5CDE261F68D5470093F43B /* VRTPolylineManager.h in Copy Headers to ios/dist/include */,
 				8A5CDE271F68D5470093F43B /* VRTPortalSceneManager.h in Copy Headers to ios/dist/include */,
 				8A5CDE281F68D5470093F43B /* VRTPortalManager.h in Copy Headers to ios/dist/include */,
-				8A5CDE291F68D5470093F43B /* BuildFile in Copy Headers to ios/dist/include */,
+				8A5CDE291F68D5470093F43B /* (null) in Copy Headers to ios/dist/include */,
 				8A5CDE171F68D4BD0093F43B /* VRTARSceneNavigator.h in Copy Headers to ios/dist/include */,
 				8A5CDE181F68D4BD0093F43B /* VRTARAnchorNode.h in Copy Headers to ios/dist/include */,
 				8A5CDE191F68D4BD0093F43B /* VRTARPlane.h in Copy Headers to ios/dist/include */,
@@ -1131,30 +1194,39 @@
 				4130E581276D9EF2001A9615 /* libReact-jsi.a */,
 				4130E583276D9EF2001A9615 /* libReact-jsiexecutor.a */,
 				4130E585276D9EF2001A9615 /* libReact-jsinspector.a */,
+				E1CFA8A62F371641004BC18F /* libReact-jsinspectorcdp.a */,
+				E1CFA8A82F371641004BC18F /* libReact-jsinspectornetwork.a */,
+				E1CFA8AA2F371641004BC18F /* libReact-jsinspectortracing.a */,
+				E1CFA8AC2F371641004BC18F /* libReact-jsitooling.a */,
 				E1E0D34C2D544C9E00FDFE35 /* libReact-logger.a */,
 				E1E0D34E2D544C9E00FDFE35 /* libReact-Mapbuffer.a */,
 				E1E0D3502D544C9E00FDFE35 /* libReact-microtasksnativemodule.a */,
-				E1E0D3522D544C9E00FDFE35 /* libReact-nativeconfig.a */,
 				E1E0D3542D544C9E00FDFE35 /* libReact-NativeModulesApple.a */,
+				E1CFA8AE2F371641004BC18F /* libReact-oscompat.a */,
 				4130E587276D9EF2001A9615 /* libReact-perflogger.a */,
 				E1E0D3562D544C9E00FDFE35 /* libReact-performancetimeline.a */,
 				4130E589276D9EF2001A9615 /* libReact-RCTAnimation.a */,
 				E1E0D3582D544C9E00FDFE35 /* libReact-RCTAppDelegate.a */,
 				4130E58B276D9EF2001A9615 /* libReact-RCTBlob.a */,
 				E1E0D35A2D544C9E00FDFE35 /* libReact-RCTFabric.a */,
+				E1CFA8B02F371641004BC18F /* libReact-RCTFBReactNativeSpec.a */,
 				4130E58D276D9EF2001A9615 /* libReact-RCTImage.a */,
 				4130E58F276D9EF2001A9615 /* libReact-RCTLinking.a */,
 				4130E591276D9EF2001A9615 /* libReact-RCTNetwork.a */,
+				E1CFA8B22F371641004BC18F /* libReact-RCTRuntime.a */,
 				4130E593276D9EF2001A9615 /* libReact-RCTSettings.a */,
 				4130E595276D9EF2001A9615 /* libReact-RCTText.a */,
 				4130E597276D9EF2001A9615 /* libReact-RCTVibration.a */,
 				E1E0D35C2D544C9E00FDFE35 /* libReact-rendererconsistency.a */,
+				E1CFA8B42F371641004BC18F /* libReact-renderercss.a */,
 				E1E0D35E2D544C9E00FDFE35 /* libReact-rendererdebug.a */,
 				E1E0D3602D544C9E00FDFE35 /* libReact-RuntimeApple.a */,
 				E1E0D3622D544C9E00FDFE35 /* libReact-RuntimeCore.a */,
+				E1CFA8B62F371641004BC18F /* libReact-runtimeexecutor.a */,
 				E1E0D3642D544C9E00FDFE35 /* libReact-RuntimeHermes.a */,
 				E1E0D3662D544C9E00FDFE35 /* libReact-runtimescheduler.a */,
 				E1E0D3682D544C9E00FDFE35 /* libReact-utils.a */,
+				E1CFA8B82F371641004BC18F /* libReactAppDependencyProvider.a */,
 				E1E0D36A2D544C9E00FDFE35 /* libReactCodegen.a */,
 				4130E599276D9EF2001A9615 /* libReactCommon.a */,
 				E1E0D36C2D544C9E00FDFE35 /* libSocketRocket.a */,
@@ -1657,6 +1729,76 @@
 			remoteRef = A23092AE248F709800A5A81F /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
+		E1CFA8A62F371641004BC18F /* libReact-jsinspectorcdp.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-jsinspectorcdp.a";
+			remoteRef = E1CFA8A52F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8A82F371641004BC18F /* libReact-jsinspectornetwork.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-jsinspectornetwork.a";
+			remoteRef = E1CFA8A72F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8AA2F371641004BC18F /* libReact-jsinspectortracing.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-jsinspectortracing.a";
+			remoteRef = E1CFA8A92F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8AC2F371641004BC18F /* libReact-jsitooling.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-jsitooling.a";
+			remoteRef = E1CFA8AB2F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8AE2F371641004BC18F /* libReact-oscompat.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-oscompat.a";
+			remoteRef = E1CFA8AD2F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8B02F371641004BC18F /* libReact-RCTFBReactNativeSpec.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-RCTFBReactNativeSpec.a";
+			remoteRef = E1CFA8AF2F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8B22F371641004BC18F /* libReact-RCTRuntime.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-RCTRuntime.a";
+			remoteRef = E1CFA8B12F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8B42F371641004BC18F /* libReact-renderercss.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-renderercss.a";
+			remoteRef = E1CFA8B32F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8B62F371641004BC18F /* libReact-runtimeexecutor.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libReact-runtimeexecutor.a";
+			remoteRef = E1CFA8B52F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1CFA8B82F371641004BC18F /* libReactAppDependencyProvider.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libReactAppDependencyProvider.a;
+			remoteRef = E1CFA8B72F371641004BC18F /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
 		E1E0D3262D544C9E00FDFE35 /* boost_privacy.bundle */ = {
 			isa = PBXReferenceProxy;
 			fileType = wrapper.cfbundle;
@@ -1809,13 +1951,6 @@
 			fileType = archive.ar;
 			path = "libReact-microtasksnativemodule.a";
 			remoteRef = E1E0D34F2D544C9E00FDFE35 /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-		E1E0D3522D544C9E00FDFE35 /* libReact-nativeconfig.a */ = {
-			isa = PBXReferenceProxy;
-			fileType = archive.ar;
-			path = "libReact-nativeconfig.a";
-			remoteRef = E1E0D3512D544C9E00FDFE35 /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 		E1E0D3542D544C9E00FDFE35 /* libReact-NativeModulesApple.a */ = {
@@ -2045,17 +2180,17 @@
 				8BE0D5021DFA3D9B0032AB99 /* VRTText.mm in Sources */,
 				8A04D5182024F6B200FD5F68 /* VRTARImageMarkerManager.mm in Sources */,
 				8BE0D5261DFA3DEA0032AB99 /* VRTTreeNode.m in Sources */,
-				E139A8EB2E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8EC2E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8ED2E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8EE2E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8EF2E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8F02E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8F22E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8F32E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A9402E0BAF2D0050EC9A /* BuildFile in Sources */,
-				E139A8F42E0B9C6A0050EC9A /* BuildFile in Sources */,
-				E139A8F52E0B9C6A0050EC9A /* BuildFile in Sources */,
+				E139A8EB2E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8EC2E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8ED2E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8EE2E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8EF2E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8F02E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8F22E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8F32E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A9402E0BAF2D0050EC9A /* (null) in Sources */,
+				E139A8F42E0B9C6A0050EC9A /* (null) in Sources */,
+				E139A8F52E0B9C6A0050EC9A /* (null) in Sources */,
 				8A31CFB41E2705EC00550CFE /* VRTQuad.mm in Sources */,
 				8BE0D5101DFA3D9B0032AB99 /* VRTVideoSurface.mm in Sources */,
 				8A130D901E3BC0690050D83B /* VRTSoundManager.mm in Sources */,
@@ -2139,10 +2274,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -2197,10 +2329,7 @@
 				HEADER_SEARCH_PATHS = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;

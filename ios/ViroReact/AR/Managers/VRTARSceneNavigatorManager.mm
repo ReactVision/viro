@@ -55,10 +55,26 @@ RCT_EXPORT_VIEW_PROPERTY(onWorldMeshUpdated, RCTDirectEventBlock)
 
 - (VRTARSceneNavigator *)view
 {
-    // Install crash fix for Fabric architecture
+    NSLog(@"[ViroMemory] VRTARSceneNavigatorManager creating new view");
+
+    // Install crash fix for Fabric view recycling (protects all Viro components except ARSceneNavigator)
+    // ARSceneNavigator uses +shouldBeRecycled to disable recycling entirely (too heavy at 700MB+)
     [VRTFabricCrashFix installFabricCrashFix];
+
     return [[VRTARSceneNavigator alloc] initWithBridge:self.bridge];
 }
 
+#ifdef RCT_NEW_ARCH_ENABLED
+// Fabric-specific: Force invalidation when view is removed
+- (void)invalidateView:(UIView *)view
+{
+    NSLog(@"[ViroMemory] VRTARSceneNavigatorManager invalidateView called for %p", view);
+    if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
+        VRTARSceneNavigator *navigator = (VRTARSceneNavigator *)view;
+        [navigator invalidate];
+        [navigator cleanupViroResources];
+    }
+}
+#endif
 
 @end

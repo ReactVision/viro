@@ -932,6 +932,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
+                // CRITICAL: Copy lighting model from shader override to override PBR
+                // This allows "Constant" lighting to override the VRX model's "PhysicallyBased" lighting
+                mergedMat->setLightingModel(shaderMaterial->getLightingModel());
+                NSLog(@"[SHADER OVERRIDE] Set lighting model from shader material");
+
                 // NOTE: We DON'T clear existing shader modifiers because:
                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
                 // 2. Clearing would remove critical system modifiers like skinning
@@ -1025,6 +1030,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             std::vector<std::shared_ptr<VROMaterial>> mergedChildMaterials;
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
+
+                                // CRITICAL: Copy lighting model from shader override to override PBR
+                                mergedMat->setLightingModel(shaderMaterial->getLightingModel());
 
                                 // NOTE: We DON'T clear existing shader modifiers because:
                                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)

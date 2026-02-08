@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## v2.52.0 - 08 February 2026
+
+### Added
+- **Full Shader Support**: Complete implementation of shader modifiers for iOS and Android platforms
+- **Shader Overrides**: New `shaderOverrides` prop for real-time shader customization across both platforms
+- **Shader Propagation**: Intelligent shader propagation system down the node tree with proper timing
+- **Fragment Output Standardization**: Unified fragment shader outputs across platforms
+- **Texture Handling in Shaders**: Full texture support in shader overrides
+- **Animated Shader Support**: Uniform binding for animated shaders
+- **Material Animation Preservation**: Materials with animations are preserved during shader application
+- **Lighting Properties in Shaders**: Lighting properties are properly copied and maintained in custom shaders
+- **Material Sharing**: Materials now shared efficiently across instances for improved performance
+- **Depth-based AR Hit Testing**: Enhanced AR hit test functionality using depth information
+- **Monocular Depth Fallback**: Non-LiDAR devices now automatically fallback to monocular depth estimation
+- **Throttle Mechanism**: Added performance throttle to prevent system overload
+
+### Fixed
+- **iOS Memory Leaks** (Critical): Completely eliminated memory leaks on iOS platform (both viro and virocore)
+- **Portal Crashes** (Critical): Fixed crashes when unmounting portals on iOS
+- **Material Overflow**: Fixed cloned materials array overflow that caused crashes
+- **VRX Asset Loading**: Resolved VRX asset loading issues
+- **Monocular Depth Alignment**: Fixed monocular depth frame alignment issues
+- **Double Anchor Reference**: Fixed issue with creating duplicate anchor references
+- **Gravity Type Crash**: Fixed Android crash caused by incorrect gravity type definition (now correctly typed as 3D vector `[number, number, number]`)
+- **hitResultId**: Fixed hitResultId availability issue in AR hit tests
+- **Thread Locks**: Refactored implementation to avoid thread locks
+
+### Changed
+- **Depth Integration**: Improved depth integration with simplified logic
+
+### Removed
+- Debug logs and visualizations from production code
+- Spam/noisy logging
+
+### ViroCore Integration
+This release includes 21 commits from virocore focused on:
+- Native shader support and modifiers
+- Memory management improvements
+- Depth processing enhancements
+
+## v2.51.0 - 01 February 2026
+
+Previous release baseline for v2.52.0 changes.
+
 ## v2.43.6 - 08 October 2025
 
 - **Fixed pod install issues**: Adjusted ViroKit requirements

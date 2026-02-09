@@ -859,24 +859,15 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         // Get materials from geometry
         std::vector<std::shared_ptr<VROMaterial>> currentMaterials = geometry->getMaterials();
 
-        NSLog(@"[SHADER OVERRIDE] Current materials count: %zu", currentMaterials.size());
-        for (size_t i = 0; i < currentMaterials.size(); i++) {
-            auto mat = currentMaterials[i];
-            bool hasDiffuseTex = mat->getDiffuse().getTexture() != nullptr;
-            NSLog(@"[SHADER OVERRIDE]   Material %zu: has diffuse texture = %@", i, hasDiffuseTex ? @"YES" : @"NO");
-        }
-
         // Check if we have materials to work with
         if (currentMaterials.empty()) {
             // Model hasn't loaded yet or has no materials, skip for now
-            NSLog(@"[SHADER OVERRIDE] No materials found, skipping");
             return;
         }
 
         // Store original embedded materials on first call (only if non-empty!)
         // For VRX/FBX with async textures, we'll update this when textures finish loading
         if (_originalEmbeddedMaterials.empty()) {
-            NSLog(@"[SHADER OVERRIDE] Storing %zu original materials", currentMaterials.size());
             _originalEmbeddedMaterials = currentMaterials;
         } else {
             // Check if we should UPDATE stored materials (for VRX with async textures)
@@ -933,17 +924,6 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // Similar to Android's dest.copyShaderModifiers(source) approach
                 // We only copy properties that affect rendering, NOT colors/textures
                 // (colors are set dynamically in shader modifiers)
-
-                NSLog(@"[SHADER OVERRIDE] === Copying properties from shader material '%s' ===",
-                      shaderMaterial->getName().c_str());
-                NSLog(@"[SHADER OVERRIDE]   Lighting model: %d", (int)shaderMaterial->getLightingModel());
-                NSLog(@"[SHADER OVERRIDE]   Shininess: %f", shaderMaterial->getShininess());
-                NSLog(@"[SHADER OVERRIDE]   BlendMode: %d", (int)shaderMaterial->getBlendMode());
-                NSLog(@"[SHADER OVERRIDE]   TransparencyMode: %d", (int)shaderMaterial->getTransparencyMode());
-                NSLog(@"[SHADER OVERRIDE]   CullMode: %d", (int)shaderMaterial->getCullMode());
-                NSLog(@"[SHADER OVERRIDE]   Diffuse intensity: %f", shaderMaterial->getDiffuse().getIntensity());
-                NSLog(@"[SHADER OVERRIDE]   Shader modifiers count: %zu", shaderMaterial->getShaderModifiers().size());
-
                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
                 mergedMat->setShininess(shaderMaterial->getShininess());
                 mergedMat->setBlendMode(shaderMaterial->getBlendMode());
@@ -952,18 +932,6 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
                 mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
-                // CRITICAL FIX: Force diffuse intensity to 1.0 for Blinn lighting
-                // Without this, the lighting calculation produces near-black colors
-                // which become transparent with RGBZero mode, showing white background
-                // Android seems to default to 1.0, but iOS might be using the GLB model's value (often 0)
-                float shaderIntensity = shaderMaterial->getDiffuse().getIntensity();
-                NSLog(@"[SHADER OVERRIDE]   Shader material diffuse intensity: %f", shaderIntensity);
-                // Use shader intensity if > 0, otherwise force to 1.0
-                float finalIntensity = (shaderIntensity > 0.0001f) ? shaderIntensity : 1.0f;
-                mergedMat->getDiffuse().setIntensity(finalIntensity);
-                NSLog(@"[SHADER OVERRIDE]   Set merged material diffuse intensity to: %f", finalIntensity);
-
-                NSLog(@"[SHADER OVERRIDE] Copied rendering properties from shader material");
 
                 // NOTE: We DON'T clear existing shader modifiers because:
                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
@@ -976,15 +944,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 mergedMat->setThreadRestrictionEnabled(false);
 
                 // Copy shader modifiers from shader material to merged material
-                NSLog(@"[SHADER OVERRIDE] Copying %zu shader modifiers...", shaderMaterial->getShaderModifiers().size());
-                int modifierIndex = 0;
                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
-                    NSLog(@"[SHADER OVERRIDE]   Modifier %d: Entry point %d, Name: %s",
-                          modifierIndex++, (int)modifier->getEntryPoint(), modifier->getName().c_str());
                     mergedMat->addShaderModifier(modifier);
                 }
-                NSLog(@"[SHADER OVERRIDE] After copying, merged material has %zu shader modifiers",
-                      mergedMat->getShaderModifiers().size());
 
                 // Copy shader uniforms (floats)
                 for (const auto &uniform : shaderMaterial->getShaderUniformFloats()) {
@@ -1020,14 +982,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
             self.shaderOverrideMap[shaderMaterialName] = clonedMaterialsArray;
 
             // Apply merged materials to geometry
-            NSLog(@"[SHADER OVERRIDE] Applying %zu merged materials to geometry", mergedMaterials.size());
             geometry->setMaterials(mergedMaterials);
         }
 
         // Force geometry substrate to reset after shader override materials are applied
-        NSLog(@"[SHADER OVERRIDE] Calling updateSubstrate() to recompile shader...");
         geometry->updateSubstrate();
-        NSLog(@"[SHADER OVERRIDE] updateSubstrate() completed");
     }
 
     // Recursively apply to child nodes if requested (for 3D models with nested geometries)
@@ -1155,7 +1114,6 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
             if (it != _childNodeOriginalMaterials.end()) {
                 childGeometry->setMaterials(it->second);
                 childGeometry->updateSubstrate();
-                NSLog(@"[SHADER OVERRIDE] Restored %zu original materials for child node", it->second.size());
             }
         }
         // Recurse to grandchildren

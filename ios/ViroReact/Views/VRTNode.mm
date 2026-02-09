@@ -903,10 +903,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
             }
 
             if (currentHasTextures && !storedHasTextures) {
-                NSLog(@"[SHADER OVERRIDE] Updating stored materials with textures");
                 _originalEmbeddedMaterials = currentMaterials;
-            } else {
-                NSLog(@"[SHADER OVERRIDE] Using %zu stored original materials", _originalEmbeddedMaterials.size());
             }
         }
 
@@ -1000,12 +997,10 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                         childOriginalMaterials = childGeometry->getMaterials();
                         if (!childOriginalMaterials.empty()) {
                             _childNodeOriginalMaterials[childPtr] = childOriginalMaterials;
-                            NSLog(@"[SHADER OVERRIDE] Stored %zu original materials for child node", childOriginalMaterials.size());
                         }
                     } else {
                         // Use stored original materials as baseline
                         childOriginalMaterials = _childNodeOriginalMaterials[childPtr];
-                        NSLog(@"[SHADER OVERRIDE] Using %zu stored original materials for child node", childOriginalMaterials.size());
                     }
 
                     if (!childOriginalMaterials.empty()) {

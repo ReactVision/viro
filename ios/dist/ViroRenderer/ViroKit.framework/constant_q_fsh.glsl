@@ -1,6 +1,7 @@
 #version 300 es
 #include constant_functions_fsh
 
+uniform highp vec3 camera_position;
 uniform lowp vec4 material_diffuse_surface_color;
 uniform lowp float material_diffuse_intensity;
 uniform lowp float material_alpha;
@@ -23,6 +24,7 @@ void main() {
     _surface.alpha = material_alpha;
     _surface.normal = v_tbn[2];
     _surface.position = v_surface_position;
+    _surface.view = normalize(camera_position - _surface.position);
 
 #pragma surface_modifier_body
 

@@ -932,7 +932,19 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // CRITICAL: Copy lighting model from shader override to override PBR
                 // This allows "Constant" lighting to override the VRX model's "PhysicallyBased" lighting
                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
-                NSLog(@"[SHADER OVERRIDE] Set lighting model from shader material");
+
+                // CRITICAL: Copy visual properties from shader override
+                // These affect how colors are rendered and blended
+                mergedMat->setShininess(shaderMaterial->getShininess());
+                mergedMat->setBlendMode(shaderMaterial->getBlendMode());
+                mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
+                mergedMat->setCullMode(shaderMaterial->getCullMode());
+
+                // CRITICAL: Copy diffuse intensity from shader override
+                // This is multiplied by the color in the fragment shader
+                mergedMat->getDiffuse().setIntensity(shaderMaterial->getDiffuse().getIntensity());
+
+                NSLog(@"[SHADER OVERRIDE] Copied visual properties from shader material");
 
                 // NOTE: We DON'T clear existing shader modifiers because:
                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
@@ -1016,11 +1028,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             if (!clonedMaterialsArray) {
                                 clonedMaterialsArray = [[NSMutableArray alloc] init];
                                 self.shaderOverrideMap[shaderMaterialName] = clonedMaterialsArray;
-                            } else {
-                                // CRITICAL: Clear array from previous scene runs to prevent accumulation
-                                // Without this, arrays grow on each rerun, causing "index beyond bounds" crashes
-                                [clonedMaterialsArray removeAllObjects];
                             }
+                            // NOTE: Do NOT clear the array here - we need to accumulate materials from ALL child nodes
+                            // The array is cleared once at the start of applyShaderOverridesRecursive (line 852)
 
                             std::vector<std::shared_ptr<VROMaterial>> mergedChildMaterials;
                             for (const auto &originalMat : childOriginalMaterials) {
@@ -1028,6 +1038,13 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
                                 // CRITICAL: Copy lighting model from shader override to override PBR
                                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
+
+                                // CRITICAL: Copy visual properties from shader override
+                                mergedMat->setShininess(shaderMaterial->getShininess());
+                                mergedMat->setBlendMode(shaderMaterial->getBlendMode());
+                                mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
+                                mergedMat->setCullMode(shaderMaterial->getCullMode());
+                                mergedMat->getDiffuse().setIntensity(shaderMaterial->getDiffuse().getIntensity());
 
                                 // NOTE: We DON'T clear existing shader modifiers because:
                                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)

@@ -929,22 +929,41 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                // CRITICAL: Copy lighting model from shader override to override PBR
-                // This allows "Constant" lighting to override the VRX model's "PhysicallyBased" lighting
-                mergedMat->setLightingModel(shaderMaterial->getLightingModel());
+                // CRITICAL: Copy properties from shader override material
+                // Similar to Android's dest.copyShaderModifiers(source) approach
+                // We only copy properties that affect rendering, NOT colors/textures
+                // (colors are set dynamically in shader modifiers)
 
-                // CRITICAL: Copy visual properties from shader override
-                // These affect how colors are rendered and blended
+                NSLog(@"[SHADER OVERRIDE] === Copying properties from shader material '%s' ===",
+                      shaderMaterial->getName().c_str());
+                NSLog(@"[SHADER OVERRIDE]   Lighting model: %d", (int)shaderMaterial->getLightingModel());
+                NSLog(@"[SHADER OVERRIDE]   Shininess: %f", shaderMaterial->getShininess());
+                NSLog(@"[SHADER OVERRIDE]   BlendMode: %d", (int)shaderMaterial->getBlendMode());
+                NSLog(@"[SHADER OVERRIDE]   TransparencyMode: %d", (int)shaderMaterial->getTransparencyMode());
+                NSLog(@"[SHADER OVERRIDE]   CullMode: %d", (int)shaderMaterial->getCullMode());
+                NSLog(@"[SHADER OVERRIDE]   Diffuse intensity: %f", shaderMaterial->getDiffuse().getIntensity());
+                NSLog(@"[SHADER OVERRIDE]   Shader modifiers count: %zu", shaderMaterial->getShaderModifiers().size());
+
+                mergedMat->setLightingModel(shaderMaterial->getLightingModel());
                 mergedMat->setShininess(shaderMaterial->getShininess());
                 mergedMat->setBlendMode(shaderMaterial->getBlendMode());
                 mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
                 mergedMat->setCullMode(shaderMaterial->getCullMode());
+                mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
+                mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
-                // CRITICAL: Copy diffuse intensity from shader override
-                // This is multiplied by the color in the fragment shader
-                mergedMat->getDiffuse().setIntensity(shaderMaterial->getDiffuse().getIntensity());
+                // CRITICAL FIX: Force diffuse intensity to 1.0 for Blinn lighting
+                // Without this, the lighting calculation produces near-black colors
+                // which become transparent with RGBZero mode, showing white background
+                // Android seems to default to 1.0, but iOS might be using the GLB model's value (often 0)
+                float shaderIntensity = shaderMaterial->getDiffuse().getIntensity();
+                NSLog(@"[SHADER OVERRIDE]   Shader material diffuse intensity: %f", shaderIntensity);
+                // Use shader intensity if > 0, otherwise force to 1.0
+                float finalIntensity = (shaderIntensity > 0.0001f) ? shaderIntensity : 1.0f;
+                mergedMat->getDiffuse().setIntensity(finalIntensity);
+                NSLog(@"[SHADER OVERRIDE]   Set merged material diffuse intensity to: %f", finalIntensity);
 
-                NSLog(@"[SHADER OVERRIDE] Copied visual properties from shader material");
+                NSLog(@"[SHADER OVERRIDE] Copied rendering properties from shader material");
 
                 // NOTE: We DON'T clear existing shader modifiers because:
                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
@@ -952,10 +971,20 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // 3. No accumulation occurs since each shader change starts from stored originals
                 // mergedMat->removeAllShaderModifiers(); // ← REMOVED to preserve skinning modifiers
 
+                // CRITICAL: Disable thread restrictions temporarily (like Android does)
+                // This allows shader modifiers to be copied synchronously during material setup
+                mergedMat->setThreadRestrictionEnabled(false);
+
                 // Copy shader modifiers from shader material to merged material
+                NSLog(@"[SHADER OVERRIDE] Copying %zu shader modifiers...", shaderMaterial->getShaderModifiers().size());
+                int modifierIndex = 0;
                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
+                    NSLog(@"[SHADER OVERRIDE]   Modifier %d: Entry point %d, Name: %s",
+                          modifierIndex++, (int)modifier->getEntryPoint(), modifier->getName().c_str());
                     mergedMat->addShaderModifier(modifier);
                 }
+                NSLog(@"[SHADER OVERRIDE] After copying, merged material has %zu shader modifiers",
+                      mergedMat->getShaderModifiers().size());
 
                 // Copy shader uniforms (floats)
                 for (const auto &uniform : shaderMaterial->getShaderUniformFloats()) {
@@ -973,6 +1002,13 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 for (const auto &uniform : shaderMaterial->getShaderUniformMat4s()) {
                     mergedMat->setShaderUniform(uniform.first, uniform.second);
                 }
+                // Copy shader uniform textures (like Android does)
+                for (const auto &uniform : shaderMaterial->getShaderUniformTextures()) {
+                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                }
+
+                // Re-enable thread restrictions
+                mergedMat->setThreadRestrictionEnabled(true);
 
                 mergedMaterials.push_back(mergedMat);
 
@@ -984,11 +1020,14 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
             self.shaderOverrideMap[shaderMaterialName] = clonedMaterialsArray;
 
             // Apply merged materials to geometry
+            NSLog(@"[SHADER OVERRIDE] Applying %zu merged materials to geometry", mergedMaterials.size());
             geometry->setMaterials(mergedMaterials);
         }
 
         // Force geometry substrate to reset after shader override materials are applied
+        NSLog(@"[SHADER OVERRIDE] Calling updateSubstrate() to recompile shader...");
         geometry->updateSubstrate();
+        NSLog(@"[SHADER OVERRIDE] updateSubstrate() completed");
     }
 
     // Recursively apply to child nodes if requested (for 3D models with nested geometries)
@@ -1033,24 +1072,27 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             // The array is cleared once at the start of applyShaderOverridesRecursive (line 852)
 
                             std::vector<std::shared_ptr<VROMaterial>> mergedChildMaterials;
+
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // CRITICAL: Copy lighting model from shader override to override PBR
+                                // Copy rendering properties from shader override (NOT colors/textures)
                                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
-
-                                // CRITICAL: Copy visual properties from shader override
                                 mergedMat->setShininess(shaderMaterial->getShininess());
                                 mergedMat->setBlendMode(shaderMaterial->getBlendMode());
                                 mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
                                 mergedMat->setCullMode(shaderMaterial->getCullMode());
-                                mergedMat->getDiffuse().setIntensity(shaderMaterial->getDiffuse().getIntensity());
+                                mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
+                                mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
                                 // NOTE: We DON'T clear existing shader modifiers because:
                                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
                                 // 2. Clearing would remove critical system modifiers like skinning
                                 // 3. No accumulation occurs since each shader change starts from stored originals
                                 // mergedMat->removeAllShaderModifiers(); // ← REMOVED to preserve skinning modifiers
+
+                                // Disable thread restrictions (like Android)
+                                mergedMat->setThreadRestrictionEnabled(false);
 
                                 // Copy shader modifiers
                                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -1070,6 +1112,12 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                                 for (const auto &uniform : shaderMaterial->getShaderUniformMat4s()) {
                                     mergedMat->setShaderUniform(uniform.first, uniform.second);
                                 }
+                                for (const auto &uniform : shaderMaterial->getShaderUniformTextures()) {
+                                    mergedMat->setShaderUniform(uniform.first, uniform.second);
+                                }
+
+                                // Re-enable thread restrictions
+                                mergedMat->setThreadRestrictionEnabled(true);
 
                                 mergedChildMaterials.push_back(mergedMat);
 

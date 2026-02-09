@@ -197,11 +197,8 @@ const withDefaultInfoPlist = (config, _props) => {
     config.ios.infoPlist.NSMicrophoneUsageDescription =
         config.ios.infoPlist.NSMicrophoneUsageDescription ||
             microphoneUsagePermission;
-    // Add Google Cloud API key for ARCore Cloud Anchors/Geospatial (iOS)
-    const shouldIncludeARCore = includeARCore === true ||
-        cloudAnchorProvider === "arcore" ||
-        geospatialAnchorProvider === "arcore";
-    if (googleCloudApiKey && shouldIncludeARCore) {
+    // Add Google Cloud API key for ARCore Cloud Anchors and Geospatial API (iOS)
+    if (googleCloudApiKey) {
         config.ios.infoPlist.GARAPIKey = googleCloudApiKey;
     }
     // Add location permissions for Geospatial API

@@ -253,7 +253,7 @@ const withViroManifest = (config: ExpoConfig) =>
         },
       });
 
-      // Add Google Cloud API key for ARCore Cloud Anchors if configured
+      // Add Google Cloud API key for ARCore Cloud Anchors and Geospatial API if configured
       const viroPlugin = config?.plugins?.find(
         (plugin) =>
           Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
@@ -261,7 +261,7 @@ const withViroManifest = (config: ExpoConfig) =>
 
       if (Array.isArray(viroPlugin) && viroPlugin.length > 1) {
         const pluginOptions = viroPlugin[1] as ViroConfigurationOptions;
-        if (pluginOptions.googleCloudApiKey && pluginOptions.cloudAnchorProvider === "arcore") {
+        if (pluginOptions.googleCloudApiKey) {
           contents?.manifest?.application?.[0]["meta-data"]?.push({
             $: {
               "android:name": "com.google.android.ar.API_KEY",

@@ -126,7 +126,11 @@ export type ViroSoundRoom = {
     floorMaterial: string;
 };
 export type ViroPhysicsWorld = {
-    gravity: number;
+    /**
+     * The gravity vector applied to the physics world, specified as [x, y, z].
+     * For example, Earth's gravity would be [0, -9.81, 0].
+     */
+    gravity: Viro3DPoint;
     drawBounds?: boolean;
 };
 export type ViroRay = any;

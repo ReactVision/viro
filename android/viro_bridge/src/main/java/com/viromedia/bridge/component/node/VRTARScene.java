@@ -154,18 +154,32 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
     }
 
     public void setOcclusionMode(ARScene.OcclusionMode mode) {
+        android.util.Log.i("ViroAR", "[OCCLUSION] VRTARScene.setOcclusionMode called with mode: " + mode);
         mPendingOcclusionMode = mode;
-        if (mSceneDidAppear) {
+        android.util.Log.i("ViroAR", "[OCCLUSION]   mSceneDidAppear=" + mSceneDidAppear +
+                                     ", isTornDown=" + isTornDown() +
+                                     ", mNativeScene=" + (mNativeScene != null ? "NOT_NULL" : "NULL"));
+        if (mSceneDidAppear && !isTornDown() && mNativeScene != null) {
+            android.util.Log.i("ViroAR", "[OCCLUSION]   Calling native setOcclusionMode with mode: " + mode);
             ((ARScene) mNativeScene).setOcclusionMode(mode);
+        } else {
+            android.util.Log.i("ViroAR", "[OCCLUSION]   NOT calling native - will apply when scene appears");
         }
     }
 
     @Override
     public void onSceneDidAppear() {
+        android.util.Log.i("ViroAR", "[OCCLUSION] VRTARScene.onSceneDidAppear called");
         super.onSceneDidAppear();
         mSceneDidAppear = true;
-        if (mPendingOcclusionMode != null) {
+        android.util.Log.i("ViroAR", "[OCCLUSION]   mPendingOcclusionMode=" + mPendingOcclusionMode +
+                                     ", isTornDown=" + isTornDown() +
+                                     ", mNativeScene=" + (mNativeScene != null ? "NOT_NULL" : "NULL"));
+        if (mPendingOcclusionMode != null && !isTornDown() && mNativeScene != null) {
+            android.util.Log.i("ViroAR", "[OCCLUSION]   Applying pending occlusion mode: " + mPendingOcclusionMode);
             ((ARScene) mNativeScene).setOcclusionMode(mPendingOcclusionMode);
+        } else {
+            android.util.Log.i("ViroAR", "[OCCLUSION]   No pending occlusion mode to apply");
         }
     }
 

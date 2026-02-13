@@ -290,21 +290,30 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     public void setOcclusionMode(String mode) {
+        android.util.Log.i(TAG, "[OCCLUSION] setOcclusionMode called with mode string: '" + mode + "'");
         mOcclusionMode = ARScene.OcclusionMode.DISABLED;
         if (mode != null) {
-            switch (mode.toLowerCase()) {
+            String modeLower = mode.toLowerCase();
+            android.util.Log.i(TAG, "[OCCLUSION] mode.toLowerCase(): '" + modeLower + "'");
+            switch (modeLower) {
                 case "depthbased":
                     mOcclusionMode = ARScene.OcclusionMode.DEPTH_BASED;
+                    android.util.Log.i(TAG, "[OCCLUSION] Set to DEPTH_BASED");
                     break;
                 case "peopleonly":
                     mOcclusionMode = ARScene.OcclusionMode.PEOPLE_ONLY;
+                    android.util.Log.i(TAG, "[OCCLUSION] Set to PEOPLE_ONLY");
                     break;
                 case "disabled":
                 default:
                     mOcclusionMode = ARScene.OcclusionMode.DISABLED;
+                    android.util.Log.i(TAG, "[OCCLUSION] Set to DISABLED (matched case: '" + modeLower + "')");
                     break;
             }
+        } else {
+            android.util.Log.i(TAG, "[OCCLUSION] mode was NULL, using DISABLED");
         }
+        android.util.Log.i(TAG, "[OCCLUSION] Final mOcclusionMode: " + mOcclusionMode + ", mGLInitialized: " + mGLInitialized);
         // If GL is initialized, apply immediately; otherwise queue for later
         if (mGLInitialized) {
             applyOcclusionMode();
@@ -318,9 +327,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
      * Called either immediately when GL is ready, or deferred via onSuccess callback.
      */
     private void applyOcclusionMode() {
+        android.util.Log.i(TAG, "[OCCLUSION] applyOcclusionMode: applying mode " + mOcclusionMode + " to " + getChildCount() + " children");
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             if (child instanceof VRTARScene) {
+                android.util.Log.i(TAG, "[OCCLUSION] applyOcclusionMode: applying to VRTARScene child " + i);
                 ((VRTARScene) child).setOcclusionMode(mOcclusionMode);
             }
         }

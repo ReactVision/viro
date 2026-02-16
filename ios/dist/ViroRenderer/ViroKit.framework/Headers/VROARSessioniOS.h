@@ -197,6 +197,7 @@ private:
      The ARCore cloud anchor provider instance (for iOS using ARCore SDK).
      */
     VROCloudAnchorProviderARCore *_cloudAnchorProviderARCore = nil;
+    bool _needsGeospatialModeApply = false;
 
     /*
      The last computed ARFrame.

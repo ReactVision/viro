@@ -289,14 +289,11 @@
 
                     if (uri && filename && filename.length > 0) {
                         resourceMap[std::string([filename UTF8String])] = std::string([uri UTF8String]);
-                        NSLog(@"[VRX RESOURCES] Mapped texture '%@' -> '%@'", filename, uri);
                     }
                 }
             }
-            NSLog(@"[VRX RESOURCES] Loading VRX with %lu resources", (unsigned long)resourceMap.size());
             VROFBXLoader::loadFBXFromResources(url, VROResourceType::URL, self.node, resourceMap, self.driver, onFinish);
         } else {
-            NSLog(@"[VRX RESOURCES] Loading VRX without resources (textures may not load)");
             VROFBXLoader::loadFBXFromResource(url, VROResourceType::URL, self.node, self.driver, onFinish);
         }
     } else if ([_type caseInsensitiveCompare:@"GLTF"] == NSOrderedSame) {

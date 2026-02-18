@@ -421,7 +421,7 @@ export type ViroCloudAnchorState =
 /**
  * Cloud anchor provider type.
  */
-export type ViroCloudAnchorProvider = "none" | "arcore";
+export type ViroCloudAnchorProvider = "none" | "arcore" | "reactvision";
 
 /**
  * Represents a cloud-hosted AR anchor.

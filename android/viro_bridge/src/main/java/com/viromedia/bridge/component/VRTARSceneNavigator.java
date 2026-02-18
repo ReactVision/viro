@@ -348,6 +348,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     // Cloud Anchor Support
 
     private String mCloudAnchorProvider = "none";
+    private String mRvApiKey = null;
+    private String mRvProjectId = null;
     private static final String TAG = "ViroAR";
 
     public void setCloudAnchorProvider(String provider) {
@@ -375,6 +377,34 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             } catch (Exception e) {
                 Log.w(TAG, "Could not check for ARCore API key: " + e.getMessage());
             }
+        } else if ("reactvision".equals(mCloudAnchorProvider)) {
+            Log.i(TAG, "ReactVision Cloud Anchors provider enabled");
+
+            // Read ReactVision credentials from AndroidManifest meta-data
+            try {
+                android.content.pm.ApplicationInfo ai = getContext().getPackageManager()
+                    .getApplicationInfo(getContext().getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+                if (ai.metaData != null) {
+                    mRvApiKey = ai.metaData.getString("com.reactvision.RVApiKey");
+                    mRvProjectId = ai.metaData.getString("com.reactvision.RVProjectId");
+                    if (mRvApiKey != null && !mRvApiKey.isEmpty()) {
+                        Log.i(TAG, "ReactVision API key found in AndroidManifest.xml");
+                    } else {
+                        Log.w(TAG, "WARNING: com.reactvision.RVApiKey not found in AndroidManifest.xml. ReactVision cloud anchors will not work!");
+                    }
+                } else {
+                    Log.w(TAG, "WARNING: No meta-data found in AndroidManifest.xml. ReactVision cloud anchors may not work!");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Could not check for ReactVision credentials: " + e.getMessage());
+            }
+
+            // Configure the AR scene if it is already available; otherwise the credentials
+            // are stored in mRvApiKey/mRvProjectId and applied lazily in host/resolve.
+            ARScene arScene = getCurrentARScene();
+            if (arScene != null && mRvApiKey != null && !mRvApiKey.isEmpty()) {
+                arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+            }
         } else {
             Log.i(TAG, "Cloud Anchors disabled");
         }
@@ -400,8 +430,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
     public void hostCloudAnchor(String anchorId, int ttlDays,
                                 ARSceneNavigatorModule.CloudAnchorCallback callback) {
-        if (!"arcore".equals(mCloudAnchorProvider)) {
-            callback.onFailure("Cloud anchor provider not configured. Set cloudAnchorProvider='arcore' to enable.",
+        if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {
+            callback.onFailure("Cloud anchor provider not configured. Set cloudAnchorProvider='arcore' or 'reactvision' to enable.",
                                "ErrorInternal");
             return;
         }
@@ -412,7 +442,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
-        // Host the anchor using ARCore's cloud anchor API
+        // For ReactVision, ensure credentials are configured on the native session.
+        // This handles the case where setCloudAnchorProvider was called before GL was ready.
+        if ("reactvision".equals(mCloudAnchorProvider) && mRvApiKey != null && !mRvApiKey.isEmpty()) {
+            arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+        }
+
+        // Host the anchor via the configured cloud anchor provider
         // The native layer handles anchor lookup by ID
         arScene.hostCloudAnchorById(anchorId, ttlDays, new ARScene.CloudAnchorHostListener() {
             @Override
@@ -430,8 +466,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
     public void resolveCloudAnchor(String cloudAnchorId,
                                    ARSceneNavigatorModule.CloudAnchorResolveCallback callback) {
-        if (!"arcore".equals(mCloudAnchorProvider)) {
-            callback.onFailure("Cloud anchor provider not configured. Set cloudAnchorProvider='arcore' to enable.",
+        if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {
+            callback.onFailure("Cloud anchor provider not configured. Set cloudAnchorProvider='arcore' or 'reactvision' to enable.",
                                "ErrorInternal");
             return;
         }
@@ -442,7 +478,12 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
-        // Resolve the cloud anchor
+        // For ReactVision, ensure credentials are configured on the native session.
+        if ("reactvision".equals(mCloudAnchorProvider) && mRvApiKey != null && !mRvApiKey.isEmpty()) {
+            arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+        }
+
+        // Resolve the cloud anchor via the configured provider
         arScene.resolveCloudAnchor(cloudAnchorId, new ARScene.CloudAnchorResolveListener() {
             @Override
             public void onSuccess(ARAnchor anchor, ARNode arNode) {

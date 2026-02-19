@@ -569,6 +569,19 @@
                 } else {
                     RCTLogWarn(@"[ViroAR] WARNING: GARAPIKey not found in Info.plist. Cloud anchors will not work!");
                 }
+            } else if ([cloudAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
+                arSession->setCloudAnchorProvider(VROCloudAnchorProvider::ReactVision);
+                RCTLogInfo(@"[ViroAR] ReactVision Cloud Anchors provider enabled");
+
+                // Check if ReactVision credentials are configured
+                NSString *rvApiKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVApiKey"];
+                NSString *rvProjectId = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVProjectId"];
+                if (!rvApiKey || rvApiKey.length == 0) {
+                    RCTLogWarn(@"[ViroAR] WARNING: RVApiKey not found in Info.plist. ReactVision cloud anchors will not work!");
+                }
+                if (!rvProjectId || rvProjectId.length == 0) {
+                    RCTLogWarn(@"[ViroAR] WARNING: RVProjectId not found in Info.plist. ReactVision cloud anchors will not work!");
+                }
             } else {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::None);
                 RCTLogInfo(@"[ViroAR] Cloud Anchors disabled");

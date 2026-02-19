@@ -272,9 +272,6 @@ public:
     int getHeight() const {
         return _height;
     }
-    bool isSRGB() const {
-        return _sRGB;
-    }
 
 protected:
     int _width, _height;

@@ -42,6 +42,8 @@ class VROTrackingHelper;
 class VROMonocularDepthEstimator;
 @class VROARKitSessionDelegate;
 @class VROCloudAnchorProviderARCore;
+@class VROCloudAnchorProviderReactVision;
+namespace ReactVisionCCA { class RVCCAGeospatialProvider; }
 
 class API_AVAILABLE(ios(12.0)) VROARSessioniOS : public VROARSession, public std::enable_shared_from_this<VROARSessioniOS> {
 public:
@@ -197,6 +199,20 @@ private:
      The ARCore cloud anchor provider instance (for iOS using ARCore SDK).
      */
     VROCloudAnchorProviderARCore *_cloudAnchorProviderARCore = nil;
+
+    /*
+     The ReactVision cloud anchor provider instance.
+     Reads RVApiKey and RVProjectId from Info.plist.
+     */
+    VROCloudAnchorProviderReactVision *_cloudAnchorProviderRV = nil;
+
+    /*
+     The ReactVision geospatial provider instance.
+     Active when setGeospatialAnchorProvider(ReactVision) is called.
+     */
+    std::shared_ptr<ReactVisionCCA::RVCCAGeospatialProvider> _geospatialProviderRV;
+    std::string _rvGeoProjectId;
+
     bool _needsGeospatialModeApply = false;
 
     /*

@@ -565,6 +565,37 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             } catch (Exception e) {
                 Log.w(TAG, "Could not check for ARCore API key: " + e.getMessage());
             }
+        } else if ("reactvision".equals(mGeospatialAnchorProvider)) {
+            Log.i(TAG, "ReactVision Geospatial provider enabled");
+
+            // Read ReactVision credentials from AndroidManifest meta-data
+            try {
+                android.content.pm.ApplicationInfo ai = getContext().getPackageManager()
+                    .getApplicationInfo(getContext().getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+                if (ai.metaData != null) {
+                    String rvApiKey   = ai.metaData.getString("com.reactvision.RVApiKey");
+                    String rvProjectId = ai.metaData.getString("com.reactvision.RVProjectId");
+                    if (rvApiKey != null && !rvApiKey.isEmpty()) {
+                        Log.i(TAG, "ReactVision API key found in AndroidManifest.xml");
+                        // Pass credentials to the native AR session so
+                        // VROARSessionARCore::setGeospatialAnchorProvider(ReactVision) can
+                        // construct the RVCCAGeospatialProvider with valid credentials.
+                        ARScene arScene = getCurrentARScene();
+                        if (arScene != null) {
+                            arScene.setReactVisionConfig(rvApiKey,
+                                rvProjectId != null ? rvProjectId : "");
+                        } else {
+                            // Store for lazy application once the scene becomes available.
+                            mRvApiKey     = rvApiKey;
+                            mRvProjectId  = rvProjectId != null ? rvProjectId : "";
+                        }
+                    } else {
+                        Log.w(TAG, "WARNING: com.reactvision.RVApiKey not found in AndroidManifest.xml. ReactVision Geospatial will not work!");
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Could not check for ReactVision credentials: " + e.getMessage());
+            }
         } else {
             Log.i(TAG, "Geospatial provider disabled");
         }

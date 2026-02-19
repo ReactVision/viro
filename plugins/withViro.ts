@@ -14,15 +14,17 @@ export type XrMode = "GVR" | "AR" | "OVR_MOBILE";
  * Cloud Anchors provider type.
  * - "none": Cloud Anchors disabled
  * - "arcore": Use ARCore Cloud Anchors (works on both iOS and Android)
+ * - "reactvision": Use ReactVision Cloud Anchors backend (requires libreactvisioncca)
  */
-export type CloudAnchorProvider = "none" | "arcore";
+export type CloudAnchorProvider = "none" | "arcore" | "reactvision";
 
 /**
  * Geospatial Anchor provider type.
  * - "none": Geospatial API disabled
  * - "arcore": Use ARCore Geospatial API (works on both iOS and Android)
+ * - "reactvision": Use ReactVision GPS-based anchor backend (requires libreactvisioncca)
  */
-export type GeospatialAnchorProvider = "none" | "arcore";
+export type GeospatialAnchorProvider = "none" | "arcore" | "reactvision";
 
 /**
  * iOS framework linkage type.
@@ -56,6 +58,22 @@ export interface ViroConfigurationOptions {
    * Make sure to enable the ARCore API for your project.
    */
   googleCloudApiKey?: string;
+
+  /**
+   * ReactVision API key for ReactVision Cloud Anchors and Geospatial API.
+   * Required if using cloudAnchorProvider: "reactvision" or geospatialAnchorProvider: "reactvision".
+   *
+   * Written to AndroidManifest as com.reactvision.RVApiKey and to Info.plist as RVApiKey.
+   */
+  rvApiKey?: string;
+
+  /**
+   * ReactVision Project ID for ReactVision Cloud Anchors and Geospatial API.
+   * Required if using cloudAnchorProvider: "reactvision" or geospatialAnchorProvider: "reactvision".
+   *
+   * Written to AndroidManifest as com.reactvision.RVProjectId and to Info.plist as RVProjectId.
+   */
+  rvProjectId?: string;
 
   /**
    * Cloud Anchors provider for cross-platform anchor sharing.

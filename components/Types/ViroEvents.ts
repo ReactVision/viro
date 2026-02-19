@@ -478,7 +478,7 @@ export type ViroCloudAnchorStateChangeEvent = {
 /**
  * Geospatial anchor provider type.
  */
-export type ViroGeospatialAnchorProvider = "none" | "arcore";
+export type ViroGeospatialAnchorProvider = "none" | "arcore" | "reactvision";
 
 /**
  * Earth tracking state.

@@ -269,6 +269,22 @@ const withViroManifest = (config: ExpoConfig) =>
             },
           });
         }
+        if (pluginOptions.rvApiKey) {
+          contents?.manifest?.application?.[0]["meta-data"]?.push({
+            $: {
+              "android:name": "com.reactvision.RVApiKey",
+              "android:value": pluginOptions.rvApiKey,
+            },
+          });
+        }
+        if (pluginOptions.rvProjectId) {
+          contents?.manifest?.application?.[0]["meta-data"]?.push({
+            $: {
+              "android:name": "com.reactvision.RVProjectId",
+              "android:value": pluginOptions.rvProjectId,
+            },
+          });
+        }
       }
 
       if (

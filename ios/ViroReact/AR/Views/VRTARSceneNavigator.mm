@@ -721,6 +721,17 @@
                 } else {
                     RCTLogWarn(@"[ViroAR] WARNING: GARAPIKey not found in Info.plist. Geospatial features will not work!");
                 }
+            } else if ([geospatialAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
+                arSession->setGeospatialAnchorProvider(VROGeospatialAnchorProvider::ReactVision);
+                RCTLogInfo(@"[ViroAR] ReactVision Geospatial provider enabled");
+
+                // Check that credentials are present in Info.plist
+                NSString *rvApiKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVApiKey"];
+                if (rvApiKey && rvApiKey.length > 0) {
+                    RCTLogInfo(@"[ViroAR] RVApiKey found in Info.plist");
+                } else {
+                    RCTLogWarn(@"[ViroAR] WARNING: RVApiKey not found in Info.plist. ReactVision Geospatial will not work!");
+                }
             } else {
                 arSession->setGeospatialAnchorProvider(VROGeospatialAnchorProvider::None);
                 RCTLogInfo(@"[ViroAR] Geospatial provider disabled");

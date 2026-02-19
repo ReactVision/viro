@@ -174,6 +174,22 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
                 },
             });
         }
+        if (pluginOptions.rvApiKey) {
+            contents?.manifest?.application?.[0]["meta-data"]?.push({
+                $: {
+                    "android:name": "com.reactvision.RVApiKey",
+                    "android:value": pluginOptions.rvApiKey,
+                },
+            });
+        }
+        if (pluginOptions.rvProjectId) {
+            contents?.manifest?.application?.[0]["meta-data"]?.push({
+                $: {
+                    "android:name": "com.reactvision.RVProjectId",
+                    "android:value": pluginOptions.rvProjectId,
+                },
+            });
+        }
     }
     if (viroPluginConfig.includes("GVR") ||
         viroPluginConfig.includes("OVR_MOBILE")) {

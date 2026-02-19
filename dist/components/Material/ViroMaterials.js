@@ -73,7 +73,6 @@ class ViroMaterials {
             result[key] = resultMaterial;
         }
         if (MaterialManager) {
-            console.log("ViroMaterials: Sending materials to native:", Object.keys(result));
             MaterialManager.setJSMaterials(result);
         }
         else {

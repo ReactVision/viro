@@ -161,6 +161,8 @@ const withDefaultInfoPlist = (config, _props) => {
     let microphoneUsagePermission = withViro_1.DEFAULTS.ios.microphoneUsagePermission;
     let locationUsagePermission = withViro_1.DEFAULTS.ios.locationUsagePermission;
     let googleCloudApiKey;
+    let rvApiKey;
+    let rvProjectId;
     let cloudAnchorProvider;
     let geospatialAnchorProvider;
     let includeARCore;
@@ -178,6 +180,8 @@ const withDefaultInfoPlist = (config, _props) => {
             locationUsagePermission =
                 pluginOptions.ios?.locationUsagePermission || locationUsagePermission;
             googleCloudApiKey = pluginOptions.googleCloudApiKey;
+            rvApiKey = pluginOptions.rvApiKey;
+            rvProjectId = pluginOptions.rvProjectId;
             cloudAnchorProvider = pluginOptions.cloudAnchorProvider;
             geospatialAnchorProvider = pluginOptions.geospatialAnchorProvider;
             includeARCore = pluginOptions.ios?.includeARCore;
@@ -201,8 +205,15 @@ const withDefaultInfoPlist = (config, _props) => {
     if (googleCloudApiKey) {
         config.ios.infoPlist.GARAPIKey = googleCloudApiKey;
     }
+    // Add ReactVision credentials for ReactVision Cloud Anchors and Geospatial API (iOS)
+    if (rvApiKey) {
+        config.ios.infoPlist.RVApiKey = rvApiKey;
+    }
+    if (rvProjectId) {
+        config.ios.infoPlist.RVProjectId = rvProjectId;
+    }
     // Add location permissions for Geospatial API
-    if (geospatialAnchorProvider === "arcore" || includeARCore === true) {
+    if (geospatialAnchorProvider === "arcore" || geospatialAnchorProvider === "reactvision" || includeARCore === true) {
         config.ios.infoPlist.NSLocationWhenInUseUsageDescription =
             config.ios.infoPlist.NSLocationWhenInUseUsageDescription || locationUsagePermission;
         config.ios.infoPlist.NSLocationAlwaysAndWhenInUseUsageDescription =

@@ -223,7 +223,9 @@ public:
     }
 
     bool isOcclusionEnabled() const {
-        return _occlusionMode != VROOcclusionMode::Disabled && _depthTexture != nullptr;
+        return (_occlusionMode == VROOcclusionMode::DepthBased ||
+                _occlusionMode == VROOcclusionMode::PeopleOnly)
+               && _depthTexture != nullptr;
     }
 
     void setViewport(VROViewport viewport) {

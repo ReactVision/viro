@@ -58,6 +58,9 @@
     BOOL _pendingWorldMeshEnabled;
     BOOL _needsWorldMeshApply;
     VROWorldMeshConfig _worldMeshConfigCpp;
+
+    // depthEnabled: activate depth sensing without occlusion rendering
+    BOOL _depthEnabled;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -83,6 +86,7 @@
         _bloomEnabled = YES;
         _shadowsEnabled = YES;
         _multisamplingEnabled = NO;
+        _depthEnabled = NO;
     }
     return self;
 }
@@ -163,15 +167,12 @@
         arSession->setVideoQuality(_vroVideoQuality);
         arSession->setNumberOfTrackedImages(_numberOfTrackedImages);
 
-        // Apply initial occlusion mode if set
-        if (_occlusionMode) {
-            VROOcclusionMode mode = VROOcclusionMode::Disabled;
-            if ([_occlusionMode caseInsensitiveCompare:@"depthBased"] == NSOrderedSame) {
-                mode = VROOcclusionMode::DepthBased;
-            } else if ([_occlusionMode caseInsensitiveCompare:@"peopleOnly"] == NSOrderedSame) {
-                mode = VROOcclusionMode::PeopleOnly;
+        // Apply initial occlusion mode (considers both occlusionMode and depthEnabled)
+        {
+            VROOcclusionMode mode = [self computeEffectiveOcclusionMode];
+            if (mode != VROOcclusionMode::Disabled || _occlusionMode != nil || _depthEnabled) {
+                arSession->setOcclusionMode(mode);
             }
-            arSession->setOcclusionMode(mode);
         }
 
         // Apply initial depth debug setting if set
@@ -479,19 +480,38 @@
     _multisamplingEnabled = multisamplingEnabled;
 }
 
+- (VROOcclusionMode)computeEffectiveOcclusionMode {
+    // Explicit occlusionMode prop always takes precedence.
+    // Guard against nil: in ObjC [nil caseInsensitiveCompare:] returns 0 == NSOrderedSame,
+    // which would incorrectly match "depthBased" when the prop is not set.
+    if (_occlusionMode != nil && [_occlusionMode caseInsensitiveCompare:@"depthBased"] == NSOrderedSame)
+        return VROOcclusionMode::DepthBased;
+    if (_occlusionMode != nil && [_occlusionMode caseInsensitiveCompare:@"peopleOnly"] == NSOrderedSame)
+        return VROOcclusionMode::PeopleOnly;
+    // depthEnabled activates depth sensing without occlusion rendering
+    if (_depthEnabled)
+        return VROOcclusionMode::DepthOnly;
+    return VROOcclusionMode::Disabled;
+}
+
 - (void)setOcclusionMode:(NSString *)occlusionMode {
     _occlusionMode = occlusionMode;
     if (_vroView) {
         VROViewAR *viewAR = (VROViewAR *) _vroView;
         std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
         if (arSession) {
-            VROOcclusionMode mode = VROOcclusionMode::Disabled;
-            if ([occlusionMode caseInsensitiveCompare:@"depthBased"] == NSOrderedSame) {
-                mode = VROOcclusionMode::DepthBased;
-            } else if ([occlusionMode caseInsensitiveCompare:@"peopleOnly"] == NSOrderedSame) {
-                mode = VROOcclusionMode::PeopleOnly;
-            }
-            arSession->setOcclusionMode(mode);
+            arSession->setOcclusionMode([self computeEffectiveOcclusionMode]);
+        }
+    }
+}
+
+- (void)setDepthEnabled:(BOOL)depthEnabled {
+    _depthEnabled = depthEnabled;
+    if (_vroView) {
+        VROViewAR *viewAR = (VROViewAR *) _vroView;
+        std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+        if (arSession) {
+            arSession->setOcclusionMode([self computeEffectiveOcclusionMode]);
         }
     }
 }

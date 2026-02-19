@@ -111,7 +111,8 @@ enum class VROGeospatialAnchorProvider {
 enum class VROOcclusionMode {
     Disabled,       // No occlusion - virtual objects always render on top
     DepthBased,     // Use depth data to occlude virtual objects behind real-world surfaces
-    PeopleOnly      // Only occlude virtual objects behind detected people (iOS 13+/Android with ARCore)
+    PeopleOnly,     // Only occlude virtual objects behind detected people (iOS 13+/Android with ARCore)
+    DepthOnly       // Activates depth sensing WITHOUT occlusion rendering (depth data available, no visual occlusion)
 };
 
 /*

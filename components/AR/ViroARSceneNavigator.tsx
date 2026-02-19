@@ -104,6 +104,20 @@ type Props = ViewProps & {
   occlusionMode?: ViroOcclusionMode;
 
   /**
+   * Enables depth sensing without activating occlusion rendering.
+   * Virtual objects will NOT be occluded by real-world surfaces, but depth data
+   * will be available for hit tests (DepthPoint type) and distance measurement.
+   *
+   * If occlusionMode="depthBased" is also set, occlusionMode takes precedence.
+   *
+   * Android: requires ARCore Depth API support (ARCore 1.18+).
+   * iOS: uses LiDAR on supported devices, monocular depth estimator as fallback.
+   *
+   * @default false
+   */
+  depthEnabled?: boolean;
+
+  /**
    * [Debug] Enable depth debug visualization to see how the depth texture is being sampled.
    * When enabled, the camera background will show a color overlay representing depth values:
    * - Magenta = No depth data

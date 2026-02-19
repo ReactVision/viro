@@ -158,10 +158,6 @@ export class ViroMaterials {
     }
 
     if (MaterialManager) {
-      console.log(
-        "ViroMaterials: Sending materials to native:",
-        Object.keys(result)
-      );
       MaterialManager.setJSMaterials(result);
     } else {
       console.error(
@@ -210,6 +206,11 @@ export class ViroMaterials {
       );
       return;
     }
-    MaterialManager.updateShaderUniform(materialName, uniformName, uniformType, value);
+    MaterialManager.updateShaderUniform(
+      materialName,
+      uniformName,
+      uniformType,
+      value
+    );
   }
 }

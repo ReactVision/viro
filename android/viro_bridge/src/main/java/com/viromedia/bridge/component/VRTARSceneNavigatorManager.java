@@ -97,6 +97,11 @@ public class VRTARSceneNavigatorManager extends VRTViroViewGroupManager<VRTARSce
         navigator.setOcclusionMode(mode);
     }
 
+    @ReactProp(name = "depthEnabled", defaultBoolean = false)
+    public void setDepthEnabled(VRTARSceneNavigator navigator, boolean enabled) {
+        navigator.setDepthEnabled(enabled);
+    }
+
     @ReactProp(name = "cloudAnchorProvider")
     public void setCloudAnchorProvider(VRTARSceneNavigator navigator, String provider) {
         navigator.setCloudAnchorProvider(provider);

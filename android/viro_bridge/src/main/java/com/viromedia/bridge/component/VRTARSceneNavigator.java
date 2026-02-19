@@ -54,6 +54,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private boolean mNeedsAutoFocusToggle = false;
     private ARScene.OcclusionMode mOcclusionMode = ARScene.OcclusionMode.DISABLED;
     private boolean mNeedsOcclusionModeToggle = false;
+    private boolean mDepthEnabled = false;
+    private boolean mNeedsDepthEnabledToggle = false;
 
     // Pending configuration for features that may be set before session is ready
     private boolean mSemanticModeEnabled = false;
@@ -104,6 +106,12 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (navigator.mNeedsOcclusionModeToggle) {
                 navigator.applyOcclusionMode();
                 navigator.mNeedsOcclusionModeToggle = false;
+            }
+
+            // Apply pending depthEnabled configuration
+            if (navigator.mNeedsDepthEnabledToggle) {
+                navigator.applyOcclusionMode();
+                navigator.mNeedsDepthEnabledToggle = false;
             }
 
             // Apply pending semantic mode configuration
@@ -168,9 +176,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
         super.addView(child, index);
 
-        // Apply current occlusion mode to newly added ARScenes
+        // Apply current effective occlusion mode to newly added ARScenes
         if (child instanceof VRTARScene) {
-            ((VRTARScene) child).setOcclusionMode(mOcclusionMode);
+            ((VRTARScene) child).setOcclusionMode(computeEffectiveOcclusionMode());
         }
     }
 
@@ -322,27 +330,49 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    public void setDepthEnabled(boolean enabled) {
+        mDepthEnabled = enabled;
+        android.util.Log.i(TAG, "[OCCLUSION] setDepthEnabled: " + enabled + ", mGLInitialized: " + mGLInitialized);
+        if (mGLInitialized) {
+            applyOcclusionMode();
+        } else {
+            mNeedsDepthEnabledToggle = true;
+        }
+    }
+
     /**
-     * Apply occlusion mode to all existing ARScenes.
+     * Compute the effective occlusion mode based on occlusionMode prop and depthEnabled prop.
+     * Explicit occlusionMode always takes precedence over depthEnabled.
+     */
+    private ARScene.OcclusionMode computeEffectiveOcclusionMode() {
+        if (mOcclusionMode == ARScene.OcclusionMode.DEPTH_BASED) return ARScene.OcclusionMode.DEPTH_BASED;
+        if (mOcclusionMode == ARScene.OcclusionMode.PEOPLE_ONLY) return ARScene.OcclusionMode.PEOPLE_ONLY;
+        if (mDepthEnabled) return ARScene.OcclusionMode.DEPTH_ONLY;
+        return ARScene.OcclusionMode.DISABLED;
+    }
+
+    /**
+     * Apply effective occlusion mode to all existing ARScenes.
      * Called either immediately when GL is ready, or deferred via onSuccess callback.
      */
     private void applyOcclusionMode() {
-        android.util.Log.i(TAG, "[OCCLUSION] applyOcclusionMode: applying mode " + mOcclusionMode + " to " + getChildCount() + " children");
+        ARScene.OcclusionMode effective = computeEffectiveOcclusionMode();
+        android.util.Log.i(TAG, "[OCCLUSION] applyOcclusionMode: applying effective mode " + effective + " to " + getChildCount() + " children");
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             if (child instanceof VRTARScene) {
                 android.util.Log.i(TAG, "[OCCLUSION] applyOcclusionMode: applying to VRTARScene child " + i);
-                ((VRTARScene) child).setOcclusionMode(mOcclusionMode);
+                ((VRTARScene) child).setOcclusionMode(effective);
             }
         }
     }
 
     /**
-     * Get the current occlusion mode. Used when adding new scenes so they
+     * Get the current effective occlusion mode. Used when adding new scenes so they
      * inherit the navigator's occlusion setting.
      */
     public ARScene.OcclusionMode getOcclusionMode() {
-        return mOcclusionMode;
+        return computeEffectiveOcclusionMode();
     }
 
     // Cloud Anchor Support

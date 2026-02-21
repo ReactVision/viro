@@ -58,7 +58,7 @@ public:
             _ambientLightColor = { 1.0, 1.0, 1.0 };
             _pointCloudNode = std::make_shared<VRONode>();
             _pointCloudEmitter = nullptr;
-            _detectionTypes = { VROAnchorDetection::PlanesHorizontal }; //default is horizontal
+            _detectionTypes = { VROAnchorDetection::PlanesHorizontal, VROAnchorDetection::PlanesVertical };
         };
     virtual ~VROARScene();
     

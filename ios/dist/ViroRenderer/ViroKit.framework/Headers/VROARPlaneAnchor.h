@@ -40,7 +40,7 @@
  Thresholds:
  - Minimum extent change: 1cm or 5%
  - Minimum center change: 1cm
- - Update throttle: 100ms (10 updates/sec max)
+ - Update throttle: 33ms early (first 20 updates), 66ms mature
  */
 #define VRO_PLANE_CHANGE_DETECTION_ENABLED
 
@@ -177,15 +177,14 @@ public:
         // Check extent change (absolute and percentage)
         VROVector3f extentDiff = newExtent - _extent;
         float maxExtentDiff = std::max(std::abs(extentDiff.x), std::abs(extentDiff.z));
+        // Absolute threshold: any 1cm change is significant
         if (maxExtentDiff > EXTENT_THRESHOLD) {
-            // Also check percentage change for larger planes
-            if (_extent.magnitude() > 0.001f) {
-                float percentChange = maxExtentDiff / _extent.magnitude();
-                if (percentChange > EXTENT_PERCENT_THRESHOLD) {
-                    return true;
-                }
-            } else {
-                // For very small planes, any change is significant
+            return true;
+        }
+        // Relative threshold: significant % change even if absolute is small
+        if (_extent.magnitude() > 0.001f) {
+            float percentChange = maxExtentDiff / _extent.magnitude();
+            if (percentChange > EXTENT_PERCENT_THRESHOLD) {
                 return true;
             }
         }
@@ -221,13 +220,11 @@ public:
 
     // Check if update should be throttled
     bool shouldThrottleUpdate() const {
-        // Minimum time between updates (milliseconds)
-        static const int MIN_UPDATE_INTERVAL_MS = 100; // 10 updates per second max
-
+        // First 20 updates: ~30fps (33ms). After: ~15fps (66ms).
+        int intervalMs = (_updateCount < 20) ? 33 : 66;
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastUpdateTime).count();
-
-        return elapsed < MIN_UPDATE_INTERVAL_MS;
+        return elapsed < intervalMs;
     }
 
     // Mark that an update occurred

@@ -288,7 +288,7 @@ class ViroARScene extends ViroBase_1.ViroBase {
         // Since anchorDetectionTypes can be either a string or an array, convert the string to a 1-element array.
         let anchorDetectionTypes = typeof this.props.anchorDetectionTypes === "string"
             ? new Array(this.props.anchorDetectionTypes)
-            : this.props.anchorDetectionTypes;
+            : this.props.anchorDetectionTypes ?? ["planesHorizontal", "planesVertical"];
         let timeToFuse = undefined;
         if (this.props.onFuse != undefined &&
             typeof this.props.onFuse === "object") {

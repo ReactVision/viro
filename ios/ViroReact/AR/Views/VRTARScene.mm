@@ -66,7 +66,7 @@ static NSString *const kPointCloudKey = @"pointCloud";
         _vroArScene->initDeclarativeSession();
         _vroArScene->setDelegate(_sceneDelegate);
         _vroArScene->getDeclarativeSession()->setDelegate(_sceneDelegate);
-        _nativeDetectionTypes = { VROAnchorDetection::PlanesHorizontal }; // default detection type is horizontal plane
+        _nativeDetectionTypes = { VROAnchorDetection::PlanesHorizontal, VROAnchorDetection::PlanesVertical };
         _vroArScene->setAnchorDetectionTypes(_nativeDetectionTypes);
     }
     return self;

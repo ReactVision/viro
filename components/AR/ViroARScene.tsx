@@ -420,7 +420,7 @@ export class ViroARScene extends ViroBase<Props> {
     let anchorDetectionTypes =
       typeof this.props.anchorDetectionTypes === "string"
         ? new Array(this.props.anchorDetectionTypes)
-        : this.props.anchorDetectionTypes;
+        : this.props.anchorDetectionTypes ?? ["planesHorizontal", "planesVertical"];
 
     let timeToFuse = undefined;
     if (

@@ -145,6 +145,56 @@
 
 ### Fixed
 
+- **Android — physics body crash on scene close** (`virocore/ViroRenderer/capi/Node_JNI.cpp`)
+
+  Closing a scene that contained physics-enabled nodes crashed with a null
+  pointer dereference at `VRONode::setTransformDelegate+56`.  The GL-thread
+  lambdas queued by `nativeSetTransformDelegate` and
+  `nativeRemoveTransformDelegate` called `node->setTransformDelegate()` without
+  first checking whether the `std::weak_ptr<VRONode>` had already expired.
+  Added an `if (!node) { return; }` guard in both lambdas so that a node
+  destroyed before the lambda runs is silently skipped instead of crashing.
+
+- **Android — New Architecture Metro error** (`viro/android/viro_bridge/…/PerfMonitor.java`)
+
+  "You should not use ReactNativeHost directly in the New Architecture" was
+  thrown during dev-menu initialisation.  `PerfMonitor.setView()` called
+  `getReactNativeHost().getReactInstanceManager().getDevSupportManager()`,
+  which throws under the New Architecture.  Replaced with the New-Arch API:
+  `getReactHost().getDevSupportManager()`.
+
+- **iOS — `startVideoRecording` silent failure / `stopVideoRecording` returns `{success: false, errorCode: 0}`** (`virocore/ios/ViroKit/VROViewRecorder.mm`, `VROViewAR.mm`)
+
+  Video recording was completely non-functional after the move to the React
+  Native New Architecture.  Several independent bugs combined to produce a
+  silent failure with no error callback and an empty URL on stop:
+
+  - `[AVAssetWriter startWriting]` return value was never checked.  A failed
+    writer still set `_isRecording = YES`, causing the stop path to hit the
+    `kVROViewErrorAlreadyStopped` branch and return `errorCode: 0`.
+  - The pixel buffer pool was never validated after `startWriting`.  A nil pool
+    produced a null `_videoPixelBuffer` used later without a check.
+  - `AVAssetWriter` was created before the video dimensions were validated; a
+    zero-size view (not yet laid out) produced an invalid writer.
+  - `AVAudioSession` was configured without `mode:AVAudioSessionModeVideoRecording`
+    and without `[session setActive:YES]`.  On iOS 17+ ARKit takes control of
+    the audio session, silently preventing `AVAudioRecorder` from writing data;
+    the resulting empty/unplayable audio file then caused `generateFinalVideoFile`
+    to call `handler(NO)` → `completionHandler(NO, nil, nil, kVROViewErrorUnknown)`.
+  - `generateFinalVideoFile` hard-failed when the audio file was missing or
+    unplayable, with no fallback.
+
+  Fixes applied:
+  - Added dimension guard (`kVROViewErrorInitialization`) before writer creation.
+  - Added `startWriting` return check with cleanup and `kVROViewErrorInitialization`.
+  - Added pixel buffer pool nil check with writer cancellation and error callback.
+  - Added nil check for `AVAudioRecorder` after `initWithURL:settings:error:`.
+  - Added `-record` return value check with a diagnostic log.
+  - Set `mode:AVAudioSessionModeVideoRecording` and `[session setActive:YES]` in
+    `VROViewAR` so the audio session is properly activated before recording starts.
+  - `generateFinalVideoFile` now falls back to video-only output when the audio
+    file is missing or unplayable, instead of failing the entire recording.
+
 - **ViroARPlaneSelector — index-mapping mismatch (root cause of ghost planes)**
 
   The old implementation pre-allocated 25 `ViroARPlane` slots per alignment

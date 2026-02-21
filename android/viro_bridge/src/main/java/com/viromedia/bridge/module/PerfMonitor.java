@@ -80,7 +80,7 @@ public class PerfMonitor extends ReactContextBaseJavaModule {
             Application application = getCurrentActivity().getApplication();
             if (application instanceof ReactApplication) {
                 ReactApplication reactApplication = (ReactApplication) application;
-                DevSupportManager devSupport = reactApplication.getReactNativeHost().getReactInstanceManager().getDevSupportManager();
+                DevSupportManager devSupport = reactApplication.getReactHost().getDevSupportManager();
                 devSupport.addCustomDevOption("[Viro] Toggle FPS Display", new PerfOptionHandler(this));
 
                 mIsInitialized = true;

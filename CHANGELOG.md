@@ -1,5 +1,211 @@
 # CHANGELOG
 
+## v2.53.0 - 20 February 2026
+
+### Breaking Changes
+
+- **ViroARPlaneSelector — new architecture (scene-event-driven)**
+
+  The component no longer self-discovers planes through pre-allocated
+  `ViroARPlane` detector slots.  You must forward the parent
+  `ViroARScene` anchor events to it via a ref:
+
+  ```tsx
+  const selectorRef = useRef<ViroARPlaneSelector>(null);
+
+  <ViroARScene
+    anchorDetectionTypes={["PlanesHorizontal", "PlanesVertical"]}
+    onAnchorFound={(a)   => selectorRef.current?.handleAnchorFound(a)}
+    onAnchorUpdated={(a) => selectorRef.current?.handleAnchorUpdated(a)}
+    onAnchorRemoved={(a) => a && selectorRef.current?.handleAnchorRemoved(a)}
+  >
+    <ViroARPlaneSelector ref={selectorRef} alignment="Both" onPlaneSelected={...}>
+      <MyContent />
+    </ViroARPlaneSelector>
+  </ViroARScene>
+  ```
+
+  The old self-contained usage (no ref, no anchor wiring) no longer works.
+
+### Added
+
+- **ReactVisionCCA — Cloud Anchor Provider**
+
+  A new `"reactvision"` value is available for the `cloudAnchorProvider` prop
+  on `ViroARSceneNavigator`.  It routes cloud anchor hosting and resolving
+  through the ReactVision platform instead of Google Cloud Anchors, requiring
+  no Google Cloud configuration or API key.  The existing `hostCloudAnchor`,
+  `resolveCloudAnchor`, and `onCloudAnchorStateChange` API is unchanged.
+
+- **ReactVisionCCA — Geospatial Anchor Provider**
+
+  GPS-tagged anchors are now available through the ReactVision platform via
+  `ReactVisionClient`.  Anchors carry a latitude/longitude/altitude pose with
+  optional metadata and support creation, retrieval, update, deletion, proximity
+  search, and 3-D asset linking.
+
+- **ViroARPlaneSelector — tap-position object placement**
+
+  Objects placed as `children` of `ViroARPlaneSelector` now appear at the
+  exact point the user tapped, not at the plane's geometric centre.
+
+  The world-space tap position from `onClickState` is converted to the
+  plane's local coordinate space using the full inverse rotation matrix
+  (R = Rx·Ry·Rz, X-Y-Z Euler order as used by `VROMatrix4f`) and clamped
+  to the plane surface (Y = 0 in local space).  Children retain their own
+  Y offset (`position={[0, 0.5, 0]}` etc.) relative to the tap point.
+
+- **ViroARPlaneSelector — `onPlaneSelected` receives tap position**
+
+  ```ts
+  onPlaneSelected?: (plane: ViroPlaneUpdatedMap, tapPosition?: [number, number, number]) => void;
+  ```
+
+  `tapPosition` is the world-space ray–surface intersection point.
+
+- **ViroARPlaneSelector — `onPlaneRemoved` prop**
+
+  Called when ARKit/ARCore removes a tracked plane.  Receives the
+  `anchorId` string.  Selection is automatically cleared if the removed
+  plane was selected.
+
+- **ViroARSceneNavigator — `depthEnabled` prop**
+
+  Activates the depth sensor (LiDAR on supported iOS devices, monocular
+  depth estimator as fallback; ARCore Depth API on Android 1.18+) without
+  enabling occlusion rendering.  Virtual objects are **not** occluded, but
+  depth data becomes available for:
+  - `performARHitTest` — returns `DepthPoint` results
+  - distance measurement use-cases
+
+  When `occlusionMode="depthBased"` is set at the same time,
+  `occlusionMode` takes precedence and full depth-based occlusion is used
+  instead.
+
+  ```tsx
+  <ViroARSceneNavigator depthEnabled={true} ... />
+  ```
+
+  | Platform | Requirement |
+  |---|---|
+  | iOS | LiDAR device or monocular fallback (all devices) |
+  | Android | ARCore Depth API — ARCore 1.18+ |
+
+- **ViroARSceneNavigator — `depthDebugEnabled` prop**
+
+  Debug visualisation of the depth texture over the camera feed.  Colours
+  represent depth values: magenta = no data, blue = near, red = far.
+  Useful for verifying depth coverage before relying on hit-test results.
+
+  ```tsx
+  <ViroARSceneNavigator depthEnabled={true} depthDebugEnabled={true} ... />
+  ```
+
+  Default: `false`. Both iOS and Android.
+
+- **ViroARSceneNavigator — `preferMonocularDepth` prop (iOS only)**
+
+  When `true`, forces iOS to use the monocular depth estimator even on
+  LiDAR-equipped devices.  Useful for testing depth behaviour on older
+  hardware or when LiDAR accuracy is not required and power consumption
+  is a concern.
+
+  Default: `false` (LiDAR used when available).
+
+- **ViroARPlaneSelector — `hideOverlayOnSelection` prop**
+
+  Controls whether the plane overlay hides once a plane is selected.
+  Default `true` — the overlay disappears after selection so only your
+  `children` content remains visible.  Pass `false` to keep the overlay
+  visible (e.g. to show the plane boundary while the user repositions
+  content).  Unselected planes are always hidden after a selection
+  regardless of this prop.
+
+- **ViroARPlaneSelector — `material` prop**
+
+  Pass a `ViroMaterials`-registered material name to customise the plane
+  overlay surface.  Defaults to the built-in translucent blue.
+
+- **ViroARPlaneSelector — `handleAnchorRemoved` public method**
+
+  New public instance method matching `handleAnchorFound` /
+  `handleAnchorUpdated`.  Removes a plane from the visible set and
+  clears selection if needed.
+
+- **ARKit/ARCore plane detection — both orientations enabled by default**
+
+  Previously only horizontal planes were detected unless `anchorDetectionTypes`
+  was set explicitly.  The default is now horizontal + vertical at all layers:
+
+  | Layer | File |
+  |---|---|
+  | C++ default | `VROARScene.h` |
+  | iOS native default | `VRTARScene.mm` |
+  | JS fallback default | `ViroARScene.tsx` |
+
+### Fixed
+
+- **ViroARPlaneSelector — index-mapping mismatch (root cause of ghost planes)**
+
+  The old implementation pre-allocated 25 `ViroARPlane` slots per alignment
+  and mapped them by JS array index.  The C++ constraint matcher assigns
+  anchors non-deterministically, so the slot at index `i` did not reliably
+  hold the plane `detectedPlanes[i]` referred to.  The rewrite uses one
+  `<ViroARPlane anchorId={id}>` per confirmed anchor — no mismatch possible.
+
+- **ViroARPlaneSelector — selected plane disappeared on selection**
+
+  Opacity was computed as `isSelected ? 0 : isVisible ? 1 : 0` — the
+  selected plane hid itself immediately after tap.  Fixed to
+  `selectedPlaneId === null || isSelected ? 1 : 0`.
+
+- **ViroARPlaneSelector — children duplicated across all plane slots**
+
+  Children were rendered inside every one of the 50 pre-allocated slots.
+  Now rendered once, only on the selected plane, wrapped in a `ViroNode`
+  at the tap position.
+
+- **ViroARPlaneSelector — `onPlaneDetected` return value ignored**
+
+  Returning `false` from `onPlaneDetected` previously had no effect.
+  Now correctly prevents the plane from being added to the visible set.
+
+- **ViroARPlaneSelector — removed planes not cleaned up**
+
+  Disappeared planes were never removed from internal state.  The new
+  `handleAnchorRemoved` deletes the entry from the Map and resets
+  selection if needed.
+
+- **VROARPlaneAnchor — `hasSignificantChanges` AND→OR threshold logic**
+
+  The previous implementation required *both* the absolute (>1 cm) *and*
+  the relative (>5 %) extent thresholds to pass simultaneously.  For large
+  planes (floors, walls) the relative check almost never passed once the
+  plane was mature, silently dropping most ARKit update notifications.
+  Fixed to OR: either threshold alone triggers an update.
+
+- **VROARPlaneAnchor — hard 100 ms update throttle suppressed early detection**
+
+  ARKit sends rapid update bursts in the first seconds of plane detection.
+  A fixed 100 ms minimum interval discarded most of them.  Replaced with
+  an adaptive throttle: 33 ms (≈30 fps) for the first 20 updates,
+  66 ms (≈15 fps) thereafter.
+
+### Changed
+
+- **ViroARPlaneSelector — `useActualShape` now defaults to `true`**
+
+  Previously the bounding-rect `ViroQuad` fallback was used whenever
+  vertices were absent; now the polygon path is always preferred and the
+  quad is only used as a fallback before ARKit provides boundary vertices.
+
+### ViroCore Integration
+
+This release integrates ReactVisionCCA into ViroCore, adding:
+- Cloud anchor hosting and resolving via the ReactVision platform (Android + iOS)
+- Geospatial anchor CRUD and proximity search
+- New `ReactVision` provider wired into `VROARSession` on both platforms
+
 ## v2.52.0 - 08 February 2026
 
 ### Added

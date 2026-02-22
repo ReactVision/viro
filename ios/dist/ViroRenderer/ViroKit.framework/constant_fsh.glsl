@@ -5,6 +5,7 @@ uniform highp vec3 camera_position;
 uniform highp vec4 material_diffuse_surface_color;
 uniform highp float material_diffuse_intensity;
 uniform lowp float material_alpha;
+uniform lowp float material_alpha_cutoff;
 
 #pragma surface_modifier_uniforms
 #pragma fragment_modifier_uniforms
@@ -28,6 +29,10 @@ void main() {
 #pragma surface_modifier_body
 
     highp vec4 _output_color = vec4(_surface.diffuse_color.xyz * _surface.diffuse_intensity, _surface.alpha * _surface.diffuse_color.a);
+
+    if (material_alpha_cutoff > 0.0 && _output_color.a < material_alpha_cutoff) {
+        discard;
+    }
 
 #pragma fragment_modifier_body
 

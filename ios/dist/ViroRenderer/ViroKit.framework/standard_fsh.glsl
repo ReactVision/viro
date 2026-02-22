@@ -12,6 +12,8 @@ uniform highp float material_roughness_intensity;
 uniform highp float material_metalness;
 uniform highp float material_metalness_intensity;
 uniform highp float material_ao;
+uniform lowp float material_alpha_cutoff;
+uniform highp vec3 material_emissive_color;
 
 #pragma surface_modifier_uniforms
 #pragma fragment_modifier_uniforms
@@ -63,8 +65,13 @@ void main() {
 
     highp vec4 _output_color = vec4(_ambient  * _surface.diffuse_color.xyz +
                                     _diffuse  * _surface.diffuse_color.xyz * _surface.diffuse_intensity +
-                                    _specular * _surface.specular_color,
+                                    _specular * _surface.specular_color +
+                                    material_emissive_color,
                                     _surface.alpha * _surface.diffuse_color.a);
+
+    if (material_alpha_cutoff > 0.0 && _output_color.a < material_alpha_cutoff) {
+        discard;
+    }
 
 #pragma fragment_modifier_body
 

@@ -407,8 +407,17 @@ public class VRTNode extends VRTComponent {
                 mEventDelegateJni = null;
             }
             
-            // Clean up materials
+            // Clean up materials — registry must be cleaned BEFORE clearing mMaterials
             if (mMaterials != null) {
+                for (Material mat : mMaterials) {
+                    String matName = mat.getName();
+                    if (matName != null) {
+                        java.util.Set<WeakReference<VRTNode>> nodes = sMaterialUsageRegistry.get(matName);
+                        if (nodes != null) {
+                            nodes.removeIf(ref -> ref.get() == this || ref.get() == null);
+                        }
+                    }
+                }
                 mMaterials.clear();
                 mMaterials = null;
             }
@@ -428,19 +437,6 @@ public class VRTNode extends VRTComponent {
             if (mChildNodeOriginalMaterials != null) {
                 mChildNodeOriginalMaterials.clear();
                 mChildNodeOriginalMaterials = null;
-            }
-
-            // Clean up material usage registry
-            if (mMaterials != null) {
-                for (Material mat : mMaterials) {
-                    String matName = mat.getName();
-                    if (matName != null) {
-                        java.util.Set<WeakReference<VRTNode>> nodes = sMaterialUsageRegistry.get(matName);
-                        if (nodes != null) {
-                            nodes.removeIf(ref -> ref.get() == this);
-                        }
-                    }
-                }
             }
 
             // Clean up node

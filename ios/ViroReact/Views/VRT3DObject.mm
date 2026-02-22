@@ -214,8 +214,9 @@
             [strongSelf setMorphTargets:strongSelf->_morphTargets];
 
             if (strongSelf.materials) {
-                // Apply materials recursively to all child geometries in the loaded model
-                [strongSelf applyMaterialsRecursive:YES];
+                // Apply materials to root node only (non-recursive), matching Android behaviour.
+                // Recursive application strips embedded textures from every sub-mesh of the model.
+                [strongSelf applyMaterialsRecursive:NO];
             }
 
             // Apply shader overrides if specified (preserves textures)

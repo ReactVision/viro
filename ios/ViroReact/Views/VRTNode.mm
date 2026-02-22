@@ -91,9 +91,12 @@ const double kTransformDelegateDistanceFilter = 0.01;
     // Store original embedded materials from GLB before any shader overrides
     // This allows us to always start from the true baseline when switching shaders
     std::vector<std::shared_ptr<VROMaterial>> _originalEmbeddedMaterials;
-    // Store original materials for child nodes (to preserve skinning modifiers, etc.)
+    // Store original materials for child nodes (used by applyShaderOverridesRecursive:)
     // Maps node pointer to its original materials vector
     std::unordered_map<VRONode*, std::vector<std::shared_ptr<VROMaterial>>> _childNodeOriginalMaterials;
+    // Store original embedded materials for child nodes used by applyMaterialsRecursive:
+    // Kept separate from _childNodeOriginalMaterials to avoid interference with shader overrides
+    std::unordered_map<VRONode*, std::vector<std::shared_ptr<VROMaterial>>> _childNodeMaterialMergeOriginals;
 }
 // Track shader override materials and their clones for uniform updates
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *shaderOverrideMap;
@@ -684,46 +687,61 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
     [self updateVideoTextures];
 
-    // Recursively apply materials to all child nodes if requested
-    if (recursive) {
+    // Recursively merge material rendering properties onto child node embedded materials.
+    // This preserves embedded textures and skinning modifiers while applying user-specified
+    // rendering settings (lighting model, bloom, blend mode, etc.) from the first override material.
+    if (recursive && self.materials && self.materials.count > 0) {
         VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
-        std::vector<std::shared_ptr<VROMaterial>> tempMaterials;
+        NSString *firstMaterialName = self.materials[0];
+        std::shared_ptr<VROMaterial> overrideMaterial = [materialManager getMaterialByName:firstMaterialName];
 
-        if (self.materials) {
-            // Build materials list from material names - always copy
-            for (int i = 0; i < self.materials.count; i++) {
-                NSString *materialName = [self.materials objectAtIndex:i];
-                std::shared_ptr<VROMaterial> sourceMaterial = [materialManager getMaterialByName:materialName];
-                if (sourceMaterial) {
-                    // Always copy to prevent state persistence
-                    tempMaterials.push_back(std::make_shared<VROMaterial>(sourceMaterial));
-                }
-            }
-        } else {
-            // No materials - use default empty material for cleanup
-            tempMaterials.push_back(std::make_shared<VROMaterial>());
-        }
+        if (overrideMaterial) {
+            std::function<void(std::shared_ptr<VRONode>)> applyToChildren = [&](std::shared_ptr<VRONode> node) {
+                for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
+                    std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
+                    if (childGeometry) {
+                        VRONode *childPtr = child.get();
+                        std::vector<std::shared_ptr<VROMaterial>> childOriginalMaterials;
 
-        // Apply to all child nodes recursively
-        std::function<void(std::shared_ptr<VRONode>)> applyToChildren = [&](std::shared_ptr<VRONode> node) {
-            for (std::shared_ptr<VRONode> child : node->getChildNodes()) {
-                std::shared_ptr<VROGeometry> childGeometry = child->getGeometry();
-                if (childGeometry) {
-                    // Always create fresh copies for each child geometry
-                    std::vector<std::shared_ptr<VROMaterial>> childMaterials;
-                    for (const auto &mat : tempMaterials) {
-                        childMaterials.push_back(std::make_shared<VROMaterial>(mat));
+                        // Save original embedded materials on first call; use stored ones thereafter
+                        if (_childNodeMaterialMergeOriginals.find(childPtr) == _childNodeMaterialMergeOriginals.end()) {
+                            childOriginalMaterials = childGeometry->getMaterials();
+                            if (!childOriginalMaterials.empty()) {
+                                _childNodeMaterialMergeOriginals[childPtr] = childOriginalMaterials;
+                            }
+                        } else {
+                            childOriginalMaterials = _childNodeMaterialMergeOriginals[childPtr];
+                        }
+
+                        if (!childOriginalMaterials.empty()) {
+                            std::vector<std::shared_ptr<VROMaterial>> mergedChildMaterials;
+                            for (const auto &originalMat : childOriginalMaterials) {
+                                // Copy embedded material — preserves textures and skinning modifiers
+                                std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
+
+                                // Apply rendering properties from the user override only (NOT colors/textures)
+                                mergedMat->setLightingModel(overrideMaterial->getLightingModel());
+                                mergedMat->setBloomThreshold(overrideMaterial->getBloomThreshold());
+                                mergedMat->setShininess(overrideMaterial->getShininess());
+                                mergedMat->setBlendMode(overrideMaterial->getBlendMode());
+                                mergedMat->setTransparencyMode(overrideMaterial->getTransparencyMode());
+                                mergedMat->setCullMode(overrideMaterial->getCullMode());
+                                mergedMat->setWritesToDepthBuffer(overrideMaterial->getWritesToDepthBuffer());
+                                mergedMat->setReadsFromDepthBuffer(overrideMaterial->getReadsFromDepthBuffer());
+
+                                mergedChildMaterials.push_back(mergedMat);
+                            }
+                            childGeometry->setMaterials(mergedChildMaterials);
+                            childGeometry->updateSubstrate();
+                        }
                     }
-                    childGeometry->setMaterials(childMaterials);
-                    // Force geometry substrate to reset
-                    childGeometry->updateSubstrate();
+                    // Recurse to grandchildren
+                    applyToChildren(child);
                 }
-                // Recurse to grandchildren
-                applyToChildren(child);
-            }
-        };
+            };
 
-        applyToChildren(self.node);
+            applyToChildren(self.node);
+        }
     }
 }
 

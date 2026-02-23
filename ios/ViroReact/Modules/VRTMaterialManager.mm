@@ -405,6 +405,9 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                     
                     // Handle both string and dictionary formats
                     NSString *modifierCode;
+                    NSArray *varyingsArray = nil;
+                    BOOL requiresSceneDepth = NO;
+                    BOOL requiresCameraTexture = NO;
                     if ([modifierValue isKindOfClass:[NSString class]]) {
                         modifierCode = (NSString *)modifierValue;
                     } else if ([modifierValue isKindOfClass:[NSDictionary class]]) {
@@ -416,24 +419,57 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                         } else {
                             modifierCode = body;
                         }
-                        
+
                         if (!modifierCode) {
                             RCTLogError(@"Shader modifier dictionary must contain 'body' or 'uniforms' key");
                             continue;
+                        }
+
+                        // Extract varyings if present
+                        if (modifierDict[@"varyings"] && [modifierDict[@"varyings"] isKindOfClass:[NSArray class]]) {
+                            varyingsArray = (NSArray *)modifierDict[@"varyings"];
+                        }
+
+                        // Extract requiresSceneDepth flag
+                        if (modifierDict[@"requiresSceneDepth"]) {
+                            requiresSceneDepth = [modifierDict[@"requiresSceneDepth"] boolValue];
+                        }
+                        // Extract requiresCameraTexture flag
+                        if (modifierDict[@"requiresCameraTexture"]) {
+                            requiresCameraTexture = [modifierDict[@"requiresCameraTexture"] boolValue];
                         }
                     } else {
                         RCTLogError(@"Shader modifier must be string or dictionary with 'body' key");
                         continue;
                     }
-                    
+
                     VROShaderEntryPoint entryPoint = [self convertEntryPoint:entryPointName];
                     NSArray *lines = [modifierCode componentsSeparatedByString:@"\n"];
                     std::vector<std::string> linesVec;
                     for (NSString *line in lines) {
                         linesVec.push_back(std::string([line UTF8String]));
                     }
-                    
+
                     auto modifier = std::make_shared<VROShaderModifier>(entryPoint, linesVec);
+
+                    // Set varyings if present
+                    if (varyingsArray && varyingsArray.count > 0) {
+                        std::vector<std::string> varyings;
+                        for (NSString *varying in varyingsArray) {
+                            varyings.push_back(std::string([varying UTF8String]));
+                        }
+                        modifier->setVaryings(varyings);
+                    }
+
+                    // Set requiresSceneDepth if flagged
+                    if (requiresSceneDepth) {
+                        modifier->setRequiresSceneDepth(true);
+                    }
+                    // Set requiresCameraTexture if flagged
+                    if (requiresCameraTexture) {
+                        modifier->setRequiresCameraTexture(true);
+                    }
+
                     vroMaterial->addShaderModifier(modifier);
                 }
             } else if ([@"materialUniforms" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame ||
@@ -479,6 +515,11 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
         }
     } else if ([type isEqualToString:@"mat4"]) {
         // TODO: parse matrix
+    } else if ([type isEqualToString:@"sampler2D"]) {
+        std::shared_ptr<VROTexture> texture = [self createTexture2D:value sRGB:YES];
+        if (texture) {
+            vroMaterial->setShaderUniform(std::string([name UTF8String]), texture);
+        }
     }
 }
 

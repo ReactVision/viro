@@ -225,6 +225,63 @@ public:
     std::string getName() const {
         return _name;
     }
+
+    /*
+     Priority controls the injection order when multiple modifiers share the same entry
+     point. Lower values run first. Modifiers with equal priority preserve their
+     insertion order (stable sort). Suggested conventions:
+       -100  Engine internals (AR shadow, occlusion, etc.)
+          0  Default / user modifiers
+        100  Debug / overlay modifiers
+     */
+    void setPriority(int priority) {
+        _priority = priority;
+    }
+    int getPriority() const {
+        return _priority;
+    }
+
+    /*
+     When true, the modifier's GLSL code may declare and sample 'uniform sampler2D scene_depth_texture'.
+     The engine automatically binds the previous frame's scene depth to that sampler.
+     Only available when HDR rendering is enabled; the sampler returns null (skipped) otherwise.
+     This flag is informational metadata — the binding is driven by the sampler name alone.
+     */
+    void setRequiresSceneDepth(bool value) {
+        _requiresSceneDepth = value;
+    }
+    bool requiresSceneDepth() const {
+        return _requiresSceneDepth;
+    }
+
+    /*
+     When true, the modifier's GLSL code may declare and sample 'uniform sampler2D camera_texture'.
+     The engine automatically binds the live AR camera background texture to that sampler.
+     On Android (ARCore) the texture is GL_TEXTURE_EXTERNAL_OES; the engine injects the required
+     #extension and replaces 'sampler2D camera_texture' with 'samplerExternalOES camera_texture'
+     automatically, so user code can always declare 'uniform sampler2D camera_texture'.
+     A 'uniform mat4 camera_image_transform' is also auto-bound, providing the UV mapping
+     from viewport coordinates to camera image coordinates.
+     */
+    void setRequiresCameraTexture(bool value) {
+        _requiresCameraTexture = value;
+    }
+    bool requiresCameraTexture() const {
+        return _requiresCameraTexture;
+    }
+
+    /*
+     Varyings declare typed variables that are written in the vertex stage (Geometry or Vertex
+     entry point) and read in the fragment stage (Surface, LightingModel, or Fragment entry
+     point). Each string should be a GLSL type + name pair, e.g. "highp float displacement".
+     The "out" / "in" qualifiers are added automatically by VROShaderProgram.
+     */
+    void setVaryings(std::vector<std::string> varyings) {
+        _varyings = std::move(varyings);
+    }
+    const std::vector<std::string> &getVaryings() const {
+        return _varyings;
+    }
     
     /*
      Vertex attributes required by the modifier must be set. This is a bitmask of
@@ -292,6 +349,15 @@ private:
     
     int _shaderModifierId;
     std::string _name;
+    int _priority = 0;
+    bool _requiresSceneDepth = false;
+    bool _requiresCameraTexture = false;
+
+    /*
+     Typed varying declarations shared between vertex and fragment stages.
+     Each string is a GLSL type+name pair, e.g. "highp float displacement".
+     */
+    std::vector<std::string> _varyings;
     
     /*
      VROShaderMask indicating any additional vertex attributes this modifier requires. See

@@ -145,6 +145,10 @@ public:
         return _samplers;
     }
 
+    const std::vector<std::string> &getModifierSamplers() const {
+        return _modifierSamplers;
+    }
+
     const std::string &getName() const {
         return _shaderName;
     }
@@ -269,6 +273,13 @@ private:
      List of the names of all samplers used by this shader.
      */
     std::vector<std::string> _samplers;
+
+    /*
+     List of sampler names declared inside shader modifiers (via "uniform sampler2D ..." in
+     modifier code). These are assigned texture units sequentially after _samplers, and the
+     corresponding textures are supplied via VROMaterial::getShaderUniformTextures().
+     */
+    std::vector<std::string> _modifierSamplers;
     
     /*
      The modifiers used on this shader.

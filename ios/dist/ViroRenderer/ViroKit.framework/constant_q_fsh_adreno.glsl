@@ -14,6 +14,7 @@ uniform samplerCube diffuse_texture;
 in lowp mat3 v_tbn;
 in highp vec2 v_texcoord;
 in highp vec3 v_surface_position;
+#pragma varying_in_declarations
 
 layout (location = 0) out highp vec4 frag_color;
 

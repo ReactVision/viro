@@ -208,6 +208,27 @@ public:
         return _depthTexture;
     }
 
+    void setSceneDepthTexture(std::shared_ptr<VROTexture> texture) {
+        _sceneDepthTexture = texture;
+    }
+    std::shared_ptr<VROTexture> getSceneDepthTexture() const {
+        return _sceneDepthTexture;
+    }
+
+    void setCameraBackgroundTexture(std::shared_ptr<VROTexture> texture) {
+        _cameraBackgroundTexture = texture;
+    }
+    std::shared_ptr<VROTexture> getCameraBackgroundTexture() const {
+        return _cameraBackgroundTexture;
+    }
+
+    void setCameraImageTransform(VROMatrix4f transform) {
+        _cameraImageTransform = transform;
+    }
+    VROMatrix4f getCameraImageTransform() const {
+        return _cameraImageTransform;
+    }
+
     void setDepthTextureTransform(VROMatrix4f transform) {
         _depthTextureTransform = transform;
     }
@@ -316,6 +337,25 @@ private:
      Depth texture from AR framework for occlusion.
      */
     std::shared_ptr<VROTexture> _depthTexture;
+
+    /*
+     Scene depth texture captured from the previous frame's base render pass.
+     Null for the first frame or when HDR rendering is disabled.
+     Sampled as raw depth values (no PCF compare mode).
+     */
+    std::shared_ptr<VROTexture> _sceneDepthTexture;
+
+    /*
+     Live AR camera background texture. On Android this is GL_TEXTURE_EXTERNAL_OES;
+     on iOS it is a standard GL_TEXTURE_2D. Null when no AR session is active.
+     */
+    std::shared_ptr<VROTexture> _cameraBackgroundTexture;
+
+    /*
+     Transform mapping viewport UV coordinates to camera image UV coordinates.
+     This accounts for device orientation and camera crop/zoom.
+     */
+    VROMatrix4f _cameraImageTransform;
 
     /*
      Transform to convert from screen UV to depth texture UV.

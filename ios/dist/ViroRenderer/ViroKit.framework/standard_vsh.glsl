@@ -54,6 +54,7 @@ out mat3 v_tbn;
 out vec2 v_texcoord;
 out vec3 v_surface_position;
 flat out int v_instance_id;
+#pragma varying_out_declarations
 
 void main() {
 #inject vertex_assignments

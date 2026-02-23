@@ -206,6 +206,26 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                 material.setShaderUniform(uniformName, matrix);
                 uniformValue = matrix;
             }
+        } else if ("sampler2D".equalsIgnoreCase(uniformType)) {
+            String path = null;
+            ReadableType valueType = value.getType();
+            if (valueType == ReadableType.String) {
+                path = value.asString();
+            } else if (valueType == ReadableType.Map) {
+                ReadableMap sourceMap = value.asMap();
+                if (sourceMap.hasKey("source") && sourceMap.getType("source") == ReadableType.Map) {
+                    path = sourceMap.getMap("source").getString("uri");
+                } else if (sourceMap.hasKey("uri")) {
+                    path = sourceMap.getString("uri");
+                }
+            }
+            if (path != null) {
+                Texture texture = loadTextureFromPath(path);
+                if (texture != null) {
+                    material.setShaderUniform(uniformName, texture);
+                    uniformValue = path;
+                }
+            }
         }
 
         // Propagate uniform updates to:
@@ -470,6 +490,9 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             Log.d("VRTMaterialManager", "Processing entry point: " + entryPointName + ", type: " + type);
 
             String modifierCode = null;
+            String[] varyings = null;
+            boolean requiresSceneDepth = false;
+            boolean requiresCameraTexture = false;
 
             // Handle both string and dictionary formats
             if (type == ReadableType.String) {
@@ -491,6 +514,24 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                     continue;
                 }
                 Log.d("VRTMaterialManager", "Map format, code length: " + modifierCode.length());
+
+                // Extract varyings if present
+                if (modifierDict.hasKey("varyings") && modifierDict.getType("varyings") == ReadableType.Array) {
+                    ReadableArray varyingsArr = modifierDict.getArray("varyings");
+                    varyings = new String[varyingsArr.size()];
+                    for (int i = 0; i < varyingsArr.size(); i++) {
+                        varyings[i] = varyingsArr.getString(i);
+                    }
+                }
+
+                // Extract requiresSceneDepth flag
+                if (modifierDict.hasKey("requiresSceneDepth")) {
+                    requiresSceneDepth = modifierDict.getBoolean("requiresSceneDepth");
+                }
+                // Extract requiresCameraTexture flag
+                if (modifierDict.hasKey("requiresCameraTexture")) {
+                    requiresCameraTexture = modifierDict.getBoolean("requiresCameraTexture");
+                }
             } else {
                 Log.e("VRTMaterialManager", "Shader modifier must be string or dictionary with 'body' key");
                 continue;
@@ -498,7 +539,7 @@ public class MaterialManager extends ReactContextBaseJavaModule {
 
             if (modifierCode != null && modifierCode.length() > 0) {
                 Log.d("VRTMaterialManager", "Calling material.addShaderModifier for entry point: " + entryPointName);
-                material.addShaderModifier(entryPointName, modifierCode);
+                material.addShaderModifier(entryPointName, modifierCode, varyings, requiresSceneDepth, requiresCameraTexture);
                 Log.d("VRTMaterialManager", "Successfully added shader modifier");
             }
         }
@@ -596,7 +637,28 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                 material.setShaderUniform(name, matrix);
                 Log.d("VRTMaterialManager", "Set mat4 uniform: " + name);
             }
+        } else if ("sampler2D".equalsIgnoreCase(type)) {
+            String path = parseImagePath(uniformData, "value");
+            if (path != null) {
+                Texture texture = loadTextureFromPath(path);
+                if (texture != null) {
+                    material.setShaderUniform(name, texture);
+                    Log.d("VRTMaterialManager", "Set sampler2D uniform: " + name);
+                }
+            }
         }
+    }
+
+    private Texture loadTextureFromPath(String path) {
+        Uri uri = Helper.parseUri(path, mContext);
+        ImageDownloader downloader = new ImageDownloader(mContext);
+        Bitmap imageBitmap = downloader.getImageSync(uri);
+        if (imageBitmap == null) {
+            Log.w("VRTMaterialManager", "loadTextureFromPath: failed to load image at: " + path);
+            return null;
+        }
+        Image nativeImage = new Image(imageBitmap, Texture.Format.RGBA8);
+        return new Texture(nativeImage, true, false);
     }
 
     private Texture parseTexture(Image image, boolean sRGB, boolean mipmap,

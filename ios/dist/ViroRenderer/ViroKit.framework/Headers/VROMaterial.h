@@ -392,7 +392,9 @@ public:
     }
     void setShaderUniform(std::string name, std::shared_ptr<VROTexture> texture) {
         _shaderUniformTextures[name] = texture;
-        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
+        // Call updateSubstrateTextures() (not updateSubstrate()) to re-bind textures without
+        // destroying and recreating the shader binding.
+        updateSubstrateTextures();
     }
 
     const std::map<std::string, float> &getShaderUniformFloats() const { return _shaderUniformFloats; }

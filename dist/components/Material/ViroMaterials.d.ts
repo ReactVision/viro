@@ -30,6 +30,20 @@ export type ViroResolvedCubeMap = {
 export type ViroShaderModifier = {
     body?: string;
     uniforms?: string;
+    /** Typed varying declarations shared between vertex and fragment stages.
+     *  Each string is a GLSL type+name pair, e.g. "highp float displacement".
+     *  The 'out' / 'in' qualifiers are added automatically. */
+    varyings?: string[];
+    /** When true the modifier may declare and sample
+     *  'uniform sampler2D scene_depth_texture'.
+     *  The engine auto-binds the previous frame's scene depth buffer (HDR mode only).
+     *  The sampler is bound by name — this flag is informational metadata. */
+    requiresSceneDepth?: boolean;
+    /** When true the modifier may declare and sample 'uniform sampler2D camera_texture'.
+     *  The engine auto-binds the live AR camera background texture.
+     *  On Android (ARCore) the OES extension and samplerExternalOES are injected automatically.
+     *  A 'uniform mat4 camera_image_transform' is also auto-bound for UV mapping. */
+    requiresCameraTexture?: boolean;
 };
 export type ViroShaderModifiers = {
     geometry?: string | ViroShaderModifier;
@@ -85,7 +99,7 @@ export declare class ViroMaterials {
      *
      * @param materialName - The name of the material to update
      * @param uniformName - The name of the uniform variable (e.g., "time")
-     * @param uniformType - The type of the uniform ("float", "vec2", "vec3", "vec4", "mat4")
+     * @param uniformType - The type of the uniform ("float", "vec2", "vec3", "vec4", "mat4", "sampler2D")
      * @param value - The new value (number for float, array for vectors/matrices)
      *
      * @example
@@ -96,5 +110,5 @@ export declare class ViroMaterials {
      * // Update color uniform
      * ViroMaterials.updateShaderUniform("myMaterial", "glowColor", "vec3", [1.0, 0.5, 0.0]);
      */
-    static updateShaderUniform(materialName: string, uniformName: string, uniformType: "float" | "vec2" | "vec3" | "vec4" | "mat4", value: number | number[]): void;
+    static updateShaderUniform(materialName: string, uniformName: string, uniformType: "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D", value: number | number[] | any): void;
 }

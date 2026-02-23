@@ -256,6 +256,14 @@ public:
     void setOcclusionMode(VROOcclusionMode mode);
     void setDepthTexture(std::shared_ptr<VROTexture> depthTexture);
     void setDepthTextureTransform(VROMatrix4f transform);
+
+    /*
+     Set the live AR camera background texture and its viewport-to-image UV transform.
+     These are auto-bound to shader modifier samplers named 'camera_texture' and the
+     uniform 'camera_image_transform', respectively.
+     */
+    void setCameraBackgroundTexture(std::shared_ptr<VROTexture> texture);
+    void setCameraImageTransform(VROMatrix4f transform);
     
 #pragma mark - Camera
    

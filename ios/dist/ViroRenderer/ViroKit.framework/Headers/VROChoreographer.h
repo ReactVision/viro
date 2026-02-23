@@ -261,6 +261,20 @@ private:
      Floating point target for initially rendering the scene.
      */
     std::shared_ptr<VRORenderTarget> _hdrTarget;
+
+    /*
+     Depth-only render target (DepthTextureRaw) used to capture the scene depth
+     after the base render pass. The depth is blitted from _hdrTarget each frame
+     and stored on VRORenderContext as the scene depth for the *next* frame.
+     Only created when HDR rendering is enabled and MRT is supported.
+     */
+    std::shared_ptr<VRORenderTarget> _sceneDepthTarget;
+
+    /*
+     The scene depth texture captured from the last completed frame. Set on
+     VRORenderContext at the start of each frame so shaders can sample it.
+     */
+    std::shared_ptr<VROTexture> _lastSceneDepthTexture;
     
     /*
      Tone mapping render pass to render the floating point scene in RGB.

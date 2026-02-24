@@ -21,6 +21,16 @@
 
 package com.viromedia.bridge.component;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -382,6 +392,19 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mRvProjectId = null;
     private static final String TAG = "ViroAR";
 
+    // ReactVision GPS pose support
+    private LocationManager mLocationManager = null;
+    private LocationListener mLocationListener = null;
+    private SensorManager mSensorManager = null;
+    private SensorEventListener mSensorListener = null;
+    private double mLastHeading = 0.0;
+    private double mLastHeadingAccuracy = 0.0;
+    private double mLastLat = 0.0;
+    private double mLastLng = 0.0;
+    private double mLastAlt = 0.0;
+    private double mLastHorizAcc = 0.0;
+    private double mLastVertAcc = 0.0;
+
     public void setCloudAnchorProvider(String provider) {
         mCloudAnchorProvider = provider != null ? provider.toLowerCase() : "none";
 
@@ -547,6 +570,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
         if ("arcore".equals(mGeospatialAnchorProvider)) {
             Log.i(TAG, "ARCore Geospatial provider enabled");
+            stopRVLocationUpdates();
 
             // Check if API key is configured in AndroidManifest
             try {
@@ -596,8 +620,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             } catch (Exception e) {
                 Log.w(TAG, "Could not check for ReactVision credentials: " + e.getMessage());
             }
+            // Start GPS + compass updates for getCameraGeospatialPose()
+            startRVLocationUpdates();
         } else {
             Log.i(TAG, "Geospatial provider disabled");
+            stopRVLocationUpdates();
         }
     }
 
@@ -631,6 +658,100 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         Log.i(TAG, "Geospatial mode applied: " + (mGeospatialModeEnabled ? "enabled" : "disabled"));
     }
 
+    private void startRVLocationUpdates() {
+        if (mLocationManager != null) return; // already started
+        try {
+            android.content.Context ctx = getContext();
+            mLocationManager = (LocationManager) ctx.getSystemService(android.content.Context.LOCATION_SERVICE);
+            if (mLocationManager == null) return;
+
+            mLocationListener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    mLastLat      = location.getLatitude();
+                    mLastLng      = location.getLongitude();
+                    mLastAlt      = location.getAltitude();
+                    mLastHorizAcc = location.getAccuracy();
+                    mLastVertAcc  = location.hasVerticalAccuracy()
+                                    ? location.getVerticalAccuracyMeters() : mLastHorizAcc;
+                    pushLocationToNative();
+                }
+                @Override public void onStatusChanged(String p, int s, Bundle e) {}
+                @Override public void onProviderEnabled(String p) {}
+                @Override public void onProviderDisabled(String p) {}
+            };
+
+            boolean hasFine = ctx.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                              == PackageManager.PERMISSION_GRANTED;
+            boolean hasCoarse = ctx.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                == PackageManager.PERMISSION_GRANTED;
+            if (hasFine) {
+                mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                        1000L, 0f, mLocationListener, Looper.getMainLooper());
+            } else if (hasCoarse) {
+                mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,
+                        1000L, 0f, mLocationListener, Looper.getMainLooper());
+            } else {
+                Log.w(TAG, "No location permission — ReactVision GPS pose unavailable");
+                mLocationManager = null;
+                mLocationListener = null;
+                return;
+            }
+
+            // Heading from rotation vector sensor (fuses gyro + compass)
+            mSensorManager = (SensorManager) ctx.getSystemService(android.content.Context.SENSOR_SERVICE);
+            if (mSensorManager != null) {
+                Sensor rotSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+                if (rotSensor != null) {
+                    mSensorListener = new SensorEventListener() {
+                        private final float[] rotMatrix = new float[9];
+                        private final float[] orientation = new float[3];
+                        @Override
+                        public void onSensorChanged(SensorEvent event) {
+                            SensorManager.getRotationMatrixFromVector(rotMatrix, event.values);
+                            SensorManager.getOrientation(rotMatrix, orientation);
+                            double azimuthRad = orientation[0]; // radians, North=0, clockwise
+                            double heading = Math.toDegrees(azimuthRad);
+                            if (heading < 0) heading += 360.0;
+                            mLastHeading = heading;
+                            // Accuracy from sensor accuracy level (approximate degrees)
+                            mLastHeadingAccuracy = event.accuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH ? 5.0
+                                    : event.accuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM ? 15.0 : 45.0;
+                            pushLocationToNative();
+                        }
+                        @Override public void onAccuracyChanged(Sensor s, int a) {}
+                    };
+                    mSensorManager.registerListener(mSensorListener, rotSensor,
+                            SensorManager.SENSOR_DELAY_UI, new Handler(Looper.getMainLooper()));
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to start location updates: " + e.getMessage());
+        }
+    }
+
+    private void stopRVLocationUpdates() {
+        if (mLocationManager != null && mLocationListener != null) {
+            try { mLocationManager.removeUpdates(mLocationListener); } catch (Exception ignored) {}
+        }
+        if (mSensorManager != null && mSensorListener != null) {
+            mSensorManager.unregisterListener(mSensorListener);
+        }
+        mLocationManager = null;
+        mLocationListener = null;
+        mSensorManager = null;
+        mSensorListener = null;
+    }
+
+    private void pushLocationToNative() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene != null) {
+            arScene.setLastKnownLocation(mLastLat, mLastLng, mLastAlt,
+                                         mLastHorizAcc, mLastVertAcc,
+                                         mLastHeading, mLastHeadingAccuracy);
+        }
+    }
+
     public String getEarthTrackingState() {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
@@ -649,8 +770,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     public void getCameraGeospatialPose(ARSceneNavigatorModule.GeospatialPoseCallback callback) {
-        if (!"arcore".equals(mGeospatialAnchorProvider)) {
-            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider='arcore' to enable.");
+        if ("none".equals(mGeospatialAnchorProvider)) {
+            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider to enable.");
             return;
         }
 

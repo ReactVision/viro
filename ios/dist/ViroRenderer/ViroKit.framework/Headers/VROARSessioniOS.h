@@ -213,6 +213,18 @@ private:
     std::shared_ptr<ReactVisionCCA::RVCCAGeospatialProvider> _geospatialProviderRV;
     std::string _rvGeoProjectId;
 
+    /*
+     CLLocationManager delegate for ReactVision geospatial — provides GPS pose
+     when ARCore VPS is not in use.
+     */
+    id _rvLocationDelegate;
+
+    /*
+     Last GPS pose received from Core Location (ReactVision provider path).
+     Updated on the main thread; read from any thread via getCameraGeospatialPose().
+     */
+    mutable VROGeospatialPose _lastKnownGPSPose;
+
     bool _needsGeospatialModeApply = false;
 
     /*

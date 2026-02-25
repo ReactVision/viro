@@ -547,6 +547,24 @@
     return projectedPoint;
 }
 
+#pragma mark - Cloud Anchor Helpers
+
+/**
+ * Improvement 2: split "message|StateString" encoded by the C++ layer
+ * (encodeError in VROCloudAnchorProviderReactVision.mm) into separate components.
+ * Falls back to [raw, "ErrorInternal"] when the separator is absent (ARCore path).
+ */
+static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, NSString * __autoreleasing *outState) {
+    NSRange sep = [raw rangeOfString:@"|" options:NSBackwardsSearch];
+    if (sep.location != NSNotFound) {
+        *outMsg   = [raw substringToIndex:sep.location];
+        *outState = [raw substringFromIndex:sep.location + 1];
+    } else {
+        *outMsg   = raw;
+        *outState = @"ErrorInternal";
+    }
+}
+
 #pragma mark - Cloud Anchor Methods
 
 - (void)setCloudAnchorProvider:(NSString *)cloudAnchorProvider {
@@ -647,10 +665,12 @@
             }
         },
         [completionHandler](std::string error) {
-            // Failure callback
+            // Failure callback — Improvement 2: parse encoded "|StateString"
             if (completionHandler) {
-                NSString *errorStr = [NSString stringWithUTF8String:error.c_str()];
-                completionHandler(NO, nil, errorStr, @"ErrorInternal");
+                NSString *raw = [NSString stringWithUTF8String:error.c_str()];
+                NSString *msg, *state;
+                splitErrorState(raw, &msg, &state);
+                completionHandler(NO, nil, msg, state);
             }
         }
     );
@@ -698,10 +718,12 @@
             }
         },
         [completionHandler](std::string error) {
-            // Failure callback
+            // Failure callback — Improvement 2: parse encoded "|StateString"
             if (completionHandler) {
-                NSString *errorStr = [NSString stringWithUTF8String:error.c_str()];
-                completionHandler(NO, nil, errorStr, @"ErrorInternal");
+                NSString *raw = [NSString stringWithUTF8String:error.c_str()];
+                NSString *msg, *state;
+                splitErrorState(raw, &msg, &state);
+                completionHandler(NO, nil, msg, state);
             }
         }
     );

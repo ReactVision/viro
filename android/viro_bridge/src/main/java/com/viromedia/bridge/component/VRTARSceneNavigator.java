@@ -390,6 +390,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mCloudAnchorProvider = "none";
     private String mRvApiKey = null;
     private String mRvProjectId = null;
+    // Improvement 5: track whether credentials have been pushed to the native session
+    // so setReactVisionConfig() is called exactly once per provider activation.
+    private boolean mRvConfigApplied = false;
     private static final String TAG = "ViroAR";
 
     // ReactVision GPS pose support
@@ -406,6 +409,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private double mLastVertAcc = 0.0;
 
     public void setCloudAnchorProvider(String provider) {
+        // Improvement 5: reset so credentials are re-applied on next host/resolve
+        mRvConfigApplied = false;
         mCloudAnchorProvider = provider != null ? provider.toLowerCase() : "none";
 
         Log.i(TAG, "Setting cloud anchor provider: " + mCloudAnchorProvider);
@@ -455,9 +460,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             // Configure the AR scene if it is already available; otherwise the credentials
             // are stored in mRvApiKey/mRvProjectId and applied lazily in host/resolve.
             ARScene arScene = getCurrentARScene();
-            if (arScene != null && mRvApiKey != null && !mRvApiKey.isEmpty()) {
-                arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
-            }
+            ensureRvConfigApplied(arScene);
         } else {
             Log.i(TAG, "Cloud Anchors disabled");
         }
@@ -481,6 +484,34 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         return null;
     }
 
+    /**
+     * Improvement 5: apply ReactVision credentials to the native AR session exactly once
+     * per provider activation. Subsequent calls to hostCloudAnchor / resolveCloudAnchor
+     * skip the JNI call because the session already has the credentials.
+     */
+    private void ensureRvConfigApplied(ARScene arScene) {
+        if (mRvConfigApplied) return;
+        if (!"reactvision".equals(mCloudAnchorProvider)) return;
+        if (arScene == null) return;
+        if (mRvApiKey == null || mRvApiKey.isEmpty()) return;
+        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+        mRvConfigApplied = true;
+    }
+
+    /**
+     * Improvement 2: split the "message|StateString" encoding produced by the C++ layer
+     * (encodeError in VROCloudAnchorProviderReactVision.cpp) into a [message, state] pair.
+     * Falls back to [raw, "ErrorInternal"] if the separator is absent (e.g. ARCore errors).
+     */
+    private static String[] splitErrorState(String raw) {
+        if (raw == null) return new String[]{"Unknown error", "ErrorInternal"};
+        int sep = raw.lastIndexOf('|');
+        if (sep >= 0) {
+            return new String[]{raw.substring(0, sep), raw.substring(sep + 1)};
+        }
+        return new String[]{raw, "ErrorInternal"};
+    }
+
     public void hostCloudAnchor(String anchorId, int ttlDays,
                                 ARSceneNavigatorModule.CloudAnchorCallback callback) {
         if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {
@@ -495,24 +526,22 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
-        // For ReactVision, ensure credentials are configured on the native session.
-        // This handles the case where setCloudAnchorProvider was called before GL was ready.
-        if ("reactvision".equals(mCloudAnchorProvider) && mRvApiKey != null && !mRvApiKey.isEmpty()) {
-            arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
-        }
+        // Improvement 5: apply credentials once per provider activation
+        ensureRvConfigApplied(arScene);
 
         // Host the anchor via the configured cloud anchor provider
         // The native layer handles anchor lookup by ID
         arScene.hostCloudAnchorById(anchorId, ttlDays, new ARScene.CloudAnchorHostListener() {
             @Override
             public void onSuccess(ARAnchor cloudAnchor, ARNode arNode) {
-                // Get the cloud anchor ID from the returned anchor
                 callback.onSuccess(cloudAnchor.getCloudAnchorId());
             }
 
             @Override
             public void onFailure(String error) {
-                callback.onFailure(error, "ErrorInternal");
+                // Improvement 2: split "message|StateString" encoded by C++ layer
+                String[] parts = splitErrorState(error);
+                callback.onFailure(parts[0], parts[1]);
             }
         });
     }
@@ -531,23 +560,22 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
-        // For ReactVision, ensure credentials are configured on the native session.
-        if ("reactvision".equals(mCloudAnchorProvider) && mRvApiKey != null && !mRvApiKey.isEmpty()) {
-            arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
-        }
+        // Improvement 5: apply credentials once per provider activation
+        ensureRvConfigApplied(arScene);
 
         // Resolve the cloud anchor via the configured provider
         arScene.resolveCloudAnchor(cloudAnchorId, new ARScene.CloudAnchorResolveListener() {
             @Override
             public void onSuccess(ARAnchor anchor, ARNode arNode) {
-                // Convert anchor to WritableMap using ARUtils
                 WritableMap anchorData = ARUtils.mapFromARAnchor(anchor);
                 callback.onSuccess(anchorData);
             }
 
             @Override
             public void onFailure(String error) {
-                callback.onFailure(error, "ErrorInternal");
+                // Improvement 2: split "message|StateString" encoded by C++ layer
+                String[] parts = splitErrorState(error);
+                callback.onFailure(parts[0], parts[1]);
             }
         });
     }

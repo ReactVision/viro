@@ -543,7 +543,15 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.hostCloudAnchorById(anchorId, ttlDays, new ARScene.CloudAnchorHostListener() {
             @Override
             public void onSuccess(ARAnchor cloudAnchor, ARNode arNode) {
-                callback.onSuccess(cloudAnchor.getCloudAnchorId());
+                // RVCA sets anchor.setId(cloudId) alongside setCloudAnchorId(cloudId).
+                // On Android, getCloudAnchorId() can be null due to VROARAnchorARCore
+                // field shadowing; fall back to getAnchorId() which is set to cloudId
+                // via the non-shadowed VROARAnchor::_id field.
+                String cloudId = cloudAnchor.getCloudAnchorId();
+                if (cloudId == null || cloudId.isEmpty()) {
+                    cloudId = cloudAnchor.getAnchorId();
+                }
+                callback.onSuccess(cloudId);
             }
 
             @Override

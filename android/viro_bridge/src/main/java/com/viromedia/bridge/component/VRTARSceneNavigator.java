@@ -437,6 +437,15 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             }
         } else if ("reactvision".equals(mCloudAnchorProvider)) {
             Log.i(TAG, "ReactVision Cloud Anchors provider enabled");
+            // libreactvisioncca.so is a dynamic dependency of libviro_renderer.so and is
+            // loaded transitively by the linker, but Android only calls JNI_OnLoad for
+            // libraries explicitly loaded via System.loadLibrary. Without this call g_jvm
+            // stays null and all JNI network calls fail with "JNI unavailable".
+            try {
+                System.loadLibrary("reactvisioncca");
+            } catch (UnsatisfiedLinkError e) {
+                Log.w(TAG, "Could not load libreactvisioncca.so: " + e.getMessage());
+            }
 
             // Read ReactVision credentials from AndroidManifest meta-data
             try {

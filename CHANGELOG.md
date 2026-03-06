@@ -279,6 +279,16 @@
 
 ### Fixed
 
+- **GLB/3D models — washed-out / overexposed colours** (`virocore/ViroRenderer/VROMaterialShaderBinding.cpp`, `standard_fsh.glsl`)
+
+  Models loaded from GLB files (and some OBJ/FBX assets) appeared overexposed or had their
+  colours washed out.  Root cause: `material_emissive_color` was being added to the fragment
+  shader output for every material, including those with no intentional emission.  GLB materials
+  often carry a non-zero emission value in their PBR data; added on top of the diffuse+specular
+  result it pushed the final colour toward white.  Removed the `material_emissive_color` and
+  `material_alpha_cutoff` uniforms from the standard shader binding — these were incorrectly
+  applied to all materials instead of only emissive/masked ones.
+
 - **Android — physics body crash on scene close** (`virocore/ViroRenderer/capi/Node_JNI.cpp`)
 
   Closing a scene that contained physics-enabled nodes crashed with a null

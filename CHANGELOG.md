@@ -37,6 +37,35 @@
   use `provider` instead. The old types still compile with a deprecation warning
   to ease migration.
 
+- **Expo plugin (`withViro`) — `provider` replaces `cloudAnchorProvider` and `geospatialAnchorProvider`**
+
+  The two separate Expo plugin options are merged into a single `provider` option in
+  `app.json`.  The old options are deprecated but still accepted as overrides.
+
+  **Before:**
+  ```json
+  ["@reactvision/react-viro", {
+    "cloudAnchorProvider": "reactvision",
+    "geospatialAnchorProvider": "reactvision",
+    "rvApiKey": "...",
+    "rvProjectId": "..."
+  }]
+  ```
+
+  **After:**
+  ```json
+  ["@reactvision/react-viro", {
+    "provider": "reactvision",
+    "rvApiKey": "...",
+    "rvProjectId": "..."
+  }]
+  ```
+
+  Setting `provider: "arcore"` continues to inject ARCore pods on iOS and force dynamic
+  linkage, exactly as `cloudAnchorProvider: "arcore"` did before.
+  Setting `provider: "reactvision"` injects location permissions on both platforms
+  (previously only triggered when `geospatialAnchorProvider: "reactvision"` was explicit).
+
 - **ViroARPlaneSelector — new architecture (scene-event-driven)**
 
   The component no longer self-discovers planes through pre-allocated

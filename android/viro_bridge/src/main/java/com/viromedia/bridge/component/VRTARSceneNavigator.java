@@ -968,6 +968,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
+        ensureRvConfigApplied(arScene);
         arScene.rvGetGeospatialAnchor(anchorId, callback);
     }
 
@@ -978,6 +979,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
+        ensureRvConfigApplied(arScene);
         arScene.rvFindNearbyGeospatialAnchors(lat, lng, radius, limit, callback);
     }
 
@@ -988,6 +990,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
+        ensureRvConfigApplied(arScene);
         arScene.rvUpdateGeospatialAnchor(anchorId, sceneAssetId, sceneId, name, callback);
     }
 
@@ -997,12 +1000,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
+        ensureRvConfigApplied(arScene);
         arScene.rvDeleteGeospatialAnchor(anchorId, callback);
     }
 
     public void rvListGeospatialAnchors(int limit, int offset, ARScene.RvGeospatialCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvListGeospatialAnchors(limit, offset, callback);
     }
 
@@ -1010,12 +1015,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void rvGetCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvGetCloudAnchor(anchorId, callback);
     }
 
     public void rvListCloudAnchors(int limit, int offset, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvListCloudAnchors(limit, offset, callback);
     }
 
@@ -1023,12 +1030,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                                      boolean isPublic, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvUpdateCloudAnchor(anchorId, name, description, isPublic, callback);
     }
 
     public void rvDeleteCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvDeleteCloudAnchor(anchorId, callback);
     }
 
@@ -1036,6 +1045,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                                           ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvFindNearbyCloudAnchors(lat, lng, radius, limit, callback);
     }
 
@@ -1044,6 +1054,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                                             ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvAttachAssetToCloudAnchor(anchorId, fileUrl, fileSize, name, assetType, externalUserId, callback);
     }
 
@@ -1051,6 +1062,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                                               ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvRemoveAssetFromCloudAnchor(anchorId, assetId, callback);
     }
 
@@ -1060,6 +1072,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                                               ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
         arScene.rvTrackCloudAnchorResolution(anchorId, success, confidence, matchCount, inlierCount,
                 processingTimeMs, platform, externalUserId, callback);
     }

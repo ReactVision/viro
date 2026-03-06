@@ -129,6 +129,8 @@ import {
   ViroPinchStateTypes,
   ViroClickStateTypes,
   ViroRotateStateTypes,
+  // Provider Types
+  ViroProvider,
   // Cloud Anchor Types
   ViroCloudAnchorState,
   ViroCloudAnchorProvider,
@@ -283,6 +285,8 @@ export {
   ViroShaderUniform,
   ViroShaderModifier,
   VIRO_VERSION,
+  // Provider Types
+  ViroProvider,
   // Cloud Anchor Types
   ViroCloudAnchorState,
   ViroCloudAnchorProvider,

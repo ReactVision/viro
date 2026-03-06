@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroCloudAnchorProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialAnchorProvider, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -102,28 +102,22 @@ type Props = ViewProps & {
      */
     preferMonocularDepth?: boolean;
     /**
-     * Enable cloud anchors for cross-platform anchor sharing.
-     * When set to 'arcore', the ARCore Cloud Anchors SDK will be used.
-     * Requires a valid Google Cloud API key configured in the native project.
+     * Cloud and geospatial anchor provider.
+     * Set to `"reactvision"` (default) for the ReactVision backend,
+     * `"arcore"` for Google Cloud Anchors, or `"none"` to disable.
      *
-     * @default "none"
+     * Replaces the old `cloudAnchorProvider` / `geospatialAnchorProvider` props,
+     * which are now deprecated. Both providers are set to the same value.
+     *
+     * @default "reactvision"
      * @platform ios,android
      */
-    cloudAnchorProvider?: ViroCloudAnchorProvider;
+    provider?: ViroProvider;
     /**
      * Callback fired when a cloud anchor state changes.
      * This includes progress updates during hosting/resolving operations.
      */
     onCloudAnchorStateChange?: (event: ViroCloudAnchorStateChangeEvent) => void;
-    /**
-     * Enable the ARCore Geospatial API for location-based AR experiences.
-     * When set to 'arcore', the ARCore Geospatial SDK will be used.
-     * Requires a valid Google Cloud API key configured in the native project.
-     *
-     * @default "none"
-     * @platform ios,android
-     */
-    geospatialAnchorProvider?: ViroGeospatialAnchorProvider;
     /**
      * Enable world mesh for physics collision with real-world surfaces.
      * When enabled, virtual physics objects will collide with detected

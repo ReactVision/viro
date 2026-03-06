@@ -11,20 +11,17 @@ const LOCATION_USAGE = "Allow $(PRODUCT_NAME) to use your location for AR experi
 export type XrMode = "GVR" | "AR" | "OVR_MOBILE";
 
 /**
- * Cloud Anchors provider type.
- * - "none": Cloud Anchors disabled
- * - "arcore": Use ARCore Cloud Anchors (works on both iOS and Android)
- * - "reactvision": Use ReactVision Cloud Anchors backend (requires libreactvisioncca)
+ * Anchor provider type.
+ * - "none": Disabled
+ * - "arcore": Use ARCore Cloud Anchors / Geospatial API
+ * - "reactvision": Use ReactVision backend (requires libreactvisioncca)
  */
-export type CloudAnchorProvider = "none" | "arcore" | "reactvision";
+export type Provider = "none" | "arcore" | "reactvision";
 
-/**
- * Geospatial Anchor provider type.
- * - "none": Geospatial API disabled
- * - "arcore": Use ARCore Geospatial API (works on both iOS and Android)
- * - "reactvision": Use ReactVision GPS-based anchor backend (requires libreactvisioncca)
- */
-export type GeospatialAnchorProvider = "none" | "arcore" | "reactvision";
+/** @deprecated Use Provider */
+export type CloudAnchorProvider = Provider;
+/** @deprecated Use Provider */
+export type GeospatialAnchorProvider = Provider;
 
 /**
  * iOS framework linkage type.
@@ -42,15 +39,15 @@ export interface ViroConfigurationOptions {
    * When set to "dynamic", uses dynamic frameworks which is required for ARCore SDK.
    * When set to "static", uses static frameworks for smaller binary size.
    *
-   * Note: If using cloudAnchorProvider or geospatialAnchorProvider with "arcore",
-   * this will be automatically set to "dynamic" regardless of the configured value.
+   * Note: If using provider: "arcore", this will be automatically set to "dynamic".
    *
    * DEFAULTS TO: undefined (uses project default, typically static)
    */
   iosLinkage?: IosLinkage;
+
   /**
    * Google Cloud API key for ARCore Cloud Anchors and Geospatial API.
-   * Required if using cloudAnchorProvider: "arcore" or geospatialAnchorProvider: "arcore"
+   * Required if using provider: "arcore".
    *
    * Get your API key from Google Cloud Console:
    * https://console.cloud.google.com/apis/credentials
@@ -61,7 +58,7 @@ export interface ViroConfigurationOptions {
 
   /**
    * ReactVision API key for ReactVision Cloud Anchors and Geospatial API.
-   * Required if using cloudAnchorProvider: "reactvision" or geospatialAnchorProvider: "reactvision".
+   * Required if using provider: "reactvision" (the default).
    *
    * Written to AndroidManifest as com.reactvision.RVApiKey and to Info.plist as RVApiKey.
    */
@@ -69,26 +66,33 @@ export interface ViroConfigurationOptions {
 
   /**
    * ReactVision Project ID for ReactVision Cloud Anchors and Geospatial API.
-   * Required if using cloudAnchorProvider: "reactvision" or geospatialAnchorProvider: "reactvision".
+   * Required if using provider: "reactvision" (the default).
    *
    * Written to AndroidManifest as com.reactvision.RVProjectId and to Info.plist as RVProjectId.
    */
   rvProjectId?: string;
 
   /**
-   * Cloud Anchors provider for cross-platform anchor sharing.
-   * When set to "arcore", enables ARCore Cloud Anchors on both iOS and Android.
+   * Anchor provider for both cloud anchors and geospatial anchors.
+   * Replaces the deprecated cloudAnchorProvider + geospatialAnchorProvider props.
    *
-   * DEFAULTS TO: "none"
+   * - "reactvision": Use ReactVision backend (requires rvApiKey + rvProjectId)
+   * - "arcore": Use ARCore Cloud Anchors / Geospatial API (requires googleCloudApiKey)
+   * - "none": Disable both
+   *
+   * DEFAULTS TO: undefined (no provider-specific manifest entries or permissions injected)
+   */
+  provider?: Provider;
+
+  /**
+   * @deprecated Use provider instead.
+   * Cloud Anchors provider. Overrides provider for cloud anchors only if set.
    */
   cloudAnchorProvider?: CloudAnchorProvider;
 
   /**
-   * Geospatial Anchor provider for location-based AR.
-   * When set to "arcore", enables ARCore Geospatial API on both iOS and Android.
-   * Requires googleCloudApiKey to be set.
-   *
-   * DEFAULTS TO: "none"
+   * @deprecated Use provider instead.
+   * Geospatial Anchor provider. Overrides provider for geospatial only if set.
    */
   geospatialAnchorProvider?: GeospatialAnchorProvider;
 
@@ -126,12 +130,12 @@ export interface ViroConfigurationOptions {
     /**
      * Whether to include ARCore SDK pods.
      * When true, adds ARCore/CloudAnchors, ARCore/Geospatial, and ARCore/Semantics pods.
-     * This is automatically set to true when using cloudAnchorProvider or geospatialAnchorProvider with "arcore".
+     * This is automatically set to true when using provider: "arcore".
      *
      * ViroKit is built with weak linking, so ARCore pods are optional.
      * Without ARCore pods, cloud anchors, geospatial, and semantics features will be disabled at runtime.
      *
-     * DEFAULTS TO: false (unless cloudAnchorProvider or geospatialAnchorProvider is "arcore")
+     * DEFAULTS TO: false (unless provider is "arcore")
      */
     includeARCore?: boolean;
   };

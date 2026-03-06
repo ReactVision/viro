@@ -22,8 +22,11 @@ const withViroPods = (config) => {
                 const pluginConfig = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro");
                 if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
                     const options = pluginConfig[1];
-                    cloudAnchorProvider = options.cloudAnchorProvider;
-                    geospatialAnchorProvider = options.geospatialAnchorProvider;
+                    // Resolve unified provider prop; old props override for backward compat
+                    const resolvedProvider = options.provider ?? undefined;
+                    const legacyOpts = options;
+                    cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? resolvedProvider;
+                    geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? resolvedProvider;
                     iosLinkage = options.iosLinkage;
                     includeARCore = options.ios?.includeARCore;
                 }
@@ -182,8 +185,11 @@ const withDefaultInfoPlist = (config, _props) => {
             googleCloudApiKey = pluginOptions.googleCloudApiKey;
             rvApiKey = pluginOptions.rvApiKey;
             rvProjectId = pluginOptions.rvProjectId;
-            cloudAnchorProvider = pluginOptions.cloudAnchorProvider;
-            geospatialAnchorProvider = pluginOptions.geospatialAnchorProvider;
+            // Resolve unified provider prop; old props override for backward compat
+            const resolvedProvider = pluginOptions.provider ?? undefined;
+            const legacyOpts2 = pluginOptions;
+            cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? resolvedProvider;
+            geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? resolvedProvider;
             includeARCore = pluginOptions.ios?.includeARCore;
         }
     }

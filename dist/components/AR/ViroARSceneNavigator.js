@@ -955,10 +955,10 @@ class ViroARSceneNavigator extends React.Component {
         if (this.sceneNavigator.viroAppProps?.rootTag) {
             delete this.sceneNavigator.viroAppProps?.rootTag;
         }
-        const { viroAppProps = {} } = this.props;
+        const { viroAppProps = {}, provider = "reactvision", ...restProps } = this.props;
         return (<VRTARSceneNavigator ref={(component) => {
                 this._component = component;
-            }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} key={this.state.internalRemountKey} onTabSwitch={this._onTabSwitch}>
+            }} {...restProps} cloudAnchorProvider={provider} geospatialAnchorProvider={provider} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} key={this.state.internalRemountKey} onTabSwitch={this._onTabSwitch}>
         {items}
       </VRTARSceneNavigator>);
     }

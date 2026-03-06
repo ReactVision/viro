@@ -419,9 +419,12 @@ export type ViroCloudAnchorState =
   | "ErrorHostingServiceUnavailable";
 
 /**
- * Cloud anchor provider type.
+ * Unified AR provider — controls both cloud anchors and geospatial anchors.
  */
-export type ViroCloudAnchorProvider = "none" | "arcore" | "reactvision";
+export type ViroProvider = "none" | "arcore" | "reactvision";
+
+/** @deprecated Use ViroProvider */
+export type ViroCloudAnchorProvider = ViroProvider;
 
 /**
  * Represents a cloud-hosted AR anchor.
@@ -475,10 +478,8 @@ export type ViroCloudAnchorStateChangeEvent = {
  * Viro Geospatial API Events and Types
  * ============================================================================ */
 
-/**
- * Geospatial anchor provider type.
- */
-export type ViroGeospatialAnchorProvider = "none" | "arcore" | "reactvision";
+/** @deprecated Use ViroProvider */
+export type ViroGeospatialAnchorProvider = ViroProvider;
 
 /**
  * Earth tracking state.

@@ -30,8 +30,11 @@ const withViroPods = (config: ExpoConfig) => {
         );
         if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
           const options = pluginConfig[1] as ViroConfigurationOptions;
-          cloudAnchorProvider = options.cloudAnchorProvider;
-          geospatialAnchorProvider = options.geospatialAnchorProvider;
+          // Resolve unified provider prop; old props override for backward compat
+          const resolvedProvider = options.provider ?? undefined;
+          const legacyOpts = options as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
+          cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? resolvedProvider;
+          geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? resolvedProvider;
           iosLinkage = options.iosLinkage;
           includeARCore = options.ios?.includeARCore;
         }
@@ -239,8 +242,11 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
       googleCloudApiKey = pluginOptions.googleCloudApiKey;
       rvApiKey = pluginOptions.rvApiKey;
       rvProjectId = pluginOptions.rvProjectId;
-      cloudAnchorProvider = pluginOptions.cloudAnchorProvider;
-      geospatialAnchorProvider = pluginOptions.geospatialAnchorProvider;
+      // Resolve unified provider prop; old props override for backward compat
+      const resolvedProvider = pluginOptions.provider ?? undefined;
+      const legacyOpts2 = pluginOptions as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
+      cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? resolvedProvider;
+      geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? resolvedProvider;
       includeARCore = pluginOptions.ios?.includeARCore;
     }
   }

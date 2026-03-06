@@ -22,11 +22,10 @@ import {
 } from "react-native";
 import {
   ViroWorldOrigin,
-  ViroCloudAnchorProvider,
+  ViroProvider,
   ViroCloudAnchorStateChangeEvent,
   ViroHostCloudAnchorResult,
   ViroResolveCloudAnchorResult,
-  ViroGeospatialAnchorProvider,
   ViroGeospatialSupportResult,
   ViroEarthTrackingStateResult,
   ViroGeospatialPoseResult,
@@ -154,30 +153,23 @@ type Props = ViewProps & {
   preferMonocularDepth?: boolean;
 
   /**
-   * Enable cloud anchors for cross-platform anchor sharing.
-   * When set to 'arcore', the ARCore Cloud Anchors SDK will be used.
-   * Requires a valid Google Cloud API key configured in the native project.
+   * Cloud and geospatial anchor provider.
+   * Set to `"reactvision"` (default) for the ReactVision backend,
+   * `"arcore"` for Google Cloud Anchors, or `"none"` to disable.
    *
-   * @default "none"
+   * Replaces the old `cloudAnchorProvider` / `geospatialAnchorProvider` props,
+   * which are now deprecated. Both providers are set to the same value.
+   *
+   * @default "reactvision"
    * @platform ios,android
    */
-  cloudAnchorProvider?: ViroCloudAnchorProvider;
+  provider?: ViroProvider;
 
   /**
    * Callback fired when a cloud anchor state changes.
    * This includes progress updates during hosting/resolving operations.
    */
   onCloudAnchorStateChange?: (event: ViroCloudAnchorStateChangeEvent) => void;
-
-  /**
-   * Enable the ARCore Geospatial API for location-based AR experiences.
-   * When set to 'arcore', the ARCore Geospatial SDK will be used.
-   * Requires a valid Google Cloud API key configured in the native project.
-   *
-   * @default "none"
-   * @platform ios,android
-   */
-  geospatialAnchorProvider?: ViroGeospatialAnchorProvider;
 
   /**
    * Enable world mesh for physics collision with real-world surfaces.
@@ -1427,14 +1419,20 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       delete this.sceneNavigator.viroAppProps?.rootTag;
     }
 
-    const { viroAppProps = {} } = this.props;
+    const {
+      viroAppProps = {},
+      provider = "reactvision",
+      ...restProps
+    } = this.props;
 
     return (
       <VRTARSceneNavigator
         ref={(component) => {
           this._component = component;
         }}
-        {...this.props}
+        {...restProps}
+        cloudAnchorProvider={provider}
+        geospatialAnchorProvider={provider}
         viroAppProps={viroAppProps}
         currentSceneIndex={this.state.currentSceneIndex}
         style={(this.props.style, styles.container)}

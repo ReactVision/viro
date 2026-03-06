@@ -4,6 +4,39 @@
 
 ### Breaking Changes
 
+- **`ViroARSceneNavigator` — `provider` replaces `cloudAnchorProvider` and `geospatialAnchorProvider`**
+
+  The two separate props are merged into a single `provider` prop that controls
+  both the cloud anchor and geospatial anchor backends simultaneously.
+
+  **Before:**
+  ```tsx
+  <ViroARSceneNavigator
+    cloudAnchorProvider="reactvision"
+    geospatialAnchorProvider="reactvision"
+    initialScene={{ scene: MyARScene }}
+  />
+  ```
+
+  **After:**
+  ```tsx
+  // provider defaults to "reactvision" — prop can be omitted entirely
+  <ViroARSceneNavigator
+    initialScene={{ scene: MyARScene }}
+  />
+
+  // Or to override:
+  <ViroARSceneNavigator
+    provider="arcore"
+    initialScene={{ scene: MyARScene }}
+  />
+  ```
+
+  `ViroCloudAnchorProvider` and `ViroGeospatialAnchorProvider` types are now
+  deprecated aliases for the new `ViroProvider` type. Remove them from props;
+  use `provider` instead. The old types still compile with a deprecation warning
+  to ease migration.
+
 - **ViroARPlaneSelector — new architecture (scene-event-driven)**
 
   The component no longer self-discovers planes through pre-allocated
@@ -31,18 +64,49 @@
 
 - **ReactVisionCCA — Cloud Anchor Provider**
 
-  A new `"reactvision"` value is available for the `cloudAnchorProvider` prop
-  on `ViroARSceneNavigator`.  It routes cloud anchor hosting and resolving
-  through the ReactVision platform instead of Google Cloud Anchors, requiring
-  no Google Cloud configuration or API key.  The existing `hostCloudAnchor`,
-  `resolveCloudAnchor`, and `onCloudAnchorStateChange` API is unchanged.
+  The `"reactvision"` provider routes `hostCloudAnchor` / `resolveCloudAnchor`
+  through the ReactVision platform — no Google Cloud configuration or API key
+  required.  The existing `hostCloudAnchor`, `resolveCloudAnchor`, and
+  `onCloudAnchorStateChange` API is unchanged.
 
-- **ReactVisionCCA — Geospatial Anchor Provider**
+- **ReactVisionCCA — Cloud Anchor Management API**
 
-  GPS-tagged anchors are now available through the ReactVision platform via
-  `ReactVisionClient`.  Anchors carry a latitude/longitude/altitude pose with
-  optional metadata and support creation, retrieval, update, deletion, proximity
-  search, and 3-D asset linking.
+  8 new methods on `arSceneNavigator` for full CRUD and analytics on cloud anchors
+  (available when `provider="reactvision"`, the default):
+
+  | Method | Description |
+  |--------|-------------|
+  | `rvGetCloudAnchor(anchorId)` | Fetch a single anchor record |
+  | `rvListCloudAnchors(limit, offset)` | Paginated list of all project anchors |
+  | `rvUpdateCloudAnchor(id, name, desc, isPublic)` | Rename / re-describe an anchor |
+  | `rvDeleteCloudAnchor(anchorId)` | Permanently delete an anchor and its assets |
+  | `rvFindNearbyCloudAnchors(lat, lng, radius, limit)` | GPS proximity search |
+  | `rvAttachAssetToCloudAnchor(id, url, size, name, type, userId)` | Attach a hosted file |
+  | `rvRemoveAssetFromCloudAnchor(anchorId, assetId)` | Remove an attached asset |
+  | `rvTrackCloudAnchorResolution(...)` | Record resolve analytics manually |
+
+  All calls are handled entirely inside the compiled native RVCCA binary — no
+  API keys or endpoint URLs are present in the JS bundle.
+  See [docs/REACT_API.md](https://github.com/ReactVision/react-viro) for full TypeScript types.
+
+- **ReactVisionCCA — Geospatial Anchor Provider + Management API**
+
+  GPS-tagged anchors are available through the ReactVision platform.
+  5 new management methods on `arSceneNavigator`:
+
+  | Method | Description |
+  |--------|-------------|
+  | `rvListGeospatialAnchors(limit, offset)` | Paginated list |
+  | `rvGetGeospatialAnchor(anchorId)` | Fetch a single geospatial anchor |
+  | `rvFindNearbyGeospatialAnchors(lat, lng, radius, limit)` | GPS proximity search |
+  | `rvUpdateGeospatialAnchor(id, sceneAssetId, sceneId, name)` | Update metadata |
+  | `rvDeleteGeospatialAnchor(anchorId)` | Permanently delete |
+
+- **New `ViroProvider` type**
+
+  Canonical union type `"none" | "arcore" | "reactvision"` exported from the
+  package. Replaces the old `ViroCloudAnchorProvider` and `ViroGeospatialAnchorProvider`
+  (now deprecated aliases).
 
 - **ViroARPlaneSelector — tap-position object placement**
 
@@ -399,6 +463,21 @@ This release integrates ReactVisionCCA into ViroCore, adding:
 - Cloud anchor hosting and resolving via the ReactVision platform (Android + iOS)
 - Geospatial anchor CRUD and proximity search
 - New `ReactVision` provider wired into `VROARSession` on both platforms
+
+### Fixed
+
+- **Android management API — "provider not available":** `ensureRvConfigApplied()` was not
+  called before management method delegates; native ReactVision session was never initialised
+  for management-only calls. Fixed across all 13 management methods.
+- **`rvListGeospatialAnchors` callback type (iOS + Android):** Lambda declared
+  `ApiResult<std::vector<GeospatialAnchorRecord>>` but method requires
+  `ApiResult<GeospatialListResult>`. Fixed in `VROARSessioniOS.cpp` and `VROARSessionARCore.cpp`.
+- **Missing `functions/v1/` prefix on two cloud anchor endpoints:** `listCloudAnchors` and
+  `findNearbyCloudAnchors` were calling the wrong paths.
+- **`register-device` platform prefix in `os_version`:** iOS now sends `"ios/<version>"`;
+  Android sends `"android/<version>"`. Allows the backend to distinguish platforms.
+
+---
 
 ## v2.52.0 - 08 February 2026
 

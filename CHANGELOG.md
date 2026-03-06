@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v2.53.0 - 20 February 2026
+## v2.53.0 - 06 March 2026
 
 ### Breaking Changes
 
@@ -142,6 +142,140 @@
   | C++ default | `VROARScene.h` |
   | iOS native default | `VRTARScene.mm` |
   | JS fallback default | `ViroARScene.tsx` |
+
+- **Shader modifiers — custom `sampler2D` uniforms**
+
+  Shader modifier code can now declare and receive `uniform sampler2D` inputs.
+  Previously, sampler declarations in modifiers were silently ignored and the
+  GPU always read texture unit 0.  Now each named sampler is assigned its own
+  texture unit and bound correctly at draw time.
+
+  ```typescript
+  ViroMaterials.createMaterials({
+    noisyMetal: {
+      lightingModel: "PBR",
+      shaderModifiers: {
+        surface: {
+          uniforms: "uniform sampler2D noise_tex;",
+          body: `
+            float noise = texture(noise_tex, _surface.diffuse_texcoord * 3.0).r;
+            _surface.roughness = mix(0.2, 0.9, noise);
+            _surface.metalness = mix(0.4, 1.0, noise);
+          `
+        }
+      },
+      materialUniforms: [
+        { name: "noise_tex", type: "sampler2D", value: require("./textures/noise.png") }
+      ]
+    }
+  });
+  ```
+
+  `ViroShaderUniform.type` now accepts `"sampler2D"` and `value` accepts a
+  `require()` image reference.
+
+- **Shader modifiers — runtime texture uniform update**
+
+  `ViroMaterials.updateShaderUniform` now accepts `"sampler2D"` as a type,
+  allowing any texture bound to a modifier sampler to be swapped at runtime:
+
+  ```typescript
+  ViroMaterials.updateShaderUniform("colorGraded", "lut_tex", "sampler2D",
+    isDaytime ? require("./lut_day.png") : require("./lut_night.png"));
+  ```
+
+- **Shader modifiers — custom varyings between vertex and fragment stages**
+
+  A new `varyings` field on shader modifier entry points lets vertex-stage
+  (Geometry) modifiers pass typed data to fragment-stage (Surface / Fragment)
+  modifiers.  Declare the same name in both stages; the engine injects `out` /
+  `in` declarations automatically:
+
+  ```typescript
+  shaderModifiers: {
+    geometry: {
+      varyings: ["highp float displacement_amount"],
+      uniforms: "uniform float time;",
+      body: `
+        float wave = sin(_geometry.position.x * 4.0 + time) * 0.1;
+        _geometry.position.y += wave;
+        displacement_amount = abs(wave) / 0.1;
+      `
+    },
+    surface: {
+      varyings: ["highp float displacement_amount"],
+      body: `_surface.roughness = mix(0.1, 0.9, displacement_amount);`
+    }
+  }
+  ```
+
+- **Shader modifiers — scene depth buffer access**
+
+  Fragment modifier entry points can set `requiresSceneDepth: true` to receive
+  `scene_depth_texture` (sampler2D) and `scene_viewport_size` (vec2) automatically.
+  Enables soft particles, contact edge glow, depth-based fog, and intersection
+  effects.  On older Adreno/Mali GPUs that cannot sample the depth buffer in-pass,
+  the engine automatically inserts a blit to a `GL_R32F` color attachment.
+
+  ```typescript
+  fragment: {
+    requiresSceneDepth: true,
+    body: `
+      vec2 screenUV = gl_FragCoord.xy / scene_viewport_size;
+      float sceneDepth = texture(scene_depth_texture, screenUV).r;
+      float softFactor = clamp(abs(sceneDepth - gl_FragCoord.z) / 0.1, 0.0, 1.0);
+      _output_color.a *= softFactor;
+    `
+  }
+  ```
+
+- **Shader modifiers — live AR camera texture access**
+
+  Fragment modifier entry points can set `requiresCameraTexture: true` to
+  sample the live AR camera feed on any geometry.  Two uniforms are bound
+  automatically: `ar_camera_texture` (the camera feed) and `ar_camera_transform`
+  (a `mat3` correcting for device orientation and aspect ratio).  The sampler
+  type difference between platforms (`samplerExternalOES` on Android, `sampler2D`
+  on iOS) is handled invisibly — developer GLSL is identical on both platforms.
+
+  ```typescript
+  surface: {
+    requiresCameraTexture: true,
+    body: `
+      vec2 cameraUV = (ar_camera_transform * vec3(_surface.diffuse_texcoord, 1.0)).xy;
+      _surface.diffuse_color = texture(ar_camera_texture, cameraUV);
+    `
+  }
+  ```
+
+  Enables magnifying glass, portal, refraction, warp, and camera-feed-on-geometry
+  effects.
+
+- **Shader modifiers — deterministic priority ordering**
+
+  `VROShaderModifier` now has a `priority` field (default 0).  Multiple modifiers
+  on the same material are injected in ascending priority order.  Engine-internal
+  modifiers (AR shadow, occlusion) use priority -100; user modifiers default to 0;
+  debug overlays use 100.  Prevents engine modifiers from interfering with
+  user-defined effects regardless of attachment order.
+
+- **Updated `ViroShaderModifier` type**
+
+  ```typescript
+  export type ViroShaderModifier = {
+    uniforms?: string;
+    body?: string;
+    varyings?: string[];             // pass typed data from vertex to fragment stage
+    requiresSceneDepth?: boolean;    // auto-bind scene_depth_texture + scene_viewport_size
+    requiresCameraTexture?: boolean; // auto-bind ar_camera_texture + ar_camera_transform
+  };
+
+  export type ViroShaderUniform = {
+    name: string;
+    type: "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D";
+    value: number | number[] | ReturnType<typeof require>;
+  };
+  ```
 
 ### Fixed
 

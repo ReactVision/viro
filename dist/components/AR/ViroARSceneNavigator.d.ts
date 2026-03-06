@@ -437,6 +437,37 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _removeGeospatialAnchor: (anchorId: string) => void;
     /**
+     * ReactVision — fetch a geospatial anchor record by UUID.
+     * Returns the anchor with linked scene asset data (position, rotation, scale, fileUrl).
+     */
+    _rvGetGeospatialAnchor: (anchorId: string) => Promise<any>;
+    /**
+     * ReactVision — find geospatial anchors near a GPS location.
+     * @param latitude  Centre latitude
+     * @param longitude Centre longitude
+     * @param radius    Search radius in metres (default 500)
+     * @param limit     Max results (default 50)
+     */
+    _rvFindNearbyGeospatialAnchors: (latitude: number, longitude: number, radius?: number, limit?: number) => Promise<any>;
+    /**
+     * ReactVision — update a geospatial anchor (link scene asset, scene, or rename).
+     * Pass null/empty string to leave a field unchanged.
+     */
+    _rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string) => Promise<any>;
+    /**
+     * ReactVision — permanently delete a geospatial anchor from the backend.
+     */
+    _rvDeleteGeospatialAnchor: (anchorId: string) => Promise<any>;
+    _rvListGeospatialAnchors: (limit: number, offset: number) => Promise<any>;
+    _rvGetCloudAnchor: (anchorId: string) => Promise<any>;
+    _rvListCloudAnchors: (limit: number, offset: number) => Promise<any>;
+    _rvUpdateCloudAnchor: (anchorId: string, name: string, description: string, isPublic: boolean) => Promise<any>;
+    _rvDeleteCloudAnchor: (anchorId: string) => Promise<any>;
+    _rvFindNearbyCloudAnchors: (latitude: number, longitude: number, radius: number, limit: number) => Promise<any>;
+    _rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
+    _rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
+    _rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
+    /**
      * Check if Scene Semantics mode is supported on this device.
      * Scene Semantics uses ML to classify each pixel in the camera feed
      * into categories like sky, building, tree, road, etc.
@@ -536,6 +567,19 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         createTerrainAnchor: (latitude: number, longitude: number, altitudeAboveTerrain: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         createRooftopAnchor: (latitude: number, longitude: number, altitudeAboveRooftop: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         removeGeospatialAnchor: (anchorId: string) => void;
+        rvGetGeospatialAnchor: (anchorId: string) => Promise<any>;
+        rvFindNearbyGeospatialAnchors: (latitude: number, longitude: number, radius?: number, limit?: number) => Promise<any>;
+        rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string) => Promise<any>;
+        rvDeleteGeospatialAnchor: (anchorId: string) => Promise<any>;
+        rvListGeospatialAnchors: (limit: number, offset: number) => Promise<any>;
+        rvGetCloudAnchor: (anchorId: string) => Promise<any>;
+        rvListCloudAnchors: (limit: number, offset: number) => Promise<any>;
+        rvUpdateCloudAnchor: (anchorId: string, name: string, description: string, isPublic: boolean) => Promise<any>;
+        rvDeleteCloudAnchor: (anchorId: string) => Promise<any>;
+        rvFindNearbyCloudAnchors: (latitude: number, longitude: number, radius: number, limit: number) => Promise<any>;
+        rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
+        rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
+        rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
         isSemanticModeSupported: () => Promise<ViroSemanticSupportResult>;
         setSemanticModeEnabled: (enabled: boolean) => void;
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;
@@ -571,6 +615,19 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         createTerrainAnchor: (latitude: number, longitude: number, altitudeAboveTerrain: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         createRooftopAnchor: (latitude: number, longitude: number, altitudeAboveRooftop: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         removeGeospatialAnchor: (anchorId: string) => void;
+        rvGetGeospatialAnchor: (anchorId: string) => Promise<any>;
+        rvFindNearbyGeospatialAnchors: (latitude: number, longitude: number, radius?: number, limit?: number) => Promise<any>;
+        rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string) => Promise<any>;
+        rvDeleteGeospatialAnchor: (anchorId: string) => Promise<any>;
+        rvListGeospatialAnchors: (limit: number, offset: number) => Promise<any>;
+        rvGetCloudAnchor: (anchorId: string) => Promise<any>;
+        rvListCloudAnchors: (limit: number, offset: number) => Promise<any>;
+        rvUpdateCloudAnchor: (anchorId: string, name: string, description: string, isPublic: boolean) => Promise<any>;
+        rvDeleteCloudAnchor: (anchorId: string) => Promise<any>;
+        rvFindNearbyCloudAnchors: (latitude: number, longitude: number, radius: number, limit: number) => Promise<any>;
+        rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
+        rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
+        rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
         isSemanticModeSupported: () => Promise<ViroSemanticSupportResult>;
         setSemanticModeEnabled: (enabled: boolean) => void;
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;

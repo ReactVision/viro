@@ -714,6 +714,355 @@ RCT_EXPORT_METHOD(removeGeospatialAnchor:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(rvGetGeospatialAnchor:(nonnull NSNumber *)reactTag
+                               anchorId:(NSString *)anchorId
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"});
+                return;
+            }
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            [component rvGetGeospatialAnchor:anchorId
+                           completionHandler:^(BOOL success, NSDictionary *anchorData, NSString *error) {
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setObject:@(success) forKey:@"success"];
+                if (anchorData) [result setObject:anchorData forKey:@"anchor"];
+                if (error)      [result setObject:error      forKey:@"error"];
+                resolve(result);
+            }];
+        } @catch (NSException *exception) {
+            resolve(@{@"success": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvFindNearbyGeospatialAnchors:(nonnull NSNumber *)reactTag
+                                       latitude:(double)latitude
+                                      longitude:(double)longitude
+                                         radius:(double)radius
+                                          limit:(int)limit
+                                        resolve:(RCTPromiseResolveBlock)resolve
+                                         reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"});
+                return;
+            }
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            [component rvFindNearbyGeospatialAnchors:latitude
+                                           longitude:longitude
+                                              radius:radius
+                                               limit:limit
+                                   completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setObject:@(success) forKey:@"success"];
+                [result setObject:anchors ?: @[] forKey:@"anchors"];
+                if (error) [result setObject:error forKey:@"error"];
+                resolve(result);
+            }];
+        } @catch (NSException *exception) {
+            resolve(@{@"success": @NO, @"anchors": @[], @"error": exception.reason});
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
+                                  anchorId:(NSString *)anchorId
+                              sceneAssetId:(NSString *)sceneAssetId
+                                   sceneId:(NSString *)sceneId
+                                      name:(NSString *)name
+                                   resolve:(RCTPromiseResolveBlock)resolve
+                                    reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"});
+                return;
+            }
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            [component rvUpdateGeospatialAnchor:anchorId
+                                   sceneAssetId:sceneAssetId
+                                        sceneId:sceneId
+                                           name:name
+                              completionHandler:^(BOOL success, NSDictionary *anchorData, NSString *error) {
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setObject:@(success) forKey:@"success"];
+                if (anchorData) [result setObject:anchorData forKey:@"anchor"];
+                if (error)      [result setObject:error      forKey:@"error"];
+                resolve(result);
+            }];
+        } @catch (NSException *exception) {
+            resolve(@{@"success": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvDeleteGeospatialAnchor:(nonnull NSNumber *)reactTag
+                                  anchorId:(NSString *)anchorId
+                                   resolve:(RCTPromiseResolveBlock)resolve
+                                    reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"});
+                return;
+            }
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            [component rvDeleteGeospatialAnchor:anchorId
+                              completionHandler:^(BOOL success, NSString *error) {
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setObject:@(success) forKey:@"success"];
+                if (error) [result setObject:error forKey:@"error"];
+                resolve(result);
+            }];
+        } @catch (NSException *exception) {
+            resolve(@{@"success": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
+                                    limit:(NSInteger)limit
+                                   offset:(NSInteger)offset
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvListGeospatialAnchors:(int)limit offset:(int)offset
+                completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+// ── Cloud anchor management ───────────────────────────────────────────────────
+
+RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
+                           anchorId:(NSString *)anchorId
+                            resolve:(RCTPromiseResolveBlock)resolve
+                             reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvGetCloudAnchor:anchorId
+                completionHandler:^(BOOL success, NSDictionary *anchorData, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (anchorData) [r setObject:anchorData forKey:@"anchor"];
+                if (error)      [r setObject:error      forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvListCloudAnchors:(nonnull NSNumber *)reactTag
+                               limit:(NSInteger)limit
+                              offset:(NSInteger)offset
+                             resolve:(RCTPromiseResolveBlock)resolve
+                              reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvListCloudAnchors:(int)limit offset:(int)offset
+                completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvUpdateCloudAnchor:(nonnull NSNumber *)reactTag
+                               anchorId:(NSString *)anchorId
+                                   name:(NSString *)name
+                            description:(NSString *)description
+                               isPublic:(BOOL)isPublic
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvUpdateCloudAnchor:anchorId name:name description:description
+                isPublic:isPublic completionHandler:^(BOOL success, NSDictionary *anchorData, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (anchorData) [r setObject:anchorData forKey:@"anchor"];
+                if (error)      [r setObject:error      forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvDeleteCloudAnchor:(nonnull NSNumber *)reactTag
+                              anchorId:(NSString *)anchorId
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvDeleteCloudAnchor:anchorId
+                completionHandler:^(BOOL success, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
+                                  latitude:(double)latitude
+                                 longitude:(double)longitude
+                                    radius:(double)radius
+                                     limit:(NSInteger)limit
+                                   resolve:(RCTPromiseResolveBlock)resolve
+                                    reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvFindNearbyCloudAnchors:latitude longitude:longitude
+                radius:radius limit:(int)limit
+                completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvAttachAssetToCloudAnchor:(nonnull NSNumber *)reactTag
+                                    anchorId:(NSString *)anchorId
+                                     fileUrl:(NSString *)fileUrl
+                                    fileSize:(double)fileSize
+                                        name:(NSString *)name
+                                   assetType:(NSString *)assetType
+                              externalUserId:(NSString *)externalUserId
+                                     resolve:(RCTPromiseResolveBlock)resolve
+                                      reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvAttachAssetToCloudAnchor:anchorId fileUrl:fileUrl
+                fileSize:(int64_t)fileSize name:name assetType:assetType externalUserId:externalUserId
+                completionHandler:^(BOOL success, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvRemoveAssetFromCloudAnchor:(nonnull NSNumber *)reactTag
+                                       anchorId:(NSString *)anchorId
+                                        assetId:(NSString *)assetId
+                                        resolve:(RCTPromiseResolveBlock)resolve
+                                         reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvRemoveAssetFromCloudAnchor:anchorId assetId:assetId
+                completionHandler:^(BOOL success, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvTrackCloudAnchorResolution:(nonnull NSNumber *)reactTag
+                                       anchorId:(NSString *)anchorId
+                                        success:(BOOL)success
+                                     confidence:(double)confidence
+                                     matchCount:(NSInteger)matchCount
+                                    inlierCount:(NSInteger)inlierCount
+                               processingTimeMs:(NSInteger)processingTimeMs
+                                       platform:(NSString *)platform
+                                 externalUserId:(NSString *)externalUserId
+                                        resolve:(RCTPromiseResolveBlock)resolve
+                                         reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvTrackCloudAnchorResolution:anchorId success:success
+                confidence:confidence matchCount:(int)matchCount inlierCount:(int)inlierCount
+                processingTimeMs:(int)processingTimeMs platform:platform externalUserId:externalUserId
+                completionHandler:^(BOOL ok, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(ok) forKey:@"success"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
 #pragma mark - Scene Semantics API Methods
 
 RCT_EXPORT_METHOD(isSemanticModeSupported:(nonnull NSNumber *)reactTag

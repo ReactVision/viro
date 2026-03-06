@@ -151,6 +151,63 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 
 - (void)removeGeospatialAnchor:(NSString *)anchorId;
 
+// ReactVision Geospatial CRUD
+- (void)rvGetGeospatialAnchor:(NSString *)anchorId
+            completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
+- (void)rvFindNearbyGeospatialAnchors:(double)latitude
+                            longitude:(double)longitude
+                               radius:(double)radius
+                                limit:(int)limit
+                    completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
+- (void)rvUpdateGeospatialAnchor:(NSString *)anchorId
+                    sceneAssetId:(NSString *)sceneAssetId
+                         sceneId:(NSString *)sceneId
+                            name:(NSString *)name
+               completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
+- (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
+               completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
+- (void)rvListGeospatialAnchors:(int)limit
+                         offset:(int)offset
+              completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
+
+// Cloud anchor management
+- (void)rvGetCloudAnchor:(NSString *)anchorId
+       completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
+- (void)rvListCloudAnchors:(int)limit
+                    offset:(int)offset
+         completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
+- (void)rvUpdateCloudAnchor:(NSString *)anchorId
+                       name:(NSString *)name
+                description:(NSString *)description
+                   isPublic:(BOOL)isPublic
+          completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
+- (void)rvDeleteCloudAnchor:(NSString *)anchorId
+          completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
+- (void)rvFindNearbyCloudAnchors:(double)latitude
+                       longitude:(double)longitude
+                          radius:(double)radius
+                           limit:(int)limit
+               completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
+- (void)rvAttachAssetToCloudAnchor:(NSString *)anchorId
+                           fileUrl:(NSString *)fileUrl
+                          fileSize:(int64_t)fileSize
+                              name:(NSString *)name
+                         assetType:(NSString *)assetType
+                    externalUserId:(NSString *)externalUserId
+                 completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
+- (void)rvRemoveAssetFromCloudAnchor:(NSString *)anchorId
+                             assetId:(NSString *)assetId
+                   completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
+- (void)rvTrackCloudAnchorResolution:(NSString *)anchorId
+                             success:(BOOL)success
+                          confidence:(double)confidence
+                          matchCount:(int)matchCount
+                         inlierCount:(int)inlierCount
+                    processingTimeMs:(int)processingTimeMs
+                            platform:(NSString *)platform
+                      externalUserId:(NSString *)externalUserId
+                   completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
+
 #pragma mark - Scene Semantics API Methods
 
 // Check if Scene Semantics mode is supported on this device

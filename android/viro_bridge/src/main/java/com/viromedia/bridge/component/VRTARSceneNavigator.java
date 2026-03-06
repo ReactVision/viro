@@ -841,7 +841,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
     public void checkVPSAvailability(double latitude, double longitude,
                                       ARSceneNavigatorModule.VPSAvailabilityCallback callback) {
-        if (!"arcore".equals(mGeospatialAnchorProvider)) {
+        if ("none".equals(mGeospatialAnchorProvider)) {
             callback.onResult("Unknown");
             return;
         }
@@ -873,8 +873,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void createGeospatialAnchor(double latitude, double longitude, double altitude,
                                         float[] quaternion,
                                         ARSceneNavigatorModule.GeospatialAnchorCallback callback) {
-        if (!"arcore".equals(mGeospatialAnchorProvider)) {
-            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider='arcore' to enable.");
+        if ("none".equals(mGeospatialAnchorProvider)) {
+            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider prop to enable.");
             return;
         }
 
@@ -901,8 +901,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void createTerrainAnchor(double latitude, double longitude, double altitudeAboveTerrain,
                                      float[] quaternion,
                                      ARSceneNavigatorModule.GeospatialAnchorCallback callback) {
-        if (!"arcore".equals(mGeospatialAnchorProvider)) {
-            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider='arcore' to enable.");
+        if ("none".equals(mGeospatialAnchorProvider)) {
+            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider prop to enable.");
             return;
         }
 
@@ -929,8 +929,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void createRooftopAnchor(double latitude, double longitude, double altitudeAboveRooftop,
                                      float[] quaternion,
                                      ARSceneNavigatorModule.GeospatialAnchorCallback callback) {
-        if (!"arcore".equals(mGeospatialAnchorProvider)) {
-            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider='arcore' to enable.");
+        if ("none".equals(mGeospatialAnchorProvider)) {
+            callback.onFailure("Geospatial provider not configured. Set geospatialAnchorProvider prop to enable.");
             return;
         }
 
@@ -960,6 +960,108 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
         arScene.removeGeospatialAnchor(anchorId);
+    }
+
+    public void rvGetGeospatialAnchor(String anchorId, ARScene.RvGeospatialCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult(false, "", "AR scene not available");
+            return;
+        }
+        arScene.rvGetGeospatialAnchor(anchorId, callback);
+    }
+
+    public void rvFindNearbyGeospatialAnchors(double lat, double lng, double radius, int limit,
+                                               ARScene.RvGeospatialCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult(false, "", "AR scene not available");
+            return;
+        }
+        arScene.rvFindNearbyGeospatialAnchors(lat, lng, radius, limit, callback);
+    }
+
+    public void rvUpdateGeospatialAnchor(String anchorId, String sceneAssetId, String sceneId,
+                                          String name, ARScene.RvGeospatialCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult(false, "", "AR scene not available");
+            return;
+        }
+        arScene.rvUpdateGeospatialAnchor(anchorId, sceneAssetId, sceneId, name, callback);
+    }
+
+    public void rvDeleteGeospatialAnchor(String anchorId, ARScene.RvGeospatialCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult(false, "", "AR scene not available");
+            return;
+        }
+        arScene.rvDeleteGeospatialAnchor(anchorId, callback);
+    }
+
+    public void rvListGeospatialAnchors(int limit, int offset, ARScene.RvGeospatialCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvListGeospatialAnchors(limit, offset, callback);
+    }
+
+    // Cloud anchor management
+    public void rvGetCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvGetCloudAnchor(anchorId, callback);
+    }
+
+    public void rvListCloudAnchors(int limit, int offset, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvListCloudAnchors(limit, offset, callback);
+    }
+
+    public void rvUpdateCloudAnchor(String anchorId, String name, String description,
+                                     boolean isPublic, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvUpdateCloudAnchor(anchorId, name, description, isPublic, callback);
+    }
+
+    public void rvDeleteCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvDeleteCloudAnchor(anchorId, callback);
+    }
+
+    public void rvFindNearbyCloudAnchors(double lat, double lng, double radius, int limit,
+                                          ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvFindNearbyCloudAnchors(lat, lng, radius, limit, callback);
+    }
+
+    public void rvAttachAssetToCloudAnchor(String anchorId, String fileUrl, long fileSize,
+                                            String name, String assetType, String externalUserId,
+                                            ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvAttachAssetToCloudAnchor(anchorId, fileUrl, fileSize, name, assetType, externalUserId, callback);
+    }
+
+    public void rvRemoveAssetFromCloudAnchor(String anchorId, String assetId,
+                                              ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvRemoveAssetFromCloudAnchor(anchorId, assetId, callback);
+    }
+
+    public void rvTrackCloudAnchorResolution(String anchorId, boolean success, double confidence,
+                                              int matchCount, int inlierCount, int processingTimeMs,
+                                              String platform, String externalUserId,
+                                              ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        arScene.rvTrackCloudAnchorResolution(anchorId, success, confidence, matchCount, inlierCount,
+                processingTimeMs, platform, externalUserId, callback);
     }
 
     // ========================================================================

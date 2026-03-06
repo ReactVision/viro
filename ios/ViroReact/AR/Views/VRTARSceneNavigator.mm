@@ -1152,6 +1152,297 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     }
 }
 
+static NSDictionary *rvParseAnchorJson(NSString *json) {
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    if (!data) return nil;
+    return [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+}
+
+static NSArray *rvParseAnchorArrayJson(NSString *json) {
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    if (!data) return @[];
+    id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    return [obj isKindOfClass:[NSArray class]] ? obj : @[];
+}
+
+- (void)rvGetGeospatialAnchor:(NSString *)anchorId
+            completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, nil, @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, nil, @"AR session not available");
+        return;
+    }
+    arSession->rvGetGeospatialAnchor(
+        std::string([anchorId UTF8String]),
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                if (success) {
+                    NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                    completionHandler(YES, rvParseAnchorJson(jsonStr), nil);
+                } else {
+                    completionHandler(NO, nil, [NSString stringWithUTF8String:error.c_str()]);
+                }
+            }
+        });
+}
+
+- (void)rvFindNearbyGeospatialAnchors:(double)latitude
+                            longitude:(double)longitude
+                               radius:(double)radius
+                                limit:(int)limit
+                    completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, @[], @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, @[], @"AR session not available");
+        return;
+    }
+    arSession->rvFindNearbyGeospatialAnchors(latitude, longitude, radius, limit,
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                if (success) {
+                    NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                    completionHandler(YES, rvParseAnchorArrayJson(jsonStr), nil);
+                } else {
+                    completionHandler(NO, @[], [NSString stringWithUTF8String:error.c_str()]);
+                }
+            }
+        });
+}
+
+- (void)rvUpdateGeospatialAnchor:(NSString *)anchorId
+                    sceneAssetId:(NSString *)sceneAssetId
+                         sceneId:(NSString *)sceneId
+                            name:(NSString *)name
+               completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, nil, @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, nil, @"AR session not available");
+        return;
+    }
+    arSession->rvUpdateGeospatialAnchor(
+        std::string([anchorId UTF8String]),
+        sceneAssetId ? std::string([sceneAssetId UTF8String]) : "",
+        sceneId      ? std::string([sceneId UTF8String])      : "",
+        name         ? std::string([name UTF8String])         : "",
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                if (success) {
+                    NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                    completionHandler(YES, rvParseAnchorJson(jsonStr), nil);
+                } else {
+                    completionHandler(NO, nil, [NSString stringWithUTF8String:error.c_str()]);
+                }
+            }
+        });
+}
+
+- (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
+               completionHandler:(void (^)(BOOL success, NSString *error))completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, @"AR session not available");
+        return;
+    }
+    arSession->rvDeleteGeospatialAnchor(
+        std::string([anchorId UTF8String]),
+        [completionHandler](bool success, std::string error) {
+            if (completionHandler) {
+                completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+- (void)rvListGeospatialAnchors:(int)limit
+                         offset:(int)offset
+              completionHandler:(void (^)(BOOL, NSArray *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @[], @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @[], @"AR session not available"); return; }
+    arSession->rvListGeospatialAnchors(limit, offset,
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                completionHandler(success, success ? rvParseAnchorArrayJson(jsonStr) : @[],
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+// ── Cloud anchor management ───────────────────────────────────────────────────
+
+- (void)rvGetCloudAnchor:(NSString *)anchorId
+       completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
+    arSession->rvGetCloudAnchor(std::string([anchorId UTF8String]),
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                completionHandler(success, success ? rvParseAnchorJson(jsonStr) : nil,
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+- (void)rvListCloudAnchors:(int)limit
+                    offset:(int)offset
+         completionHandler:(void (^)(BOOL, NSArray *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @[], @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @[], @"AR session not available"); return; }
+    arSession->rvListCloudAnchors(limit, offset,
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                completionHandler(success, success ? rvParseAnchorArrayJson(jsonStr) : @[],
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+- (void)rvUpdateCloudAnchor:(NSString *)anchorId
+                       name:(NSString *)name
+                description:(NSString *)description
+                   isPublic:(BOOL)isPublic
+          completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
+    arSession->rvUpdateCloudAnchor(
+        std::string([anchorId UTF8String]),
+        name        ? std::string([name UTF8String])        : "",
+        description ? std::string([description UTF8String]) : "",
+        (bool)isPublic,
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                completionHandler(success, success ? rvParseAnchorJson(jsonStr) : nil,
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+- (void)rvDeleteCloudAnchor:(NSString *)anchorId
+          completionHandler:(void (^)(BOOL, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
+    arSession->rvDeleteCloudAnchor(std::string([anchorId UTF8String]),
+        [completionHandler](bool success, std::string error) {
+            if (completionHandler)
+                completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+        });
+}
+
+- (void)rvFindNearbyCloudAnchors:(double)latitude
+                       longitude:(double)longitude
+                          radius:(double)radius
+                           limit:(int)limit
+               completionHandler:(void (^)(BOOL, NSArray *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @[], @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @[], @"AR session not available"); return; }
+    arSession->rvFindNearbyCloudAnchors(latitude, longitude, radius, limit,
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                completionHandler(success, success ? rvParseAnchorArrayJson(jsonStr) : @[],
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+- (void)rvAttachAssetToCloudAnchor:(NSString *)anchorId
+                           fileUrl:(NSString *)fileUrl
+                          fileSize:(int64_t)fileSize
+                              name:(NSString *)name
+                         assetType:(NSString *)assetType
+                    externalUserId:(NSString *)externalUserId
+                 completionHandler:(void (^)(BOOL, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
+    arSession->rvAttachAssetToCloudAnchor(
+        std::string([anchorId UTF8String]),
+        std::string([fileUrl UTF8String]),
+        fileSize,
+        name           ? std::string([name UTF8String])           : "",
+        assetType      ? std::string([assetType UTF8String])      : "",
+        externalUserId ? std::string([externalUserId UTF8String]) : "",
+        [completionHandler](bool success, std::string error) {
+            if (completionHandler)
+                completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+        });
+}
+
+- (void)rvRemoveAssetFromCloudAnchor:(NSString *)anchorId
+                             assetId:(NSString *)assetId
+                   completionHandler:(void (^)(BOOL, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
+    arSession->rvRemoveAssetFromCloudAnchor(
+        std::string([anchorId UTF8String]),
+        std::string([assetId UTF8String]),
+        [completionHandler](bool success, std::string error) {
+            if (completionHandler)
+                completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+        });
+}
+
+- (void)rvTrackCloudAnchorResolution:(NSString *)anchorId
+                             success:(BOOL)success
+                          confidence:(double)confidence
+                          matchCount:(int)matchCount
+                         inlierCount:(int)inlierCount
+                    processingTimeMs:(int)processingTimeMs
+                            platform:(NSString *)platform
+                      externalUserId:(NSString *)externalUserId
+                   completionHandler:(void (^)(BOOL, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
+    arSession->rvTrackCloudAnchorResolution(
+        std::string([anchorId UTF8String]),
+        (bool)success, confidence, matchCount, inlierCount, processingTimeMs,
+        platform       ? std::string([platform UTF8String])       : "",
+        externalUserId ? std::string([externalUserId UTF8String]) : "",
+        [completionHandler](bool ok, std::string error) {
+            if (completionHandler)
+                completionHandler(ok, ok ? nil : [NSString stringWithUTF8String:error.c_str()]);
+        });
+}
+
 #pragma mark - Scene Semantics API Methods
 
 - (BOOL)isSemanticModeSupported {

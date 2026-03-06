@@ -150,6 +150,40 @@ public:
                              std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
                              std::function<void(std::string error)> onFailure) override;
     void removeGeospatialAnchor(std::shared_ptr<VROGeospatialAnchor> anchor) override;
+    void rvGetGeospatialAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvFindNearbyGeospatialAnchors(double lat, double lng, double radius, int limit,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvUpdateGeospatialAnchor(const std::string& anchorId,
+        const std::string& sceneAssetId, const std::string& sceneId, const std::string& name,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvDeleteGeospatialAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvListGeospatialAnchors(int limit, int offset,
+        std::function<void(bool, std::string, std::string)> callback) override;
+
+    // Cloud anchor management
+    void rvGetCloudAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvListCloudAnchors(int limit, int offset,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvUpdateCloudAnchor(const std::string& anchorId, const std::string& name,
+        const std::string& description, bool isPublic,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvDeleteCloudAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvFindNearbyCloudAnchors(double lat, double lng, double radius, int limit,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvAttachAssetToCloudAnchor(const std::string& anchorId, const std::string& fileUrl,
+        int64_t fileSize, const std::string& name, const std::string& assetType,
+        const std::string& externalUserId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvRemoveAssetFromCloudAnchor(const std::string& anchorId, const std::string& assetId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvTrackCloudAnchorResolution(const std::string& anchorId, bool success,
+        double confidence, int matchCount, int inlierCount, int processingTimeMs,
+        const std::string& platform, const std::string& externalUserId,
+        std::function<void(bool, std::string)> callback) override;
 
     // Scene Semantics API
     bool isSemanticModeSupported() const override;

@@ -603,6 +603,66 @@ class ViroARSceneNavigator extends React.Component {
     _removeGeospatialAnchor = (anchorId) => {
         ViroARSceneNavigatorModule.removeGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId);
     };
+    /**
+     * ReactVision — fetch a geospatial anchor record by UUID.
+     * Returns the anchor with linked scene asset data (position, rotation, scale, fileUrl).
+     */
+    _rvGetGeospatialAnchor = async (anchorId) => {
+        return await ViroARSceneNavigatorModule.rvGetGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId);
+    };
+    /**
+     * ReactVision — find geospatial anchors near a GPS location.
+     * @param latitude  Centre latitude
+     * @param longitude Centre longitude
+     * @param radius    Search radius in metres (default 500)
+     * @param limit     Max results (default 50)
+     */
+    _rvFindNearbyGeospatialAnchors = async (latitude, longitude, radius = 500, limit = 50) => {
+        return await ViroARSceneNavigatorModule.rvFindNearbyGeospatialAnchors((0, react_native_1.findNodeHandle)(this), latitude, longitude, radius, limit);
+    };
+    /**
+     * ReactVision — update a geospatial anchor (link scene asset, scene, or rename).
+     * Pass null/empty string to leave a field unchanged.
+     */
+    _rvUpdateGeospatialAnchor = async (anchorId, sceneAssetId, sceneId, name) => {
+        return await ViroARSceneNavigatorModule.rvUpdateGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId, sceneAssetId ?? "", sceneId ?? "", name ?? "");
+    };
+    /**
+     * ReactVision — permanently delete a geospatial anchor from the backend.
+     */
+    _rvDeleteGeospatialAnchor = async (anchorId) => {
+        return await ViroARSceneNavigatorModule.rvDeleteGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId);
+    };
+    _rvListGeospatialAnchors = async (limit, offset) => {
+        return await ViroARSceneNavigatorModule.rvListGeospatialAnchors((0, react_native_1.findNodeHandle)(this), limit, offset);
+    };
+    // ===========================================================================
+    // Cloud Anchor Management API Methods
+    // ===========================================================================
+    _rvGetCloudAnchor = async (anchorId) => {
+        return await ViroARSceneNavigatorModule.rvGetCloudAnchor((0, react_native_1.findNodeHandle)(this), anchorId);
+    };
+    _rvListCloudAnchors = async (limit, offset) => {
+        return await ViroARSceneNavigatorModule.rvListCloudAnchors((0, react_native_1.findNodeHandle)(this), limit, offset);
+    };
+    _rvUpdateCloudAnchor = async (anchorId, name, description, isPublic) => {
+        return await ViroARSceneNavigatorModule.rvUpdateCloudAnchor((0, react_native_1.findNodeHandle)(this), anchorId, name, description, isPublic);
+    };
+    _rvDeleteCloudAnchor = async (anchorId) => {
+        return await ViroARSceneNavigatorModule.rvDeleteCloudAnchor((0, react_native_1.findNodeHandle)(this), anchorId);
+    };
+    _rvFindNearbyCloudAnchors = async (latitude, longitude, radius, limit) => {
+        return await ViroARSceneNavigatorModule.rvFindNearbyCloudAnchors((0, react_native_1.findNodeHandle)(this), latitude, longitude, radius, limit);
+    };
+    _rvAttachAssetToCloudAnchor = async (anchorId, fileUrl, fileSize, name, assetType, externalUserId) => {
+        return await ViroARSceneNavigatorModule.rvAttachAssetToCloudAnchor((0, react_native_1.findNodeHandle)(this), anchorId, fileUrl, fileSize, name, assetType, externalUserId);
+    };
+    _rvRemoveAssetFromCloudAnchor = async (anchorId, assetId) => {
+        return await ViroARSceneNavigatorModule.rvRemoveAssetFromCloudAnchor((0, react_native_1.findNodeHandle)(this), anchorId, assetId);
+    };
+    _rvTrackCloudAnchorResolution = async (anchorId, success, confidence, matchCount, inlierCount, processingTimeMs, platform, externalUserId) => {
+        return await ViroARSceneNavigatorModule.rvTrackCloudAnchorResolution((0, react_native_1.findNodeHandle)(this), anchorId, success, confidence, matchCount, inlierCount, processingTimeMs, platform, externalUserId);
+    };
     // ===========================================================================
     // Scene Semantics API Methods
     // ===========================================================================
@@ -797,6 +857,21 @@ class ViroARSceneNavigator extends React.Component {
         createTerrainAnchor: this._createTerrainAnchor,
         createRooftopAnchor: this._createRooftopAnchor,
         removeGeospatialAnchor: this._removeGeospatialAnchor,
+        // ReactVision Geospatial CRUD
+        rvGetGeospatialAnchor: this._rvGetGeospatialAnchor,
+        rvFindNearbyGeospatialAnchors: this._rvFindNearbyGeospatialAnchors,
+        rvUpdateGeospatialAnchor: this._rvUpdateGeospatialAnchor,
+        rvDeleteGeospatialAnchor: this._rvDeleteGeospatialAnchor,
+        rvListGeospatialAnchors: this._rvListGeospatialAnchors,
+        // ReactVision Cloud Anchor Management
+        rvGetCloudAnchor: this._rvGetCloudAnchor,
+        rvListCloudAnchors: this._rvListCloudAnchors,
+        rvUpdateCloudAnchor: this._rvUpdateCloudAnchor,
+        rvDeleteCloudAnchor: this._rvDeleteCloudAnchor,
+        rvFindNearbyCloudAnchors: this._rvFindNearbyCloudAnchors,
+        rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
+        rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
+        rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
         // Scene Semantics API
         isSemanticModeSupported: this._isSemanticModeSupported,
         setSemanticModeEnabled: this._setSemanticModeEnabled,
@@ -836,6 +911,21 @@ class ViroARSceneNavigator extends React.Component {
         createTerrainAnchor: this._createTerrainAnchor,
         createRooftopAnchor: this._createRooftopAnchor,
         removeGeospatialAnchor: this._removeGeospatialAnchor,
+        // ReactVision Geospatial CRUD
+        rvGetGeospatialAnchor: this._rvGetGeospatialAnchor,
+        rvFindNearbyGeospatialAnchors: this._rvFindNearbyGeospatialAnchors,
+        rvUpdateGeospatialAnchor: this._rvUpdateGeospatialAnchor,
+        rvDeleteGeospatialAnchor: this._rvDeleteGeospatialAnchor,
+        rvListGeospatialAnchors: this._rvListGeospatialAnchors,
+        // ReactVision Cloud Anchor Management
+        rvGetCloudAnchor: this._rvGetCloudAnchor,
+        rvListCloudAnchors: this._rvListCloudAnchors,
+        rvUpdateCloudAnchor: this._rvUpdateCloudAnchor,
+        rvDeleteCloudAnchor: this._rvDeleteCloudAnchor,
+        rvFindNearbyCloudAnchors: this._rvFindNearbyCloudAnchors,
+        rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
+        rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
+        rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
         // Scene Semantics API
         isSemanticModeSupported: this._isSemanticModeSupported,
         setSemanticModeEnabled: this._setSemanticModeEnabled,

@@ -30,11 +30,18 @@ public class RVHttpClient {
             String apiKey,
             String contentType,
             byte[] body,
-            int timeoutSec) {
+            int timeoutSec,
+            String[] headerNames,
+            String[] headerValues) {
 
         HttpURLConnection conn = null;
         try {
             conn = openConnection(url, method, apiKey, timeoutSec);
+
+            if (headerNames != null) {
+                for (int i = 0; i < headerNames.length; i++)
+                    conn.setRequestProperty(headerNames[i], headerValues[i]);
+            }
 
             if (body != null && body.length > 0) {
                 conn.setDoOutput(true);

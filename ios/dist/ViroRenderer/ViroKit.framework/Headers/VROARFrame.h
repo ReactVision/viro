@@ -120,6 +120,17 @@ public:
     virtual std::shared_ptr<VROARPointCloud> getPointCloud() = 0;
 
     /*
+     Returns a tightly-packed (stride == width), row-major Y (luma) plane of the
+     camera image.  width and height are set to the plane dimensions.
+     The pointer is valid for the lifetime of this frame object; caller must NOT free it.
+     Returns false if the luma plane is unavailable (platform unsupported, frame not ready).
+     */
+    virtual bool getCameraImageY(const uint8_t** data, int* width, int* height) {
+        (void)data; (void)width; (void)height;
+        return false;
+    }
+
+    /*
      Get the depth texture for this frame, if available.
      Returns nullptr if depth is not supported or not enabled.
      The texture contains depth values in meters as 16-bit unsigned integers

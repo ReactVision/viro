@@ -70,6 +70,7 @@ public:
     VROVector3f getAmbientLightColor() const;
 
     std::shared_ptr<VROARPointCloud> getPointCloud();
+    bool getCameraImageY(const uint8_t** data, int* width, int* height) override;
 
     // Depth data support (iOS 14.0+ with LiDAR)
     std::shared_ptr<VROTexture> getDepthTexture() override;
@@ -115,6 +116,10 @@ private:
     // Cached depth textures (mutable to allow lazy initialization in const methods)
     mutable std::shared_ptr<VROTexture> _depthTexture;
     mutable std::shared_ptr<VROTexture> _depthConfidenceTexture;
+
+    // Cached tightly-packed Y plane (acquired lazily via getCameraImageY)
+    mutable std::vector<uint8_t> _lumaData;
+    mutable int _lumaW = 0, _lumaH = 0;
 
     /*
      Sample depth texture at normalized UV coordinates (0-1 range).

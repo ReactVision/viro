@@ -67,6 +67,74 @@ export function polarToCartesianActual(polarcoords: number[]) {
 }
 
 import { Platform, NativeModules } from "react-native";
+import type { ViroGeospatialPose } from "../Types/ViroEvents";
+
+// ---------------------------------------------------------------------------
+// Geospatial utilities — GPS ↔ AR world-space conversion
+// ---------------------------------------------------------------------------
+
+const EARTH_RADIUS_M = 6378137; // WGS84 equatorial radius in metres
+
+/**
+ * Convert a lat/lng pair to Web Mercator coordinates (metres).
+ * Returns [x (Easting), y (Northing)].
+ */
+export function latLngToMercator(
+  lat: number,
+  lng: number,
+): [number, number] {
+  const x = EARTH_RADIUS_M * (lng * Math.PI) / 180;
+  const y =
+    EARTH_RADIUS_M *
+    Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+  return [x, y];
+}
+
+/**
+ * Convert a GPS position (lat/lng/alt) to an AR world-space offset from the
+ * device's current geospatial pose.
+ *
+ * Uses a Mercator projection for the horizontal plane and the device compass
+ * heading to rotate into the AR coordinate frame:
+ *   +X = right,  +Y = up,  -Z = forward (right-hand rule)
+ *
+ * @param devicePose  Current camera geospatial pose from getCameraGeospatialPose()
+ * @param anchorLat   Target latitude in degrees
+ * @param anchorLng   Target longitude in degrees
+ * @param anchorAlt   Target altitude in metres (WGS84)
+ * @returns [arX, arY, arZ] position in metres relative to the device
+ */
+export function gpsToArWorld(
+  devicePose: ViroGeospatialPose,
+  anchorLat: number,
+  anchorLng: number,
+  anchorAlt: number,
+): [number, number, number] {
+  const [devX, devY] = latLngToMercator(devicePose.latitude, devicePose.longitude);
+  const [ancX, ancY] = latLngToMercator(anchorLat, anchorLng);
+
+  // Delta in metres: East (X) and North (Y)
+  const deltaE = ancX - devX;
+  const deltaN = ancY - devY;
+  const deltaAlt = anchorAlt - devicePose.altitude;
+
+  // Bearing from device to anchor (clockwise from North, radians)
+  const bearing = Math.atan2(deltaE, deltaN);
+  const distance = Math.sqrt(deltaE * deltaE + deltaN * deltaN);
+
+  // Device compass heading: degrees CW from North → radians
+  const headingRad = (devicePose.heading * Math.PI) / 180;
+
+  // Relative bearing in device frame
+  const relBearing = bearing - headingRad;
+
+  // AR frame: +X = right, -Z = forward
+  return [
+    distance * Math.sin(relBearing), // arX
+    deltaAlt,                         // arY (altitude difference)
+    -distance * Math.cos(relBearing), // arZ
+  ];
+}
 
 export interface ViroiOSArSupportResponse {
   isARSupported: boolean;

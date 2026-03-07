@@ -28,6 +28,27 @@ export declare function polarToCartesian(polarcoords: number[]): number[];
  * phi - the yz-plane angle starting from y = 0 degrees
  */
 export declare function polarToCartesianActual(polarcoords: number[]): number[];
+import type { ViroGeospatialPose } from "../Types/ViroEvents";
+/**
+ * Convert a lat/lng pair to Web Mercator coordinates (metres).
+ * Returns [x (Easting), y (Northing)].
+ */
+export declare function latLngToMercator(lat: number, lng: number): [number, number];
+/**
+ * Convert a GPS position (lat/lng/alt) to an AR world-space offset from the
+ * device's current geospatial pose.
+ *
+ * Uses a Mercator projection for the horizontal plane and the device compass
+ * heading to rotate into the AR coordinate frame:
+ *   +X = right,  +Y = up,  -Z = forward (right-hand rule)
+ *
+ * @param devicePose  Current camera geospatial pose from getCameraGeospatialPose()
+ * @param anchorLat   Target latitude in degrees
+ * @param anchorLng   Target longitude in degrees
+ * @param anchorAlt   Target altitude in metres (WGS84)
+ * @returns [arX, arY, arZ] position in metres relative to the device
+ */
+export declare function gpsToArWorld(devicePose: ViroGeospatialPose, anchorLat: number, anchorLng: number, anchorAlt: number): [number, number, number];
 export interface ViroiOSArSupportResponse {
     isARSupported: boolean;
 }

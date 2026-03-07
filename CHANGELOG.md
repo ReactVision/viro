@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v2.53.0 - 06 March 2026
+## v2.53.0 — 06 March 2026
 
 ### Breaking Changes
 
@@ -90,6 +90,12 @@
   The old self-contained usage (no ref, no anchor wiring) no longer works.
 
 ### Added
+
+- **`gpsToArWorld(devicePose, lat, lng, alt)` utility** — converts a GPS coordinate to an
+  AR world-space `[x, y, z]` offset from the device's current geospatial pose. Uses
+  Mercator projection + compass heading. Available in `@reactvision/react-viro`.
+- **`latLngToMercator(lat, lng)` utility** — WGS84 Mercator projection returning metres.
+  Building block for `gpsToArWorld` and custom geo math.
 
 - **ReactVisionCCA — Cloud Anchor Provider**
 
@@ -479,6 +485,28 @@
   66 ms (≈15 fps) thereafter.
 
 ### Changed
+
+- **`createGeospatialAnchor`, `createTerrainAnchor`, `createRooftopAnchor` — now work
+  with `provider="reactvision"`** (previously returned an error).
+
+  The native layer (virocore) delegates GPS→AR math to
+  `RVCCAGeospatialProvider::computeArPosition()` (proprietary, inside `libreactvisioncca`),
+  then creates a native ARKit / ARCore local anchor. No VPS, no ARCore Geospatial API,
+  and no ARCore pods are required.
+
+  | Method | ReactVision placement |
+  |---|---|
+  | `createGeospatialAnchor(lat, lng, alt, quat)` | GPS absolute altitude |
+  | `createTerrainAnchor(lat, lng, altAboveTerrain, quat)` | `deviceAlt + altAboveTerrain` |
+  | `createRooftopAnchor(lat, lng, altAboveRooftop, quat)` | `deviceAlt + altAboveRooftop` |
+
+  The returned `anchorId` is a native AR anchor tracked by VIO for the session.
+  Placement accuracy matches device GPS accuracy (~3–10 m horizontally).
+
+- **GPS math moved to `libreactvisioncca`** (IP protection). The Mercator projection
+  logic was removed from open-source virocore (`gpsToArWorldNative` static helpers deleted
+  from `VROARSessioniOS.cpp` and `VROARSessionARCore.cpp`). Virocore retains only the
+  platform-specific native anchor creation calls (ARKit/ARCore APIs).
 
 - **ViroARPlaneSelector — `useActualShape` now defaults to `true`**
 

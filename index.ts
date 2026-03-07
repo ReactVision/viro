@@ -67,6 +67,8 @@ import {
   polarToCartesianActual,
   isARSupportedOnDevice,
   ViroARSupportResponse,
+  latLngToMercator,
+  gpsToArWorld,
 } from "./components/Utilities/ViroUtils";
 import { ViroARCamera } from "./components/AR/ViroARCamera";
 import {
@@ -217,6 +219,8 @@ export {
   polarToCartesian,
   polarToCartesianActual,
   isARSupportedOnDevice,
+  latLngToMercator,
+  gpsToArWorld,
   // Types
   ViroARSupportResponse,
   ViroHoverEvent,

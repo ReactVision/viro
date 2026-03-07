@@ -393,6 +393,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     // Improvement 5: track whether credentials have been pushed to the native session
     // so setReactVisionConfig() is called exactly once per provider activation.
     private boolean mRvConfigApplied = false;
+    private boolean mGeoProviderApplied = false;
     private static final String TAG = "ViroAR";
 
     // ReactVision GPS pose support
@@ -507,6 +508,18 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         mRvConfigApplied = true;
     }
 
+    private void ensureGeoProviderApplied(ARScene arScene) {
+        if (mGeoProviderApplied) return;
+        if (!"reactvision".equals(mGeospatialAnchorProvider)) return;
+        if (arScene == null) return;
+        if (mRvApiKey == null || mRvApiKey.isEmpty()) return;
+        // setReactVisionConfig queues credentials on renderer thread first;
+        // setGeospatialAnchorProvider queues provider init after it (FIFO).
+        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+        arScene.setGeospatialAnchorProvider("reactvision");
+        mGeoProviderApplied = true;
+    }
+
     /**
      * Improvement 2: split the "message|StateString" encoding produced by the C++ layer
      * (encodeError in VROCloudAnchorProviderReactVision.cpp) into a [message, state] pair.
@@ -609,6 +622,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mGeospatialAnchorProvider = "none";
 
     public void setGeospatialAnchorProvider(String provider) {
+        mGeoProviderApplied = false;
         mGeospatialAnchorProvider = provider != null ? provider.toLowerCase() : "none";
 
         Log.i(TAG, "Setting geospatial anchor provider: " + mGeospatialAnchorProvider);
@@ -646,13 +660,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                     String rvProjectId = ai.metaData.getString("com.reactvision.RVProjectId");
                     if (rvApiKey != null && !rvApiKey.isEmpty()) {
                         Log.i(TAG, "ReactVision API key found in AndroidManifest.xml");
-                        // Pass credentials to the native AR session so
-                        // VROARSessionARCore::setGeospatialAnchorProvider(ReactVision) can
-                        // construct the RVCCAGeospatialProvider with valid credentials.
+                        // Push credentials then activate the geospatial provider.
+                        // Both calls dispatch to the renderer thread in FIFO order, so
+                        // setGeospatialAnchorProvider always runs after setReactVisionConfig.
                         ARScene arScene = getCurrentARScene();
                         if (arScene != null) {
                             arScene.setReactVisionConfig(rvApiKey,
                                 rvProjectId != null ? rvProjectId : "");
+                            arScene.setGeospatialAnchorProvider("reactvision");
                         } else {
                             // Store for lazy application once the scene becomes available.
                             mRvApiKey     = rvApiKey;
@@ -968,7 +983,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
-        ensureRvConfigApplied(arScene);
+        ensureGeoProviderApplied(arScene);
         arScene.rvGetGeospatialAnchor(anchorId, callback);
     }
 
@@ -979,7 +994,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
-        ensureRvConfigApplied(arScene);
+        ensureGeoProviderApplied(arScene);
         arScene.rvFindNearbyGeospatialAnchors(lat, lng, radius, limit, callback);
     }
 
@@ -990,7 +1005,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
-        ensureRvConfigApplied(arScene);
+        ensureGeoProviderApplied(arScene);
         arScene.rvUpdateGeospatialAnchor(anchorId, sceneAssetId, sceneId, name, callback);
     }
 
@@ -1000,14 +1015,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
-        ensureRvConfigApplied(arScene);
+        ensureGeoProviderApplied(arScene);
         arScene.rvDeleteGeospatialAnchor(anchorId, callback);
     }
 
     public void rvListGeospatialAnchors(int limit, int offset, ARScene.RvGeospatialCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
-        ensureRvConfigApplied(arScene);
+        ensureGeoProviderApplied(arScene);
         arScene.rvListGeospatialAnchors(limit, offset, callback);
     }
 

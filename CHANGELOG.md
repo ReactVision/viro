@@ -97,14 +97,14 @@
 - **`latLngToMercator(lat, lng)` utility** — WGS84 Mercator projection returning metres.
   Building block for `gpsToArWorld` and custom geo math.
 
-- **ReactVisionCCA — Cloud Anchor Provider**
+- **ReactVision — Cloud Anchor Provider**
 
   The `"reactvision"` provider routes `hostCloudAnchor` / `resolveCloudAnchor`
   through the ReactVision platform — no Google Cloud configuration or API key
   required.  The existing `hostCloudAnchor`, `resolveCloudAnchor`, and
   `onCloudAnchorStateChange` API is unchanged.
 
-- **ReactVisionCCA — Cloud Anchor Management API**
+- **ReactVision — Cloud Anchor Management API**
 
   8 new methods on `arSceneNavigator` for full CRUD and analytics on cloud anchors
   (available when `provider="reactvision"`, the default):
@@ -120,11 +120,10 @@
   | `rvRemoveAssetFromCloudAnchor(anchorId, assetId)` | Remove an attached asset |
   | `rvTrackCloudAnchorResolution(...)` | Record resolve analytics manually |
 
-  All calls are handled entirely inside the compiled native RVCCA binary — no
+  All calls are handled entirely inside the compiled native binary — no
   API keys or endpoint URLs are present in the JS bundle.
-  See [docs/REACT_API.md](https://github.com/ReactVision/react-viro) for full TypeScript types.
 
-- **ReactVisionCCA — Geospatial Anchor Provider + Management API**
+- **ReactVision — Geospatial Anchor Provider + Management API**
 
   GPS-tagged anchors are available through the ReactVision platform.
   5 new management methods on `arSceneNavigator`:
@@ -486,13 +485,12 @@
 
 ### Changed
 
-- **`createGeospatialAnchor`, `createTerrainAnchor`, `createRooftopAnchor` — now work
-  with `provider="reactvision"`** (previously returned an error).
+- **`createGeospatialAnchor`, `createTerrainAnchor`, `createRooftopAnchor` — supported
+  with `provider="reactvision"`.**
 
-  The native layer (virocore) delegates GPS→AR math to
-  `RVCCAGeospatialProvider::computeArPosition()` (proprietary, inside `libreactvisioncca`),
-  then creates a native ARKit / ARCore local anchor. No VPS, no ARCore Geospatial API,
-  and no ARCore pods are required.
+  GPS→AR placement uses Mercator projection + compass heading to compute the relative
+  AR-frame offset, then creates a native ARKit / ARCore local anchor. No VPS, no ARCore
+  Geospatial API, and no ARCore pods are required.
 
   | Method | ReactVision placement |
   |---|---|
@@ -503,11 +501,6 @@
   The returned `anchorId` is a native AR anchor tracked by VIO for the session.
   Placement accuracy matches device GPS accuracy (~3–10 m horizontally).
 
-- **GPS math moved to `libreactvisioncca`** (IP protection). The Mercator projection
-  logic was removed from open-source virocore (`gpsToArWorldNative` static helpers deleted
-  from `VROARSessioniOS.cpp` and `VROARSessionARCore.cpp`). Virocore retains only the
-  platform-specific native anchor creation calls (ARKit/ARCore APIs).
-
 - **ViroARPlaneSelector — `useActualShape` now defaults to `true`**
 
   Previously the bounding-rect `ViroQuad` fallback was used whenever
@@ -516,23 +509,10 @@
 
 ### ViroCore Integration
 
-This release integrates ReactVisionCCA into ViroCore, adding:
+This release integrates the ReactVision native backend into ViroCore:
 - Cloud anchor hosting and resolving via the ReactVision platform (Android + iOS)
-- Geospatial anchor CRUD and proximity search
-- New `ReactVision` provider wired into `VROARSession` on both platforms
-
-### Fixed
-
-- **Android management API — "provider not available":** `ensureRvConfigApplied()` was not
-  called before management method delegates; native ReactVision session was never initialised
-  for management-only calls. Fixed across all 13 management methods.
-- **`rvListGeospatialAnchors` callback type (iOS + Android):** Lambda declared
-  `ApiResult<std::vector<GeospatialAnchorRecord>>` but method requires
-  `ApiResult<GeospatialListResult>`. Fixed in `VROARSessioniOS.cpp` and `VROARSessionARCore.cpp`.
-- **Missing `functions/v1/` prefix on two cloud anchor endpoints:** `listCloudAnchors` and
-  `findNearbyCloudAnchors` were calling the wrong paths.
-- **`register-device` platform prefix in `os_version`:** iOS now sends `"ios/<version>"`;
-  Android sends `"android/<version>"`. Allows the backend to distinguish platforms.
+- Geospatial anchor CRUD, proximity search, and GPS→AR placement
+- `ReactVision` provider wired into the AR session layer on both platforms
 
 ---
 

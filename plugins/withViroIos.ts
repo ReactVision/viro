@@ -31,7 +31,7 @@ const withViroPods = (config: ExpoConfig) => {
         if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
           const options = pluginConfig[1] as ViroConfigurationOptions;
           // Resolve unified provider prop; old props override for backward compat
-          const resolvedProvider = options.provider ?? undefined;
+          const resolvedProvider = options.provider ?? "reactvision";
           const legacyOpts = options as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
           cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? resolvedProvider;
           geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? resolvedProvider;
@@ -243,7 +243,7 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
       rvApiKey = pluginOptions.rvApiKey;
       rvProjectId = pluginOptions.rvProjectId;
       // Resolve unified provider prop; old props override for backward compat
-      const resolvedProvider = pluginOptions.provider ?? undefined;
+      const resolvedProvider = pluginOptions.provider ?? "reactvision";
       const legacyOpts2 = pluginOptions as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
       cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? resolvedProvider;
       geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? resolvedProvider;

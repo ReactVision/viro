@@ -263,7 +263,7 @@ const withViroManifest = (config: ExpoConfig) =>
         const pluginOptions = viroPlugin[1] as ViroConfigurationOptions;
 
         // Resolve unified provider prop; old geospatialAnchorProvider overrides for backward compat
-        const resolvedProvider = pluginOptions.provider ?? undefined;
+        const resolvedProvider = pluginOptions.provider ?? "reactvision";
         const legacyOpts = pluginOptions as { geospatialAnchorProvider?: string };
         const geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? resolvedProvider;
 

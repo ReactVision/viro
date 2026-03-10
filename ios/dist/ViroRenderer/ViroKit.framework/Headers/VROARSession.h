@@ -585,7 +585,7 @@ public:
     }
 
     /*
-     Update an existing geospatial anchor (link scene asset, scene, or rename).
+     Update an existing geospatial anchor (link scene asset, scene, user asset, or rename).
      Pass empty strings to leave a field unchanged.
      Callback receives (success, jsonData, error).
      */
@@ -594,8 +594,24 @@ public:
         const std::string& sceneAssetId,
         const std::string& sceneId,
         const std::string& name,
+        const std::string& userAssetId,
         std::function<void(bool success, std::string jsonData, std::string error)> callback) {
         if (callback) callback(false, "", "Not supported");
+    }
+
+    /*
+     Upload a file to ReactVision storage and return a user_asset_id.
+     filePath must be a local file path readable by the native layer.
+     assetType: "3d-model" | "image" | "video" | "audio"
+     Callback receives (success, userAssetId, fileUrl, error).
+     */
+    virtual void rvUploadAsset(
+        const std::string& filePath,
+        const std::string& assetType,
+        const std::string& fileName,
+        const std::string& appUserId,
+        std::function<void(bool success, std::string userAssetId, std::string fileUrl, std::string error)> callback) {
+        if (callback) callback(false, "", "", "Not supported");
     }
 
     /*

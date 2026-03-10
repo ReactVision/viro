@@ -1023,14 +1023,31 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     anchorId: string,
     sceneAssetId?: string,
     sceneId?: string,
-    name?: string
+    name?: string,
+    userAssetId?: string
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvUpdateGeospatialAnchor(
       findNodeHandle(this),
       anchorId,
       sceneAssetId ?? "",
       sceneId ?? "",
-      name ?? ""
+      name ?? "",
+      userAssetId ?? ""
+    );
+  };
+
+  _rvUploadAsset = async (
+    filePath: string,
+    assetType: string,
+    fileName: string,
+    appUserId?: string
+  ): Promise<any> => {
+    return await ViroARSceneNavigatorModule.rvUploadAsset(
+      findNodeHandle(this),
+      filePath,
+      assetType,
+      fileName,
+      appUserId ?? ""
     );
   };
 
@@ -1377,6 +1394,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
     rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
     rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+    // Assets API
+    rvUploadAsset: this._rvUploadAsset,
     // Scene Semantics API
     isSemanticModeSupported: this._isSemanticModeSupported,
     setSemanticModeEnabled: this._setSemanticModeEnabled,
@@ -1433,6 +1452,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
     rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
     rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+    // Assets API
+    rvUploadAsset: this._rvUploadAsset,
     // Scene Semantics API
     isSemanticModeSupported: this._isSemanticModeSupported,
     setSemanticModeEnabled: this._setSemanticModeEnabled,

@@ -163,7 +163,11 @@ public:
         std::function<void(bool, std::string, std::string)> callback) override;
     void rvUpdateGeospatialAnchor(const std::string& anchorId,
         const std::string& sceneAssetId, const std::string& sceneId, const std::string& name,
+        const std::string& userAssetId,
         std::function<void(bool, std::string, std::string)> callback) override;
+    void rvUploadAsset(const std::string& filePath, const std::string& assetType,
+        const std::string& fileName, const std::string& appUserId,
+        std::function<void(bool, std::string, std::string, std::string)> callback) override;
     void rvDeleteGeospatialAnchor(const std::string& anchorId,
         std::function<void(bool, std::string)> callback) override;
     void rvListGeospatialAnchors(int limit, int offset,

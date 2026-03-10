@@ -175,7 +175,13 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
                     sceneAssetId:(NSString *)sceneAssetId
                          sceneId:(NSString *)sceneId
                             name:(NSString *)name
+                     userAssetId:(NSString *)userAssetId
                completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
+- (void)rvUploadAsset:(NSString *)filePath
+            assetType:(NSString *)assetType
+             fileName:(NSString *)fileName
+           appUserId:(NSString *)appUserId
+    completionHandler:(void (^)(BOOL success, NSString *userAssetId, NSString *fileUrl, NSString *error))completionHandler;
 - (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
                completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
 - (void)rvListGeospatialAnchors:(int)limit

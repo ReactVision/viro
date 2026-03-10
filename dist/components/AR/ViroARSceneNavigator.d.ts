@@ -467,7 +467,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      * ReactVision — update a geospatial anchor (link scene asset, scene, or rename).
      * Pass null/empty string to leave a field unchanged.
      */
-    _rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string) => Promise<any>;
+    _rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string, userAssetId?: string) => Promise<any>;
+    _rvUploadAsset: (filePath: string, assetType: string, fileName: string, appUserId?: string) => Promise<any>;
     /**
      * ReactVision — permanently delete a geospatial anchor from the backend.
      */
@@ -585,7 +586,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         removeGeospatialAnchor: (anchorId: string) => void;
         rvGetGeospatialAnchor: (anchorId: string) => Promise<any>;
         rvFindNearbyGeospatialAnchors: (latitude: number, longitude: number, radius?: number, limit?: number) => Promise<any>;
-        rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string) => Promise<any>;
+        rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string, userAssetId?: string) => Promise<any>;
         rvDeleteGeospatialAnchor: (anchorId: string) => Promise<any>;
         rvListGeospatialAnchors: (limit: number, offset: number) => Promise<any>;
         rvGetCloudAnchor: (anchorId: string) => Promise<any>;
@@ -596,6 +597,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
         rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
         rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
+        rvUploadAsset: (filePath: string, assetType: string, fileName: string, appUserId?: string) => Promise<any>;
         isSemanticModeSupported: () => Promise<ViroSemanticSupportResult>;
         setSemanticModeEnabled: (enabled: boolean) => void;
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;
@@ -635,7 +637,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         removeGeospatialAnchor: (anchorId: string) => void;
         rvGetGeospatialAnchor: (anchorId: string) => Promise<any>;
         rvFindNearbyGeospatialAnchors: (latitude: number, longitude: number, radius?: number, limit?: number) => Promise<any>;
-        rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string) => Promise<any>;
+        rvUpdateGeospatialAnchor: (anchorId: string, sceneAssetId?: string, sceneId?: string, name?: string, userAssetId?: string) => Promise<any>;
         rvDeleteGeospatialAnchor: (anchorId: string) => Promise<any>;
         rvListGeospatialAnchors: (limit: number, offset: number) => Promise<any>;
         rvGetCloudAnchor: (anchorId: string) => Promise<any>;
@@ -646,6 +648,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
         rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
         rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
+        rvUploadAsset: (filePath: string, assetType: string, fileName: string, appUserId?: string) => Promise<any>;
         isSemanticModeSupported: () => Promise<ViroSemanticSupportResult>;
         setSemanticModeEnabled: (enabled: boolean) => void;
         getSemanticLabelFractions: () => Promise<ViroSemanticLabelFractionsResult>;

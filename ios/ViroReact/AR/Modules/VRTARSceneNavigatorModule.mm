@@ -831,6 +831,7 @@ RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
                               sceneAssetId:(NSString *)sceneAssetId
                                    sceneId:(NSString *)sceneId
                                       name:(NSString *)name
+                               userAssetId:(NSString *)userAssetId
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
@@ -846,6 +847,7 @@ RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
                                    sceneAssetId:sceneAssetId
                                         sceneId:sceneId
                                            name:name
+                                    userAssetId:userAssetId
                               completionHandler:^(BOOL success, NSDictionary *anchorData, NSString *error) {
                 NSMutableDictionary *result = [NSMutableDictionary new];
                 [result setObject:@(success) forKey:@"success"];
@@ -856,6 +858,34 @@ RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
         } @catch (NSException *exception) {
             resolve(@{@"success": @NO, @"error": exception.reason});
         }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
+                       filePath:(NSString *)filePath
+                      assetType:(NSString *)assetType
+                       fileName:(NSString *)fileName
+                      appUserId:(NSString *)appUserId
+                        resolve:(RCTPromiseResolveBlock)resolve
+                         reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvUploadAsset:filePath assetType:assetType
+                fileName:fileName appUserId:appUserId
+                completionHandler:^(BOOL success, NSString *userAssetId, NSString *fileUrl, NSString *error) {
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setObject:@(success) forKey:@"success"];
+                if (userAssetId) [result setObject:userAssetId forKey:@"userAssetId"];
+                if (fileUrl)     [result setObject:fileUrl     forKey:@"fileUrl"];
+                if (error)       [result setObject:error       forKey:@"error"];
+                resolve(result);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
     }];
 }
 

@@ -648,8 +648,11 @@ class ViroARSceneNavigator extends React.Component {
      * ReactVision — update a geospatial anchor (link scene asset, scene, or rename).
      * Pass null/empty string to leave a field unchanged.
      */
-    _rvUpdateGeospatialAnchor = async (anchorId, sceneAssetId, sceneId, name) => {
-        return await ViroARSceneNavigatorModule.rvUpdateGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId, sceneAssetId ?? "", sceneId ?? "", name ?? "");
+    _rvUpdateGeospatialAnchor = async (anchorId, sceneAssetId, sceneId, name, userAssetId) => {
+        return await ViroARSceneNavigatorModule.rvUpdateGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId, sceneAssetId ?? "", sceneId ?? "", name ?? "", userAssetId ?? "");
+    };
+    _rvUploadAsset = async (filePath, assetType, fileName, appUserId) => {
+        return await ViroARSceneNavigatorModule.rvUploadAsset((0, react_native_1.findNodeHandle)(this), filePath, assetType, fileName, appUserId ?? "");
     };
     /**
      * ReactVision — permanently delete a geospatial anchor from the backend.
@@ -898,6 +901,8 @@ class ViroARSceneNavigator extends React.Component {
         rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
         rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
         rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+        // Assets API
+        rvUploadAsset: this._rvUploadAsset,
         // Scene Semantics API
         isSemanticModeSupported: this._isSemanticModeSupported,
         setSemanticModeEnabled: this._setSemanticModeEnabled,
@@ -954,6 +959,8 @@ class ViroARSceneNavigator extends React.Component {
         rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
         rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
         rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+        // Assets API
+        rvUploadAsset: this._rvUploadAsset,
         // Scene Semantics API
         isSemanticModeSupported: this._isSemanticModeSupported,
         setSemanticModeEnabled: this._setSemanticModeEnabled,

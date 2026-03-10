@@ -1285,6 +1285,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
                     sceneAssetId:(NSString *)sceneAssetId
                          sceneId:(NSString *)sceneId
                             name:(NSString *)name
+                     userAssetId:(NSString *)userAssetId
                completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler {
     if (!_vroView) {
         if (completionHandler) completionHandler(NO, nil, @"AR view not initialized");
@@ -1301,6 +1302,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         sceneAssetId ? std::string([sceneAssetId UTF8String]) : "",
         sceneId      ? std::string([sceneId UTF8String])      : "",
         name         ? std::string([name UTF8String])         : "",
+        userAssetId  ? std::string([userAssetId UTF8String])  : "",
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 if (success) {
@@ -1308,6 +1310,40 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
                     completionHandler(YES, rvParseAnchorJson(jsonStr), nil);
                 } else {
                     completionHandler(NO, nil, [NSString stringWithUTF8String:error.c_str()]);
+                }
+            }
+        });
+}
+
+- (void)rvUploadAsset:(NSString *)filePath
+            assetType:(NSString *)assetType
+             fileName:(NSString *)fileName
+           appUserId:(NSString *)appUserId
+    completionHandler:(void (^)(BOOL success, NSString *userAssetId, NSString *fileUrl, NSString *error))completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, nil, nil, @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, nil, nil, @"AR session not available");
+        return;
+    }
+    arSession->rvUploadAsset(
+        std::string([filePath UTF8String]),
+        assetType  ? std::string([assetType UTF8String])  : "",
+        fileName   ? std::string([fileName UTF8String])   : "",
+        appUserId  ? std::string([appUserId UTF8String])  : "",
+        [completionHandler](bool success, std::string assetId, std::string fileUrl, std::string error) {
+            if (completionHandler) {
+                if (success) {
+                    completionHandler(YES,
+                        [NSString stringWithUTF8String:assetId.c_str()],
+                        [NSString stringWithUTF8String:fileUrl.c_str()],
+                        nil);
+                } else {
+                    completionHandler(NO, nil, nil, [NSString stringWithUTF8String:error.c_str()]);
                 }
             }
         });

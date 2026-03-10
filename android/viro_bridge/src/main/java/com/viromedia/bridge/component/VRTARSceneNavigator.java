@@ -248,6 +248,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             android.util.Log.i(TAG, "  Rotation listener disabled");
         }
 
+        // Stop GPS/sensor callbacks before disposal to avoid use-after-free in pushLocationToNative
+        stopRVLocationUpdates();
+
         // Pause AR session before disposal
         ViroViewARCore arView = getARView();
         if (arView != null) {
@@ -1040,14 +1043,26 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     public void rvUpdateGeospatialAnchor(String anchorId, String sceneAssetId, String sceneId,
-                                          String name, ARScene.RvGeospatialCallback callback) {
+                                          String name, String userAssetId,
+                                          ARScene.RvGeospatialCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
             if (callback != null) callback.onResult(false, "", "AR scene not available");
             return;
         }
         ensureGeoProviderApplied(arScene);
-        arScene.rvUpdateGeospatialAnchor(anchorId, sceneAssetId, sceneId, name, callback);
+        arScene.rvUpdateGeospatialAnchor(anchorId, sceneAssetId, sceneId, name, userAssetId, callback);
+    }
+
+    public void rvUploadAsset(String filePath, String assetType, String fileName,
+                               String appUserId, ARScene.RvUploadAssetCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult(false, "", "", "AR scene not available");
+            return;
+        }
+        ensureGeoProviderApplied(arScene);
+        arScene.rvUploadAsset(filePath, assetType, fileName, appUserId, callback);
     }
 
     public void rvDeleteGeospatialAnchor(String anchorId, ARScene.RvGeospatialCallback callback) {

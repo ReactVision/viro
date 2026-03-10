@@ -702,6 +702,58 @@ RCT_EXPORT_METHOD(createRooftopAnchor:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(hostGeospatialAnchor:(nonnull NSNumber *)reactTag
+                            latitude:(double)latitude
+                           longitude:(double)longitude
+                            altitude:(double)altitude
+                        altitudeMode:(NSString *)altitudeMode
+                            resolver:(RCTPromiseResolveBlock)resolve
+                            rejecter:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                         NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        VRTARSceneNavigator *component = (VRTARSceneNavigator *)viewRegistry[reactTag];
+        if (!component || ![component isKindOfClass:[VRTARSceneNavigator class]]) {
+            resolve(@{@"success": @NO, @"error": @"Invalid component"});
+            return;
+        }
+        [component hostGeospatialAnchor:latitude
+                              longitude:longitude
+                               altitude:altitude
+                           altitudeMode:altitudeMode
+                      completionHandler:^(BOOL success, NSString *platformUuid, NSString *error) {
+            if (success) {
+                resolve(@{@"success": @YES, @"anchorId": platformUuid});
+            } else {
+                resolve(@{@"success": @NO, @"error": error ?: @"Unknown error"});
+            }
+        }];
+    }];
+}
+
+RCT_EXPORT_METHOD(resolveGeospatialAnchor:(nonnull NSNumber *)reactTag
+                          platformUuid:(NSString *)platformUuid
+                             quaternion:(id)quaternion
+                               resolver:(RCTPromiseResolveBlock)resolve
+                               rejecter:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                         NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        VRTARSceneNavigator *component = (VRTARSceneNavigator *)viewRegistry[reactTag];
+        if (!component || ![component isKindOfClass:[VRTARSceneNavigator class]]) {
+            resolve(@{@"success": @NO, @"error": @"Invalid component"});
+            return;
+        }
+        [component resolveGeospatialAnchor:platformUuid
+                                 quaternion:quaternion
+                         completionHandler:^(BOOL success, NSDictionary *anchorData, NSString *error) {
+            if (success) {
+                resolve(@{@"success": @YES, @"anchor": anchorData});
+            } else {
+                resolve(@{@"success": @NO, @"error": error ?: @"Unknown error"});
+            }
+        }];
+    }];
+}
+
 RCT_EXPORT_METHOD(removeGeospatialAnchor:(nonnull NSNumber *)reactTag
                                 anchorId:(NSString *)anchorId) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,

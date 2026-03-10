@@ -63,7 +63,7 @@ export interface ViroConfigurationOptions {
      * - "arcore": Use ARCore Cloud Anchors / Geospatial API (requires googleCloudApiKey)
      * - "none": Disable both
      *
-     * DEFAULTS TO: undefined (no provider-specific manifest entries or permissions injected)
+     * DEFAULTS TO: "reactvision"
      */
     provider?: Provider;
     /**

@@ -604,6 +604,30 @@ class ViroARSceneNavigator extends React.Component {
         ViroARSceneNavigatorModule.removeGeospatialAnchor((0, react_native_1.findNodeHandle)(this), anchorId);
     };
     /**
+     * ReactVision — save GPS coordinates to the backend and return a cross-device shareable UUID.
+     * Does NOT create a local AR anchor — call createGeospatialAnchor separately for AR placement.
+     *
+     * @param latitude     WGS84 latitude
+     * @param longitude    WGS84 longitude
+     * @param altitude     Altitude in metres
+     * @param altitudeMode "street_level" (default) or "rooftop_level"
+     * @returns Promise resolving to { success, anchorId } where anchorId is the platform UUID
+     */
+    _hostGeospatialAnchor = async (latitude, longitude, altitude, altitudeMode) => {
+        return await ViroARSceneNavigatorModule.hostGeospatialAnchor((0, react_native_1.findNodeHandle)(this), latitude, longitude, altitude, altitudeMode || "street_level");
+    };
+    /**
+     * ReactVision — fetch GPS coordinates from the backend by platform UUID and create a local AR anchor.
+     * Combines rvGetGeospatialAnchor + createGeospatialAnchor into a single call.
+     *
+     * @param platformUuid UUID returned by hostGeospatialAnchor
+     * @param quaternion   Orientation [x, y, z, w] (default identity)
+     * @returns Promise resolving to { success, anchor: { anchorId, latitude, longitude, altitude } }
+     */
+    _resolveGeospatialAnchor = async (platformUuid, quaternion) => {
+        return await ViroARSceneNavigatorModule.resolveGeospatialAnchor((0, react_native_1.findNodeHandle)(this), platformUuid, quaternion || [0, 0, 0, 1]);
+    };
+    /**
      * ReactVision — fetch a geospatial anchor record by UUID.
      * Returns the anchor with linked scene asset data (position, rotation, scale, fileUrl).
      */
@@ -854,6 +878,8 @@ class ViroARSceneNavigator extends React.Component {
         getCameraGeospatialPose: this._getCameraGeospatialPose,
         checkVPSAvailability: this._checkVPSAvailability,
         createGeospatialAnchor: this._createGeospatialAnchor,
+        hostGeospatialAnchor: this._hostGeospatialAnchor,
+        resolveGeospatialAnchor: this._resolveGeospatialAnchor,
         createTerrainAnchor: this._createTerrainAnchor,
         createRooftopAnchor: this._createRooftopAnchor,
         removeGeospatialAnchor: this._removeGeospatialAnchor,
@@ -908,6 +934,8 @@ class ViroARSceneNavigator extends React.Component {
         getCameraGeospatialPose: this._getCameraGeospatialPose,
         checkVPSAvailability: this._checkVPSAvailability,
         createGeospatialAnchor: this._createGeospatialAnchor,
+        hostGeospatialAnchor: this._hostGeospatialAnchor,
+        resolveGeospatialAnchor: this._resolveGeospatialAnchor,
         createTerrainAnchor: this._createTerrainAnchor,
         createRooftopAnchor: this._createRooftopAnchor,
         removeGeospatialAnchor: this._removeGeospatialAnchor,

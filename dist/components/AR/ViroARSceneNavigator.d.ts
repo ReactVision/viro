@@ -431,6 +431,26 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _removeGeospatialAnchor: (anchorId: string) => void;
     /**
+     * ReactVision — save GPS coordinates to the backend and return a cross-device shareable UUID.
+     * Does NOT create a local AR anchor — call createGeospatialAnchor separately for AR placement.
+     *
+     * @param latitude     WGS84 latitude
+     * @param longitude    WGS84 longitude
+     * @param altitude     Altitude in metres
+     * @param altitudeMode "street_level" (default) or "rooftop_level"
+     * @returns Promise resolving to { success, anchorId } where anchorId is the platform UUID
+     */
+    _hostGeospatialAnchor: (latitude: number, longitude: number, altitude: number, altitudeMode?: string) => Promise<any>;
+    /**
+     * ReactVision — fetch GPS coordinates from the backend by platform UUID and create a local AR anchor.
+     * Combines rvGetGeospatialAnchor + createGeospatialAnchor into a single call.
+     *
+     * @param platformUuid UUID returned by hostGeospatialAnchor
+     * @param quaternion   Orientation [x, y, z, w] (default identity)
+     * @returns Promise resolving to { success, anchor: { anchorId, latitude, longitude, altitude } }
+     */
+    _resolveGeospatialAnchor: (platformUuid: string, quaternion?: ViroQuaternion) => Promise<any>;
+    /**
      * ReactVision — fetch a geospatial anchor record by UUID.
      * Returns the anchor with linked scene asset data (position, rotation, scale, fileUrl).
      */
@@ -558,6 +578,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         getCameraGeospatialPose: () => Promise<ViroGeospatialPoseResult>;
         checkVPSAvailability: (latitude: number, longitude: number) => Promise<ViroVPSAvailabilityResult>;
         createGeospatialAnchor: (latitude: number, longitude: number, altitude: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
+        hostGeospatialAnchor: (latitude: number, longitude: number, altitude: number, altitudeMode?: string) => Promise<any>;
+        resolveGeospatialAnchor: (platformUuid: string, quaternion?: ViroQuaternion) => Promise<any>;
         createTerrainAnchor: (latitude: number, longitude: number, altitudeAboveTerrain: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         createRooftopAnchor: (latitude: number, longitude: number, altitudeAboveRooftop: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         removeGeospatialAnchor: (anchorId: string) => void;
@@ -606,6 +628,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         getCameraGeospatialPose: () => Promise<ViroGeospatialPoseResult>;
         checkVPSAvailability: (latitude: number, longitude: number) => Promise<ViroVPSAvailabilityResult>;
         createGeospatialAnchor: (latitude: number, longitude: number, altitude: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
+        hostGeospatialAnchor: (latitude: number, longitude: number, altitude: number, altitudeMode?: string) => Promise<any>;
+        resolveGeospatialAnchor: (platformUuid: string, quaternion?: ViroQuaternion) => Promise<any>;
         createTerrainAnchor: (latitude: number, longitude: number, altitudeAboveTerrain: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         createRooftopAnchor: (latitude: number, longitude: number, altitudeAboveRooftop: number, quaternion?: ViroQuaternion) => Promise<ViroCreateGeospatialAnchorResult>;
         removeGeospatialAnchor: (anchorId: string) => void;

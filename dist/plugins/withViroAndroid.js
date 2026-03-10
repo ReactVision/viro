@@ -166,10 +166,13 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
     const viroPlugin = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro");
     if (Array.isArray(viroPlugin) && viroPlugin.length > 1) {
         const pluginOptions = viroPlugin[1];
-        // Resolve unified provider prop; old geospatialAnchorProvider overrides for backward compat
-        const resolvedProvider = pluginOptions.provider ?? undefined;
+        // Resolve unified provider prop; old geospatialAnchorProvider overrides for backward compat.
+        // Default to "reactvision" only when rvApiKey is present (implies RV intent) but provider
+        // is not explicitly set — avoids injecting location permissions for apps with no credentials.
         const legacyOpts = pluginOptions;
-        const geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? resolvedProvider;
+        const geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider
+            ?? pluginOptions.provider
+            ?? (pluginOptions.rvApiKey ? "reactvision" : undefined);
         if (pluginOptions.googleCloudApiKey) {
             contents?.manifest?.application?.[0]["meta-data"]?.push({
                 $: {

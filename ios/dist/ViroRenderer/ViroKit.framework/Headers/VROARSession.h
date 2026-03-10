@@ -446,6 +446,25 @@ public:
         }
     }
 
+    virtual void resolveGeospatialAnchor(const std::string& platformUuid, VROQuaternion quaternion,
+                                          std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
+                                          std::function<void(std::string error)> onFailure) {
+        if (onFailure) {
+            onFailure("Resolve geospatial anchor not supported");
+        }
+    }
+
+    // Host a geospatial anchor to the ReactVision backend at the given GPS position.
+    // Returns the platform UUID via onSuccess(platformUuid) string callback.
+    virtual void hostGeospatialAnchor(double latitude, double longitude, double altitude,
+                                       const std::string& altitudeMode,
+                                       std::function<void(std::string platformUuid)> onSuccess,
+                                       std::function<void(std::string error)> onFailure) {
+        if (onFailure) {
+            onFailure("Host geospatial anchor not supported");
+        }
+    }
+
     /*
      Create a terrain anchor at the specified location.
      Terrain anchors are positioned relative to the terrain surface.

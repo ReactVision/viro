@@ -151,6 +151,18 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 
 - (void)removeGeospatialAnchor:(NSString *)anchorId;
 
+// ReactVision-specific: save GPS anchor to backend (returns platform UUID), no local AR anchor
+- (void)hostGeospatialAnchor:(double)latitude
+                   longitude:(double)longitude
+                    altitude:(double)altitude
+               altitudeMode:(NSString *)altitudeMode
+           completionHandler:(void (^)(BOOL success, NSString * _Nullable platformUuid, NSString * _Nullable error))completionHandler;
+
+// ReactVision-specific: fetch GPS coords from backend by UUID + create local AR anchor
+- (void)resolveGeospatialAnchor:(NSString *)platformUuid
+                      quaternion:(id)quaternion
+              completionHandler:(GeospatialAnchorCompletionHandler)completionHandler;
+
 // ReactVision Geospatial CRUD
 - (void)rvGetGeospatialAnchor:(NSString *)anchorId
             completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;

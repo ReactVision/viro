@@ -141,6 +141,13 @@ public:
                                 VROQuaternion quaternion,
                                 std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
                                 std::function<void(std::string error)> onFailure) override;
+    void resolveGeospatialAnchor(const std::string& platformUuid, VROQuaternion quaternion,
+                                  std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
+                                  std::function<void(std::string error)> onFailure) override;
+    void hostGeospatialAnchor(double latitude, double longitude, double altitude,
+                               const std::string& altitudeMode,
+                               std::function<void(std::string platformUuid)> onSuccess,
+                               std::function<void(std::string error)> onFailure) override;
     void createTerrainAnchor(double latitude, double longitude, double altitudeAboveTerrain,
                              VROQuaternion quaternion,
                              std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,

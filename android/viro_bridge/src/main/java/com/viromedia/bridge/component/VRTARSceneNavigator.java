@@ -841,6 +841,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
+        ensureGeoProviderApplied(arScene);
         arScene.getCameraGeospatialPose(new ARScene.GeospatialPoseListener() {
             @Override
             public void onSuccess(ARScene.GeospatialPose pose) {
@@ -899,6 +900,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
+        ensureGeoProviderApplied(arScene);
         arScene.createGeospatialAnchor(latitude, longitude, altitude, quaternion,
             new ARScene.GeospatialAnchorListener() {
                 @Override
@@ -910,6 +912,45 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 public void onFailure(String error) {
                     callback.onFailure(error);
                 }
+            });
+    }
+
+    public void hostGeospatialAnchor(double latitude, double longitude, double altitude,
+                                      String altitudeMode,
+                                      ARSceneNavigatorModule.HostGeospatialAnchorCallback callback) {
+        if (!"reactvision".equals(mGeospatialAnchorProvider)) {
+            callback.onFailure("hostGeospatialAnchor requires the ReactVision geospatial provider.");
+            return;
+        }
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            callback.onFailure("AR scene not available");
+            return;
+        }
+        ensureGeoProviderApplied(arScene);
+        arScene.hostGeospatialAnchor(latitude, longitude, altitude, altitudeMode,
+            new ARScene.HostGeospatialAnchorListener() {
+                @Override public void onSuccess(String platformUuid) { callback.onSuccess(platformUuid); }
+                @Override public void onFailure(String error) { callback.onFailure(error); }
+            });
+    }
+
+    public void resolveGeospatialAnchor(String platformUuid, float[] quaternion,
+                                         ARSceneNavigatorModule.GeospatialAnchorCallback callback) {
+        if (!"reactvision".equals(mGeospatialAnchorProvider)) {
+            callback.onFailure("resolveGeospatialAnchor requires the ReactVision geospatial provider.");
+            return;
+        }
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            callback.onFailure("AR scene not available");
+            return;
+        }
+        ensureGeoProviderApplied(arScene);
+        arScene.resolveGeospatialAnchor(platformUuid, quaternion,
+            new ARScene.GeospatialAnchorListener() {
+                @Override public void onSuccess(ARScene.GeospatialAnchor anchor) { callback.onSuccess(anchor); }
+                @Override public void onFailure(String error) { callback.onFailure(error); }
             });
     }
 

@@ -22,11 +22,12 @@ const withViroPods = (config) => {
                 const pluginConfig = config?.plugins?.find((plugin) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro");
                 if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
                     const options = pluginConfig[1];
-                    // Resolve unified provider prop; old props override for backward compat
-                    const resolvedProvider = options.provider ?? undefined;
+                    // Resolve unified provider prop; old props override for backward compat.
+                    // Default to "reactvision" only when rvApiKey is present (implies RV intent).
+                    const defaultProvider = options.rvApiKey ? "reactvision" : undefined;
                     const legacyOpts = options;
-                    cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? resolvedProvider;
-                    geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? resolvedProvider;
+                    cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? options.provider ?? defaultProvider;
+                    geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? options.provider ?? defaultProvider;
                     iosLinkage = options.iosLinkage;
                     includeARCore = options.ios?.includeARCore;
                 }
@@ -185,11 +186,12 @@ const withDefaultInfoPlist = (config, _props) => {
             googleCloudApiKey = pluginOptions.googleCloudApiKey;
             rvApiKey = pluginOptions.rvApiKey;
             rvProjectId = pluginOptions.rvProjectId;
-            // Resolve unified provider prop; old props override for backward compat
-            const resolvedProvider = pluginOptions.provider ?? undefined;
+            // Resolve unified provider prop; old props override for backward compat.
+            // Default to "reactvision" only when rvApiKey is present (implies RV intent).
+            const defaultProvider2 = pluginOptions.rvApiKey ? "reactvision" : undefined;
             const legacyOpts2 = pluginOptions;
-            cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? resolvedProvider;
-            geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? resolvedProvider;
+            cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? pluginOptions.provider ?? defaultProvider2;
+            geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? pluginOptions.provider ?? defaultProvider2;
             includeARCore = pluginOptions.ios?.includeARCore;
         }
     }

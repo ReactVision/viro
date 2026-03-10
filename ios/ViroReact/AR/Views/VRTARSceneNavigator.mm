@@ -1021,6 +1021,76 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     );
 }
 
+- (void)hostGeospatialAnchor:(double)latitude
+                   longitude:(double)longitude
+                    altitude:(double)altitude
+               altitudeMode:(NSString *)altitudeMode
+           completionHandler:(void (^)(BOOL success, NSString *platformUuid, NSString *error))completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, nil, @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, nil, @"AR session not available");
+        return;
+    }
+    std::string modeStr = altitudeMode ? std::string([altitudeMode UTF8String]) : "street_level";
+    arSession->hostGeospatialAnchor(latitude, longitude, altitude, modeStr,
+        [completionHandler](std::string platformUuid) {
+            if (completionHandler) {
+                completionHandler(YES, [NSString stringWithUTF8String:platformUuid.c_str()], nil);
+            }
+        },
+        [completionHandler](std::string error) {
+            if (completionHandler) {
+                completionHandler(NO, nil, [NSString stringWithUTF8String:error.c_str()]);
+            }
+        }
+    );
+}
+
+- (void)resolveGeospatialAnchor:(NSString *)platformUuid
+                      quaternion:(id)quaternion
+              completionHandler:(GeospatialAnchorCompletionHandler)completionHandler {
+    if (!_vroView) {
+        if (completionHandler) completionHandler(NO, nil, @"AR view not initialized");
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) completionHandler(NO, nil, @"AR session not available");
+        return;
+    }
+    VROQuaternion quat = [self parseQuaternion:quaternion];
+    std::string uuidStr = std::string([platformUuid UTF8String]);
+    arSession->resolveGeospatialAnchor(uuidStr, quat,
+        [completionHandler](std::shared_ptr<VROGeospatialAnchor> anchor) {
+            if (completionHandler) {
+                VROMatrix4f transform = anchor->getTransform();
+                VROVector3f position = transform.extractTranslation();
+                NSDictionary *anchorData = @{
+                    @"anchorId": [NSString stringWithUTF8String:anchor->getId().c_str()],
+                    @"type": @"WGS84",
+                    @"latitude": @(anchor->getLatitude()),
+                    @"longitude": @(anchor->getLongitude()),
+                    @"altitude": @(anchor->getAltitude()),
+                    @"heading": @(anchor->getHeading()),
+                    @"position": @[@(position.x), @(position.y), @(position.z)]
+                };
+                completionHandler(YES, anchorData, nil);
+            }
+        },
+        [completionHandler](std::string error) {
+            if (completionHandler) {
+                completionHandler(NO, nil, [NSString stringWithUTF8String:error.c_str()]);
+            }
+        }
+    );
+}
+
 - (void)createTerrainAnchor:(double)latitude
                   longitude:(double)longitude
         altitudeAboveTerrain:(double)altitudeAboveTerrain
@@ -1134,22 +1204,14 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
         return;
     }
 
-    // Find the geospatial anchor by ID and remove it
+    // Geospatial anchors are not in the ARKit frame anchor list (they are GPS-computed,
+    // not ARKit-tracked). Construct a minimal anchor with just the ID and delegate
+    // removal to the session, which uses getId() for the backend API call.
     std::string anchorIdStr = std::string([anchorId UTF8String]);
-    std::unique_ptr<VROARFrame> &frame = arSession->getLastFrame();
-    if (frame) {
-        const std::vector<std::shared_ptr<VROARAnchor>> &anchors = frame->getAnchors();
-        for (const auto &anchor : anchors) {
-            if (anchor->getId() == anchorIdStr) {
-                std::shared_ptr<VROGeospatialAnchor> geoAnchor =
-                    std::dynamic_pointer_cast<VROGeospatialAnchor>(anchor);
-                if (geoAnchor) {
-                    arSession->removeGeospatialAnchor(geoAnchor);
-                    break;
-                }
-            }
-        }
-    }
+    auto geoAnchor = std::make_shared<VROGeospatialAnchor>(
+        VROGeospatialAnchorType::WGS84, 0, 0, 0, VROQuaternion());
+    geoAnchor->setId(anchorIdStr);
+    arSession->removeGeospatialAnchor(geoAnchor);
 }
 
 static NSDictionary *rvParseAnchorJson(NSString *json) {

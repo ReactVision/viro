@@ -231,7 +231,7 @@ const withDefaultInfoPlist = (config, _props) => {
 };
 exports.withDefaultInfoPlist = withDefaultInfoPlist;
 const withViroIos = (config, props) => {
-    (0, config_plugins_1.withPlugins)(config, [[withViroPods, props]]);
+    config = (0, config_plugins_1.withPlugins)(config, [[withViroPods, props]]);
     (0, exports.withDefaultInfoPlist)(config, props);
     withEnabledBitcode(config);
     withExcludedSimulatorArchitectures(config);

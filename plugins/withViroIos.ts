@@ -294,7 +294,7 @@ export const withViroIos: ConfigPlugin<ViroConfigurationOptions> = (
   config,
   props
 ) => {
-  withPlugins(config, [[withViroPods, props]]);
+  config = withPlugins(config, [[withViroPods, props]]);
   withDefaultInfoPlist(config, props);
   withEnabledBitcode(config);
   withExcludedSimulatorArchitectures(config);

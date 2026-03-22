@@ -32,6 +32,7 @@
 #import <React/RCTUtils.h>
 #import <React/RCTImageSource.h>
 #import <ViroKit/VROShaderModifier.h>
+#import <ViroKit/VROSemantics.h>
 #import <ViroKit/VROTextureUtil.h>
 #import <ViroKit/VROVideoTextureiOS.h>
 #import <ViroKit/VROImageiOS.h>
@@ -393,6 +394,19 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             } else if ([@"bloomThreshold" caseInsensitiveCompare:materialPropertyName]  == NSOrderedSame){
                 NSNumber *number =  material[key];
                 vroMaterial->setBloomThreshold([number floatValue]);
+            } else if ([@"semanticMask" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
+                NSDictionary *maskConfig = material[key];
+                if ([maskConfig isKindOfClass:[NSDictionary class]]) {
+                    NSString *modeStr = maskConfig[@"mode"];
+                    VROSemanticMaskMode maskMode = VROSemanticMaskMode::ShowOnly;
+                    if ([@"hide" isEqualToString:modeStr]) {
+                        maskMode = VROSemanticMaskMode::Hide;
+                    }
+                    uint16_t labelMask = (uint16_t)[maskConfig[@"labelMask"] unsignedShortValue];
+                    vroMaterial->setSemanticMaskMode(maskMode);
+                    vroMaterial->setSemanticLabelMask(labelMask);
+                    vroMaterial->setSemanticMaskEnabled(true);
+                }
             } else if ([@"metalness" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame){
                 vroMaterial->getMetalness().setColor({ [material[key] floatValue], 1.0, 1.0, 1.0 });
             } else if ([@"roughness" caseInsensitiveCompare:materialPropertyName]  == NSOrderedSame){

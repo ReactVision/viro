@@ -27,6 +27,14 @@ export type ViroResolvedCubeMap = {
     nz: ImageResolvedAssetSource;
     pz: ImageResolvedAssetSource;
 };
+export type ViroSemanticMaskMode = "showOnly" | "hide";
+export type ViroSemanticLabel = "sky" | "building" | "tree" | "road" | "sidewalk" | "terrain" | "structure" | "object" | "vehicle" | "person" | "water";
+export type ViroSemanticMaskConfig = {
+    /** Whether to show the material only where the label matches, or to hide it there. */
+    mode: ViroSemanticMaskMode;
+    /** One or more semantic labels to match against. */
+    labels: ViroSemanticLabel[];
+};
 export type ViroShaderModifier = {
     body?: string;
     uniforms?: string;
@@ -86,6 +94,10 @@ export type ViroMaterial = {
     ambientOcclusionTexture?: any;
     shaderModifiers?: ViroShaderModifiers;
     materialUniforms?: ViroShaderUniform[];
+    /** Semantic masking — shows or hides the material based on ARCore scene semantics labels.
+     *  Requires `setSemanticModeEnabled(true)` on the AR scene navigator.
+     *  Only supported on Android (ARCore). Gracefully no-ops on iOS. */
+    semanticMask?: ViroSemanticMaskConfig;
 };
 export type ViroMaterialDict = {
     [key: string]: ViroMaterial;

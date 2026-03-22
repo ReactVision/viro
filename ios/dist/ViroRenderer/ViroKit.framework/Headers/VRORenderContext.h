@@ -222,6 +222,13 @@ public:
         return _cameraBackgroundTexture;
     }
 
+    void setSemanticTexture(std::shared_ptr<VROTexture> texture) {
+        _semanticTexture = texture;
+    }
+    std::shared_ptr<VROTexture> getSemanticTexture() const {
+        return _semanticTexture;
+    }
+
     void setCameraImageTransform(VROMatrix4f transform) {
         _cameraImageTransform = transform;
     }
@@ -350,6 +357,12 @@ private:
      on iOS it is a standard GL_TEXTURE_2D. Null when no AR session is active.
      */
     std::shared_ptr<VROTexture> _cameraBackgroundTexture;
+
+    /*
+     Semantic segmentation texture (R8, per-pixel label 0-11 = VROSemanticLabel).
+     Updated each frame when semantic mode is enabled. Null when not available.
+     */
+    std::shared_ptr<VROTexture> _semanticTexture;
 
     /*
      Transform mapping viewport UV coordinates to camera image UV coordinates.

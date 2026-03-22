@@ -264,6 +264,13 @@ public:
      */
     void setCameraBackgroundTexture(std::shared_ptr<VROTexture> texture);
     void setCameraImageTransform(VROMatrix4f transform);
+
+    /*
+     Set the semantic segmentation texture (R8, per-pixel label 0-11).
+     Auto-bound to shader modifier samplers named 'semantic_texture'.
+     Pass nullptr when semantic mode is disabled or data is unavailable.
+     */
+    void setSemanticTexture(std::shared_ptr<VROTexture> texture);
     
 #pragma mark - Camera
    

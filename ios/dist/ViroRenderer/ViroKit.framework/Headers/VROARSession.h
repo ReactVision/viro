@@ -319,6 +319,13 @@ public:
      texture are updated after each call to updateFrame().
      */
     virtual std::shared_ptr<VROTexture> getCameraBackgroundTexture() = 0;
+
+    /*
+     Get the semantic texture for the current frame. Each pixel is a VROSemanticLabel
+     value (0-11, R8 format). Returns nullptr if semantic mode is not enabled or
+     the platform does not support it.
+     */
+    virtual std::shared_ptr<VROTexture> getSemanticTexture() { return nullptr; }
     
     /*
      Invoke when the viewport changes. The AR engine may adjust its camera

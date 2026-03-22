@@ -23,6 +23,7 @@ const withViroPods = (config: ExpoConfig) => {
       let geospatialAnchorProvider: string | undefined;
       let iosLinkage: "dynamic" | "static" | undefined;
       let includeARCore: boolean | undefined;
+      let includeSemantics: boolean | undefined;
       if (Array.isArray(config.plugins)) {
         const pluginConfig = config?.plugins?.find(
           (plugin) =>
@@ -38,6 +39,7 @@ const withViroPods = (config: ExpoConfig) => {
           geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? options.provider ?? defaultProvider;
           iosLinkage = options.iosLinkage;
           includeARCore = options.ios?.includeARCore;
+          includeSemantics = options.ios?.includeSemantics;
         }
       }
 
@@ -61,39 +63,41 @@ const withViroPods = (config: ExpoConfig) => {
           `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
           `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`;
 
-        // Add ARCore pods if enabled (explicitly via includeARCore or implicitly via cloud/geospatial providers)
+        // Add ARCore pods if enabled (explicitly via includeARCore/includeSemantics or implicitly via providers)
         // ViroKit.podspec declares these as weak_frameworks, making ARCore optional at runtime
         const needsARCoreForFeatures = cloudAnchorProvider === "arcore" || geospatialAnchorProvider === "arcore";
         const shouldIncludeARCore = includeARCore === true || needsARCoreForFeatures;
+        const shouldIncludeSemantics = shouldIncludeARCore || includeSemantics === true;
 
-        if (shouldIncludeARCore) {
+        if (shouldIncludeSemantics) {
           viroPods +=
             `\n\n  # ARCore SDK - Cloud Anchors, Geospatial, and Scene Semantics API\n` +
             `  # ViroKit uses weak linking for these frameworks, making ARCore optional at runtime.\n` +
             `  # ViroKit checks availability using NSClassFromString and gracefully degrades if not present.\n` +
             `  pod 'ARCore/CloudAnchors', '~> 1.51.0'`;
 
-          // Add Geospatial pod if geospatial is enabled or explicit ARCore inclusion
+          // Add Geospatial pod if geospatial is enabled or full ARCore inclusion
           if (geospatialAnchorProvider === "arcore" || includeARCore === true) {
             viroPods +=
               `\n  pod 'ARCore/Geospatial', '~> 1.51.0'`;
           }
 
           // Add Semantics pod for Scene Semantics API (ML-based scene understanding)
+          // Included whenever ARCore is present OR includeSemantics: true
           viroPods +=
             `\n  pod 'ARCore/Semantics', '~> 1.51.0'`;
         }
 
         // Add use_frameworks! if configured
-        // User's iosLinkage setting is respected; if not set and ARCore is enabled, default to dynamic
-        const effectiveLinkage = iosLinkage || (shouldIncludeARCore ? "dynamic" : undefined);
+        // User's iosLinkage setting is respected; if not set and ARCore/Semantics is enabled, default to dynamic
+        const effectiveLinkage = iosLinkage || (shouldIncludeSemantics ? "dynamic" : undefined);
         if (effectiveLinkage) {
           // Insert use_frameworks! before the target block
           let linkageComment: string;
-          if (shouldIncludeARCore && effectiveLinkage === "static") {
+          if (shouldIncludeSemantics && effectiveLinkage === "static") {
             // Warn user that static linkage may not work with ARCore
             linkageComment = `# WARNING: ARCore SDK typically requires dynamic frameworks.\n# Static linkage is set but may cause build issues with ARCore pods.`;
-          } else if (shouldIncludeARCore) {
+          } else if (shouldIncludeSemantics) {
             linkageComment = `# Framework linkage: ${effectiveLinkage} (ARCore requires dynamic frameworks)`;
           } else {
             linkageComment = `# Framework linkage configured via app.json (iosLinkage: "${effectiveLinkage}")`;

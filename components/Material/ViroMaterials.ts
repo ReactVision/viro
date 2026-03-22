@@ -54,6 +54,43 @@ export type ViroResolvedCubeMap = {
   pz: ImageResolvedAssetSource;
 };
 
+export type ViroSemanticMaskMode = "showOnly" | "hide";
+
+export type ViroSemanticLabel =
+  | "sky"
+  | "building"
+  | "tree"
+  | "road"
+  | "sidewalk"
+  | "terrain"
+  | "structure"
+  | "object"
+  | "vehicle"
+  | "person"
+  | "water";
+
+export type ViroSemanticMaskConfig = {
+  /** Whether to show the material only where the label matches, or to hide it there. */
+  mode: ViroSemanticMaskMode;
+  /** One or more semantic labels to match against. */
+  labels: ViroSemanticLabel[];
+};
+
+// Maps VROSemanticLabel enum value → bit position (bit N = label N, value 1-11).
+const kSemanticLabelBit: Record<ViroSemanticLabel, number> = {
+  sky:       1 << 1,
+  building:  1 << 2,
+  tree:      1 << 3,
+  road:      1 << 4,
+  sidewalk:  1 << 5,
+  terrain:   1 << 6,
+  structure: 1 << 7,
+  object:    1 << 8,
+  vehicle:   1 << 9,
+  person:    1 << 10,
+  water:     1 << 11,
+};
+
 export type ViroShaderModifier = {
   body?: string;
   uniforms?: string;
@@ -116,6 +153,10 @@ export type ViroMaterial = {
   ambientOcclusionTexture?: any; // TODO: types
   shaderModifiers?: ViroShaderModifiers;
   materialUniforms?: ViroShaderUniform[];
+  /** Semantic masking — shows or hides the material based on ARCore scene semantics labels.
+   *  Requires `setSemanticModeEnabled(true)` on the AR scene navigator.
+   *  Only supported on Android (ARCore). Gracefully no-ops on iOS. */
+  semanticMask?: ViroSemanticMaskConfig;
 };
 
 export type ViroMaterialDict = {
@@ -163,6 +204,16 @@ export class ViroMaterials {
         } else if (prop.endsWith("color") || prop.endsWith("Color")) {
           var color = processColor(material[prop]);
           resultMaterial[prop] = color;
+        } else if (prop === "semanticMask") {
+          const config = material[prop] as ViroSemanticMaskConfig;
+          let labelMask = 0;
+          for (const label of config.labels) {
+            labelMask |= kSemanticLabelBit[label] ?? 0;
+          }
+          resultMaterial["semanticMask"] = {
+            mode: config.mode,
+            labelMask,
+          };
         } else {
           //just apply material property directly.
           resultMaterial[prop] = material[prop];

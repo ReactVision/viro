@@ -421,6 +421,18 @@ public class MaterialManager extends ReactContextBaseJavaModule {
         // Parse material/shader uniforms
         parseShaderUniforms(nativeMaterial, materialMap);
 
+        // Parse semantic mask config
+        if (materialMap.hasKey("semanticMask")) {
+            ReadableMap maskConfig = materialMap.getMap("semanticMask");
+            if (maskConfig != null) {
+                String modeStr = maskConfig.hasKey("mode") ? maskConfig.getString("mode") : "showOnly";
+                int labelMask = maskConfig.hasKey("labelMask") ? maskConfig.getInt("labelMask") : 0;
+                // mode 0 = ShowOnly, mode 1 = Hide
+                int mode = "hide".equalsIgnoreCase(modeStr) ? 1 : 0;
+                nativeMaterial.setSemanticMaskEnabled(true, mode, labelMask);
+            }
+        }
+
         // We don't need to hold a Java texture reference after assigning the texture to the material.
         // Make an exception for the videoTexture as we use the nativeref to play,pause, loop the video.
         if (diffuseTexture != null && videoTexture == null) {

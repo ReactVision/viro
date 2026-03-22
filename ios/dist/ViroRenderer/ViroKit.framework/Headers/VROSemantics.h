@@ -68,6 +68,15 @@ enum class VROSemanticMode {
 };
 
 /*
+ * Mask mode for semantic material masking.
+ * Controls whether fragments are shown or hidden based on label match.
+ */
+enum class VROSemanticMaskMode {
+    ShowOnly = 0,  // Only render fragments where the label matches
+    Hide     = 1   // Hide fragments where the label matches
+};
+
+/*
  * Semantic image data containing label IDs for each pixel.
  * The image is a single-channel buffer where each byte represents
  * a VROSemanticLabel value (0-11).

@@ -37,6 +37,7 @@
 #include "VROStringUtil.h"
 #include "VROThreadRestricted.h"
 #include "VRODriver.h"
+#include "VROSemantics.h"
 
 enum class VROFace {
     Front,
@@ -362,6 +363,21 @@ public:
     }
 
     /*
+     Semantic masking. When enabled, fragments are shown or hidden based on
+     the semantic label of the underlying real-world pixel (requires ARCore
+     scene semantics to be enabled on the AR session).
+     */
+    void setSemanticMaskEnabled(bool enabled);
+    bool isSemanticMaskEnabled() const { return _semanticMaskEnabled; }
+
+    void setSemanticMaskMode(VROSemanticMaskMode mode);
+    VROSemanticMaskMode getSemanticMaskMode() const { return _semanticMaskMode; }
+
+    // Bitmask of VROSemanticLabel values (bit N = label N). Use (1 << label_int) to set bits.
+    void setSemanticLabelMask(uint16_t mask);
+    uint16_t getSemanticLabelMask() const { return _semanticLabelMask; }
+
+    /*
      Material rendering order; this should only be used to fix a rendering order between materials
      that are part of the same geometry. For cross-geometry rendering order, use
      VRONode::setRenderingOrder().
@@ -646,6 +662,19 @@ private:
      Defaults to true.
      */
     bool _needsToneMapping;
+
+    /*
+     Semantic masking.
+     */
+    bool _semanticMaskEnabled = false;
+    VROSemanticMaskMode _semanticMaskMode = VROSemanticMaskMode::ShowOnly;
+    uint16_t _semanticLabelMask = 0;
+
+    // Shader modifier injected when semantic masking is enabled (kept to allow removal).
+    std::shared_ptr<VROShaderModifier> _semanticMaskModifier;
+
+    // Internal: inject or remove the semantic mask shader modifier.
+    void applySemanticMaskModifier();
 
     /*
      The rendering order of this material, which determines when it is rendered in relation to

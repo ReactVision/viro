@@ -138,6 +138,17 @@ export interface ViroConfigurationOptions {
      * DEFAULTS TO: false (unless provider is "arcore")
      */
     includeARCore?: boolean;
+    /**
+     * Whether to include the ARCore/Semantics pod for scene semantic segmentation.
+     * When true, adds the ARCore/Semantics pod (and ARCore/CloudAnchors as a base dependency)
+     * without enabling cloud anchors or geospatial features.
+     *
+     * Use this when you want semantic masking (ViroMaterial.semanticMask) but do NOT need
+     * cloud anchors or geospatial anchors. If includeARCore is already true, this has no effect.
+     *
+     * DEFAULTS TO: false
+     */
+    includeSemantics?: boolean;
   };
   android?: {
     xRMode?: XrMode[];

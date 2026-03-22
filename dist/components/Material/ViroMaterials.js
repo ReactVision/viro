@@ -23,6 +23,20 @@ const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Ima
 var MaterialManager = react_native_1.NativeModules.VRTMaterialManager ||
     react_native_1.TurboModuleRegistry.get("VRTMaterialManager");
 console.log("VRTMaterialManager lookup:", MaterialManager ? "FOUND" : "NOT FOUND");
+// Maps VROSemanticLabel enum value → bit position (bit N = label N, value 1-11).
+const kSemanticLabelBit = {
+    sky: 1 << 1,
+    building: 1 << 2,
+    tree: 1 << 3,
+    road: 1 << 4,
+    sidewalk: 1 << 5,
+    terrain: 1 << 6,
+    structure: 1 << 7,
+    object: 1 << 8,
+    vehicle: 1 << 9,
+    person: 1 << 10,
+    water: 1 << 11,
+};
 class ViroMaterials {
     static createMaterials(materials) {
         var result = {};
@@ -64,6 +78,17 @@ class ViroMaterials {
                 else if (prop.endsWith("color") || prop.endsWith("Color")) {
                     var color = (0, react_native_1.processColor)(material[prop]);
                     resultMaterial[prop] = color;
+                }
+                else if (prop === "semanticMask") {
+                    const config = material[prop];
+                    let labelMask = 0;
+                    for (const label of config.labels) {
+                        labelMask |= kSemanticLabelBit[label] ?? 0;
+                    }
+                    resultMaterial["semanticMask"] = {
+                        mode: config.mode,
+                        labelMask,
+                    };
                 }
                 else {
                     //just apply material property directly.

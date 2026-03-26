@@ -63,6 +63,29 @@ export interface RVGeospatialListResult {
     data: RVGeospatialAnchor[];
     total?: number;
 }
+export interface RVSceneAsset {
+    id: string;
+    name: string;
+    description?: string | null;
+    file_url?: string | null;
+    file_size?: number | null;
+    asset_type_name?: "3D-MODEL" | "TEXT" | "IMAGE" | "VIDEO" | null;
+    position_x?: number | null;
+    position_y?: number | null;
+    position_z?: number | null;
+    rotation_x?: number | null;
+    rotation_y?: number | null;
+    rotation_z?: number | null;
+    scale?: number | null;
+    latitude: number;
+    longitude: number;
+    is_draggable: boolean;
+    trigger_image_url?: string | null;
+    trigger_image_orientation?: "Up" | "Down" | "Left" | "Right" | null;
+    trigger_image_physical_width_m?: number | null;
+    created_at: string;
+    updated_at: string;
+}
 export interface RVCloudAnchor {
     id: string;
     project_id: string;
@@ -102,6 +125,8 @@ export declare class ReactVisionClient {
     listCloudAnchors(projectId: string, limit?: number, offset?: number): Promise<RVApiResult<RVCloudAnchor[]>>;
     /** Delete a cloud anchor. */
     deleteCloudAnchor(id: string): Promise<RVApiResult<null>>;
+    /** Fetch all assets for a scene by scene ID. */
+    getSceneAssets(sceneId: string): Promise<RVApiResult<RVSceneAsset[]>>;
     private _get;
     private _post;
     private _patch;

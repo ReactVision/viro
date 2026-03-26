@@ -82,6 +82,17 @@ class ReactVisionClient {
         return this._delete(`/cloud-anchors/${id}`);
     }
     // --------------------------------------------------------------------------
+    // Scenes
+    // --------------------------------------------------------------------------
+    /** Fetch all assets for a scene by scene ID. */
+    async getSceneAssets(sceneId) {
+        const result = await this._get(`/functions/v1/scenes/${encodeURIComponent(sceneId)}/assets`);
+        if (!result.success)
+            return result;
+        const assets = result.data?.assets ?? result.data ?? [];
+        return { success: true, data: assets };
+    }
+    // --------------------------------------------------------------------------
     // Internal fetch helpers
     // --------------------------------------------------------------------------
     async _get(path) {

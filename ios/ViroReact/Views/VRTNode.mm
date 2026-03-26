@@ -729,6 +729,13 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                                 mergedMat->setWritesToDepthBuffer(overrideMaterial->getWritesToDepthBuffer());
                                 mergedMat->setReadsFromDepthBuffer(overrideMaterial->getReadsFromDepthBuffer());
 
+                                // Propagate shader modifiers (e.g. semantic mask, custom effects)
+                                for (const auto &modifier : overrideMaterial->getShaderModifiers()) {
+                                    if (!mergedMat->hasShaderModifier(modifier)) {
+                                        mergedMat->addShaderModifier(modifier);
+                                    }
+                                }
+
                                 mergedChildMaterials.push_back(mergedMat);
                             }
                             childGeometry->setMaterials(mergedChildMaterials);

@@ -27,7 +27,7 @@ export type ViroResolvedCubeMap = {
     nz: ImageResolvedAssetSource;
     pz: ImageResolvedAssetSource;
 };
-export type ViroSemanticMaskMode = "showOnly" | "hide";
+export type ViroSemanticMaskMode = "showOnly" | "hide" | "debug";
 export type ViroSemanticLabel = "sky" | "building" | "tree" | "road" | "sidewalk" | "terrain" | "structure" | "object" | "vehicle" | "person" | "water";
 export type ViroSemanticMaskConfig = {
     /** Whether to show the material only where the label matches, or to hide it there. */

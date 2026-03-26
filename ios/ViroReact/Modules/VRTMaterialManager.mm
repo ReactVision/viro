@@ -401,6 +401,8 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                     VROSemanticMaskMode maskMode = VROSemanticMaskMode::ShowOnly;
                     if ([@"hide" isEqualToString:modeStr]) {
                         maskMode = VROSemanticMaskMode::Hide;
+                    } else if ([@"debug" isEqualToString:modeStr]) {
+                        maskMode = VROSemanticMaskMode::Debug;
                     }
                     uint16_t labelMask = (uint16_t)[maskConfig[@"labelMask"] unsignedShortValue];
                     vroMaterial->setSemanticMaskMode(maskMode);

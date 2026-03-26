@@ -54,7 +54,7 @@ export type ViroResolvedCubeMap = {
   pz: ImageResolvedAssetSource;
 };
 
-export type ViroSemanticMaskMode = "showOnly" | "hide";
+export type ViroSemanticMaskMode = "showOnly" | "hide" | "debug";
 
 export type ViroSemanticLabel =
   | "sky"

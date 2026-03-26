@@ -73,7 +73,8 @@ enum class VROSemanticMode {
  */
 enum class VROSemanticMaskMode {
     ShowOnly = 0,  // Only render fragments where the label matches
-    Hide     = 1   // Hide fragments where the label matches
+    Hide     = 1,  // Hide fragments where the label matches
+    Debug    = 2   // Color fragments by semantic label for debugging
 };
 
 /*

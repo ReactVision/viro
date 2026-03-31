@@ -129,6 +129,17 @@ enum class VROCameraPosition;
  */
 - (void)setDepthDebugEnabled:(BOOL)enabled opacity:(float)opacity;
 
+/*
+ Enable or disable semantic segmentation debug visualization. When enabled, the camera
+ background shows a color overlay where each real-world category is mapped to a distinct
+ color: sky=light-blue, building=gray, tree=green, road=dark-gray, sidewalk=tan,
+ terrain=brown, structure=orange, object=yellow, vehicle=red, person=magenta, water=blue.
+ Requires semantic mode to be enabled via setSemanticModeEnabled.
+
+ @param enabled Whether to enable the semantic debug overlay
+ */
+- (void)setSemanticDebugEnabled:(BOOL)enabled;
+
 #pragma mark - Monocular Depth Estimation
 
 /*

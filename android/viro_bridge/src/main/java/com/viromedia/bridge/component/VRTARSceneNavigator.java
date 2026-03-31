@@ -70,6 +70,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     // Pending configuration for features that may be set before session is ready
     private boolean mSemanticModeEnabled = false;
     private boolean mNeedsSemanticModeToggle = false;
+    private boolean mSemanticDebugEnabled = false;
+    private float mSemanticConfidenceThreshold = 0.0f;
     private boolean mGeospatialModeEnabled = false;
     private boolean mNeedsGeospatialModeToggle = false;
 
@@ -134,6 +136,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (navigator.mNeedsGeospatialModeToggle) {
                 navigator.applyGeospatialModeEnabled();
                 navigator.mNeedsGeospatialModeToggle = false;
+            }
+
+            // Apply initial semantic debug / confidence threshold if set
+            if (navigator.mSemanticDebugEnabled) {
+                navigator.setSemanticDebugEnabled(navigator.mSemanticDebugEnabled);
+            }
+            if (navigator.mSemanticConfidenceThreshold > 0.0f) {
+                navigator.setSemanticConfidenceThreshold(navigator.mSemanticConfidenceThreshold);
             }
 
             // Apply pending world mesh configuration
@@ -1120,6 +1130,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.rvFindNearbyCloudAnchors(lat, lng, radius, limit, callback);
     }
 
+    public void rvGetSceneAssets(String sceneId, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
+        arScene.rvGetSceneAssets(sceneId, callback);
+    }
+
     public void rvAttachAssetToCloudAnchor(String anchorId, String fileUrl, long fileSize,
                                             String name, String assetType, String externalUserId,
                                             ARScene.RvCloudAnchorCallback callback) {
@@ -1283,6 +1300,22 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
         arScene.setSemanticModeEnabled(mSemanticModeEnabled);
         Log.i(TAG, "Scene Semantics mode applied: " + (mSemanticModeEnabled ? "enabled" : "disabled"));
+    }
+
+    public void setSemanticDebugEnabled(boolean enabled) {
+        mSemanticDebugEnabled = enabled;
+        ViroViewARCore arView = getARView();
+        if (arView != null) {
+            arView.setSemanticDebugEnabled(enabled);
+        }
+    }
+
+    public void setSemanticConfidenceThreshold(float threshold) {
+        mSemanticConfidenceThreshold = threshold;
+        ViroViewARCore arView = getARView();
+        if (arView != null) {
+            arView.setSemanticConfidenceThreshold(threshold);
+        }
     }
 
     /**

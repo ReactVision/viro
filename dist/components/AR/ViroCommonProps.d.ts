@@ -54,6 +54,17 @@ export type ViroObjectProps = {
     lightReceivingBitMask?: number;
     shadowCastingBitMask?: number;
     shaderModifiers?: ViroShaderModifiers;
+    /**
+     * Apply shader modifiers from named materials to this node and all its children,
+     * preserving embedded textures (e.g. GLB/VRX). Unlike `materials`, which replaces
+     * the root geometry's material entirely, `shaderOverrides` merges only the shader
+     * modifiers and rendering properties from the named material onto every child mesh
+     * in the hierarchy. Use this for GLB models when you want to apply semantic masking,
+     * custom effects, or other per-material shader modifiers without losing the model's
+     * original textures and skinning.
+     *
+     * Accepts an array of material names previously registered via `ViroMaterials.createMaterials`.
+     */
     shaderOverrides?: string[];
     materialUniforms?: {
         [key: string]: any;

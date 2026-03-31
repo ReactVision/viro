@@ -136,22 +136,51 @@ export function gpsToArWorld(
   ];
 }
 
+export type ViroPermission = "camera" | "microphone" | "storage" | "location";
+
+const ALL_PERMISSIONS: ViroPermission[] = [
+  "camera",
+  "microphone",
+  "storage",
+  "location",
+];
+
 export interface ViroPermissionsResult {
-  camera: boolean;
-  microphone: boolean;
-  storage: boolean;
-  location: boolean;
+  camera?: boolean;
+  microphone?: boolean;
+  storage?: boolean;
+  location?: boolean;
 }
 
 /**
- * Check and request the permissions required for Viro AR to function (camera access).
- * Resolves with `{ granted: true }` if camera permission is granted, `{ granted: false }` if denied.
+ * Request the specified permissions required for Viro AR to function.
+ * Omit `permissions` to request all four (camera, microphone, storage, location).
+ * Only the requested keys are present in the resolved result.
  */
-export function requestRequiredPermissions(): Promise<ViroPermissionsResult> {
+export function requestRequiredPermissions(
+  permissions: ViroPermission[] = ALL_PERMISSIONS
+): Promise<ViroPermissionsResult> {
   if (Platform.OS === "ios") {
-    return NativeModules.VRTARUtils.requestRequiredPermissions();
+    return NativeModules.VRTARUtils.requestRequiredPermissions(permissions);
   } else {
-    return NativeModules.VRTARSceneNavigatorModule.requestRequiredPermissions();
+    return NativeModules.VRTARSceneNavigatorModule.requestRequiredPermissions(
+      permissions
+    );
+  }
+}
+
+/**
+ * Check the current status of the specified permissions without prompting the user.
+ * Omit `permissions` to check all four (camera, microphone, storage, location).
+ * Only the requested keys are present in the resolved result.
+ */
+export function checkPermissions(
+  permissions: ViroPermission[] = ALL_PERMISSIONS
+): Promise<ViroPermissionsResult> {
+  if (Platform.OS === "ios") {
+    return NativeModules.VRTARUtils.checkPermissions(permissions);
+  } else {
+    return NativeModules.VRTARSceneNavigatorModule.checkPermissions(permissions);
   }
 }
 

@@ -131,6 +131,28 @@ type Props = ViewProps & {
   depthDebugEnabled?: boolean;
 
   /**
+   * Enable semantic segmentation debug visualization. When enabled, the camera
+   * background shows a color overlay for each real-world category (sky, building, tree,
+   * road, sidewalk, terrain, structure, object, vehicle, person, water).
+   * Requires `setSemanticModeEnabled(true)` to be called on the scene navigator first.
+   *
+   * @default false
+   */
+  semanticDebugEnabled?: boolean;
+
+  /**
+   * Confidence threshold (0.0–1.0) below which semantic labels are discarded (treated
+   * as unlabeled = 0) before the texture is uploaded to the GPU. Higher values reduce
+   * noise and boundary blinking at the cost of smaller labeled regions.
+   *
+   * Only used on Android (ARCore provides per-pixel confidence). On iOS, ARKit's
+   * segmentation is already temporally smoothed by the OS.
+   *
+   * @default 0.0
+   */
+  semanticConfidenceThreshold?: number;
+
+  /**
    * [iOS Only] Prefer monocular depth estimation over LiDAR.
    * When true, monocular depth will be used even on devices with LiDAR.
    *
@@ -1105,6 +1127,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     );
   };
 
+  _rvGetSceneAssets = async (sceneId: string): Promise<any> => {
+    return await ViroARSceneNavigatorModule.rvGetSceneAssets(
+      findNodeHandle(this), sceneId
+    );
+  };
+
   _rvAttachAssetToCloudAnchor = async (
     anchorId: string,
     fileUrl: string,
@@ -1394,6 +1422,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
     rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
     rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+    rvGetSceneAssets: this._rvGetSceneAssets,
     // Assets API
     rvUploadAsset: this._rvUploadAsset,
     // Scene Semantics API
@@ -1452,6 +1481,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
     rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
     rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+    rvGetSceneAssets: this._rvGetSceneAssets,
     // Assets API
     rvUploadAsset: this._rvUploadAsset,
     // Scene Semantics API

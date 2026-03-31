@@ -1610,6 +1610,27 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void rvGetSceneAssets(final int sceneNavTag, final String sceneId, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
+                    ((VRTARSceneNavigator) view).rvGetSceneAssets(sceneId, (success, jsonData, error) -> {
+                        WritableMap r = Arguments.createMap();
+                        r.putBoolean("success", success);
+                        r.putArray("assets", rvJsonArrayToArray(jsonData));
+                        if (!success) r.putString("error", error);
+                        promise.resolve(r);
+                    });
+                } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }
+            }
+        });
+    }
+
+    @ReactMethod
     public void rvAttachAssetToCloudAnchor(final int sceneNavTag, final String anchorId,
                                             final String fileUrl, final double fileSize,
                                             final String name, final String assetType,
@@ -1892,13 +1913,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void requestRequiredPermissions(final Promise promise) {
-        final String[] required = {
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        };
+    public void requestRequiredPermissions(final ReadableArray permissions, final Promise promise) {
+        final String[] required = toManifestPermissions(permissions);
 
         boolean allGranted = true;
         for (String perm : required) {
@@ -1908,7 +1924,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
             }
         }
         if (allGranted) {
-            promise.resolve(buildPermissionsResult());
+            promise.resolve(buildPermissionsResult(permissions));
             return;
         }
 
@@ -1924,20 +1940,50 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
         ((ReactActivity) activity).requestPermissions(required, PERMISSION_REQ_CODE_CAMERA, new PermissionListener() {
             @Override
-            public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+            public boolean onRequestPermissionsResult(int requestCode, String[] perms, int[] grantResults) {
                 if (requestCode != PERMISSION_REQ_CODE_CAMERA) return false;
-                promise.resolve(buildPermissionsResult());
+                promise.resolve(buildPermissionsResult(permissions));
                 return true;
             }
         });
     }
 
-    private WritableMap buildPermissionsResult() {
+    @ReactMethod
+    public void checkPermissions(ReadableArray permissions, final Promise promise) {
+        promise.resolve(buildPermissionsResult(permissions));
+    }
+
+    private String[] toManifestPermissions(ReadableArray permissions) {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (int i = 0; i < permissions.size(); i++) {
+            switch (permissions.getString(i)) {
+                case "camera":     list.add(Manifest.permission.CAMERA); break;
+                case "microphone": list.add(Manifest.permission.RECORD_AUDIO); break;
+                case "storage":    list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE); break;
+                case "location":   list.add(Manifest.permission.ACCESS_FINE_LOCATION); break;
+            }
+        }
+        return list.toArray(new String[0]);
+    }
+
+    private WritableMap buildPermissionsResult(ReadableArray permissions) {
         WritableMap result = Arguments.createMap();
-        result.putBoolean("camera", ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) == 0);
-        result.putBoolean("microphone", ContextCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO) == 0);
-        result.putBoolean("storage", ContextCompat.checkSelfPermission(mContext, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0);
-        result.putBoolean("location", ContextCompat.checkSelfPermission(mContext, Manifest.permission.ACCESS_FINE_LOCATION) == 0);
+        for (int i = 0; i < permissions.size(); i++) {
+            switch (permissions.getString(i)) {
+                case "camera":
+                    result.putBoolean("camera", ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) == 0);
+                    break;
+                case "microphone":
+                    result.putBoolean("microphone", ContextCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO) == 0);
+                    break;
+                case "storage":
+                    result.putBoolean("storage", ContextCompat.checkSelfPermission(mContext, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0);
+                    break;
+                case "location":
+                    result.putBoolean("location", ContextCompat.checkSelfPermission(mContext, Manifest.permission.ACCESS_FINE_LOCATION) == 0);
+                    break;
+            }
+        }
         return result;
     }
 

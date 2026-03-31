@@ -243,6 +243,13 @@ public:
         return _depthTextureTransform;
     }
 
+    void setSemanticTextureTransform(VROMatrix4f transform) {
+        _semanticTextureTransform = transform;
+    }
+    VROMatrix4f getSemanticTextureTransform() const {
+        return _semanticTextureTransform;
+    }
+
     void setOcclusionMode(VROOcclusionMode mode) {
         _occlusionMode = mode;
     }
@@ -374,6 +381,13 @@ private:
      Transform to convert from screen UV to depth texture UV.
      */
     VROMatrix4f _depthTextureTransform;
+
+    /*
+     Transform to convert from GL screen UV (y=0 bottom) to semantic texture UV.
+     Equals getViewportToCameraImageTransform() converted to GL convention.
+     Valid on both iOS (ARCore semantics) and Android (ARCore semantics).
+     */
+    VROMatrix4f _semanticTextureTransform;
 
     /*
      Current occlusion mode.

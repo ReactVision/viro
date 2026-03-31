@@ -23,14 +23,18 @@ allprojects {
         mavenLocal()
         mavenCentral()
         maven {
+            // React Native publishes its Android artifacts here
+            url("$rootDir/../node_modules/react-native/android")
+        }
+        maven {
             //url 'https://maven.google.com'
             // Android JSC is installed from npm
-            url("$rootDir/../node_modules/jsc-android/dist")        
+            url("$rootDir/../node_modules/jsc-android/dist")
         }
         google()
         jcenter()
-        
-        maven { url 'https://jitpack.io' }  
+
+        maven { url 'https://jitpack.io' }
     }
 }
 

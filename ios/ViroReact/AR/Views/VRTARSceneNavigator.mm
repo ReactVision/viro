@@ -180,6 +180,11 @@
             [viewAR setDepthDebugEnabled:_depthDebugEnabled opacity:0.7f];
         }
 
+        // Apply initial semantic debug setting if set
+        if (_semanticDebugEnabled) {
+            [viewAR setSemanticDebugEnabled:_semanticDebugEnabled];
+        }
+
         // Apply cloud anchor provider if it was set before view was ready
         if (_cloudAnchorProvider) {
             [self setCloudAnchorProvider:_cloudAnchorProvider];
@@ -522,6 +527,19 @@
         VROViewAR *viewAR = (VROViewAR *) _vroView;
         [viewAR setDepthDebugEnabled:depthDebugEnabled opacity:0.7f];
     }
+}
+
+- (void)setSemanticDebugEnabled:(BOOL)semanticDebugEnabled {
+    _semanticDebugEnabled = semanticDebugEnabled;
+    if (_vroView) {
+        VROViewAR *viewAR = (VROViewAR *) _vroView;
+        [viewAR setSemanticDebugEnabled:semanticDebugEnabled];
+    }
+}
+
+- (void)setSemanticConfidenceThreshold:(float)threshold {
+    _semanticConfidenceThreshold = threshold;
+    // iOS: ARKit semantic segmentation is temporally smoothed by the OS; no-op here.
 }
 
 /*
@@ -1468,6 +1486,23 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, @[], @"AR session not available"); return; }
     arSession->rvFindNearbyCloudAnchors(latitude, longitude, radius, limit,
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
+                completionHandler(success, success ? rvParseAnchorArrayJson(jsonStr) : @[],
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
+- (void)rvGetSceneAssets:(NSString *)sceneId
+      completionHandler:(void (^)(BOOL, NSArray *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, @[], @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, @[], @"AR session not available"); return; }
+    arSession->rvGetSceneAssets(
+        std::string([sceneId UTF8String]),
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];

@@ -343,7 +343,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                 ViewProps.PADDING_RIGHT,
                 ViewProps.PADDING_TOP,
                 ViewProps.PADDING_BOTTOM,
-        }, defaultFloat = YogaConstants.UNDEFINED)
+        }, defaultFloat = Float.NaN)
         public void setPaddings(int index, Dynamic padding) {
             if (padding.getType() == ReadableType.String) {
                 super.setPaddings(index, padding);
@@ -362,7 +362,7 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
                 ViewProps.BORDER_RIGHT_WIDTH,
                 ViewProps.BORDER_TOP_WIDTH,
                 ViewProps.BORDER_BOTTOM_WIDTH,
-        }, defaultFloat = YogaConstants.UNDEFINED)
+        }, defaultFloat = Float.NaN)
         public void setBorderWidths(int index, float borderWidth) {
             super.setBorderWidths(index, borderWidth * s2DUnitPer3DUnit);
         }

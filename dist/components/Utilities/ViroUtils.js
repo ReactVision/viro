@@ -15,6 +15,7 @@ exports.polarToCartesianActual = polarToCartesianActual;
 exports.latLngToMercator = latLngToMercator;
 exports.gpsToArWorld = gpsToArWorld;
 exports.requestRequiredPermissions = requestRequiredPermissions;
+exports.checkPermissions = checkPermissions;
 exports.isARSupportedOnDevice = isARSupportedOnDevice;
 /**
  * Convert the given polar coords of the form [r, theta, phi] to cartesian
@@ -114,16 +115,36 @@ function gpsToArWorld(devicePose, anchorLat, anchorLng, anchorAlt) {
         -distance * Math.cos(relBearing), // arZ
     ];
 }
+const ALL_PERMISSIONS = [
+    "camera",
+    "microphone",
+    "storage",
+    "location",
+];
 /**
- * Check and request the permissions required for Viro AR to function (camera access).
- * Resolves with `{ granted: true }` if camera permission is granted, `{ granted: false }` if denied.
+ * Request the specified permissions required for Viro AR to function.
+ * Omit `permissions` to request all four (camera, microphone, storage, location).
+ * Only the requested keys are present in the resolved result.
  */
-function requestRequiredPermissions() {
+function requestRequiredPermissions(permissions = ALL_PERMISSIONS) {
     if (react_native_1.Platform.OS === "ios") {
-        return react_native_1.NativeModules.VRTARUtils.requestRequiredPermissions();
+        return react_native_1.NativeModules.VRTARUtils.requestRequiredPermissions(permissions);
     }
     else {
-        return react_native_1.NativeModules.VRTARSceneNavigatorModule.requestRequiredPermissions();
+        return react_native_1.NativeModules.VRTARSceneNavigatorModule.requestRequiredPermissions(permissions);
+    }
+}
+/**
+ * Check the current status of the specified permissions without prompting the user.
+ * Omit `permissions` to check all four (camera, microphone, storage, location).
+ * Only the requested keys are present in the resolved result.
+ */
+function checkPermissions(permissions = ALL_PERMISSIONS) {
+    if (react_native_1.Platform.OS === "ios") {
+        return react_native_1.NativeModules.VRTARUtils.checkPermissions(permissions);
+    }
+    else {
+        return react_native_1.NativeModules.VRTARSceneNavigatorModule.checkPermissions(permissions);
     }
 }
 function isARSupportedOnDevice() {

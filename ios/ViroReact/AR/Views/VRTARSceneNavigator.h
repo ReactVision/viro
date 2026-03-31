@@ -50,6 +50,8 @@
 @property (nonatomic, copy) NSString *occlusionMode;
 @property (nonatomic, assign) BOOL depthEnabled;
 @property (nonatomic, assign) BOOL depthDebugEnabled;
+@property (nonatomic, assign) BOOL semanticDebugEnabled;
+@property (nonatomic, assign) float semanticConfidenceThreshold;
 @property (nonatomic, copy) NSString *cloudAnchorProvider;
 @property (nonatomic, copy) NSString *geospatialAnchorProvider;
 
@@ -206,6 +208,8 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
                           radius:(double)radius
                            limit:(int)limit
                completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
+- (void)rvGetSceneAssets:(NSString *)sceneId
+      completionHandler:(void (^)(BOOL success, NSArray *assets, NSString *error))completionHandler;
 - (void)rvAttachAssetToCloudAnchor:(NSString *)anchorId
                            fileUrl:(NSString *)fileUrl
                           fileSize:(int64_t)fileSize

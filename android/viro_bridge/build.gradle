@@ -102,14 +102,19 @@ afterEvaluate {
     }
 }
 
+// Resolve the installed react-native version from node_modules so this library
+// compiles against whatever version the host app (or local dev) has installed.
+def reactNativeVersion = new groovy.json.JsonSlurper()
+    .parseText(new File("${rootProject.projectDir}/../node_modules/react-native/package.json").text)
+    .version
+
 dependencies {
     androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.6.0"
 
-    implementation("com.facebook.react:react-android:0.76.0")
-    //implementation("com.facebook.react:react-native:+")
+    compileOnly("com.facebook.react:react-android:${reactNativeVersion}")
 
     implementation 'androidx.appcompat:appcompat:1.0.0'
     testImplementation 'junit:junit:4.12'

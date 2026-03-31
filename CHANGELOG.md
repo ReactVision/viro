@@ -1,5 +1,191 @@
 # CHANGELOG
 
+## v2.54.0 — 31 March 2026
+
+### Added
+
+- **Semantic Masking — `semanticMask` prop on `ViroMaterial`** *(Android + iOS)*
+
+  Selectively show or hide a material based on what the AR session classifies each
+  pixel as in the real world.  A per-frame 256×144 semantic segmentation image from
+  ARCore is used to discard fragments at the GPU level — no CPU readback, no extra
+  render pass.
+
+  ```typescript
+  ViroMaterials.createMaterials({
+    // Only render on pixels classified as sky
+    skyOnly: {
+      diffuseColor: "#ffffff",
+      semanticMask: {
+        mode: "showOnly",
+        labels: ["sky"],
+      },
+    },
+    // Invisible on people (useful for occlusion)
+    hidePeople: {
+      diffuseColor: "#00ff00",
+      semanticMask: {
+        mode: "hide",
+        labels: ["person"],
+      },
+    },
+  });
+  ```
+
+  **`mode`** controls the discard direction:
+
+  | Mode | Behaviour |
+  |------|-----------|
+  | `"showOnly"` | Fragment rendered only where the pixel matches a label |
+  | `"hide"` | Fragment discarded where the pixel matches a label |
+  | `"debug"` | Overrides color: blue = unlabeled, teal→orange gradient = classified pixels |
+
+  **`labels`** — one or more of:
+  `"sky"`, `"building"`, `"tree"`, `"road"`, `"sidewalk"`, `"terrain"`,
+  `"structure"`, `"object"`, `"vehicle"`, `"person"`, `"water"`
+
+  **iOS setup:** requires the ARCore Semantics pod.  Add `includeSemantics: true` to
+  the Expo plugin config in `app.json`.  If `provider: "arcore"` or
+  `includeARCore: true` is already set, the pod is included automatically.
+  The prop is silently ignored when the session has not yet produced a semantic image.
+
+- **`requestRequiredPermissions(permissions?)` utility**
+
+  Prompts the user for the specified permissions and resolves with their granted
+  status.  Pass a `ViroPermission[]` to request only what your feature needs;
+  omit it to request all four.
+
+  ```typescript
+  import { requestRequiredPermissions } from "@reactvision/react-viro";
+
+  // Camera only
+  const { camera } = await requestRequiredPermissions(["camera"]);
+
+  // All four
+  const result = await requestRequiredPermissions();
+  ```
+
+- **`checkPermissions(permissions?)` utility**
+
+  Non-prompting read of current permission status.  Never shows a system dialog.
+
+  ```typescript
+  import { checkPermissions } from "@reactvision/react-viro";
+
+  const { camera, microphone } = await checkPermissions(["camera", "microphone"]);
+  if (!camera) {
+    // guide user to Settings
+  }
+  ```
+
+  `ViroPermission` (`"camera" | "microphone" | "storage" | "location"`) is exported
+  as a standalone type.  `ViroPermissionsResult` keys are typed `boolean?` — only
+  keys for the requested permissions are present in the resolved object.
+
+- **Animated GLB support — skeletal animation, morph targets, and skinning**
+
+  GLB/glTF 2.0 models with embedded animations are now fully supported on both
+  platforms.  Three animation systems are covered:
+
+  | System | Description |
+  |--------|-------------|
+  | Skeletal animation | Bone-driven character and creature rigs |
+  | Morph targets | Blend-shape facial animation and shape keys |
+  | Skinning | Vertex-weight deformation tied to a skeleton |
+
+  Animations are played via the existing `ViroAnimatedComponent` API — no new props
+  required.  Multiple animations embedded in a single GLB file are each exposed as a
+  named clip.
+
+- **Expo 54 and Expo 55 support**
+
+  The package peer dependency range and Expo config plugin are updated to support
+  both Expo SDK 54 and Expo SDK 55.
+
+### Fixed
+
+- **[Android] `ViroARImageMarker` — `onAnchorFound` never fires**
+
+  The native `ARScene.java` callback path for image anchors was not bridging the
+  `onAnchorFound` event to the React Native layer.  The marker component appeared to
+  work (the tracked image drove the AR overlay position) but the JS `onAnchorFound`
+  handler was never called, making it impossible to react to detection in user code.
+
+- **[Android] App crash on launch on 16 KB page-size devices (Android 15 / 16) — [#429](https://github.com/ReactVision/viro/issues/429)**
+
+  All bundled `.a` static libraries have been recompiled and aligned to 16 KB
+  boundaries.  Devices that enforce the new ABI requirement (Android 15 and later)
+  were crashing immediately on `System.loadLibrary` because the dynamic linker
+  rejected unaligned segments in the `.so` produced from the old `.a` files.
+
+- **[Android] Fatal `SIGSEGV` after returning from background — [#445](https://github.com/ReactVision/viro/issues/445)**
+
+  Three independent bugs combined to produce a guaranteed crash whenever the OS
+  reclaimed the OpenGL/EGL context while the app was in the background:
+
+  1. **Background model downloads** — assets that finished downloading while paused
+     queued GPU-upload tasks that fired against the destroyed context on resume.
+     GPU tasks are now gated on EGL context validity before execution.
+
+  2. **Stale texture IDs** — the AR session retained OpenGL texture handles from the
+     destroyed context and attempted to render with them on the next frame.
+     Texture handles are now invalidated on context loss and re-created on resume.
+
+  3. **Render-queue shutdown race (VIRO-4537)** — a pre-existing null-ordering bug
+     prevented the render queue from being cleanly shut down during `dispose()`,
+     leaving a partially torn-down renderer reachable.  The shutdown sequence is now
+     ordered correctly.
+
+- **[iOS] Invalid Podfile syntax error on EAS iOS builds — [#441](https://github.com/ReactVision/viro/issues/441)**
+
+  The Expo config plugin (`withViro`) was writing a `pod` directive with a string
+  literal in a position that CocoaPods does not accept, producing:
+
+  ```
+  Invalid Podfile file: syntax error, unexpected string literal,
+  expecting end-of-input
+  ```
+
+  The generated Podfile snippet is now syntactically valid in all EAS build
+  environments.
+
+- **[Android] Model texture overlays entire screen during video recording**
+
+  `VRODriverOpenGL` maintains a CPU-side cache of the currently-bound OpenGL texture
+  per unit and bound shader program.  This cache was shared between the display EGL
+  context and the recording EGL context.
+
+  When `VRORecorderEglSurfaceDisplay::bind()` switched to the recording context the
+  cache still reflected display-context state.  The recording blit updated the
+  cache (RTT texture → unit 0); when `invalidate()` restored the display context the
+  cache falsely reported that the RTT texture was still bound, skipped
+  `glBindTexture`, and sampled the wrong texture — causing the model's diffuse
+  texture to overlay the full display frame.
+
+  The texture binding cache is now invalidated whenever the active EGL surface
+  changes.
+
+- **[iOS] `ViroPortalScene` interior content not rendering — [#452](https://github.com/ReactVision/viro/issues/452)**
+
+  Portal interior content (3D objects, `Viro360Image`, etc.) was invisible on iOS
+  in v2.53.0 while the portal frame and stencil hole rendered correctly.
+
+  `VRODisplayOpenGLiOS::bind()` was missing two OpenGL state resets that
+  `VRORenderTargetOpenGL::bind()` already included:
+
+  - `glStencilMask(0xFF)` before `glClear` — portal rendering leaves the stencil
+    write-mask at `0x0F` (lower 4 bits only); without this reset `GL_STENCIL_BUFFER_BIT`
+    in `glClear` did not clear the upper bits, leaving stale values that failed the
+    stencil test on the following frame and prevented portal contents from drawing.
+  - `glStencilFuncSeparate(GL_FRONT_AND_BACK, GL_ALWAYS, 0xFF, 0xFF)` after
+    `glClear` — resets the stencil function to always-pass so non-portal geometry
+    rendered after the portal pass is not inadvertently clipped.
+
+  Android was unaffected because it uses `VRORenderTargetOpenGL::bind()` directly
+  which already contained both resets.
+
+---
+
 ## v2.53.0 — 06 March 2026
 
 ### Breaking Changes

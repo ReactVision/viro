@@ -81,6 +81,26 @@ type Props = ViewProps & {
      */
     depthDebugEnabled?: boolean;
     /**
+     * Enable semantic segmentation debug visualization. When enabled, the camera
+     * background shows a color overlay for each real-world category (sky, building, tree,
+     * road, sidewalk, terrain, structure, object, vehicle, person, water).
+     * Requires `setSemanticModeEnabled(true)` to be called on the scene navigator first.
+     *
+     * @default false
+     */
+    semanticDebugEnabled?: boolean;
+    /**
+     * Confidence threshold (0.0–1.0) below which semantic labels are discarded (treated
+     * as unlabeled = 0) before the texture is uploaded to the GPU. Higher values reduce
+     * noise and boundary blinking at the cost of smaller labeled regions.
+     *
+     * Only used on Android (ARCore provides per-pixel confidence). On iOS, ARKit's
+     * segmentation is already temporally smoothed by the OS.
+     *
+     * @default 0.0
+     */
+    semanticConfidenceThreshold?: number;
+    /**
      * [iOS Only] Prefer monocular depth estimation over LiDAR.
      * When true, monocular depth will be used even on devices with LiDAR.
      *
@@ -479,6 +499,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
     _rvUpdateCloudAnchor: (anchorId: string, name: string, description: string, isPublic: boolean) => Promise<any>;
     _rvDeleteCloudAnchor: (anchorId: string) => Promise<any>;
     _rvFindNearbyCloudAnchors: (latitude: number, longitude: number, radius: number, limit: number) => Promise<any>;
+    _rvGetSceneAssets: (sceneId: string) => Promise<any>;
     _rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
     _rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
     _rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
@@ -597,6 +618,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
         rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
         rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
+        rvGetSceneAssets: (sceneId: string) => Promise<any>;
         rvUploadAsset: (filePath: string, assetType: string, fileName: string, appUserId?: string) => Promise<any>;
         isSemanticModeSupported: () => Promise<ViroSemanticSupportResult>;
         setSemanticModeEnabled: (enabled: boolean) => void;
@@ -648,6 +670,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         rvAttachAssetToCloudAnchor: (anchorId: string, fileUrl: string, fileSize: number, name: string, assetType: string, externalUserId: string) => Promise<any>;
         rvRemoveAssetFromCloudAnchor: (anchorId: string, assetId: string) => Promise<any>;
         rvTrackCloudAnchorResolution: (anchorId: string, success: boolean, confidence: number, matchCount: number, inlierCount: number, processingTimeMs: number, platform: string, externalUserId: string) => Promise<any>;
+        rvGetSceneAssets: (sceneId: string) => Promise<any>;
         rvUploadAsset: (filePath: string, assetType: string, fileName: string, appUserId?: string) => Promise<any>;
         isSemanticModeSupported: () => Promise<ViroSemanticSupportResult>;
         setSemanticModeEnabled: (enabled: boolean) => void;

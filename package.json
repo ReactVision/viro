@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.53.1",
+  "version": "2.54.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -27,11 +27,11 @@
     "prepare": "npm run build"
   },
   "peerDependencies": {
-    "expo": "~55.0.8",
-    "react-native": "~0.83.2"
+    "expo": ">=54.0.0 <56.0.0",
+    "react-native": ">=0.81.0 <0.84.0"
   },
   "engines": {
-    "react-native": "~0.83.2"
+    "react-native": ">=0.81.0 <0.84.0"
   },
   "peerDependenciesMeta": {
     "expo": {

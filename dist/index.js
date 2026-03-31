@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARTrackingReasonConstants = exports.Viro3DSceneNavigator = exports.ViroVRSceneNavigator = exports.ViroVideo = exports.ViroText = exports.ViroSpotLight = exports.ViroSpinner = exports.ViroSphere = exports.ViroSpatialSound = exports.ViroSoundField = exports.ViroSound = exports.ViroAnimatedComponent = exports.ViroAmbientLight = exports.ViroAnimatedImage = exports.Viro360Video = exports.Viro360Image = exports.Viro3DObject = exports.ViroAnimations = exports.ViroSkyBox = exports.ViroSceneNavigator = exports.ViroSurface = exports.ViroScene = exports.ViroQuad = exports.ViroPortalScene = exports.ViroPortal = exports.ViroPolyline = exports.ViroPolygon = exports.ViroParticleEmitter = exports.ViroOrbitCamera = exports.ViroOmniLight = exports.ViroNode = exports.ViroMaterialVideo = exports.ViroARCamera = exports.ViroMaterials = exports.ViroImage = exports.ViroLightingEnvironment = exports.ViroGeometry = exports.ViroFlexView = exports.ViroDirectionalLight = exports.ViroController = exports.ViroCamera = exports.ViroButton = exports.ViroBox = exports.ViroARSceneNavigator = exports.ViroARScene = exports.ViroARPlaneSelector = exports.ViroARPlane = exports.ViroARTrackingTargets = exports.ViroARObjectMarker = exports.ViroARImageMarker = void 0;
-exports.VIRO_VERSION = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.gpsToArWorld = exports.latLngToMercator = exports.requestRequiredPermissions = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = void 0;
+exports.VIRO_VERSION = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.gpsToArWorld = exports.latLngToMercator = exports.checkPermissions = exports.requestRequiredPermissions = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = void 0;
 /**
  * Copyright (c) 2016-present, Viro Media, Inc.
  * All rights reserved.
@@ -108,6 +108,7 @@ Object.defineProperty(exports, "polarToCartesian", { enumerable: true, get: func
 Object.defineProperty(exports, "polarToCartesianActual", { enumerable: true, get: function () { return ViroUtils_1.polarToCartesianActual; } });
 Object.defineProperty(exports, "isARSupportedOnDevice", { enumerable: true, get: function () { return ViroUtils_1.isARSupportedOnDevice; } });
 Object.defineProperty(exports, "requestRequiredPermissions", { enumerable: true, get: function () { return ViroUtils_1.requestRequiredPermissions; } });
+Object.defineProperty(exports, "checkPermissions", { enumerable: true, get: function () { return ViroUtils_1.checkPermissions; } });
 Object.defineProperty(exports, "latLngToMercator", { enumerable: true, get: function () { return ViroUtils_1.latLngToMercator; } });
 Object.defineProperty(exports, "gpsToArWorld", { enumerable: true, get: function () { return ViroUtils_1.gpsToArWorld; } });
 const ViroARCamera_1 = require("./components/AR/ViroARCamera");

@@ -102,6 +102,16 @@ public class VRTARSceneNavigatorManager extends VRTViroViewGroupManager<VRTARSce
         navigator.setDepthEnabled(enabled);
     }
 
+    @ReactProp(name = "semanticDebugEnabled", defaultBoolean = false)
+    public void setSemanticDebugEnabled(VRTARSceneNavigator navigator, boolean enabled) {
+        navigator.setSemanticDebugEnabled(enabled);
+    }
+
+    @ReactProp(name = "semanticConfidenceThreshold", defaultFloat = 0.0f)
+    public void setSemanticConfidenceThreshold(VRTARSceneNavigator navigator, float threshold) {
+        navigator.setSemanticConfidenceThreshold(threshold);
+    }
+
     @ReactProp(name = "cloudAnchorProvider")
     public void setCloudAnchorProvider(VRTARSceneNavigator navigator, String provider) {
         navigator.setCloudAnchorProvider(provider);

@@ -1063,6 +1063,29 @@ RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(rvGetSceneAssets:(nonnull NSNumber *)reactTag
+                            sceneId:(NSString *)sceneId
+                             resolve:(RCTPromiseResolveBlock)resolve
+                              reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvGetSceneAssets:sceneId
+                completionHandler:^(BOOL success, NSArray *assets, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                [r setObject:success ? assets : @[] forKey:@"assets"];
+                if (error) [r setObject:error forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvAttachAssetToCloudAnchor:(nonnull NSNumber *)reactTag
                                     anchorId:(NSString *)anchorId
                                      fileUrl:(NSString *)fileUrl

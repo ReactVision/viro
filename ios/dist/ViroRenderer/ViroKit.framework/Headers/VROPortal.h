@@ -299,6 +299,7 @@ private:
      Installs required shader modifiers on the background.
      */
     void installBackgroundShaderModifier();
+    void installPortalBackgroundShaderModifier();
     
     /*
      Deactivates culling on every geometry in the given node, recursively down the

@@ -229,6 +229,13 @@ public:
         return _semanticTexture;
     }
 
+    void setSemanticConfidenceTexture(std::shared_ptr<VROTexture> texture) {
+        _semanticConfidenceTexture = texture;
+    }
+    std::shared_ptr<VROTexture> getSemanticConfidenceTexture() const {
+        return _semanticConfidenceTexture;
+    }
+
     void setCameraImageTransform(VROMatrix4f transform) {
         _cameraImageTransform = transform;
     }
@@ -370,6 +377,13 @@ private:
      Updated each frame when semantic mode is enabled. Null when not available.
      */
     std::shared_ptr<VROTexture> _semanticTexture;
+
+    /*
+     Per-pixel confidence for the semantic label (R8, 0=uncertain, 255=certain).
+     Updated each frame alongside _semanticTexture. When not provided by the platform
+     (e.g. iOS), a 1×1 all-white texture is used so the shader always reads conf=1.0.
+     */
+    std::shared_ptr<VROTexture> _semanticConfidenceTexture;
 
     /*
      Transform mapping viewport UV coordinates to camera image UV coordinates.

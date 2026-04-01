@@ -91,6 +91,7 @@ public:
     std::unique_ptr<VROARFrame> &getLastFrame();
     std::shared_ptr<VROTexture> getCameraBackgroundTexture();
     std::shared_ptr<VROTexture> getSemanticTexture() override;
+    std::shared_ptr<VROTexture> getSemanticConfidenceTexture() override;
     
     void setViewport(VROViewport viewport);
     void setOrientation(VROCameraOrientation orientation);
@@ -329,6 +330,14 @@ private:
      Video texture cache used for transferring camera content to OpenGL.
      */
     std::shared_ptr<VROVideoTextureCacheOpenGL> _videoTextureCache;
+
+    /*
+     Fallback 1×1 all-white confidence texture (conf=1.0 everywhere).
+     Returned by getSemanticConfidenceTexture() because the ARCore iOS SDK does not
+     expose a per-pixel confidence image. The result is hard alpha edges (no soft blend)
+     on iOS, identical to the previous discard behaviour.
+     */
+    std::shared_ptr<VROTexture> _defaultConfidenceTexture;
     
     /*
      Update the VROARAnchor with the transforms in the given ARAnchor.

@@ -272,6 +272,13 @@ public:
      Pass nullptr when semantic mode is disabled or data is unavailable.
      */
     void setSemanticTexture(std::shared_ptr<VROTexture> texture);
+
+    /*
+     Set the per-pixel semantic confidence texture (R8, 0=uncertain, 255=certain).
+     Auto-bound to shader modifier samplers named 'semantic_confidence_texture'.
+     Pass a 1×1 all-white texture (or nullptr) when confidence data is unavailable.
+     */
+    void setSemanticConfidenceTexture(std::shared_ptr<VROTexture> texture);
     
 #pragma mark - Camera
    

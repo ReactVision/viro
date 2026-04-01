@@ -326,7 +326,14 @@ public:
      the platform does not support it.
      */
     virtual std::shared_ptr<VROTexture> getSemanticTexture() { return nullptr; }
-    
+
+    /*
+     Get the confidence texture for the current frame. Each pixel is a confidence value
+     (R8, 0=uncertain, 255=certain) corresponding to the label in getSemanticTexture().
+     Returns nullptr if not supported; callers should substitute a 1×1 white texture.
+     */
+    virtual std::shared_ptr<VROTexture> getSemanticConfidenceTexture() { return nullptr; }
+
     /*
      Invoke when the viewport changes. The AR engine may adjust its camera
      background and projection matrices in response to a viewport change.

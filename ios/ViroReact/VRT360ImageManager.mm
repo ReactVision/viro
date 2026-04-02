@@ -41,6 +41,7 @@ RCT_EXPORT_VIEW_PROPERTY(rotation, NSNumberArray)
 RCT_EXPORT_VIEW_PROPERTY(format, VROTextureInternalFormat)
 RCT_EXPORT_VIEW_PROPERTY(stereoMode, NSString)
 RCT_EXPORT_VIEW_PROPERTY(isHdr, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(skyEffect, BOOL)
 
 - (VRT360Image *)view
 {

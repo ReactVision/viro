@@ -38,6 +38,13 @@ type Props = ViewProps & {
   steroMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
   isHdr?: boolean;
   /**
+   * When true, the image is rendered as a sky-effect overlay: it appears only over pixels
+   * semantically labeled as sky by ARCore/ARKit scene semantics, using alpha blending via
+   * the confidence texture for smooth boundary transitions. Requires scene semantics to be
+   * enabled on the AR session. Has no effect in VR mode. Default false.
+   */
+  skyEffect?: boolean;
+  /**
    * Callback triggered when we are processing the assets to be
    * displayed in this 360 Photo (either downloading / reading from file).
    */

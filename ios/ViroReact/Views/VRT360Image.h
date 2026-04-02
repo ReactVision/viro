@@ -40,6 +40,7 @@
 @property (nonatomic, assign) VROTextureInternalFormat format;
 @property (nonatomic, assign) BOOL isHdr;
 @property (nonatomic, copy, nullable) NSString *stereoMode;
+@property (nonatomic, assign) BOOL skyEffect;
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 

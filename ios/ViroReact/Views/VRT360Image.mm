@@ -46,6 +46,7 @@
     VRTPhotoLibraryAsyncLoader *_assetLoader;
     VRTHDRImageAsyncLoader *_hdrLoader;
     NSString *_stereoMode;
+    BOOL _skyEffect;
 }
 
 @synthesize onLoadStartViro = _onLoadStartViro;
@@ -90,6 +91,10 @@
     _stereoMode = mode;
 }
 
+- (void)setSkyEffect:(BOOL)skyEffect {
+    _skyEffect = skyEffect;
+}
+
 - (void)setRotation:(NSArray<NSNumber *> *)rotation {
     _rotation = [rotation copy];
     if (_sphereTextureAddedToScene) {
@@ -117,11 +122,14 @@
 
 - (void)updateSceneWithSphereTexture {
     if(!_sphereTextureAddedToScene && _sphereTexture && self.parentHasAppeared) {
-        self.node->getParentPortal()->setBackgroundSphere(_sphereTexture);
-        float rotationValues[3] = {0.0f, 0.0f, 0.0f};
-        populateFloatArrayFromNSArray(_rotation, rotationValues, 3);
-        self.node->getParentPortal()->setBackgroundRotation({toRadians(rotationValues[0]), toRadians(rotationValues[1]), toRadians(rotationValues[2])});
-        
+        if (_skyEffect) {
+            self.node->getParentPortal()->setSkyEffectBackground(_sphereTexture);
+        } else {
+            self.node->getParentPortal()->setBackgroundSphere(_sphereTexture);
+            float rotationValues[3] = {0.0f, 0.0f, 0.0f};
+            populateFloatArrayFromNSArray(_rotation, rotationValues, 3);
+            self.node->getParentPortal()->setBackgroundRotation({toRadians(rotationValues[0]), toRadians(rotationValues[1]), toRadians(rotationValues[2])});
+        }
         _sphereTextureAddedToScene = YES;
     }
 }

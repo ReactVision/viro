@@ -55,6 +55,7 @@ public class VRT360Image extends VRTNode {
     private HDRImageDownloadListener mHDRDownloadListener;
     private Image360DownloadListener mImageDownloadListener;
     private boolean mIsHdr;
+    private boolean mSkyEffect;
 
     public VRT360Image(ReactContext context) {
         super(context);
@@ -69,6 +70,10 @@ public class VRT360Image extends VRTNode {
 
     public void setIsHdr(boolean hdr){
         mIsHdr = hdr;
+    }
+
+    public void setSkyEffect(boolean skyEffect) {
+        mSkyEffect = skyEffect;
     }
 
     public void setSource(ReadableMap source) {
@@ -120,6 +125,13 @@ public class VRT360Image extends VRTNode {
     public void onTearDown() {
         super.onTearDown();
         invalidateImageDownloadListeners();
+
+        if (mSkyEffect && getNodeJni() != null) {
+            PortalScene portal = getNodeJni().getParentPortalScene();
+            if (portal != null) {
+                portal.removeSkyEffect();
+            }
+        }
 
         if (mLatestImage != null) {
             mLatestImage.destroy();
@@ -223,8 +235,12 @@ public class VRT360Image extends VRTNode {
         if (getNodeJni() != null) {
             PortalScene portal = getNodeJni().getParentPortalScene();
             if (portal != null) {
-                portal.setBackgroundTexture(mLatestTexture);
-                portal.setBackgroundRotation(Helper.toRadiansVector(mRotation));
+                if (mSkyEffect) {
+                    portal.setSkyEffectTexture(mLatestTexture);
+                } else {
+                    portal.setBackgroundTexture(mLatestTexture);
+                    portal.setBackgroundRotation(Helper.toRadiansVector(mRotation));
+                }
             }
         }
     }

@@ -219,6 +219,16 @@ public:
         return _background;
     }
     void removeBackground();
+
+    /*
+     Set a sky-effect background: a sphere textured with the given texture, masked so that
+     it only appears over pixels semantically labeled as Sky. Uses alpha blending via the
+     confidence texture for smooth edges. Unlike setBackgroundSphere(), this sphere is added
+     as a child node (not the portal background geometry) so that it participates in the
+     scene's transparent render pass and the semantic mask shader is properly applied.
+     */
+    void setSkyEffectBackground(std::shared_ptr<VROTexture> texture);
+    void removeSkyEffectBackground();
     
 private:
     
@@ -278,6 +288,12 @@ private:
      node content.
      */
     std::shared_ptr<VROGeometry> _background;
+
+    /*
+     Child node holding the sky-effect sphere geometry. Kept as a node so that semantic
+     mask shader modifiers are applied normally via the scene render pass.
+     */
+    std::shared_ptr<VRONode> _skyEffectNode;
     
     /*
      The lighting environment for this portal. Determines the effect of image-based

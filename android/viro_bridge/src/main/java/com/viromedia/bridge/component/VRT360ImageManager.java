@@ -67,6 +67,9 @@ public class VRT360ImageManager extends VRTViroViewGroupManager<VRT360Image> {
     @ReactProp(name = "isHdr", defaultBoolean = false)
     public void setIsHdr(VRT360Image view, boolean hdr) { view.setIsHdr(hdr); }
 
+    @ReactProp(name = "skyEffect", defaultBoolean = false)
+    public void setSkyEffect(VRT360Image view, boolean skyEffect) { view.setSkyEffect(skyEffect); }
+
     @Override
     public Map getExportedCustomDirectEventTypeConstants() {
         Map events = super.getExportedCustomDirectEventTypeConstants();

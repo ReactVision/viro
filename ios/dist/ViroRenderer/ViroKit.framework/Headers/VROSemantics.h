@@ -72,9 +72,13 @@ enum class VROSemanticMode {
  * Controls whether fragments are shown or hidden based on label match.
  */
 enum class VROSemanticMaskMode {
-    ShowOnly = 0,  // Only render fragments where the label matches
-    Hide     = 1,  // Hide fragments where the label matches
-    Debug    = 2   // Color fragments by semantic label for debugging
+    ShowOnly    = 0,  // Only render fragments where the label matches
+    Hide        = 1,  // Hide fragments where the label matches
+    Debug       = 2,  // Color fragments by semantic label for debugging
+    ShowOnlySky = 3   // ShowOnly + unlabeled pixels use viewport Y to decide:
+                      // upper half → show sphere (sky context),
+                      // lower half → hide sphere (ground/foreground context).
+                      // Use this for Viro360Image skyEffect only.
 };
 
 /*

@@ -49,6 +49,8 @@ const collisionPairKey_1 = require("./domain/collisionPairKey");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
+const studioMaterials_1 = require("./domain/studioMaterials");
+const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const ANDROID_MAX_3D_MODELS = 3;
 const IOS_MAX_3D_MODELS = 10;
 /**
@@ -62,6 +64,15 @@ const StudioARScene = (props) => {
     if (!sceneData)
         return <ViroARScene_1.ViroARScene />;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
+    // ─── Material registration ────────────────────────────────────────────────
+    // Must run synchronously before first render so shaderOverrides resolve.
+    const materialsRegisteredRef = (0, react_1.useRef)(false);
+    if (!materialsRegisteredRef.current) {
+        (0, studioMaterials_1.registerStudioMaterialsForAssets)(assets);
+        materialsRegisteredRef.current = true;
+    }
+    // Drive `time` uniform for animated shader presets (~60fps).
+    (0, useStudioShaderTimeUniforms_1.useStudioShaderTimeUniforms)(assets);
     // ─── Animation registration ───────────────────────────────────────────────
     // Done synchronously at render time so the registry is populated before
     // any Viro component reads the animation prop.

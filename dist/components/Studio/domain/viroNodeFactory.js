@@ -42,6 +42,7 @@ const ViroImage_1 = require("../../ViroImage");
 const ViroText_1 = require("../../ViroText");
 const ViroVideo_1 = require("../../ViroVideo");
 const sceneNavigationHandler_1 = require("./sceneNavigationHandler");
+const materialConfig_1 = require("./materialConfig");
 /**
  * Derives the transform config for an asset.
  * Clamps Z to -2 for non-trigger assets to guarantee visibility.
@@ -134,7 +135,9 @@ function create3DObject(asset, config, onAssetLoaded) {
             config.scale[2] * 0.8,
         ]
         : config.scale;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)}/>);
+    const hasMaterialConfig = (0, materialConfig_1.parseMaterialConfig)(asset.material_config) !== null;
+    const shaderOverrides = hasMaterialConfig ? [(0, materialConfig_1.studioMaterialName)(asset.id)] : undefined;
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} {...(shaderOverrides ? { shaderOverrides } : {})}/>);
 }
 function createImage(asset, config, onAssetLoaded) {
     if (!asset.file_url) {

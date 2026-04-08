@@ -6,6 +6,7 @@ import { ViroText } from "../../ViroText";
 import { ViroVideo } from "../../ViroVideo";
 import { StudioAnimation, StudioAsset, ViroAnimationProp } from "../types";
 import { executeFunctionWithRelations } from "./sceneNavigationHandler";
+import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
 
 type SceneNavigator = any;
 
@@ -148,6 +149,9 @@ function create3DObject(
         ] as [number, number, number])
       : config.scale;
 
+  const hasMaterialConfig = parseMaterialConfig(asset.material_config) !== null;
+  const shaderOverrides = hasMaterialConfig ? [studioMaterialName(asset.id)] : undefined;
+
   return (
     <Viro3DObject
       key={asset.id}
@@ -164,6 +168,7 @@ function create3DObject(
       onError={(e) =>
         console.error(`[Studio] 3D model "${asset.name}" error:`, e)
       }
+      {...(shaderOverrides ? { shaderOverrides } : {})}
     />
   );
 }

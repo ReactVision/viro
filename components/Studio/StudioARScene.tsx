@@ -26,6 +26,8 @@ import { createNode } from "./domain/viroNodeFactory";
 import {
   executeOnLoadFunction,
 } from "./domain/sceneNavigationHandler";
+import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import {
   StudioAnimation,
   StudioSceneResponse,
@@ -60,6 +62,17 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
 
   const { scene, assets, animations, collision_bindings, functions } =
     sceneData;
+
+  // ─── Material registration ────────────────────────────────────────────────
+  // Must run synchronously before first render so shaderOverrides resolve.
+  const materialsRegisteredRef = useRef(false);
+  if (!materialsRegisteredRef.current) {
+    registerStudioMaterialsForAssets(assets);
+    materialsRegisteredRef.current = true;
+  }
+
+  // Drive `time` uniform for animated shader presets (~60fps).
+  useStudioShaderTimeUniforms(assets);
 
   // ─── Animation registration ───────────────────────────────────────────────
   // Done synchronously at render time so the registry is populated before

@@ -73,6 +73,14 @@ export interface ViroConfigurationOptions {
   rvProjectId?: string;
 
   /**
+   * Override the ReactVision platform base URL.
+   * Omit for production. Set to a staging URL for testing.
+   *
+   * Written to AndroidManifest as com.reactvision.RVEndpoint and to Info.plist as RVEndpoint.
+   */
+  rvEndpoint?: string;
+
+  /**
    * Anchor provider for both cloud anchors and geospatial anchors.
    * Replaces the deprecated cloudAnchorProvider + geospatialAnchorProvider props.
    *

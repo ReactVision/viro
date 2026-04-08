@@ -571,6 +571,11 @@ public:
         std::function<void(bool success, std::string error)> callback) {
         if (callback) callback(false, "Not supported");
     }
+    virtual void rvGetScene(
+        const std::string& sceneId,
+        std::function<void(bool success, std::string jsonData, std::string error)> callback) {
+        if (callback) callback(false, "", "Not supported");
+    }
     virtual void rvGetSceneAssets(
         const std::string& sceneId,
         std::function<void(bool success, std::string jsonData, std::string error)> callback) {

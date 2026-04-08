@@ -1495,6 +1495,23 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         });
 }
 
+- (void)rvGetScene:(NSString *)sceneId
+ completionHandler:(void (^)(BOOL, NSString *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
+    arSession->rvGetScene(
+        std::string([sceneId UTF8String]),
+        [completionHandler](bool success, std::string jsonData, std::string error) {
+            if (completionHandler) {
+                NSString *dataStr = success ? [NSString stringWithUTF8String:jsonData.c_str()] : nil;
+                NSString *errStr  = success ? nil : [NSString stringWithUTF8String:error.c_str()];
+                completionHandler(success, dataStr, errStr);
+            }
+        });
+}
+
 - (void)rvGetSceneAssets:(NSString *)sceneId
       completionHandler:(void (^)(BOOL, NSArray *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, @[], @"AR view not initialized"); return; }

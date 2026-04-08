@@ -294,6 +294,14 @@ const withViroManifest = (config: ExpoConfig) =>
             },
           });
         }
+        if (pluginOptions.rvEndpoint) {
+          contents?.manifest?.application?.[0]["meta-data"]?.push({
+            $: {
+              "android:name": "com.reactvision.RVEndpoint",
+              "android:value": pluginOptions.rvEndpoint,
+            },
+          });
+        }
 
         // Add location permissions when geospatial provider is active
         if (geospatialAnchorProvider === "arcore" || geospatialAnchorProvider === "reactvision") {

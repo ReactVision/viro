@@ -224,6 +224,7 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
   let googleCloudApiKey: string | undefined;
   let rvApiKey: string | undefined;
   let rvProjectId: string | undefined;
+  let rvEndpoint: string | undefined;
   let cloudAnchorProvider: string | undefined;
   let geospatialAnchorProvider: string | undefined;
   let includeARCore: boolean | undefined;
@@ -247,6 +248,7 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
       googleCloudApiKey = pluginOptions.googleCloudApiKey;
       rvApiKey = pluginOptions.rvApiKey;
       rvProjectId = pluginOptions.rvProjectId;
+      rvEndpoint = pluginOptions.rvEndpoint;
       // Resolve unified provider prop; old props override for backward compat.
       // Default to "reactvision" only when rvApiKey is present (implies RV intent).
       const defaultProvider2 = pluginOptions.rvApiKey ? "reactvision" : undefined;
@@ -281,6 +283,9 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
   }
   if (rvProjectId) {
     config.ios.infoPlist.RVProjectId = rvProjectId;
+  }
+  if (rvEndpoint) {
+    config.ios.infoPlist.RVEndpoint = rvEndpoint;
   }
 
   // Add location permissions for Geospatial API

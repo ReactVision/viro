@@ -1631,6 +1631,27 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void rvGetScene(final int sceneNavTag, final String sceneId, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
+                    ((VRTARSceneNavigator) view).rvGetScene(sceneId, (success, jsonData, error) -> {
+                        WritableMap r = Arguments.createMap();
+                        r.putBoolean("success", success);
+                        if (success) r.putString("data", jsonData);
+                        if (!success) r.putString("error", error);
+                        promise.resolve(r);
+                    });
+                } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }
+            }
+        });
+    }
+
+    @ReactMethod
     public void rvAttachAssetToCloudAnchor(final int sceneNavTag, final String anchorId,
                                             final String fileUrl, final double fileSize,
                                             final String name, final String assetType,

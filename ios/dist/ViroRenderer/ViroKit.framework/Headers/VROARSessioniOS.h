@@ -197,6 +197,8 @@ public:
         double confidence, int matchCount, int inlierCount, int processingTimeMs,
         const std::string& platform, const std::string& externalUserId,
         std::function<void(bool, std::string)> callback) override;
+    void rvGetScene(const std::string& sceneId,
+        std::function<void(bool, std::string, std::string)> callback) override;
     void rvGetSceneAssets(const std::string& sceneId,
         std::function<void(bool, std::string, std::string)> callback) override;
 

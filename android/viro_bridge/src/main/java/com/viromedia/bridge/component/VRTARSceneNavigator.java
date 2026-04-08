@@ -403,6 +403,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mCloudAnchorProvider = "none";
     private String mRvApiKey = null;
     private String mRvProjectId = null;
+    private String mRvEndpoint = null;
     // Improvement 5: track whether credentials have been pushed to the native session
     // so setReactVisionConfig() is called exactly once per provider activation.
     private boolean mRvConfigApplied = false;
@@ -468,6 +469,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 if (ai.metaData != null) {
                     mRvApiKey = ai.metaData.getString("com.reactvision.RVApiKey");
                     mRvProjectId = ai.metaData.getString("com.reactvision.RVProjectId");
+                    mRvEndpoint = ai.metaData.getString("com.reactvision.RVEndpoint");
                     if (mRvApiKey != null && !mRvApiKey.isEmpty()) {
                         Log.i(TAG, "ReactVision API key found in AndroidManifest.xml");
                     } else {
@@ -517,7 +519,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (!"reactvision".equals(mCloudAnchorProvider)) return;
         if (arScene == null) return;
         if (mRvApiKey == null || mRvApiKey.isEmpty()) return;
-        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "",
+                mRvEndpoint != null ? mRvEndpoint : "");
         mRvConfigApplied = true;
     }
 
@@ -528,7 +531,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (mRvApiKey == null || mRvApiKey.isEmpty()) return;
         // setReactVisionConfig queues credentials on renderer thread first;
         // setGeospatialAnchorProvider queues provider init after it (FIFO).
-        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "");
+        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "",
+                mRvEndpoint != null ? mRvEndpoint : "");
         arScene.setGeospatialAnchorProvider("reactvision");
         mGeoProviderApplied = true;
     }
@@ -671,6 +675,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 if (ai.metaData != null) {
                     String rvApiKey   = ai.metaData.getString("com.reactvision.RVApiKey");
                     String rvProjectId = ai.metaData.getString("com.reactvision.RVProjectId");
+                    String rvEndpoint = ai.metaData.getString("com.reactvision.RVEndpoint");
                     if (rvApiKey != null && !rvApiKey.isEmpty()) {
                         Log.i(TAG, "ReactVision API key found in AndroidManifest.xml");
                         // Push credentials then activate the geospatial provider.
@@ -679,7 +684,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                         ARScene arScene = getCurrentARScene();
                         if (arScene != null) {
                             arScene.setReactVisionConfig(rvApiKey,
-                                rvProjectId != null ? rvProjectId : "");
+                                rvProjectId != null ? rvProjectId : "",
+                                rvEndpoint != null ? rvEndpoint : "");
                             arScene.setGeospatialAnchorProvider("reactvision");
                         } else {
                             // Store for lazy application once the scene becomes available.
@@ -1128,6 +1134,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
         ensureRvConfigApplied(arScene);
         arScene.rvFindNearbyCloudAnchors(lat, lng, radius, limit, callback);
+    }
+
+    public void rvGetScene(String sceneId, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
+        arScene.rvGetScene(sceneId, callback);
     }
 
     public void rvGetSceneAssets(String sceneId, ARScene.RvCloudAnchorCallback callback) {

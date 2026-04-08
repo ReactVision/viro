@@ -681,6 +681,9 @@ class ViroARSceneNavigator extends React.Component {
     _rvFindNearbyCloudAnchors = async (latitude, longitude, radius, limit) => {
         return await ViroARSceneNavigatorModule.rvFindNearbyCloudAnchors((0, react_native_1.findNodeHandle)(this), latitude, longitude, radius, limit);
     };
+    _rvGetScene = async (sceneId) => {
+        return await ViroARSceneNavigatorModule.rvGetScene((0, react_native_1.findNodeHandle)(this), sceneId);
+    };
     _rvGetSceneAssets = async (sceneId) => {
         return await ViroARSceneNavigatorModule.rvGetSceneAssets((0, react_native_1.findNodeHandle)(this), sceneId);
     };
@@ -904,6 +907,7 @@ class ViroARSceneNavigator extends React.Component {
         rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
         rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
         rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+        rvGetScene: this._rvGetScene,
         rvGetSceneAssets: this._rvGetSceneAssets,
         // Assets API
         rvUploadAsset: this._rvUploadAsset,
@@ -963,6 +967,7 @@ class ViroARSceneNavigator extends React.Component {
         rvAttachAssetToCloudAnchor: this._rvAttachAssetToCloudAnchor,
         rvRemoveAssetFromCloudAnchor: this._rvRemoveAssetFromCloudAnchor,
         rvTrackCloudAnchorResolution: this._rvTrackCloudAnchorResolution,
+        rvGetScene: this._rvGetScene,
         rvGetSceneAssets: this._rvGetSceneAssets,
         // Assets API
         rvUploadAsset: this._rvUploadAsset,

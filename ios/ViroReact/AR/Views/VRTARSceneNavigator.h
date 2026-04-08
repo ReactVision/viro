@@ -208,6 +208,8 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
                           radius:(double)radius
                            limit:(int)limit
                completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
+- (void)rvGetScene:(NSString *)sceneId
+ completionHandler:(void (^)(BOOL success, NSString *data, NSString *error))completionHandler;
 - (void)rvGetSceneAssets:(NSString *)sceneId
       completionHandler:(void (^)(BOOL success, NSArray *assets, NSString *error))completionHandler;
 - (void)rvAttachAssetToCloudAnchor:(NSString *)anchorId

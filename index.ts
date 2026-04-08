@@ -4,6 +4,7 @@
  *
  */
 import { ViroAnimations } from "./components/Animation/ViroAnimations";
+import { StudioSceneNavigator, StudioARScene } from "./components/Studio";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";
 import { Viro360Video } from "./components/Viro360Video";
@@ -323,4 +324,17 @@ export {
   ViroMonocularDepthSupportResult,
   ViroMonocularDepthModelAvailableResult,
   ViroMonocularDepthPreferenceResult,
+  // Studio Integration
+  StudioSceneNavigator,
+  StudioARScene,
 };
+
+export type {
+  StudioSceneResponse,
+  StudioAsset,
+  StudioAnimation,
+  StudioCollisionBinding,
+  StudioSceneFunction,
+  StudioSceneMeta,
+  StudioProjectMeta,
+} from "./components/Studio";

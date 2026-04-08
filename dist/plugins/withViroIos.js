@@ -171,6 +171,7 @@ const withDefaultInfoPlist = (config, _props) => {
     let googleCloudApiKey;
     let rvApiKey;
     let rvProjectId;
+    let rvEndpoint;
     let cloudAnchorProvider;
     let geospatialAnchorProvider;
     let includeARCore;
@@ -190,6 +191,7 @@ const withDefaultInfoPlist = (config, _props) => {
             googleCloudApiKey = pluginOptions.googleCloudApiKey;
             rvApiKey = pluginOptions.rvApiKey;
             rvProjectId = pluginOptions.rvProjectId;
+            rvEndpoint = pluginOptions.rvEndpoint;
             // Resolve unified provider prop; old props override for backward compat.
             // Default to "reactvision" only when rvApiKey is present (implies RV intent).
             const defaultProvider2 = pluginOptions.rvApiKey ? "reactvision" : undefined;
@@ -223,6 +225,9 @@ const withDefaultInfoPlist = (config, _props) => {
     }
     if (rvProjectId) {
         config.ios.infoPlist.RVProjectId = rvProjectId;
+    }
+    if (rvEndpoint) {
+        config.ios.infoPlist.RVEndpoint = rvEndpoint;
     }
     // Add location permissions for Geospatial API
     if (geospatialAnchorProvider === "arcore" || geospatialAnchorProvider === "reactvision" || includeARCore === true) {

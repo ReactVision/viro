@@ -12,10 +12,14 @@ Pod::Spec.new do |s|
   s.author              = 'ReactVision'
   s.requires_arc        = true
   s.platform            = :ios, '12.0'
-  s.ios.deployment_target = '12.0'
-  
+  s.ios.deployment_target     = '12.0'
+  s.visionos.deployment_target = '1.0'
+
+  # visionOS: CompositorServices drives the immersive render loop.
+  s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
+
   # Base source files (always included)
-  source_files_array = ['ViroReact/**/*.{h,m,mm}']
+  source_files_array = ['ViroReact/**/*.{h,m,mm,swift}']
   header_files_array = ['ViroReact/**/*.h']
   
   # Include dist files if they exist (for release builds)

@@ -8,6 +8,8 @@ interface StudioSceneNavigatorProps {
     style?: ViewStyle;
     onSceneReady?: () => void;
     onError?: (err: Error) => void;
+    /** Called when a NAVIGATION function transitions to a new scene. */
+    onSceneChange?: (sceneId: string, sceneName: string) => void;
 }
 /**
  * Drop-in AR scene component that fetches and renders a Studio-authored scene.
@@ -18,5 +20,5 @@ interface StudioSceneNavigatorProps {
  * Usage:
  *   <StudioSceneNavigator sceneId="abc-123-uuid" style={StyleSheet.absoluteFill} />
  */
-export declare function StudioSceneNavigator({ sceneId, worldAlignment, autofocus, style, onSceneReady, onError, }: StudioSceneNavigatorProps): React.JSX.Element;
+export declare function StudioSceneNavigator({ sceneId, worldAlignment, autofocus, style, onSceneReady, onError, onSceneChange, }: StudioSceneNavigatorProps): React.JSX.Element;
 export {};

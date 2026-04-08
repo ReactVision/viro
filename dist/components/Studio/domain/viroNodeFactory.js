@@ -43,11 +43,13 @@ const ViroText_1 = require("../../ViroText");
 const ViroVideo_1 = require("../../ViroVideo");
 const sceneNavigationHandler_1 = require("./sceneNavigationHandler");
 const materialConfig_1 = require("./materialConfig");
+const dragConfiguration_1 = require("./dragConfiguration");
+const physicsConfig_1 = require("./physicsConfig");
 /**
  * Derives the transform config for an asset.
  * Clamps Z to -2 for non-trigger assets to guarantee visibility.
  */
-function createNodeConfig(asset, sceneNavigator, animations, onAnimationTrigger, animationStates) {
+function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates) {
     const hasTriggerImage = !!asset.trigger_image_url;
     let posZ = asset.position_z ?? -2;
     if (!hasTriggerImage && posZ > -0.5) {
@@ -81,12 +83,17 @@ function createNodeConfig(asset, sceneNavigator, animations, onAnimationTrigger,
     if (scaleValue > 10)
         scaleValue = 2;
     const scale = [scaleValue, scaleValue, scaleValue];
-    const dragType = asset.is_draggable
-        ? "FixedDistance"
-        : undefined;
+    const dragType = dragConfiguration_1.DragConfiguration.getDragType(asset, scene);
+    let dragPlane;
+    if (dragType === "FixedToPlane") {
+        dragPlane = dragConfiguration_1.DragConfiguration.getDragPlane(scene?.plane_direction ?? "Horizontal", position);
+    }
+    const parsedPhysics = (0, physicsConfig_1.parsePhysicsBodyConfig)(asset.physics_config);
+    const physicsBody = parsedPhysics ? (0, physicsConfig_1.buildViroPhysicsBody)(parsedPhysics) : undefined;
+    const viroTag = parsedPhysics ? asset.id : undefined;
     const onClick = createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger);
     const animation = animationStates?.[asset.id];
-    return { position, rotation, scale, dragType, onClick, animation };
+    return { position, rotation, scale, dragType, dragPlane, physicsBody, viroTag, onClick, animation };
 }
 function createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger) {
     const fn = asset.scene_function;
@@ -137,7 +144,7 @@ function create3DObject(asset, config, onAssetLoaded) {
         : config.scale;
     const hasMaterialConfig = (0, materialConfig_1.parseMaterialConfig)(asset.material_config) !== null;
     const shaderOverrides = hasMaterialConfig ? [(0, materialConfig_1.studioMaterialName)(asset.id)] : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} {...(shaderOverrides ? { shaderOverrides } : {})}/>);
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody ? { physicsBody: config.physicsBody, viroTag: config.viroTag } : {})}/>);
 }
 function createImage(asset, config, onAssetLoaded) {
     if (!asset.file_url) {
@@ -164,9 +171,9 @@ function createVideo(asset, config) {
 /**
  * Creates the appropriate Viro component for a StudioAsset.
  */
-function createNode(asset, sceneNavigator, animations, onAnimationTrigger, animationStates, onAssetLoaded) {
+function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded) {
     const type = resolveType(asset);
-    const config = createNodeConfig(asset, sceneNavigator, animations, onAnimationTrigger, animationStates);
+    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates);
     switch (type) {
         case "3D-MODEL":
             return create3DObject(asset, config, onAssetLoaded);

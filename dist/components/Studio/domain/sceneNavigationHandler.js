@@ -22,7 +22,7 @@ function resolveAnimationTargetAssetId(animationId, animations) {
  * Single dispatcher for all scene function types.
  * Used by onClick, onCollision, and on_load_function triggers.
  */
-function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, depth = 0) {
+function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, depth = 0, onSceneChange) {
     if (depth > ANIMATION_CHAIN_MAX_DEPTH) {
         console.warn(`[Studio] Max animation chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for function ${fn.id}.`);
         return;
@@ -31,7 +31,7 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         const nav = fn.scene_navigation;
         if (!nav?.navigate_to || !sceneNavigator)
             return;
-        void navigateToScene(sceneNavigator, nav.navigate_to, animations);
+        void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange);
     }
     else if (fn.function_type === "ALERT") {
         const alrt = fn.scene_alert;
@@ -58,13 +58,13 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
 /**
  * Executes the scene's on_load_function if set.
  */
-function executeOnLoadFunction(functionId, functions, sceneNavigator, animations, onAnimationTrigger) {
+function executeOnLoadFunction(functionId, functions, sceneNavigator, animations, onAnimationTrigger, onSceneChange) {
     const fn = resolveById(functionId, functions);
     if (!fn) {
         console.warn(`[Studio] on_load_function ${functionId} not found.`);
         return;
     }
-    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger);
+    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
 }
 /**
  * Navigates to a new AR scene by fetching its data via rvGetScene and
@@ -73,7 +73,7 @@ function executeOnLoadFunction(functionId, functions, sceneNavigator, animations
  * The sceneNavigator object exposes rvGetScene as a method — no separate
  * API client needed here.
  */
-async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations) {
+async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations, onSceneChange) {
     if (!sceneNavigator) {
         console.error("[Studio] SceneNavigator not available for navigation");
         react_native_1.Alert.alert("Navigation Error", "Unable to navigate to scene");
@@ -91,10 +91,11 @@ async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations)
         sceneNavigator.push({
             scene: StudioARScene,
             passProps: {
-                sceneId: targetSceneId,
-                preloadedScene: sceneData,
+                sceneData,
+                onSceneChange,
             },
         });
+        onSceneChange?.(targetSceneId, sceneData.scene.name ?? targetSceneId);
         console.log(`[Studio] Navigated to scene: ${sceneData.scene.name}`);
     }
     catch (error) {

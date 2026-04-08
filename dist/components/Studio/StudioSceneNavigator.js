@@ -51,7 +51,7 @@ function LoadingScene() { return <ViroARScene_1.ViroARScene />; }
  * Usage:
  *   <StudioSceneNavigator sceneId="abc-123-uuid" style={StyleSheet.absoluteFill} />
  */
-function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, }) {
+function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, }) {
     const navigatorRef = (0, react_1.useRef)(null);
     const loadedRef = (0, react_1.useRef)(false);
     const loadScene = (0, react_1.useCallback)(async () => {
@@ -72,6 +72,7 @@ function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus =
                 passProps: {
                     sceneData,
                     onReady: onSceneReady,
+                    onSceneChange,
                 },
             });
         }

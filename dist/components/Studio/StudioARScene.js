@@ -51,6 +51,7 @@ const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
+const physicsConfig_1 = require("./domain/physicsConfig");
 const ANDROID_MAX_3D_MODELS = 3;
 const IOS_MAX_3D_MODELS = 10;
 /**
@@ -59,7 +60,7 @@ const IOS_MAX_3D_MODELS = 10;
  * to sceneNavigator.push() when navigating between scenes.
  */
 const StudioARScene = (props) => {
-    const { sceneNavigator, sceneData, onReady } = props;
+    const { sceneNavigator, sceneData, onReady, onSceneChange } = props;
     // Guard: sceneData may be null during the brief push animation.
     if (!sceneData)
         return <ViroARScene_1.ViroARScene />;
@@ -160,7 +161,7 @@ const StudioARScene = (props) => {
     (0, react_1.useEffect)(() => {
         if (scene.on_load_function && !onLoadExecutedRef.current) {
             onLoadExecutedRef.current = true;
-            (0, sceneNavigationHandler_1.executeOnLoadFunction)(scene.on_load_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key));
+            (0, sceneNavigationHandler_1.executeOnLoadFunction)(scene.on_load_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), onSceneChange);
         }
     }, [scene.id]);
     // ─── Collision bindings ───────────────────────────────────────────────────
@@ -186,7 +187,7 @@ const StudioARScene = (props) => {
     const getCollisionHandler = (0, react_1.useCallback)((placementId) => {
         if (!collisionAssetIds.has(placementId))
             return undefined;
-        return (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(placementId, bindingsByPairKey, sceneNavigator, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key));
+        return (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(placementId, bindingsByPairKey, sceneNavigator, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key), onSceneChange);
     }, [bindingsByPairKey, collisionAssetIds, sceneNavigator, animations]);
     // ─── Trigger image targets ────────────────────────────────────────────────
     const { planeAssets, imageTriggeredAssets } = (0, react_1.useMemo)(() => {
@@ -229,7 +230,7 @@ const StudioARScene = (props) => {
                     return null;
                 }
             }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded);
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded);
         })
             .filter(Boolean);
     }, [
@@ -247,7 +248,7 @@ const StudioARScene = (props) => {
             const targetName = urlToTargetName.get(asset.trigger_image_url);
             if (!targetName)
                 return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded);
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded);
             if (!node)
                 return null;
             return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
@@ -266,8 +267,13 @@ const StudioARScene = (props) => {
     // ─── Plane detection mode ─────────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
+    // ─── Physics world ────────────────────────────────────────────────────────
+    const physicsWorldConfig = (0, physicsConfig_1.parsePhysicsWorldConfig)(scene.physics_world_config);
+    const physicsWorld = physicsWorldConfig?.enabled
+        ? (0, physicsConfig_1.buildViroPhysicsWorld)(physicsWorldConfig)
+        : undefined;
     // ─── Render ───────────────────────────────────────────────────────────────
-    return (<ViroARScene_1.ViroARScene>
+    return (<ViroARScene_1.ViroARScene {...(physicsWorld ? { physicsWorld: physicsWorld } : {})}>
       <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
 
       {planeDetectionMode === "AUTOMATIC" ? (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment}>

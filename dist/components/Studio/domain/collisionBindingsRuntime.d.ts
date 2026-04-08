@@ -10,6 +10,7 @@ export declare function dispatchCollisionBindingActions(params: {
     bindingsByPairKey: Map<string, StudioCollisionBinding[]>;
     sceneNavigator?: unknown;
     animations: StudioAnimation[];
+    onSceneChange?: (sceneId: string, sceneName: string) => void;
     onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void;
     cooldownMs?: number;
     lastFiredRef: MutableRefObject<Map<string, number>>;
@@ -17,4 +18,4 @@ export declare function dispatchCollisionBindingActions(params: {
 /**
  * Returns an onCollision handler for a given placement asset ID.
  */
-export declare function createPlacementCollisionHandler(placementId: string, bindingsByPairKey: Map<string, StudioCollisionBinding[]>, sceneNavigator: unknown, animations: StudioAnimation[], lastFiredRef: MutableRefObject<Map<string, number>>, onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void): (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void;
+export declare function createPlacementCollisionHandler(placementId: string, bindingsByPairKey: Map<string, StudioCollisionBinding[]>, sceneNavigator: unknown, animations: StudioAnimation[], lastFiredRef: MutableRefObject<Map<string, number>>, onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void, onSceneChange?: (sceneId: string, sceneName: string) => void): (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void;

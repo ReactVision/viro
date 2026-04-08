@@ -7,6 +7,8 @@ interface StudioARSceneProps {
     sceneData: StudioSceneResponse | null;
     onReady?: () => void;
     onError?: (err: Error) => void;
+    /** Called when a NAVIGATION function transitions to a new scene. */
+    onSceneChange?: (sceneId: string, sceneName: string) => void;
 }
 /**
  * AR scene component driven by a StudioSceneResponse.

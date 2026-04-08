@@ -17,6 +17,8 @@ interface StudioSceneNavigatorProps {
   style?: ViewStyle;
   onSceneReady?: () => void;
   onError?: (err: Error) => void;
+  /** Called when a NAVIGATION function transitions to a new scene. */
+  onSceneChange?: (sceneId: string, sceneName: string) => void;
 }
 
 /**
@@ -35,6 +37,7 @@ export function StudioSceneNavigator({
   style,
   onSceneReady,
   onError,
+  onSceneChange,
 }: StudioSceneNavigatorProps) {
   const navigatorRef = useRef<any>(null);
   const loadedRef = useRef(false);
@@ -60,6 +63,7 @@ export function StudioSceneNavigator({
         passProps: {
           sceneData,
           onReady: onSceneReady,
+          onSceneChange,
         },
       });
     } catch (e) {

@@ -28,6 +28,7 @@ import {
 } from "./domain/sceneNavigationHandler";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
+import { buildViroPhysicsWorld, parsePhysicsWorldConfig } from "./domain/physicsConfig";
 import {
   StudioAnimation,
   StudioSceneResponse,
@@ -47,6 +48,8 @@ interface StudioARSceneProps {
   sceneData: StudioSceneResponse | null;
   onReady?: () => void;
   onError?: (err: Error) => void;
+  /** Called when a NAVIGATION function transitions to a new scene. */
+  onSceneChange?: (sceneId: string, sceneName: string) => void;
 }
 
 /**
@@ -55,7 +58,7 @@ interface StudioARSceneProps {
  * to sceneNavigator.push() when navigating between scenes.
  */
 export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
-  const { sceneNavigator, sceneData, onReady } = props;
+  const { sceneNavigator, sceneData, onReady, onSceneChange } = props;
 
   // Guard: sceneData may be null during the brief push animation.
   if (!sceneData) return <ViroARScene />;
@@ -204,7 +207,8 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
         functions,
         sceneNavigator,
         animations,
-        (id, key) => triggerAnimationRef.current(id, key)
+        (id, key) => triggerAnimationRef.current(id, key),
+        onSceneChange,
       );
     }
   }, [scene.id]);
@@ -242,7 +246,8 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
         sceneNavigator,
         animations,
         collisionCooldownRef,
-        (id, key) => triggerAnimationRef.current(id, key)
+        (id, key) => triggerAnimationRef.current(id, key),
+        onSceneChange,
       );
     },
     [bindingsByPairKey, collisionAssetIds, sceneNavigator, animations]
@@ -308,6 +313,7 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
           asset,
           sceneNavigator,
           animations,
+          scene,
           (id, key) => triggerAnimationRef.current(id, key),
           animationStates,
           handleAssetLoaded
@@ -334,6 +340,7 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
           asset,
           sceneNavigator,
           animations,
+          scene,
           (id, key) => triggerAnimationRef.current(id, key),
           animationStates,
           handleAssetLoaded
@@ -363,10 +370,17 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
   ).toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
 
+  // ─── Physics world ────────────────────────────────────────────────────────
+
+  const physicsWorldConfig = parsePhysicsWorldConfig(scene.physics_world_config);
+  const physicsWorld = physicsWorldConfig?.enabled
+    ? buildViroPhysicsWorld(physicsWorldConfig)
+    : undefined;
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <ViroARScene>
+    <ViroARScene {...(physicsWorld ? { physicsWorld: physicsWorld as any } : {})}>
       <ViroAmbientLight color="#ffffff" intensity={1000} />
 
       {planeDetectionMode === "AUTOMATIC" ? (

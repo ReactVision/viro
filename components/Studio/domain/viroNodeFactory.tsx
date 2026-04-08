@@ -4,9 +4,11 @@ import { Viro3DObject } from "../../Viro3DObject";
 import { ViroImage } from "../../ViroImage";
 import { ViroText } from "../../ViroText";
 import { ViroVideo } from "../../ViroVideo";
-import { StudioAnimation, StudioAsset, ViroAnimationProp } from "../types";
+import { StudioAnimation, StudioAsset, StudioSceneMeta, ViroAnimationProp } from "../types";
 import { executeFunctionWithRelations } from "./sceneNavigationHandler";
 import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
+import { DragConfiguration } from "./dragConfiguration";
+import { buildViroPhysicsBody, parsePhysicsBodyConfig } from "./physicsConfig";
 
 type SceneNavigator = any;
 
@@ -15,6 +17,9 @@ export type NodeConfig = {
   rotation: [number, number, number];
   scale: [number, number, number];
   dragType?: "FixedDistance" | "FixedDistanceOrigin" | "FixedToWorld" | "FixedToPlane";
+  dragPlane?: { planePoint: [number, number, number]; planeNormal: [number, number, number]; maxDistance: number };
+  physicsBody?: Record<string, unknown>;
+  viroTag?: string;
   onClick?: () => void;
   animation?: ViroAnimationProp;
 };
@@ -27,6 +32,7 @@ export function createNodeConfig(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
   animations: StudioAnimation[],
+  scene: StudioSceneMeta | null,
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   animationStates?: Record<string, ViroAnimationProp>
 ): NodeConfig {
@@ -69,9 +75,19 @@ export function createNodeConfig(
   if (scaleValue > 10) scaleValue = 2;
   const scale: [number, number, number] = [scaleValue, scaleValue, scaleValue];
 
-  const dragType: NodeConfig["dragType"] = asset.is_draggable
-    ? "FixedDistance"
-    : undefined;
+  const dragType = DragConfiguration.getDragType(asset, scene);
+
+  let dragPlane: NodeConfig["dragPlane"];
+  if (dragType === "FixedToPlane") {
+    dragPlane = DragConfiguration.getDragPlane(
+      scene?.plane_direction ?? "Horizontal",
+      position,
+    );
+  }
+
+  const parsedPhysics = parsePhysicsBodyConfig(asset.physics_config);
+  const physicsBody = parsedPhysics ? buildViroPhysicsBody(parsedPhysics) : undefined;
+  const viroTag = parsedPhysics ? asset.id : undefined;
 
   const onClick = createOnClickHandler(
     asset,
@@ -82,7 +98,7 @@ export function createNodeConfig(
 
   const animation = animationStates?.[asset.id];
 
-  return { position, rotation, scale, dragType, onClick, animation };
+  return { position, rotation, scale, dragType, dragPlane, physicsBody, viroTag, onClick, animation };
 }
 
 function createOnClickHandler(
@@ -161,6 +177,7 @@ function create3DObject(
       scale={scale}
       type={modelType}
       dragType={config.dragType}
+      dragPlane={config.dragPlane}
       animation={config.animation as any}
       onClick={config.onClick}
       renderingOrder={Platform.OS === "android" ? 1 : 0}
@@ -169,6 +186,7 @@ function create3DObject(
         console.error(`[Studio] 3D model "${asset.name}" error:`, e)
       }
       {...(shaderOverrides ? { shaderOverrides } : {})}
+      {...(config.physicsBody ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag } : {})}
     />
   );
 }
@@ -260,6 +278,7 @@ export function createNode(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
   animations: StudioAnimation[],
+  scene: StudioSceneMeta | null,
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   animationStates?: Record<string, ViroAnimationProp>,
   onAssetLoaded?: (id: string) => void
@@ -269,6 +288,7 @@ export function createNode(
     asset,
     sceneNavigator,
     animations,
+    scene,
     onAnimationTrigger,
     animationStates
   );

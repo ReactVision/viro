@@ -19,6 +19,7 @@ export function dispatchCollisionBindingActions(params: {
   bindingsByPairKey: Map<string, StudioCollisionBinding[]>;
   sceneNavigator?: unknown;
   animations: StudioAnimation[];
+  onSceneChange?: (sceneId: string, sceneName: string) => void;
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void;
   cooldownMs?: number;
   lastFiredRef: MutableRefObject<Map<string, number>>;
@@ -29,6 +30,7 @@ export function dispatchCollisionBindingActions(params: {
     bindingsByPairKey,
     sceneNavigator,
     animations,
+    onSceneChange,
     onAnimationTrigger,
     cooldownMs = DEFAULT_COOLDOWN_MS,
     lastFiredRef,
@@ -56,7 +58,7 @@ export function dispatchCollisionBindingActions(params: {
     if (now - last < cooldownMs) continue;
     map.set(ck, now);
 
-    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger);
+    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
   }
 }
 
@@ -69,7 +71,8 @@ export function createPlacementCollisionHandler(
   sceneNavigator: unknown,
   animations: StudioAnimation[],
   lastFiredRef: MutableRefObject<Map<string, number>>,
-  onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void
+  onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
 ): (
   viroTag: string,
   collidedPoint: [number, number, number],
@@ -82,6 +85,7 @@ export function createPlacementCollisionHandler(
       bindingsByPairKey,
       sceneNavigator,
       animations,
+      onSceneChange,
       onAnimationTrigger,
       lastFiredRef,
     });

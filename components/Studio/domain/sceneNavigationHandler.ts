@@ -36,7 +36,8 @@ export function executeFunctionWithRelations(
   sceneNavigator: SceneNavigator | undefined,
   animations: StudioAnimation[],
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
-  depth = 0
+  depth = 0,
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
 ): void {
   if (depth > ANIMATION_CHAIN_MAX_DEPTH) {
     console.warn(
@@ -48,7 +49,7 @@ export function executeFunctionWithRelations(
   if (fn.function_type === "NAVIGATION") {
     const nav = fn.scene_navigation;
     if (!nav?.navigate_to || !sceneNavigator) return;
-    void navigateToScene(sceneNavigator, nav.navigate_to, animations);
+    void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange);
   } else if (fn.function_type === "ALERT") {
     const alrt = fn.scene_alert;
     if (!alrt) return;
@@ -83,14 +84,15 @@ export function executeOnLoadFunction(
   functions: StudioSceneFunction[],
   sceneNavigator: SceneNavigator | undefined,
   animations: StudioAnimation[],
-  onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void
+  onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
 ): void {
   const fn = resolveById(functionId, functions);
   if (!fn) {
     console.warn(`[Studio] on_load_function ${functionId} not found.`);
     return;
   }
-  executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger);
+  executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
 }
 
 /**
@@ -103,7 +105,8 @@ export function executeOnLoadFunction(
 async function navigateToScene(
   sceneNavigator: SceneNavigator,
   targetSceneId: string,
-  currentAnimations: StudioAnimation[]
+  currentAnimations: StudioAnimation[],
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");
@@ -127,11 +130,12 @@ async function navigateToScene(
     sceneNavigator.push({
       scene: StudioARScene,
       passProps: {
-        sceneId: targetSceneId,
-        preloadedScene: sceneData,
+        sceneData,
+        onSceneChange,
       },
     });
 
+    onSceneChange?.(targetSceneId, sceneData.scene.name ?? targetSceneId);
     console.log(`[Studio] Navigated to scene: ${sceneData.scene.name}`);
   } catch (error) {
     console.error("[Studio] Error navigating to scene:", error);

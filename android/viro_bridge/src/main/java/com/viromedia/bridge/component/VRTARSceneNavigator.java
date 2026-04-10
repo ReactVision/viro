@@ -62,6 +62,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private DisplayRotationListener mRotationListener;
     private boolean mAutoFocusEnabled = false;
     private boolean mNeedsAutoFocusToggle = false;
+    private boolean mTorchEnabled = false;
+    private boolean mNeedsTorchToggle = false;
     private ARScene.OcclusionMode mOcclusionMode = ARScene.OcclusionMode.DISABLED;
     private boolean mNeedsOcclusionModeToggle = false;
     private boolean mDepthEnabled = false;
@@ -112,6 +114,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (navigator.mNeedsAutoFocusToggle) {
                 navigator.setAutoFocusEnabled(navigator.mAutoFocusEnabled);
                 navigator.mNeedsAutoFocusToggle = false;
+            }
+
+            if (navigator.mNeedsTorchToggle) {
+                navigator.setTorchEnabled(navigator.mTorchEnabled);
+                navigator.mNeedsTorchToggle = false;
             }
 
             // Apply pending occlusion mode configuration
@@ -317,6 +324,15 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             ((ViroViewARCore)mViroView).setCameraAutoFocusEnabled(mAutoFocusEnabled);
         } else {
             mNeedsAutoFocusToggle = true;
+        }
+    }
+
+    public void setTorchEnabled(boolean enabled) {
+        mTorchEnabled = enabled;
+        if (mGLInitialized) {
+            ((ViroViewARCore)mViroView).setTorchEnabled(mTorchEnabled);
+        } else {
+            mNeedsTorchToggle = true;
         }
     }
 

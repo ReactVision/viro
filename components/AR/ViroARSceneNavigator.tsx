@@ -77,6 +77,15 @@ type Props = ViewProps & {
 
   autofocus?: boolean;
   /**
+   * Enable or disable the device torch (flashlight) while the AR session is active.
+   * Requires ARCore SharedCamera mode support on the device. When supported, the torch
+   * can be toggled without interrupting the AR session. When not supported, the prop
+   * is silently ignored.
+   *
+   * Android only.
+   */
+  torchEnabled?: boolean;
+  /**
    * iOS only props! Note: these props may change as the underlying platforms coalesce in features.
    */
   worldAlignment?: "Gravity" | "GravityAndHeading" | "Camera";

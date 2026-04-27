@@ -81,7 +81,7 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
   // Done synchronously at render time so the registry is populated before
   // any Viro component reads the animation prop.
   const registeredKeyRef = useRef<string | null>(null);
-  const animationsKey = animations.map((a) => a.name).join(",");
+  const animationsKey = animations.map((a) => a.animation_key).join(",");
   if (animations.length > 0 && registeredKeyRef.current !== animationsKey) {
     registeredKeyRef.current = animationsKey;
     registerSceneAnimations(animations);
@@ -155,7 +155,7 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
       let run: boolean;
 
       if (override) {
-        const triggered = anims.find((a) => a.name === override.key);
+        const triggered = anims.find((a) => a.animation_key === override.key);
         if (!triggered) continue;
         activeAnim = triggered;
         run = override.run && !!loadedAssetIds[assetId];
@@ -165,11 +165,11 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
       }
 
       states[assetId] = {
-        name: activeAnim.name,
+        name: activeAnim.animation_key,
         run,
         loop: activeAnim.loop,
         interruptible: activeAnim.interruptible,
-        delay: activeAnim.delay ?? 0,
+        delay: activeAnim.delay_ms ?? 0,
         onStart: activeAnim.on_start_function
           ? () =>
               executeOnLoadFunction(

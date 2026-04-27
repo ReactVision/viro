@@ -6,6 +6,21 @@ import { ViroARSceneNavigator } from "../AR/ViroARSceneNavigator";
 import { StudioARScene } from "./StudioARScene";
 import { StudioSceneResponse } from "./types";
 
+interface RvGetSceneResult {
+  success: boolean;
+  data?: string;
+  error?: string;
+}
+
+interface ArSceneNavigatorHandle {
+  rvGetScene: (sceneId: string) => Promise<RvGetSceneResult>;
+  push: (route: { scene: React.ComponentType<any>; passProps?: Record<string, unknown> }) => void;
+}
+
+interface ViroARSceneNavigatorRef {
+  arSceneNavigator?: ArSceneNavigatorHandle;
+}
+
 // Minimal placeholder rendered while rvGetScene is in-flight.
 function LoadingScene() { return <ViroARScene />; }
 
@@ -39,46 +54,82 @@ export function StudioSceneNavigator({
   onError,
   onSceneChange,
 }: StudioSceneNavigatorProps) {
-  const navigatorRef = useRef<any>(null);
-  const loadedRef = useRef(false);
+  const navigatorRef = useRef<ViroARSceneNavigatorRef | null>(null);
+  const loadedSceneIdRef = useRef<string | null>(null);
 
-  const loadScene = useCallback(async () => {
-    if (loadedRef.current) return;
+  const onSceneReadyRef = useRef(onSceneReady);
+  const onErrorRef = useRef(onError);
+  const onSceneChangeRef = useRef(onSceneChange);
+  onSceneReadyRef.current = onSceneReady;
+  onErrorRef.current = onError;
+  onSceneChangeRef.current = onSceneChange;
 
-    // Wait one frame to ensure the native view is mounted and has a node handle.
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const loadScene = useCallback(
+    async (id: string, isCancelled: () => boolean) => {
+      // Wait one frame to ensure the native view is mounted and has a node handle.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (isCancelled()) return;
 
-    try {
       const nav = navigatorRef.current?.arSceneNavigator;
-      const result = await nav?.rvGetScene(sceneId);
+      if (!nav) {
+        throw new Error("ViroARSceneNavigator not mounted");
+      }
+
+      const result = await nav.rvGetScene(id);
+      if (isCancelled()) return;
       if (!result?.success) {
         throw new Error(result?.error ?? "rvGetScene failed");
       }
+      if (typeof result.data !== "string") {
+        throw new Error("rvGetScene returned no data");
+      }
 
-      const sceneData: StudioSceneResponse = JSON.parse(result.data);
-      loadedRef.current = true;
+      let sceneData: StudioSceneResponse;
+      try {
+        sceneData = JSON.parse(result.data) as StudioSceneResponse;
+      } catch (parseErr) {
+        throw new Error(
+          `Failed to parse scene response: ${(parseErr as Error).message}`
+        );
+      }
 
-      nav?.push({
+      if (isCancelled()) return;
+      loadedSceneIdRef.current = id;
+
+      nav.push({
         scene: StudioARScene,
         passProps: {
           sceneData,
-          onReady: onSceneReady,
-          onSceneChange,
+          onReady: onSceneReadyRef.current,
+          onSceneChange: onSceneChangeRef.current,
         },
       });
-    } catch (e) {
-      console.error("[Studio] Failed to load scene:", e);
-      (onError ?? console.error)(e as Error);
-    }
-  }, [sceneId, onSceneReady, onError]);
+    },
+    []
+  );
 
   useEffect(() => {
-    loadScene();
-  }, [loadScene]);
+    if (loadedSceneIdRef.current === sceneId) return;
+
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+
+    loadScene(sceneId, isCancelled).catch((e: unknown) => {
+      if (cancelled) return;
+      const err = e instanceof Error ? e : new Error(String(e));
+      const handler = onErrorRef.current;
+      if (handler) handler(err);
+      else console.error("[Studio] Failed to load scene:", err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sceneId, loadScene]);
 
   return (
     <ViroARSceneNavigator
-      ref={navigatorRef}
+      ref={navigatorRef as React.RefObject<any>}
       initialScene={{ scene: LoadingScene }}
       worldAlignment={worldAlignment}
       autofocus={autofocus}

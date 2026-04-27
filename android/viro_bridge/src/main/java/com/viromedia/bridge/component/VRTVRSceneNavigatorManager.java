@@ -108,9 +108,20 @@ public class VRTVRSceneNavigatorManager extends VRTViroViewGroupManager<VRTVRSce
         navigator.setHasOnExitViroCallback(hasOnExitViroCallback);
     }
 
+    @ReactProp(name = "passthroughEnabled", defaultBoolean = false)
+    public void setPassthroughEnabled(VRTVRSceneNavigator navigator, boolean enabled) {
+        navigator.setPassthroughEnabled(enabled);
+    }
+
+    @ReactProp(name = "handTrackingEnabled", defaultBoolean = true)
+    public void setHandTrackingEnabled(VRTVRSceneNavigator navigator, boolean enabled) {
+        navigator.setHandTrackingEnabled(enabled);
+    }
+
     @Override
     public Map getExportedCustomDirectEventTypeConstants() {
         return MapBuilder.of(
-                ViroEvents.ON_EXIT_VIRO, MapBuilder.of("registrationName", ViroEvents.ON_EXIT_VIRO));
+                ViroEvents.ON_EXIT_VIRO, MapBuilder.of("registrationName", ViroEvents.ON_EXIT_VIRO),
+                ViroEvents.ON_HAND_UPDATE, MapBuilder.of("registrationName", ViroEvents.ON_HAND_UPDATE));
     }
 }

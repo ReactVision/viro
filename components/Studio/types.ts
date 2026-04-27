@@ -39,9 +39,9 @@ export interface StudioSceneFunction {
   } | null;
   scene_animation: {
     id: string;
-    name: string;
-    duration: number | null;
-    delay: number | null;
+    animation_key: string;
+    duration_ms: number | null;
+    delay_ms: number | null;
     properties: Record<string, unknown>;
   } | null;
 }
@@ -88,10 +88,10 @@ export interface StudioAnimation {
   id: string;
   scene_id: string;
   target_asset_id: string;
-  name: string; // animation_key — use as ViroAnimations key
+  animation_key: string; // ViroAnimations registry key
   properties: Record<string, unknown>; // Viro keyframe format
-  duration: number | null; // ms
-  delay: number | null; // ms
+  duration_ms: number | null;
+  delay_ms: number | null;
   easing:
     | "Linear"
     | "EaseIn"

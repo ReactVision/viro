@@ -246,6 +246,18 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
     protected void setViroContext() {
         if (mViroView != null && mViewAdded && mGLInitialized && mSelectedSceneIndex < mSceneArray.size()) {
+            // Refresh the cached ViroContext: ViroViewOpenXR creates its
+            // ViroContext lazily on the host Activity's first onActivityResumed
+            // (deferred to bind OpenXR's session to VRActivity, not MainActivity).
+            // The mViroContext captured in the constructor will be null in that
+            // case; pick it up now that the renderer is ready.
+            if (mViroContext == null) {
+                mViroContext = mViroView.getViroContext();
+            }
+            // Re-publish platform info to all scenes now that getHeadset and
+            // getControllerType return real values (they returned "" before the
+            // OpenXR renderer existed).
+            notifyScenePlatformInformation();
             VRTScene childScene = mSceneArray.get(mSelectedSceneIndex);
             childScene.setViroContext(mViroContext);
             // Please don't delete this line. It's magic. But, legitimate magic.

@@ -4,12 +4,11 @@ import {
   withAndroidManifest,
   withAppBuildGradle,
   withDangerousMod,
-  withPlugins,
   withProjectBuildGradle,
   withSettingsGradle,
   WarningAggregator,
 } from "@expo/config-plugins";
-import { ExpoConfig } from "@expo/config-types";
+import type { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
 import path from "path";
 import { insertLinesHelper } from "./util/insertLinesHelper";
@@ -83,9 +82,9 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
           if (Array.isArray(viroPlugin[1].android?.xRMode)) {
             viroPluginConfig = (
               viroPlugin[1].android?.xRMode as XrMode[]
-            ).filter((mode) => ["AR", "GVR", "OVR_MOBILE"].includes(mode));
+            ).filter((mode) => ["AR", "GVR", "OVR_MOBILE", "QUEST"].includes(mode));
           } else if (
-            ["AR", "GVR", "OVR_MOBILE"].includes(viroPlugin[1]?.android?.xRMode)
+            ["AR", "GVR", "OVR_MOBILE", "QUEST"].includes(viroPlugin[1]?.android?.xRMode)
           ) {
             viroPluginConfig = [viroPlugin[1]?.android.xRMode];
           }
@@ -344,6 +343,7 @@ const withViroManifest = (config: ExpoConfig) =>
         });
       }
 
+
       contents.manifest.queries = [
         {
           package: [
@@ -399,18 +399,224 @@ const withViroManifest = (config: ExpoConfig) =>
         },
       });
 
+      // Quest-specific features and permissions — after uses-feature is initialized
+      if (viroPluginConfig.includes("QUEST")) {
+        contents.manifest["uses-feature"].push({
+          $: {
+            "android:name": "android.hardware.vr.headtracking",
+            "android:required": "true",
+            "android:version": "1",
+          },
+        });
+        contents.manifest["uses-feature"].push({
+          $: {
+            "android:name": "oculus.software.handtracking",
+            "android:required": "false",
+          },
+        });
+        // XR_FB_passthrough requires this uses-feature; without it the OpenXR
+        // runtime silently strips the extension. required=false so apps that
+        // only render fully-virtual scenes still install on Quest 2 etc.
+        contents.manifest["uses-feature"].push({
+          $: {
+            "android:name": "com.oculus.feature.PASSTHROUGH",
+            "android:required": "false",
+          },
+        });
+        const existingPermissions: string[] = (contents.manifest["uses-permission"] || [])
+          .map((p: any) => p.$?.["android:name"]);
+        if (!existingPermissions.includes("com.oculus.permission.HAND_TRACKING")) {
+          contents.manifest["uses-permission"].push({
+            $: { "android:name": "com.oculus.permission.HAND_TRACKING" },
+          });
+        }
+        if (!existingPermissions.includes("com.oculus.permission.EYE_TRACKING")) {
+          contents.manifest["uses-permission"].push({
+            $: { "android:name": "com.oculus.permission.EYE_TRACKING" },
+          });
+        }
+      }
+
       return newConfig;
     }
   );
+
+// ── Quest VRActivity generation ────────────────────────────────────────────────
+
+/**
+ * When QUEST mode is active, generate VRActivity.kt in the app's android source
+ * and register it in AndroidManifest with com.oculus.intent.category.VR.
+ *
+ * VRActivity is a ReactActivity that mounts "VRQuestScene" — a root component
+ * the app must register via AppRegistry. Running in a separate Activity with the
+ * VR intent category causes Horizon OS to grant exclusive OpenXR display access.
+ */
+const withViroQuestActivity: ConfigPlugin<ViroConfigurationOptions> = (config) => {
+  // Read xRMode directly from config.plugins. We cannot rely on the
+  // module-level `viroPluginConfig` here: that variable is only updated
+  // when `withBranchAndroid`'s withDangerousMod callback runs (mod-apply
+  // time), which is *after* this chain-time check executes. On the first
+  // prebuild of a new project, viroPluginConfig still holds the default
+  // ["AR", "GVR"] when this plugin is composed, and QUEST mods would be
+  // silently skipped — no VRActivity.kt and no manifest entry.
+  const viroPluginEntry = config?.plugins?.find(
+    (plugin) =>
+      Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
+  );
+  let xrModes: string[] = ["AR", "GVR"];
+  if (Array.isArray(viroPluginEntry)) {
+    const xrMode = viroPluginEntry[1]?.android?.xRMode;
+    if (Array.isArray(xrMode)) {
+      xrModes = xrMode.filter((m: string) =>
+        ["AR", "GVR", "OVR_MOBILE", "QUEST"].includes(m)
+      );
+    } else if (
+      typeof xrMode === "string" &&
+      ["AR", "GVR", "OVR_MOBILE", "QUEST"].includes(xrMode)
+    ) {
+      xrModes = [xrMode];
+    }
+  }
+  if (!xrModes.includes("QUEST")) return config;
+
+  // 1. Generate VRActivity.kt
+  config = withDangerousMod(config, [
+    "android",
+    async (config) => {
+      const packageName = config?.android?.package ?? "";
+      const packagePath = packageName.split(".");
+      const activityDir = path.join(
+        config.modRequest.platformProjectRoot,
+        "app", "src", "main", "java",
+        ...packagePath
+      );
+
+      if (!fs.existsSync(activityDir)) {
+        fs.mkdirSync(activityDir, { recursive: true });
+      }
+
+      const activityPath = path.join(activityDir, "VRActivity.kt");
+
+      // Only write if not already present (preserve manual edits)
+      if (!fs.existsSync(activityPath)) {
+        const kotlinContent = `package ${packageName}
+
+import android.app.Activity
+import android.app.Application
+import android.os.Bundle
+import com.facebook.react.ReactActivity
+import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
+import com.facebook.react.defaults.DefaultReactActivityDelegate
+
+/**
+ * VRActivity — generated by @reactvision/react-viro Expo plugin.
+ * Carries com.oculus.intent.category.VR so Horizon OS grants exclusive
+ * OpenXR display access. Mounts the "VRQuestScene" React root component.
+ * Launch via NativeModules.VRLauncher.launchVRScene().
+ *
+ * Uses DefaultReactActivityDelegate directly (no ReactActivityDelegateWrapper).
+ * The Expo wrapper is unnecessary for a VR-only activity that has no Expo
+ * module lifecycle of its own. VRLauncherModule.launchVRScene() runs
+ * dangerouslyForceOverride before startActivity, restoring the New Architecture
+ * feature flags so DefaultReactActivityDelegate takes the bridgeless path.
+ *
+ * Mutual exclusion with MainActivity:
+ *   Quest will happily run MainActivity (panel) and VRActivity (immersive) at
+ *   the same time if the user taps the app icon in the dock while VR is
+ *   running. We register an Application.ActivityLifecycleCallbacks here that
+ *   finishes self when *any other* Activity in this app resumes — returning
+ *   the user cleanly to the panel.
+ */
+class VRActivity : ReactActivity() {
+
+    private var lifecycleCallbacks: Application.ActivityLifecycleCallbacks? = null
+
+    override fun getMainComponentName(): String = "VRQuestScene"
+
+    override fun createReactActivityDelegate(): ReactActivityDelegate =
+        DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val callbacks = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityResumed(other: Activity) {
+                if (other !== this@VRActivity && !isFinishing && !isDestroyed) {
+                    finish()
+                }
+            }
+            override fun onActivityCreated(a: Activity, b: Bundle?) {}
+            override fun onActivityStarted(a: Activity) {}
+            override fun onActivityPaused(a: Activity) {}
+            override fun onActivityStopped(a: Activity) {}
+            override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
+            override fun onActivityDestroyed(a: Activity) {}
+        }
+        application.registerActivityLifecycleCallbacks(callbacks)
+        lifecycleCallbacks = callbacks
+    }
+
+    override fun onDestroy() {
+        lifecycleCallbacks?.let { application.unregisterActivityLifecycleCallbacks(it) }
+        lifecycleCallbacks = null
+        super.onDestroy()
+    }
+}
+`;
+        fs.writeFileSync(activityPath, kotlinContent, "utf-8");
+      }
+
+      return config;
+    },
+  ]);
+
+  // 2. Add VRActivity to AndroidManifest
+  config = withAndroidManifest(config, async (config) => {
+    const app = config.modResults.manifest.application?.[0];
+    if (!app) return config;
+
+    if (!app.activity) app.activity = [];
+
+    const alreadyAdded = app.activity.some(
+      (a: any) => a.$?.["android:name"] === ".VRActivity"
+    );
+
+    if (!alreadyAdded) {
+      app.activity.push({
+        $: {
+          "android:name": ".VRActivity",
+          "android:screenOrientation": "landscape",
+          "android:exported": "false",
+          "android:configChanges":
+            "keyboard|keyboardHidden|orientation|screenSize|uiMode",
+          "android:launchMode": "singleTask",
+        },
+        "intent-filter": [
+          {
+            action: [{ $: { "android:name": "android.intent.action.MAIN" } }],
+            category: [
+              { $: { "android:name": "com.oculus.intent.category.VR" } },
+            ],
+          },
+        ],
+      });
+    }
+
+    return config;
+  });
+
+  return config;
+};
 
 export const withViroAndroid: ConfigPlugin<ViroConfigurationOptions> = (
   config,
   props
 ) => {
-  withPlugins(config, [[withBranchAndroid, props]]);
-  withViroProjectBuildGradle(config);
-  withViroManifest(config);
-  withViroSettingsGradle(config);
-  withViroAppBuildGradle(config);
+  config = withBranchAndroid(config, props) as typeof config;
+  config = withViroProjectBuildGradle(config) as typeof config;
+  config = withViroManifest(config) as typeof config;
+  config = withViroSettingsGradle(config) as typeof config;
+  config = withViroAppBuildGradle(config) as typeof config;
+  config = withViroQuestActivity(config, props) as typeof config;
   return config;
 };

@@ -57,9 +57,17 @@ namespace ViroCardBoard{
 
 namespace ViroOculus{
     enum InputSource{
-        Controller = 1,
-        TouchPad = 2,
-        BackButton = 3
+        Controller      = 1,  // right controller primary ray (legacy alias for RightController)
+        TouchPad        = 2,
+        BackButton      = 3,  // menu (left) and B (right) buttons — navigation / back
+        LeftController  = 4,  // left controller primary ray
+        AButton         = 5,  // right-hand A button
+        XButton         = 6,  // left-hand X button
+        YButton         = 7,  // left-hand Y button
+        LeftGrip        = 8,  // left grip / squeeze
+        RightGrip       = 9,  // right grip / squeeze
+        LeftThumbstick  = 10, // left thumbstick scroll axis
+        RightThumbstick = 11, // right thumbstick scroll axis
     };
 }
 #endif

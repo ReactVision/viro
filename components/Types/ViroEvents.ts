@@ -134,6 +134,7 @@ export type ViroPlatformInfo = {
 export enum ViroPlatformTypes {
   GVR = "gvr",
   GEAR_VR = "ovr-mobile",
+  QUEST = "quest",
 }
 
 export enum ViroHeadsetTypes {
@@ -174,6 +175,58 @@ export type ViroExitViroEvent = {};
 
 export type ViroErrorEvent = {
   error: Error;
+};
+
+/** ===========================================================================
+ * Quest / OpenXR Hand Tracking Types (M4)
+ * ============================================================================ */
+
+export type ViroJoint = {
+  position: Viro3DPoint;
+  /** Sphere radius representing finger pad size (meters). */
+  radius: number;
+};
+
+export type ViroHandJoints = {
+  wrist: ViroJoint;
+  thumbMetacarpal: ViroJoint;
+  thumbProximal: ViroJoint;
+  thumbDistal: ViroJoint;
+  thumbTip: ViroJoint;
+  indexMetacarpal: ViroJoint;
+  indexProximal: ViroJoint;
+  indexIntermediate: ViroJoint;
+  indexDistal: ViroJoint;
+  indexTip: ViroJoint;
+  middleMetacarpal: ViroJoint;
+  middleProximal: ViroJoint;
+  middleIntermediate: ViroJoint;
+  middleDistal: ViroJoint;
+  middleTip: ViroJoint;
+  ringMetacarpal: ViroJoint;
+  ringProximal: ViroJoint;
+  ringIntermediate: ViroJoint;
+  ringDistal: ViroJoint;
+  ringTip: ViroJoint;
+  littleMetacarpal: ViroJoint;
+  littleProximal: ViroJoint;
+  littleIntermediate: ViroJoint;
+  littleDistal: ViroJoint;
+  littleTip: ViroJoint;
+};
+
+export type ViroHandPinchEvent = {
+  hand: "left" | "right";
+  /** World-space position of the pinch point (midpoint between thumb tip and index tip). */
+  position: Viro3DPoint;
+  /** Pinch strength [0..1] from XR_FB_hand_tracking_aim, or 1.0 on pinch-complete fallback. */
+  pinchStrength: number;
+};
+
+/** Per-frame skeletal hand data dispatched via onHandUpdate. null when hand is not tracked. */
+export type ViroHandUpdateEvent = {
+  left: ViroHandJoints | null;
+  right: ViroHandJoints | null;
 };
 
 /** ===========================================================================

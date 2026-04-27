@@ -35,6 +35,7 @@ var ViroPlatformTypes;
 (function (ViroPlatformTypes) {
     ViroPlatformTypes["GVR"] = "gvr";
     ViroPlatformTypes["GEAR_VR"] = "ovr-mobile";
+    ViroPlatformTypes["QUEST"] = "quest";
 })(ViroPlatformTypes || (exports.ViroPlatformTypes = ViroPlatformTypes = {}));
 var ViroHeadsetTypes;
 (function (ViroHeadsetTypes) {

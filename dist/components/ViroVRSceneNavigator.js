@@ -48,6 +48,7 @@ exports.ViroVRSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroSceneNavigatorModule = react_native_1.NativeModules.VRTSceneNavigatorModule;
+const VRModuleOpenXR = react_native_1.NativeModules.VRModuleOpenXR;
 var mathRandomOffset = 0;
 /**
  * ViroVRSceneNavigator is used to transition between multiple scenes.

@@ -19,7 +19,10 @@ import {
   StyleSheet,
   ViewProps,
 } from "react-native";
-import { ViroExitViroEvent } from "./Types/ViroEvents";
+import {
+  ViroExitViroEvent,
+  ViroHandUpdateEvent,
+} from "./Types/ViroEvents";
 import {
   Viro3DPoint,
   ViroNativeRef,
@@ -27,6 +30,10 @@ import {
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
+const VRModuleOpenXR = NativeModules.VRModuleOpenXR as {
+  recenterTracking: (viewTag: number) => void;
+  setPassthroughEnabled: (viewTag: number, enabled: boolean) => void;
+} | undefined;
 
 type State = {
   sceneDictionary: ViroSceneDictionary;
@@ -78,6 +85,21 @@ type Props = ViewProps & {
   bloomEnabled?: boolean;
   shadowsEnabled?: boolean;
   multisamplingEnabled?: boolean;
+
+  /** Enable XR_FB_passthrough mixed-reality camera feed (Quest 3 / Quest Pro). */
+  passthroughEnabled?: boolean;
+
+  /**
+   * Enable skeletal hand tracking (Quest — requires com.oculus.permission.HAND_TRACKING in manifest).
+   * Pinch and grab gestures fire the same onClick/onDrag events as controller buttons.
+   */
+  handTrackingEnabled?: boolean;
+
+  /**
+   * Per-frame skeletal hand joint data. Fires at display refresh rate (72/90 Hz).
+   * null for a hand means it is not currently tracked.
+   */
+  onHandUpdate?: (event: NativeSyntheticEvent<ViroHandUpdateEvent>) => void;
 };
 
 /**

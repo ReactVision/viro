@@ -8,7 +8,7 @@ const READ_PHOTOS_USAGE = "Allow $(PRODUCT_NAME) to access your photos";
 const WRITE_PHOTOS_USAGE = "Allow $(PRODUCT_NAME) to save photos";
 const LOCATION_USAGE = "Allow $(PRODUCT_NAME) to use your location for AR experiences";
 
-export type XrMode = "GVR" | "AR" | "OVR_MOBILE";
+export type XrMode = "GVR" | "AR" | "OVR_MOBILE" | "QUEST";
 
 /**
  * Anchor provider type.

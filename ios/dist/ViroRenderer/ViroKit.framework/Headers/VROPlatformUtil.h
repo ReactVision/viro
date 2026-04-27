@@ -53,6 +53,7 @@ enum class VROPlatformType {
     Unknown,
     AndroidGVR,
     AndroidOVR,
+    AndroidOpenXR,
     AndroidARCore,
     AndroidSceneView,
     iOSCardboard,
@@ -162,6 +163,18 @@ VROTextureFormat VROPlatformGetBitmapFormat(jobject jbitmap);
  returns immediately).
  */
 void VROPlatformDispatchAsyncRenderer(std::function<void()> fcn);
+
+/*
+ OpenXR / headless-GL renderers that own their own render thread should call
+ VROPlatformSetUseDirectRendererQueue(true) during initialisation. All
+ subsequent VROPlatformDispatchAsyncRenderer calls will enqueue into a C++
+ queue instead of going through the GLSurfaceView Java path.
+
+ The render thread must call VROPlatformDrainRendererQueue() every frame to
+ execute queued work (e.g. setSceneController, texture uploads).
+ */
+void VROPlatformSetUseDirectRendererQueue(bool use);
+void VROPlatformDrainRendererQueue();
 
 /*
  Run the given function on a background thread. The thread can be pooled, 

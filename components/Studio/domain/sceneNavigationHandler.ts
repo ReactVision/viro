@@ -72,7 +72,7 @@ export function executeFunctionWithRelations(
       );
       return;
     }
-    onAnimationTrigger(targetAssetId, anim.name);
+    onAnimationTrigger(targetAssetId, anim.animation_key);
   }
 }
 

@@ -18,10 +18,10 @@ export function buildViroAnimationRegistry(
 
   for (const anim of animations) {
     warnAnimationPerformance(anim);
-    registry[anim.name] = {
+    registry[anim.animation_key] = {
       properties: anim.properties,
-      duration: anim.duration ?? 1000,
-      delay: anim.delay ?? 0,
+      duration: anim.duration_ms ?? 1000,
+      delay: anim.delay_ms ?? 0,
       ...(anim.easing ? { easing: anim.easing } : {}),
     };
   }
@@ -52,9 +52,9 @@ export function registerSceneAnimations(animations: StudioAnimation[]): void {
 }
 
 function warnAnimationPerformance(anim: StudioAnimation): void {
-  if ((anim.duration ?? 0) > MAX_DURATION_MS) {
+  if ((anim.duration_ms ?? 0) > MAX_DURATION_MS) {
     console.warn(
-      `[Studio/Animation] "${anim.name}" duration ${anim.duration}ms exceeds ` +
+      `[Studio/Animation] "${anim.animation_key}" duration ${anim.duration_ms}ms exceeds ` +
         `recommended max of ${MAX_DURATION_MS}ms.`
     );
   }
@@ -69,7 +69,7 @@ function warnAnimationPerformance(anim: StudioAnimation): void {
     if (key === "scaleX" || key === "scaleY" || key === "scaleZ") {
       if (val > MAX_SCALE || val < MIN_SCALE) {
         console.warn(
-          `[Studio/Animation] "${anim.name}" ${key}=${val} is outside ` +
+          `[Studio/Animation] "${anim.animation_key}" ${key}=${val} is outside ` +
             `recommended range [${MIN_SCALE}, ${MAX_SCALE}].`
         );
       }
@@ -78,7 +78,7 @@ function warnAnimationPerformance(anim: StudioAnimation): void {
     if (key === "positionX" || key === "positionY" || key === "positionZ") {
       if (Math.abs(val) > MAX_POSITION_ABS) {
         console.warn(
-          `[Studio/Animation] "${anim.name}" ${key}=${val} is far from origin.`
+          `[Studio/Animation] "${anim.animation_key}" ${key}=${val} is far from origin.`
         );
       }
     }

@@ -27,6 +27,7 @@ import android.os.Looper;
 import com.facebook.react.bridge.ReactContext;
 import com.viro.core.ViroViewGVR;
 import com.viro.core.ViroViewOVR;
+import com.viro.core.ViroViewOpenXR;
 import com.viro.core.ViroView;
 import com.viromedia.bridge.ReactViroPackage;
 import com.viromedia.bridge.utility.ViroLog;
@@ -110,6 +111,37 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    private static class StartupListenerOpenXR implements ViroViewOpenXR.StartupListener {
+
+        private WeakReference<VRTVRSceneNavigator> mNavigator;
+
+        public StartupListenerOpenXR(VRTVRSceneNavigator navigator) {
+            mNavigator = new WeakReference<VRTVRSceneNavigator>(navigator);
+        }
+
+        @Override
+        public void onSuccess() {
+            final VRTVRSceneNavigator navigator = mNavigator.get();
+            if (navigator == null) {
+                return;
+            }
+
+            navigator.mGLInitialized = true;
+            (new Handler(Looper.getMainLooper())).post(new Runnable() {
+                @Override
+                public void run() {
+                    navigator.mGLInitialized = true;
+                    navigator.setViroContext();
+                }
+            });
+        }
+
+        @Override
+        public void onFailure(ViroViewOpenXR.StartupError error, String message) {
+            // TODO: propagate failure to JS via onError event
+        }
+    }
+
     public VRTVRSceneNavigator(ReactContext reactContext,
                                ReactViroPackage.ViroPlatform platform) {
         super(reactContext, platform);
@@ -120,6 +152,9 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
             case OVR_MOBILE:
                 return new ViroViewOVR(reactContext.getCurrentActivity(),
                         new StartupListenerOVR(this));
+            case QUEST:
+                return new ViroViewOpenXR(reactContext.getCurrentActivity(),
+                        new StartupListenerOpenXR(this));
             case GVR:
                 // default case is to use GVR
             default:
@@ -131,6 +166,26 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
     public void setVrModeEnabled(boolean vrModeEnabled) {
         mVrMode = vrModeEnabled;
         mNeedsSetVrMode = true;
+    }
+
+    /**
+     * Enable or disable XR_FB_passthrough mixed-reality mode.
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setPassthroughEnabled(boolean enabled) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setPassthroughEnabled(enabled);
+        }
+    }
+
+    /**
+     * Enable or disable skeletal hand tracking.
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setHandTrackingEnabled(boolean enabled) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setHandTrackingEnabled(enabled);
+        }
     }
 
     @Override

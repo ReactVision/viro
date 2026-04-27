@@ -1,5 +1,154 @@
 # CHANGELOG
 
+## v2.55.0 — 27 April 2026
+
+> **Install path.** Bare React Native is not tested for this release. It
+> should work but will require a substantial amount of manual wiring (the
+> `VRActivity` Android Activity, Quest manifest features, package
+> registration in `MainApplication.kt`, iOS Podfile entries). For now we
+> recommend the **Expo Dev Client**, where the plugin emits all of the
+> above automatically. Bare RN support will be revisited in a follow-up
+> release.
+
+### Added
+
+- **Meta Horizon OS support**
+
+  VR scenes run natively on Meta Quest 3 / Quest Pro / Quest 2 / Quest 1
+  through the new OpenXR backend in `virocore`. Validated end-to-end at 90Hz
+  on Quest 3. Includes:
+
+  - **Dual-Activity launcher pattern** — `MainActivity` for the panel,
+    `VRActivity` for exclusive VR. The plugin emits `VRActivity.kt`,
+    manifest entries, Quest features (`android.hardware.vr.headtracking`,
+    `oculus.software.handtracking`, `com.oculus.feature.PASSTHROUGH`) and
+    the haptic / hand-tracking permissions automatically when `xRMode`
+    includes `"QUEST"` in `app.json`.
+  - **Two simultaneous pointers** — right and left controllers / tracked
+    hands each render an independent cyan laser, with independent hover and
+    click resolution per source.
+  - **Touch controllers + hand tracking** — triggers, grips, A/B/X/Y, menu,
+    thumbsticks, haptics; `XR_FB_hand_tracking_aim` for fingertip aim;
+    pinch-to-click and grip-to-grab per hand.
+  - **Passthrough + recenter** — `VRModuleOpenXR.setPassthroughEnabled(viewTag, …)`
+    and `recenterTracking(viewTag)` exposed via `NativeModules`.
+  - **Full lighting pipeline** — HDR, PBR, bloom, shadows.
+
+- **`ViroXRSceneNavigator`** — cross-reality auto-router
+
+  Mounts `ViroVRSceneNavigator` on Meta Quest, `ViroARSceneNavigator` on
+  iOS / non-Quest Android. Accepts a single `initialScene` (used for both
+  modes) or per-platform `arInitialScene` / `vrInitialScene`. Forwards
+  `ref` to the underlying navigator.
+
+  ```tsx
+  import { ViroXRSceneNavigator } from "@reactvision/react-viro";
+
+  <ViroXRSceneNavigator
+    arInitialScene={{ scene: MyARScene }}
+    vrInitialScene={{ scene: MyVRScene }}
+  />
+  ```
+
+- **`StudioSceneNavigator`**
+
+  Drop-in component for ReactVision Studio scenes. Fetches scene by UUID via
+  `rvGetScene(sceneId)` (auth via Expo plugin's API key) and renders the full
+  scene tree: 3D models / images / video / text, scene functions
+  (`NAVIGATION` / `ALERT` / `ANIMATION`), collision bindings, animation
+  registry, material configs (with `time`, viewport `_rf_vpw`/`_rf_vph`,
+  and auto-flagged `requiresCameraTexture` shader uniforms), physics world.
+
+  ```tsx
+  import { StudioSceneNavigator } from "@reactvision/react-viro";
+
+  <StudioSceneNavigator sceneId="abc-123-uuid" style={StyleSheet.absoluteFill} />
+  ```
+
+  TypeScript schema for the scene response is exported (`StudioSceneResponse`,
+  `StudioAsset`, `StudioAnimation`, `StudioSceneFunction`,
+  `StudioCollisionBinding`, `StudioSceneMeta`, `StudioProjectMeta`).
+
+  Aligned with the Studio API rename: animation fields are now
+  `animation_key` (was `name`), `duration_ms` (was `duration`), `delay_ms`
+  (was `delay`).
+
+- **Platform-detection utilities**
+
+  - `isQuest` — `true` on actual Quest hardware. Detection is based on
+    `Build.MANUFACTURER` / `BRAND` / `MODEL` via `Platform.constants`
+    (covers Oculus and Meta strings), **not** on module presence — so a
+    single APK that bundles Quest support does not misidentify regular
+    Android phones as Quest.
+  - `hasOpenXRSupport` — build-time check for whether the OpenXR native
+    module is registered. Useful for in-app diagnostics.
+
+- **Multi-pointer JS hooks**
+
+  - `useAnySourceHover()` — `[hovered, onHover]`. Aggregates per-source
+    hover events into a single boolean (`true` while any source is on the
+    node). Eliminates spurious enter/exit toggles when a second pointer
+    crosses an already-hovered node.
+  - `useAnySourcePressed()` — `[pressed, onClickState]`. Aggregates
+    per-source `CLICK_DOWN` / `CLICK_UP` into a single boolean (`true`
+    while any pointer is holding). Useful for visual feedback during the
+    held portion of a click.
+
+  Both hooks deduplicate within the same source so a repeated event
+  doesn't re-render. Apps that *do* care which specific pointer fired
+  (drag-to-controller, single-handed gestures) can ignore the hooks and
+  read `source` directly from the raw callbacks — same as before.
+
+- **Platform guards on `ViroARSceneNavigator` and `ViroVRSceneNavigator`**
+
+  - `ViroARSceneNavigator` no longer attempts to mount the AR view on Meta
+    Quest (would have crashed the renderer). Renders a default fallback
+    message; override via the new `questFallback?: React.ReactNode` prop
+    (pass `null` to render nothing).
+  - `ViroVRSceneNavigator` no longer falls through to the deprecated
+    Google Cardboard split-screen renderer on regular Android phones.
+    Renders a default fallback message; override via the new
+    `nonQuestFallback?: React.ReactNode` prop.
+
+  Both guards are pure JS (`isQuest` check at render time); no native
+  changes required.
+
+### Fixed
+
+- **AR Image Markers — children pin to screen coordinates after re-detection**
+  *(Android, [GitHub #465](https://github.com/ReactVision/viro/issues/465))*
+
+  Models parented to a `ViroARImageMarker` no longer become fixed at screen
+  coordinates after the target was lost and re-acquired in v2.54.0. Markers
+  re-anchor cleanly to the detected world pose every time, including
+  subsequent re-detection.
+
+- **iOS `ViroPortalScene` portal-tree stability**
+  *([GitHub #452](https://github.com/ReactVision/viro/issues/452))*
+
+  Continued portal-render-pass hardening on top of the v2.54.0 fix:
+  - Portal stencil silhouette no longer drops transparent entry fragments
+    before alpha discard runs (`_silhouetteMaterial->setAlphaCutoff(0.0f)`).
+  - 360° background inside a portal is no longer overwritten by the AR
+    camera background drawn afterwards (depth=0.9999 + depth-write enabled
+    on the portal background sphere/cube).
+  - The interior of a portal hole no longer reveals the portal interior
+    when the user is *outside* a nested exit-frame portal (skip stencil
+    DECR for `isExit=true`, use `Equal` stencil function when
+    `anyChildIsExit=true`).
+  - AR occlusion is disabled inside the portal interior (`recursionLevel > 0`)
+    so virtual content is no longer discarded by depth-based occlusion in
+    nested portals.
+
+- **16 KB `.so` page alignment for `libvrapi.so`** *(Issue A)*
+
+  The Android 2025 ABI requires all shipped `.so` files to align to 16 KB
+  pages. `libvrapi.so` is now repackaged with
+  `-Wl,-z,max-page-size=16384`, fixing load failures on devices with the
+  new page size.
+
+---
+
 ## v2.54.0 — 31 March 2026
 
 ### Added

@@ -162,6 +162,11 @@ import {
   ViroMonocularDepthSupportResult,
   ViroMonocularDepthModelAvailableResult,
   ViroMonocularDepthPreferenceResult,
+  // Quest / OpenXR Hand Tracking Types
+  ViroJoint,
+  ViroHandJoints,
+  ViroHandPinchEvent,
+  ViroHandUpdateEvent,
 } from "./components/Types/ViroEvents";
 import { ViroSurface } from "./components/ViroSurface";
 import { ViroSceneNavigator } from "./components/ViroSceneNavigator";
@@ -324,6 +329,11 @@ export {
   ViroMonocularDepthSupportResult,
   ViroMonocularDepthModelAvailableResult,
   ViroMonocularDepthPreferenceResult,
+  // Quest / OpenXR Hand Tracking Types
+  ViroJoint,
+  ViroHandJoints,
+  ViroHandPinchEvent,
+  ViroHandUpdateEvent,
   // Studio Integration
   StudioSceneNavigator,
   StudioARScene,

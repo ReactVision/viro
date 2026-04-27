@@ -84,6 +84,7 @@ import com.viromedia.bridge.module.SceneNavigatorModule;
 import com.viromedia.bridge.module.PerfMonitor;
 import com.viromedia.bridge.module.SoundModule;
 import com.viromedia.bridge.module.VRT3DSceneNavigatorModule;
+import com.viromedia.bridge.module.VRLauncherModule;
 import com.viromedia.bridge.module.VRModuleOpenXR;
 import com.viromedia.bridge.module.VRTImageModule;
 
@@ -109,7 +110,7 @@ public class ReactViroPackage implements ReactPackage {
     @Override
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
         Log.e("Manish", "createNativeModules");
-        return Arrays.<NativeModule>asList(
+        List<NativeModule> modules = new java.util.ArrayList<>(Arrays.<NativeModule>asList(
                 new MaterialManager(reactContext),
                 new AnimationManager(reactContext),
                 new CameraModule(reactContext),
@@ -123,9 +124,13 @@ public class ReactViroPackage implements ReactPackage {
                 new ARSceneModule(reactContext),
                 new ARSceneNavigatorModule(reactContext),
                 new ARTrackingTargetsModule(reactContext),
-                new VRT3DSceneNavigatorModule(reactContext),
-                new VRModuleOpenXR(reactContext)
-        );
+                new VRT3DSceneNavigatorModule(reactContext)
+        ));
+        if (mViroPlatform == ViroPlatform.QUEST) {
+            modules.add(new VRModuleOpenXR(reactContext));
+            modules.add(new VRLauncherModule(reactContext));
+        }
+        return modules;
     }
 
     @Override

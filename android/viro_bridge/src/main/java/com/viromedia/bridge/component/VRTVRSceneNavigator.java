@@ -178,6 +178,16 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    /**
+     * Enable or disable skeletal hand tracking.
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setHandTrackingEnabled(boolean enabled) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setHandTrackingEnabled(enabled);
+        }
+    }
+
     @Override
     public void onPropsSet() {
         if (mNeedsSetVrMode) {

@@ -283,6 +283,14 @@ public:
 #pragma mark - Camera
    
     /*
+     Returns true if the render context has been initialized (initRenderer called).
+     Safe to call before any scene is set.
+     */
+    bool hasRenderContext() const {
+        return _context != nullptr;
+    }
+
+    /*
      Get the camera used in the last frame.
      */
     const VROCamera &getCamera() const {

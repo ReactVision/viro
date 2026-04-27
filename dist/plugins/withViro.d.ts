@@ -1,5 +1,5 @@
 import { ConfigPlugin } from "@expo/config-plugins";
-export type XrMode = "GVR" | "AR" | "OVR_MOBILE";
+export type XrMode = "GVR" | "AR" | "OVR_MOBILE" | "QUEST";
 /**
  * Anchor provider type.
  * - "none": Disabled

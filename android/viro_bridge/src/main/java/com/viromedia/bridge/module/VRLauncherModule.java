@@ -85,29 +85,48 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
     }
 
     /**
-     * Finish the currently-foreground VRActivity, returning the user to whatever
+     * Finish any live VRActivity in this process, returning the user to whatever
      * Activity is below it in the task (typically MainActivity, the panel app).
      *
-     * Safe to call when no VRActivity is foreground (no-op). Only finishes an
-     * Activity whose simple class name is "VRActivity" — guards against
-     * accidentally finishing MainActivity if this is somehow called from there.
+     * Why we don't use {@code getReactApplicationContext().getCurrentActivity()}:
+     *   In dual-Activity Quest setups the ReactHost lifecycle is binary-state.
+     *   {@code ReactHost.onHostResume(VRActivity)} doesn't refire if MainActivity
+     *   already transitioned the host to RESUMED, so {@code currentActivity} on
+     *   the React context can stay pointed at MainActivity even while VRActivity
+     *   is foreground in the immersive compositor. Trusting it makes
+     *   {@code finish()} target the wrong Activity (or a null one) and silently
+     *   no-op, leaving the user stuck.
+     *
+     * Instead we walk {@code android.app.ActivityThread.mActivities} for live
+     * Activities whose class is named "VRActivity" and finish each — same
+     * reflection pattern used for host-Activity lookup in ViroViewOpenXR.
      *
      * JS usage:
      *   NativeModules.VRLauncher?.exitVRScene();
      */
     @ReactMethod
     public void exitVRScene() {
-        final Activity current = getReactApplicationContext().getCurrentActivity();
-        if (current == null) {
-            return;
-        }
-        if (!"VRActivity".equals(current.getClass().getSimpleName())) {
-            return;
-        }
         new Handler(Looper.getMainLooper()).post(() -> {
-            if (!current.isFinishing() && !current.isDestroyed()) {
-                current.finish();
-            }
+            try {
+                Class<?> threadCls = Class.forName("android.app.ActivityThread");
+                Object thread = threadCls.getMethod("currentActivityThread").invoke(null);
+                java.lang.reflect.Field activitiesField = threadCls.getDeclaredField("mActivities");
+                activitiesField.setAccessible(true);
+                Object activities = activitiesField.get(thread);
+                if (!(activities instanceof java.util.Map)) {
+                    return;
+                }
+                for (Object record : ((java.util.Map<?, ?>) activities).values()) {
+                    java.lang.reflect.Field activityField = record.getClass().getDeclaredField("activity");
+                    activityField.setAccessible(true);
+                    Object a = activityField.get(record);
+                    if (!(a instanceof Activity)) continue;
+                    Activity act = (Activity) a;
+                    if (!"VRActivity".equals(act.getClass().getSimpleName())) continue;
+                    if (act.isFinishing() || act.isDestroyed()) continue;
+                    act.finish();
+                }
+            } catch (Throwable ignored) {}
         });
     }
 }

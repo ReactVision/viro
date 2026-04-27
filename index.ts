@@ -60,7 +60,11 @@ import { ViroSpotLight } from "./components/ViroSpotLight";
 import { ViroText } from "./components/ViroText";
 import { ViroVideo } from "./components/ViroVideo";
 import { ViroVRSceneNavigator } from "./components/ViroVRSceneNavigator";
+import { ViroXRSceneNavigator } from "./components/ViroXRSceneNavigator";
 import { Viro3DSceneNavigator } from "./components/Viro3DSceneNavigator";
+import { hasOpenXRSupport, isQuest } from "./components/Utilities/ViroPlatform";
+import { useAnySourceHover } from "./components/Utilities/useAnySourceHover";
+import { useAnySourcePressed } from "./components/Utilities/useAnySourcePressed";
 import { ViroTextStyle } from "./components/Styles/ViroTextStyle";
 import { ViroStyle } from "./components/Styles/ViroStyle";
 import {
@@ -221,8 +225,13 @@ export {
   ViroText,
   ViroVideo,
   ViroVRSceneNavigator,
+  ViroXRSceneNavigator,
   Viro3DSceneNavigator,
   // Utilities
+  hasOpenXRSupport,
+  isQuest,
+  useAnySourceHover,
+  useAnySourcePressed,
   ViroARTrackingReasonConstants,
   ViroRecordingErrorConstants,
   ViroTrackingStateConstants,

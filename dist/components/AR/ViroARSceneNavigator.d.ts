@@ -30,6 +30,12 @@ type Props = ViewProps & {
         scene: () => React.JSX.Element;
     };
     initialSceneKey?: string;
+    /**
+     * Optional fallback rendered when this navigator is mounted on a Meta Quest
+     * device (where AR is not supported). When omitted, a default message view
+     * is rendered. Pass `null` to render nothing.
+     */
+    questFallback?: React.ReactNode;
     autofocus?: boolean;
     /**
      * iOS only props! Note: these props may change as the underlying platforms coalesce in features.
@@ -172,6 +178,7 @@ type State = {
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
 export declare class ViroARSceneNavigator extends React.Component<Props, State> {
+    static _questWarningLogged: boolean;
     _component: ViroNativeRef;
     constructor(props: Props);
     componentDidMount(): void;

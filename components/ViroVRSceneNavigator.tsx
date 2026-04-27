@@ -17,6 +17,8 @@ import {
   NativeSyntheticEvent,
   requireNativeComponent,
   StyleSheet,
+  Text,
+  View,
   ViewProps,
 } from "react-native";
 import {
@@ -29,6 +31,7 @@ import {
   ViroScene,
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
+import { isQuest } from "./Utilities/ViroPlatform";
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = NativeModules.VRModuleOpenXR as {
   recenterTracking: (viewTag: number) => void;
@@ -70,6 +73,14 @@ type Props = ViewProps & {
   };
 
   /**
+   * Optional fallback rendered when this navigator is mounted on a non-Quest
+   * device (where the only available VR backend is the deprecated Google
+   * Cardboard split-screen renderer). When omitted, a default message view is
+   * rendered. Pass `null` to render nothing.
+   */
+  nonQuestFallback?: React.ReactNode;
+
+  /**
    * Called when either the user physically decides to exit vr (hits
    * the "X" buton).
    */
@@ -106,6 +117,7 @@ type Props = ViewProps & {
  * ViroVRSceneNavigator is used to transition between multiple scenes.
  */
 export class ViroVRSceneNavigator extends React.Component<Props, State> {
+  static _nonQuestWarningLogged = false;
   _component: ViroNativeRef = null;
 
   /**
@@ -496,6 +508,27 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
   };
 
   render() {
+    if (!isQuest) {
+      if (!ViroVRSceneNavigator._nonQuestWarningLogged) {
+        console.warn(
+          "[Viro] ViroVRSceneNavigator is intended for Meta Quest. The legacy " +
+            "Google Cardboard / OVR Mobile paths are deprecated. Use " +
+            "ViroXRSceneNavigator (auto-detects Quest) or ViroARSceneNavigator on phones."
+        );
+        ViroVRSceneNavigator._nonQuestWarningLogged = true;
+      }
+      if ("nonQuestFallback" in this.props) {
+        return <>{this.props.nonQuestFallback}</>;
+      }
+      return (
+        <View style={[styles.container, vrFallbackStyles.fallback]}>
+          <Text style={vrFallbackStyles.fallbackText}>
+            VR is only supported on Meta Quest.
+          </Text>
+        </View>
+      );
+    }
+
     const items = this._renderSceneStackItems();
 
     // Uncomment this line to check for misnamed props
@@ -535,6 +568,18 @@ var styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+});
+
+const vrFallbackStyles = StyleSheet.create({
+  fallback: {
+    backgroundColor: "#000",
+    padding: 24,
+  },
+  fallbackText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
 

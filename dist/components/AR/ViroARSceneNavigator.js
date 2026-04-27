@@ -47,12 +47,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const ViroARSceneNavigatorModule = react_native_1.NativeModules.VRTARSceneNavigatorModule;
 let mathRandomOffset = 0;
 /**
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
 class ViroARSceneNavigator extends React.Component {
+    static _questWarningLogged = false;
     _component = null;
     constructor(props) {
         super(props);
@@ -987,6 +989,21 @@ class ViroARSceneNavigator extends React.Component {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroARSceneNavigator", this.props);
+        if (ViroPlatform_1.isQuest) {
+            if (!ViroARSceneNavigator._questWarningLogged) {
+                console.warn("[Viro] ViroARSceneNavigator is not supported on Meta Quest. " +
+                    "Use ViroXRSceneNavigator (auto-detects Quest) or ViroVRSceneNavigator instead.");
+                ViroARSceneNavigator._questWarningLogged = true;
+            }
+            if ("questFallback" in this.props) {
+                return <>{this.props.questFallback}</>;
+            }
+            return (<react_native_1.View style={[styles.container, styles.questFallback]}>
+          <react_native_1.Text style={styles.questFallbackText}>
+            AR is not supported on Meta Quest.
+          </react_native_1.Text>
+        </react_native_1.View>);
+        }
         const items = this._renderSceneStackItems();
         // update the arSceneNavigator with the latest given props on every render
         this.arSceneNavigator.viroAppProps = this.props.viroAppProps;
@@ -1014,6 +1031,15 @@ const styles = react_native_1.StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+    },
+    questFallback: {
+        backgroundColor: "#000",
+        padding: 24,
+    },
+    questFallbackText: {
+        color: "#fff",
+        fontSize: 16,
+        textAlign: "center",
     },
 });
 const VRTARSceneNavigator = (0, react_native_1.requireNativeComponent)("VRTARSceneNavigator", 

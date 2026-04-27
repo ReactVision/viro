@@ -18,8 +18,11 @@ import {
   NativeModules,
   requireNativeComponent,
   StyleSheet,
+  Text,
+  View,
   ViewProps,
 } from "react-native";
+import { isQuest } from "../Utilities/ViroPlatform";
 import {
   ViroWorldOrigin,
   ViroProvider,
@@ -74,6 +77,13 @@ type Props = ViewProps & {
     scene: () => React.JSX.Element;
   };
   initialSceneKey?: string;
+
+  /**
+   * Optional fallback rendered when this navigator is mounted on a Meta Quest
+   * device (where AR is not supported). When omitted, a default message view
+   * is rendered. Pass `null` to render nothing.
+   */
+  questFallback?: React.ReactNode;
 
   autofocus?: boolean;
   /**
@@ -232,6 +242,7 @@ type State = {
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.
  */
 export class ViroARSceneNavigator extends React.Component<Props, State> {
+  static _questWarningLogged = false;
   _component: ViroNativeRef = null;
 
   constructor(props: Props) {
@@ -1510,6 +1521,26 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroARSceneNavigator", this.props);
 
+    if (isQuest) {
+      if (!ViroARSceneNavigator._questWarningLogged) {
+        console.warn(
+          "[Viro] ViroARSceneNavigator is not supported on Meta Quest. " +
+            "Use ViroXRSceneNavigator (auto-detects Quest) or ViroVRSceneNavigator instead."
+        );
+        ViroARSceneNavigator._questWarningLogged = true;
+      }
+      if ("questFallback" in this.props) {
+        return <>{this.props.questFallback}</>;
+      }
+      return (
+        <View style={[styles.container, styles.questFallback]}>
+          <Text style={styles.questFallbackText}>
+            AR is not supported on Meta Quest.
+          </Text>
+        </View>
+      );
+    }
+
     const items = this._renderSceneStackItems();
 
     // update the arSceneNavigator with the latest given props on every render
@@ -1557,6 +1588,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  questFallback: {
+    backgroundColor: "#000",
+    padding: 24,
+  },
+  questFallbackText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
 

@@ -47,6 +47,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroVRSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
 const ViroSceneNavigatorModule = react_native_1.NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = react_native_1.NativeModules.VRModuleOpenXR;
 var mathRandomOffset = 0;
@@ -54,6 +55,7 @@ var mathRandomOffset = 0;
  * ViroVRSceneNavigator is used to transition between multiple scenes.
  */
 class ViroVRSceneNavigator extends React.Component {
+    static _nonQuestWarningLogged = false;
     _component = null;
     /**
      * Called from native when either the user physically decides to exit vr (hits
@@ -370,6 +372,22 @@ class ViroVRSceneNavigator extends React.Component {
         viroAppProps: {},
     };
     render() {
+        if (!ViroPlatform_1.isQuest) {
+            if (!ViroVRSceneNavigator._nonQuestWarningLogged) {
+                console.warn("[Viro] ViroVRSceneNavigator is intended for Meta Quest. The legacy " +
+                    "Google Cardboard / OVR Mobile paths are deprecated. Use " +
+                    "ViroXRSceneNavigator (auto-detects Quest) or ViroARSceneNavigator on phones.");
+                ViroVRSceneNavigator._nonQuestWarningLogged = true;
+            }
+            if ("nonQuestFallback" in this.props) {
+                return <>{this.props.nonQuestFallback}</>;
+            }
+            return (<react_native_1.View style={[styles.container, vrFallbackStyles.fallback]}>
+          <react_native_1.Text style={vrFallbackStyles.fallbackText}>
+            VR is only supported on Meta Quest.
+          </react_native_1.Text>
+        </react_native_1.View>);
+        }
         const items = this._renderSceneStackItems();
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroVRSceneNavigator", this.props)
@@ -395,6 +413,17 @@ var styles = react_native_1.StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+    },
+});
+const vrFallbackStyles = react_native_1.StyleSheet.create({
+    fallback: {
+        backgroundColor: "#000",
+        padding: 24,
+    },
+    fallbackText: {
+        color: "#fff",
+        fontSize: 16,
+        textAlign: "center",
     },
 });
 var VRTVRSceneNavigator = (0, react_native_1.requireNativeComponent)("VRTVRSceneNavigator", 

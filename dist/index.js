@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro3DSceneNavigator = exports.ViroXRSceneNavigator = exports.ViroVRSceneNavigator = exports.ViroVideo = exports.ViroText = exports.ViroSpotLight = exports.ViroSpinner = exports.ViroSphere = exports.ViroSpatialSound = exports.ViroSoundField = exports.ViroSound = exports.ViroAnimatedComponent = exports.ViroAmbientLight = exports.ViroAnimatedImage = exports.Viro360Video = exports.Viro360Image = exports.Viro3DObject = exports.ViroAnimations = exports.ViroSkyBox = exports.ViroSceneNavigator = exports.ViroSurface = exports.ViroScene = exports.ViroQuad = exports.ViroPortalScene = exports.ViroPortal = exports.ViroPolyline = exports.ViroPolygon = exports.ViroParticleEmitter = exports.ViroOrbitCamera = exports.ViroOmniLight = exports.ViroNode = exports.ViroMaterialVideo = exports.ViroARCamera = exports.ViroMaterials = exports.ViroImage = exports.ViroLightingEnvironment = exports.ViroGeometry = exports.ViroFlexView = exports.ViroDirectionalLight = exports.ViroController = exports.ViroCamera = exports.ViroButton = exports.ViroBox = exports.ViroARSceneNavigator = exports.ViroARScene = exports.ViroARPlaneSelector = exports.ViroARPlane = exports.ViroARTrackingTargets = exports.ViroARObjectMarker = exports.ViroARImageMarker = void 0;
-exports.StudioARScene = exports.StudioSceneNavigator = exports.VIRO_VERSION = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.gpsToArWorld = exports.latLngToMercator = exports.checkPermissions = exports.requestRequiredPermissions = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = exports.ViroARTrackingReasonConstants = exports.isQuest = exports.hasOpenXRSupport = void 0;
+exports.StudioARScene = exports.StudioSceneNavigator = exports.VIRO_VERSION = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.gpsToArWorld = exports.latLngToMercator = exports.checkPermissions = exports.requestRequiredPermissions = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = exports.ViroARTrackingReasonConstants = exports.useAnySourcePressed = exports.useAnySourceHover = exports.isQuest = exports.hasOpenXRSupport = void 0;
 /**
  * Copyright (c) 2016-present, Viro Media, Inc.
  * All rights reserved.
@@ -111,6 +111,10 @@ Object.defineProperty(exports, "Viro3DSceneNavigator", { enumerable: true, get: 
 const ViroPlatform_1 = require("./components/Utilities/ViroPlatform");
 Object.defineProperty(exports, "hasOpenXRSupport", { enumerable: true, get: function () { return ViroPlatform_1.hasOpenXRSupport; } });
 Object.defineProperty(exports, "isQuest", { enumerable: true, get: function () { return ViroPlatform_1.isQuest; } });
+const useAnySourceHover_1 = require("./components/Utilities/useAnySourceHover");
+Object.defineProperty(exports, "useAnySourceHover", { enumerable: true, get: function () { return useAnySourceHover_1.useAnySourceHover; } });
+const useAnySourcePressed_1 = require("./components/Utilities/useAnySourcePressed");
+Object.defineProperty(exports, "useAnySourcePressed", { enumerable: true, get: function () { return useAnySourcePressed_1.useAnySourcePressed; } });
 const ViroUtils_1 = require("./components/Utilities/ViroUtils");
 Object.defineProperty(exports, "polarToCartesian", { enumerable: true, get: function () { return ViroUtils_1.polarToCartesian; } });
 Object.defineProperty(exports, "polarToCartesianActual", { enumerable: true, get: function () { return ViroUtils_1.polarToCartesianActual; } });

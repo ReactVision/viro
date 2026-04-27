@@ -28,6 +28,7 @@ import {
 } from "./domain/sceneNavigationHandler";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
+import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
 import { buildViroPhysicsWorld, parsePhysicsWorldConfig } from "./domain/physicsConfig";
 import {
   StudioAnimation,
@@ -76,6 +77,9 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
 
   // Drive `time` uniform for animated shader presets (~60fps).
   useStudioShaderTimeUniforms(assets);
+
+  // Push _rf_vpw / _rf_vph viewport uniforms for shaders sampling the camera feed.
+  useStudioShaderViewportUniforms(assets);
 
   // ─── Animation registration ───────────────────────────────────────────────
   // Done synchronously at render time so the registry is populated before

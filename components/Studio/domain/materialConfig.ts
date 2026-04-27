@@ -73,6 +73,8 @@ function collectShaderModifierStrings(config: MaterialConfig): string[] {
 }
 
 const TIME_WORD_RE = /\btime\b/i;
+const CAMERA_TEXTURE_RE = /\bcamera_texture\b/;
+const RF_VIEWPORT_RE = /\b_rf_vpw\b|\b_rf_vph\b/;
 
 export function materialConfigNeedsTimeUniform(config: MaterialConfig): boolean {
   if (config.materialUniforms?.some((u) => u.name === "time")) return true;
@@ -80,9 +82,34 @@ export function materialConfigNeedsTimeUniform(config: MaterialConfig): boolean 
 }
 
 /**
+ * True if the shader uses _rf_vpw/_rf_vph viewport uniforms.
+ * These must be pushed via ViroMaterials.updateShaderUniform on mount and orientation change.
+ */
+export function materialConfigNeedsViewportUniforms(config: MaterialConfig): boolean {
+  return collectShaderModifierStrings(config).some((s) => RF_VIEWPORT_RE.test(s));
+}
+
+/**
+ * Prepends GLSL uniform declarations that the body references but the uniforms block omits.
+ * Required when shaders are authored for remote delivery without explicit sampler declarations.
+ */
+function injectMissingGlslDeclarations(uniforms: string, body: string): string {
+  let result = uniforms;
+  if (CAMERA_TEXTURE_RE.test(body) && !CAMERA_TEXTURE_RE.test(result)) {
+    result =
+      "uniform sampler2D camera_texture;\nuniform highp mat4 camera_image_transform;\n" +
+      result;
+  }
+  if (RF_VIEWPORT_RE.test(body) && !/\b_rf_vpw\b/.test(result)) {
+    result = "uniform highp float _rf_vpw;\nuniform highp float _rf_vph;\n" + result;
+  }
+  return result;
+}
+
+/**
  * iOS only applies `ViroMaterials.updateShaderUniform` to uniforms registered
- * via `materialUniforms`. If a shader references `time` in GLSL only, we add
- * the runtime binding here.
+ * via `materialUniforms`. If a shader references `time` or viewport uniforms in
+ * GLSL only, we add the runtime binding here.
  */
 function mergeMaterialUniformsForViro(
   config: MaterialConfig,
@@ -95,12 +122,21 @@ function mergeMaterialUniformsForViro(
     list.push({ name: "time", type: "float", value: 0 });
   }
 
+  if (materialConfigNeedsViewportUniforms(config)) {
+    if (!list.some((u) => u.name === "_rf_vpw"))
+      list.push({ name: "_rf_vpw", type: "float", value: 0 });
+    if (!list.some((u) => u.name === "_rf_vph"))
+      list.push({ name: "_rf_vph", type: "float", value: 0 });
+  }
+
   return list.length > 0 ? list : undefined;
 }
 
 /**
  * Studio stores modifiers as `{ uniforms, body }`; Viro works best with a single
- * GLSL string per stage. Stages with advanced fields are left as structured objects.
+ * GLSL string per stage. Stages with advanced fields are kept as structured objects.
+ * Camera texture usage is detected from GLSL and auto-flagged so the Viro native
+ * layer binds the camera feed even when the DB JSON omits `requiresCameraTexture`.
  */
 function normalizeShaderModifiersForViro(
   mods: NonNullable<MaterialConfig["shaderModifiers"]>,
@@ -113,18 +149,35 @@ function normalizeShaderModifiersForViro(
     }
     if (stage && typeof stage === "object") {
       const s = stage as ShaderModifierStage;
+      const uniforms = typeof s.uniforms === "string" ? s.uniforms : "";
+      const body = typeof s.body === "string" ? s.body : "";
+
+      // Detect camera texture usage in GLSL even when the flag is absent from DB JSON.
+      const usesCameraTexture =
+        CAMERA_TEXTURE_RE.test(body) || CAMERA_TEXTURE_RE.test(uniforms);
+
       const hasAdvanced =
         s.varyings != null ||
         s.requiresSceneDepth === true ||
         s.requiresCameraTexture === true ||
+        usesCameraTexture ||
         s.priority != null;
+
       if (hasAdvanced) {
-        out[key] = stage as object;
+        if (usesCameraTexture && s.requiresCameraTexture !== true) {
+          // Auto-fix: flag the stage and inject any missing GLSL declarations so the
+          // native Viro layer binds camera_texture and the shader compiles cleanly.
+          out[key] = {
+            ...s,
+            requiresCameraTexture: true,
+            uniforms: injectMissingGlslDeclarations(uniforms, body),
+          };
+        } else {
+          out[key] = stage as object;
+        }
         continue;
       }
-      const uniforms = typeof s.uniforms === "string" ? s.uniforms.trim() : "";
-      const body = typeof s.body === "string" ? s.body.trim() : "";
-      const merged = [uniforms, body].filter(Boolean).join("\n");
+      const merged = [uniforms.trim(), body.trim()].filter(Boolean).join("\n");
       out[key] = merged.length > 0 ? merged : (stage as object);
     }
   }

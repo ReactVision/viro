@@ -52,7 +52,7 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
             console.warn(`[Studio] ANIMATION function ${fn.id}: could not resolve target_asset_id for animation ${anim.id}`);
             return;
         }
-        onAnimationTrigger(targetAssetId, anim.name);
+        onAnimationTrigger(targetAssetId, anim.animation_key);
     }
 }
 /**

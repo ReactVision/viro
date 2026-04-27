@@ -53,36 +53,68 @@ function LoadingScene() { return <ViroARScene_1.ViroARScene />; }
  */
 function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, }) {
     const navigatorRef = (0, react_1.useRef)(null);
-    const loadedRef = (0, react_1.useRef)(false);
-    const loadScene = (0, react_1.useCallback)(async () => {
-        if (loadedRef.current)
-            return;
+    const loadedSceneIdRef = (0, react_1.useRef)(null);
+    const onSceneReadyRef = (0, react_1.useRef)(onSceneReady);
+    const onErrorRef = (0, react_1.useRef)(onError);
+    const onSceneChangeRef = (0, react_1.useRef)(onSceneChange);
+    onSceneReadyRef.current = onSceneReady;
+    onErrorRef.current = onError;
+    onSceneChangeRef.current = onSceneChange;
+    const loadScene = (0, react_1.useCallback)(async (id, isCancelled) => {
         // Wait one frame to ensure the native view is mounted and has a node handle.
         await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        if (isCancelled())
+            return;
+        const nav = navigatorRef.current?.arSceneNavigator;
+        if (!nav) {
+            throw new Error("ViroARSceneNavigator not mounted");
+        }
+        const result = await nav.rvGetScene(id);
+        if (isCancelled())
+            return;
+        if (!result?.success) {
+            throw new Error(result?.error ?? "rvGetScene failed");
+        }
+        if (typeof result.data !== "string") {
+            throw new Error("rvGetScene returned no data");
+        }
+        let sceneData;
         try {
-            const nav = navigatorRef.current?.arSceneNavigator;
-            const result = await nav?.rvGetScene(sceneId);
-            if (!result?.success) {
-                throw new Error(result?.error ?? "rvGetScene failed");
-            }
-            const sceneData = JSON.parse(result.data);
-            loadedRef.current = true;
-            nav?.push({
-                scene: StudioARScene_1.StudioARScene,
-                passProps: {
-                    sceneData,
-                    onReady: onSceneReady,
-                    onSceneChange,
-                },
-            });
+            sceneData = JSON.parse(result.data);
         }
-        catch (e) {
-            console.error("[Studio] Failed to load scene:", e);
-            (onError ?? console.error)(e);
+        catch (parseErr) {
+            throw new Error(`Failed to parse scene response: ${parseErr.message}`);
         }
-    }, [sceneId, onSceneReady, onError]);
+        if (isCancelled())
+            return;
+        loadedSceneIdRef.current = id;
+        nav.push({
+            scene: StudioARScene_1.StudioARScene,
+            passProps: {
+                sceneData,
+                onReady: onSceneReadyRef.current,
+                onSceneChange: onSceneChangeRef.current,
+            },
+        });
+    }, []);
     (0, react_1.useEffect)(() => {
-        loadScene();
-    }, [loadScene]);
+        if (loadedSceneIdRef.current === sceneId)
+            return;
+        let cancelled = false;
+        const isCancelled = () => cancelled;
+        loadScene(sceneId, isCancelled).catch((e) => {
+            if (cancelled)
+                return;
+            const err = e instanceof Error ? e : new Error(String(e));
+            const handler = onErrorRef.current;
+            if (handler)
+                handler(err);
+            else
+                console.error("[Studio] Failed to load scene:", err);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [sceneId, loadScene]);
     return (<ViroARSceneNavigator_1.ViroARSceneNavigator ref={navigatorRef} initialScene={{ scene: LoadingScene }} worldAlignment={worldAlignment} autofocus={autofocus} style={style ?? react_native_1.StyleSheet.absoluteFill}/>);
 }

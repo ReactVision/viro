@@ -51,6 +51,7 @@ const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
+const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
 const physicsConfig_1 = require("./domain/physicsConfig");
 const ANDROID_MAX_3D_MODELS = 3;
 const IOS_MAX_3D_MODELS = 10;
@@ -74,11 +75,13 @@ const StudioARScene = (props) => {
     }
     // Drive `time` uniform for animated shader presets (~60fps).
     (0, useStudioShaderTimeUniforms_1.useStudioShaderTimeUniforms)(assets);
+    // Push _rf_vpw / _rf_vph viewport uniforms for shaders sampling the camera feed.
+    (0, useStudioShaderViewportUniforms_1.useStudioShaderViewportUniforms)(assets);
     // ─── Animation registration ───────────────────────────────────────────────
     // Done synchronously at render time so the registry is populated before
     // any Viro component reads the animation prop.
     const registeredKeyRef = (0, react_1.useRef)(null);
-    const animationsKey = animations.map((a) => a.name).join(",");
+    const animationsKey = animations.map((a) => a.animation_key).join(",");
     if (animations.length > 0 && registeredKeyRef.current !== animationsKey) {
         registeredKeyRef.current = animationsKey;
         (0, animationRegistry_1.registerSceneAnimations)(animations);
@@ -130,7 +133,7 @@ const StudioARScene = (props) => {
             let activeAnim;
             let run;
             if (override) {
-                const triggered = anims.find((a) => a.name === override.key);
+                const triggered = anims.find((a) => a.animation_key === override.key);
                 if (!triggered)
                     continue;
                 activeAnim = triggered;
@@ -141,11 +144,11 @@ const StudioARScene = (props) => {
                 run = false;
             }
             states[assetId] = {
-                name: activeAnim.name,
+                name: activeAnim.animation_key,
                 run,
                 loop: activeAnim.loop,
                 interruptible: activeAnim.interruptible,
-                delay: activeAnim.delay ?? 0,
+                delay: activeAnim.delay_ms ?? 0,
                 onStart: activeAnim.on_start_function
                     ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_start_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key))
                     : undefined,

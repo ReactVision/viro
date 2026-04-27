@@ -36,9 +36,9 @@ export interface StudioSceneFunction {
     } | null;
     scene_animation: {
         id: string;
-        name: string;
-        duration: number | null;
-        delay: number | null;
+        animation_key: string;
+        duration_ms: number | null;
+        delay_ms: number | null;
         properties: Record<string, unknown>;
     } | null;
 }
@@ -82,10 +82,10 @@ export interface StudioAnimation {
     id: string;
     scene_id: string;
     target_asset_id: string;
-    name: string;
+    animation_key: string;
     properties: Record<string, unknown>;
-    duration: number | null;
-    delay: number | null;
+    duration_ms: number | null;
+    delay_ms: number | null;
     easing: "Linear" | "EaseIn" | "EaseOut" | "EaseInEaseOut" | "Bounce" | null;
     loop: boolean;
     interruptible: boolean;

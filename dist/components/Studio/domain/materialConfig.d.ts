@@ -39,6 +39,11 @@ export type MaterialConfig = {
 };
 export type ViroMaterialDefinition = Record<string, unknown>;
 export declare function materialConfigNeedsTimeUniform(config: MaterialConfig): boolean;
+/**
+ * True if the shader uses _rf_vpw/_rf_vph viewport uniforms.
+ * These must be pushed via ViroMaterials.updateShaderUniform on mount and orientation change.
+ */
+export declare function materialConfigNeedsViewportUniforms(config: MaterialConfig): boolean;
 export declare function studioMaterialName(assetId: string): string;
 /**
  * Parses `scene_assets.material_config` JSON. Returns null if missing or invalid.

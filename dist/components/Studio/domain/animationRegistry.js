@@ -16,10 +16,10 @@ function buildViroAnimationRegistry(animations) {
     const registry = {};
     for (const anim of animations) {
         warnAnimationPerformance(anim);
-        registry[anim.name] = {
+        registry[anim.animation_key] = {
             properties: anim.properties,
-            duration: anim.duration ?? 1000,
-            delay: anim.delay ?? 0,
+            duration: anim.duration_ms ?? 1000,
+            delay: anim.delay_ms ?? 0,
             ...(anim.easing ? { easing: anim.easing } : {}),
         };
     }
@@ -41,8 +41,8 @@ function registerSceneAnimations(animations) {
     console.log(`[Studio/Animation] Registered ${Object.keys(registry).length} animation(s): ${Object.keys(registry).join(", ")}`);
 }
 function warnAnimationPerformance(anim) {
-    if ((anim.duration ?? 0) > MAX_DURATION_MS) {
-        console.warn(`[Studio/Animation] "${anim.name}" duration ${anim.duration}ms exceeds ` +
+    if ((anim.duration_ms ?? 0) > MAX_DURATION_MS) {
+        console.warn(`[Studio/Animation] "${anim.animation_key}" duration ${anim.duration_ms}ms exceeds ` +
             `recommended max of ${MAX_DURATION_MS}ms.`);
     }
     const props = anim.properties;
@@ -54,13 +54,13 @@ function warnAnimationPerformance(anim) {
             continue;
         if (key === "scaleX" || key === "scaleY" || key === "scaleZ") {
             if (val > MAX_SCALE || val < MIN_SCALE) {
-                console.warn(`[Studio/Animation] "${anim.name}" ${key}=${val} is outside ` +
+                console.warn(`[Studio/Animation] "${anim.animation_key}" ${key}=${val} is outside ` +
                     `recommended range [${MIN_SCALE}, ${MAX_SCALE}].`);
             }
         }
         if (key === "positionX" || key === "positionY" || key === "positionZ") {
             if (Math.abs(val) > MAX_POSITION_ABS) {
-                console.warn(`[Studio/Animation] "${anim.name}" ${key}=${val} is far from origin.`);
+                console.warn(`[Studio/Animation] "${anim.animation_key}" ${key}=${val} is far from origin.`);
             }
         }
     }

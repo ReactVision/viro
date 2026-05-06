@@ -30,7 +30,12 @@ Pod::Spec.new do |s|
   
   s.source_files        = source_files_array
   s.public_header_files = header_files_array
-  
+
+  # visionOS-only sources: keep them out of the iOS build so consumers running
+  # `pod install` for iOS don't pull CompositorServices / VRODriverVisionOS.h
+  # into a target where those symbols don't exist.
+  s.ios.exclude_files = ['ViroReact/VisionOS/**/*']
+
   if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
     s.vendored_libraries = 'dist/lib/libViroReact.a'
   end

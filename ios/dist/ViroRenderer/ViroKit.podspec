@@ -27,7 +27,12 @@ Pod::Spec.new do |s|
   s.author              = 'ReactVision'
   s.requires_arc        = true
   s.platform            = :ios, '13.0'
+  s.visionos.deployment_target = '1.0'
   s.dependency 'React'
+
+  # visionOS requires CompositorServices for the immersive render loop.
+  # Metal and MetalKit are available on both iOS and visionOS.
+  s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
 
   # ARCore frameworks and Firebase dependencies are weak-linked via post_install hook
   # This prevents linker errors when ARCore pods are not installed

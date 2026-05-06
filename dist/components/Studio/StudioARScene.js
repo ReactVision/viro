@@ -93,17 +93,19 @@ const StudioARSceneInner = (props) => {
     const handleAssetLoaded = (0, react_1.useCallback)((assetId) => {
         setLoadedAssetIds((prev) => prev[assetId] ? prev : { ...prev, [assetId]: true });
     }, []);
-    const triggerRafsRef = (0, react_1.useRef)(new Set());
+    const triggerHandlesRef = (0, react_1.useRef)(new Set());
     (0, react_1.useEffect)(() => {
         return () => {
-            triggerRafsRef.current.forEach((id) => cancelAnimationFrame(id));
-            triggerRafsRef.current.clear();
+            triggerHandlesRef.current.forEach((id) => cancelAnimationFrame(id));
+            triggerHandlesRef.current.clear();
         };
     }, []);
     const triggerAnimation = (0, react_1.useCallback)((targetAssetId, animationKey) => {
+        // Viro's animation prop is edge-triggered on false→true. Force false first,
+        // then flip to true on the next frame so a re-trigger of the same key fires.
         setAnimOverrides((prev) => ({ ...prev, [targetAssetId]: { key: animationKey, run: false } }));
-        const rafId = requestAnimationFrame(() => {
-            triggerRafsRef.current.delete(rafId);
+        const handle = requestAnimationFrame(() => {
+            triggerHandlesRef.current.delete(handle);
             setAnimOverrides((prev) => {
                 const current = prev[targetAssetId];
                 if (!current || current.key !== animationKey || current.run)
@@ -111,7 +113,7 @@ const StudioARSceneInner = (props) => {
                 return { ...prev, [targetAssetId]: { key: animationKey, run: true } };
             });
         });
-        triggerRafsRef.current.add(rafId);
+        triggerHandlesRef.current.add(handle);
     }, []);
     const triggerAnimationRef = (0, react_1.useRef)(triggerAnimation);
     triggerAnimationRef.current = triggerAnimation;

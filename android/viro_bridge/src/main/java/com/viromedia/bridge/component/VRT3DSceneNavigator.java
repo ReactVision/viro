@@ -175,6 +175,14 @@ public class VRT3DSceneNavigator extends FrameLayout {
     public VRT3DSceneNavigator(ReactContext reactContext,
                              ReactViroPackage.ViroPlatform platform) {
         super(reactContext.getBaseContext(), null, -1);
+        android.util.Log.i("ViroDiag", "VRT3DSceneNavigator<init> platform=" + platform +
+                " reactCtx=" + reactContext.getClass().getSimpleName() +
+                " baseCtx=" + reactContext.getBaseContext().getClass().getSimpleName() +
+                "(" + System.identityHashCode(reactContext.getBaseContext()) + ")" +
+                " currentActivity=" + (reactContext.getCurrentActivity() == null ? "null" :
+                        reactContext.getCurrentActivity().getClass().getSimpleName() +
+                        "(" + System.identityHashCode(reactContext.getCurrentActivity()) + ")") +
+                " this=" + System.identityHashCode(this));
         mPlatform = platform;
         mReactContext = reactContext;
         mRendererConfig = new RendererConfiguration();
@@ -328,6 +336,13 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
     @Override
     protected void onDetachedFromWindow() {
+        android.util.Log.i("ViroDiag", "VRT3DSceneNavigator.onDetachedFromWindow this=" +
+                System.identityHashCode(this) + " viroView=" +
+                (mViroView == null ? "null" : mViroView.getClass().getSimpleName() +
+                "(" + System.identityHashCode(mViroView) + ")") +
+                " currentActivity=" + (mReactContext.getCurrentActivity() == null ? "null" :
+                        mReactContext.getCurrentActivity().getClass().getSimpleName() +
+                        "(" + System.identityHashCode(mReactContext.getCurrentActivity()) + ")"));
         super.onDetachedFromWindow();
 
         for (VRTScene scene : mSceneArray) {
@@ -355,7 +370,17 @@ public class VRT3DSceneNavigator extends FrameLayout {
             childScene.onHostResume();
         }
 
-        if (mViroView != null){
+        // Skip the cascade for ViroViewOpenXR (Quest dual-Activity).
+        // ViroViewOpenXR subscribes to Application.ActivityLifecycleCallbacks
+        // directly (see ViroViewOpenXR.init), so it already receives the real
+        // VRActivity onResume from Android. The React-host cascade here would
+        // pass mReactContext.getCurrentActivity() — which after VR.onResume is
+        // VRActivity even when the host is transitioning because of MainActivity.
+        // That triggers a false mNativeRenderer.onResume() following an equally
+        // false onPause() from the matching cascade in onHostPause, cycling the
+        // OpenXR render thread on every ReactHost lifecycle change and producing
+        // visible scene flicker in dual-Activity Quest setups.
+        if (mViroView != null && !(mViroView instanceof com.viro.core.ViroViewOpenXR)) {
             mViroView.onActivityResumed(mReactContext.getCurrentActivity());
         }
     }
@@ -366,12 +391,19 @@ public class VRT3DSceneNavigator extends FrameLayout {
             childScene.onHostPause();
         }
 
-        if (mViroView != null){
+        // See onHostResume above — same false-cascade rationale. ViroViewOpenXR
+        // ignores this path and uses Application.ActivityLifecycleCallbacks for
+        // real VRActivity pause events.
+        if (mViroView != null && !(mViroView instanceof com.viro.core.ViroViewOpenXR)) {
             mViroView.onActivityPaused(mReactContext.getCurrentActivity());
         }
     }
 
     private void onHostDestroy() {
+        android.util.Log.i("ViroDiag", "VRT3DSceneNavigator.onHostDestroy this=" +
+                System.identityHashCode(this) + " viroView=" +
+                (mViroView == null ? "null" : mViroView.getClass().getSimpleName() +
+                "(" + System.identityHashCode(mViroView) + ")"));
         mReactContext.removeLifecycleEventListener(mLifecycleListener);
     }
 

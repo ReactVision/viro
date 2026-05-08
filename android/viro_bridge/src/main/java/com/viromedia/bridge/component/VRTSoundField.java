@@ -25,7 +25,6 @@ package com.viromedia.bridge.component;
 import android.net.Uri;
 
 import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.viro.core.internal.BaseSound;
 import com.viro.core.SoundData;
 import com.viro.core.SoundField;

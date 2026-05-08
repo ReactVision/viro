@@ -25,7 +25,7 @@ import android.net.Uri;
 
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.AsyncObject3DListener;
 import com.viro.core.ViroContext;
 import com.viro.core.internal.ExecutableAnimation;
@@ -262,19 +262,11 @@ public class VRT3DObject extends VRTControl {
     }
 
     private void loadDidStart() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_LOAD_START,
-                null
-        );
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_LOAD_START, null);
     }
 
     public void loadDidEnd() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_LOAD_END,
-                null
-        );
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_LOAD_END, null);
     }
 
     public void updateAnimation() {

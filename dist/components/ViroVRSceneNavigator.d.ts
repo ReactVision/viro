@@ -78,7 +78,7 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
      * Called from native when either the user physically decides to exit vr (hits
      * the "X" buton).
      */
-    _onExitViro(_event: NativeSyntheticEvent<ViroExitViroEvent>): void;
+    _onExitViro: (_event: NativeSyntheticEvent<ViroExitViroEvent>) => void;
     constructor(props: Props);
     getRandomTag(): string;
     /**
@@ -95,7 +95,7 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
      *
      * @todo: use Typescript function overloading rather than this inaccurate solution
      */
-    push(param1?: ViroScene | string, param2?: ViroScene): void;
+    push: (param1?: ViroScene | string, param2?: ViroScene) => void;
     /**
      * Replace the top scene in the stack with the given scene. The remainder of the back
      * history is kept in the same order as before.
@@ -107,7 +107,7 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
      *
      * @todo: use Typescript function overloading rather than this inaccurate solution
      */
-    replace(param1?: ViroScene | string, param2?: ViroScene): void;
+    replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
     /**
      * Jumps to a given scene that had been previously pushed. If the scene was not pushed, we
      * then push and jump to it. The back history is re-ordered such that jumped to scenes are
@@ -120,9 +120,9 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
      *
      * @todo: use Typescript function overloading rather than this inaccurate solution
      */
-    jump(param1?: ViroScene | string, param2?: ViroScene): void;
-    pop(): void;
-    popN(n: number): void;
+    jump: (param1?: ViroScene | string, param2?: ViroScene) => void;
+    pop: () => void;
+    popN: (n: number) => void;
     /**
      * Increments the reference count for a scene within sceneDictionary that is
      * mapped to the given sceneKey. If no scenes are found / mapped, we create
@@ -150,9 +150,9 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
     reorderHistory(sceneKey: string): void;
     popHistoryByN(n: number): void;
     getSceneIndex(sceneTag: string): number;
-    _recenterTracking(): void;
-    _project(point: Viro3DPoint): Promise<any>;
-    _unproject(point: Viro3DPoint): Promise<any>;
+    _recenterTracking: () => void;
+    _project: (point: Viro3DPoint) => Promise<any>;
+    _unproject: (point: Viro3DPoint) => Promise<any>;
     _renderSceneStackItems(): React.JSX.Element[];
     sceneNavigator: {
         push: (param1?: ViroScene | string, param2?: ViroScene) => void;

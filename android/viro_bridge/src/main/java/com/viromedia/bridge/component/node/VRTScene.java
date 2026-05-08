@@ -29,7 +29,7 @@ import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.EventDelegate;
 import com.viro.core.internal.CameraCallback;
 import com.viro.core.Node;
@@ -227,10 +227,7 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
         event.putString("controller", mController);
         WritableMap eventContainer = Arguments.createMap();
         eventContainer.putMap("platformInfoViro", event);
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_PLATFORM_UPDATE,
-                eventContainer);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_PLATFORM_UPDATE, eventContainer);
     }
 
     public void setPhysicsWorld(ReadableMap map){

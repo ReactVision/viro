@@ -25,7 +25,7 @@ package com.viromedia.bridge.component;
 import android.net.Uri;
 
 import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.internal.BaseSound;
 import com.viro.core.SoundData;
 import com.viro.core.Sound;
@@ -61,9 +61,7 @@ public class VRTSound extends VRTBaseSound implements Sound.PlaybackListener {
 
     @Override
     public void onSoundFinish(Sound sound) {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(getId(),
-                ViroEvents.ON_FINISH,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_FINISH, null);
     }
 
     public void onSoundFail(String error) {

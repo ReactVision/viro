@@ -40,7 +40,7 @@ import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.ARAnchor;
 import com.viro.core.ARNode;
 import com.viro.core.ARScene;
@@ -288,9 +288,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         event.putString("type", "tabSwitch");
 
         try {
-            mReactContext
-                .getJSModule(RCTEventEmitter.class)
-                .receiveEvent(getId(), "onTabSwitch", event);
+            ViroEventEmitter.emit(mReactContext, getId(), "onTabSwitch", event);
             android.util.Log.i(TAG, "  Tab switch event emitted to React");
         } catch (Exception e) {
             android.util.Log.e(TAG, "  Failed to emit tab switch event: " + e.getMessage());

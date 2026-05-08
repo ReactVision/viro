@@ -27,7 +27,7 @@ import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.PortalScene;
 import com.viro.core.Texture;
 import com.viro.core.Vector;
@@ -270,34 +270,22 @@ public class VRT360Video extends VRTNode {
     }
 
     private void reactVideoBufferStartCallback() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_BUFFER_START,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_BUFFER_START, null);
     }
 
     private void reactVideoBufferEndCallback() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_BUFFER_END,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_BUFFER_END, null);
     }
 
     private void reactVideoFinishedCallback() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_FINISH,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_FINISH, null);
     }
 
     private void reactPlayerOnUpdateTime(float currentTime, float totalTime) {
         WritableMap event = Arguments.createMap();
         event.putDouble("currentTime", (double) currentTime);
         event.putDouble("totalTime", (double) totalTime);
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_UPDATE_TIME,
-                event);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_UPDATE_TIME, event);
     }
 
     @Override

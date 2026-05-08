@@ -549,6 +549,20 @@ import com.facebook.react.runtime.ReactHostImpl
  *   running. The same Application.ActivityLifecycleCallbacks finishes self
  *   when any other Activity in this app resumes — returning the user cleanly
  *   to the panel.
+ *
+ * Surface cleanup on destroy:
+ *   When VRActivity is destroyed we unload its React surface (reactSurface.stop()
+ *   in bridgeless arch) so its component tree — including all VRT* components
+ *   — is unmounted. Without this, the React surface stayed alive in the shared
+ *   ReactHost across VR re-entries, and on the second/third VR launch each
+ *   stale surface remounted alongside the fresh one. The C++ scene-graph
+ *   resolves a click hit to a single viewTag, but multiple VRTComponents
+ *   claimed it across surfaces — most with a ReactContext bound to a
+ *   destroyed VRActivity. Click events to the stale ReactContexts crashed in
+ *   ComponentEventDelegate as IllegalArgumentException SoftExceptions and were
+ *   silently dropped, so onClick took dozens of presses to register.
+ *   We still no-op the *delegate* onDestroy() so MainActivity keeps its
+ *   ReactHost; we only stop the surface explicitly.
  */
 class VRActivity : ReactActivity() {
 
@@ -581,7 +595,8 @@ class VRActivity : ReactActivity() {
             // followed by AppRegistryBinding::stopSurface failed and the
             // surface never recovers. By no-op'ing onDestroy here, host
             // destruction is left to MainActivity's standard delegate (the real
-            // last activity).
+            // last activity). The surface itself is stopped explicitly in
+            // VRActivity.onDestroy() below.
             override fun onDestroy() {
                 // intentionally no-op — see comment above
             }
@@ -629,6 +644,18 @@ class VRActivity : ReactActivity() {
     }
 
     override fun onDestroy() {
+        // Stop the React surface attached to this VRActivity so its component
+        // tree unmounts cleanly. In bridgeless arch this calls
+        // reactSurface.stop() + reactSurface = null, leaving the shared
+        // ReactHost intact for MainActivity. Without this the React tree from
+        // each VR session piles up across re-entries and stale VRTComponents
+        // intercept hit-tested viewTags with dead ReactContexts, breaking
+        // onClick / onHover until you press dozens of times.
+        try {
+            reactDelegate?.unloadApp()
+        } catch (t: Throwable) {
+            android.util.Log.w("VRActivity", "reactDelegate.unloadApp() failed", t)
+        }
         lifecycleCallbacks?.let { application.unregisterActivityLifecycleCallbacks(it) }
         lifecycleCallbacks = null
         mainHandler.removeCallbacksAndMessages(null)

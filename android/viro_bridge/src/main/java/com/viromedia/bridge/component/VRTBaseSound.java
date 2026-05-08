@@ -27,7 +27,6 @@ import android.util.Log;
 import com.facebook.react.bridge.JSApplicationCausedNativeException;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.viro.core.internal.BaseSound;
 import com.viro.core.ViroContext;
 import com.viro.core.SoundData;

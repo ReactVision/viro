@@ -31,7 +31,7 @@ import com.facebook.react.bridge.ReadableMap;
 import com.viromedia.bridge.component.node.VRTNode;
 import com.viromedia.bridge.utility.ViroEvents;
 import com.viromedia.bridge.utility.ViroLog;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.internal.ExecutableAnimation;
 
 import java.lang.ref.WeakReference;
@@ -309,10 +309,8 @@ public abstract class VRTManagedAnimation {
      * This method should be called when an animation starts and notifies the JS bridge
      */
     private void onStartAnimation() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                mParentComponent.getId(),
-                ViroEvents.ON_ANIMATION_START,
-                null);
+        ViroEventEmitter.emit(mReactContext, mParentComponent.getId(),
+                ViroEvents.ON_ANIMATION_START, null);
     }
 
     /**
@@ -320,10 +318,8 @@ public abstract class VRTManagedAnimation {
      * bridge. It also handles looping logic.
      */
     private void onFinishAnimation(ExecutableAnimation animation) {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                mParentComponent.getId(),
-                ViroEvents.ON_ANIMATION_FINISH,
-                null);
+        ViroEventEmitter.emit(mReactContext, mParentComponent.getId(),
+                ViroEvents.ON_ANIMATION_FINISH, null);
 
         // If the animation changed, we won't terminate or loop
         if (mExecutableAnimation == animation) {

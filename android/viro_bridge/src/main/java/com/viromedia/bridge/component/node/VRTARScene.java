@@ -30,7 +30,7 @@ import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.ARAnchor;
 import com.viro.core.internal.ARDeclarativeNode;
 
@@ -191,10 +191,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         returnMap.putInt("state", state.getId());
         returnMap.putInt("reason", reason.getId());
 
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_TRACKING_UPDATED,
-                returnMap);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_TRACKING_UPDATED, returnMap);
     }
 
     @Override
@@ -224,10 +221,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         WritableMap event = Arguments.createMap();
         event.putMap(AMBIENT_LIGHT_INFO_KEY, lightInfoMap);
 
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_AMBIENT_LIGHT_UPDATE,
-                event);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_AMBIENT_LIGHT_UPDATE, event);
     }
 
     @Override
@@ -235,10 +229,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         WritableMap returnMap = Arguments.createMap();
         returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
 
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-            getId(),
-            ViroEvents.ON_ANCHOR_FOUND,
-            returnMap);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_ANCHOR_FOUND, returnMap);
     }
 
     @Override
@@ -246,10 +237,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         WritableMap returnMap = Arguments.createMap();
         returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
 
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-            getId(),
-            ViroEvents.ON_ANCHOR_UPDATED,
-            returnMap);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_ANCHOR_UPDATED, returnMap);
     }
 
     @Override
@@ -257,10 +245,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         WritableMap returnMap = Arguments.createMap();
         returnMap.putMap("anchor", ARUtils.mapFromARAnchor(arAnchor));
 
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-            getId(),
-            ViroEvents.ON_ANCHOR_REMOVED,
-            returnMap);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_ANCHOR_REMOVED, returnMap);
     }
 
     private class PointCloudImageDownloadListener implements ImageDownloadListener {

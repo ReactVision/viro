@@ -23,7 +23,7 @@ package com.viromedia.bridge.component;
 
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.PortalScene;
 import com.viro.core.Texture;
 import com.viro.core.internal.Image;
@@ -102,19 +102,11 @@ public class VRTLightingEnvironment extends VRTNode {
     }
 
     private void imageDownloadDidStart() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_LOAD_START,
-                null
-        );
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_LOAD_START, null);
     }
 
     private void imageDownloadDidFinish() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_LOAD_END,
-                null
-        );
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_LOAD_END, null);
     }
 
     private class IBLImageDownloadListener implements HdrImageDownloader.DownloadListener {

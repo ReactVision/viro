@@ -40,7 +40,7 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.IllegalViewOperationException;
 import com.facebook.react.uimanager.PixelUtil;
 
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.ARNode;
 import com.viro.core.ARScene;
 import com.viro.core.Geometry;
@@ -1903,10 +1903,8 @@ public class VRTNode extends VRTComponent {
             event.putArray("collidedPoint", points);
             event.putArray("collidedNormal", normals);
 
-            node.getReactContext().getJSModule(RCTEventEmitter.class).receiveEvent(
-                    node.getId(),
-                    ViroEvents.ON_COLLIDED,
-                    event);
+            ViroEventEmitter.emit(node.getReactContext(), node.getId(),
+                    ViroEvents.ON_COLLIDED, event);
         }
     }
 
@@ -1941,10 +1939,8 @@ public class VRTNode extends VRTComponent {
             WritableMap event = Arguments.createMap();
             event.putArray("position", position);
 
-            node.getReactContext().getJSModule(RCTEventEmitter.class).receiveEvent(
-                    node.getId(),
-                    ViroEvents.ON_TRANSFORM_DELEGATE,
-                    event);
+            ViroEventEmitter.emit(node.getReactContext(), node.getId(),
+                    ViroEvents.ON_TRANSFORM_DELEGATE, event);
         }
     }
 }

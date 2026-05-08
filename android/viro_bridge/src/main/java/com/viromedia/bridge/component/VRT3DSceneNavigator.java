@@ -30,7 +30,7 @@ import android.widget.FrameLayout;
 
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.RendererConfiguration;
 import com.viro.core.ViroContext;
 
@@ -414,10 +414,7 @@ public class VRT3DSceneNavigator extends FrameLayout {
         }
 
         // Notify javascript listeners (for ReactNativeJs to ViroReactJs cases)
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_EXIT_VIRO,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_EXIT_VIRO, null);
 
         // Notify Native listeners (for NativeApp to ViroReactJs cases)
         Intent intent = new Intent();

@@ -29,7 +29,7 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.Node;
 import com.viro.core.PortalScene;
 import com.viro.core.internal.Image;
@@ -155,12 +155,7 @@ public class VRTSkyBox extends VRTNode {
     }
 
     private void imageDownloadDidStart() {
-        mContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                VRTSkyBoxManager.SKYBOX_LOAD_START,
-                null
-        );
-
+        ViroEventEmitter.emit(mContext, getId(), VRTSkyBoxManager.SKYBOX_LOAD_START, null);
     }
 
     private void setBackgroundCubeImageColor(long color){
@@ -207,11 +202,7 @@ public class VRTSkyBox extends VRTNode {
 
         WritableMap event = Arguments.createMap();
         event.putBoolean("success", success);
-        mContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                VRTSkyBoxManager.SKYBOX_LOAD_END,
-                event
-        );
+        ViroEventEmitter.emit(mContext, getId(), VRTSkyBoxManager.SKYBOX_LOAD_END, event);
     }
 
     private class SkyboxImageDownloadListener implements ImageDownloadListener {

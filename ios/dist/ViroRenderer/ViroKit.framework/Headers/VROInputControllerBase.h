@@ -340,6 +340,42 @@ private:
     std::map<int, std::shared_ptr<VRONode>> _lastHoveredNodesBySource;
 
     /*
+     Hover hysteresis state, per source.
+
+     OpenXR controller / hand aim ray-casts naturally jitter — pointing at a
+     small target with a controller held by an unsteady hand causes the
+     hit-test to alternate between the target node and the surrounding
+     background every 1–3 frames. Without hysteresis, every alternation
+     produced an `onHover(false)` / `onHover(true)` pair to JS, which
+     manifested as a flickering hover state and "the click takes dozens of
+     presses to register" — because if the user pulled the trigger on a
+     "miss" frame, `onButtonEvent` resolved the click against the background
+     instead of the target.
+
+     The hysteresis works as a grace period: when the hit changes from
+     `lastHovered` to a different node, we do NOT immediately fire the
+     exit — instead we record the candidate change and the timestamp.
+     If, within `kHoverHysteresisMillis`, the hit returns to `lastHovered`,
+     the exit is cancelled (no `onHover(false)` ever fires). If the new
+     candidate persists past the window, the exit is confirmed and the
+     normal enter/exit dispatch happens.
+
+     The same window is consulted by `onButtonEvent` so that clicks landing
+     on a transient miss-frame are still routed to `lastHovered` if the
+     pending-exit window is still open. That eliminates the "many presses
+     to click" symptom even though the underlying ray-cast still oscillates.
+     */
+    static constexpr double kHoverHysteresisMillis = 75.0;
+    struct HoverPending {
+        std::shared_ptr<VRONode> candidateNode;   // node the hit currently resolves to
+        VROVector3f candidatePos;                 // hit location at the moment of pending start
+        bool candidateBgHit = false;              // whether candidate is a background hit
+        double startedMillis = -1.0;              // wall-clock time when the candidate first appeared
+    };
+    std::map<int, HoverPending> _hoverPendingBySource;
+    HoverPending _hoverPending;  // legacy single-source fallback
+
+    /*
      Returns the first node that is able to handle the event action by bubbling it up.
      If nothing is able to handle the event, nullptr is returned.
      */

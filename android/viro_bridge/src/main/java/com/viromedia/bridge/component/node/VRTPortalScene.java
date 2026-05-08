@@ -24,7 +24,7 @@ package com.viromedia.bridge.component.node;
 import android.view.View;
 
 import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.viro.core.Node;
 import com.viro.core.Portal;
 import com.viro.core.PortalScene;
@@ -80,17 +80,11 @@ public class VRTPortalScene extends VRTNode  {
     }
 
     private void onPortalExit() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_PORTAL_EXIT,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_PORTAL_EXIT, null);
     }
 
     private void onPortalEnter() {
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_PORTAL_ENTER,
-                null);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_PORTAL_ENTER, null);
     }
 
     public VRTPortalScene(ReactContext context) {

@@ -125,10 +125,9 @@ const withVisionOSPodfile = (config) => {
             const podBlock = [
                 "",
                 PODFILE_MARKER,
+                `# ViroKit (iOS-only) and ViroReact (ObjC) are excluded until ViroKit`,
+                `# is compiled for xros SDK (Week 2). The POC uses Metal + CompositorServices directly.`,
                 `target '${targetName}' do`,
-                `  use_frameworks! :linkage => :dynamic`,
-                `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'`,
-                `  pod 'ViroKit',   :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`,
                 `end`,
                 "",
             ].join("\n");

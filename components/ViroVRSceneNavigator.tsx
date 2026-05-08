@@ -114,9 +114,9 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
    * Called from native when either the user physically decides to exit vr (hits
    * the "X" buton).
    */
-  _onExitViro(_event: NativeSyntheticEvent<ViroExitViroEvent>) {
+  _onExitViro = (_event: NativeSyntheticEvent<ViroExitViroEvent>) => {
     this.props.onExitViro && this.props.onExitViro();
-  }
+  };
 
   constructor(props: Props) {
     super(props);
@@ -158,7 +158,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
    *
    * @todo: use Typescript function overloading rather than this inaccurate solution
    */
-  push(param1?: ViroScene | string, param2?: ViroScene) {
+  push = (param1?: ViroScene | string, param2?: ViroScene) => {
     var sceneKey = undefined;
     var scene = undefined;
     if (typeof param1 == "string") {
@@ -193,7 +193,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
 
     this.incrementSceneReference(scene as ViroScene, sceneKey, false);
     this.addToHistory(sceneKey);
-  }
+  };
 
   /**
    * Replace the top scene in the stack with the given scene. The remainder of the back
@@ -206,7 +206,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
    *
    * @todo: use Typescript function overloading rather than this inaccurate solution
    */
-  replace(param1?: ViroScene | string, param2?: ViroScene) {
+  replace = (param1?: ViroScene | string, param2?: ViroScene) => {
     var sceneKey = undefined;
     var scene = undefined;
     if (typeof param1 == "string") {
@@ -245,7 +245,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     this.popHistoryByN(1);
     this.incrementSceneReference(scene as ViroScene, sceneKey, false);
     this.addToHistory(sceneKey);
-  }
+  };
 
   /**
    * Jumps to a given scene that had been previously pushed. If the scene was not pushed, we
@@ -259,7 +259,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
    *
    * @todo: use Typescript function overloading rather than this inaccurate solution
    */
-  jump(param1?: ViroScene | string, param2?: ViroScene) {
+  jump = (param1?: ViroScene | string, param2?: ViroScene) => {
     var sceneKey = undefined;
     var scene = undefined;
     if (typeof param1 == "string") {
@@ -294,13 +294,13 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
 
     this.incrementSceneReference(scene as ViroScene, sceneKey, true);
     this.reorderHistory(sceneKey);
-  }
+  };
 
-  pop() {
+  pop = () => {
     this.popN(1);
-  }
+  };
 
-  popN(n: number) {
+  popN = (n: number) => {
     if (n === 0) {
       return;
     }
@@ -314,7 +314,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
 
     this.decrementReferenceForLastNScenes(n);
     this.popHistoryByN(n);
-  }
+  };
 
   /**
    * Increments the reference count for a scene within sceneDictionary that is
@@ -450,20 +450,20 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     return -1;
   }
 
-  _recenterTracking() {
+  _recenterTracking = () => {
     ViroSceneNavigatorModule.recenterTracking(findNodeHandle(this));
-  }
+  };
 
-  async _project(point: Viro3DPoint) {
+  _project = async (point: Viro3DPoint) => {
     return await ViroSceneNavigatorModule.project(findNodeHandle(this), point);
-  }
+  };
 
-  async _unproject(point: Viro3DPoint) {
+  _unproject = async (point: Viro3DPoint) => {
     return await ViroSceneNavigatorModule.unproject(
       findNodeHandle(this),
       point
     );
-  }
+  };
 
   _renderSceneStackItems() {
     let views = [];

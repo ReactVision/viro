@@ -28,7 +28,7 @@ import android.view.View;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.viromedia.bridge.utility.ViroEventEmitter;
 import com.facebook.react.views.view.ReactViewGroup;
 import com.viro.core.ViroContext;
 import com.viromedia.bridge.component.node.VRTScene;
@@ -355,9 +355,6 @@ public class VRTComponent extends ReactViewGroup {
         WritableMap event = Arguments.createMap();
         event.putString("error", error);
 
-        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                ViroEvents.ON_ERROR,
-                event);
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_ERROR, event);
     }
 }

@@ -189,6 +189,9 @@ function create3DObject(
       onError={(e) =>
         console.error(`[Studio] 3D model "${asset.name}" error:`, e)
       }
+      // Viro derives native canDrag from `onDrag != undefined`; without this prop
+      // the drag recognizer is never attached, even when dragType is set.
+      {...(config.dragType ? { onDrag: () => {} } : {})}
       {...(shaderOverrides ? { shaderOverrides } : {})}
       {...(config.physicsBody ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag } : {})}
       {...(onCollision ? { onCollision: onCollision as any } : {})}
@@ -220,6 +223,7 @@ function createImage(
       onError={(e) =>
         console.error(`[Studio] Image "${asset.name}" error:`, e)
       }
+      {...(config.dragType ? { onDrag: () => {} } : {})}
     />
   );
 }
@@ -244,6 +248,7 @@ function createText(
         color: "#FFFFFF",
         textAlign: "center",
       }}
+      {...(config.dragType ? { onDrag: () => {} } : {})}
     />
   );
 }
@@ -272,6 +277,7 @@ function createVideo(
       onError={(e) =>
         console.error(`[Studio] Video "${asset.name}" error:`, e)
       }
+      {...(config.dragType ? { onDrag: () => {} } : {})}
     />
   );
 }

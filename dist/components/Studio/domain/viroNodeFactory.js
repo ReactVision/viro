@@ -144,14 +144,17 @@ function create3DObject(asset, config, onAssetLoaded, onCollision) {
         : config.scale;
     const hasMaterialConfig = (0, materialConfig_1.parseMaterialConfig)(asset.material_config) !== null;
     const shaderOverrides = hasMaterialConfig ? [(0, materialConfig_1.studioMaterialName)(asset.id)] : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody ? { physicsBody: config.physicsBody, viroTag: config.viroTag } : {})} {...(onCollision ? { onCollision: onCollision } : {})}/>);
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
+    // Viro derives native canDrag from `onDrag != undefined`; without this prop
+    // the drag recognizer is never attached, even when dragType is set.
+    {...(config.dragType ? { onDrag: () => { } } : {})} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody ? { physicsBody: config.physicsBody, viroTag: config.viroTag } : {})} {...(onCollision ? { onCollision: onCollision } : {})}/>);
 }
 function createImage(asset, config, onAssetLoaded) {
     if (!asset.file_url) {
         console.warn(`[Studio] Image "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroImage_1.ViroImage key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)}/>);
+    return (<ViroImage_1.ViroImage key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
 }
 function createText(asset, config) {
     return (<ViroText_1.ViroText key={asset.id} text={asset.name ?? ""} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} style={{
@@ -159,14 +162,14 @@ function createText(asset, config) {
             fontSize: 20,
             color: "#FFFFFF",
             textAlign: "center",
-        }}/>);
+        }} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
 }
 function createVideo(asset, config) {
     if (!asset.file_url) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)}/>);
+    return (<ViroVideo_1.ViroVideo key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
 }
 /**
  * Creates the appropriate Viro component for a StudioAsset.

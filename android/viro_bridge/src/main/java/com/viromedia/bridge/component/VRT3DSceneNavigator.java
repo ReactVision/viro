@@ -175,14 +175,6 @@ public class VRT3DSceneNavigator extends FrameLayout {
     public VRT3DSceneNavigator(ReactContext reactContext,
                              ReactViroPackage.ViroPlatform platform) {
         super(reactContext.getBaseContext(), null, -1);
-        android.util.Log.i("ViroDiag", "VRT3DSceneNavigator<init> platform=" + platform +
-                " reactCtx=" + reactContext.getClass().getSimpleName() +
-                " baseCtx=" + reactContext.getBaseContext().getClass().getSimpleName() +
-                "(" + System.identityHashCode(reactContext.getBaseContext()) + ")" +
-                " currentActivity=" + (reactContext.getCurrentActivity() == null ? "null" :
-                        reactContext.getCurrentActivity().getClass().getSimpleName() +
-                        "(" + System.identityHashCode(reactContext.getCurrentActivity()) + ")") +
-                " this=" + System.identityHashCode(this));
         mPlatform = platform;
         mReactContext = reactContext;
         mRendererConfig = new RendererConfiguration();
@@ -336,13 +328,6 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
     @Override
     protected void onDetachedFromWindow() {
-        android.util.Log.i("ViroDiag", "VRT3DSceneNavigator.onDetachedFromWindow this=" +
-                System.identityHashCode(this) + " viroView=" +
-                (mViroView == null ? "null" : mViroView.getClass().getSimpleName() +
-                "(" + System.identityHashCode(mViroView) + ")") +
-                " currentActivity=" + (mReactContext.getCurrentActivity() == null ? "null" :
-                        mReactContext.getCurrentActivity().getClass().getSimpleName() +
-                        "(" + System.identityHashCode(mReactContext.getCurrentActivity()) + ")"));
         super.onDetachedFromWindow();
 
         for (VRTScene scene : mSceneArray) {
@@ -400,10 +385,6 @@ public class VRT3DSceneNavigator extends FrameLayout {
     }
 
     private void onHostDestroy() {
-        android.util.Log.i("ViroDiag", "VRT3DSceneNavigator.onHostDestroy this=" +
-                System.identityHashCode(this) + " viroView=" +
-                (mViroView == null ? "null" : mViroView.getClass().getSimpleName() +
-                "(" + System.identityHashCode(mViroView) + ")"));
         mReactContext.removeLifecycleEventListener(mLifecycleListener);
     }
 

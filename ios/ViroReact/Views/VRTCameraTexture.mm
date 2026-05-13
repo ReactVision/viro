@@ -186,6 +186,45 @@
 }
 
 // ---------------------------------------------------------------------------
+// Photo / video capture  (called from VRTCameraTextureModule)
+// ---------------------------------------------------------------------------
+
+- (void)capturePhoto:(NSString *)outputPath
+          completion:(void (^)(BOOL success, NSString *path, NSString *error))completion {
+    if (!_cameraTexture) {
+        completion(NO, nil, @"Camera not initialised");
+        return;
+    }
+    _cameraTexture->getCaptureController()->capturePhoto(outputPath,
+        [completion](bool ok, NSString *path, NSString *err) {
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, path, err); });
+        });
+}
+
+- (void)startRecording:(NSString *)outputPath
+            completion:(void (^)(BOOL success, NSString *path, NSString *error))completion {
+    if (!_cameraTexture) {
+        completion(NO, nil, @"Camera not initialised");
+        return;
+    }
+    _cameraTexture->getCaptureController()->startRecording(outputPath,
+        [completion](bool ok, NSString *path, NSString *err) {
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, path, err); });
+        });
+}
+
+- (void)stopRecording:(void (^)(BOOL success, NSString *path, NSString *error))completion {
+    if (!_cameraTexture) {
+        completion(NO, nil, @"Camera not initialised");
+        return;
+    }
+    _cameraTexture->getCaptureController()->stopRecording(
+        [completion](bool ok, NSString *path, NSString *err) {
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, path, err); });
+        });
+}
+
+// ---------------------------------------------------------------------------
 // Cleanup
 // ---------------------------------------------------------------------------
 

@@ -47,4 +47,16 @@
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 
+// ---------------------------------------------------------------------------
+// Photo / video capture  (called from VRTCameraTextureModule)
+// ---------------------------------------------------------------------------
+
+- (void)capturePhoto:(nullable NSString *)outputPath
+          completion:(void (^)(BOOL success, NSString * _Nullable path, NSString * _Nullable error))completion;
+
+- (void)startRecording:(nullable NSString *)outputPath
+            completion:(void (^)(BOOL success, NSString * _Nullable path, NSString * _Nullable error))completion;
+
+- (void)stopRecording:(void (^)(BOOL success, NSString * _Nullable path, NSString * _Nullable error))completion;
+
 @end

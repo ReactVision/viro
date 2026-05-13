@@ -74,6 +74,7 @@ import com.viromedia.bridge.component.node.VRTPortalManager;
 
 import com.viromedia.bridge.module.ARSceneModule;
 import com.viromedia.bridge.module.ARSceneNavigatorModule;
+import com.viromedia.bridge.module.VRTCameraTextureModule;
 import com.viromedia.bridge.module.ARTrackingTargetsModule;
 import com.viromedia.bridge.module.AnimationManager;
 import com.viromedia.bridge.module.CameraModule;
@@ -125,6 +126,7 @@ public class ReactViroPackage implements ReactPackage {
                 new VRTImageModule(reactContext),
                 new ARSceneModule(reactContext),
                 new ARSceneNavigatorModule(reactContext),
+                new VRTCameraTextureModule(reactContext),
                 new ARTrackingTargetsModule(reactContext),
                 new VRT3DSceneNavigatorModule(reactContext),
                 new VRTStudioModule(reactContext)

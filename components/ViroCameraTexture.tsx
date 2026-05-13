@@ -8,12 +8,16 @@
 
 import * as React from "react";
 import {
+  findNodeHandle,
+  NativeModules,
   NativeSyntheticEvent,
   requireNativeComponent,
   ViewProps,
 } from "react-native";
 import { ViroErrorEvent } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
+
+const { VRTCameraTextureModule } = NativeModules;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +26,24 @@ import { ViroNativeRef } from "./Types/ViroUtils";
 export type ViroCameraPosition = "front" | "back";
 
 export type ViroCameraReadyEvent = Record<string, never>;
+
+/**
+ * Result returned by capturePhoto / startRecording / stopRecording.
+ * Mirrors the response shape from both iOS and Android NativeModules.
+ */
+export type ViroCaptureResult =
+  | { success: true; url: string }
+  | { success: false; error: string };
+
+export type ViroCapturePhotoOptions = {
+  /** Absolute file path for the JPEG. Defaults to a cache-dir path. */
+  outputPath?: string;
+};
+
+export type ViroCaptureVideoOptions = {
+  /** Absolute file path for the MP4. Defaults to a cache-dir path. */
+  outputPath?: string;
+};
 
 type Props = ViewProps & {
   /**
@@ -97,6 +119,86 @@ export class ViroCameraTexture extends React.Component<Props> {
   _onError = (event: NativeSyntheticEvent<ViroErrorEvent>) => {
     this.props.onError && this.props.onError(event);
   };
+
+  // ---------------------------------------------------------------------------
+  // Capture API
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Capture a single JPEG still from the camera feed.
+   *
+   * @param options.outputPath  Absolute path for the output JPEG.
+   *                            Omit to let the native layer choose a default
+   *                            cache-directory path.
+   * @returns  Promise resolving to `{ success: true, url }` on success or
+   *           `{ success: false, error }` on failure.
+   *
+   * @example
+   * ```ts
+   * const result = await cameraRef.current?.capturePhoto();
+   * if (result?.success) console.log('Saved to', result.url);
+   * ```
+   */
+  async capturePhoto(
+    options: ViroCapturePhotoOptions = {}
+  ): Promise<ViroCaptureResult> {
+    const tag = findNodeHandle(this._component);
+    if (tag == null) {
+      return { success: false, error: "ViroCameraTexture is not mounted" };
+    }
+    return VRTCameraTextureModule.capturePhoto(
+      tag,
+      options.outputPath ?? null
+    ) as Promise<ViroCaptureResult>;
+  }
+
+  /**
+   * Start recording the camera feed to an MP4 file.
+   *
+   * The promise resolves once the recording session has successfully started.
+   * Call {@link stopRecording} to finalise the file.
+   *
+   * @param options.outputPath  Absolute path for the output MP4.
+   *                            Omit to let the native layer choose a default.
+   * @returns  Promise resolving to `{ success: true, url }` (the path that
+   *           will be written) or `{ success: false, error }`.
+   *
+   * @example
+   * ```ts
+   * await cameraRef.current?.startRecording();
+   * // … some time later …
+   * const result = await cameraRef.current?.stopRecording();
+   * if (result?.success) console.log('Video saved to', result.url);
+   * ```
+   */
+  async startRecording(
+    options: ViroCaptureVideoOptions = {}
+  ): Promise<ViroCaptureResult> {
+    const tag = findNodeHandle(this._component);
+    if (tag == null) {
+      return { success: false, error: "ViroCameraTexture is not mounted" };
+    }
+    return VRTCameraTextureModule.startRecording(
+      tag,
+      options.outputPath ?? null
+    ) as Promise<ViroCaptureResult>;
+  }
+
+  /**
+   * Stop an in-progress recording and finalise the MP4 file.
+   *
+   * @returns  Promise resolving to `{ success: true, url }` with the path of
+   *           the written file, or `{ success: false, error }`.
+   */
+  async stopRecording(): Promise<ViroCaptureResult> {
+    const tag = findNodeHandle(this._component);
+    if (tag == null) {
+      return { success: false, error: "ViroCameraTexture is not mounted" };
+    }
+    return VRTCameraTextureModule.stopRecording(
+      tag
+    ) as Promise<ViroCaptureResult>;
+  }
 
   render() {
     const nativeProps = Object.assign({} as any, this.props);

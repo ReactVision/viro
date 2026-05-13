@@ -167,6 +167,25 @@ public class VRTCameraTexture extends VRTComponent {
     }
 
     // -----------------------------------------------------------------------
+    // Capture — delegated from VRTCameraTextureModule
+    // -----------------------------------------------------------------------
+
+    public void capturePhoto(String outputPath, CameraTexture.CaptureCallback callback) {
+        if (mCameraTexture == null) { callback.onError("Camera not ready"); return; }
+        mCameraTexture.capturePhoto(outputPath, callback);
+    }
+
+    public void startRecording(String outputPath, CameraTexture.CaptureCallback callback) {
+        if (mCameraTexture == null) { callback.onError("Camera not ready"); return; }
+        mCameraTexture.startRecording(outputPath, callback);
+    }
+
+    public void stopRecording(CameraTexture.CaptureCallback callback) {
+        if (mCameraTexture == null) { callback.onError("Camera not ready"); return; }
+        mCameraTexture.stopRecording(callback);
+    }
+
+    // -----------------------------------------------------------------------
     // Cleanup
     // -----------------------------------------------------------------------
 

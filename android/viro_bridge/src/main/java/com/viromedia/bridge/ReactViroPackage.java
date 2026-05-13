@@ -35,6 +35,7 @@ import com.viromedia.bridge.component.VRT360ImageManager;
 import com.viromedia.bridge.component.VRTAmbientLightManager;
 import com.viromedia.bridge.component.VRTDirectionalLightManager;
 import com.viromedia.bridge.component.VRTLightingEnvironmentManager;
+import com.viromedia.bridge.component.VRTCameraTextureManager;
 import com.viromedia.bridge.component.VRTMaterialVideoManager;
 import com.viromedia.bridge.component.VRTOmniLightManager;
 import com.viromedia.bridge.component.VRTSkyBoxManager;
@@ -176,6 +177,7 @@ public class ReactViroPackage implements ReactPackage {
                 new VRTPortalManager(reactContext),
                 new VRTLightingEnvironmentManager(reactContext),
                 new VRTMaterialVideoManager(reactContext),
+                new VRTCameraTextureManager(reactContext),
                 // AR Components
                 new VRTARSceneNavigatorManager(reactContext),
                 new VRTARSceneManager(reactContext),

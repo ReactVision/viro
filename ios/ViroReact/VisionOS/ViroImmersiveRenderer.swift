@@ -3,26 +3,13 @@
 //
 // Core Metal render loop for the Viro ImmersiveSpace.
 // Uses CompositorServices to drive a per-frame stereo render loop.
-//
-// POC Week 1 status:
-//   Clears both eye textures to Viro blue — confirms the CompositorServices
-//   pipeline is wired up and the ImmersiveSpace is receiving frames.
-//
-// Week 2 plan:
-//   Replace the clear-color stub with real VRORenderer output by:
-//     1. Creating a VRODriverMetal with the drawable's MTLDevice
-//     2. Creating a VRORenderer and wiring a VROSceneController
-//     3. Per frame: extracting per-eye view matrices from drawable.views[i].transform
-//        and projection from drawable.views[i].tangents, feeding them into
-//        VRORenderer::renderEye(VROEyeType, ...) with the drawable textures
-//        as the render targets.
 
 #if os(visionOS)
 import Foundation
 import CompositorServices
 import Metal
+import ARKit
 
-@available(visionOS 1.0, *)
 public final class ViroImmersiveRenderer: @unchecked Sendable {
 
     // MARK: - Public notifications
@@ -40,7 +27,13 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     private let layerRenderer: LayerRenderer
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
+    private let bridge: VRORendererBridge
     private var renderTask: Task<Void, Never>?
+    private var _diagFrames = 0
+
+    // World tracking for device-anchor-based view matrix.
+    private let arSession = ARKitSession()
+    private let worldTracking = WorldTrackingProvider()
 
     // MARK: - Init
 
@@ -54,12 +47,16 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
         self.layerRenderer = layerRenderer
         self.device = device
         self.commandQueue = queue
+        self.bridge = VRORendererBridge(device: device)
     }
 
     // MARK: - Lifecycle
 
     public func startRenderLoop() {
         renderTask = Task(priority: .high) {
+            if WorldTrackingProvider.isSupported {
+                try? await self.arSession.run([self.worldTracking])
+            }
             await self.runRenderLoop()
         }
     }
@@ -72,7 +69,6 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     // MARK: - Render loop
 
     private func runRenderLoop() async {
-        // Block until the system is ready to start rendering.
         layerRenderer.waitUntilRunning()
 
         DispatchQueue.main.async {
@@ -81,13 +77,14 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 object: nil)
         }
 
+        var loopCount = 0
         while !Task.isCancelled {
-            switch layerRenderer.state {
+            let state = layerRenderer.state
+            switch state {
             case .invalidated:
-                // System tore down the layer — stop.
+                NSLog("[Viro] render loop exiting: state=invalidated after \(loopCount) iterations")
                 break
             case .paused:
-                // App backgrounded — wait for resume.
                 layerRenderer.waitUntilRunning()
                 continue
             default:
@@ -97,7 +94,12 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
             if layerRenderer.state == .invalidated { break }
 
             renderFrame()
+            loopCount += 1
+            if loopCount <= 3 || loopCount % 300 == 0 {
+                NSLog("[Viro] render loop iteration \(loopCount)")
+            }
         }
+        NSLog("[Viro] render loop ended after \(loopCount) iterations, cancelled=\(Task.isCancelled)")
 
         DispatchQueue.main.async {
             NotificationCenter.default.post(
@@ -109,70 +111,128 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     // MARK: - Per-frame render
 
     private func renderFrame() {
-        guard let frame = layerRenderer.queryNextFrame() else { return }
+        guard let frame = layerRenderer.queryNextFrame() else {
+            NSLog("[Viro] queryNextFrame returned nil — state: \(layerRenderer.state.rawValue)")
+            return
+        }
         frame.startSubmission()
 
-        // Wait for optimal input time so head-tracking data is fresh.
-        let timing = frame.predictTiming()
-        LayerRenderer.Clock.wait(until: timing.optimalInputTime)
+        if let timing = frame.predictTiming() {
+            LayerRenderer.Clock().wait(until: timing.optimalInputTime)
+        }
 
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else {
-            frame.endSubmission()
+        // queryDrawable() is deprecated + API_UNAVAILABLE(macosx) — crashes in simulator.
+        // queryDrawables() returns an array. Empty = frame cancelled; invalid to access further.
+        let drawables = frame.queryDrawables()
+        guard !drawables.isEmpty else {
+            NSLog("[Viro] queryDrawables empty — skipping frame")
+            // Do NOT call frame.endSubmission() — frame is invalid when array is empty.
             return
         }
 
-        guard let drawable = try? frame.queryDrawable() else {
+        // Resolve device anchor → world-to-device transform.
+        // view.transform is eye-from-device (fixed IPD offset).
+        // To get eye-from-world (view matrix) we compose:
+        //   eyeFromWorld = view.transform × inverse(deviceAnchor.originFromAnchorTransform)
+        let deviceFromWorld: simd_float4x4
+        if let anchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()) {
+            deviceFromWorld = anchor.originFromAnchorTransform.inverse
+        } else {
+            deviceFromWorld = matrix_identity_float4x4
+        }
+
+        // Drive prepareFrame once using the first drawable's left-eye data.
+        let primary = drawables[0]
+        if !primary.views.isEmpty {
+            let eyeFromWorld0 = primary.views[0].transform * deviceFromWorld
+            bridge.prepareFrame(
+                withViewIndex: 0,
+                colorTexture: primary.colorTextures[0],
+                viewTransform: eyeFromWorld0,
+                tangents: Self.tangentsFromDrawable(primary, viewIndex: 0))
+        }
+
+        // Each drawable (built-in display, capture target, etc.) needs its own
+        // command buffer and an encodePresent call — cp_frame_end_submission asserts
+        // that every drawable returned by queryDrawables() was presented.
+        for drawable in drawables {
+            guard drawable.state == .rendering else { continue }
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else { continue }
+
+            commandBuffer.addCompletedHandler { cb in
+                if let error = cb.error {
+                    NSLog("[Viro] commandBuffer GPU error: \(error)")
+                }
+            }
+
+            let viewCount = drawable.views.count
+            for i in 0..<viewCount {
+                let view         = drawable.views[i]
+                let colorTexture = drawable.colorTextures[i]
+                let depthTexture = drawable.depthTextures[i]
+
+                let renderPass = MTLRenderPassDescriptor()
+                renderPass.colorAttachments[0].texture     = colorTexture
+                renderPass.colorAttachments[0].loadAction  = .clear
+                renderPass.colorAttachments[0].clearColor  = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
+                renderPass.colorAttachments[0].storeAction = .store
+                renderPass.depthAttachment.texture     = depthTexture
+                renderPass.depthAttachment.loadAction  = .clear
+                renderPass.depthAttachment.clearDepth  = 1.0
+                renderPass.depthAttachment.storeAction = .dontCare
+
+                guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else {
+                    continue
+                }
+
+                let eyeFromWorld = view.transform * deviceFromWorld
+                bridge.renderEye(
+                    withViewIndex: UInt(i),
+                    encoder: encoder,
+                    colorTexture: colorTexture,
+                    depthTexture: depthTexture,
+                    viewTransform: eyeFromWorld,
+                    tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
+
+                encoder.endEncoding()
+            }
+
+            drawable.encodePresent(commandBuffer: commandBuffer)
             commandBuffer.commit()
-            frame.endSubmission()
-            return
         }
 
-        // ── POC Week 1: render one pass per eye ──────────────────────────
-        // TODO Week 2: feed drawable + per-eye transforms into VRORenderer.
-        //
-        // Per-eye data available at drawable.views[i]:
-        //   .transform               — simd_float4x4 from world space
-        //   .tangents                — (left, right, up, down) tangents for projection
-        //   .textureMap              — .layered { layerIndex } or .viewport { ... }
-
-        let viewCount = drawable.views.count  // typically 2 — left eye, right eye
-        for i in 0..<viewCount {
-            renderEyePassStub(
-                commandBuffer: commandBuffer,
-                drawable: drawable,
-                viewIndex: i)
-        }
-
-        drawable.encodePresent(commandBuffer: commandBuffer)
-        commandBuffer.commit()
         frame.endSubmission()
+        bridge.endFrame()
     }
 
-    /// Stub render pass — clears to Viro blue per eye.
-    /// Replace with VRORenderer output in Week 2.
-    private func renderEyePassStub(
-        commandBuffer: MTLCommandBuffer,
-        drawable: LayerRenderer.Drawable,
+    // MARK: - Tangent extraction
+
+    /// Derives signed frustum tangents from the drawable's projection matrix.
+    ///
+    /// cp_view_get_tangents is deprecated (visionOS 2.0) and unavailable on macOS
+    /// (simulator). cp_drawable_compute_projection is available on visionOS 2.0+
+    /// and macOS 26.0+, so it works in both simulator and on-device.
+    ///
+    /// The x/y components of the projection matrix are depth-convention-independent;
+    /// we extract (left, right, up, down) signed tangents that VRORendererBridge
+    /// feeds into its asymmetric-frustum projection helper.
+    private static func tangentsFromDrawable(
+        _ drawable: LayerRenderer.Drawable,
         viewIndex: Int
-    ) {
-        let renderPass = MTLRenderPassDescriptor()
-
-        // Color — Viro brand blue (#0061B0), alpha 0 so passthrough is visible
-        renderPass.colorAttachments[0].texture    = drawable.colorTextures[viewIndex]
-        renderPass.colorAttachments[0].loadAction  = .clear
-        renderPass.colorAttachments[0].clearColor  = MTLClearColor(red: 0.0, green: 0.38, blue: 0.69, alpha: 0.0)
-        renderPass.colorAttachments[0].storeAction = .store
-
-        // Depth
-        renderPass.depthAttachment.texture    = drawable.depthTextures[viewIndex]
-        renderPass.depthAttachment.loadAction  = .clear
-        renderPass.depthAttachment.clearDepth  = 0.0
-        renderPass.depthAttachment.storeAction = .dontCare
-
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else {
-            return
-        }
-        encoder.endEncoding()
+    ) -> SIMD4<Float> {
+        let proj = drawable.computeProjection(viewIndex: viewIndex)
+        // col0.x = 2/(r−l), col2.x = (r+l)/(r−l)  →  l=(c2x−1)/c0x, r=(c2x+1)/c0x
+        // col1.y = 2/(u−d), col2.y = (u+d)/(u−d)  →  d=(c2y−1)/c1y, u=(c2y+1)/c1y
+        let c0x = proj.columns.0.x
+        let c1y = proj.columns.1.y
+        let c2x = proj.columns.2.x
+        let c2y = proj.columns.2.y
+        return SIMD4<Float>(
+            (c2x - 1.0) / c0x,   // left  (negative)
+            (c2x + 1.0) / c0x,   // right (positive)
+            (c2y + 1.0) / c1y,   // up    (positive)
+            (c2y - 1.0) / c1y    // down  (negative)
+        )
     }
 }
 #endif  // os(visionOS)

@@ -5,9 +5,9 @@
 // by ViroImmersiveRenderer.swift.
 //
 // Matrix convention:
-//   Swift hands in column-major simd_float4x4 matrices (Metal / ARKit convention).
-//   VROMatrix4f is also column-major internally.  VROConvert::toMatrix4f copies
-//   the 16 floats directly, so no transposition is needed.
+//   Swift computes eyeFromWorld = view.transform × inverse(deviceAnchor) and passes it
+//   here as the view transform.  toMatrix4f() copies the 16 floats directly (both are
+//   column-major), so no transposition or inversion is needed.
 
 #if __has_include(<CompositorServices/CompositorServices.h>)
 
@@ -26,7 +26,7 @@
 #include "VROFieldOfView.h"
 #include "VROViewport.h"
 #include "VROEye.h"
-#include "VROConvert.h"
+#include "VROMetalUtils.h"
 #include "VROLog.h"
 // Test scene
 #include "VROSceneController.h"
@@ -35,6 +35,8 @@
 #include "VROBox.h"
 #include "VROLight.h"
 #include "VROMaterial.h"
+#include "VROGLTFLoader.h"
+#include "VROModelIOUtil.h"
 
 // ── Stub input controller ─────────────────────────────────────────────────────
 // Handles the three remaining pure-virtual methods from VROInputControllerBase.
@@ -71,6 +73,8 @@ protected:
 
     // ── Driver ───────────────────────────────────────────────────────────────
     _driver = std::make_shared<VRODriverVisionOS>(device);
+    NSLog(@"[ViroBridge] driver created. library=%@ stencilFmt=%d",
+          _driver->getLibrary(), (int)_driver->getStencilPixelFormat());
 
     // ── Input controller ─────────────────────────────────────────────────────
     _inputController = std::make_shared<VROInputControllerVisionOS>(_driver);
@@ -85,28 +89,51 @@ protected:
 
     _renderer = std::make_shared<VRORenderer>(config, _inputController);
 
-    // ── Hardcoded test scene ─────────────────────────────────────────────────
-    // Renders a floating red box 1.5m in front of the user to verify the
-    // Metal pipeline is wired correctly.  Week 3+: replaced by JS-driven scenes.
+    // ── Test scene ───────────────────────────────────────────────────────────
     auto sceneController = std::make_shared<VROSceneController>();
     auto scene = sceneController->getScene();
 
-    // Ambient light so the box is visible.
-    auto light = std::make_shared<VROLight>(VROLightType::Ambient);
-    light->setColor({1.0f, 1.0f, 1.0f});
-    light->setIntensity(600);
-    scene->getRootNode()->addLight(light);
+    auto ambientLight = std::make_shared<VROLight>(VROLightType::Ambient);
+    ambientLight->setColor({0.3f, 0.3f, 0.3f});
+    ambientLight->setIntensity(1000);
+    scene->getRootNode()->addLight(ambientLight);
 
-    // Red box — 30 cm cube, 1.5 m forward, 0.5 m below eye level.
-    auto box = VROBox::createBox(0.3f, 0.3f, 0.3f);
-    auto material = std::make_shared<VROMaterial>();
-    material->getDiffuse().setColor({0.8f, 0.15f, 0.15f, 1.0f});
-    box->setMaterials({material});
+    auto dirLight = std::make_shared<VROLight>(VROLightType::Directional);
+    dirLight->setColor({1.0f, 1.0f, 1.0f});
+    dirLight->setIntensity(1000);
+    dirLight->setDirection({0.0f, -1.0f, -0.5f});
+    scene->getRootNode()->addLight(dirLight);
 
-    auto boxNode = std::make_shared<VRONode>();
-    boxNode->setGeometry(box);
-    boxNode->setPosition({0.0f, -0.5f, -1.5f});
-    scene->getRootNode()->addChildNode(boxNode);
+    // Container node added to the scene immediately; GLB geometry fills in async.
+    auto modelNode = std::make_shared<VRONode>();
+    scene->getRootNode()->addChildNode(modelNode);
+
+    NSString *glbPath = [[NSBundle mainBundle] pathForResource:@"shiba" ofType:@"glb"];
+    if (glbPath) {
+        std::string filePath([glbPath UTF8String]);
+        std::shared_ptr<VRODriver> driver = _driver;
+        VROGLTFLoader::loadGLTFFromResource(filePath, {}, VROResourceType::LocalFile,
+                                            modelNode, /*isGLB=*/true, driver,
+                                            [](std::shared_ptr<VRONode> node, bool success) {
+            if (success) {
+                node->setScale({0.5f, 0.5f, 0.5f});
+                node->setPosition({0.0f, -0.5f, -1.5f});
+                NSLog(@"[ViroBridge] shiba.glb loaded");
+            } else {
+                NSLog(@"[ViroBridge] shiba.glb failed to load");
+            }
+        });
+    } else {
+        // Bundle resource missing — fall back to red box so rendering still validates.
+        NSLog(@"[ViroBridge] shiba.glb not found in bundle, using fallback red box");
+        auto box = VROBox::createBox(0.5f, 0.5f, 0.5f);
+        auto mat = std::make_shared<VROMaterial>();
+        mat->setLightingModel(VROLightingModel::Constant);
+        mat->getDiffuse().setColor({1.0f, 0.0f, 0.0f, 1.0f});
+        box->setMaterials({mat});
+        modelNode->setGeometry(box);
+        modelNode->setPosition({0.0f, 0.0f, -1.5f});
+    }
 
     _renderer->setSceneController(sceneController, _driver);
     // ────────────────────────────────────────────────────────────────────────
@@ -116,38 +143,36 @@ protected:
 
 // ── prepareFrame ──────────────────────────────────────────────────────────────
 //
-// Called once per frame with data from the LEFT eye (view index 0).
+// Called once per frame with left-eye data (view index 0).
 // Drives VRORenderer::prepareFrame which computes physics, animations, and
-// visibility.  The eye-specific matrices are passed in from Swift after
-// compositing with the ARKit device anchor.
+// visibility.
 
 - (void)prepareFrameWithViewIndex:(NSUInteger)viewIndex
-                         drawable:(LayerRenderer.Drawable *)drawable
-                    commandBuffer:(id <MTLCommandBuffer>)commandBuffer
+                     colorTexture:(id <MTLTexture>)colorTexture
+                    viewTransform:(simd_float4x4)viewTransform
+                         tangents:(simd_float4)tangents
 {
-    // Extract left-eye dimensions for the viewport.
-    auto &view = drawable.views[viewIndex];
-    NSUInteger width  = drawable.colorTextures[viewIndex].width;
-    NSUInteger height = drawable.colorTextures[viewIndex].height;
-
+    NSUInteger width  = colorTexture.width;
+    NSUInteger height = colorTexture.height;
     VROViewport viewport(0, 0, (int)width, (int)height);
 
-    // View matrix: drawable.views[i].transform is device-to-rendering-space.
-    // We take its inverse to get the "world-to-eye" view matrix.
-    simd_float4x4 eyePose = view.transform;
-    simd_float4x4 viewMtx = simd_inverse(eyePose);
-    VROMatrix4f vroView = VROConvert::toMatrix4f(viewMtx);
+    // VROCamera::onRotationChanged extracts _forward/_up via rotation.multiply(kBaseForward),
+    // which is not a direction-only multiply — it adds the translation column too.
+    // Strip the translation so the frustum's orientation is computed correctly.
+    // The full view matrix (with translation) is still passed to renderEye for the actual shaders.
+    VROMatrix4f vroView = toMatrix4f(viewTransform);
+    VROMatrix4f vroViewRotOnly = vroView;
+    vroViewRotOnly[12] = 0.0f;
+    vroViewRotOnly[13] = 0.0f;
+    vroViewRotOnly[14] = 0.0f;
 
-    // Projection matrix from tangents (frustum, Metal depth [0,1]).
-    VROMatrix4f vroProj = [VRORendererBridge projectionFromTangents:view.tangents
-                                                               near:kZNear far:kZFar];
+    VROMatrix4f vroProj = [VRORendererBridge projectionFromTangents:tangents
+                                                               near:kZNear
+                                                                far:kZFar];
 
-    // Viro's prepareFrame uses the head rotation as the world-to-head matrix.
-    // For visionOS we pass the full view matrix (left eye) since there's no
-    // separate head+eye transform here.
     _renderer->prepareFrame(_frameNumber, viewport,
-                            VROFieldOfView(), // unused when projection is passed
-                            vroView, vroProj,
+                            VROFieldOfView(),
+                            vroViewRotOnly, vroProj,
                             _driver);
 }
 
@@ -158,28 +183,64 @@ protected:
 
 - (void)renderEyeWithViewIndex:(NSUInteger)viewIndex
                        encoder:(id <MTLRenderCommandEncoder>)encoder
-                      drawable:(LayerRenderer.Drawable *)drawable
-                 commandBuffer:(id <MTLCommandBuffer>)commandBuffer
+                  colorTexture:(id <MTLTexture>)colorTexture
+                  depthTexture:(id <MTLTexture>)depthTexture
+                 viewTransform:(simd_float4x4)viewTransform
+                      tangents:(simd_float4)tangents
 {
-    auto &view = drawable.views[viewIndex];
-    NSUInteger width  = drawable.colorTextures[viewIndex].width;
-    NSUInteger height = drawable.colorTextures[viewIndex].height;
+    // Sync pixel formats from the actual drawable textures BEFORE the renderer
+    // creates VROGeometrySubstrateMetal — updatePipelineStates() reads these
+    // formats at compile time.  VRODriverMetal defaults to BGRA8Unorm_sRGB which
+    // differs from the CompositorServices drawable format and causes silent draw
+    // rejection when the pipeline state format doesn't match the render pass.
+    _driver->setColorPixelFormat(colorTexture.pixelFormat);
+    _driver->setDepthPixelFormat(depthTexture.pixelFormat);
 
-    // Activate the encoder on the driver.
     _driver->setActiveEncoder(encoder);
 
+    NSUInteger width  = colorTexture.width;
+    NSUInteger height = colorTexture.height;
     VROViewport viewport(0, 0, (int)width, (int)height);
 
-    simd_float4x4 eyePose = view.transform;
-    simd_float4x4 viewMtx = simd_inverse(eyePose);
-    VROMatrix4f vroView = VROConvert::toMatrix4f(viewMtx);
-    VROMatrix4f vroProj = [VRORendererBridge projectionFromTangents:view.tangents
-                                                               near:kZNear far:kZFar];
+    VROMatrix4f vroView = toMatrix4f(viewTransform);
+    VROMatrix4f vroProj = [VRORendererBridge projectionFromTangents:tangents
+                                                               near:kZNear
+                                                                far:kZFar];
 
     VROEyeType eyeType = (viewIndex == 0) ? VROEyeType::Left : VROEyeType::Right;
-    _renderer->renderEye(eyeType, vroView, vroProj, viewport, _driver);
 
-    // Deactivate the encoder so stale calls don't use it.
+    // Pre-bind lighting uniforms at buffer index 4 so the constant-lighting shader
+    // receives valid ambient data.  The xcframework's bindShader() does not call
+    // bindLights(), leaving index 4 unset; unset buffers produce black output
+    // (invisible against the dark clear color).
+    // Layout: VROSceneLightingUniforms starts with vector_float3 ambient_light_color
+    // (16 bytes on arm64, matching Metal's float3 layout).  The rest stays zero
+    // (num_lights = 0, no individual light entries needed for Constant shading).
+    {
+        // 512 bytes covers VROSceneLightingUniforms (ambient + 8 VROLightUniforms + num_lights).
+        alignas(16) uint8_t lightingBytes[512] = {};
+        // Write white ambient at offset 0 (float3 = 3 floats, Metal aligns to 16 bytes).
+        float *ambient = reinterpret_cast<float *>(lightingBytes);
+        ambient[0] = 1.0f;
+        ambient[1] = 1.0f;
+        ambient[2] = 1.0f;
+        // ambient[3] stays 0 (padding between ambient_light_color and lights[]).
+        [encoder setVertexBytes:lightingBytes length:sizeof(lightingBytes) atIndex:4];
+        [encoder setFragmentBytes:lightingBytes length:sizeof(lightingBytes) atIndex:4];
+    }
+
+    @try {
+        try {
+            _renderer->renderEye(eyeType, vroView, vroProj, viewport, _driver);
+        } catch (const std::exception &e) {
+            NSLog(@"[ViroBridge] renderEye C++ exception: %s (frame=%d)", e.what(), _frameNumber);
+        } catch (...) {
+            NSLog(@"[ViroBridge] renderEye unknown C++ exception (frame=%d)", _frameNumber);
+        }
+    } @catch (NSException *e) {
+        NSLog(@"[ViroBridge] renderEye NSException: %@ — %@ (frame=%d)", e.name, e.reason, _frameNumber);
+    }
+
     _driver->setActiveEncoder(nil);
 }
 
@@ -194,7 +255,7 @@ protected:
 //
 // Builds an asymmetric frustum projection matrix from CompositorServices tangents.
 // tangents = (left, right, up, down) half-angle tangents.
-// Uses reverse-Z depth range [1, 0] for better depth precision on Vision Pro.
+// Metal NDC depth range [0, 1].
 
 + (VROMatrix4f)projectionFromTangents:(simd_float4)tangents
                                  near:(float)near
@@ -205,20 +266,19 @@ protected:
     float u = tangents[2];  // up    (positive)
     float d = tangents[3];  // down  (negative)
 
-    float rml = r - l;   // right minus left
-    float umd = u - d;   // up minus down
+    float rml = r - l;
+    float umd = u - d;
 
-    // Standard asymmetric frustum, Metal NDC z in [0, 1]:
-    //   P[col][row] using column-major storage
+    // Column-major asymmetric frustum (Metal NDC z in [0, 1])
     float mtx[16] = {
         // col 0
         2.0f / rml, 0.0f, 0.0f, 0.0f,
         // col 1
         0.0f, 2.0f / umd, 0.0f, 0.0f,
         // col 2
-        (r + l) / rml,  (u + d) / umd,  -(far) / (far - near),  -1.0f,
+        (r + l) / rml, (u + d) / umd, -(far) / (far - near), -1.0f,
         // col 3
-        0.0f, 0.0f,  -(near * far) / (far - near), 0.0f
+        0.0f, 0.0f, -(near * far) / (far - near), 0.0f
     };
     return VROMatrix4f(mtx);
 }

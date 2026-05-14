@@ -52,11 +52,11 @@ public enum ViroImmersiveSpace {
 /// The content view placed inside the ImmersiveSpace scene.
 /// Contains a CompositorLayer that drives the Viro Metal render loop.
 @available(visionOS 1.0, *)
-public struct ViroImmersiveSpaceView: View {
+public struct ViroImmersiveSpaceView: ImmersiveSpaceContent {
 
     public init() {}
 
-    public var body: some View {
+    public var body: some ImmersiveSpaceContent {
         CompositorLayer(configuration: ViroLayerConfiguration()) { layerRenderer in
             let renderer = ViroImmersiveRenderer(layerRenderer: layerRenderer)
             // Keep a reference so ARC doesn't collect the renderer.

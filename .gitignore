@@ -74,3 +74,4 @@ test/android/fastlane/README.md
 test/android/fastlane/report.xml
 /android/viro_bridge/.cxx/Debug
 /ios/dist/ViroRenderer/armv7_arm64
+/ios/dist/ViroRendererVisionOS/

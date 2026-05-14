@@ -7,22 +7,20 @@
 //
 // Usage per-frame (inside ViroImmersiveRenderer.renderFrame()):
 //
-//   1. Call -prepareFrameWithViewIndex:0 drawable:drawable commandBuffer:cb
-//      once per frame (passes the left-eye matrices to VRORenderer::prepareFrame).
+//   1. Call -prepareFrameWithViewIndex:0 colorTexture:... viewTransform:... tangents:...
+//      once per frame (left-eye data drives VRORenderer::prepareFrame).
 //
 //   2. For each eye (0 = left, 1 = right):
-//        a. Create a MTLRenderCommandEncoder for that eye.
-//        b. Call -renderEyeWithViewIndex:i
-//                 encoder:encoder
-//                 drawable:drawable
-//                 commandBuffer:cb
-//        c. Call [encoder endEncoding]
+//        a. Create MTLRenderPassDescriptor with the eye's color + depth textures.
+//        b. Create a MTLRenderCommandEncoder from that descriptor.
+//        c. Call -renderEyeWithViewIndex:i encoder:... colorTexture:... viewTransform:... tangents:...
+//        d. Call [encoder endEncoding].
 //
 //   3. Call -endFrame
 //
 // Scene loading:
-//   The bridge starts with an empty scene.  Connect your React Native scene
-//   controller by calling -setNativeSceneController: from ObjC/Swift.
+//   The bridge starts with a hardcoded red-box test scene.  Connect your React
+//   Native scene controller by calling -setNativeSceneController: from ObjC/Swift.
 
 #pragma once
 
@@ -30,7 +28,7 @@
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
-#import <CompositorServices/CompositorServices.h>
+#import <simd/simd.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -40,19 +38,31 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithDevice:(id <MTLDevice>)device NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
-/// Call once per frame, before the per-eye loop, using the left-eye drawable view (index 0).
-/// This drives VRORenderer::prepareFrame(), which updates physics, animations, and visibility.
+/// Call once per frame before the per-eye loop, using left-eye data (view index 0).
+/// Drives VRORenderer::prepareFrame() — updates physics, animations, and visibility.
+/// @param viewIndex    Typically 0 (left eye).
+/// @param colorTexture The eye's colour render-target (used only for its dimensions here).
+/// @param viewTransform The device-anchor → eye-space transform from CompositorServices.
+/// @param tangents     Frustum half-angle tangents (left, right, up, down).
 - (void)prepareFrameWithViewIndex:(NSUInteger)viewIndex
-                         drawable:(LayerRenderer.Drawable *)drawable
-                    commandBuffer:(id <MTLCommandBuffer>)commandBuffer;
+                     colorTexture:(id <MTLTexture>)colorTexture
+                    viewTransform:(simd_float4x4)viewTransform
+                         tangents:(simd_float4)tangents;
 
-/// Call once per eye.  Activates the encoder on the driver, invokes
-/// VRORenderer::renderEye(), then clears the encoder from the driver.
-/// The caller is responsible for calling [encoder endEncoding] after this returns.
+/// Call once per eye.  Sets the encoder on the driver, invokes VRORenderer::renderEye(),
+/// then clears the encoder.  The caller is responsible for calling [encoder endEncoding].
+/// @param viewIndex    0 = left eye, 1 = right eye.
+/// @param encoder      Active MTLRenderCommandEncoder targeting the eye's textures.
+/// @param colorTexture The eye's colour render-target (used for dimensions and pixel format).
+/// @param depthTexture The eye's depth render-target (used for pixel format).
+/// @param viewTransform The device-anchor → eye-space transform from CompositorServices.
+/// @param tangents     Frustum half-angle tangents (left, right, up, down).
 - (void)renderEyeWithViewIndex:(NSUInteger)viewIndex
                        encoder:(id <MTLRenderCommandEncoder>)encoder
-                      drawable:(LayerRenderer.Drawable *)drawable
-                 commandBuffer:(id <MTLCommandBuffer>)commandBuffer;
+                  colorTexture:(id <MTLTexture>)colorTexture
+                  depthTexture:(id <MTLTexture>)depthTexture
+                 viewTransform:(simd_float4x4)viewTransform
+                      tangents:(simd_float4)tangents;
 
 /// Call after all eyes have been rendered.  Drives VRORenderer::endFrame().
 - (void)endFrame;

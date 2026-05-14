@@ -54,8 +54,8 @@ public final class ViroImmersiveCoordinator {
             isImmersiveActive = true
         case .userCancelled:
             print("[Viro] VisionOS: ImmersiveSpace open was cancelled by the user")
-        case .error(let error):
-            print("[Viro] VisionOS: ImmersiveSpace open error: \(error)")
+        case .error:
+            print("[Viro] VisionOS: ImmersiveSpace open error")
         @unknown default:
             break
         }

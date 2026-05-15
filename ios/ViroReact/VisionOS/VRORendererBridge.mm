@@ -59,6 +59,7 @@ protected:
     std::shared_ptr<VRODriverVisionOS>            _driver;
     std::shared_ptr<VRORenderer>                  _renderer;
     std::shared_ptr<VROInputControllerVisionOS>   _inputController;
+    std::shared_ptr<VRONode>                      _cameraNode;
     int _frameNumber;
 }
 @end
@@ -88,6 +89,13 @@ protected:
     config.enableMultisampling  = false;
 
     _renderer = std::make_shared<VRORenderer>(config, _inputController);
+
+    // ── Camera node ──────────────────────────────────────────────────────────
+    // Root node, no VRONodeCamera attached — updateCamera() uses getWorldPosition()
+    // directly and leaves baseRotation as identity, so headRotation (worldFromEye
+    // rotation, updated every prepareFrame) drives the full camera orientation.
+    _cameraNode = std::make_shared<VRONode>();
+    _renderer->setPointOfView(_cameraNode);
 
     // ── Test scene ───────────────────────────────────────────────────────────
     auto sceneController = std::make_shared<VROSceneController>();
@@ -156,15 +164,39 @@ protected:
     NSUInteger height = colorTexture.height;
     VROViewport viewport(0, 0, (int)width, (int)height);
 
-    // VROCamera::onRotationChanged extracts _forward/_up via rotation.multiply(kBaseForward),
-    // which is not a direction-only multiply — it adds the translation column too.
-    // Strip the translation so the frustum's orientation is computed correctly.
-    // The full view matrix (with translation) is still passed to renderEye for the actual shaders.
-    VROMatrix4f vroView = toMatrix4f(viewTransform);
-    VROMatrix4f vroViewRotOnly = vroView;
-    vroViewRotOnly[12] = 0.0f;
-    vroViewRotOnly[13] = 0.0f;
-    vroViewRotOnly[14] = 0.0f;
+    // VROCamera::onRotationChanged computes:
+    //   _forward = headRotation.multiply(kBaseForward)   (multiply adds translation!)
+    // So headRotation must be worldFromEye rotation (R^T of eyeFromWorld), not eyeFromWorld.
+    // With R^T: _forward = R^T * [0,0,-1] = world-space looking direction. ✓
+    //
+    // Eye world position: eyeFromWorld = [R|t], eye is at world pos -R^T*t.
+    // Update _cameraNode so the frustum is centred at the real eye location.
+    simd_float4 t = viewTransform.columns[3];
+    VROVector3f eyeWorldPos(
+        -(viewTransform.columns[0].x * t.x + viewTransform.columns[0].y * t.y + viewTransform.columns[0].z * t.z),
+        -(viewTransform.columns[1].x * t.x + viewTransform.columns[1].y * t.y + viewTransform.columns[1].z * t.z),
+        -(viewTransform.columns[2].x * t.x + viewTransform.columns[2].y * t.y + viewTransform.columns[2].z * t.z)
+    );
+    _cameraNode->setPosition(eyeWorldPos);
+    // setPosition updates _position synchronously (no active transaction → onTermination fires
+    // immediately), but _worldPosition is only written by computeTransforms, which is normally
+    // called during scene-graph traversal.  _cameraNode is standalone (not in the scene), so we
+    // must trigger it explicitly.  With no parent the parent transform is identity.
+    _cameraNode->computeTransforms(VROMatrix4f(), VROMatrix4f());
+
+    // R^T in column-major VROMatrix4f: col i of R^T = row i of R.
+    // Row i of R (simd, column-major) = [columns[0][i], columns[1][i], columns[2][i]].
+    // Previous code copied simd columns directly → produced R, not R^T.
+    float rT[16] = {
+        // col 0 of R^T = row 0 of R (right vector)
+        viewTransform.columns[0].x, viewTransform.columns[1].x, viewTransform.columns[2].x, 0,
+        // col 1 of R^T = row 1 of R (up vector)
+        viewTransform.columns[0].y, viewTransform.columns[1].y, viewTransform.columns[2].y, 0,
+        // col 2 of R^T = row 2 of R (back = -forward vector)
+        viewTransform.columns[0].z, viewTransform.columns[1].z, viewTransform.columns[2].z, 0,
+        0, 0, 0, 1
+    };
+    VROMatrix4f worldFromEyeRot(rT);
 
     VROMatrix4f vroProj = [VRORendererBridge projectionFromTangents:tangents
                                                                near:kZNear
@@ -172,7 +204,7 @@ protected:
 
     _renderer->prepareFrame(_frameNumber, viewport,
                             VROFieldOfView(),
-                            vroViewRotOnly, vroProj,
+                            worldFromEyeRot, vroProj,
                             _driver);
 }
 

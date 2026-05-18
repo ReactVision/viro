@@ -147,42 +147,19 @@ protected:
     dirLight->setDirection({0.0f, -1.0f, -0.5f});
     scene->getRootNode()->addLight(dirLight);
 
-    // ── 360° background — large inverted sphere with equirectangular texture ─
+    // ── DIAG: solid-color background sphere (replaces dark 360 texture for diagnosis) ─
+    // Using bright magenta so the sphere is unmistakable if it renders.
+    // Revert to texture version once rendering is confirmed.
     {
-        NSString *bgPath = [[NSBundle mainBundle] pathForResource:@"360_space" ofType:@"jpg"];
-        if (bgPath) {
-            id<MTLDevice> device = std::dynamic_pointer_cast<VRODriverMetal>(_driver)->getDevice();
-            MTKTextureLoader *loader = [[MTKTextureLoader alloc] initWithDevice:device];
-            NSDictionary *opts = @{
-                MTKTextureLoaderOptionSRGB: @(NO),
-                MTKTextureLoaderOptionGenerateMipmaps: @(NO),
-            };
-            NSError *texErr = nil;
-            id<MTLTexture> metalTex = [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:bgPath]
-                                                                  options:opts error:&texErr];
-            if (metalTex) {
-                auto substrate = std::make_unique<VROTextureSubstrateMetal>(metalTex);
-                auto tex = std::make_shared<VROTexture>(VROTextureType::Texture2D,
-                                                        VROTextureInternalFormat::RGBA8,
-                                                        std::move(substrate));
-                // Large sphere with faces pointing inward so the equirectangular
-                // image is visible from inside (camera at center).
-                auto bgSphere = VROSphere::createSphere(50.0f, 30, 30, false);
-                auto bgMat = std::make_shared<VROMaterial>();
-                bgMat->setLightingModel(VROLightingModel::Constant);
-                bgMat->getDiffuse().setTexture(tex);
-                bgSphere->setMaterials({bgMat});
-                auto bgNode = std::make_shared<VRONode>();
-                bgNode->setGeometry(bgSphere);
-                scene->getRootNode()->addChildNode(bgNode);
-                NSLog(@"[ViroBridge] 360_space background sphere set (%lux%lu)",
-                      (unsigned long)metalTex.width, (unsigned long)metalTex.height);
-            } else {
-                NSLog(@"[ViroBridge] Failed to load 360_space texture: %@", texErr);
-            }
-        } else {
-            NSLog(@"[ViroBridge] 360_space.jpg not found — skipping background");
-        }
+        auto bgSphere = VROSphere::createSphere(50.0f, 20, 20, false);
+        auto bgMat = std::make_shared<VROMaterial>();
+        bgMat->setLightingModel(VROLightingModel::Constant);
+        bgMat->getDiffuse().setColor({1.0f, 0.0f, 1.0f, 1.0f});   // bright magenta
+        bgSphere->setMaterials({bgMat});
+        auto bgNode = std::make_shared<VRONode>();
+        bgNode->setGeometry(bgSphere);
+        scene->getRootNode()->addChildNode(bgNode);
+        NSLog(@"[ViroBridge] DIAG: magenta background sphere added");
     }
 
     // ── shiba.glb (centre) ───────────────────────────────────────────────────
@@ -250,16 +227,10 @@ protected:
             *loopFn = [node_w, fn_w]() {
                 auto n  = node_w.lock();
                 auto fn = fn_w.lock();
-                NSLog(@"[ViroBridge] ANIM: loopFn invoked, node=%p fn=%p", (void*)n.get(), (void*)fn.get());
                 if (!n || !fn) return;
-
                 auto anim = n->getAnimation("Walk", true);
-                NSLog(@"[ViroBridge] ANIM: getAnimation(Walk) returned %p", (void*)anim.get());
                 if (anim) {
                     anim->execute(n, *fn);
-                    NSLog(@"[ViroBridge] ANIM: execute() called");
-                } else {
-                    NSLog(@"[ViroBridge] \"Walk\" animation not found on Soldier node");
                 }
             };
 
@@ -270,7 +241,6 @@ protected:
             // CompositorServices render thread.  Signal prepareFrame to fire the
             // first execute() from the render thread so all subsequent completions
             // (also fired from update() on the render thread) stay on the same thread.
-            NSLog(@"[ViroBridge] ANIM: setting _soldierAnimPending=true (main queue → render thread handoff)");
             strongSelf->_soldierAnimPending.store(true, std::memory_order_release);
         });
     } else {
@@ -372,6 +342,20 @@ protected:
         NSLog(@"[ViroBridge] Surface shader modifier sphere added");
     }
 
+    // ── DIAG: Close white box at 0.5m — unmissable reference object ─────────
+    {
+        auto box = VROBox::createBox(0.3f, 0.3f, 0.3f);
+        auto mat = std::make_shared<VROMaterial>();
+        mat->setLightingModel(VROLightingModel::Constant);
+        mat->getDiffuse().setColor({1.0f, 1.0f, 1.0f, 1.0f});   // white
+        box->setMaterials({mat});
+        auto node = std::make_shared<VRONode>();
+        node->setGeometry(box);
+        node->setPosition({0.0f, 0.0f, -0.5f});
+        scene->getRootNode()->addChildNode(node);
+        NSLog(@"[ViroBridge] DIAG: white reference box at (0,0,-0.5)");
+    }
+
     _renderer->setSceneController(sceneController, _driver);
     // ────────────────────────────────────────────────────────────────────────
 
@@ -443,11 +427,8 @@ protected:
     // committed/updated state lives on the same thread as update().
     if (_soldierAnimPending.load(std::memory_order_acquire)) {
         _soldierAnimPending.store(false, std::memory_order_relaxed);
-        NSLog(@"[ViroBridge] ANIM: draining pending flag on render thread, loop=%p", (void*)_soldierAnimLoop.get());
         if (_soldierAnimLoop) {
-            NSLog(@"[ViroBridge] ANIM: calling loopFn on render thread");
             (*_soldierAnimLoop)();
-            NSLog(@"[ViroBridge] ANIM: loopFn returned");
         }
     }
 

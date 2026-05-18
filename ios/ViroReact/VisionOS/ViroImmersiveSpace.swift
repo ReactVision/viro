@@ -75,22 +75,28 @@ struct ViroLayerConfiguration: CompositorLayerConfiguration {
         capabilities: LayerRenderer.Capabilities,
         configuration: inout LayerRenderer.Configuration
     ) {
-        // 32-bit depth for accurate occlusion
+        NSLog("[Viro] LayerCfg supportedColorFormats=%@",
+              capabilities.supportedColorFormats.map { $0.rawValue } as NSArray)
+        NSLog("[Viro] LayerCfg supportedDepthFormats=%@",
+              capabilities.supportedDepthFormats.map { $0.rawValue } as NSArray)
+
+        // rgba16Float is Apple's recommended format for visionOS immersive rendering.
+        // bgra8Unorm_sRGB may be silently composited to black on device (visionOS 26).
         configuration.depthFormat = .depth32Float
-        // sRGB BGRA colour
-        configuration.colorFormat = .bgra8Unorm_srgb
+        configuration.colorFormat = .rgba16Float
 
-        // Enable foveation where supported (Quest Pro / Vision Pro gaze-based)
-        let foveationEnabled = capabilities.supportsFoveation
-        configuration.isFoveationEnabled = foveationEnabled
+        // .layered delivers ONE MTLTextureType2DArray for both eyes and requires
+        // a SINGLE render pass with renderTargetArrayLength=2 + viewport arrays.
+        // Our current per-eye loop uses two separate slice passes which the
+        // compositor silently ignores for .layered → black screen on device.
+        // Force .dedicated so each eye gets its own MTLTexture2D, matching the
+        // simulator path that already works.
+        // TODO: implement single-pass layered rendering to re-enable .layered.
+        configuration.layout = .dedicated
 
-        let layoutOptions: LayerRenderer.Capabilities.SupportedLayoutsOptions =
-            foveationEnabled ? [.foveationEnabled] : []
-        let supportedLayouts = capabilities.supportedLayouts(options: layoutOptions)
-
-        // Layered: both eyes in a single texture array — preferred.
-        // Dedicated: separate textures per eye — fallback.
-        configuration.layout = supportedLayouts.contains(.layered) ? .layered : .dedicated
+        // Foveation also requires rasterizationRateMap on the render pass.
+        // Keep disabled until that support is added.
+        configuration.isFoveationEnabled = false
     }
 }
 

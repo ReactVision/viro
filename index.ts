@@ -28,6 +28,7 @@ import {
   ViroTrackingStateConstants,
 } from "./components/ViroConstants";
 import { ViroController } from "./components/ViroController";
+import { ViroVirtualJoystick } from "./components/ViroVirtualJoystick";
 import { ViroDirectionalLight } from "./components/ViroDirectionalLight";
 import { ViroFlexView } from "./components/ViroFlexView";
 import { ViroGeometry } from "./components/ViroGeometry";
@@ -199,6 +200,7 @@ export {
   ViroButton,
   ViroCamera,
   ViroController,
+  ViroVirtualJoystick,
   ViroDirectionalLight,
   ViroFlexView,
   ViroGeometry,

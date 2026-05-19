@@ -224,6 +224,10 @@
 		E139A8F42E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
 		E139A8F52E0B9C6A0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
 		E139A9402E0BAF2D0050EC9A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		E1BD618F2FBBEC56008FDF74 /* VRTVirtualJoystickView.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1BD618C2FBBEC56008FDF74 /* VRTVirtualJoystickView.mm */; };
+		E1BD61902FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1BD618E2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.mm */; };
+		E1BD61E52FBBEC60008FDF74 /* VRTVirtualJoystickView.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1BD618B2FBBEC56008FDF74 /* VRTVirtualJoystickView.h */; };
+		E1BD61E62FBBEC62008FDF74 /* VRTVirtualJoystickViewManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1BD618D2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.h */; };
 		E1F9E5512FA39DEB00DBE1E8 /* VRTStudioModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */; };
 		E1F9E5B22FA39E0300DBE1E8 /* VRTStudioModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */; };
 /* End PBXBuildFile section */
@@ -756,6 +760,8 @@
 			dstPath = "${SRCROOT}/dist/include";
 			dstSubfolderSpec = 0;
 			files = (
+				E1BD61E62FBBEC62008FDF74 /* VRTVirtualJoystickViewManager.h in Copy Headers to ios/dist/include */,
+				E1BD61E52FBBEC60008FDF74 /* VRTVirtualJoystickView.h in Copy Headers to ios/dist/include */,
 				E1F9E5B22FA39E0300DBE1E8 /* VRTStudioModule.h in Copy Headers to ios/dist/include */,
 				8BD950372058C73100F8BB9E /* VRTMaterialChangedDelegate.h in Copy Headers to ios/dist/include */,
 				A5B4AF002050B4FC0006D970 /* VRTPolygonManager.h in Copy Headers to ios/dist/include */,
@@ -1112,6 +1118,10 @@
 		AB1E81C536C9046803693831 /* libPods-ViroReact.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ViroReact.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB4ED2A244DA92CFDC77EE77 /* Pods-ViroReact.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ViroReact.debug.xcconfig"; path = "Pods/Target Support Files/Pods-ViroReact/Pods-ViroReact.debug.xcconfig"; sourceTree = "<group>"; };
 		B23F778D18583A1428591854 /* Pods-ViroReact.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ViroReact.release.xcconfig"; path = "Pods/Target Support Files/Pods-ViroReact/Pods-ViroReact.release.xcconfig"; sourceTree = "<group>"; };
+		E1BD618B2FBBEC56008FDF74 /* VRTVirtualJoystickView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTVirtualJoystickView.h; path = ViroReact/Views/VRTVirtualJoystickView.h; sourceTree = "<group>"; };
+		E1BD618C2FBBEC56008FDF74 /* VRTVirtualJoystickView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTVirtualJoystickView.mm; path = ViroReact/Views/VRTVirtualJoystickView.mm; sourceTree = "<group>"; };
+		E1BD618D2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTVirtualJoystickViewManager.h; path = ViroReact/Views/VRTVirtualJoystickViewManager.h; sourceTree = "<group>"; };
+		E1BD618E2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTVirtualJoystickViewManager.mm; path = ViroReact/Views/VRTVirtualJoystickViewManager.mm; sourceTree = "<group>"; };
 		E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTStudioModule.h; path = ViroReact/Modules/VRTStudioModule.h; sourceTree = "<group>"; };
 		E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTStudioModule.mm; path = ViroReact/Modules/VRTStudioModule.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1429,6 +1439,10 @@
 		8BE0D4B81DFA3D8A0032AB99 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E1BD618B2FBBEC56008FDF74 /* VRTVirtualJoystickView.h */,
+				E1BD618C2FBBEC56008FDF74 /* VRTVirtualJoystickView.mm */,
+				E1BD618D2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.h */,
+				E1BD618E2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.mm */,
 				A5A10762212D54B2008B2DFB /* VRTAnimatedImage.h */,
 				A5A10761212D54B2008B2DFB /* VRTAnimatedImage.mm */,
 				8BD950332058C71100F8BB9E /* VRTMaterialVideo.h */,
@@ -2306,6 +2320,8 @@
 				8A35BA261F3BAA48002B069E /* VRTARSceneModule.mm in Sources */,
 				8BE0D4A31DFA15880032AB99 /* VRTSceneNavigatorManager.mm in Sources */,
 				8BE0D5031DFA3D9B0032AB99 /* VRTLabelShadowView.mm in Sources */,
+				E1BD618F2FBBEC56008FDF74 /* VRTVirtualJoystickView.mm in Sources */,
+				E1BD61902FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.mm in Sources */,
 				8BE0D4FE1DFA3D9B0032AB99 /* VRTFlexView.mm in Sources */,
 				A5A937AA1E81D1FB00FE0406 /* VRTSceneNavigatorModule.mm in Sources */,
 				8BE0D4F61DFA3D9B0032AB99 /* VRT360Image.mm in Sources */,

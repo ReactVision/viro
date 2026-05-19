@@ -30,6 +30,7 @@
 #include <vector>
 #include "VRODefines.h"
 #include "VROSoundData.h"
+#include "VROVertexBuffer.h"
 
 class VROGeometry;
 class VROMaterial;
@@ -278,6 +279,16 @@ public:
     virtual std::shared_ptr<VRORenderTarget> newRenderTarget(VRORenderTargetType type, int numAttachments, int numImages,
                                                              bool enableMipmaps, bool needsDepthStencil) = 0;
     virtual std::shared_ptr<VROVertexBuffer> newVertexBuffer(std::shared_ptr<VROData> data) = 0;
+    /*
+     Create a vertex buffer with an explicit usage hint. Subclasses that don't
+     override this default get a Static buffer; subclasses that do override gain
+     mutable buffers via VROVertexBuffer::updateData(). Used by VRODynamicGeometry
+     and any other path that needs per-frame buffer updates.
+     */
+    virtual std::shared_ptr<VROVertexBuffer> newVertexBuffer(std::shared_ptr<VROData> data,
+                                                             VROVertexBufferUsage usage) {
+        return newVertexBuffer(data);
+    }
     virtual std::shared_ptr<VRORenderTarget> getDisplay() = 0;
     virtual std::shared_ptr<VROImagePostProcess> newImagePostProcess(std::shared_ptr<VROShaderProgram> shader) = 0;
     virtual std::shared_ptr<VROVideoTextureCache> newVideoTextureCache() = 0;

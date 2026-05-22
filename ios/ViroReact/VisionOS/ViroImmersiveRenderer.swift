@@ -29,17 +29,10 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     private let commandQueue: MTLCommandQueue
     private let bridge: VRORendererBridge
     private var renderTask: Task<Void, Never>?
-    private var _diagFrames = 0
-    // 8 bytes = 1 rgba16Float pixel (4 × 2-byte float16). Shared = CPU-readable after GPU completes.
-    private let readbackBuffer: MTLBuffer?
 
     // World tracking for device-anchor-based view matrix.
     private let arSession = ARKitSession()
     private let worldTracking = WorldTrackingProvider()
-    private var _frameCount = 0
-
-    private static let diagBypassCPP    = false
-    private static let diagBypassBridge = false
 
     // MARK: - Init
 
@@ -54,19 +47,15 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
         self.device = device
         self.commandQueue = queue
         self.bridge = VRORendererBridge(device: device)
-        self.readbackBuffer = device.makeBuffer(length: 8, options: .storageModeShared)
     }
 
     // MARK: - Lifecycle
 
     public func startRenderLoop() {
         renderTask = Task(priority: .high) {
-            NSLog("[Viro] WorldTrackingProvider.isSupported=%@", WorldTrackingProvider.isSupported ? "YES" : "NO")
             if WorldTrackingProvider.isSupported {
                 do {
                     try await self.arSession.run([self.worldTracking])
-                    NSLog("[Viro] ARKitSession.run() succeeded — provider state=%@",
-                          String(describing: self.worldTracking.state))
                 } catch {
                     NSLog("[Viro] ARKitSession.run() FAILED: %@", error.localizedDescription)
                 }
@@ -122,25 +111,17 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     // MARK: - Per-frame render
 
     private func renderFrame() {
-        guard let frame = layerRenderer.queryNextFrame() else {
-            NSLog("[Viro] queryNextFrame returned nil — state: \(layerRenderer.state.rawValue)")
-            return
-        }
+        guard let frame = layerRenderer.queryNextFrame() else { return }
         frame.startSubmission()
 
         if let timing = frame.predictTiming() {
-            let t0 = CACurrentMediaTime()
             LayerRenderer.Clock().wait(until: timing.optimalInputTime)
-            if _frameCount < 3 {
-                NSLog("[Viro] timing wait=%.2fms", (CACurrentMediaTime() - t0) * 1000)
-            }
         }
 
         // queryDrawable() is deprecated + API_UNAVAILABLE(macosx) — crashes in simulator.
         // queryDrawables() returns an array. Empty = frame cancelled; invalid to access further.
         let drawables = frame.queryDrawables()
         guard !drawables.isEmpty else {
-            NSLog("[Viro] queryDrawables empty — skipping frame")
             // Do NOT call frame.endSubmission() — frame is invalid when array is empty.
             return
         }
@@ -153,33 +134,13 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
         // The anchor MUST also be set on each drawable via setDeviceAnchor() before
         // encodePresent() — CompositorServices silently discards every frame that lacks it.
         let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
-
-        _frameCount += 1
-        if _frameCount == 1 || _frameCount % 90 == 0 {
-            let anchorStr     = deviceAnchor == nil ? "NIL" : "ok"
-            let stateStr      = drawables.first.map { String(describing: $0.state) } ?? "?"
-            let providerStr   = String(describing: worldTracking.state)
-            NSLog("[Viro] HEARTBEAT frame=%d anchor=%@ provider=%@ drawableState=%@ bypassCPP=%@ drawableCount=%d",
-                  _frameCount, anchorStr, providerStr, stateStr, Self.diagBypassCPP ? "YES" : "NO", drawables.count)
-        }
-        if _frameCount <= 3 {
-            for (di, d) in drawables.enumerated() {
-                NSLog("[Viro] drawable[%d] target=%@ state=%@",
-                      di, String(describing: d.target), String(describing: d.state))
-            }
-        }
-        if _frameCount <= 5, let a = deviceAnchor {
-            let p = a.originFromAnchorTransform.columns.3
-            NSLog("[Viro] anchor frame=%d tracked=%@ pos=(%.3f,%.3f,%.3f)",
-                  _frameCount, a.isTracked ? "YES" : "NO", p.x, p.y, p.z)
-        }
         let deviceFromWorld: simd_float4x4 = deviceAnchor.map {
             $0.originFromAnchorTransform.inverse
         } ?? matrix_identity_float4x4
 
         // Drive prepareFrame once using the first drawable's left-eye data.
         let primary = drawables[0]
-        if !Self.diagBypassBridge && !primary.views.isEmpty {
+        if !primary.views.isEmpty {
             let eyeFromWorld0 = primary.views[0].transform * deviceFromWorld
             bridge.prepareFrame(
                 withViewIndex: 0,
@@ -195,23 +156,9 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
             guard drawable.state == .rendering else { continue }
             guard let commandBuffer = commandQueue.makeCommandBuffer() else { continue }
 
-            let capturedFrame = _frameCount
-            let doReadback = capturedFrame == 1
-            let rb = readbackBuffer
             commandBuffer.addCompletedHandler { cb in
-                if capturedFrame <= 3 || capturedFrame % 90 == 0 {
-                    NSLog("[Viro] cmdBuf status=%d frame=%d", cb.status.rawValue, capturedFrame)
-                }
                 if let error = cb.error {
                     NSLog("[Viro] commandBuffer GPU error: \(error)")
-                }
-                if doReadback, let rb {
-                    // rgba16Float: 4 × UInt16. float16 1.0 = 0x3C00, 0.0 = 0x0000.
-                    // Green clear → R=0000 G=3C00 B=0000 A=3C00
-                    // Black       → R=0000 G=0000 B=0000 A=????
-                    let p = rb.contents().bindMemory(to: UInt16.self, capacity: 4)
-                    NSLog("[Viro] READBACK px(0,0): R=%04X G=%04X B=%04X A=%04X (green=0000,3C00,0000,3C00)",
-                          p[0], p[1], p[2], p[3])
                 }
             }
 
@@ -230,25 +177,6 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 let colorSlice = colorTexture.textureType == .type2DArray ? i : 0
                 let depthSlice = depthTexture.textureType == .type2DArray ? i : 0
 
-                // One-shot diagnostic: log texture properties on the first eye of the first frame.
-                if _diagFrames == 0 && i == 0 {
-                    NSLog("[Viro] DIAG color: fmt=%d type=%d size=%dx%d arrayLen=%d slice=%d",
-                          colorTexture.pixelFormat.rawValue, colorTexture.textureType.rawValue,
-                          colorTexture.width, colorTexture.height, colorTexture.arrayLength, colorSlice)
-                    NSLog("[Viro] DIAG depth:  fmt=%d type=%d size=%dx%d arrayLen=%d slice=%d",
-                          depthTexture.pixelFormat.rawValue, depthTexture.textureType.rawValue,
-                          depthTexture.width, depthTexture.height, depthTexture.arrayLength, depthSlice)
-                    NSLog("[Viro] DIAG views=%d colorTextures=%d depthTextures=%d",
-                          viewCount, drawable.colorTextures.count, drawable.depthTextures.count)
-                    for vi in 0..<viewCount {
-                        let vp = drawable.views[vi].textureMap.viewport
-                        NSLog("[Viro] DIAG view[%d] texIdx=%d viewport=(%.0f,%.0f %.0fx%.0f)",
-                              vi, drawable.views[vi].textureMap.textureIndex,
-                              vp.originX, vp.originY, vp.width, vp.height)
-                    }
-                    _diagFrames += 1
-                }
-
                 let renderPass = MTLRenderPassDescriptor()
                 renderPass.colorAttachments[0].texture     = colorTexture
                 renderPass.colorAttachments[0].slice       = colorSlice
@@ -264,8 +192,8 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 renderPass.depthAttachment.storeAction = .store
 
                 guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else {
-                    NSLog("[Viro] ERROR: makeRenderCommandEncoder nil view=%d frame=%d fmt=%d type=%d slice=%d",
-                          i, _frameCount,
+                    NSLog("[Viro] ERROR: makeRenderCommandEncoder nil view=%d fmt=%d type=%d slice=%d",
+                          i,
                           colorTexture.pixelFormat.rawValue,
                           colorTexture.textureType.rawValue,
                           colorSlice)
@@ -273,46 +201,27 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 }
 
                 let eyeFromWorld = view.transform * deviceFromWorld
-                if !Self.diagBypassCPP {
-                    bridge.renderEye(
-                        withViewIndex: UInt(i),
-                        encoder: encoder,
-                        colorTexture: colorTexture,
-                        depthTexture: depthTexture,
-                        viewTransform: eyeFromWorld,
-                        tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
-                }
+                bridge.renderEye(
+                    withViewIndex: UInt(i),
+                    encoder: encoder,
+                    colorTexture: colorTexture,
+                    depthTexture: depthTexture,
+                    viewTransform: eyeFromWorld,
+                    tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
 
                 encoder.endEncoding()
-            }
-
-            // Blit 1 pixel from left-eye texture → readbackBuffer so we can verify
-            // the clear color actually landed in the texture (only on frame 1).
-            if doReadback, let rb,
-               let blit = commandBuffer.makeBlitCommandEncoder() {
-                let leftTex = drawable.colorTextures[0]
-                blit.copy(from: leftTex,
-                          sourceSlice: 0, sourceLevel: 0,
-                          sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
-                          sourceSize: MTLSize(width: 1, height: 1, depth: 1),
-                          to: rb, destinationOffset: 0,
-                          destinationBytesPerRow: 8, destinationBytesPerImage: 8)
-                blit.endEncoding()
             }
 
             // Required: set device anchor before encodePresent so CompositorServices
             // can correctly place the rendered content in world space.
             // visionOS 26+: property assignment (replaces setDeviceAnchor method from visionOS 2.x).
             drawable.deviceAnchor = deviceAnchor
-            if _frameCount <= 3 || _frameCount % 90 == 0 {
-                NSLog("[Viro] encodePresent frame=%d anchor=%@", _frameCount, deviceAnchor == nil ? "NIL" : "ok")
-            }
             drawable.encodePresent(commandBuffer: commandBuffer)
             commandBuffer.commit()
         }
 
         frame.endSubmission()
-        if !Self.diagBypassBridge { bridge.endFrame() }
+        bridge.endFrame()
     }
 
     // MARK: - Tangent extraction

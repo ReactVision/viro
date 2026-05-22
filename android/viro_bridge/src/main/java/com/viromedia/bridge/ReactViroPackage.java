@@ -69,6 +69,7 @@ import com.viromedia.bridge.component.node.control.VRTQuadManager;
 import com.viromedia.bridge.component.node.control.VRTVideoSurfaceManager;
 import com.viromedia.bridge.component.node.VRTPortalSceneManager;
 import com.viromedia.bridge.component.node.VRTPortalManager;
+import com.viromedia.bridge.component.VRTVirtualJoystickViewManager;
 
 
 import com.viromedia.bridge.module.ARSceneModule;
@@ -181,7 +182,8 @@ public class ReactViroPackage implements ReactPackage {
                 new VRTARSceneManager(reactContext),
                 new VRTARPlaneManager(reactContext),
                 new VRTARImageMarkerManager(reactContext),
-                new VRTARObjectMarkerManager(reactContext)
+                new VRTARObjectMarkerManager(reactContext),
+                new VRTVirtualJoystickViewManager(reactContext)
         );
     }
 }

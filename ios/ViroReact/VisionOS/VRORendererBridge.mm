@@ -109,8 +109,6 @@ protected:
 
     // ── Driver ───────────────────────────────────────────────────────────────
     _driver = std::make_shared<VRODriverVisionOS>(device);
-    NSLog(@"[ViroBridge] driver created. library=%@ stencilFmt=%d",
-          _driver->getLibrary(), (int)_driver->getStencilPixelFormat());
 
     // ── Input controller ─────────────────────────────────────────────────────
     _inputController = std::make_shared<VROInputControllerVisionOS>(_driver);
@@ -147,19 +145,56 @@ protected:
     dirLight->setDirection({0.0f, -1.0f, -0.5f});
     scene->getRootNode()->addLight(dirLight);
 
-    // ── DIAG: solid-color background sphere (replaces dark 360 texture for diagnosis) ─
-    // Using bright magenta so the sphere is unmistakable if it renders.
-    // Revert to texture version once rendering is confirmed.
+    // ── 360° equirectangular background sphere ────────────────────────────────
+    // VROPortal::setBackgroundSphere is absent from libViroKitVisionOS.a, so we
+    // use a large inverted sphere as a workaround.
     {
-        auto bgSphere = VROSphere::createSphere(50.0f, 20, 20, false);
-        auto bgMat = std::make_shared<VROMaterial>();
-        bgMat->setLightingModel(VROLightingModel::Constant);
-        bgMat->getDiffuse().setColor({1.0f, 0.0f, 1.0f, 1.0f});   // bright magenta
-        bgSphere->setMaterials({bgMat});
-        auto bgNode = std::make_shared<VRONode>();
-        bgNode->setGeometry(bgSphere);
-        scene->getRootNode()->addChildNode(bgNode);
-        NSLog(@"[ViroBridge] DIAG: magenta background sphere added");
+        NSURL *bgURL = [[NSBundle mainBundle] URLForResource:@"360_space" withExtension:@"jpg"];
+        if (bgURL) {
+            MTKTextureLoader *loader = [[MTKTextureLoader alloc] initWithDevice:_driver->getDevice()];
+            NSError *err = nil;
+            id<MTLTexture> metalTex = [loader newTextureWithContentsOfURL:bgURL options:@{
+                MTKTextureLoaderOptionSRGB: @NO,
+                MTKTextureLoaderOptionGenerateMipmaps: @NO
+            } error:&err];
+            if (metalTex && !err) {
+                auto substrate = std::make_unique<VROTextureSubstrateMetal>(metalTex);
+                auto tex = std::make_shared<VROTexture>(VROTextureType::Texture2D,
+                                                        VROTextureInternalFormat::RGBA8,
+                                                        std::move(substrate));
+                auto bgMat = std::make_shared<VROMaterial>();
+                bgMat->setLightingModel(VROLightingModel::Constant);
+                bgMat->getDiffuse().setTexture(tex);
+                // Skybox must not write depth — it should never occlude foreground objects.
+                bgMat->setWritesToDepthBuffer(false);
+                // VROBlendMode::None writes fragment alpha directly (no src*src blend squaring).
+                bgMat->setBlendMode(VROBlendMode::None);
+                // Force output alpha=1 so CompositorServices shows the skybox as opaque
+                // passthrough content rather than transparent in .mixed mode.
+                auto forceAlpha = std::make_shared<VROShaderModifier>(
+                    VROShaderEntryPoint::Fragment,
+                    std::vector<std::string>{"_output_color.a = 1.0;"});
+                forceAlpha->setName("skybox_alpha");
+                bgMat->addShaderModifier(forceAlpha);
+
+                auto bgSphere = VROSphere::createSphere(50.0f, 30, 30, false);
+                // Camera enclosure: render the sphere using rotation-only view matrix so
+                // the skybox always surrounds the camera regardless of world position.
+                // Without this, sphere verts span the near plane → clipped triangles
+                // project to small NDC depths → incorrect depth test against foreground.
+                bgSphere->setCameraEnclosure(true);
+                bgSphere->setMaterials({bgMat});
+                auto bgNode = std::make_shared<VRONode>();
+                bgNode->setGeometry(bgSphere);
+                // Render skybox before everything else (renderingOrder -1 < default 0).
+                bgNode->setRenderingOrder(-1);
+                scene->getRootNode()->addChildNode(bgNode);
+            } else {
+                NSLog(@"[ViroBridge] 360_space.jpg texture load failed: %@", err);
+            }
+        } else {
+            NSLog(@"[ViroBridge] 360_space.jpg not found in bundle");
+        }
     }
 
     // ── shiba.glb (centre) ───────────────────────────────────────────────────
@@ -176,7 +211,6 @@ protected:
             if (success) {
                 node->setScale({0.5f, 0.5f, 0.5f});
                 node->setPosition({0.0f, -0.5f, -1.5f});
-                NSLog(@"[ViroBridge] shiba.glb loaded");
             } else {
                 NSLog(@"[ViroBridge] shiba.glb failed to load");
             }
@@ -205,14 +239,6 @@ protected:
             }
             node->setScale({0.4f, 0.4f, 0.4f});
             node->setPosition({0.5f, -0.9f, -1.8f});
-
-            // Log available animation names to confirm "Walk" exists.
-            std::set<std::string> keys = node->getAnimationKeys(true);
-            NSMutableString *keyList = [NSMutableString string];
-            for (const std::string &k : keys) {
-                [keyList appendFormat:@" \"%s\"", k.c_str()];
-            }
-            NSLog(@"[ViroBridge] Soldier.glb loaded — animations:%@", keyList);
 
             // Loop "Walk" animation indefinitely using the same pattern as VROGLTFTest::animate().
             // A shared_ptr<function> allows the closure to re-arm itself without a retain cycle:
@@ -339,21 +365,22 @@ protected:
         node->setGeometry(sphere);
         node->setPosition({-1.0f, -0.3f, -2.0f});
         scene->getRootNode()->addChildNode(node);
-        NSLog(@"[ViroBridge] Surface shader modifier sphere added");
     }
 
-    // ── DIAG: Close white box at 0.5m — unmissable reference object ─────────
+    // ── White reference box at 0.5m ──────────────────────────────────────────
     {
         auto box = VROBox::createBox(0.3f, 0.3f, 0.3f);
         auto mat = std::make_shared<VROMaterial>();
         mat->setLightingModel(VROLightingModel::Constant);
         mat->getDiffuse().setColor({1.0f, 1.0f, 1.0f, 1.0f});   // white
+        // VROBlendMode::None writes alpha directly (no src*src blend squaring),
+        // ensuring CompositorServices sees alpha=1 and renders the box as opaque.
+        mat->setBlendMode(VROBlendMode::None);
         box->setMaterials({mat});
         auto node = std::make_shared<VRONode>();
         node->setGeometry(box);
         node->setPosition({0.0f, 0.0f, -0.5f});
         scene->getRootNode()->addChildNode(node);
-        NSLog(@"[ViroBridge] DIAG: white reference box at (0,0,-0.5)");
     }
 
     _renderer->setSceneController(sceneController, _driver);
@@ -373,6 +400,13 @@ protected:
                     viewTransform:(simd_float4x4)viewTransform
                          tangents:(simd_float4)tangents
 {
+    // Sync pixel format from the drawable texture BEFORE prepareFrame triggers
+    // updateSortKeys → material substrate creation → pipeline state compilation.
+    // VRODriverMetal defaults to BGRA8Unorm_sRGB; CompositorServices provides
+    // RGBA16Float.  Setting it here ensures any pipeline compiled during prepareFrame
+    // (including the first-frame initRenderer path) uses the correct format.
+    _driver->setColorPixelFormat(colorTexture.pixelFormat);
+
     // Register this CompositorServices thread as the VROThreadName::Renderer thread so that
     // VROAnimatable::animate() adds animations to transactions instead of immediately
     // terminating them. Must run once on the actual render thread; guard with frame==0.

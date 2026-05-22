@@ -38,15 +38,8 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     private let worldTracking = WorldTrackingProvider()
     private var _frameCount = 0
 
-    // DIAG: set true to skip C++ rendering and show only the green clear.
-    // If the user sees green → C++ pipeline is the problem.
-    // If still black  → Metal/CompositorServices submission is the problem.
-    private static let diagBypassCPP = true
-
-    // DIAG: set true to skip ALL bridge calls (prepareFrame + endFrame).
-    // If green appears with this true but not with diagBypassCPP-only →
-    // prepareFrame or endFrame is overwriting/clearing our drawable texture.
-    private static let diagBypassBridge = true
+    private static let diagBypassCPP    = false
+    private static let diagBypassBridge = false
 
     // MARK: - Init
 
@@ -68,8 +61,15 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
 
     public func startRenderLoop() {
         renderTask = Task(priority: .high) {
+            NSLog("[Viro] WorldTrackingProvider.isSupported=%@", WorldTrackingProvider.isSupported ? "YES" : "NO")
             if WorldTrackingProvider.isSupported {
-                try? await self.arSession.run([self.worldTracking])
+                do {
+                    try await self.arSession.run([self.worldTracking])
+                    NSLog("[Viro] ARKitSession.run() succeeded — provider state=%@",
+                          String(describing: self.worldTracking.state))
+                } catch {
+                    NSLog("[Viro] ARKitSession.run() FAILED: %@", error.localizedDescription)
+                }
             }
             await self.runRenderLoop()
         }
@@ -156,10 +156,11 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
 
         _frameCount += 1
         if _frameCount == 1 || _frameCount % 90 == 0 {
-            let anchorStr = deviceAnchor == nil ? "NIL" : "ok"
-            let stateStr  = drawables.first.map { String(describing: $0.state) } ?? "?"
-            NSLog("[Viro] HEARTBEAT frame=%d anchor=%@ drawableState=%@ bypassCPP=%@ drawableCount=%d",
-                  _frameCount, anchorStr, stateStr, Self.diagBypassCPP ? "YES" : "NO", drawables.count)
+            let anchorStr     = deviceAnchor == nil ? "NIL" : "ok"
+            let stateStr      = drawables.first.map { String(describing: $0.state) } ?? "?"
+            let providerStr   = String(describing: worldTracking.state)
+            NSLog("[Viro] HEARTBEAT frame=%d anchor=%@ provider=%@ drawableState=%@ bypassCPP=%@ drawableCount=%d",
+                  _frameCount, anchorStr, providerStr, stateStr, Self.diagBypassCPP ? "YES" : "NO", drawables.count)
         }
         if _frameCount <= 3 {
             for (di, d) in drawables.enumerated() {
@@ -252,13 +253,15 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 renderPass.colorAttachments[0].texture     = colorTexture
                 renderPass.colorAttachments[0].slice       = colorSlice
                 renderPass.colorAttachments[0].loadAction  = .clear
-                renderPass.colorAttachments[0].clearColor  = MTLClearColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 1.0)   // DIAG: green clear
+                renderPass.colorAttachments[0].clearColor  = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
                 renderPass.colorAttachments[0].storeAction = .store
                 renderPass.depthAttachment.texture     = depthTexture
                 renderPass.depthAttachment.slice       = depthSlice
                 renderPass.depthAttachment.loadAction  = .clear
                 renderPass.depthAttachment.clearDepth  = 1.0
-                renderPass.depthAttachment.storeAction = .dontCare
+                // CompositorServices requires stored depth for late-stage reprojection.
+                // .dontCare silently causes the compositor to discard the frame → black screen.
+                renderPass.depthAttachment.storeAction = .store
 
                 guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else {
                     NSLog("[Viro] ERROR: makeRenderCommandEncoder nil view=%d frame=%d fmt=%d type=%d slice=%d",

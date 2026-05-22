@@ -44,6 +44,7 @@
 #include "VROTextureSubstrateMetal.h"
 #include "VROSkybox.h"
 #include "VROShaderModifier.h"
+#include "VROParticleEmitter.h"
 #import <MetalKit/MetalKit.h>
 
 // Local mirror of VROLightUniforms / VROSceneLightingUniforms from VROSharedStructures.h.
@@ -365,6 +366,27 @@ protected:
         node->setGeometry(sphere);
         node->setPosition({-1.0f, -0.3f, -2.0f});
         scene->getRootNode()->addChildNode(node);
+    }
+
+    // ── Particle emitter — M2.6-C validation ────────────────────────────────
+    // A small quad emitting particles upward at -1.5m depth, left of centre.
+    // Tests VROParticleUBOMetal: instanced draw, per-particle MVP, color tint.
+    {
+        // Particle quad: small white 5x5 cm billboard.
+        auto particleQuad = VROSurface::createSurface(0.05f, 0.05f);
+        auto particleMat = particleQuad->getMaterials()[0];
+        particleMat->setLightingModel(VROLightingModel::Constant);
+        particleMat->getDiffuse().setColor({1.0f, 0.6f, 0.1f, 1.0f});   // orange base
+        particleMat->setBlendMode(VROBlendMode::Add);
+
+        std::shared_ptr<VRODriver> driver = _driver;
+        auto emitter = std::make_shared<VROParticleEmitter>(driver, particleQuad);
+        emitter->setRun(true);
+
+        auto emitterNode = std::make_shared<VRONode>();
+        emitterNode->setPosition({-0.3f, -0.6f, -1.5f});
+        emitterNode->setParticleEmitter(emitter);
+        scene->getRootNode()->addChildNode(emitterNode);
     }
 
     // ── White reference box at 0.5m ──────────────────────────────────────────

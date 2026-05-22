@@ -29,6 +29,7 @@ import {
 } from "./components/ViroConstants";
 import { ViroController } from "./components/ViroController";
 import { ViroVirtualJoystick } from "./components/ViroVirtualJoystick";
+import { ViroVirtualButton } from "./components/ViroVirtualButton";
 import { ViroDirectionalLight } from "./components/ViroDirectionalLight";
 import { ViroFlexView } from "./components/ViroFlexView";
 import { ViroGeometry } from "./components/ViroGeometry";
@@ -201,6 +202,7 @@ export {
   ViroCamera,
   ViroController,
   ViroVirtualJoystick,
+  ViroVirtualButton,
   ViroDirectionalLight,
   ViroFlexView,
   ViroGeometry,

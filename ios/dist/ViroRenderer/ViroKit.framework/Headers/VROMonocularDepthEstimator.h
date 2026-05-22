@@ -82,6 +82,15 @@ public:
  *   estimator->update(arFrame);
  *   auto depthTexture = estimator->getDepthTexture();
  */
+/**
+ * Controls how the monocular depth estimator derives metric scale.
+ */
+enum class VROMonocularDepthCalibration {
+    None,           // no scaling (raw model output, scale = 1.0)
+    Manual,         // caller sets scale via setScaleFactor() (default)
+    LiDARReference, // stub: sample LiDAR to auto-derive scale (falls back to Manual)
+};
+
 class API_AVAILABLE(ios(14.0)) VROMonocularDepthEstimator :
     public std::enable_shared_from_this<VROMonocularDepthEstimator> {
 
@@ -161,10 +170,27 @@ public:
      * Set the scale factor for converting model output to metric depth.
      * Some models output relative/disparity depth that needs scaling.
      * Default is 1.0 (assumes model outputs metric depth in meters).
+     * Implicitly sets calibration mode to Manual.
      *
      * @param scale The scale factor to multiply depth values by.
      */
     void setScaleFactor(float scale);
+
+    /**
+     * Set the calibration mode that controls how depth scale is derived.
+     * - None: raw model output (scale = 1.0)
+     * - Manual: caller-supplied scale via setScaleFactor() (default)
+     * - LiDARReference: stub, logs warning and falls back to Manual
+     */
+    void setCalibrationMode(VROMonocularDepthCalibration mode);
+    VROMonocularDepthCalibration getCalibrationMode() const;
+
+    /**
+     * Flush any pending depth data to the GPU texture.
+     * Must be called on the render (GL) thread. VROARSessioniOS calls this
+     * automatically each frame before depth is consumed.
+     */
+    void flushPendingDepthUpdate();
 
     /**
      * Enable or disable temporal filtering for depth stability.
@@ -264,10 +290,15 @@ private:
 
     // Configuration
     float _depthScaleFactor;
+    VROMonocularDepthCalibration _calibrationMode;
     bool _temporalFilteringEnabled;
     float _temporalFilterAlpha;
     int _targetFPS;
     double _lastInferenceTime;
+
+    // W4: staging buffer for in-place GPU texture updates
+    std::vector<float> _stagingDepthBuffer;
+    std::atomic<bool> _stagingDirty;
 
     // Diagnostics
     float _currentFPS;

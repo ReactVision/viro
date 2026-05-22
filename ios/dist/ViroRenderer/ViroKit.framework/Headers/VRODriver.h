@@ -296,6 +296,15 @@ public:
     virtual std::shared_ptr<VROSound> newSound(std::string resource, VROResourceType resourceType, VROSoundType type) = 0;
     virtual std::shared_ptr<VROAudioPlayer> newAudioPlayer(std::shared_ptr<VROSoundData> data) = 0;
     virtual std::shared_ptr<VROAudioPlayer> newAudioPlayer(std::string path, bool isLocal) = 0;
+    /*
+     Create an audio player pre-configured for streaming PCM. The returned
+     player's beginStreaming(sampleRate, channels) must be called before play().
+     Default implementation falls back to a no-op stub so subclasses that
+     haven't yet implemented streaming still compile.
+    */
+    virtual std::shared_ptr<VROAudioPlayer> newStreamingAudioPlayer() {
+        return newAudioPlayer(std::string(""), true);   // stub — subclasses override
+    }
     virtual std::shared_ptr<VROTypefaceCollection> newTypefaceCollection(std::string typefaces, int size, VROFontStyle style, VROFontWeight weight) = 0;
     virtual void setSoundRoom(float sizeX, float sizeY, float sizeZ, std::string wallMaterial,
                               std::string ceilingMaterial, std::string floorMaterial) = 0;

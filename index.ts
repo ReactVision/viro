@@ -182,6 +182,7 @@ import { ViroQuestEntryPoint } from "./components/ViroQuestEntryPoint";
 import { VRQuestNavigatorBridge } from "./components/Utilities/VRQuestNavigatorBridge";
 import { VRModuleOpenXR, useVRViewTag, exitVRScene } from "./components/Utilities/VRModuleOpenXR";
 import type { VRModuleOpenXRType } from "./components/Utilities/VRModuleOpenXR";
+import { StreamingAudioManager } from "./components/Utilities/StreamingAudioManager";
 import { AppRegistry } from "react-native";
 
 // Auto-register the Quest VR entry point. VRActivity launches this component
@@ -248,6 +249,8 @@ export {
   useVRViewTag,
   exitVRScene,
   Viro3DSceneNavigator,
+  // Streaming audio
+  StreamingAudioManager,
   // Utilities
   hasOpenXRSupport,
   isQuest,

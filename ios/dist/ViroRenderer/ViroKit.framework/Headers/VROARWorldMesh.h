@@ -30,6 +30,9 @@
 #include <string>
 #include <chrono>
 #include <functional>
+#include <map>
+#include <mutex>
+#include <cstdint>
 #include "VROVector3f.h"
 
 class VROARDepthMesh;
@@ -63,6 +66,16 @@ struct VROWorldMeshConfig {
 };
 
 /**
+ * Identifies the data source that produced a world mesh.
+ */
+enum class VROWorldMeshSource {
+    LiDAR,      // ARKit ARMeshAnchor (LiDAR-equipped device)
+    Monocular,  // Monocular depth estimation (non-LiDAR device)
+    Plane,      // Triangulated AR plane anchors (fallback)
+    Unknown
+};
+
+/**
  * Statistics about the current world mesh state.
  */
 struct VROWorldMeshStats {
@@ -74,7 +87,27 @@ struct VROWorldMeshStats {
 };
 
 /**
- * Callback type for mesh update notifications.
+ * Delivered to every registered subscriber when the world mesh is updated.
+ */
+struct VROWorldMeshUpdate {
+    std::shared_ptr<VROARDepthMesh> mesh;
+    VROWorldMeshStats stats;
+    VROWorldMeshSource source = VROWorldMeshSource::Unknown;
+};
+
+/**
+ * Per-subscriber options. maxTriangles = 0 means unlimited.
+ * Per-consumer decimation (W3) will be applied when maxTriangles > 0.
+ */
+struct VROWorldMeshSubscriberOptions {
+    int maxTriangles = 0;
+};
+
+using VROWorldMeshSubscriberId = uint32_t;
+using VROWorldMeshSubscriberCallback = std::function<void(const VROWorldMeshUpdate&)>;
+
+/**
+ * Legacy callback — delivers only stats. Kept for back-compat; prefer subscribe().
  */
 using VROWorldMeshUpdateCallback = std::function<void(const VROWorldMeshStats&)>;
 
@@ -144,7 +177,21 @@ public:
     VROWorldMeshStats getStats() const;
 
     /**
-     * Set a callback to be notified when the mesh is updated.
+     * Subscribe to mesh updates. Returns an opaque ID used to unsubscribe.
+     * The callback is invoked on the render thread after each successful mesh build.
+     * @param callback Receives the full VROWorldMeshUpdate (mesh, stats, source).
+     * @param options  Per-consumer options (e.g. maxTriangles for W3 decimation).
+     */
+    VROWorldMeshSubscriberId subscribe(VROWorldMeshSubscriberCallback callback,
+                                       VROWorldMeshSubscriberOptions options = {});
+
+    /**
+     * Unsubscribe a previously registered callback. No-op if id is not found.
+     */
+    void unsubscribe(VROWorldMeshSubscriberId id);
+
+    /**
+     * @deprecated Prefer subscribe(). Delivers stats only, no mesh data.
      */
     void setUpdateCallback(VROWorldMeshUpdateCallback callback) {
         _updateCallback = callback;
@@ -177,8 +224,14 @@ private:
     double _lastUpdateTimeMs = 0.0;
     double _lastDepthTimeMs = 0.0;
 
-    // Callback
+    // Legacy stats-only callback
     VROWorldMeshUpdateCallback _updateCallback;
+
+    // Subscriber registry
+    std::map<VROWorldMeshSubscriberId,
+             std::pair<VROWorldMeshSubscriberCallback, VROWorldMeshSubscriberOptions>> _subscribers;
+    VROWorldMeshSubscriberId _nextSubscriberId = 1;
+    mutable std::mutex _subscriberMutex;
 
     /**
      * Apply a new mesh to the physics world.
@@ -210,6 +263,12 @@ private:
      * Check if the mesh is stale (depth data not received recently).
      */
     bool isMeshStale() const;
+
+    /**
+     * Fire the legacy _updateCallback and all registered subscribers.
+     * Called on the render thread after a mesh is successfully applied.
+     */
+    void notifySubscribers(std::shared_ptr<VROARDepthMesh> mesh);
 };
 
 #endif /* VROARWorldMesh_h */

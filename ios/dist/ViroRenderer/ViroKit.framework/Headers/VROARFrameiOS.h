@@ -103,6 +103,12 @@ public:
         float minConfidence = 0.3f,
         float maxDepth = 5.0f) override;
 
+    // Persistent mesh from ARMeshAnchor (LiDAR, iOS 13.4+)
+    std::shared_ptr<VROARDepthMesh> generateMeshAnchorMesh() override;
+
+    // Plane-based fallback mesh (non-LiDAR / non-Depth-API)
+    std::shared_ptr<VROARDepthMesh> generatePlaneMesh() override;
+
 private:
 
     ARFrame *_frame;

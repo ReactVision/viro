@@ -258,6 +258,36 @@ public:
      */
     int getDepthBufferHeight() const { return _depthHeight; }
 
+    /**
+     * Atomically snapshot the depth and confidence buffers for offline processing
+     * (e.g. world-mesh generation). Thread-safe — takes a copy under the depth mutex.
+     * Returns false if no data is available.
+     */
+    bool snapshotDepthBuffers(std::vector<float> &outDepth,
+                              std::vector<float> &outConfidence,
+                              int &outWidth, int &outHeight) const;
+
+    /**
+     * Sample the synthesized per-pixel confidence at depth-texture UV coordinates.
+     * Returns a value in [0, 1]: 1 = highly stable, 0 = discontinuity or invalid.
+     * Returns -1 if no confidence data is available (temporal filtering disabled or
+     * first frame). Thread-safe.
+     *
+     * @param u Depth texture U coordinate [0, 1].
+     * @param v Depth texture V coordinate [0, 1].
+     */
+    float sampleConfidenceAtDepthUV(float u, float v) const;
+
+    /**
+     * Set the confidence threshold for hit-test upgrade decisions on the monocular path.
+     * Hit results are upgraded to DepthPoint only when synthesized confidence exceeds
+     * this value. Default is 0.3.
+     *
+     * @param threshold Confidence threshold in [0, 1].
+     */
+    void setHitTestConfidenceThreshold(float threshold);
+    float getHitTestConfidenceThreshold() const;
+
 private:
     // Graphics driver
     std::weak_ptr<VRODriver> _driver;
@@ -284,6 +314,7 @@ private:
     std::shared_ptr<VROTexture> _currentDepthTexture;
     std::vector<float> _depthBuffer;
     std::vector<float> _previousDepthBuffer;
+    std::vector<float> _confidenceBuffer;  // per-pixel synthesized confidence [0,1]
     int _depthWidth;
     int _depthHeight;
     VROMatrix4f _depthTextureTransform;
@@ -291,6 +322,7 @@ private:
     // Configuration
     float _depthScaleFactor;
     VROMonocularDepthCalibration _calibrationMode;
+    float _hitTestConfidenceThreshold;
     bool _temporalFilteringEnabled;
     float _temporalFilterAlpha;
     int _targetFPS;

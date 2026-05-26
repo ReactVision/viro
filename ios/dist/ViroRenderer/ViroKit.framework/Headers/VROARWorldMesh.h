@@ -63,6 +63,8 @@ struct VROWorldMeshConfig {
 
     // Visualization
     bool debugDrawEnabled = false;      // Enable wireframe visualization of mesh
+    int debugDrawMaxTriangles = 1000;   // Triangle cap for wireframe debug draw
+    float debugDrawLineThickness = 0.001f; // Line thickness for wireframe (meters)
 };
 
 /**
@@ -96,11 +98,16 @@ struct VROWorldMeshUpdate {
 };
 
 /**
- * Per-subscriber options. maxTriangles = 0 means unlimited.
- * Per-consumer decimation (W3) will be applied when maxTriangles > 0.
+ * Per-subscriber options controlling mesh decimation.
+ * maxTriangles = 0 means no limit (full mesh delivered as-is).
  */
 struct VROWorldMeshSubscriberOptions {
-    int maxTriangles = 0;
+    enum class DecimationStrategy {
+        Stride,       // Take every N-th triangle (O(1) per triangle, default)
+    };
+
+    int maxTriangles = 0;                              // 0 = unlimited
+    DecimationStrategy strategy = DecimationStrategy::Stride;
 };
 
 using VROWorldMeshSubscriberId = uint32_t;
@@ -110,6 +117,16 @@ using VROWorldMeshSubscriberCallback = std::function<void(const VROWorldMeshUpda
  * Legacy callback — delivers only stats. Kept for back-compat; prefer subscribe().
  */
 using VROWorldMeshUpdateCallback = std::function<void(const VROWorldMeshStats&)>;
+
+/**
+ * Custom deleter for btRigidBody.
+ * Bullet requires removing the body from the dynamics world before deletion;
+ * this deleter encapsulates that invariant so it can't be forgotten.
+ */
+struct BulletRigidBodyDeleter {
+    std::weak_ptr<VROPhysicsWorld> physicsWorld;
+    void operator()(btRigidBody *body) const;
+};
 
 /**
  * VROARWorldMesh manages the lifecycle of a physics collision mesh generated
@@ -208,9 +225,10 @@ public:
 private:
     std::weak_ptr<VROPhysicsWorld> _physicsWorld;
 
-    // Bullet physics components (direct, without VROPhysicsBody wrapper)
-    btRigidBody* _rigidBody = nullptr;
-    btDefaultMotionState* _motionState = nullptr;
+    // Bullet physics components — smart pointers for exception-safe lifecycle.
+    // BulletRigidBodyDeleter removes the body from the world before deletion.
+    std::unique_ptr<btRigidBody, BulletRigidBodyDeleter> _rigidBody;
+    std::unique_ptr<btDefaultMotionState> _motionState;
     std::shared_ptr<VROPhysicsShape> _physicsShape;
 
     // Current mesh data
@@ -269,6 +287,14 @@ private:
      * Called on the render thread after a mesh is successfully applied.
      */
     void notifySubscribers(std::shared_ptr<VROARDepthMesh> mesh);
+
+    /**
+     * Return a decimated copy of mesh with at most maxTriangles triangles,
+     * using Stride strategy (every N-th triangle). Vertices are copied as-is;
+     * only the index buffer is thinned. Returns mesh unchanged if already within budget.
+     */
+    static std::shared_ptr<VROARDepthMesh> decimateMesh(
+        std::shared_ptr<VROARDepthMesh> mesh, int maxTriangles);
 };
 
 #endif /* VROARWorldMesh_h */

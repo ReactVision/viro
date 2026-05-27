@@ -37,7 +37,7 @@ Pod::Spec.new do |s|
   s.ios.exclude_files = ['ViroReact/VisionOS/**/*']
 
   if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
-    s.vendored_libraries = 'dist/lib/libViroReact.a'
+    s.ios.vendored_libraries = 'dist/lib/libViroReact.a'
   end
   
   # React Native dependencies

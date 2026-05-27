@@ -49,7 +49,9 @@ export class ViroARTrackingTargets {
     }
 
     // call the createTargets function in the native module
-    ARTrackingTargetsModule.createTargets(targets);
+    if (ARTrackingTargetsModule) {
+      ARTrackingTargetsModule.createTargets(targets);
+    }
   }
 
   static checkForRequiredProps(_key: string, target: ViroARTrackingTarget) {
@@ -73,6 +75,8 @@ export class ViroARTrackingTargets {
   }
 
   static deleteTarget(targetName: string) {
-    ARTrackingTargetsModule.deleteTarget(targetName);
+    if (ARTrackingTargetsModule) {
+      ARTrackingTargetsModule.deleteTarget(targetName);
+    }
   }
 }

@@ -62,8 +62,9 @@ struct VROWorldMeshConfig {
     std::string collisionTag = "world"; // Tag for collision event identification
 
     // Visualization
-    bool debugDrawEnabled = false;      // Enable wireframe visualization of mesh
-    int debugDrawMaxTriangles = 1000;   // Triangle cap for wireframe debug draw
+    bool debugDrawEnabled = false;         // Enable wireframe visualization of mesh
+    bool debugDrawDepthTest = true;        // Depth-test wireframe against scene (occluded by real surfaces)
+    int debugDrawMaxTriangles = 1000;      // Triangle cap for wireframe debug draw
     float debugDrawLineThickness = 0.001f; // Line thickness for wireframe (meters)
 };
 

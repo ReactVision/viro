@@ -151,6 +151,7 @@ public:
     bool isWorldMeshEnabled() const;
     void setWorldMeshConfig(const VROWorldMeshConfig& config);
     VROWorldMeshStats getWorldMeshStats() const;
+    std::shared_ptr<VROARWorldMesh> getWorldMesh() const { return _worldMesh; }
 
     /*
      Override computePhysics to add world mesh debug drawing.

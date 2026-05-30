@@ -9,6 +9,7 @@ import Foundation
 import CompositorServices
 import Metal
 import ARKit
+import ViroReact
 
 public final class ViroImmersiveRenderer: @unchecked Sendable {
 

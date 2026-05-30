@@ -1,0 +1,25 @@
+diff --git a/node_modules/expo-linking/build/Schemes.js b/node_modules/expo-linking/build/Schemes.js
+index 1111111..2222222 100644
+--- a/node_modules/expo-linking/build/Schemes.js
++++ b/node_modules/expo-linking/build/Schemes.js
+@@ -82,9 +82,10 @@ export function hasConstantsManifest() {
+ // @docsMissing
+ export function resolveScheme(options) {
+     if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
+         !hasConstantsManifest()) {
+-        throw new Error(`expo-linking needs access to the expo-constants manifest (app.json or app.config.js) to determine what URI scheme to use. Setup the manifest and rebuild: https://github.com/expo/expo/blob/main/packages/expo-constants/README.md`);
++        // No expo-constants manifest available (e.g. visionOS without Expo pods).
++        // Deep-linking is not used on this platform, return empty string to degrade gracefully.
++        return options.scheme ?? '';
+     }
+diff --git a/node_modules/expo-linking/build/createURL.js b/node_modules/expo-linking/build/createURL.js
+index 1111111..2222222 100644
+--- a/node_modules/expo-linking/build/createURL.js
++++ b/node_modules/expo-linking/build/createURL.js
+@@ -8,7 +8,7 @@ function getHostUri() {
+     else if (!hasCustomScheme()) {
+         // we're probably not using up-to-date xdl, so just fake it for now
+         // we have to remove the /--/ on the end since this will be inserted again later
+-        return removeScheme(Constants.linkingUri).replace(/\/--($|\/.*$)/, '');
++        return removeScheme(Constants.linkingUri ?? '').replace(/\/--($|\/.*$)/, '');
+     }

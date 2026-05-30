@@ -31,10 +31,13 @@ Pod::Spec.new do |s|
   s.source_files        = source_files_array
   s.public_header_files = header_files_array
 
-  # visionOS-only sources: keep them out of the iOS build so consumers running
-  # `pod install` for iOS don't pull CompositorServices / VRODriverVisionOS.h
-  # into a target where those symbols don't exist.
+  # iOS: exclude all VisionOS-only files (CompositorServices, Metal render loop, SwiftUI types).
   s.ios.exclude_files = ['ViroReact/VisionOS/**/*']
+
+  # visionOS: Swift SwiftUI files are owned by ViroReactUI pod so the app can
+  # `import ViroReactUI` (pure-Swift pod → importable without use_frameworks!).
+  # ViroReact keeps the ObjC/C++ bridge (VRORendererBridge) on visionOS.
+  s.visionos.exclude_files = ['ViroReact/VisionOS/*.swift']
 
   if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
     s.ios.vendored_libraries = 'dist/lib/libViroReact.a'
@@ -51,6 +54,7 @@ Pod::Spec.new do |s|
   # Fabric-specific build configuration
   s.pod_target_xcconfig = {
     'SWIFT_VERSION' => '5.0',
+    'DEFINES_MODULE' => 'YES',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'HEADER_SEARCH_PATHS' => [
       '"$(PODS_TARGET_SRCROOT)/ViroReact"',

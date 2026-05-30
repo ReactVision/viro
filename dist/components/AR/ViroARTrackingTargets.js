@@ -30,7 +30,9 @@ class ViroARTrackingTargets {
             target.source = resultSource;
         }
         // call the createTargets function in the native module
-        ARTrackingTargetsModule.createTargets(targets);
+        if (ARTrackingTargetsModule) {
+            ARTrackingTargetsModule.createTargets(targets);
+        }
     }
     static checkForRequiredProps(_key, target) {
         // source is required
@@ -47,7 +49,9 @@ class ViroARTrackingTargets {
         }
     }
     static deleteTarget(targetName) {
-        ARTrackingTargetsModule.deleteTarget(targetName);
+        if (ARTrackingTargetsModule) {
+            ARTrackingTargetsModule.deleteTarget(targetName);
+        }
     }
 }
 exports.ViroARTrackingTargets = ViroARTrackingTargets;

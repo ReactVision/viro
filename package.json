@@ -45,6 +45,8 @@
     "components",
     "dist",
     "plugins",
+    "patches",
+    "shims",
     "scripts",
     "examples",
     "app.plugin.js",
@@ -54,6 +56,7 @@
     "android/arcore_client",
     "ios/dist",
     "ios/ViroReact.podspec",
+    "ios/ViroReactUI.podspec",
     "bin",
     "LICENSE"
   ],

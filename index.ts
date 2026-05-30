@@ -30,6 +30,9 @@ import {
 import { ViroController } from "./components/ViroController";
 import { ViroVirtualJoystick } from "./components/ViroVirtualJoystick";
 import { ViroVirtualButton } from "./components/ViroVirtualButton";
+import { ViroGameLoop } from "./components/ViroGameLoop";
+import { ViroGameLoopUtils } from "./components/ViroGameLoopUtils";
+import { useGameLoop, useLateUpdate, useFixedUpdate } from "./components/hooks/useGameLoop";
 import { ViroDirectionalLight } from "./components/ViroDirectionalLight";
 import { ViroFlexView } from "./components/ViroFlexView";
 import { ViroGeometry } from "./components/ViroGeometry";
@@ -204,6 +207,11 @@ export {
   ViroController,
   ViroVirtualJoystick,
   ViroVirtualButton,
+  ViroGameLoop,
+  ViroGameLoopUtils,
+  useGameLoop,
+  useLateUpdate,
+  useFixedUpdate,
   ViroDirectionalLight,
   ViroFlexView,
   ViroGeometry,

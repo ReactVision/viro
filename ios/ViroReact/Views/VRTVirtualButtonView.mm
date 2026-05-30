@@ -191,6 +191,9 @@ static int buttonIndexForName(NSString *name) {
 
 - (void)writeButton:(bool)pressed {
     if (_inputState) _inputState->setButton(_buttonIndex, pressed);
+    // Fire JS callback so React can update UI without a separate overlay
+    if (pressed && self.onPressIn)  self.onPressIn(@{ @"button": self.button ?: @"" });
+    if (!pressed && self.onPressOut) self.onPressOut(@{ @"button": self.button ?: @"" });
 }
 
 @end

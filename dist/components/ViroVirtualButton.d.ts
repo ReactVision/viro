@@ -55,6 +55,18 @@ export interface ViroVirtualButtonProps {
      * Defaults to `rgba(255, 255, 255, 0.6)`.
      */
     tintColor?: number | string;
+    /** Fired when the button is pressed down (same tick as C++ VROInputState write). */
+    onPressIn?: (event: {
+        nativeEvent: {
+            button: string;
+        };
+    }) => void;
+    /** Fired when the button is released (same tick as C++ VROInputState write). */
+    onPressOut?: (event: {
+        nativeEvent: {
+            button: string;
+        };
+    }) => void;
     /**
      * Positioning / sizing.
      */

@@ -38,5 +38,7 @@ RCT_EXPORT_VIEW_PROPERTY(radius, CGFloat)
 
 // UIColor applied to both the outer ring stroke and the knob fill.
 RCT_EXPORT_VIEW_PROPERTY(tintColor, UIColor)
+// JS event fired on every stick move: { x: number, y: number }
+RCT_EXPORT_VIEW_PROPERTY(onStickChange, RCTDirectEventBlock)
 
 @end

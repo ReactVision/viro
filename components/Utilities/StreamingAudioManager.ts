@@ -18,7 +18,8 @@ interface StreamingAudioNative {
   destroy(playerId: string): void;
 }
 
-const native = NativeModules.VRTStreamingAudio as
+// RCT_EXPORT_MODULE() in newer RN (0.76+) keeps the "Module" suffix in NativeModules.
+const native = (NativeModules.VRTStreamingAudioModule ?? NativeModules.VRTStreamingAudio) as
   | StreamingAudioNative
   | undefined;
 

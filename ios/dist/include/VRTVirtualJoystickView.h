@@ -16,6 +16,7 @@
 //  in all copies or substantial portions of the Software.
 
 #import <UIKit/UIKit.h>
+#import <React/RCTComponent.h>
 
 /*
  Native virtual-joystick view. Renders an outer ring and a draggable knob; on
@@ -52,5 +53,7 @@
 @property (nonatomic, copy)   NSString *stickSide;       // @"left" | @"right"
 @property (nonatomic, assign) CGFloat   radius;
 @property (nonatomic, strong) UIColor  *tintColor;
+// JS callback fired on every stick move: { x: number, y: number } in [-1, 1]
+@property (nonatomic, copy)   RCTDirectEventBlock onStickChange;
 
 @end

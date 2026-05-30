@@ -239,10 +239,14 @@ static const CGFloat kKnobRadiusFactor = 0.4;   // knob is 40% of outer radius
     } else {
         _inputState->setStickL(x, y);
     }
+    // Fire JS callback for React-side feedback (same tick as C++ write)
+    if (self.onStickChange) {
+        self.onStickChange(@{ @"x": @(x), @"y": @(y) });
+    }
 }
 
 - (void)writeNeutral {
-    [self writeStick:0.f y:0.f];
+    [self writeStick:0.f y:0.f];  // writeStick already fires onStickChange with (0,0)
 }
 
 @end

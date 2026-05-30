@@ -80,6 +80,13 @@ export interface ViroVirtualJoystickProps {
   tintColor?: number | string;
 
   /**
+   * Fired on every stick movement with { x, y } normalised to [-1, 1].
+   * Called from native synchronously after VROInputState is updated,
+   * so you can drive JS visuals from the same user gesture.
+   */
+  onStickChange?: (event: { nativeEvent: { x: number; y: number } }) => void;
+
+  /**
    * Positioning / sizing. Same prop as any RN view.
    */
   style?: StyleProp<ViewStyle>;

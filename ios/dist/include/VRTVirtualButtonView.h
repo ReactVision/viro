@@ -16,6 +16,7 @@
 //  in all copies or substantial portions of the Software.
 
 #import <UIKit/UIKit.h>
+#import <React/RCTComponent.h>
 
 /*
  Native virtual-button view. Renders a filled circle with a label; on touch-down
@@ -40,5 +41,7 @@
 @property (nonatomic, copy)   NSString *button;       // e.g. @"A"
 @property (nonatomic, assign) CGFloat   size;
 @property (nonatomic, strong) UIColor  *tintColor;
+@property (nonatomic, copy)   RCTDirectEventBlock onPressIn;
+@property (nonatomic, copy)   RCTDirectEventBlock onPressOut;
 
 @end

@@ -37,5 +37,7 @@ RCT_EXPORT_VIEW_PROPERTY(size, CGFloat)
 
 // Fill colour of the circle. Default semi-transparent white.
 RCT_EXPORT_VIEW_PROPERTY(tintColor, UIColor)
+RCT_EXPORT_VIEW_PROPERTY(onPressIn,  RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onPressOut, RCTDirectEventBlock)
 
 @end

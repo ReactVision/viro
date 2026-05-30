@@ -54,11 +54,15 @@ const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const NativeVirtualJoystick = (0, react_native_1.requireNativeComponent)("VRTVirtualJoystickView");
 const ViroVirtualJoystick = (props) => {
-    const { tintColor, ...rest } = props;
-    // Normalise color through RN's processColor so platform-specific encodings
-    // (Android's int packing) work uniformly.
+    const { tintColor, onStickChange, ...rest } = props;
     const processedTint = tintColor != null ? (0, react_native_1.processColor)(tintColor) : undefined;
-    return (<NativeVirtualJoystick {...rest} tintColor={processedTint}/>);
+    // Native sends x/y as strings to avoid Fabric conversions.h type-check spam.
+    const handleStickChange = onStickChange
+        ? (e) => onStickChange({
+            nativeEvent: { x: parseFloat(e.nativeEvent.x), y: parseFloat(e.nativeEvent.y) }
+        })
+        : undefined;
+    return (<NativeVirtualJoystick {...rest} tintColor={processedTint} onStickChange={handleStickChange}/>);
 };
 exports.ViroVirtualJoystick = ViroVirtualJoystick;
 if (react_native_1.Platform.OS === "web") {

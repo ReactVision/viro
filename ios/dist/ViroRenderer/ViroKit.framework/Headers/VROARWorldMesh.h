@@ -53,13 +53,20 @@ struct VROWorldMeshConfig {
     float maxDepth = 5.0f;              // Maximum depth in meters
 
     // Update settings
-    double updateIntervalMs = 100.0;    // Minimum time between mesh updates
+    double updateIntervalMs = 500.0;    // Minimum time between mesh updates
     double meshPersistenceMs = 500.0;   // Time to keep mesh after depth data lost
 
     // Physics properties
     float friction = 0.5f;              // Surface friction coefficient
     float restitution = 0.3f;           // Bounciness (0 = no bounce, 1 = full bounce)
     std::string collisionTag = "world"; // Tag for collision event identification
+    int physicsMaxTriangles = 0;        // Stride-decimation triangle cap (0 = no limit). Leaves
+                                        // large gaps — prefer physicsCellSize for collision.
+    float physicsCellSize = 0.10f;      // Vertex-clustering cell size in meters (0 = disabled).
+                                        // Groups nearby vertices into a single representative,
+                                        // producing a gap-free simplified mesh. Max collision gap =
+                                        // sqrt(3) * cellSize. 0.10m → catches objects >~8cm reliably.
+                                        // Applied before physicsMaxTriangles (if both set).
 
     // Visualization
     bool debugDrawEnabled = false;         // Enable wireframe visualization of mesh
@@ -238,6 +245,7 @@ private:
     // Configuration and state
     VROWorldMeshConfig _config;
     bool _enabled = false;
+    bool _isAddedToPhysicsWorld = false;  // guard against re-add on rapid updates
 
     // Timing
     double _lastUpdateTimeMs = 0.0;
@@ -296,6 +304,15 @@ private:
      */
     static std::shared_ptr<VROARDepthMesh> decimateMesh(
         std::shared_ptr<VROARDepthMesh> mesh, int maxTriangles);
+
+    /**
+     * Vertex-clustering simplification. Groups all vertices within cellSize metres
+     * into a single representative, rebuilds triangles, drops degenerate ones.
+     * Produces a gap-free mesh: max gap = sqrt(3)*cellSize.
+     * 0.10m cells → catches objects wider than ~8cm reliably.
+     */
+    static std::shared_ptr<VROARDepthMesh> clusterMesh(
+        std::shared_ptr<VROARDepthMesh> mesh, float cellSize);
 };
 
 #endif /* VROARWorldMesh_h */

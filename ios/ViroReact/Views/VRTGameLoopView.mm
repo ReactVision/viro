@@ -6,7 +6,8 @@
 #import <ViroKit/VROFrameSynchronizer.h>
 
 @implementation VRTGameLoopView {
-    std::shared_ptr<VROGameLoopListener> _listener;
+    std::shared_ptr<VROGameLoopListener>  _listener;
+    std::weak_ptr<VROFrameSynchronizer>   _syncWeak;  // held directly, avoids context access at dealloc
     BOOL _registered;
 }
 
@@ -24,10 +25,12 @@
 - (void)sceneWillAppear {
     [super sceneWillAppear];
     if (_registered) return;
-    _registered = YES;
 
     auto sync = self.context->getFrameSynchronizer();
     if (!sync) return;
+
+    _registered = YES;
+    _syncWeak = sync;  // store weak reference — safe to access even after context is gone
 
     _listener = std::make_shared<VROGameLoopListener>();
     if (_fixedHz > 0.f) {
@@ -81,14 +84,15 @@
 - (void)_unregister {
     if (!_registered || !_listener) return;
     _registered = NO;
-    auto sync = self.context ? self.context->getFrameSynchronizer() : nullptr;
+    // Use the stored weak_ptr — safe even after VROContext is deallocated.
+    auto sync = _syncWeak.lock();
     if (sync) {
         sync->removeFrameListener(_listener);
     }
     _listener.reset();
 }
 
-// ── Prop setters — apply immediately if already registered ───────────────────
+// ── Prop setters ──────────────────────────────────────────────────────────────
 
 - (void)setFixedHz:(float)fixedHz {
     _fixedHz = fixedHz;

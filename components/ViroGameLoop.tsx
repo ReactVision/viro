@@ -66,7 +66,6 @@ export function ViroGameLoop({
         onFixedUpdate ? (e) => onFixedUpdate(e.nativeEvent) : undefined
       }
       fixedHz={fixedHz}
-      style={{ width: 0, height: 0 }}
     />
   );
 }

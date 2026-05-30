@@ -98,16 +98,22 @@ const NativeVirtualJoystick =
 export const ViroVirtualJoystick: React.FC<ViroVirtualJoystickProps> = (
   props,
 ) => {
-  const { tintColor, ...rest } = props;
-  // Normalise color through RN's processColor so platform-specific encodings
-  // (Android's int packing) work uniformly.
+  const { tintColor, onStickChange, ...rest } = props;
   const processedTint =
     tintColor != null ? processColor(tintColor) : undefined;
+
+  // Native sends x/y as strings to avoid Fabric conversions.h type-check spam.
+  const handleStickChange = onStickChange
+    ? (e: any) => onStickChange({
+        nativeEvent: { x: parseFloat(e.nativeEvent.x), y: parseFloat(e.nativeEvent.y) }
+      })
+    : undefined;
 
   return (
     <NativeVirtualJoystick
       {...rest}
       tintColor={processedTint}
+      onStickChange={handleStickChange}
     />
   );
 };

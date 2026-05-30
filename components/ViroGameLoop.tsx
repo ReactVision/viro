@@ -56,15 +56,18 @@ export function ViroGameLoop({
   onFixedUpdate,
   fixedHz,
 }: ViroGameLoopProps) {
+  // Native sends dt/elapsed as strings to avoid Fabric conversions.h type-check spam.
+  const parse = (e: any) => ({
+    dt:      parseFloat(e.nativeEvent.dt),
+    elapsed: parseFloat(e.nativeEvent.elapsed ?? "0"),
+  });
+  const parseFixed = (e: any) => ({ dt: parseFloat(e.nativeEvent.dt) });
+
   return (
     <VRTGameLoopView
-      onUpdate={onUpdate ? (e) => onUpdate(e.nativeEvent) : undefined}
-      onLateUpdate={
-        onLateUpdate ? (e) => onLateUpdate(e.nativeEvent) : undefined
-      }
-      onFixedUpdate={
-        onFixedUpdate ? (e) => onFixedUpdate(e.nativeEvent) : undefined
-      }
+      onUpdate={onUpdate ? (e) => onUpdate(parse(e)) : undefined}
+      onLateUpdate={onLateUpdate ? (e) => onLateUpdate(parse(e)) : undefined}
+      onFixedUpdate={onFixedUpdate ? (e) => onFixedUpdate(parseFixed(e)) : undefined}
       fixedHz={fixedHz}
     />
   );

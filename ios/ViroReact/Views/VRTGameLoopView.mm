@@ -39,12 +39,18 @@
 
     __weak VRTGameLoopView *weakSelf = self;
 
+    // Fabric (New Architecture) validates RCTDirectEventBlock payload values against
+    // its type system. Floats passed as NSNumber cause conversions.h:338 spam.
+    // Passing as NSString and parsing in JS avoids the validation failure.
     _listener->setOnFrameWillRender([weakSelf](float dt, float elapsed) {
         VRTGameLoopView *self = weakSelf;
         if (!self || !self->_onUpdate) return;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self->_onUpdate) {
-                self->_onUpdate(@{ @"dt": @(dt), @"elapsed": @(elapsed) });
+                self->_onUpdate(@{
+                    @"dt":      [NSString stringWithFormat:@"%.6f", dt],
+                    @"elapsed": [NSString stringWithFormat:@"%.6f", elapsed]
+                });
             }
         });
     });
@@ -54,7 +60,10 @@
         if (!self || !self->_onLateUpdate) return;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self->_onLateUpdate) {
-                self->_onLateUpdate(@{ @"dt": @(dt), @"elapsed": @(elapsed) });
+                self->_onLateUpdate(@{
+                    @"dt":      [NSString stringWithFormat:@"%.6f", dt],
+                    @"elapsed": [NSString stringWithFormat:@"%.6f", elapsed]
+                });
             }
         });
     });
@@ -64,7 +73,7 @@
         if (!self || !self->_onFixedUpdate) return;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self->_onFixedUpdate) {
-                self->_onFixedUpdate(@{ @"dt": @(dt) });
+                self->_onFixedUpdate(@{ @"dt": [NSString stringWithFormat:@"%.6f", dt] });
             }
         });
     });

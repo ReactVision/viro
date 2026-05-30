@@ -241,7 +241,11 @@ static const CGFloat kKnobRadiusFactor = 0.4;   // knob is 40% of outer radius
     }
     // Fire JS callback for React-side feedback (same tick as C++ write)
     if (self.onStickChange) {
-        self.onStickChange(@{ @"x": @(x), @"y": @(y) });
+        // Pass as strings to avoid Fabric conversions.h:338 type-check spam
+        self.onStickChange(@{
+            @"x": [NSString stringWithFormat:@"%.4f", x],
+            @"y": [NSString stringWithFormat:@"%.4f", y]
+        });
     }
 }
 

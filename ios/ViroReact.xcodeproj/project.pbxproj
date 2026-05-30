@@ -198,6 +198,8 @@
 		8FEF008D1F38A718006AE4B1 /* VRTPortalSceneManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8FEF00831F37CAEF006AE4B1 /* VRTPortalSceneManager.mm */; };
 		94C35AD42FC0DE200064C011 /* VRTVirtualButtonView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 94C35AD12FC0DE1F0064C011 /* VRTVirtualButtonView.mm */; };
 		94C35AD52FC0DE200064C011 /* VRTVirtualButtonViewManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 94C35AD32FC0DE1F0064C011 /* VRTVirtualButtonViewManager.mm */; };
+		94C35AD62FC0DE210064C011 /* VRTVirtualButtonView.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 94C35AD02FC0DE1F0064C011 /* VRTVirtualButtonView.h */; };
+		94C35AD72FC0DE210064C011 /* VRTVirtualButtonViewManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 94C35AD22FC0DE1F0064C011 /* VRTVirtualButtonViewManager.h */; };
 		A50A310F1ECE1E8800DEBE9B /* VRTNodeModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = A50A310D1ECE1E8800DEBE9B /* VRTNodeModule.mm */; };
 		A53359701E9E0169005B3EC5 /* VRTControllerModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = A533596E1E9E0169005B3EC5 /* VRTControllerModule.mm */; };
 		A53F00D1203DE44D00415D86 /* VRTHDRImageAsyncLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = A53F00D0203DE44D00415D86 /* VRTHDRImageAsyncLoader.mm */; };
@@ -766,6 +768,8 @@
 			files = (
 				E1BD61E62FBBEC62008FDF74 /* VRTVirtualJoystickViewManager.h in Copy Headers to ios/dist/include */,
 				E1BD61E52FBBEC60008FDF74 /* VRTVirtualJoystickView.h in Copy Headers to ios/dist/include */,
+				94C35AD72FC0DE210064C011 /* VRTVirtualButtonViewManager.h in Copy Headers to ios/dist/include */,
+				94C35AD62FC0DE210064C011 /* VRTVirtualButtonView.h in Copy Headers to ios/dist/include */,
 				E1F9E5B22FA39E0300DBE1E8 /* VRTStudioModule.h in Copy Headers to ios/dist/include */,
 				7127551CAB844856B739EA0C /* VRTStreamingAudioModule.h in Copy Headers to ios/dist/include */,
 				8BD950372058C73100F8BB9E /* VRTMaterialChangedDelegate.h in Copy Headers to ios/dist/include */,
@@ -1090,10 +1094,10 @@
 		8FEF00851F37D04F006AE4B1 /* VRTPortal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTPortal.mm; path = ViroReact/Views/VRTPortal.mm; sourceTree = "<group>"; };
 		8FEF00861F37D0C0006AE4B1 /* VRTPortalManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTPortalManager.mm; path = ViroReact/VRTPortalManager.mm; sourceTree = "<group>"; };
 		8FEF00871F37D0C0006AE4B1 /* VRTPortalManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTPortalManager.h; path = ViroReact/VRTPortalManager.h; sourceTree = "<group>"; };
-		94C35AD02FC0DE1F0064C011 /* VRTVirtualButtonView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VRTVirtualButtonView.h; sourceTree = "<group>"; };
-		94C35AD12FC0DE1F0064C011 /* VRTVirtualButtonView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = VRTVirtualButtonView.mm; sourceTree = "<group>"; };
-		94C35AD22FC0DE1F0064C011 /* VRTVirtualButtonViewManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VRTVirtualButtonViewManager.h; sourceTree = "<group>"; };
-		94C35AD32FC0DE1F0064C011 /* VRTVirtualButtonViewManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = VRTVirtualButtonViewManager.mm; sourceTree = "<group>"; };
+		94C35AD02FC0DE1F0064C011 /* VRTVirtualButtonView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTVirtualButtonView.h; path = ViroReact/Views/VRTVirtualButtonView.h; sourceTree = "<group>"; };
+		94C35AD12FC0DE1F0064C011 /* VRTVirtualButtonView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTVirtualButtonView.mm; path = ViroReact/Views/VRTVirtualButtonView.mm; sourceTree = "<group>"; };
+		94C35AD22FC0DE1F0064C011 /* VRTVirtualButtonViewManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTVirtualButtonViewManager.h; path = ViroReact/Views/VRTVirtualButtonViewManager.h; sourceTree = "<group>"; };
+		94C35AD32FC0DE1F0064C011 /* VRTVirtualButtonViewManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTVirtualButtonViewManager.mm; path = ViroReact/Views/VRTVirtualButtonViewManager.mm; sourceTree = "<group>"; };
 		A50A310C1ECE1E8800DEBE9B /* VRTNodeModule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTNodeModule.h; path = ViroReact/Modules/VRTNodeModule.h; sourceTree = "<group>"; };
 		A50A310D1ECE1E8800DEBE9B /* VRTNodeModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTNodeModule.mm; path = ViroReact/Modules/VRTNodeModule.mm; sourceTree = "<group>"; };
 		A533596D1E9E0169005B3EC5 /* VRTControllerModule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTControllerModule.h; path = ViroReact/Modules/VRTControllerModule.h; sourceTree = "<group>"; };

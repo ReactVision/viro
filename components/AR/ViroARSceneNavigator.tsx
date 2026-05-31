@@ -196,6 +196,17 @@ type Props = ViewProps & {
   monocularDepthScale?: number;
 
   /**
+   * Maximum inference rate for monocular depth (default: 5).
+   * Lower values reduce device heat. Thermal state automatically
+   * overrides this downward: Fair→3fps, Serious→2fps, Critical→stopped.
+   * 3fps is barely perceptible for occlusion; 5fps is very smooth.
+   *
+   * @default 5
+   * @platform ios
+   */
+  monocularDepthTargetFPS?: number;
+
+  /**
    * Cloud and geospatial anchor provider.
    * Set to `"reactvision"` (default) for the ReactVision backend,
    * `"arcore"` for Google Cloud Anchors, or `"none"` to disable.

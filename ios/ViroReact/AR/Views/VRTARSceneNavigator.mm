@@ -1853,11 +1853,20 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 
 - (void)setMonocularDepthScale:(float)scale {
     if (!_vroView) {
-        _monocularDepthScale = scale;  // store for later
+        _monocularDepthScale = scale;
         return;
     }
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     [viewAR setMonocularDepthScale:scale];
+}
+
+- (void)setMonocularDepthTargetFPS:(int)fps {
+    if (!_vroView) {
+        _monocularDepthTargetFPS = fps;
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    [viewAR setMonocularDepthTargetFPS:fps];
 }
 
 - (BOOL)isPreferMonocularDepth {

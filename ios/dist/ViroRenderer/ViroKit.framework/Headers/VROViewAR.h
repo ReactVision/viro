@@ -188,4 +188,10 @@ enum class VROCameraPosition;
  */
 - (BOOL)isPreferMonocularDepth;
 
+// Calibration scale applied to monocular depth values (1.0 = no change).
+- (void)setMonocularDepthScale:(float)scale;
+
+// Target inference rate for monocular depth. Thermal state overrides downward automatically.
+- (void)setMonocularDepthTargetFPS:(int)fps;
+
 @end

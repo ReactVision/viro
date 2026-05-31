@@ -211,6 +211,16 @@ public:
         return VROMatrix4f::identity();
     }
 
+    /*
+     Debug-only variant: orientation-corrected transform WITHOUT the ScaleFill
+     crop correction. Maps the full screen [0,1]×[0,1] to the full depth texture
+     [0,1]×[0,1] so the debug overlay fills the screen without magenta bands.
+     The occlusion path still uses getDepthTextureTransform() for correctness.
+     */
+    virtual VROMatrix4f getDepthDebugTextureTransform() const {
+        return VROMatrix4f::identity();
+    }
+
     // ========================================================================
     // Scene Semantics API
     // ========================================================================

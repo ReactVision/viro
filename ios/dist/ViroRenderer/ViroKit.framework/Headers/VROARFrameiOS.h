@@ -94,6 +94,17 @@ public:
      */
     VROMatrix4f getDepthTextureTransform() const;
 
+    /*
+     Returns a simplified depth transform for DEBUG visualization only.
+     Unlike getDepthTextureTransform(), this does NOT apply the ScaleFill
+     crop correction — it maps the full screen [0,1]×[0,1] to the full
+     depth texture [0,1]×[0,1]. This gives a single full-screen depth
+     overlay (no magenta bands at the edges of the coverage region).
+     The occlusion path still uses getDepthTextureTransform() for
+     correctness (only occlude where real depth data exists).
+     */
+    VROMatrix4f getDepthDebugTextureTransform() const;
+
     // Scene Semantics support (requires ARCore SDK with Semantics extension)
     float getSemanticLabelFraction(VROSemanticLabel label) override;
 

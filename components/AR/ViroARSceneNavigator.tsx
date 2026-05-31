@@ -185,6 +185,17 @@ type Props = ViewProps & {
   preferMonocularDepth?: boolean;
 
   /**
+   * Calibration scale applied to monocular depth values before use in occlusion.
+   * 1.0 (default) = no change. Use < 1.0 if the model overestimates distances
+   * (virtual objects visible through real surfaces). Use > 1.0 if it underestimates.
+   * Typical tuning range: 0.7 – 1.3.
+   *
+   * @default 1.0
+   * @platform ios
+   */
+  monocularDepthScale?: number;
+
+  /**
    * Cloud and geospatial anchor provider.
    * Set to `"reactvision"` (default) for the ReactVision backend,
    * `"arcore"` for Google Cloud Anchors, or `"none"` to disable.

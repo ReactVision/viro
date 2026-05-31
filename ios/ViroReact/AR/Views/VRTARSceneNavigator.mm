@@ -180,6 +180,11 @@
             [viewAR setDepthDebugEnabled:_depthDebugEnabled opacity:0.7f];
         }
 
+        // Apply initial monocular depth scale if set
+        if (_monocularDepthScale != 0.0f && _monocularDepthScale != 1.0f) {
+            [viewAR setMonocularDepthScale:_monocularDepthScale];
+        }
+
         // Apply initial semantic debug setting if set
         if (_semanticDebugEnabled) {
             [viewAR setSemanticDebugEnabled:_semanticDebugEnabled];
@@ -1844,6 +1849,15 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     [viewAR setPreferMonocularDepth:prefer];
     RCTLogInfo(@"[ViroAR] Prefer monocular depth %@", prefer ? @"enabled" : @"disabled");
+}
+
+- (void)setMonocularDepthScale:(float)scale {
+    if (!_vroView) {
+        _monocularDepthScale = scale;  // store for later
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    [viewAR setMonocularDepthScale:scale];
 }
 
 - (BOOL)isPreferMonocularDepth {

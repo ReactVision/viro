@@ -62,6 +62,7 @@ public class ViroEvents {
     public static final String ON_AR_POINT_CLOUD_UPDATE = "onARPointCloudUpdateViro";
     public static final String ON_CAMERA_TRANSFORM_UPDATE = "onCameraTransformUpdateViro";
     public static final String ON_HAND_UPDATE = "onHandUpdateViro";
+    public static final String ON_CAMERA_READY = "onCameraReadyViro";
 
     // Game loop events
     public static final String ON_UPDATE       = "onUpdate";

@@ -46,6 +46,8 @@ import {
   ViroShaderModifier,
 } from "./components/Material/ViroMaterials";
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
+import { ViroCameraTexture } from "./components/ViroCameraTexture";
+export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
 import { ViroOrbitCamera } from "./components/ViroOrbitCamera";
@@ -220,6 +222,7 @@ export {
   ViroMaterials,
   ViroARCamera,
   ViroMaterialVideo,
+  ViroCameraTexture,
   ViroNode,
   ViroOmniLight,
   ViroOrbitCamera,

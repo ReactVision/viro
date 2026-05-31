@@ -14,9 +14,12 @@
 package com.viromedia.bridge.component;
 
 import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.annotations.ReactProp;
+import com.viromedia.bridge.utility.ViroEvents;
+import java.util.Map;
 
 public class VRTVirtualJoystickViewManager extends SimpleViewManager<VRTVirtualJoystickView> {
 
@@ -54,5 +57,12 @@ public class VRTVirtualJoystickViewManager extends SimpleViewManager<VRTVirtualJ
         if (color != null) {
             view.setTintColor(color);
         }
+    }
+
+    @Override
+    public Map getExportedCustomDirectEventTypeConstants() {
+        return MapBuilder.of(
+            ViroEvents.ON_STICK_CHANGE, MapBuilder.of("registrationName", ViroEvents.ON_STICK_CHANGE)
+        );
     }
 }

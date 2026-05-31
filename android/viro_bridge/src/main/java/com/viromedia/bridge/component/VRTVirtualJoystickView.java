@@ -20,6 +20,12 @@ import android.graphics.Paint;
 import android.view.MotionEvent;
 import android.view.View;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.WritableMap;
+import com.viromedia.bridge.utility.ViroEventEmitter;
+import com.viromedia.bridge.utility.ViroEvents;
+
 /**
  * Native virtual-joystick view. Renders an outer ring and a draggable knob; on touch
  * the knob follows the finger clamped to the ring, and the normalised stick position is
@@ -61,13 +67,15 @@ public class VRTVirtualJoystickView extends View {
     private String  mAcquiredId   = null;
     private float   mKnobDx       = 0f;
     private float   mKnobDy       = 0f;
+    private final ReactContext mReactContext;
 
     // --- paint ---
     private final Paint mRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mKnobPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    public VRTVirtualJoystickView(Context context) {
+    public VRTVirtualJoystickView(ReactContext context) {
         super(context);
+        mReactContext = context;
         mRadius = dpToPx(DEFAULT_RADIUS_DP);
         setWillNotDraw(false);
         setBackgroundColor(Color.TRANSPARENT);
@@ -209,6 +217,11 @@ public class VRTVirtualJoystickView extends View {
         } else {
             nativeSetStickL(mNativeRef, x, y);
         }
+        // Emit JS callback — values as strings to avoid Fabric conversions.h warnings
+        WritableMap event = Arguments.createMap();
+        event.putString("x", String.format("%.4f", x));
+        event.putString("y", String.format("%.4f", y));
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_STICK_CHANGE, event);
     }
 
     // -------------------------------------------------------------------------

@@ -20,6 +20,11 @@ import android.graphics.Paint;
 import android.view.MotionEvent;
 import android.view.View;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
+import com.viromedia.bridge.utility.ViroEventEmitter;
+import com.viromedia.bridge.utility.ViroEvents;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -76,13 +81,15 @@ public class VRTVirtualButtonView extends View {
     private long   mNativeRef   = 0;
     private String mAcquiredId  = null;
     private boolean mPressed    = false;
+    private final ReactContext mReactContext;
 
     // --- paint ---
     private final Paint mCirclePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mLabelPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    public VRTVirtualButtonView(Context context) {
+    public VRTVirtualButtonView(ReactContext context) {
         super(context);
+        mReactContext = context;
         mSize = dpToPx(DEFAULT_SIZE_DP);
         setWillNotDraw(false);
         setBackgroundColor(Color.TRANSPARENT);
@@ -198,6 +205,10 @@ public class VRTVirtualButtonView extends View {
     private void writeButton(boolean pressed) {
         if (mNativeRef == 0) return;
         nativeSetButton(mNativeRef, mButtonIndex, pressed);
+        // Emit JS callback
+        ViroEventEmitter.emit(mReactContext, getId(),
+            pressed ? ViroEvents.ON_PRESS_IN : ViroEvents.ON_PRESS_OUT,
+            Arguments.createMap());
     }
 
     // -------------------------------------------------------------------------

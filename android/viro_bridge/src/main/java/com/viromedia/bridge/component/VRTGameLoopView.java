@@ -20,12 +20,14 @@ public class VRTGameLoopView extends VRTNode {
         System.loadLibrary("viro_renderer");
     }
 
-    private long  mListenerRef = 0;
-    private long  mContextRef  = 0;
-    private float mFixedHz     = 0.f;
+    private long         mListenerRef   = 0;
+    private long         mContextRef    = 0;
+    private float        mFixedHz       = 0.f;
+    private final ReactContext mReactContext;
 
     public VRTGameLoopView(ReactContext reactContext) {
         super(reactContext);
+        mReactContext = reactContext;
     }
 
     // ── Props ─────────────────────────────────────────────────────────────────
@@ -68,20 +70,20 @@ public class VRTGameLoopView extends VRTNode {
         WritableMap event = Arguments.createMap();
         event.putDouble("dt", dt);
         event.putDouble("elapsed", elapsed);
-        ViroEventEmitter.emit((ReactContext) getContext(), getId(), "onUpdate", event);
+        ViroEventEmitter.emit(mReactContext, getId(), "onUpdate", event);
     }
 
     public void notifyLateUpdate(float dt, float elapsed) {
         WritableMap event = Arguments.createMap();
         event.putDouble("dt", dt);
         event.putDouble("elapsed", elapsed);
-        ViroEventEmitter.emit((ReactContext) getContext(), getId(), "onLateUpdate", event);
+        ViroEventEmitter.emit(mReactContext, getId(), "onLateUpdate", event);
     }
 
     public void notifyFixedUpdate(float dt) {
         WritableMap event = Arguments.createMap();
         event.putDouble("dt", dt);
-        ViroEventEmitter.emit((ReactContext) getContext(), getId(), "onFixedUpdate", event);
+        ViroEventEmitter.emit(mReactContext, getId(), "onFixedUpdate", event);
     }
 
     // ── JNI ──────────────────────────────────────────────────────────────────

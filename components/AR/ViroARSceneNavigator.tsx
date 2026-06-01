@@ -207,6 +207,17 @@ type Props = ViewProps & {
   monocularDepthTargetFPS?: number;
 
   /**
+   * Use the front (selfie) camera as the AR session background.
+   * On iOS uses ARFaceTrackingConfiguration (requires TrueDepth camera, iPhone X+).
+   * On Android uses ARCore Augmented Faces mode (front camera).
+   * World tracking, plane detection, and LiDAR are unavailable in this mode.
+   *
+   * @default false
+   * @platform ios, android
+   */
+  frontCameraEnabled?: boolean;
+
+  /**
    * Cloud and geospatial anchor provider.
    * Set to `"reactvision"` (default) for the ReactVision backend,
    * `"arcore"` for Google Cloud Anchors, or `"none"` to disable.

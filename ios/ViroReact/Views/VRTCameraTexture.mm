@@ -25,9 +25,9 @@
 
 #import "VRTCameraTexture.h"
 #import "VRTMaterialManager.h"
-#include "VROCameraTextureiOS.h"
-#include "VROCameraTexture.h"
-#include "VROMaterial.h"
+#import <ViroKit/VROCameraTextureiOS.h>
+#import <ViroKit/VROCameraTexture.h>
+#import <ViroKit/VROMaterial.h>
 
 @implementation VRTCameraTexture {
     // The C++ camera texture (created once, recreated on camera-switch)
@@ -195,7 +195,7 @@
         completion(NO, nil, @"Camera not initialised");
         return;
     }
-    _cameraTexture->getCaptureController()->capturePhoto(outputPath,
+    _cameraTexture->capturePhoto(outputPath,
         [completion](bool ok, NSString *path, NSString *err) {
             dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, path, err); });
         });
@@ -207,7 +207,7 @@
         completion(NO, nil, @"Camera not initialised");
         return;
     }
-    _cameraTexture->getCaptureController()->startRecording(outputPath,
+    _cameraTexture->startRecording(outputPath,
         [completion](bool ok, NSString *path, NSString *err) {
             dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, path, err); });
         });
@@ -218,7 +218,7 @@
         completion(NO, nil, @"Camera not initialised");
         return;
     }
-    _cameraTexture->getCaptureController()->stopRecording(
+    _cameraTexture->stopRecording(
         [completion](bool ok, NSString *path, NSString *err) {
             dispatch_async(dispatch_get_main_queue(), ^{ completion(ok, path, err); });
         });

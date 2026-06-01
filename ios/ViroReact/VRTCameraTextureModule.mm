@@ -65,7 +65,7 @@ static inline void resolveError(RCTPromiseResolveBlock resolve, NSString *msg) {
 - (nullable VRTCameraTexture *)cameraTextureForTag:(nonnull NSNumber *)reactTag
                                         uiManager:(RCTUIManager *)uiManager
                                           resolve:(RCTPromiseResolveBlock)resolve {
-    UIView *view = uiManager.viewRegistry[reactTag];
+    UIView *view = [uiManager viewForReactTag:reactTag];
     if (![view isKindOfClass:[VRTCameraTexture class]]) {
         NSString *msg = [NSString stringWithFormat:
             @"Expected VRTCameraTexture for tag %@, got %@", reactTag, NSStringFromClass([view class])];

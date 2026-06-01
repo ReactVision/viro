@@ -199,6 +199,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Apply current effective occlusion mode to newly added ARScenes
         if (child instanceof VRTARScene) {
             ((VRTARScene) child).setOcclusionMode(computeEffectiveOcclusionMode());
+            if (mFrontCameraEnabled) {
+                ((VRTARScene) child).setFrontCameraEnabled(true);
+            }
         }
     }
 
@@ -348,6 +351,18 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             applyOcclusionMode();
         } else {
             mNeedsOcclusionModeToggle = true;
+        }
+    }
+
+    private boolean mFrontCameraEnabled = false;
+
+    public void setFrontCameraEnabled(boolean enabled) {
+        mFrontCameraEnabled = enabled;
+        for (int i = 0; i < getChildCount(); i++) {
+            android.view.View child = getChildAt(i);
+            if (child instanceof com.viromedia.bridge.component.node.VRTARScene) {
+                ((com.viromedia.bridge.component.node.VRTARScene) child).setFrontCameraEnabled(enabled);
+            }
         }
     }
 

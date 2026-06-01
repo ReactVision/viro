@@ -126,6 +126,11 @@ public:
     void setPreferMonocularDepth(bool prefer);
     bool isPreferMonocularDepth() const;
 
+    // Use the front (TrueDepth) camera via ARFaceTrackingConfiguration.
+    // When true, world tracking, planes, and LiDAR are unavailable.
+    void setFrontCameraEnabled(bool enabled);
+    bool isFrontCameraEnabled() const { return _frontCameraEnabled; }
+
     // Multiply all monocular depth values by this factor before use.
     // 1.0 = no change (default). Use < 1.0 if model overestimates distance.
     void setMonocularDepthScale(float scale);
@@ -232,6 +237,8 @@ public:
      Get the native ARSession object for anchor creation.
      */
     ARSession *getARSession() const { return _session; }
+    ARConfiguration *getSessionConfiguration() const { return _sessionConfiguration; }
+    bool isPaused() const { return _sessionPaused; }
 
 private:
     
@@ -364,6 +371,7 @@ private:
     std::shared_ptr<VROMonocularDepthEstimator> _monocularDepthEstimator;
     bool _monocularDepthEnabled;
     bool _preferMonocularDepth;  // When true, use monocular even on LiDAR devices
+    bool _frontCameraEnabled;    // When true, use ARFaceTrackingConfiguration (front camera)
     bool _monocularDepthLoading;
     float _monocularDepthScale;  // Multiplied into depth values (1.0 = no change)
     int   _monocularDepthTargetFPS;  // 0 = use estimator default

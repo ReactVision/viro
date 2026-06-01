@@ -126,7 +126,7 @@ public class VRTCameraTexture extends VRTComponent {
             : CameraTexture.Position.FRONT;
 
         // CameraTexture(ViroContext, Position) → nativeCreate + nativeInit dispatched to GL.
-        mCameraTexture = new CameraTexture(mViroContext, pos);
+        mCameraTexture = new CameraTexture(mViroContext, pos, getContext());
 
         // Wire the onCameraReady callback — fires once on the first Camera2 frame.
         mCameraTexture.setReadyListener(new CameraTexture.ReadyListener() {

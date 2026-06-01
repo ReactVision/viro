@@ -194,4 +194,7 @@ enum class VROCameraPosition;
 // Target inference rate for monocular depth. Thermal state overrides downward automatically.
 - (void)setMonocularDepthTargetFPS:(int)fps;
 
+// Switch to ARFaceTrackingConfiguration (front TrueDepth camera) when YES.
+- (void)setFrontCameraEnabled:(BOOL)enabled;
+
 @end

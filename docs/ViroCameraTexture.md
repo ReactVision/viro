@@ -386,3 +386,31 @@ If the microphone permission is not granted, `startRecording` will resolve with 
 - The texture resolution is fixed at **1280 × 720** on Android. On iOS it follows the AVFoundation session preset (default `AVCaptureSessionPresetHigh`).
 - The front camera feed is mirrored automatically by the OS. No transform is needed on the geometry.
 - Multiple `ViroCameraTexture` components targeting the same material name will conflict — only the last one to mount will hold the texture.
+
+---
+
+## Choosing between `ViroCameraTexture` and `frontCameraEnabled`
+
+Both features deliver a front-camera feed, but they serve different use cases:
+
+| | `ViroCameraTexture` | `frontCameraEnabled` on ViroARSceneNavigator |
+|---|---|---|
+| **Feed destination** | Material texture on any geometry | Full-screen AR session background |
+| **AR tracking** | Back camera AR remains active | Front camera, no world tracking |
+| **Coordinate system** | World-locked AR (back camera) | Gravity-aligned (iOS) / device-relative (Android) |
+| **Selfie mirror effect** | ✅ Quad/sphere with camera texture | ❌ Not a mirror — whole scene is front camera |
+| **Face filter / overlay** | ❌ No face tracking | ✅ ARFaceTracking (iOS) / Augmented Faces (Android) |
+| **Capture photo/video** | ✅ `capturePhoto()`, `startRecording()` | ❌ Not supported |
+| **Typical use case** | Picture-in-picture, VR mirror, AR viewport | Selfie AR, face effects, front-facing scenes |
+
+**Use `ViroCameraTexture` when:**
+- You want to show a camera feed on a specific surface (mirror, screen, viewport)
+- You need to keep the back-camera AR world active simultaneously
+- You want photo or video capture from the front camera
+
+**Use `frontCameraEnabled` when:**
+- The entire scene should use the front camera as background
+- You want face-tracking behavior (content anchored relative to face or gravity)
+- No geometry-level camera texture needed
+
+See [`PLATFORM_EXTENSIONS.md`](./PLATFORM_EXTENSIONS.md) for the `frontCameraEnabled` API reference.

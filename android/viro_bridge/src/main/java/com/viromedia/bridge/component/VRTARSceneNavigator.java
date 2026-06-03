@@ -114,6 +114,19 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 navigator.mNeedsAutoFocusToggle = false;
             }
 
+            // Apply frontCameraEnabled before the first ARCore config runs.
+            // This must happen after GL init but before any VRTARScene child
+            // calls setOcclusionMode (which triggers updateARCoreConfig).
+            if (navigator.mFrontCameraEnabled) {
+                for (int i = 0; i < navigator.getChildCount(); i++) {
+                    android.view.View child = navigator.getChildAt(i);
+                    if (child instanceof com.viromedia.bridge.component.node.VRTARScene) {
+                        ((com.viromedia.bridge.component.node.VRTARScene) child)
+                            .setFrontCameraEnabled(true);
+                    }
+                }
+            }
+
             // Apply pending occlusion mode configuration
             if (navigator.mNeedsOcclusionModeToggle) {
                 navigator.applyOcclusionMode();

@@ -749,13 +749,14 @@ class VRActivity : ReactActivity() {
     }
 
     // Quest store validator requires all activities to be landscape.
+    // Only apply when targeting Quest (questAppId present); AR/phone apps use portrait.
+    const questAppId = props?.android?.questAppId;
     const mainActivity = app.activity?.[0];
-    if (mainActivity?.$ && mainActivity.$["android:name"] !== ".VRActivity") {
+    if (questAppId && mainActivity?.$ && mainActivity.$["android:name"] !== ".VRActivity") {
       mainActivity.$["android:screenOrientation"] = "landscape";
     }
 
     // Inject com.oculus.app_id into <application> for Meta Quest App Name
-    const questAppId = props?.android?.questAppId;
     if (questAppId) {
       if (!app["meta-data"]) app["meta-data"] = [];
       const alreadyHasAppId = (app["meta-data"] as any[]).some(

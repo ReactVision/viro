@@ -156,6 +156,15 @@ private:
                       const void *data,
                       size_t byteSize);
 
+    /*
+     Like updateBuffer but pads the VROData to totalBytes with zeros so
+     VROGeometrySource's declared vertexCount stays consistent with the buffer
+     capacity (avoids VROByteBuffer over-read during bounding-box computation).
+     */
+    void updateBufferPadded(const std::shared_ptr<VROVertexBuffer> &buffer,
+                            const void *activeData, size_t activeBytes,
+                            size_t totalBytes);
+
 };
 
 #endif /* VRODynamicGeometry_h */

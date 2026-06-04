@@ -190,6 +190,7 @@
 		8BF0A1234DFA15880032AB99 /* VRTFabricCrashFix.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BF0A1236DFA15880032AB99 /* VRTFabricCrashFix.mm */; };
 		8BF0A1237DFA15880032AB99 /* VRTFabricCrashFix.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BF0A1235DFA15880032AB99 /* VRTFabricCrashFix.h */; };
 		8F346B1B1F225559000D16B9 /* VRTManagedAnimation.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8F346B191F225559000D16B9 /* VRTManagedAnimation.mm */; };
+		8F346B1C1F225559000D16B9 /* VRTManagedAnimation.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8F346B181F225559000D16B9 /* VRTManagedAnimation.h */; };
 		8F3AB8B921485B9200DF68EA /* VRTGeometryManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8F3AB8B821485B9200DF68EA /* VRTGeometryManager.mm */; };
 		8F705DE71E8B3755008BE8F8 /* VRTPerfMonitor.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8F705DE51E8B3754008BE8F8 /* VRTPerfMonitor.mm */; };
 		8FBA9B75214756860055D996 /* VRTGeometry.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8FBA9B74214756860055D996 /* VRTGeometry.mm */; };
@@ -780,6 +781,7 @@
 				E1BD61E52FBBEC60008FDF74 /* VRTVirtualJoystickView.h in Copy Headers to ios/dist/include */,
 				94C35AD72FC0DE210064C011 /* VRTVirtualButtonViewManager.h in Copy Headers to ios/dist/include */,
 				94C35AD62FC0DE210064C011 /* VRTVirtualButtonView.h in Copy Headers to ios/dist/include */,
+				8F346B1C1F225559000D16B9 /* VRTManagedAnimation.h in Copy Headers to ios/dist/include */,
 				E1BD61A62FC1A002008FDF74 /* VRTGameLoopView.h in Copy Headers to ios/dist/include */,
 				E1BD61A72FC1A002008FDF74 /* VRTGameLoopViewManager.h in Copy Headers to ios/dist/include */,
 				E1F9E5B22FA39E0300DBE1E8 /* VRTStudioModule.h in Copy Headers to ios/dist/include */,

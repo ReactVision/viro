@@ -51,6 +51,25 @@ public:
     virtual void setMuted(bool muted) = 0;
     virtual void seekToTime(float seconds) = 0;
 
+    /*
+     Streaming PCM API. Subclasses that support runtime PCM feeding override
+     these; the default no-ops preserve all existing non-streaming subclasses.
+
+     beginStreaming: configure the player for streaming mode (instead of
+       loading a file/blob). Must be called before play(). sampleRate is in
+       Hz; channels is 1 (mono) or 2 (stereo).
+
+     pushSamples: feed interleaved float PCM samples in the range [-1, 1].
+       Thread-safe — may be called from any thread (sim loop, TTS callback,
+       etc.). Returns the number of samples accepted; if the ring buffer is
+       full the excess is dropped.
+
+     isStreaming: true once beginStreaming has been called successfully.
+    */
+    virtual void beginStreaming(int sampleRate, int channels) {}
+    virtual size_t pushSamples(const float *data, size_t count) { return 0; }
+    virtual bool isStreaming() const { return false; }
+
 protected:
     std::shared_ptr<VROSoundDelegateInternal> _delegate;
 };

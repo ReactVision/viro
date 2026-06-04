@@ -256,6 +256,7 @@ public:
     void setOcclusionMode(VROOcclusionMode mode);
     void setDepthTexture(std::shared_ptr<VROTexture> depthTexture);
     void setDepthTextureTransform(VROMatrix4f transform);
+    void setDepthIsMonocular(bool monocular);
     void setSemanticTextureTransform(VROMatrix4f transform);
 
     /*

@@ -51,6 +51,9 @@
 @property (nonatomic, assign) BOOL depthEnabled;
 @property (nonatomic, assign) BOOL depthDebugEnabled;
 @property (nonatomic, assign) BOOL semanticDebugEnabled;
+@property (nonatomic, assign) float monocularDepthScale;
+@property (nonatomic, assign) int monocularDepthTargetFPS;
+@property (nonatomic, assign) BOOL frontCameraEnabled;
 @property (nonatomic, assign) float semanticConfidenceThreshold;
 @property (nonatomic, copy) NSString *cloudAnchorProvider;
 @property (nonatomic, copy) NSString *geospatialAnchorProvider;

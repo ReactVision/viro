@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ViroQuestEntryPoint = exports.ViroXRSceneNavigator = exports.ViroVRSceneNavigator = exports.ViroVideo = exports.ViroText = exports.ViroSpotLight = exports.ViroSpinner = exports.ViroSphere = exports.ViroSpatialSound = exports.ViroSoundField = exports.ViroSound = exports.ViroAnimatedComponent = exports.ViroAmbientLight = exports.ViroAnimatedImage = exports.Viro360Video = exports.Viro360Image = exports.Viro3DObject = exports.ViroAnimations = exports.ViroSkyBox = exports.ViroSceneNavigator = exports.ViroSurface = exports.ViroScene = exports.ViroQuad = exports.ViroPortalScene = exports.ViroPortal = exports.ViroPolyline = exports.ViroPolygon = exports.ViroParticleEmitter = exports.ViroOrbitCamera = exports.ViroOmniLight = exports.ViroNode = exports.ViroMaterialVideo = exports.ViroARCamera = exports.ViroMaterials = exports.ViroImage = exports.ViroLightingEnvironment = exports.ViroGeometry = exports.ViroFlexView = exports.ViroDirectionalLight = exports.ViroController = exports.ViroCamera = exports.ViroButton = exports.ViroBox = exports.ViroARSceneNavigator = exports.ViroARScene = exports.ViroARPlaneSelector = exports.ViroARPlane = exports.ViroARTrackingTargets = exports.ViroARObjectMarker = exports.ViroARImageMarker = void 0;
-exports.exitImmersiveSpace = exports.enterImmersiveSpace = exports.isVisionOS = exports.ViroVisionOSModule = exports.StudioARScene = exports.StudioSceneNavigator = exports.VIRO_VERSION = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.gpsToArWorld = exports.latLngToMercator = exports.checkPermissions = exports.requestRequiredPermissions = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = exports.ViroARTrackingReasonConstants = exports.useAnySourcePressed = exports.useAnySourceHover = exports.isQuest = exports.hasOpenXRSupport = exports.Viro3DSceneNavigator = exports.exitVRScene = exports.useVRViewTag = exports.VRModuleOpenXR = exports.VRQuestNavigatorBridge = void 0;
+exports.ViroSpatialSound = exports.ViroSoundField = exports.ViroSound = exports.ViroAnimatedComponent = exports.ViroAmbientLight = exports.ViroAnimatedImage = exports.Viro360Video = exports.Viro360Image = exports.Viro3DObject = exports.ViroAnimations = exports.ViroSkyBox = exports.ViroSceneNavigator = exports.ViroSurface = exports.ViroScene = exports.ViroQuad = exports.ViroPortalScene = exports.ViroPortal = exports.ViroPolyline = exports.ViroPolygon = exports.ViroParticleEmitter = exports.ViroOrbitCamera = exports.ViroOmniLight = exports.ViroNode = exports.ViroCameraTexture = exports.ViroMaterialVideo = exports.ViroARCamera = exports.ViroMaterials = exports.ViroImage = exports.ViroLightingEnvironment = exports.ViroGeometry = exports.ViroFlexView = exports.ViroDirectionalLight = exports.useFixedUpdate = exports.useLateUpdate = exports.useGameLoop = exports.ViroGameLoopUtils = exports.ViroGameLoop = exports.ViroVirtualButton = exports.ViroVirtualJoystick = exports.ViroController = exports.ViroCamera = exports.ViroButton = exports.ViroBox = exports.ViroARSceneNavigator = exports.ViroARScene = exports.ViroARPlaneSelector = exports.ViroARPlane = exports.ViroARTrackingTargets = exports.ViroARObjectMarker = exports.ViroARImageMarker = void 0;
+exports.exitImmersiveSpace = exports.enterImmersiveSpace = exports.isVisionOS = exports.ViroVisionOSModule = exports.StudioARScene = exports.StudioSceneNavigator = exports.VIRO_VERSION = exports.ViroRotateStateTypes = exports.ViroPinchStateTypes = exports.ViroClickStateTypes = exports.gpsToArWorld = exports.latLngToMercator = exports.checkPermissions = exports.requestRequiredPermissions = exports.isARSupportedOnDevice = exports.polarToCartesianActual = exports.polarToCartesian = exports.ViroTrackingStateConstants = exports.ViroRecordingErrorConstants = exports.ViroARTrackingReasonConstants = exports.useAnySourcePressed = exports.useAnySourceHover = exports.isQuest = exports.hasOpenXRSupport = exports.StreamingAudioManager = exports.Viro3DSceneNavigator = exports.exitVRScene = exports.useVRViewTag = exports.VRModuleOpenXR = exports.VRQuestNavigatorBridge = exports.ViroQuestEntryPoint = exports.ViroXRSceneNavigator = exports.ViroVRSceneNavigator = exports.ViroVideo = exports.ViroText = exports.ViroSpotLight = exports.ViroSpinner = exports.ViroSphere = void 0;
 /**
  * Copyright (c) 2016-present, Viro Media, Inc.
  * All rights reserved.
@@ -55,6 +55,18 @@ Object.defineProperty(exports, "ViroRecordingErrorConstants", { enumerable: true
 Object.defineProperty(exports, "ViroTrackingStateConstants", { enumerable: true, get: function () { return ViroConstants_1.ViroTrackingStateConstants; } });
 const ViroController_1 = require("./components/ViroController");
 Object.defineProperty(exports, "ViroController", { enumerable: true, get: function () { return ViroController_1.ViroController; } });
+const ViroVirtualJoystick_1 = require("./components/ViroVirtualJoystick");
+Object.defineProperty(exports, "ViroVirtualJoystick", { enumerable: true, get: function () { return ViroVirtualJoystick_1.ViroVirtualJoystick; } });
+const ViroVirtualButton_1 = require("./components/ViroVirtualButton");
+Object.defineProperty(exports, "ViroVirtualButton", { enumerable: true, get: function () { return ViroVirtualButton_1.ViroVirtualButton; } });
+const ViroGameLoop_1 = require("./components/ViroGameLoop");
+Object.defineProperty(exports, "ViroGameLoop", { enumerable: true, get: function () { return ViroGameLoop_1.ViroGameLoop; } });
+const ViroGameLoopUtils_1 = require("./components/ViroGameLoopUtils");
+Object.defineProperty(exports, "ViroGameLoopUtils", { enumerable: true, get: function () { return ViroGameLoopUtils_1.ViroGameLoopUtils; } });
+const useGameLoop_1 = require("./components/hooks/useGameLoop");
+Object.defineProperty(exports, "useGameLoop", { enumerable: true, get: function () { return useGameLoop_1.useGameLoop; } });
+Object.defineProperty(exports, "useLateUpdate", { enumerable: true, get: function () { return useGameLoop_1.useLateUpdate; } });
+Object.defineProperty(exports, "useFixedUpdate", { enumerable: true, get: function () { return useGameLoop_1.useFixedUpdate; } });
 const ViroDirectionalLight_1 = require("./components/ViroDirectionalLight");
 Object.defineProperty(exports, "ViroDirectionalLight", { enumerable: true, get: function () { return ViroDirectionalLight_1.ViroDirectionalLight; } });
 const ViroFlexView_1 = require("./components/ViroFlexView");
@@ -69,6 +81,8 @@ const ViroMaterials_1 = require("./components/Material/ViroMaterials");
 Object.defineProperty(exports, "ViroMaterials", { enumerable: true, get: function () { return ViroMaterials_1.ViroMaterials; } });
 const ViroMaterialVideo_1 = require("./components/ViroMaterialVideo");
 Object.defineProperty(exports, "ViroMaterialVideo", { enumerable: true, get: function () { return ViroMaterialVideo_1.ViroMaterialVideo; } });
+const ViroCameraTexture_1 = require("./components/ViroCameraTexture");
+Object.defineProperty(exports, "ViroCameraTexture", { enumerable: true, get: function () { return ViroCameraTexture_1.ViroCameraTexture; } });
 const ViroNode_1 = require("./components/ViroNode");
 Object.defineProperty(exports, "ViroNode", { enumerable: true, get: function () { return ViroNode_1.ViroNode; } });
 const ViroOmniLight_1 = require("./components/ViroOmniLight");
@@ -148,6 +162,8 @@ const VRModuleOpenXR_1 = require("./components/Utilities/VRModuleOpenXR");
 Object.defineProperty(exports, "VRModuleOpenXR", { enumerable: true, get: function () { return VRModuleOpenXR_1.VRModuleOpenXR; } });
 Object.defineProperty(exports, "useVRViewTag", { enumerable: true, get: function () { return VRModuleOpenXR_1.useVRViewTag; } });
 Object.defineProperty(exports, "exitVRScene", { enumerable: true, get: function () { return VRModuleOpenXR_1.exitVRScene; } });
+const StreamingAudioManager_1 = require("./components/Utilities/StreamingAudioManager");
+Object.defineProperty(exports, "StreamingAudioManager", { enumerable: true, get: function () { return StreamingAudioManager_1.StreamingAudioManager; } });
 const react_native_1 = require("react-native");
 // Auto-register the Quest VR entry point. VRActivity launches this component
 // as 'VRQuestScene'. Registering here means apps need no manual setup.

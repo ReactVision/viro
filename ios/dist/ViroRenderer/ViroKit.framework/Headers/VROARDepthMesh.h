@@ -28,6 +28,7 @@
 
 #include <vector>
 #include <memory>
+#include <string>
 #include "VROVector3f.h"
 
 /**
@@ -52,7 +53,8 @@ public:
      */
     VROARDepthMesh(std::vector<VROVector3f> vertices,
                    std::vector<int> indices,
-                   std::vector<float> confidences);
+                   std::vector<float> confidences,
+                   std::string source = "lidar");
 
     ~VROARDepthMesh();
 
@@ -91,10 +93,16 @@ public:
      */
     bool isValid() const;
 
+    /**
+     * Get the depth source identifier. "lidar" or "monocular".
+     */
+    const std::string& getSource() const { return _source; }
+
 private:
     std::vector<VROVector3f> _vertices;
     std::vector<int> _indices;
     std::vector<float> _confidences;
+    std::string _source;
 };
 
 #endif /* VROARDepthMesh_h */

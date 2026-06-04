@@ -84,6 +84,25 @@ You can get a Studio account, which includes Platform access, for free at <https
 - Cloud Anchors guide: <https://viro-community.readme.io/docs/cloud-anchors>
 - Geospatial Anchors guide: <https://viro-community.readme.io/docs/geospatial-anchors>
 
+## Studio
+
+[ReactVision Studio](https://studio.reactvision.xyz) is our browser-based visual scene editor for AR and VR. Build scenes visually in Studio, then embed them inside your own ViroReact app with a single component. Designers and developers can iterate on a scene in Studio and have it update in production without a new app build.
+
+**Build scenes visually**
+
+- **Placement** — drag-and-drop 3D objects, images, video, text, and primitives into a scene with visual gizmos for position, rotation, and scale. No JSX required to lay out a scene.
+- **AI asset generation** — generate 3D models from a text prompt or reference image directly inside the editor, powered by ReactVision Platform.
+- **Animations** — author keyframe and property animations on a timeline, chain them into sequences, and trigger them from interactions or scene events.
+- **Physics** — assign dynamic, static, or kinematic bodies to objects, configure mass, friction, and restitution, and wire up collision callbacks — the same physics engine ViroReact ships with, exposed visually.
+
+**Embed Studio scenes in your app**
+
+Drop the `StudioSceneNavigator` component into your ViroReact app, point it at a Studio scene, and your app picks up whatever your team is editing in Studio without a new native build.
+
+**Getting started**
+
+Full walkthrough — including Studio setup, exporting a scene, and wiring `StudioSceneNavigator` into a React Native app — is in our blog: <https://updates.reactvision.xyz/how-to-build-your-first-ar-vr-app-with-studio-and-react-native-f2421ecce9ae>
+
 ## Documentation
 
 - Full API reference and guides: <https://viro-community.readme.io/docs/overview>

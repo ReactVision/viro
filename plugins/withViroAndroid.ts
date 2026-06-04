@@ -319,12 +319,26 @@ const withViroManifest = (config: ExpoConfig) =>
         }
       }
 
+      // Derive active XR modes from the config at apply-time.
+      // `viroPluginConfig` (module-level) is updated by withBranchAndroid's
+      // withDangerousMod callback, which runs *after* withAndroidManifest
+      // callbacks — so it is still ["AR","GVR"] here. Read from config.plugins
+      // directly instead.
+      const activeXrModes = (() => {
+        const p = (newConfig.plugins ?? []).find(
+          (plugin: any) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
+        );
+        if (Array.isArray(p) && p[1]?.android?.xRMode) {
+          const xrMode = p[1].android.xRMode;
+          return Array.isArray(xrMode) ? (xrMode as string[]) : [xrMode as string];
+        }
+        return viroPluginConfig;
+      })();
+
       if (
-        viroPluginConfig.includes("GVR") ||
-        viroPluginConfig.includes("OVR_MOBILE")
+        activeXrModes.includes("GVR") ||
+        activeXrModes.includes("OVR_MOBILE")
       ) {
-        //   <!-- Add the following line for cardboard -->
-        //   <category android:name="com.google.intent.category.CARDBOARD" />
         contents?.manifest?.application?.[0]?.activity[0][
           "intent-filter"
         ][0].category.push({
@@ -332,8 +346,6 @@ const withViroManifest = (config: ExpoConfig) =>
             "android:name": "com.google.intent.category.CARDBOARD",
           },
         });
-        //   <!-- Add the following line for daydream -->
-        //   <category android:name="com.google.intent.category.DAYDREAM" />
         contents?.manifest?.application?.[0]?.activity[0][
           "intent-filter"
         ][0].category.push({
@@ -343,6 +355,13 @@ const withViroManifest = (config: ExpoConfig) =>
         });
       }
 
+      // android.permission.SYSTEM_ALERT_WINDOW is merged in from React Native's
+      // debug manifest and is rejected by the Meta Quest Store.
+      if (contents.manifest["uses-permission"]) {
+        contents.manifest["uses-permission"] = contents.manifest["uses-permission"].filter(
+          (p: any) => p.$?.["android:name"] !== "android.permission.SYSTEM_ALERT_WINDOW"
+        );
+      }
 
       contents.manifest.queries = [
         {
@@ -376,11 +395,13 @@ const withViroManifest = (config: ExpoConfig) =>
         },
       });
 
+      // Keep GLES 3.0 declared (required=false) so the Quest Store validator
+      // sees a graphics API. Previously tools:node="remove" silently stripped
+      // this entry from the merged manifest entirely.
       contents.manifest["uses-feature"].push({
         $: {
           "android:glEsVersion": "0x00030000",
           "android:required": "false",
-          "tools:node": "remove",
           "tools:replace": "required",
         },
       });
@@ -400,7 +421,7 @@ const withViroManifest = (config: ExpoConfig) =>
       });
 
       // Quest-specific features and permissions — after uses-feature is initialized
-      if (viroPluginConfig.includes("QUEST")) {
+      if (activeXrModes.includes("QUEST")) {
         contents.manifest["uses-feature"].push({
           $: {
             "android:name": "android.hardware.vr.headtracking",
@@ -420,6 +441,13 @@ const withViroManifest = (config: ExpoConfig) =>
         contents.manifest["uses-feature"].push({
           $: {
             "android:name": "com.oculus.feature.PASSTHROUGH",
+            "android:required": "false",
+          },
+        });
+        // Required when com.oculus.permission.EYE_TRACKING is declared.
+        contents.manifest["uses-feature"].push({
+          $: {
+            "android:name": "oculus.software.eye_tracking",
             "android:required": "false",
           },
         });
@@ -670,7 +698,17 @@ class VRActivity : ReactActivity() {
     },
   ]);
 
-  // 2. Add VRActivity to AndroidManifest
+  // 2. Cap targetSdkVersion to 34 — Meta Quest Store rejects targetSdk > 34.
+  config = withAppBuildGradle(config, (config) => {
+    config.modResults.contents = config.modResults.contents.replace(
+      /targetSdk(?:Version)?\s*[=\s]\s*(\d+)/g,
+      (match: string, ver: string) =>
+        parseInt(ver, 10) > 34 ? match.replace(ver, "34") : match
+    );
+    return config;
+  });
+
+  // 3. Add VRActivity to AndroidManifest
   config = withAndroidManifest(config, async (config) => {
     const app = config.modResults.manifest.application?.[0];
     if (!app) return config;
@@ -682,7 +720,7 @@ class VRActivity : ReactActivity() {
     );
 
     if (!alreadyAdded) {
-      app.activity.push({
+      (app.activity as any[]).push({
         $: {
           "android:name": ".VRActivity",
           "android:screenOrientation": "landscape",
@@ -699,11 +737,26 @@ class VRActivity : ReactActivity() {
             ],
           },
         ],
+        "meta-data": [
+          {
+            $: {
+              "android:name": "com.oculus.vr.focusaware",
+              "android:value": "true",
+            },
+          },
+        ],
       });
     }
 
-    // Inject com.oculus.app_id into <application> for Meta Quest App Name
+    // Quest store validator requires all activities to be landscape.
+    // Only apply when targeting Quest (questAppId present); AR/phone apps use portrait.
     const questAppId = props?.android?.questAppId;
+    const mainActivity = app.activity?.[0];
+    if (questAppId && mainActivity?.$ && mainActivity.$["android:name"] !== ".VRActivity") {
+      mainActivity.$["android:screenOrientation"] = "landscape";
+    }
+
+    // Inject com.oculus.app_id into <application> for Meta Quest App Name
     if (questAppId) {
       if (!app["meta-data"]) app["meta-data"] = [];
       const alreadyHasAppId = (app["meta-data"] as any[]).some(

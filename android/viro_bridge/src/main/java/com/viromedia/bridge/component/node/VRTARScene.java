@@ -69,6 +69,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
 
     // Pending occlusion mode to apply when scene is ready
     private ARScene.OcclusionMode mPendingOcclusionMode = null;
+    private boolean mPendingFrontCameraEnabled = false;
     private boolean mSceneDidAppear = false;
 
     public VRTARScene(ReactContext reactContext) {
@@ -153,6 +154,13 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         mEventDelegateJni.setEventEnabled(EventDelegate.EventAction.ON_AR_POINT_CLOUD_UPDATE, canARPointCloudUpdate);
     }
 
+    public void setFrontCameraEnabled(boolean enabled) {
+        mPendingFrontCameraEnabled = enabled;
+        if (mSceneDidAppear && !isTornDown() && mNativeScene instanceof ARScene) {
+            ((ARScene) mNativeScene).setFrontCameraEnabled(enabled);
+        }
+    }
+
     public void setOcclusionMode(ARScene.OcclusionMode mode) {
         android.util.Log.i("ViroAR", "[OCCLUSION] VRTARScene.setOcclusionMode called with mode: " + mode);
         mPendingOcclusionMode = mode;
@@ -180,6 +188,11 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
             ((ARScene) mNativeScene).setOcclusionMode(mPendingOcclusionMode);
         } else {
             android.util.Log.i("ViroAR", "[OCCLUSION]   No pending occlusion mode to apply");
+        }
+
+        // Apply front camera setting if it was requested before scene was ready
+        if (mPendingFrontCameraEnabled && !isTornDown() && mNativeScene instanceof ARScene) {
+            ((ARScene) mNativeScene).setFrontCameraEnabled(true);
         }
     }
 

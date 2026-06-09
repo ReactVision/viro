@@ -1,11 +1,90 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.SequenceScheduler = void 0;
 exports.executeFunctionWithRelations = executeFunctionWithRelations;
 exports.executeOnLoadFunction = executeOnLoadFunction;
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../../Utilities/ViroPlatform");
 const VRTStudioModule_1 = require("../VRTStudioModule");
 const ANIMATION_CHAIN_MAX_DEPTH = 10;
+class SequenceScheduler {
+    timers = new Set();
+    appStateSub = null;
+    backgrounded = false;
+    // Sequence ids currently mid-run. A re-trigger of an in-flight sequence is
+    // ignored (no stacked/overlapping runs); single actions are unaffected.
+    activeSequences = new Set();
+    constructor() {
+        this.appStateSub = react_native_1.AppState.addEventListener("change", (state) => {
+            if (state === "active")
+                this.resumeAll();
+            else
+                this.pauseAll();
+        });
+    }
+    // Returns false if the sequence is already running (caller should skip).
+    beginSequence(id) {
+        if (this.activeSequences.has(id))
+            return false;
+        this.activeSequences.add(id);
+        return true;
+    }
+    endSequence(id) {
+        this.activeSequences.delete(id);
+    }
+    schedule(callback, ms) {
+        const timer = {
+            callback,
+            remainingMs: Math.max(0, ms),
+            startedAt: Date.now(),
+            handle: null,
+        };
+        this.timers.add(timer);
+        if (!this.backgrounded)
+            this.arm(timer);
+    }
+    arm(timer) {
+        timer.startedAt = Date.now();
+        timer.handle = setTimeout(() => {
+            this.timers.delete(timer);
+            timer.callback();
+        }, timer.remainingMs);
+    }
+    pauseAll() {
+        if (this.backgrounded)
+            return;
+        this.backgrounded = true;
+        const now = Date.now();
+        for (const timer of this.timers) {
+            if (timer.handle === null)
+                continue;
+            clearTimeout(timer.handle);
+            timer.handle = null;
+            timer.remainingMs = Math.max(0, timer.remainingMs - (now - timer.startedAt));
+        }
+    }
+    resumeAll() {
+        if (!this.backgrounded)
+            return;
+        this.backgrounded = false;
+        for (const timer of this.timers)
+            this.arm(timer);
+    }
+    cancelAll() {
+        for (const timer of this.timers) {
+            if (timer.handle !== null)
+                clearTimeout(timer.handle);
+        }
+        this.timers.clear();
+        this.activeSequences.clear();
+    }
+    dispose() {
+        this.cancelAll();
+        this.appStateSub?.remove();
+        this.appStateSub = null;
+    }
+}
+exports.SequenceScheduler = SequenceScheduler;
 /**
  * Resolves a scene function by ID from a flat list.
  */
@@ -24,9 +103,56 @@ function resolveAnimationTargetAssetId(animationId, animations) {
  * Single dispatcher for all scene function types.
  * Used by onClick, onCollision, and on_load_function triggers.
  */
-function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, depth = 0, onSceneChange) {
+function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, depth = 0, onSceneChange, runtimeCtx) {
     if (depth > ANIMATION_CHAIN_MAX_DEPTH) {
-        console.warn(`[Studio] Max animation chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for function ${fn.id}.`);
+        console.warn(`[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for function ${fn.id}.`);
+        return;
+    }
+    if (fn.function_type === "SEQUENCE") {
+        const seq = fn.scene_sequence;
+        if (!seq)
+            return;
+        if (!runtimeCtx) {
+            console.warn(`[Studio] SEQUENCE function ${fn.id} needs a runtime context (scheduler); skipping.`);
+            return;
+        }
+        // Ignore a re-trigger while this sequence is still running (no stacking).
+        if (!runtimeCtx.scheduler.beginSequence(seq.id))
+            return;
+        const steps = [...seq.steps].sort((a, b) => a.step_order - b.step_order);
+        const runStep = (i) => {
+            if (i >= steps.length) {
+                runtimeCtx.scheduler.endSequence(seq.id);
+                return;
+            }
+            const step = steps[i];
+            if (step.step_type === "WAIT") {
+                // Non-blocking: the rest of the sequence continues after the timer.
+                runtimeCtx.scheduler.schedule(() => runStep(i + 1), step.duration_ms ?? 0);
+                return;
+            }
+            // ACTION: dispatch the action, then advance.
+            if (step.function) {
+                executeFunctionWithRelations(step.function, sceneNavigator, animations, onAnimationTrigger, depth + 1, onSceneChange, runtimeCtx);
+                // A sequence is scoped to one scene. NAVIGATION leaves it, so the
+                // sequence ends here; remaining steps belong to the scene we just left.
+                // Author follow-on steps as the target scene's on_load sequence.
+                if (step.function.function_type === "NAVIGATION") {
+                    runtimeCtx.scheduler.endSequence(seq.id);
+                    return;
+                }
+                // ANIMATION: hold the sequence for the animation's run time so later
+                // steps (including WAIT) begin when it finishes, not when it starts.
+                if (step.function.function_type === "ANIMATION") {
+                    const anim = step.function.scene_animation;
+                    const runMs = (anim?.delay_ms ?? 0) + (anim?.duration_ms ?? 0);
+                    runtimeCtx.scheduler.schedule(() => runStep(i + 1), runMs);
+                    return;
+                }
+            }
+            runStep(i + 1);
+        };
+        runStep(0);
         return;
     }
     if (fn.function_type === "NAVIGATION") {
@@ -65,13 +191,13 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
 /**
  * Executes the scene's on_load_function if set.
  */
-function executeOnLoadFunction(functionId, functions, sceneNavigator, animations, onAnimationTrigger, onSceneChange) {
+function executeOnLoadFunction(functionId, functions, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx) {
     const fn = resolveById(functionId, functions);
     if (!fn) {
         console.warn(`[Studio] on_load_function ${functionId} not found.`);
         return;
     }
-    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
+    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange, runtimeCtx);
 }
 /**
  * Navigates to a new AR scene by fetching its data via rvGetScene and

@@ -18,13 +18,28 @@ export interface StudioProjectMeta {
     id: string;
     occlusion_mode: "NONE" | "PEOPLEONLY" | "DEPTHBASED";
 }
+/** One ordered step of a Sequence: an ACTION (runs a function) or a WAIT (timed pause). */
+export interface StudioSequenceStep {
+    id: string;
+    step_order: number;
+    step_type: "ACTION" | "WAIT";
+    duration_ms: number | null;
+    function_id: string | null;
+    function: StudioSceneFunction | null;
+}
+export interface StudioSequence {
+    id: string;
+    name: string | null;
+    steps: StudioSequenceStep[];
+}
 export interface StudioSceneFunction {
     id: string;
     scene: string;
-    function_type: "NAVIGATION" | "ALERT" | "ANIMATION";
+    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE";
     navigation: string | null;
     alert: string | null;
     animation: string | null;
+    sequence: string | null;
     scene_navigation: {
         id: string;
         navigate_to: string;
@@ -41,6 +56,7 @@ export interface StudioSceneFunction {
         delay_ms: number | null;
         properties: Record<string, unknown>;
     } | null;
+    scene_sequence: StudioSequence | null;
 }
 export interface StudioAsset {
     id: string;

@@ -72,6 +72,25 @@ exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
     const { sceneNavigator, sceneData, onReady, onSceneChange } = props;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
+    // ─── Sequence scheduler ───────────────────────────────────────────────────
+    // One per scene. Drives WAIT steps; cancelled on unmount and on navigation so
+    // a pending WAIT never fires into a torn-down or replaced scene.
+    const schedulerRef = (0, react_1.useRef)(null);
+    if (schedulerRef.current === null) {
+        schedulerRef.current = new sceneNavigationHandler_1.SequenceScheduler();
+    }
+    (0, react_1.useEffect)(() => {
+        return () => {
+            schedulerRef.current?.dispose();
+            schedulerRef.current = null;
+        };
+    }, []);
+    const runtimeCtx = (0, react_1.useMemo)(() => ({ scheduler: schedulerRef.current }), []);
+    // Cancel this scene's pending WAITs before handing off to the next scene.
+    const handleSceneChange = (0, react_1.useCallback)((sceneId, sceneName) => {
+        schedulerRef.current?.cancelAll();
+        onSceneChange?.(sceneId, sceneName);
+    }, [onSceneChange]);
     // ─── Material registration ────────────────────────────────────────────────
     const materialsRegisteredRef = (0, react_1.useRef)(false);
     if (!materialsRegisteredRef.current) {
@@ -148,21 +167,21 @@ const StudioARSceneInner = (props) => {
                 interruptible: activeAnim.interruptible,
                 delay: activeAnim.delay_ms ?? 0,
                 onStart: activeAnim.on_start_function
-                    ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_start_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key))
+                    ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_start_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx)
                     : undefined,
                 onFinish: activeAnim.on_finish_function
-                    ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_finish_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key))
+                    ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_finish_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx)
                     : undefined,
             };
         }
         return states;
-    }, [animations, animOverrides, loadedAssetIds, functions, sceneNavigator]);
+    }, [animations, animOverrides, loadedAssetIds, functions, sceneNavigator, handleSceneChange, runtimeCtx]);
     // ─── on_load_function ─────────────────────────────────────────────────────
     const onLoadExecutedRef = (0, react_1.useRef)(false);
     (0, react_1.useEffect)(() => {
         if (scene.on_load_function && !onLoadExecutedRef.current) {
             onLoadExecutedRef.current = true;
-            (0, sceneNavigationHandler_1.executeOnLoadFunction)(scene.on_load_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), onSceneChange);
+            (0, sceneNavigationHandler_1.executeOnLoadFunction)(scene.on_load_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
         }
     }, [scene.id]);
     // ─── Collision bindings ───────────────────────────────────────────────────
@@ -188,8 +207,8 @@ const StudioARSceneInner = (props) => {
     const getCollisionHandler = (0, react_1.useCallback)((placementId) => {
         if (!collisionAssetIds.has(placementId))
             return undefined;
-        return (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(placementId, bindingsByPairKey, sceneNavigator, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key), onSceneChange);
-    }, [bindingsByPairKey, collisionAssetIds, sceneNavigator, animations]);
+        return (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(placementId, bindingsByPairKey, sceneNavigator, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
+    }, [bindingsByPairKey, collisionAssetIds, sceneNavigator, animations, handleSceneChange, runtimeCtx]);
     // ─── Trigger image targets ────────────────────────────────────────────────
     const { planeAssets, imageTriggeredAssets } = (0, react_1.useMemo)(() => {
         const plane = assets.filter((a) => !a.trigger_image_url);
@@ -235,10 +254,10 @@ const StudioARSceneInner = (props) => {
                     return null;
                 }
             }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), onSceneChange);
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), handleSceneChange, runtimeCtx);
         })
             .filter(Boolean);
-    }, [planeAssets, sceneNavigator, animations, animationStates, handleAssetLoaded, getCollisionHandler, maxModels, onSceneChange]);
+    }, [planeAssets, sceneNavigator, animations, animationStates, handleAssetLoaded, getCollisionHandler, maxModels, handleSceneChange, runtimeCtx]);
     const renderedImageTriggeredAssets = (0, react_1.useMemo)(() => {
         if (ViroPlatform_1.isQuest)
             return [];
@@ -247,7 +266,7 @@ const StudioARSceneInner = (props) => {
             const targetName = urlToTargetName.get(asset.trigger_image_url);
             if (!targetName)
                 return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), onSceneChange);
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), handleSceneChange, runtimeCtx);
             if (!node)
                 return null;
             return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
@@ -255,7 +274,7 @@ const StudioARSceneInner = (props) => {
           </ViroARImageMarker_1.ViroARImageMarker>);
         })
             .filter(Boolean);
-    }, [urlToTargetName, imageTriggeredAssets, sceneNavigator, animations, animationStates, handleAssetLoaded, getCollisionHandler, onSceneChange]);
+    }, [urlToTargetName, imageTriggeredAssets, sceneNavigator, animations, animationStates, handleAssetLoaded, getCollisionHandler, handleSceneChange, runtimeCtx]);
     // ─── Plane detection (AR only) ────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");

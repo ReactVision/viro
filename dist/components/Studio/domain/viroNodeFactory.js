@@ -49,7 +49,7 @@ const physicsConfig_1 = require("./physicsConfig");
  * Derives the transform config for an asset.
  * Clamps Z to -2 for non-trigger assets to guarantee visibility.
  */
-function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange) {
+function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange, runtimeCtx) {
     const hasTriggerImage = !!asset.trigger_image_url;
     let posZ = asset.position_z ?? -2;
     if (!hasTriggerImage && posZ > -0.5) {
@@ -91,11 +91,11 @@ function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationT
     const parsedPhysics = (0, physicsConfig_1.parsePhysicsBodyConfig)(asset.physics_config);
     const physicsBody = parsedPhysics ? (0, physicsConfig_1.buildViroPhysicsBody)(parsedPhysics) : undefined;
     const viroTag = parsedPhysics ? asset.id : undefined;
-    const onClick = createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger, onSceneChange);
+    const onClick = createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx);
     const animation = animationStates?.[asset.id];
     return { position, rotation, scale, dragType, dragPlane, physicsBody, viroTag, onClick, animation };
 }
-function createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger, onSceneChange) {
+function createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx) {
     const fn = asset.scene_function;
     if (!fn)
         return undefined;
@@ -111,7 +111,7 @@ function createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrig
         console.warn(`[Studio] Asset "${asset.name}" has ANIMATION but no animation data`);
         return undefined;
     }
-    return () => (0, sceneNavigationHandler_1.executeFunctionWithRelations)(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
+    return () => (0, sceneNavigationHandler_1.executeFunctionWithRelations)(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange, runtimeCtx);
 }
 /** Resolves asset type from asset_type_name. */
 function resolveType(asset) {
@@ -174,9 +174,9 @@ function createVideo(asset, config) {
 /**
  * Creates the appropriate Viro component for a StudioAsset.
  */
-function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, onSceneChange) {
+function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, onSceneChange, runtimeCtx) {
     const type = resolveType(asset);
-    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange);
+    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange, runtimeCtx);
     switch (type) {
         case "3D-MODEL":
             return create3DObject(asset, config, onAssetLoaded, onCollision);

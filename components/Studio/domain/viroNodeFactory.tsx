@@ -5,7 +5,10 @@ import { ViroImage } from "../../ViroImage";
 import { ViroText } from "../../ViroText";
 import { ViroVideo } from "../../ViroVideo";
 import { StudioAnimation, StudioAsset, StudioSceneMeta, ViroAnimationProp } from "../types";
-import { executeFunctionWithRelations } from "./sceneNavigationHandler";
+import {
+  executeFunctionWithRelations,
+  SequenceRuntimeContext,
+} from "./sceneNavigationHandler";
 import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
 import { DragConfiguration } from "./dragConfiguration";
 import { buildViroPhysicsBody, parsePhysicsBodyConfig } from "./physicsConfig";
@@ -35,7 +38,8 @@ export function createNodeConfig(
   scene: StudioSceneMeta | null,
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   animationStates?: Record<string, ViroAnimationProp>,
-  onSceneChange?: (sceneId: string, sceneName: string) => void
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext
 ): NodeConfig {
   const hasTriggerImage = !!asset.trigger_image_url;
 
@@ -95,7 +99,8 @@ export function createNodeConfig(
     sceneNavigator,
     animations,
     onAnimationTrigger,
-    onSceneChange
+    onSceneChange,
+    runtimeCtx
   );
 
   const animation = animationStates?.[asset.id];
@@ -108,7 +113,8 @@ function createOnClickHandler(
   sceneNavigator: SceneNavigator | undefined,
   animations: StudioAnimation[],
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
-  onSceneChange?: (sceneId: string, sceneName: string) => void
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext
 ): (() => void) | undefined {
   const fn = asset.scene_function;
   if (!fn) return undefined;
@@ -127,7 +133,15 @@ function createOnClickHandler(
   }
 
   return () =>
-    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
+    executeFunctionWithRelations(
+      fn,
+      sceneNavigator,
+      animations,
+      onAnimationTrigger,
+      0,
+      onSceneChange,
+      runtimeCtx
+    );
 }
 
 /** Resolves asset type from asset_type_name. */
@@ -294,7 +308,8 @@ export function createNode(
   animationStates?: Record<string, ViroAnimationProp>,
   onAssetLoaded?: (id: string) => void,
   onCollision?: (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void,
-  onSceneChange?: (sceneId: string, sceneName: string) => void
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -304,7 +319,8 @@ export function createNode(
     scene,
     onAnimationTrigger,
     animationStates,
-    onSceneChange
+    onSceneChange,
+    runtimeCtx
   );
 
   switch (type) {

@@ -14,5 +14,6 @@ export type {
   StudioSceneFunction,
   StudioSceneMeta,
   StudioSceneResponse,
+  StudioSceneVariable,
   ViroAnimationProp,
 } from "./types";

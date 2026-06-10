@@ -52,6 +52,7 @@ const collisionPairKey_1 = require("./domain/collisionPairKey");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
+const variableStore_1 = require("./domain/variableStore");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
@@ -70,7 +71,7 @@ const StudioARScene = (props) => {
 };
 exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
-    const { sceneNavigator, sceneData, onReady, onSceneChange } = props;
+    const { sceneNavigator, sceneData, onReady, onSceneChange, variableStore } = props;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
     // ─── Sequence scheduler ───────────────────────────────────────────────────
     // One per scene. Drives WAIT steps; cancelled on unmount and on navigation so
@@ -85,7 +86,20 @@ const StudioARSceneInner = (props) => {
             schedulerRef.current = null;
         };
     }, []);
-    const runtimeCtx = (0, react_1.useMemo)(() => ({ scheduler: schedulerRef.current }), []);
+    // ─── Variable store ───────────────────────────────────────────────────────
+    // Normally passed down by the navigator (session-scoped); hosts mounting this
+    // scene directly get a scene-local fallback. Seeding happens here, at instance
+    // init, so values exist before any effect dispatches on_load. seed() is
+    // initialize-if-absent, hence idempotent and strict-mode safe.
+    const variableStoreRef = (0, react_1.useRef)(null);
+    if (variableStoreRef.current === null) {
+        variableStoreRef.current = variableStore ?? new variableStore_1.StudioVariableStore();
+        variableStoreRef.current.seed(sceneData.variables ?? []);
+    }
+    const runtimeCtx = (0, react_1.useMemo)(() => ({
+        scheduler: schedulerRef.current,
+        variableStore: variableStoreRef.current,
+    }), []);
     // Cancel this scene's pending WAITs before handing off to the next scene.
     const handleSceneChange = (0, react_1.useCallback)((sceneId, sceneName) => {
         schedulerRef.current?.cancelAll();

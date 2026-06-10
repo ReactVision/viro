@@ -7,6 +7,7 @@ import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
 import { isQuest } from "../Utilities/ViroPlatform";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import { StudioVariableStore } from "./domain/variableStore";
 import { StudioARScene } from "./StudioARScene";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
@@ -64,6 +65,19 @@ export function StudioSceneNavigator({
 }: StudioSceneNavigatorProps) {
   const navigatorRef = useRef<any>(null);
   const loadedSceneIdRef = useRef<string | null>(null);
+
+  // Session-scoped variable store: outlives every scene push, resets when the
+  // navigator (= the AR/VR session) unmounts.
+  const variableStoreRef = useRef<StudioVariableStore | null>(null);
+  if (variableStoreRef.current === null) {
+    variableStoreRef.current = new StudioVariableStore();
+  }
+  useEffect(() => {
+    return () => {
+      variableStoreRef.current?.reset();
+      variableStoreRef.current = null;
+    };
+  }, []);
 
   const onSceneReadyRef = useRef(onSceneReady);
   const onErrorRef = useRef(onError);
@@ -138,6 +152,7 @@ export function StudioSceneNavigator({
           sceneData,
           onReady: onSceneReadyRef.current,
           onSceneChange: onSceneChangeRef.current,
+          variableStore: variableStoreRef.current,
         },
       };
 

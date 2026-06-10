@@ -43,6 +43,7 @@ const ViroXRSceneNavigator_1 = require("../ViroXRSceneNavigator");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const studioMaterials_1 = require("./domain/studioMaterials");
+const variableStore_1 = require("./domain/variableStore");
 const StudioARScene_1 = require("./StudioARScene");
 const VRTStudioModule_1 = require("./VRTStudioModule");
 function LoadingARScene() { return <ViroARScene_1.ViroARScene />; }
@@ -72,6 +73,18 @@ const styles = react_native_1.StyleSheet.create({
 function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, }) {
     const navigatorRef = (0, react_1.useRef)(null);
     const loadedSceneIdRef = (0, react_1.useRef)(null);
+    // Session-scoped variable store: outlives every scene push, resets when the
+    // navigator (= the AR/VR session) unmounts.
+    const variableStoreRef = (0, react_1.useRef)(null);
+    if (variableStoreRef.current === null) {
+        variableStoreRef.current = new variableStore_1.StudioVariableStore();
+    }
+    (0, react_1.useEffect)(() => {
+        return () => {
+            variableStoreRef.current?.reset();
+            variableStoreRef.current = null;
+        };
+    }, []);
     const onSceneReadyRef = (0, react_1.useRef)(onSceneReady);
     const onErrorRef = (0, react_1.useRef)(onError);
     const onSceneChangeRef = (0, react_1.useRef)(onSceneChange);
@@ -137,6 +150,7 @@ function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus =
                 sceneData,
                 onReady: onSceneReadyRef.current,
                 onSceneChange: onSceneChangeRef.current,
+                variableStore: variableStoreRef.current,
             },
         };
         if (ViroPlatform_1.isQuest) {

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { StudioVariableStore } from "./domain/variableStore";
 import { StudioSceneResponse } from "./types";
 interface StudioARSceneProps {
     sceneNavigator?: any;
@@ -6,6 +7,8 @@ interface StudioARSceneProps {
     onReady?: () => void;
     onError?: (err: Error) => void;
     onSceneChange?: (sceneId: string, sceneName: string) => void;
+    /** Session-scoped store owned by the navigator; survives scene pushes. */
+    variableStore?: StudioVariableStore;
 }
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until

@@ -28,6 +28,7 @@ import {
   executeOnLoadFunction,
   SequenceScheduler,
 } from "./domain/sceneNavigationHandler";
+import { StudioVariableStore } from "./domain/variableStore";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
@@ -49,6 +50,8 @@ interface StudioARSceneProps {
   onReady?: () => void;
   onError?: (err: Error) => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
+  /** Session-scoped store owned by the navigator; survives scene pushes. */
+  variableStore?: StudioVariableStore;
 }
 
 /**
@@ -69,7 +72,7 @@ interface StudioARSceneInnerProps extends StudioARSceneProps {
 }
 
 const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
-  const { sceneNavigator, sceneData, onReady, onSceneChange } = props;
+  const { sceneNavigator, sceneData, onReady, onSceneChange, variableStore } = props;
   const { scene, assets, animations, collision_bindings, functions } = sceneData;
 
   // ─── Sequence scheduler ───────────────────────────────────────────────────
@@ -85,8 +88,23 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       schedulerRef.current = null;
     };
   }, []);
+
+  // ─── Variable store ───────────────────────────────────────────────────────
+  // Normally passed down by the navigator (session-scoped); hosts mounting this
+  // scene directly get a scene-local fallback. Seeding happens here, at instance
+  // init, so values exist before any effect dispatches on_load. seed() is
+  // initialize-if-absent, hence idempotent and strict-mode safe.
+  const variableStoreRef = useRef<StudioVariableStore | null>(null);
+  if (variableStoreRef.current === null) {
+    variableStoreRef.current = variableStore ?? new StudioVariableStore();
+    variableStoreRef.current.seed(sceneData.variables ?? []);
+  }
+
   const runtimeCtx = useMemo(
-    () => ({ scheduler: schedulerRef.current! }),
+    () => ({
+      scheduler: schedulerRef.current!,
+      variableStore: variableStoreRef.current!,
+    }),
     [],
   );
 

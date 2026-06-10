@@ -32,14 +32,22 @@ export interface StudioSequence {
     name: string | null;
     steps: StudioSequenceStep[];
 }
+/** Scene-level variable declaration. Runtime state lives in StudioVariableStore. */
+export interface StudioSceneVariable {
+    id: string;
+    name: string;
+    type: "BOOLEAN" | "NUMBER" | "STRING";
+    initial_value: boolean | number | string;
+}
 export interface StudioSceneFunction {
     id: string;
     scene: string;
-    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE";
+    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE";
     navigation: string | null;
     alert: string | null;
     animation: string | null;
     sequence: string | null;
+    set_variable: string | null;
     scene_navigation: {
         id: string;
         navigate_to: string;
@@ -57,6 +65,14 @@ export interface StudioSceneFunction {
         properties: Record<string, unknown>;
     } | null;
     scene_sequence: StudioSequence | null;
+    /** name/type are joined from the target scene_variables row, so they follow renames. */
+    scene_set_variable: {
+        id: string;
+        variable_id: string;
+        name: string;
+        type: "BOOLEAN" | "NUMBER" | "STRING";
+        expression: string;
+    } | null;
 }
 export interface StudioAsset {
     id: string;
@@ -149,6 +165,8 @@ export interface StudioSceneResponse {
     collision_bindings: StudioCollisionBinding[];
     animations: StudioAnimation[];
     functions: StudioSceneFunction[];
+    /** Absent in responses from backends predating the Variables feature. */
+    variables?: StudioSceneVariable[];
     meta: {
         request_id: string;
     };

@@ -2,6 +2,8 @@ import { Alert, AppState } from "react-native";
 import { isQuest } from "../../Utilities/ViroPlatform";
 import { StudioAnimation, StudioSceneFunction, StudioSceneResponse } from "../types";
 import { VRTStudioModule } from "../VRTStudioModule";
+import { evaluate, parseExpression, valueMatchesType } from "./expressionEvaluator";
+import { StudioVariableStore } from "./variableStore";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
@@ -105,12 +107,13 @@ export class SequenceScheduler {
 }
 
 /**
- * Runtime context threaded through executeFunctionWithRelations. Today it only
- * carries the Sequence scheduler; the Variables epic adds a variable store here
- * without a breaking signature change.
+ * Runtime context threaded through executeFunctionWithRelations: the Sequence
+ * scheduler plus the per-session variable store (optional so dispatch sites
+ * without variables keep working).
  */
 export type SequenceRuntimeContext = {
   scheduler: SequenceScheduler;
+  variableStore?: StudioVariableStore;
 };
 
 /**
@@ -214,7 +217,13 @@ export function executeFunctionWithRelations(
   if (fn.function_type === "NAVIGATION") {
     const nav = fn.scene_navigation;
     if (!nav?.navigate_to || !sceneNavigator) return;
-    void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange);
+    void navigateToScene(
+      sceneNavigator,
+      nav.navigate_to,
+      animations,
+      onSceneChange,
+      runtimeCtx?.variableStore,
+    );
   } else if (fn.function_type === "ALERT") {
     const alrt = fn.scene_alert;
     if (!alrt) return;
@@ -242,6 +251,34 @@ export function executeFunctionWithRelations(
       return;
     }
     onAnimationTrigger(targetAssetId, anim.animation_key);
+  } else if (fn.function_type === "SET_VARIABLE") {
+    // Failure policy: warn + skip the write, never throw — the sequence continues.
+    const sv = fn.scene_set_variable;
+    const store = runtimeCtx?.variableStore;
+    if (!sv) return;
+    if (!store) {
+      console.warn(
+        `[Studio] SET_VARIABLE function ${fn.id} needs a runtime context (variable store); skipping.`
+      );
+      return;
+    }
+    const parsed = parseExpression(sv.expression);
+    if (!parsed.ok) {
+      console.warn(`[Studio] SET_VARIABLE "${sv.name}": ${parsed.error}; skipping.`);
+      return;
+    }
+    const result = evaluate(parsed.ast, (name) => store.get(name));
+    if (!result.ok) {
+      console.warn(`[Studio] SET_VARIABLE "${sv.name}": ${result.error}; skipping.`);
+      return;
+    }
+    if (!valueMatchesType(result.value, sv.type)) {
+      console.warn(
+        `[Studio] SET_VARIABLE "${sv.name}": result is a ${typeof result.value}, expected ${sv.type}; skipping.`
+      );
+      return;
+    }
+    store.set(sv.name, result.value);
   }
 }
 
@@ -285,6 +322,7 @@ async function navigateToScene(
   targetSceneId: string,
   currentAnimations: StudioAnimation[],
   onSceneChange?: (sceneId: string, sceneName: string) => void,
+  variableStore?: StudioVariableStore,
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");
@@ -310,6 +348,9 @@ async function navigateToScene(
       passProps: {
         sceneData,
         onSceneChange,
+        // The session store rides along on every push so values survive scene
+        // transitions for the navigator's whole lifetime.
+        variableStore,
       },
     });
 

@@ -6,6 +6,7 @@ exports.executeOnLoadFunction = executeOnLoadFunction;
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../../Utilities/ViroPlatform");
 const VRTStudioModule_1 = require("../VRTStudioModule");
+const expressionEvaluator_1 = require("./expressionEvaluator");
 const ANIMATION_CHAIN_MAX_DEPTH = 10;
 class SequenceScheduler {
     timers = new Set();
@@ -159,7 +160,7 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         const nav = fn.scene_navigation;
         if (!nav?.navigate_to || !sceneNavigator)
             return;
-        void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange);
+        void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange, runtimeCtx?.variableStore);
     }
     else if (fn.function_type === "ALERT") {
         const alrt = fn.scene_alert;
@@ -187,6 +188,32 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         }
         onAnimationTrigger(targetAssetId, anim.animation_key);
     }
+    else if (fn.function_type === "SET_VARIABLE") {
+        // Failure policy: warn + skip the write, never throw — the sequence continues.
+        const sv = fn.scene_set_variable;
+        const store = runtimeCtx?.variableStore;
+        if (!sv)
+            return;
+        if (!store) {
+            console.warn(`[Studio] SET_VARIABLE function ${fn.id} needs a runtime context (variable store); skipping.`);
+            return;
+        }
+        const parsed = (0, expressionEvaluator_1.parseExpression)(sv.expression);
+        if (!parsed.ok) {
+            console.warn(`[Studio] SET_VARIABLE "${sv.name}": ${parsed.error}; skipping.`);
+            return;
+        }
+        const result = (0, expressionEvaluator_1.evaluate)(parsed.ast, (name) => store.get(name));
+        if (!result.ok) {
+            console.warn(`[Studio] SET_VARIABLE "${sv.name}": ${result.error}; skipping.`);
+            return;
+        }
+        if (!(0, expressionEvaluator_1.valueMatchesType)(result.value, sv.type)) {
+            console.warn(`[Studio] SET_VARIABLE "${sv.name}": result is a ${typeof result.value}, expected ${sv.type}; skipping.`);
+            return;
+        }
+        store.set(sv.name, result.value);
+    }
 }
 /**
  * Executes the scene's on_load_function if set.
@@ -206,7 +233,7 @@ function executeOnLoadFunction(functionId, functions, sceneNavigator, animations
  * The sceneNavigator object exposes rvGetScene as a method — no separate
  * API client needed here.
  */
-async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations, onSceneChange) {
+async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations, onSceneChange, variableStore) {
     if (!sceneNavigator) {
         console.error("[Studio] SceneNavigator not available for navigation");
         react_native_1.Alert.alert("Navigation Error", "Unable to navigate to scene");
@@ -226,6 +253,9 @@ async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations,
             passProps: {
                 sceneData,
                 onSceneChange,
+                // The session store rides along on every push so values survive scene
+                // transitions for the navigator's whole lifetime.
+                variableStore,
             },
         });
         onSceneChange?.(targetSceneId, sceneData.scene.name ?? targetSceneId);

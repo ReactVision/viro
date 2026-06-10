@@ -1,4 +1,5 @@
 import { StudioAnimation, StudioSceneFunction } from "../types";
+import { StudioVariableStore } from "./variableStore";
 type SceneNavigator = any;
 export declare class SequenceScheduler {
     private timers;
@@ -16,12 +17,13 @@ export declare class SequenceScheduler {
     dispose(): void;
 }
 /**
- * Runtime context threaded through executeFunctionWithRelations. Today it only
- * carries the Sequence scheduler; the Variables epic adds a variable store here
- * without a breaking signature change.
+ * Runtime context threaded through executeFunctionWithRelations: the Sequence
+ * scheduler plus the per-session variable store (optional so dispatch sites
+ * without variables keep working).
  */
 export type SequenceRuntimeContext = {
     scheduler: SequenceScheduler;
+    variableStore?: StudioVariableStore;
 };
 /**
  * Single dispatcher for all scene function types.

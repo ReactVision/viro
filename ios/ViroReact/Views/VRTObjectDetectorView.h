@@ -1,0 +1,73 @@
+//
+//  VRTObjectDetectorView.h
+//  ViroReact
+//
+//  Copyright © 2026 ReactVision. All rights reserved.
+//
+//  Permission is hereby granted, free of charge, to any person obtaining
+//  a copy of this software and associated documentation files (the
+//  "Software"), to deal in the Software without restriction, including
+//  without limitation the rights to use, copy, modify, merge, publish,
+//  distribute, sublicense, and/or sell copies of the Software, and to
+//  permit persons to whom the Software is furnished to do so, subject to
+//  the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included
+//  in all copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+//  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+//  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+//  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+//  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+#import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
+#import <React/RCTView.h>
+#import <React/RCTBridgeModule.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+/**
+ * VRTObjectDetectorView — zero-size UIView that manages an AVCaptureSession,
+ * samples frames at `maxFPS`, runs YOLOE inference on each frame, and emits
+ * detection results to JS via RCT direct event callbacks.
+ *
+ * Inference is performed on a dedicated serial dispatch queue to avoid blocking
+ * the main thread or the AR render thread.
+ */
+@interface VRTObjectDetectorView : RCTView <AVCaptureVideoDataOutputSampleBufferDelegate>
+
+// --- Props set by VRTObjectDetectorViewManager ---
+
+/** Model name (CoreML bundle) or absolute path to .onnx. Default: "yoloe-26s". */
+@property (nonatomic, copy) NSString *model;
+
+/** "prompt-free" | "text" | "visual". Default: "prompt-free". */
+@property (nonatomic, copy) NSString *mode;
+
+/** Text labels for "text" mode. Ignored otherwise. */
+@property (nonatomic, copy) NSArray<NSString *> *categories;
+
+/** Minimum confidence [0,1] for a detection to be emitted. Default: 0.4. */
+@property (nonatomic, assign) float confidenceThreshold;
+
+/** NMS IoU threshold. Default: 0.45. */
+@property (nonatomic, assign) float iouThreshold;
+
+/** Maximum inference calls per second. Default: 15. */
+@property (nonatomic, assign) NSInteger maxFPS;
+
+/** "front" | "back". Default: "back". */
+@property (nonatomic, copy) NSString *cameraPosition;
+
+// --- RCT event callbacks ---
+@property (nonatomic, copy, nullable) RCTDirectEventBlock onDetectionViro;
+@property (nonatomic, copy, nullable) RCTDirectEventBlock onReadyViro;
+@property (nonatomic, copy, nullable) RCTDirectEventBlock onErrorViro;
+
+@end
+
+NS_ASSUME_NONNULL_END

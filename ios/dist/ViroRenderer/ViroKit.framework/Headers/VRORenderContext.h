@@ -208,6 +208,9 @@ public:
         return _depthTexture;
     }
 
+    void setDepthIsMonocular(bool monocular) { _depthIsMonocular = monocular; }
+    bool isDepthMonocular() const { return _depthIsMonocular; }
+
     void setSceneDepthTexture(std::shared_ptr<VROTexture> texture) {
         _sceneDepthTexture = texture;
     }
@@ -358,6 +361,7 @@ private:
      Depth texture from AR framework for occlusion.
      */
     std::shared_ptr<VROTexture> _depthTexture;
+    bool _depthIsMonocular = false;
 
     /*
      Scene depth texture captured from the previous frame's base render pass.

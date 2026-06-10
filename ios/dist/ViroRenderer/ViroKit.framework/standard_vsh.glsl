@@ -40,6 +40,7 @@ in vec3 morph_3;
 in vec3 morph_4;
 in vec3 morph_5;
 in vec3 morph_6;
+in lowp vec4 color;
 
 uniform highp vec3 camera_position;
 uniform mat4 normal_matrix;
@@ -54,6 +55,7 @@ out mat3 v_tbn;
 out vec2 v_texcoord;
 out vec3 v_surface_position;
 flat out int v_instance_id;
+out lowp vec4 v_color;
 #pragma varying_out_declarations
 
 void main() {
@@ -76,6 +78,8 @@ void main() {
     v_tbn = mat3(t, b, n);
 
     _vertex.position = _transforms.projection_matrix * _transforms.view_matrix * _transforms.model_matrix * vec4(_geometry.position, 1.0);
+
+    v_color = color;
 
 #pragma vertex_modifier_body
     

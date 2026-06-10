@@ -30,6 +30,9 @@
 #include <string>
 #include <chrono>
 #include <functional>
+#include <map>
+#include <mutex>
+#include <cstdint>
 #include "VROVector3f.h"
 
 class VROARDepthMesh;
@@ -50,16 +53,36 @@ struct VROWorldMeshConfig {
     float maxDepth = 5.0f;              // Maximum depth in meters
 
     // Update settings
-    double updateIntervalMs = 100.0;    // Minimum time between mesh updates
+    double updateIntervalMs = 500.0;    // Minimum time between mesh updates
     double meshPersistenceMs = 500.0;   // Time to keep mesh after depth data lost
 
     // Physics properties
     float friction = 0.5f;              // Surface friction coefficient
     float restitution = 0.3f;           // Bounciness (0 = no bounce, 1 = full bounce)
     std::string collisionTag = "world"; // Tag for collision event identification
+    int physicsMaxTriangles = 0;        // Stride-decimation triangle cap (0 = no limit). Leaves
+                                        // large gaps — prefer physicsCellSize for collision.
+    float physicsCellSize = 0.10f;      // Vertex-clustering cell size in meters (0 = disabled).
+                                        // Groups nearby vertices into a single representative,
+                                        // producing a gap-free simplified mesh. Max collision gap =
+                                        // sqrt(3) * cellSize. 0.10m → catches objects >~8cm reliably.
+                                        // Applied before physicsMaxTriangles (if both set).
 
     // Visualization
-    bool debugDrawEnabled = false;      // Enable wireframe visualization of mesh
+    bool debugDrawEnabled = false;         // Enable wireframe visualization of mesh
+    bool debugDrawDepthTest = true;        // Depth-test wireframe against scene (occluded by real surfaces)
+    int debugDrawMaxTriangles = 1000;      // Triangle cap for wireframe debug draw
+    float debugDrawLineThickness = 0.001f; // Line thickness for wireframe (meters)
+};
+
+/**
+ * Identifies the data source that produced a world mesh.
+ */
+enum class VROWorldMeshSource {
+    LiDAR,      // ARKit ARMeshAnchor (LiDAR-equipped device)
+    Monocular,  // Monocular depth estimation (non-LiDAR device)
+    Plane,      // Triangulated AR plane anchors (fallback)
+    Unknown
 };
 
 /**
@@ -74,9 +97,44 @@ struct VROWorldMeshStats {
 };
 
 /**
- * Callback type for mesh update notifications.
+ * Delivered to every registered subscriber when the world mesh is updated.
+ */
+struct VROWorldMeshUpdate {
+    std::shared_ptr<VROARDepthMesh> mesh;
+    VROWorldMeshStats stats;
+    VROWorldMeshSource source = VROWorldMeshSource::Unknown;
+};
+
+/**
+ * Per-subscriber options controlling mesh decimation.
+ * maxTriangles = 0 means no limit (full mesh delivered as-is).
+ */
+struct VROWorldMeshSubscriberOptions {
+    enum class DecimationStrategy {
+        Stride,       // Take every N-th triangle (O(1) per triangle, default)
+    };
+
+    int maxTriangles = 0;                              // 0 = unlimited
+    DecimationStrategy strategy = DecimationStrategy::Stride;
+};
+
+using VROWorldMeshSubscriberId = uint32_t;
+using VROWorldMeshSubscriberCallback = std::function<void(const VROWorldMeshUpdate&)>;
+
+/**
+ * Legacy callback — delivers only stats. Kept for back-compat; prefer subscribe().
  */
 using VROWorldMeshUpdateCallback = std::function<void(const VROWorldMeshStats&)>;
+
+/**
+ * Custom deleter for btRigidBody.
+ * Bullet requires removing the body from the dynamics world before deletion;
+ * this deleter encapsulates that invariant so it can't be forgotten.
+ */
+struct BulletRigidBodyDeleter {
+    std::weak_ptr<VROPhysicsWorld> physicsWorld;
+    void operator()(btRigidBody *body) const;
+};
 
 /**
  * VROARWorldMesh manages the lifecycle of a physics collision mesh generated
@@ -144,7 +202,21 @@ public:
     VROWorldMeshStats getStats() const;
 
     /**
-     * Set a callback to be notified when the mesh is updated.
+     * Subscribe to mesh updates. Returns an opaque ID used to unsubscribe.
+     * The callback is invoked on the render thread after each successful mesh build.
+     * @param callback Receives the full VROWorldMeshUpdate (mesh, stats, source).
+     * @param options  Per-consumer options (e.g. maxTriangles for W3 decimation).
+     */
+    VROWorldMeshSubscriberId subscribe(VROWorldMeshSubscriberCallback callback,
+                                       VROWorldMeshSubscriberOptions options = {});
+
+    /**
+     * Unsubscribe a previously registered callback. No-op if id is not found.
+     */
+    void unsubscribe(VROWorldMeshSubscriberId id);
+
+    /**
+     * @deprecated Prefer subscribe(). Delivers stats only, no mesh data.
      */
     void setUpdateCallback(VROWorldMeshUpdateCallback callback) {
         _updateCallback = callback;
@@ -161,9 +233,10 @@ public:
 private:
     std::weak_ptr<VROPhysicsWorld> _physicsWorld;
 
-    // Bullet physics components (direct, without VROPhysicsBody wrapper)
-    btRigidBody* _rigidBody = nullptr;
-    btDefaultMotionState* _motionState = nullptr;
+    // Bullet physics components — smart pointers for exception-safe lifecycle.
+    // BulletRigidBodyDeleter removes the body from the world before deletion.
+    std::unique_ptr<btRigidBody, BulletRigidBodyDeleter> _rigidBody;
+    std::unique_ptr<btDefaultMotionState> _motionState;
     std::shared_ptr<VROPhysicsShape> _physicsShape;
 
     // Current mesh data
@@ -172,13 +245,20 @@ private:
     // Configuration and state
     VROWorldMeshConfig _config;
     bool _enabled = false;
+    bool _isAddedToPhysicsWorld = false;  // guard against re-add on rapid updates
 
     // Timing
     double _lastUpdateTimeMs = 0.0;
     double _lastDepthTimeMs = 0.0;
 
-    // Callback
+    // Legacy stats-only callback
     VROWorldMeshUpdateCallback _updateCallback;
+
+    // Subscriber registry
+    std::map<VROWorldMeshSubscriberId,
+             std::pair<VROWorldMeshSubscriberCallback, VROWorldMeshSubscriberOptions>> _subscribers;
+    VROWorldMeshSubscriberId _nextSubscriberId = 1;
+    mutable std::mutex _subscriberMutex;
 
     /**
      * Apply a new mesh to the physics world.
@@ -210,6 +290,29 @@ private:
      * Check if the mesh is stale (depth data not received recently).
      */
     bool isMeshStale() const;
+
+    /**
+     * Fire the legacy _updateCallback and all registered subscribers.
+     * Called on the render thread after a mesh is successfully applied.
+     */
+    void notifySubscribers(std::shared_ptr<VROARDepthMesh> mesh);
+
+    /**
+     * Return a decimated copy of mesh with at most maxTriangles triangles,
+     * using Stride strategy (every N-th triangle). Vertices are copied as-is;
+     * only the index buffer is thinned. Returns mesh unchanged if already within budget.
+     */
+    static std::shared_ptr<VROARDepthMesh> decimateMesh(
+        std::shared_ptr<VROARDepthMesh> mesh, int maxTriangles);
+
+    /**
+     * Vertex-clustering simplification. Groups all vertices within cellSize metres
+     * into a single representative, rebuilds triangles, drops degenerate ones.
+     * Produces a gap-free mesh: max gap = sqrt(3)*cellSize.
+     * 0.10m cells → catches objects wider than ~8cm reliably.
+     */
+    static std::shared_ptr<VROARDepthMesh> clusterMesh(
+        std::shared_ptr<VROARDepthMesh> mesh, float cellSize);
 };
 
 #endif /* VROARWorldMesh_h */

@@ -176,6 +176,29 @@ public:
         return nullptr;
     }
 
+    /**
+     * Generate a persistent mesh from all active ARMeshAnchor objects (iOS LiDAR, iOS 13.4+).
+     * ARKit accumulates the mesh as the user scans the environment — geometry seen in
+     * previous frames remains present even when no longer in the camera frustum.
+     * Returns nullptr on non-LiDAR devices, Android, or unsupported OS versions.
+     * Source tag: "lidar"
+     */
+    virtual std::shared_ptr<VROARDepthMesh> generateMeshAnchorMesh() {
+        return nullptr;
+    }
+
+    /**
+     * Generate a mesh by triangulating all detected AR plane anchors.
+     * Fallback path for non-LiDAR iOS and non-Depth-API Android devices.
+     * Plane anchors are persistent within the AR session, so the mesh degrades
+     * gracefully rather than disappearing on unsupported hardware.
+     * Returns nullptr if no planes have been detected yet.
+     * Source tag: "plane"
+     */
+    virtual std::shared_ptr<VROARDepthMesh> generatePlaneMesh() {
+        return nullptr;
+    }
+
     /*
      Returns the transform matrix to convert from camera texture coordinates
      to depth texture coordinates. The depth map may have a different
@@ -185,6 +208,16 @@ public:
      By default returns identity (assumes depth texture UVs match camera UVs).
      */
     virtual VROMatrix4f getDepthTextureTransform() const {
+        return VROMatrix4f::identity();
+    }
+
+    /*
+     Debug-only variant: orientation-corrected transform WITHOUT the ScaleFill
+     crop correction. Maps the full screen [0,1]×[0,1] to the full depth texture
+     [0,1]×[0,1] so the debug overlay fills the screen without magenta bands.
+     The occlusion path still uses getDepthTextureTransform() for correctness.
+     */
+    virtual VROMatrix4f getDepthDebugTextureTransform() const {
         return VROMatrix4f::identity();
     }
 

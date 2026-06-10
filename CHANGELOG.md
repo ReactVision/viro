@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## v2.56.0 — 04 June 2026
+
+### Added
+
+- **Dynamic mesh node** — new `VRODynamicMeshNode` lets vertex buffers be replaced every frame without recreating geometry or its GPU resources. Designed for procedural meshes, external engine output, real-time simulations, and any use case where mesh topology changes at runtime.
+
+- **Virtual game controller** — `ViroVirtualJoystick` and `ViroVirtualButton` are native on-screen controller components for iOS and Android. Input is captured at the native layer and written directly to a thread-safe state registry, bypassing the JS bridge for sub-2 ms input latency. Both components also fire JS callbacks (`onStickChange`, `onPressIn`, `onPressOut`) for UI feedback.
+
+- **PCM audio streaming** — `StreamingAudioManager` enables real-time audio output by pushing raw PCM samples at runtime, without loading a complete audio file. Useful for procedural audio, embedded engine sound output, positional TTS, and physics-driven audio.
+
+- **AR World Mesh — public subscriber API** — `VROARWorldMesh` is now a general-purpose multi-consumer mesh provider. Subscribers receive full mesh geometry (vertices, indices, confidence) and a source tag (`LiDAR`, `Monocular`, or `Plane`). Key improvements include: persistent mesh sourcing from `ARMeshAnchor` (iOS LiDAR), a plane-based fallback for non-LiDAR devices, per-consumer triangle decimation, asynchronous Bullet physics construction to prevent ARKit frame drops, and vertex clustering for gap-free collision meshes.
+
+- **Game loop** — `ViroGameLoop` component and `useGameLoop` / `useFixedUpdate` hooks provide per-frame callbacks with variable dt and optional deterministic fixed-step mode (configurable frequency). `ViroGameLoopUtils` exposes `setPosition`, `setRotation`, and `setScale` for zero-overhead node manipulation from the game loop, bypassing the React reconciler.
+
+- **Selfie camera** — new AR scene that renders the front-facing camera with AR overlay effects.
+
+### Improved
+
+- **Monocular depth pipeline** (iOS) — the depth estimation model has been upgraded to Depth Anything V2 (metric, indoor), which outputs depth in meters and significantly improves occlusion accuracy on non-LiDAR devices. Additional improvements include temporal confidence synthesis, world-mesh fallback via monocular depth, full orientation support, thermal throttling, and per-source occlusion bias. Two new props on `ViroARSceneNavigator` — `monocularDepthScale` and `monocularDepthTargetFPS` — allow runtime calibration and inference rate control.
+
+### Fixed
+
+- **SIGABRT on Android 14+ (API 34)** — `ARUtilsCreateJavaARAnchorFromAnchor` called `NewStringUTF` with a non-Modified-UTF-8 ARCore anchor ID, causing a hard crash on Android 14 and above.
+
+- **Quest Store submission rejected due to forced landscape orientation** — `withViroAndroid.ts` unconditionally set `android:screenOrientation="landscape"` on `MainActivity`, overriding `app.json` orientation for all apps regardless of platform. This caused Quest Store validation failures for apps that did not target Quest. The landscape override is now applied only when `props.android.questAppId` is set.
+
+---
+
 ## v2.55.0 — 27 April 2026
 
 > **Install path.** Bare React Native is not tested for this release. It

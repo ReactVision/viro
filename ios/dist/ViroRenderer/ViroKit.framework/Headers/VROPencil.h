@@ -72,9 +72,18 @@ public:
         _brushThickness = thickness;
     }
 
+    /*
+     When enabled, lines are depth-tested against the scene (occluded by closer surfaces).
+     Default false to preserve the original overlay behavior.
+     */
+    void setDepthTestEnabled(bool enabled) {
+        _depthTestEnabled = enabled;
+    }
+
 private:
     std::vector<std::vector<VROVector3f>> _paths;
     float _brushThickness;
+    bool _depthTestEnabled = false;
 };
 
 #endif

@@ -114,6 +114,19 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 navigator.mNeedsAutoFocusToggle = false;
             }
 
+            // Apply frontCameraEnabled before the first ARCore config runs.
+            // This must happen after GL init but before any VRTARScene child
+            // calls setOcclusionMode (which triggers updateARCoreConfig).
+            if (navigator.mFrontCameraEnabled) {
+                for (int i = 0; i < navigator.getChildCount(); i++) {
+                    android.view.View child = navigator.getChildAt(i);
+                    if (child instanceof com.viromedia.bridge.component.node.VRTARScene) {
+                        ((com.viromedia.bridge.component.node.VRTARScene) child)
+                            .setFrontCameraEnabled(true);
+                    }
+                }
+            }
+
             // Apply pending occlusion mode configuration
             if (navigator.mNeedsOcclusionModeToggle) {
                 navigator.applyOcclusionMode();
@@ -199,6 +212,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Apply current effective occlusion mode to newly added ARScenes
         if (child instanceof VRTARScene) {
             ((VRTARScene) child).setOcclusionMode(computeEffectiveOcclusionMode());
+            if (mFrontCameraEnabled) {
+                ((VRTARScene) child).setFrontCameraEnabled(true);
+            }
         }
     }
 
@@ -348,6 +364,18 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             applyOcclusionMode();
         } else {
             mNeedsOcclusionModeToggle = true;
+        }
+    }
+
+    private boolean mFrontCameraEnabled = false;
+
+    public void setFrontCameraEnabled(boolean enabled) {
+        mFrontCameraEnabled = enabled;
+        for (int i = 0; i < getChildCount(); i++) {
+            android.view.View child = getChildAt(i);
+            if (child instanceof com.viromedia.bridge.component.node.VRTARScene) {
+                ((com.viromedia.bridge.component.node.VRTARScene) child).setFrontCameraEnabled(enabled);
+            }
         }
     }
 

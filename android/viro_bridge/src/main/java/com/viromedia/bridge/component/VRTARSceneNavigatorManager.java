@@ -92,6 +92,11 @@ public class VRTARSceneNavigatorManager extends VRTViroViewGroupManager<VRTARSce
         navigator.setMultisamplingEnabled(enabled);
     }
 
+    @ReactProp(name = "frontCameraEnabled")
+    public void setFrontCameraEnabled(VRTARSceneNavigator navigator, boolean enabled) {
+        navigator.setFrontCameraEnabled(enabled);
+    }
+
     @ReactProp(name = "occlusionMode")
     public void setOcclusionMode(VRTARSceneNavigator navigator, String mode) {
         navigator.setOcclusionMode(mode);

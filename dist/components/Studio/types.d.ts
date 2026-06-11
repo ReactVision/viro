@@ -39,15 +39,33 @@ export interface StudioSceneVariable {
     type: "BOOLEAN" | "NUMBER" | "STRING";
     initial_value: boolean | number | string;
 }
+/**
+ * BRANCH payload. Variable names/types are joined from scene_variables so they
+ * follow renames. Arms are owned, headless sequences run like nested sequences.
+ */
+export interface StudioSceneBranch {
+    id: string;
+    variable_id: string;
+    variable_name: string;
+    variable_type: "BOOLEAN" | "NUMBER" | "STRING";
+    comparison: "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "LESS_THAN" | "GREATER_OR_EQUAL" | "LESS_OR_EQUAL" | "LIKE" | "ILIKE";
+    compare_literal: boolean | number | string | null;
+    compare_variable_id: string | null;
+    compare_variable_name: string | null;
+    compare_variable_type: "BOOLEAN" | "NUMBER" | "STRING" | null;
+    then_sequence: StudioSequence;
+    else_sequence: StudioSequence | null;
+}
 export interface StudioSceneFunction {
     id: string;
     scene: string;
-    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE";
+    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH";
     navigation: string | null;
     alert: string | null;
     animation: string | null;
     sequence: string | null;
     set_variable: string | null;
+    branch: string | null;
     scene_navigation: {
         id: string;
         navigate_to: string;
@@ -73,6 +91,7 @@ export interface StudioSceneFunction {
         type: "BOOLEAN" | "NUMBER" | "STRING";
         expression: string;
     } | null;
+    scene_branch: StudioSceneBranch | null;
 }
 export interface StudioAsset {
     id: string;

@@ -18,7 +18,7 @@ import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
 
 type Props = {
-  arShadowReceiver?: boolean
+  arShadowReceiver?: boolean;
   uvCoordinates?: ViroUVCoordinate[];
 };
 
@@ -62,6 +62,7 @@ export class ViroQuad extends ViroBase<Props> {
     nativeProps.style = [this.props.style];
     nativeProps.onHoverViro = this._onHover;
     nativeProps.onClickViro = this._onClickState;
+    nativeProps.onClick = undefined;
     nativeProps.onTouchViro = this._onTouch;
     nativeProps.onScrollViro = this._onScroll;
     nativeProps.onSwipeViro = this._onSwipe;

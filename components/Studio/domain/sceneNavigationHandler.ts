@@ -1,8 +1,18 @@
 import { Alert, AppState } from "react-native";
 import { isQuest } from "../../Utilities/ViroPlatform";
-import { StudioAnimation, StudioSceneFunction, StudioSceneResponse } from "../types";
+import {
+  StudioAnimation,
+  StudioSceneFunction,
+  StudioSceneResponse,
+  StudioSequenceStep,
+} from "../types";
 import { VRTStudioModule } from "../VRTStudioModule";
-import { evaluate, parseExpression, valueMatchesType } from "./expressionEvaluator";
+import {
+  evaluate,
+  evaluateBranchCondition,
+  parseExpression,
+  valueMatchesType,
+} from "./expressionEvaluator";
 import { StudioVariableStore } from "./variableStore";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
@@ -126,6 +136,131 @@ function resolveById(
   return fns.find((f) => f.id === id);
 }
 
+/** Everything the step walker threads through; depth is the owning list's chain depth. */
+type StepRunnerDeps = {
+  sceneNavigator: SceneNavigator | undefined;
+  animations: StudioAnimation[];
+  onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void;
+  onSceneChange?: (sceneId: string, sceneName: string) => void;
+  runtimeCtx: SequenceRuntimeContext;
+  depth: number;
+};
+
+/**
+ * Walks an ordered step list with two continuations: onDone when the list
+ * completes, onAbort on early termination (NAVIGATION leaves the scene; the
+ * top caller releases its beginSequence guard either way, so a failed async
+ * navigation can't leave a sequence permanently blocked).
+ */
+function runSteps(
+  steps: StudioSequenceStep[],
+  deps: StepRunnerDeps,
+  onDone: () => void,
+  onAbort: () => void,
+): void {
+  const ordered = [...steps].sort((a, b) => a.step_order - b.step_order);
+  const runStep = (i: number): void => {
+    if (i >= ordered.length) {
+      onDone();
+      return;
+    }
+    const step = ordered[i];
+    if (step.step_type === "WAIT") {
+      // Non-blocking: the rest of the list continues after the timer.
+      deps.runtimeCtx.scheduler.schedule(() => runStep(i + 1), step.duration_ms ?? 0);
+      return;
+    }
+    // ACTION: dispatch the action, then advance.
+    if (step.function) {
+      // BRANCH needs the continuation: the outer list resumes only after the
+      // chosen arm completes (arm WAITs delay later outer steps).
+      if (step.function.function_type === "BRANCH") {
+        runBranch(step.function, deps, () => runStep(i + 1), onAbort);
+        return;
+      }
+      executeFunctionWithRelations(
+        step.function,
+        deps.sceneNavigator,
+        deps.animations,
+        deps.onAnimationTrigger,
+        deps.depth + 1,
+        deps.onSceneChange,
+        deps.runtimeCtx,
+      );
+      // A step list is scoped to one scene. NAVIGATION leaves it, so the walk
+      // ends here; remaining steps belong to the scene we just left.
+      // Author follow-on steps as the target scene's on_load sequence.
+      if (step.function.function_type === "NAVIGATION") {
+        onAbort();
+        return;
+      }
+      // ANIMATION: hold the walk for the animation's run time so later steps
+      // (including WAIT) begin when it finishes, not when it starts.
+      if (step.function.function_type === "ANIMATION") {
+        const anim = step.function.scene_animation;
+        const runMs = (anim?.delay_ms ?? 0) + (anim?.duration_ms ?? 0);
+        deps.runtimeCtx.scheduler.schedule(() => runStep(i + 1), runMs);
+        return;
+      }
+    }
+    runStep(i + 1);
+  };
+  runStep(0);
+}
+
+/**
+ * Evaluates a BRANCH condition and runs the chosen arm like a nested sequence.
+ * Failure policy: warn + skip both arms + continue the outer list, never throw.
+ */
+function runBranch(
+  fn: StudioSceneFunction,
+  deps: StepRunnerDeps,
+  onDone: () => void,
+  onAbort: () => void,
+): void {
+  const branch = fn.scene_branch;
+  if (!branch) {
+    onDone();
+    return;
+  }
+  const branchDepth = deps.depth + 1;
+  if (branchDepth > ANIMATION_CHAIN_MAX_DEPTH) {
+    console.warn(
+      `[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for branch ${branch.id}.`
+    );
+    onDone();
+    return;
+  }
+  const store = deps.runtimeCtx.variableStore;
+  if (!store) {
+    console.warn(
+      `[Studio] BRANCH function ${fn.id} needs a runtime context (variable store); skipping.`
+    );
+    onDone();
+    return;
+  }
+  const result = evaluateBranchCondition(
+    {
+      comparison: branch.comparison,
+      variable_name: branch.variable_name,
+      compare_literal: branch.compare_literal,
+      compare_variable_name: branch.compare_variable_name,
+    },
+    (name) => store.get(name),
+  );
+  if (!result.ok) {
+    console.warn(`[Studio] BRANCH ${branch.id}: ${result.error}; skipping both arms.`);
+    onDone();
+    return;
+  }
+  const arm = result.value ? branch.then_sequence : branch.else_sequence;
+  if (!arm) {
+    onDone();
+    return;
+  }
+  runSteps(arm.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+}
+
 /**
  * Looks up target_asset_id for an ANIMATION-type scene function.
  * The inline scene_animation only has the animation UUID — we resolve it
@@ -169,48 +304,13 @@ export function executeFunctionWithRelations(
     }
     // Ignore a re-trigger while this sequence is still running (no stacking).
     if (!runtimeCtx.scheduler.beginSequence(seq.id)) return;
-    const steps = [...seq.steps].sort((a, b) => a.step_order - b.step_order);
-    const runStep = (i: number): void => {
-      if (i >= steps.length) {
-        runtimeCtx.scheduler.endSequence(seq.id);
-        return;
-      }
-      const step = steps[i];
-      if (step.step_type === "WAIT") {
-        // Non-blocking: the rest of the sequence continues after the timer.
-        runtimeCtx.scheduler.schedule(() => runStep(i + 1), step.duration_ms ?? 0);
-        return;
-      }
-      // ACTION: dispatch the action, then advance.
-      if (step.function) {
-        executeFunctionWithRelations(
-          step.function,
-          sceneNavigator,
-          animations,
-          onAnimationTrigger,
-          depth + 1,
-          onSceneChange,
-          runtimeCtx,
-        );
-        // A sequence is scoped to one scene. NAVIGATION leaves it, so the
-        // sequence ends here; remaining steps belong to the scene we just left.
-        // Author follow-on steps as the target scene's on_load sequence.
-        if (step.function.function_type === "NAVIGATION") {
-          runtimeCtx.scheduler.endSequence(seq.id);
-          return;
-        }
-        // ANIMATION: hold the sequence for the animation's run time so later
-        // steps (including WAIT) begin when it finishes, not when it starts.
-        if (step.function.function_type === "ANIMATION") {
-          const anim = step.function.scene_animation;
-          const runMs = (anim?.delay_ms ?? 0) + (anim?.duration_ms ?? 0);
-          runtimeCtx.scheduler.schedule(() => runStep(i + 1), runMs);
-          return;
-        }
-      }
-      runStep(i + 1);
-    };
-    runStep(0);
+    const finish = () => runtimeCtx.scheduler.endSequence(seq.id);
+    runSteps(
+      seq.steps,
+      { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
+      finish,
+      finish,
+    );
     return;
   }
 
@@ -279,6 +379,26 @@ export function executeFunctionWithRelations(
       return;
     }
     store.set(sv.name, result.value);
+  } else if (fn.function_type === "BRANCH") {
+    // Branch is authored in-sequence (runSteps dispatches it there with the
+    // outer continuation); this path covers a trigger wired directly to a
+    // BRANCH function. Guard like a sequence so arm WAITs can't stack runs.
+    const branch = fn.scene_branch;
+    if (!branch) return;
+    if (!runtimeCtx) {
+      console.warn(
+        `[Studio] BRANCH function ${fn.id} needs a runtime context (scheduler); skipping.`
+      );
+      return;
+    }
+    if (!runtimeCtx.scheduler.beginSequence(branch.id)) return;
+    const finish = () => runtimeCtx.scheduler.endSequence(branch.id);
+    runBranch(
+      fn,
+      { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
+      finish,
+      finish,
+    );
   }
 }
 

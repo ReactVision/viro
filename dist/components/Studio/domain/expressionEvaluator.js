@@ -26,6 +26,7 @@ exports.parseExpression = parseExpression;
 exports.checkTypes = checkTypes;
 exports.validateExpressionForTarget = validateExpressionForTarget;
 exports.compare = compare;
+exports.evaluateBranchCondition = evaluateBranchCondition;
 exports.evaluate = evaluate;
 exports.valueMatchesType = valueMatchesType;
 exports.formatLiteral = formatLiteral;
@@ -323,7 +324,7 @@ function validateExpressionForTarget(src, targetType, declared) {
     }
     return { ok: true };
 }
-/** Typed comparison shared with (future) Branch conditions. Throws on operand mismatch. */
+/** Typed comparison shared with Branch conditions. Throws on operand mismatch. */
 function compare(op, left, right) {
     if (op === "==" || op === "!=") {
         if (typeof left !== typeof right) {
@@ -343,6 +344,62 @@ function compare(op, left, right) {
             return left > right;
         default:
             return left >= right;
+    }
+}
+const BRANCH_COMPARISON_OPS = {
+    EQUALS: "==",
+    NOT_EQUALS: "!=",
+    GREATER_THAN: ">",
+    LESS_THAN: "<",
+    GREATER_OR_EQUAL: ">=",
+    LESS_OR_EQUAL: "<=",
+};
+/** SQL LIKE semantics: % = any sequence, _ = any single char; no escape syntax. */
+function likeMatch(text, pattern, caseInsensitive) {
+    let regex = "";
+    for (const ch of pattern) {
+        if (ch === "%")
+            regex += "[\\s\\S]*";
+        else if (ch === "_")
+            regex += "[\\s\\S]";
+        else
+            regex += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    return new RegExp(`^${regex}$`, caseInsensitive ? "i" : "").test(text);
+}
+/**
+ * Evaluates a structured Branch condition against the runtime store.
+ * Never throws; callers warn + skip both arms on { ok: false }.
+ */
+function evaluateBranchCondition(cond, get) {
+    const left = get(cond.variable_name);
+    if (left === undefined) {
+        return { ok: false, error: `Variable "${cond.variable_name}" is not defined` };
+    }
+    let right;
+    if (cond.compare_variable_name !== null) {
+        right = get(cond.compare_variable_name);
+        if (right === undefined) {
+            return { ok: false, error: `Variable "${cond.compare_variable_name}" is not defined` };
+        }
+    }
+    else if (cond.compare_literal !== null) {
+        right = cond.compare_literal;
+    }
+    else {
+        return { ok: false, error: "Condition has no operand" };
+    }
+    if (cond.comparison === "LIKE" || cond.comparison === "ILIKE") {
+        if (typeof left !== "string" || typeof right !== "string") {
+            return { ok: false, error: `"${cond.comparison}" needs String operands` };
+        }
+        return { ok: true, value: likeMatch(left, right, cond.comparison === "ILIKE") };
+    }
+    try {
+        return { ok: true, value: compare(BRANCH_COMPARISON_OPS[cond.comparison], left, right) };
+    }
+    catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
 }
 function guardFinite(n) {

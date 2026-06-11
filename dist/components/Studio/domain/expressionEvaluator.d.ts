@@ -73,8 +73,28 @@ export declare function validateExpressionForTarget(src: string, targetType: Stu
     error: string;
 };
 export type ComparisonOp = "==" | "!=" | "<" | "<=" | ">" | ">=";
-/** Typed comparison shared with (future) Branch conditions. Throws on operand mismatch. */
+/** Typed comparison shared with Branch conditions. Throws on operand mismatch. */
 export declare function compare(op: ComparisonOp, left: StudioVariableValue, right: StudioVariableValue): boolean;
+export type BranchComparison = "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "LESS_THAN" | "GREATER_OR_EQUAL" | "LESS_OR_EQUAL" | "LIKE" | "ILIKE";
+/** Structural input so this file stays standalone (no scene-type imports). */
+export type BranchConditionInput = {
+    comparison: BranchComparison;
+    variable_name: string;
+    compare_literal: StudioVariableValue | null;
+    compare_variable_name: string | null;
+};
+export type BranchConditionResult = {
+    ok: true;
+    value: boolean;
+} | {
+    ok: false;
+    error: string;
+};
+/**
+ * Evaluates a structured Branch condition against the runtime store.
+ * Never throws; callers warn + skip both arms on { ok: false }.
+ */
+export declare function evaluateBranchCondition(cond: BranchConditionInput, get: (name: string) => StudioVariableValue | undefined): BranchConditionResult;
 export declare function evaluate(node: ExpressionNode, get: (name: string) => StudioVariableValue | undefined): EvaluateResult;
 export declare function valueMatchesType(value: StudioVariableValue, type: StudioVariableType): boolean;
 /** Serialize a literal value into expression syntax (the editor's literal mode). */

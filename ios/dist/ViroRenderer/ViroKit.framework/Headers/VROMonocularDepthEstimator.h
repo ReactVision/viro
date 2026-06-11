@@ -82,6 +82,15 @@ public:
  *   estimator->update(arFrame);
  *   auto depthTexture = estimator->getDepthTexture();
  */
+/**
+ * Controls how the monocular depth estimator derives metric scale.
+ */
+enum class VROMonocularDepthCalibration {
+    None,           // no scaling (raw model output, scale = 1.0)
+    Manual,         // caller sets scale via setScaleFactor() (default)
+    LiDARReference, // stub: sample LiDAR to auto-derive scale (falls back to Manual)
+};
+
 class API_AVAILABLE(ios(14.0)) VROMonocularDepthEstimator :
     public std::enable_shared_from_this<VROMonocularDepthEstimator> {
 
@@ -161,10 +170,27 @@ public:
      * Set the scale factor for converting model output to metric depth.
      * Some models output relative/disparity depth that needs scaling.
      * Default is 1.0 (assumes model outputs metric depth in meters).
+     * Implicitly sets calibration mode to Manual.
      *
      * @param scale The scale factor to multiply depth values by.
      */
     void setScaleFactor(float scale);
+
+    /**
+     * Set the calibration mode that controls how depth scale is derived.
+     * - None: raw model output (scale = 1.0)
+     * - Manual: caller-supplied scale via setScaleFactor() (default)
+     * - LiDARReference: stub, logs warning and falls back to Manual
+     */
+    void setCalibrationMode(VROMonocularDepthCalibration mode);
+    VROMonocularDepthCalibration getCalibrationMode() const;
+
+    /**
+     * Flush any pending depth data to the GPU texture.
+     * Must be called on the render (GL) thread. VROARSessioniOS calls this
+     * automatically each frame before depth is consumed.
+     */
+    void flushPendingDepthUpdate();
 
     /**
      * Enable or disable temporal filtering for depth stability.
@@ -232,6 +258,36 @@ public:
      */
     int getDepthBufferHeight() const { return _depthHeight; }
 
+    /**
+     * Atomically snapshot the depth and confidence buffers for offline processing
+     * (e.g. world-mesh generation). Thread-safe — takes a copy under the depth mutex.
+     * Returns false if no data is available.
+     */
+    bool snapshotDepthBuffers(std::vector<float> &outDepth,
+                              std::vector<float> &outConfidence,
+                              int &outWidth, int &outHeight) const;
+
+    /**
+     * Sample the synthesized per-pixel confidence at depth-texture UV coordinates.
+     * Returns a value in [0, 1]: 1 = highly stable, 0 = discontinuity or invalid.
+     * Returns -1 if no confidence data is available (temporal filtering disabled or
+     * first frame). Thread-safe.
+     *
+     * @param u Depth texture U coordinate [0, 1].
+     * @param v Depth texture V coordinate [0, 1].
+     */
+    float sampleConfidenceAtDepthUV(float u, float v) const;
+
+    /**
+     * Set the confidence threshold for hit-test upgrade decisions on the monocular path.
+     * Hit results are upgraded to DepthPoint only when synthesized confidence exceeds
+     * this value. Default is 0.3.
+     *
+     * @param threshold Confidence threshold in [0, 1].
+     */
+    void setHitTestConfidenceThreshold(float threshold);
+    float getHitTestConfidenceThreshold() const;
+
 private:
     // Graphics driver
     std::weak_ptr<VRODriver> _driver;
@@ -258,16 +314,23 @@ private:
     std::shared_ptr<VROTexture> _currentDepthTexture;
     std::vector<float> _depthBuffer;
     std::vector<float> _previousDepthBuffer;
+    std::vector<float> _confidenceBuffer;  // per-pixel synthesized confidence [0,1]
     int _depthWidth;
     int _depthHeight;
     VROMatrix4f _depthTextureTransform;
 
     // Configuration
     float _depthScaleFactor;
+    VROMonocularDepthCalibration _calibrationMode;
+    float _hitTestConfidenceThreshold;
     bool _temporalFilteringEnabled;
     float _temporalFilterAlpha;
     int _targetFPS;
     double _lastInferenceTime;
+
+    // W4: staging buffer for in-place GPU texture updates
+    std::vector<float> _stagingDepthBuffer;
+    std::atomic<bool> _stagingDirty;
 
     // Diagnostics
     float _currentFPS;

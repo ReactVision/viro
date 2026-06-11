@@ -180,6 +180,16 @@
             [viewAR setDepthDebugEnabled:_depthDebugEnabled opacity:0.7f];
         }
 
+        // Apply initial monocular depth scale if set
+        if (_monocularDepthScale != 0.0f && _monocularDepthScale != 1.0f) {
+            [viewAR setMonocularDepthScale:_monocularDepthScale];
+        }
+
+        // Apply front camera setting if enabled before view was ready
+        if (_frontCameraEnabled) {
+            [viewAR setFrontCameraEnabled:YES];
+        }
+
         // Apply initial semantic debug setting if set
         if (_semanticDebugEnabled) {
             [viewAR setSemanticDebugEnabled:_semanticDebugEnabled];
@@ -1844,6 +1854,33 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     [viewAR setPreferMonocularDepth:prefer];
     RCTLogInfo(@"[ViroAR] Prefer monocular depth %@", prefer ? @"enabled" : @"disabled");
+}
+
+- (void)setMonocularDepthScale:(float)scale {
+    if (!_vroView) {
+        _monocularDepthScale = scale;
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    [viewAR setMonocularDepthScale:scale];
+}
+
+- (void)setMonocularDepthTargetFPS:(int)fps {
+    if (!_vroView) {
+        _monocularDepthTargetFPS = fps;
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    [viewAR setMonocularDepthTargetFPS:fps];
+}
+
+- (void)setFrontCameraEnabled:(BOOL)enabled {
+    if (!_vroView) {
+        _frontCameraEnabled = enabled;
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    [viewAR setFrontCameraEnabled:enabled];
 }
 
 - (BOOL)isPreferMonocularDepth {

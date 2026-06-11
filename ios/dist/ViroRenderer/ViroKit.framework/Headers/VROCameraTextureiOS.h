@@ -62,7 +62,23 @@ public:
      texture.
      */
     std::vector<float> getCameraIntrinsics() const;
-    
+
+    /*
+     Expose the underlying capture controller so that callers (e.g. VRTCameraTexture)
+     can invoke photo / video capture directly.
+     */
+    std::shared_ptr<VROAVCaptureController> getCaptureController() const {
+        return _controller;
+    }
+
+    // Convenience wrappers so callers don't need to import VROAVCaptureController.h.
+    void setUpdateListener(std::function<void(CMSampleBufferRef, std::vector<float>)> listener);
+    void capturePhoto(NSString *outputPath,
+                      std::function<void(bool, NSString *, NSString *)> onCaptured);
+    void startRecording(NSString *outputPath,
+                        std::function<void(bool, NSString *, NSString *)> onStarted);
+    void stopRecording(std::function<void(bool, NSString *, NSString *)> onStopped);
+
 private:
     
     /*

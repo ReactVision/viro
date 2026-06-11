@@ -28,6 +28,11 @@ import {
   ViroTrackingStateConstants,
 } from "./components/ViroConstants";
 import { ViroController } from "./components/ViroController";
+import { ViroVirtualJoystick } from "./components/ViroVirtualJoystick";
+import { ViroVirtualButton } from "./components/ViroVirtualButton";
+import { ViroGameLoop } from "./components/ViroGameLoop";
+import { ViroGameLoopUtils } from "./components/ViroGameLoopUtils";
+import { useGameLoop, useLateUpdate, useFixedUpdate } from "./components/hooks/useGameLoop";
 import { ViroDirectionalLight } from "./components/ViroDirectionalLight";
 import { ViroFlexView } from "./components/ViroFlexView";
 import { ViroGeometry } from "./components/ViroGeometry";
@@ -41,6 +46,8 @@ import {
   ViroShaderModifier,
 } from "./components/Material/ViroMaterials";
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
+import { ViroCameraTexture } from "./components/ViroCameraTexture";
+export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
 import { ViroOrbitCamera } from "./components/ViroOrbitCamera";
@@ -180,6 +187,7 @@ import { ViroQuestEntryPoint } from "./components/ViroQuestEntryPoint";
 import { VRQuestNavigatorBridge } from "./components/Utilities/VRQuestNavigatorBridge";
 import { VRModuleOpenXR, useVRViewTag, exitVRScene } from "./components/Utilities/VRModuleOpenXR";
 import type { VRModuleOpenXRType } from "./components/Utilities/VRModuleOpenXR";
+import { StreamingAudioManager } from "./components/Utilities/StreamingAudioManager";
 import { AppRegistry } from "react-native";
 
 // Auto-register the Quest VR entry point. VRActivity launches this component
@@ -199,6 +207,13 @@ export {
   ViroButton,
   ViroCamera,
   ViroController,
+  ViroVirtualJoystick,
+  ViroVirtualButton,
+  ViroGameLoop,
+  ViroGameLoopUtils,
+  useGameLoop,
+  useLateUpdate,
+  useFixedUpdate,
   ViroDirectionalLight,
   ViroFlexView,
   ViroGeometry,
@@ -207,6 +222,7 @@ export {
   ViroMaterials,
   ViroARCamera,
   ViroMaterialVideo,
+  ViroCameraTexture,
   ViroNode,
   ViroOmniLight,
   ViroOrbitCamera,
@@ -244,6 +260,8 @@ export {
   useVRViewTag,
   exitVRScene,
   Viro3DSceneNavigator,
+  // Streaming audio
+  StreamingAudioManager,
   // Utilities
   hasOpenXRSupport,
   isQuest,

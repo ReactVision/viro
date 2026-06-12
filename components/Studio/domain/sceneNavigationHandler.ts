@@ -200,6 +200,13 @@ function runSteps(
         runApiRequest(step.function, deps, () => runStep(i + 1), onAbort);
         return;
       }
+      // RUN_SEQUENCE: a step referencing a named SEQUENCE function runs that
+      // sequence's steps inline (not begin-guarded, like an arm); the outer
+      // list resumes only after it completes. The depth guard bounds chains.
+      if (step.function.function_type === "SEQUENCE") {
+        runReferencedSequence(step.function, deps, () => runStep(i + 1), onAbort);
+        return;
+      }
       executeFunctionWithRelations(
         step.function,
         deps.sceneNavigator,
@@ -231,8 +238,10 @@ function runSteps(
 }
 
 /**
- * Evaluates a BRANCH condition and runs the chosen arm like a nested sequence.
- * Failure policy: warn + skip both arms + continue the outer list, never throw.
+ * Evaluates a BRANCH's conditions in eval order (first match wins) and runs the
+ * matched arm, or the no-match arm if none match, like a nested sequence.
+ * Failure policy: a condition that fails to evaluate warns and is treated as
+ * not matched (fall through to the next condition); never throws.
  */
 function runBranch(
   fn: StudioSceneFunction,
@@ -261,26 +270,65 @@ function runBranch(
     onDone();
     return;
   }
-  const result = evaluateBranchCondition(
-    {
-      comparison: branch.comparison,
-      variable_name: branch.variable_name,
-      compare_literal: branch.compare_literal,
-      compare_variable_name: branch.compare_variable_name,
-    },
-    (name) => store.get(name),
+  const conditions = [...branch.conditions].sort(
+    (a, b) => a.eval_order - b.eval_order
   );
-  if (!result.ok) {
-    console.warn(`[Studio] BRANCH ${branch.id}: ${result.error}; skipping both arms.`);
-    onDone();
-    return;
+  for (const condition of conditions) {
+    const result = evaluateBranchCondition(
+      {
+        comparison: condition.comparison,
+        variable_name: condition.variable_name,
+        compare_literal: condition.compare_literal,
+        compare_variable_name: condition.compare_variable_name,
+      },
+      (name) => store.get(name),
+    );
+    if (!result.ok) {
+      console.warn(
+        `[Studio] BRANCH ${branch.id} condition ${condition.eval_order}: ${result.error}; treating as not matched.`
+      );
+      continue;
+    }
+    if (result.value) {
+      runSteps(condition.sequence.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+      return;
+    }
   }
-  const arm = result.value ? branch.then_sequence : branch.else_sequence;
+  // No condition matched: run the no-match arm if present, else continue.
+  const arm = branch.no_match_sequence;
   if (!arm) {
     onDone();
     return;
   }
   runSteps(arm.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+}
+
+/**
+ * Runs a named SEQUENCE function's steps inline as a Run Sequence step. Unlike
+ * a trigger-dispatched sequence it is NOT begin-guarded (it composes like a
+ * branch arm); the depth guard bounds reference chains the editor's cycle
+ * filter and the resolve RPC also defend against.
+ */
+function runReferencedSequence(
+  fn: StudioSceneFunction,
+  deps: StepRunnerDeps,
+  onDone: () => void,
+  onAbort: () => void,
+): void {
+  const seq = fn.scene_sequence;
+  if (!seq) {
+    onDone();
+    return;
+  }
+  const seqDepth = deps.depth + 1;
+  if (seqDepth > ANIMATION_CHAIN_MAX_DEPTH) {
+    console.warn(
+      `[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for sequence ${seq.id}.`
+    );
+    onDone();
+    return;
+  }
+  runSteps(seq.steps, { ...deps, depth: seqDepth }, onDone, onAbort);
 }
 
 /**

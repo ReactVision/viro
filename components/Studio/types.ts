@@ -49,11 +49,13 @@ export interface StudioSceneVariable {
 }
 
 /**
- * BRANCH payload. Variable names/types are joined from scene_variables so they
- * follow renames. Arms are owned, headless sequences run like nested sequences.
+ * One ordered predicate arm of a BRANCH. Variable names/types are joined from
+ * project_variables so they follow renames. The arm is an owned, headless
+ * sequence run like a nested sequence.
  */
-export interface StudioSceneBranch {
+export interface StudioBranchCondition {
   id: string;
+  eval_order: number;
   variable_id: string;
   variable_name: string;
   variable_type: "BOOLEAN" | "NUMBER" | "STRING";
@@ -70,8 +72,18 @@ export interface StudioSceneBranch {
   compare_variable_id: string | null;
   compare_variable_name: string | null;
   compare_variable_type: "BOOLEAN" | "NUMBER" | "STRING" | null;
-  then_sequence: StudioSequence;
-  else_sequence: StudioSequence | null;
+  sequence: StudioSequence;
+}
+
+/**
+ * BRANCH payload. Conditions are evaluated in eval_order (first match wins),
+ * falling through to the optional no-match arm. Arms are owned, headless
+ * sequences run like nested sequences.
+ */
+export interface StudioSceneBranch {
+  id: string;
+  conditions: StudioBranchCondition[];
+  no_match_sequence: StudioSequence | null;
 }
 
 /** One response->variable binding of an API_REQUEST function. */

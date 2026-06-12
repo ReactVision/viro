@@ -36,6 +36,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     private static final String API_KEY_META      = "com.reactvision.RVApiKey";
     private static final String PROJECT_ID_META   = "com.reactvision.RVProjectId";
     private static final int    TIMEOUT_SEC       = 30;
+    private static final int    API_REQUEST_TIMEOUT_SEC = 40;
 
     public VRTStudioModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -76,6 +77,36 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void rvGetProjectId(Promise promise) {
         promise.resolve(readMeta(PROJECT_ID_META));
+    }
+
+    /**
+     * Executes a Studio API Request through the scene-api-request egress proxy.
+     * JS sends the full request body ({"function_id", "variables"}) as a
+     * pre-serialised string; native only transmits it.
+     */
+    @ReactMethod
+    public void rvStudioApiRequest(String bodyJson, Promise promise) {
+        String apiKey = readApiKey();
+        if (apiKey == null) {
+            resolve(promise, false, null, "com.reactvision.RVApiKey not set in AndroidManifest.xml");
+            return;
+        }
+        String url = BASE_URL + "/functions/v1/scene-api-request";
+        new Thread(() -> {
+            try {
+                String[] result = RVHttpClient.send(
+                        "POST", url, apiKey,
+                        "application/json",
+                        bodyJson.getBytes(StandardCharsets.UTF_8),
+                        API_REQUEST_TIMEOUT_SEC, null, null);
+                int status = Integer.parseInt(result[0]);
+                boolean ok = status >= 200 && status < 300;
+                resolve(promise, ok, ok ? result[1] : null,
+                        ok ? null : (result[2].isEmpty() ? result[1] : result[2]));
+            } catch (Exception e) {
+                resolve(promise, false, null, e.getMessage());
+            }
+        }).start();
     }
 
     // -----------------------------------------------------------------------

@@ -2,11 +2,14 @@ import { Alert, AppState } from "react-native";
 import { isQuest } from "../../Utilities/ViroPlatform";
 import {
   StudioAnimation,
+  StudioApiRequestExecutor,
+  StudioApiRequestOutcome,
   StudioSceneFunction,
   StudioSceneResponse,
   StudioSequenceStep,
 } from "../types";
 import { VRTStudioModule } from "../VRTStudioModule";
+import { applyBindings } from "./apiRequestHelpers";
 import {
   evaluate,
   evaluateBranchCondition,
@@ -18,6 +21,9 @@ import { StudioVariableStore } from "./variableStore";
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
 const ANIMATION_CHAIN_MAX_DEPTH = 10;
+// The proxy enforces the authored timeout server-side; the client backstop
+// only covers an unreachable/unresponsive proxy.
+const API_REQUEST_CLIENT_GRACE_MS = 5000;
 
 /**
  * Non-blocking, cancellable timer pool driving Sequence WAIT steps.
@@ -45,6 +51,14 @@ export class SequenceScheduler {
   // Sequence ids currently mid-run. A re-trigger of an in-flight sequence is
   // ignored (no stacked/overlapping runs); single actions are unaffected.
   private activeSequences = new Set<string>();
+  // Bumped by cancelAll(). Async work (API requests) captures the value when
+  // it starts and drops its continuation if it changed — a late response can
+  // never fire into a torn-down or replaced scene.
+  private generationCounter = 0;
+
+  get generation(): number {
+    return this.generationCounter;
+  }
 
   constructor() {
     this.appStateSub = AppState.addEventListener("change", (state) => {
@@ -107,6 +121,7 @@ export class SequenceScheduler {
     }
     this.timers.clear();
     this.activeSequences.clear();
+    this.generationCounter++;
   }
 
   dispose(): void {
@@ -118,12 +133,13 @@ export class SequenceScheduler {
 
 /**
  * Runtime context threaded through executeFunctionWithRelations: the Sequence
- * scheduler plus the per-session variable store (optional so dispatch sites
- * without variables keep working).
+ * scheduler plus the per-session variable store and API-request transport
+ * (optional so dispatch sites without them keep working).
  */
 export type SequenceRuntimeContext = {
   scheduler: SequenceScheduler;
   variableStore?: StudioVariableStore;
+  apiRequestExecutor?: StudioApiRequestExecutor;
 };
 
 /**
@@ -176,6 +192,12 @@ function runSteps(
       // chosen arm completes (arm WAITs delay later outer steps).
       if (step.function.function_type === "BRANCH") {
         runBranch(step.function, deps, () => runStep(i + 1), onAbort);
+        return;
+      }
+      // API_REQUEST blocks the outer list until the response (or timeout)
+      // resolves and the chosen outcome arm completes.
+      if (step.function.function_type === "API_REQUEST") {
+        runApiRequest(step.function, deps, () => runStep(i + 1), onAbort);
         return;
       }
       executeFunctionWithRelations(
@@ -259,6 +281,93 @@ function runBranch(
     return;
   }
   runSteps(arm.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+}
+
+/**
+ * Executes an API_REQUEST through the injected executor and runs the matching
+ * outcome arm like a nested sequence. The proxy enforces the real timeout; a
+ * scheduler backstop covers an unreachable proxy. Failure policy mirrors
+ * SET_VARIABLE/BRANCH: warn + degrade, never throw. A scheduler generation
+ * captured at start drops the continuation if the scene is torn down or
+ * replaced while the request is in flight.
+ */
+function runApiRequest(
+  fn: StudioSceneFunction,
+  deps: StepRunnerDeps,
+  onDone: () => void,
+  onAbort: () => void,
+): void {
+  const apiRequest = fn.scene_api_request;
+  if (!apiRequest) {
+    onDone();
+    return;
+  }
+  const chainDepth = deps.depth + 1;
+  if (chainDepth > ANIMATION_CHAIN_MAX_DEPTH) {
+    console.warn(
+      `[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for API request ${apiRequest.id}.`
+    );
+    onDone();
+    return;
+  }
+  const executor = deps.runtimeCtx.apiRequestExecutor;
+  if (!executor) {
+    console.warn(
+      `[Studio] API_REQUEST function ${fn.id} needs a runtime context (executor); skipping.`
+    );
+    onDone();
+    return;
+  }
+  const scheduler = deps.runtimeCtx.scheduler;
+  const store = deps.runtimeCtx.variableStore;
+  const generation = scheduler.generation;
+  let settled = false;
+
+  const proceed = (outcome: StudioApiRequestOutcome): void => {
+    if (settled || scheduler.generation !== generation) return;
+    settled = true;
+    if (store) {
+      const { writes, warnings } = applyBindings(apiRequest.bindings ?? [], outcome);
+      for (const warning of warnings) {
+        console.warn(`[Studio] API_REQUEST ${apiRequest.id}: ${warning}`);
+      }
+      for (const write of writes) {
+        store.set(write.name, write.value);
+      }
+    } else if ((apiRequest.bindings ?? []).length > 0) {
+      console.warn(
+        `[Studio] API_REQUEST ${apiRequest.id}: no variable store; bindings skipped.`
+      );
+    }
+    const arm = outcome.ok ? apiRequest.success_sequence : apiRequest.failure_sequence;
+    if (!arm) {
+      onDone();
+      return;
+    }
+    runSteps(arm.steps, { ...deps, depth: chainDepth }, onDone, onAbort);
+  };
+
+  scheduler.schedule(() => {
+    proceed({
+      ok: false,
+      status: null,
+      error_code: "TIMEOUT",
+      error_message: "Request timed out",
+    });
+  }, apiRequest.timeout_ms + API_REQUEST_CLIENT_GRACE_MS);
+
+  const variables = store ? store.snapshot() : {};
+  executor(fn.id, variables)
+    .then((outcome) => proceed(outcome))
+    .catch((error: unknown) => {
+      proceed({
+        ok: false,
+        status: null,
+        error_code: "NETWORK_ERROR",
+        error_message:
+          error instanceof Error ? error.message : "Request failed",
+      });
+    });
 }
 
 /**
@@ -394,6 +503,27 @@ export function executeFunctionWithRelations(
     if (!runtimeCtx.scheduler.beginSequence(branch.id)) return;
     const finish = () => runtimeCtx.scheduler.endSequence(branch.id);
     runBranch(
+      fn,
+      { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
+      finish,
+      finish,
+    );
+  } else if (fn.function_type === "API_REQUEST") {
+    // Authored in-sequence (runSteps dispatches it there with the outer
+    // continuation); this path covers a trigger wired directly to an
+    // API_REQUEST function. Guard like a sequence so a re-trigger can't
+    // stack runs while a request (or an arm WAIT) is in flight.
+    const apiRequest = fn.scene_api_request;
+    if (!apiRequest) return;
+    if (!runtimeCtx) {
+      console.warn(
+        `[Studio] API_REQUEST function ${fn.id} needs a runtime context (scheduler); skipping.`
+      );
+      return;
+    }
+    if (!runtimeCtx.scheduler.beginSequence(apiRequest.id)) return;
+    const finish = () => runtimeCtx.scheduler.endSequence(apiRequest.id);
+    runApiRequest(
       fn,
       { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
       finish,

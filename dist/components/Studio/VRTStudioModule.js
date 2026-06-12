@@ -28,4 +28,14 @@ exports.VRTStudioModule = {
             return Promise.resolve(null);
         return native.rvGetProjectId();
     },
+    /**
+     * POSTs a pre-serialised scene-api-request body ({function_id, variables})
+     * to the egress proxy, authenticated with the app's RVApiKey. The resolved
+     * `data` is the proxy's outcome envelope JSON.
+     */
+    rvStudioApiRequest: (bodyJson) => {
+        if (!native)
+            return Promise.resolve(NOT_AVAILABLE);
+        return native.rvStudioApiRequest(bodyJson);
+    },
 };

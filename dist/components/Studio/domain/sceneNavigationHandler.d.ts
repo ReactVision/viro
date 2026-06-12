@@ -1,4 +1,4 @@
-import { StudioAnimation, StudioSceneFunction } from "../types";
+import { StudioAnimation, StudioApiRequestExecutor, StudioSceneFunction } from "../types";
 import { StudioVariableStore } from "./variableStore";
 type SceneNavigator = any;
 export declare class SequenceScheduler {
@@ -6,6 +6,8 @@ export declare class SequenceScheduler {
     private appStateSub;
     private backgrounded;
     private activeSequences;
+    private generationCounter;
+    get generation(): number;
     constructor();
     beginSequence(id: string): boolean;
     endSequence(id: string): void;
@@ -18,12 +20,13 @@ export declare class SequenceScheduler {
 }
 /**
  * Runtime context threaded through executeFunctionWithRelations: the Sequence
- * scheduler plus the per-session variable store (optional so dispatch sites
- * without variables keep working).
+ * scheduler plus the per-session variable store and API-request transport
+ * (optional so dispatch sites without them keep working).
  */
 export type SequenceRuntimeContext = {
     scheduler: SequenceScheduler;
     variableStore?: StudioVariableStore;
+    apiRequestExecutor?: StudioApiRequestExecutor;
 };
 /**
  * Single dispatcher for all scene function types.

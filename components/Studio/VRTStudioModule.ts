@@ -10,6 +10,7 @@ interface StudioNativeModule {
   rvGetScene(sceneId: string): Promise<StudioModuleResult>;
   rvGetProject(): Promise<StudioModuleResult>;
   rvGetProjectId(): Promise<string | null>;
+  rvStudioApiRequest(bodyJson: string): Promise<StudioModuleResult>;
 }
 
 const native = NativeModules.VRTStudio as StudioNativeModule | undefined;
@@ -36,5 +37,14 @@ export const VRTStudioModule = {
   rvGetProjectId: (): Promise<string | null> => {
     if (!native) return Promise.resolve(null);
     return native.rvGetProjectId();
+  },
+  /**
+   * POSTs a pre-serialised scene-api-request body ({function_id, variables})
+   * to the egress proxy, authenticated with the app's RVApiKey. The resolved
+   * `data` is the proxy's outcome envelope JSON.
+   */
+  rvStudioApiRequest: (bodyJson: string): Promise<StudioModuleResult> => {
+    if (!native) return Promise.resolve(NOT_AVAILABLE);
+    return native.rvStudioApiRequest(bodyJson);
   },
 };

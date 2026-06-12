@@ -51,6 +51,7 @@ const collisionBindingsRuntime_1 = require("./domain/collisionBindingsRuntime");
 const collisionPairKey_1 = require("./domain/collisionPairKey");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
+const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const studioMaterials_1 = require("./domain/studioMaterials");
@@ -99,6 +100,9 @@ const StudioARSceneInner = (props) => {
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
         variableStore: variableStoreRef.current,
+        // Seamless API_REQUEST transport: native RVApiKey POST to the egress
+        // proxy. No host setup required.
+        apiRequestExecutor: defaultApiRequestExecutor_1.defaultApiRequestExecutor,
     }), []);
     // Cancel this scene's pending WAITs before handing off to the next scene.
     const handleSceneChange = (0, react_1.useCallback)((sceneId, sceneName) => {

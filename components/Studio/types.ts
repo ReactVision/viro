@@ -74,6 +74,56 @@ export interface StudioSceneBranch {
   else_sequence: StudioSequence | null;
 }
 
+/** One response->variable binding of an API_REQUEST function. */
+export interface StudioApiRequestBinding {
+  id: string;
+  source: "BODY" | "STATUS" | "OK" | "ERROR_MESSAGE";
+  selector: string | null;
+  variable_id: string;
+  variable_name: string;
+  variable_type: "BOOLEAN" | "NUMBER" | "STRING";
+  bind_order: number;
+}
+
+/**
+ * API_REQUEST payload. The HTTP call executes server-side through the
+ * platform egress proxy (the client only ever sends the function id plus
+ * current variable values); connection_id is an opaque server-side
+ * reference. Arms are owned, headless sequences run like nested sequences.
+ */
+export interface StudioSceneApiRequest {
+  id: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  url_template: string;
+  headers: { key: string; value_template: string }[];
+  body_template: string | null;
+  timeout_ms: number;
+  connection_id: string | null;
+  bindings: StudioApiRequestBinding[];
+  success_sequence: StudioSequence | null;
+  failure_sequence: StudioSequence | null;
+}
+
+/** Outcome envelope an API-request executor resolves with. */
+export interface StudioApiRequestOutcome {
+  ok: boolean;
+  status: number | null;
+  body?: unknown;
+  error_code?: string | null;
+  error_message?: string | null;
+}
+
+/**
+ * Host-app transport for API_REQUEST functions: StudioGo calls the
+ * scene-api-request edge function with the user JWT; production Viro apps
+ * call it with their X-API-Key. Must resolve with an outcome (reject only on
+ * transport failure).
+ */
+export type StudioApiRequestExecutor = (
+  functionId: string,
+  variables: Record<string, boolean | number | string>,
+) => Promise<StudioApiRequestOutcome>;
+
 export interface StudioSceneFunction {
   id: string;
   scene: string;
@@ -83,13 +133,15 @@ export interface StudioSceneFunction {
     | "ANIMATION"
     | "SEQUENCE"
     | "SET_VARIABLE"
-    | "BRANCH";
+    | "BRANCH"
+    | "API_REQUEST";
   navigation: string | null;
   alert: string | null;
   animation: string | null;
   sequence: string | null;
   set_variable: string | null;
   branch: string | null;
+  api_request: string | null;
   scene_navigation: { id: string; navigate_to: string } | null;
   scene_alert: {
     id: string;
@@ -113,6 +165,7 @@ export interface StudioSceneFunction {
     expression: string;
   } | null;
   scene_branch: StudioSceneBranch | null;
+  scene_api_request: StudioSceneApiRequest | null;
 }
 
 export interface StudioAsset {

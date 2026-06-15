@@ -26,9 +26,12 @@
 #import "VRTObjectDetectorView.h"
 #import <CoreVideo/CoreVideo.h>
 #import <Accelerate/Accelerate.h>
+
+#if VIRO_ONNXRUNTIME_AVAILABLE
 #import <onnxruntime/ort_session.h>
 #import <onnxruntime/ort_env.h>
 #import <onnxruntime/ort_value.h>
+#endif
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -66,9 +69,11 @@ static const int       kClsOffset            = 5;
     // Whether the session is running and the model is loaded.
     BOOL                         _modelLoaded;
 
-    // ONNX Runtime objects.
+    // ONNX Runtime objects (present only when VIRO_ONNXRUNTIME_AVAILABLE is defined).
+#if VIRO_ONNXRUNTIME_AVAILABLE
     ORTEnv                      *_ortEnv;
     ORTSession                  *_ortSession;
+#endif
 }
 
 #pragma mark - Lifecycle
@@ -243,16 +248,15 @@ static const int       kClsOffset            = 5;
 #pragma mark - Model loading
 
 - (BOOL)_loadModel:(NSError **)error {
+#if VIRO_ONNXRUNTIME_AVAILABLE
     // Resolve the model file path.
     NSString *modelPath = nil;
 
     if ([_model hasPrefix:@"file://"] || [_model hasPrefix:@"/"]) {
-        // Absolute path or file:// URL — strip the scheme if present.
         modelPath = [_model hasPrefix:@"file://"]
             ? [_model substringFromIndex:7]
             : _model;
     } else {
-        // Bare name — look for a bundled .onnx resource.
         modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"];
     }
 
@@ -266,31 +270,24 @@ static const int       kClsOffset            = 5;
         return NO;
     }
 
-    // Create the ORT environment (one per session is fine).
     NSError *ortError = nil;
-    _ortEnv = [[ORTEnv alloc] initWithLoggingLevel:ORTLoggingLevelWarning
-                                             error:&ortError];
-    if (!_ortEnv || ortError) {
-        if (error) *error = ortError;
-        return NO;
-    }
+    _ortEnv = [[ORTEnv alloc] initWithLoggingLevel:ORTLoggingLevelWarning error:&ortError];
+    if (!_ortEnv || ortError) { if (error) *error = ortError; return NO; }
 
     ORTSessionOptions *options = [[ORTSessionOptions alloc] initWithError:&ortError];
-    if (!options || ortError) {
-        if (error) *error = ortError;
-        return NO;
-    }
+    if (!options || ortError) { if (error) *error = ortError; return NO; }
 
     _ortSession = [[ORTSession alloc] initWithEnv:_ortEnv
                                         modelPath:modelPath
                                    sessionOptions:options
                                             error:&ortError];
-    if (!_ortSession || ortError) {
-        if (error) *error = ortError;
-        return NO;
-    }
+    if (!_ortSession || ortError) { if (error) *error = ortError; return NO; }
 
     return YES;
+#else
+    // ONNX Runtime not linked — camera pipeline runs, inference returns empty.
+    return YES;
+#endif
 }
 
 #pragma mark - AVCaptureVideoDataOutputSampleBufferDelegate
@@ -394,6 +391,9 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 #pragma mark - Inference
 
 - (NSArray<NSDictionary *> *)_runInferenceOnPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+#if !VIRO_ONNXRUNTIME_AVAILABLE
+    return @[];
+#else
     if (!_ortSession) return @[];
 
     // 1. Preprocess: BGRA -> Float32 NCHW 640x640
@@ -483,6 +483,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     }
 
     return [detections copy];
+#endif // VIRO_ONNXRUNTIME_AVAILABLE
 }
 
 @end

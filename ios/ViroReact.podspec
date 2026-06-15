@@ -42,7 +42,21 @@ Pod::Spec.new do |s|
 
   # React Native dependencies
   s.dependency 'React-Core'
-  s.dependency 'onnxruntime-objc', '~> 1.20'
+
+  # ONNX Runtime is distributed as a vendored dynamic xcframework (onnxruntime.xcframework).
+  # When the xcframework is present in ios/dist/Frameworks/, enable inference by setting:
+  #   GCC_PREPROCESSOR_DEFINITIONS = $(inherited) VIRO_ONNXRUNTIME_AVAILABLE=1
+  # Until then, VRTObjectDetectorView compiles with the camera pipeline active
+  # and inference returning empty results.
+  if File.exist?(File.join(__dir__, 'dist/Frameworks/onnxruntime.xcframework'))
+    s.vendored_frameworks = [
+      'dist/ViroRenderer/ViroKit.framework',
+      'dist/Frameworks/onnxruntime.xcframework'
+    ]
+    s.pod_target_xcconfig = {
+      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1 VIRO_ONNXRUNTIME_AVAILABLE=1'
+    }
+  end
 
   # Fabric dependencies
   s.dependency 'React-RCTFabric'
@@ -59,8 +73,7 @@ Pod::Spec.new do |s|
       '"$(PODS_ROOT)/Headers/Public"',
       '"$(PODS_ROOT)/Headers/Public/ViroKit"',
       '"$(PODS_ROOT)/ViroKit/dist/include"',
-      '"$(PODS_ROOT)/ViroKit/Headers"',
-      '"$(PODS_ROOT)/onnxruntime-objc/objectivec/include"'
+      '"$(PODS_ROOT)/ViroKit/Headers"'
     ].join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1',
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'

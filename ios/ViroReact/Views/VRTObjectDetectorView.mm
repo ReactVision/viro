@@ -25,6 +25,10 @@
 
 #import "VRTObjectDetectorView.h"
 #import <CoreVideo/CoreVideo.h>
+#import <Accelerate/Accelerate.h>
+#import <onnxruntime/ort_session.h>
+#import <onnxruntime/ort_env.h>
+#import <onnxruntime/ort_value.h>
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -33,8 +37,15 @@
 static const NSInteger kDefaultMaxFPS        = 15;
 static const float     kDefaultConfidence    = 0.4f;
 static const float     kDefaultIou           = 0.45f;
-// Model input size expected by YOLOE (640×640 square).
+// Model input size expected by YOLOE (640x640 square).
 static const int       kModelInputSize       = 640;
+// YOLOE output: [1, 300, 38]  — 300 proposals, 38 values each.
+static const int       kNumProposals         = 300;
+static const int       kProposalDim          = 38;
+// Layout within each proposal: [x1, y1, x2, y2, conf, cls, mask_coef x32]
+static const int       kBBoxOffset           = 0;  // x1 y1 x2 y2
+static const int       kConfOffset           = 4;
+static const int       kClsOffset            = 5;
 
 // ---------------------------------------------------------------------------
 // Implementation
@@ -54,6 +65,10 @@ static const int       kModelInputSize       = 640;
 
     // Whether the session is running and the model is loaded.
     BOOL                         _modelLoaded;
+
+    // ONNX Runtime objects.
+    ORTEnv                      *_ortEnv;
+    ORTSession                  *_ortSession;
 }
 
 #pragma mark - Lifecycle
@@ -228,20 +243,53 @@ static const int       kModelInputSize       = 640;
 #pragma mark - Model loading
 
 - (BOOL)_loadModel:(NSError **)error {
-    // Try CoreML first (bundle name without extension), then ONNX (absolute path).
-    // TODO (Phase 0): replace stub with actual CoreML / ONNX Runtime load call.
-    //
-    // CoreML path:
-    //   NSString *bundlePath = [[NSBundle mainBundle] pathForResource:_model ofType:@"mlpackage"];
-    //   NSURL *modelURL = [NSURL fileURLWithPath:bundlePath];
-    //   _mlModel = [MLModel modelWithContentsOfURL:modelURL error:error];
-    //   return _mlModel != nil;
-    //
-    // ONNX Runtime path:
-    //   _ortSession = [ORTSession sessionWithModelPath:_model error:error];
-    //   return _ortSession != nil;
+    // Resolve the model file path.
+    NSString *modelPath = nil;
 
-    // Stub: always succeeds so the camera pipeline can be validated independently.
+    if ([_model hasPrefix:@"file://"] || [_model hasPrefix:@"/"]) {
+        // Absolute path or file:// URL — strip the scheme if present.
+        modelPath = [_model hasPrefix:@"file://"]
+            ? [_model substringFromIndex:7]
+            : _model;
+    } else {
+        // Bare name — look for a bundled .onnx resource.
+        modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"];
+    }
+
+    if (!modelPath || ![[NSFileManager defaultManager] fileExistsAtPath:modelPath]) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"VRTObjectDetector"
+                                         code:1
+                                     userInfo:@{NSLocalizedDescriptionKey:
+                                                    [NSString stringWithFormat:@"ONNX model not found: %@", _model]}];
+        }
+        return NO;
+    }
+
+    // Create the ORT environment (one per session is fine).
+    NSError *ortError = nil;
+    _ortEnv = [[ORTEnv alloc] initWithLoggingLevel:ORTLoggingLevelWarning
+                                             error:&ortError];
+    if (!_ortEnv || ortError) {
+        if (error) *error = ortError;
+        return NO;
+    }
+
+    ORTSessionOptions *options = [[ORTSessionOptions alloc] initWithError:&ortError];
+    if (!options || ortError) {
+        if (error) *error = ortError;
+        return NO;
+    }
+
+    _ortSession = [[ORTSession alloc] initWithEnv:_ortEnv
+                                        modelPath:modelPath
+                                   sessionOptions:options
+                                            error:&ortError];
+    if (!_ortSession || ortError) {
+        if (error) *error = ortError;
+        return NO;
+    }
+
     return YES;
 }
 
@@ -272,32 +320,169 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     });
 }
 
+#pragma mark - Preprocessing
+
+// Resize BGRA CVPixelBuffer to 640x640 using vImage, then convert to
+// Float32 NCHW [1, 3, 640, 640] normalised to [0, 1].
+// Returns nil on failure; caller is responsible for freeing the returned buffer.
+- (float *)_preprocessPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    size_t srcWidth  = CVPixelBufferGetWidth(pixelBuffer);
+    size_t srcHeight = CVPixelBufferGetHeight(pixelBuffer);
+    size_t srcRowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
+    void  *srcBaseAddr = CVPixelBufferGetBaseAddress(pixelBuffer);
+
+    // --- Resize BGRA to 640x640 using vImage bilinear ---
+    vImage_Buffer srcBuf = {
+        .data     = srcBaseAddr,
+        .height   = srcHeight,
+        .width    = srcWidth,
+        .rowBytes = srcRowBytes
+    };
+
+    const size_t dstSize = kModelInputSize * kModelInputSize * 4; // BGRA
+    uint8_t *resizedBGRA = (uint8_t *)malloc(dstSize);
+    if (!resizedBGRA) {
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+        return nil;
+    }
+
+    vImage_Buffer dstBuf = {
+        .data     = resizedBGRA,
+        .height   = (vImagePixelCount)kModelInputSize,
+        .width    = (vImagePixelCount)kModelInputSize,
+        .rowBytes = (size_t)kModelInputSize * 4
+    };
+
+    vImage_Error vErr = vImageScale_ARGB8888(&srcBuf, &dstBuf, NULL, kvImageHighQualityResampling);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (vErr != kvImageNoError) {
+        free(resizedBGRA);
+        return nil;
+    }
+
+    // --- Convert BGRA uint8 -> Float32 NCHW [1, 3, H, W] normalised to [0,1] ---
+    // BGRA channel order: B=0, G=1, R=2, A=3
+    const int numPixels = kModelInputSize * kModelInputSize;
+    float *nchwBuffer = (float *)malloc(sizeof(float) * 3 * numPixels);
+    if (!nchwBuffer) {
+        free(resizedBGRA);
+        return nil;
+    }
+
+    float *rPlane = nchwBuffer + 0 * numPixels;
+    float *gPlane = nchwBuffer + 1 * numPixels;
+    float *bPlane = nchwBuffer + 2 * numPixels;
+
+    const float inv255 = 1.0f / 255.0f;
+    for (int i = 0; i < numPixels; i++) {
+        uint8_t b = resizedBGRA[i * 4 + 0];
+        uint8_t g = resizedBGRA[i * 4 + 1];
+        uint8_t r = resizedBGRA[i * 4 + 2];
+        // A channel ignored
+        rPlane[i] = (float)r * inv255;
+        gPlane[i] = (float)g * inv255;
+        bPlane[i] = (float)b * inv255;
+    }
+
+    free(resizedBGRA);
+    return nchwBuffer; // caller must free()
+}
+
 #pragma mark - Inference
 
 - (NSArray<NSDictionary *> *)_runInferenceOnPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-    // TODO (Phase 0): Replace stub with actual YOLOE inference.
-    //
-    // Pipeline:
-    //   1. Lock pixel buffer and get raw BGRA bytes.
-    //   2. Resize to kModelInputSize × kModelInputSize (letterbox, preserve aspect).
-    //   3. Convert BGRA → RGB, normalize to [0,1] float32.
-    //   4. Run CoreML / ONNX Runtime inference.
-    //   5. Post-process: decode anchors, apply confidence filter, run NMS.
-    //   6. Map bounding boxes back to original image coordinates (normalized [0,1]).
-    //   7. Return array of detection dicts.
-    //
-    // Each detection dict shape:
-    //   @{
-    //     @"label":      @"chair",
-    //     @"confidence": @(0.87),
-    //     @"boundingBox": @{
-    //       @"x": @(0.1), @"y": @(0.2),
-    //       @"width": @(0.3), @"height": @(0.4)
-    //     }
-    //   }
+    if (!_ortSession) return @[];
 
-    // Stub: return empty array until model is wired in.
-    return @[];
+    // 1. Preprocess: BGRA -> Float32 NCHW 640x640
+    float *inputData = [self _preprocessPixelBuffer:pixelBuffer];
+    if (!inputData) return @[];
+
+    // 2. Build ORT input tensor
+    NSError *ortError = nil;
+    const int64_t inputShape[] = {1, 3, kModelInputSize, kModelInputSize};
+    NSArray<NSNumber *> *shapeArray = @[@1, @3, @(kModelInputSize), @(kModelInputSize)];
+
+    NSMutableData *inputNSData = [NSMutableData dataWithBytes:inputData
+                                                       length:sizeof(float) * 3 * kModelInputSize * kModelInputSize];
+    free(inputData);
+
+    ORTValue *inputTensor = [ORTValue tensorWithData:inputNSData
+                                        elementType:ORTTensorElementDataTypeFloat
+                                              shape:shapeArray
+                                              error:&ortError];
+    if (!inputTensor || ortError) return @[];
+
+    // 3. Run inference
+    NSArray<NSString *> *inputNames  = @[@"images"];
+    NSArray<NSString *> *outputNames = @[@"output0"];
+    NSDictionary<NSString *, ORTValue *> *inputMap = @{@"images": inputTensor};
+
+    NSDictionary<NSString *, ORTValue *> *outputMap =
+        [_ortSession runWithInputs:inputMap
+                       outputNames:[NSSet setWithArray:outputNames]
+                       runOptions:nil
+                             error:&ortError];
+
+    if (!outputMap || ortError) return @[];
+
+    ORTValue *output0 = outputMap[@"output0"];
+    if (!output0) return @[];
+
+    // 4. Extract raw float data from output tensor
+    // Expected shape: [1, 300, 38]
+    NSData *outputData = [output0 tensorDataWithError:&ortError];
+    if (!outputData || ortError) return @[];
+
+    const float *outPtr = (const float *)outputData.bytes;
+    const NSInteger totalFloats = outputData.length / sizeof(float);
+    if (totalFloats < kNumProposals * kProposalDim) return @[];
+
+    // 5. Parse detections
+    NSMutableArray<NSDictionary *> *detections = [NSMutableArray array];
+    const float scale = 1.0f / (float)kModelInputSize;
+
+    for (int i = 0; i < kNumProposals; i++) {
+        const float *proposal = outPtr + i * kProposalDim;
+
+        float conf = proposal[kConfOffset];
+        if (conf < _confidenceThreshold) continue;
+
+        float x1 = proposal[kBBoxOffset + 0] * scale;
+        float y1 = proposal[kBBoxOffset + 1] * scale;
+        float x2 = proposal[kBBoxOffset + 2] * scale;
+        float y2 = proposal[kBBoxOffset + 3] * scale;
+
+        // Clamp to [0, 1]
+        x1 = MAX(0.0f, MIN(1.0f, x1));
+        y1 = MAX(0.0f, MIN(1.0f, y1));
+        x2 = MAX(0.0f, MIN(1.0f, x2));
+        y2 = MAX(0.0f, MIN(1.0f, y2));
+
+        float width  = x2 - x1;
+        float height = y2 - y1;
+        if (width <= 0.0f || height <= 0.0f) continue;
+
+        int classId = (int)proposal[kClsOffset];
+        NSString *label = [NSString stringWithFormat:@"%d", classId];
+
+        NSDictionary *bbox = @{
+            @"x":      @(x1),
+            @"y":      @(y1),
+            @"width":  @(width),
+            @"height": @(height)
+        };
+
+        [detections addObject:@{
+            @"label":       label,
+            @"confidence":  @(conf),
+            @"boundingBox": bbox
+        }];
+    }
+
+    return [detections copy];
 }
 
 @end

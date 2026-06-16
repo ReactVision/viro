@@ -51,6 +51,12 @@ static const int       kConfOffset           = 4;
 static const int       kClsOffset            = 5;
 
 // ---------------------------------------------------------------------------
+// Global inference provider slot
+// ---------------------------------------------------------------------------
+
+static VRTInferenceBlock gInferenceProvider = nil;
+
+// ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
 
@@ -245,6 +251,12 @@ static const int       kClsOffset            = 5;
     });
 }
 
+#pragma mark - Provider registration
+
++ (void)registerInferenceProvider:(VRTInferenceBlock)provider {
+    gInferenceProvider = [provider copy];
+}
+
 #pragma mark - Model loading
 
 - (BOOL)_loadModel:(NSError **)error {
@@ -391,23 +403,35 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 #pragma mark - Inference
 
 - (NSArray<NSDictionary *> *)_runInferenceOnPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+    // Preprocess first (needed by both provider and built-in ORT path)
+    float *nchwData = [self _preprocessPixelBuffer:pixelBuffer];
+    if (!nchwData) return @[];
+
+    // Priority 1: use the externally registered provider (react-viro-onnx)
+    if (gInferenceProvider) {
+        NSString *modelPath = _model;
+        // Resolve file:// / bare-name path for the provider
+        if (![modelPath hasPrefix:@"/"] && ![modelPath hasPrefix:@"file://"]) {
+            modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"] ?: _model;
+        }
+        NSArray *result = gInferenceProvider(modelPath, nchwData, kModelInputSize, _confidenceThreshold);
+        free(nchwData);
+        return result;
+    }
+
 #if !VIRO_ONNXRUNTIME_AVAILABLE
+    free(nchwData);
     return @[];
 #else
-    if (!_ortSession) return @[];
+    if (!_ortSession) { free(nchwData); return @[]; }
 
-    // 1. Preprocess: BGRA -> Float32 NCHW 640x640
-    float *inputData = [self _preprocessPixelBuffer:pixelBuffer];
-    if (!inputData) return @[];
-
-    // 2. Build ORT input tensor
+    // 2. Build ORT input tensor (nchwData already preprocessed above)
     NSError *ortError = nil;
-    const int64_t inputShape[] = {1, 3, kModelInputSize, kModelInputSize};
     NSArray<NSNumber *> *shapeArray = @[@1, @3, @(kModelInputSize), @(kModelInputSize)];
 
-    NSMutableData *inputNSData = [NSMutableData dataWithBytes:inputData
+    NSMutableData *inputNSData = [NSMutableData dataWithBytes:nchwData
                                                        length:sizeof(float) * 3 * kModelInputSize * kModelInputSize];
-    free(inputData);
+    free(nchwData);
 
     ORTValue *inputTensor = [ORTValue tensorWithData:inputNSData
                                         elementType:ORTTensorElementDataTypeFloat

@@ -31,14 +31,39 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /**
+ * Block type for the pluggable inference provider.
+ *
+ * modelPath      — absolute path to the .onnx model file
+ * nchwData       — Float32 NCHW buffer [1, 3, inputSize, inputSize], normalized [0,1]
+ * inputSize      — width == height of the square input (e.g. 640)
+ * confThreshold  — minimum confidence to emit a detection
+ *
+ * Returns an array of detection dicts:
+ *   { label: NSString, confidence: NSNumber, boundingBox: { x, y, width, height } }
+ * All coordinates are normalized [0, 1].
+ */
+typedef NSArray<NSDictionary *> * _Nonnull (^VRTInferenceBlock)(
+    NSString * _Nonnull modelPath,
+    const float * _Nonnull nchwData,
+    int inputSize,
+    float confThreshold
+);
+
+/**
  * VRTObjectDetectorView — zero-size UIView that manages an AVCaptureSession,
  * samples frames at `maxFPS`, runs YOLOE inference on each frame, and emits
  * detection results to JS via RCT direct event callbacks.
  *
- * Inference is performed on a dedicated serial dispatch queue to avoid blocking
- * the main thread or the AR render thread.
+ * By default, inference returns empty results. Install @reactvision/react-viro-onnx
+ * and call ViroONNX.install() to activate real ONNX Runtime inference.
  */
 @interface VRTObjectDetectorView : RCTView <AVCaptureVideoDataOutputSampleBufferDelegate>
+
+/**
+ * Register a pluggable inference provider (e.g. ONNX Runtime from react-viro-onnx).
+ * Idempotent — subsequent calls replace the previous provider.
+ */
++ (void)registerInferenceProvider:(VRTInferenceBlock)provider;
 
 // --- Props set by VRTObjectDetectorViewManager ---
 

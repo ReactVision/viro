@@ -72,6 +72,31 @@ public class VRTObjectDetectorView extends View {
 
     private static final String TAG = "VRTObjectDetector";
 
+    // -------------------------------------------------------------------------
+    // Pluggable inference provider (installed by react-viro-onnx)
+    // -------------------------------------------------------------------------
+
+    public interface InferenceProvider {
+        /**
+         * Run inference on a preprocessed Float32 NCHW buffer.
+         *
+         * @param modelPath     absolute path to the .onnx model
+         * @param nchwData      float[] of shape [1, 3, inputSize, inputSize], normalized [0,1]
+         * @param inputSize     width == height of the square input (e.g. 640)
+         * @param confThreshold minimum confidence to emit a detection
+         * @return list of detection maps: {label, confidence, boundingBox:{x,y,width,height}}
+         */
+        List<java.util.Map<String, Object>> infer(
+            String modelPath, float[] nchwData, int inputSize, float confThreshold);
+    }
+
+    private static InferenceProvider sInferenceProvider = null;
+
+    /** Called by react-viro-onnx at install time. */
+    public static void registerInferenceProvider(InferenceProvider provider) {
+        sInferenceProvider = provider;
+    }
+
     private static final int   DEFAULT_MAX_FPS    = 15;
     private static final float DEFAULT_CONFIDENCE = 0.4f;
     private static final float DEFAULT_IOU        = 0.45f;
@@ -346,16 +371,11 @@ public class VRTObjectDetectorView extends View {
     }
 
     // -------------------------------------------------------------------------
-    // Inference — ONNX Runtime, YOLOE output [1, 300, 38]
+    // Preprocessing — RGBA_8888 ImageProxy → float[] NCHW [1,3,640,640]
     // -------------------------------------------------------------------------
 
-    private List<WritableMap> runInference(ImageProxy imageProxy) {
-        List<WritableMap> results = new ArrayList<>();
-
-        if (mOrtSession == null || mOrtEnv == null) return results;
-
+    private float[] preprocessImageProxy(ImageProxy imageProxy) {
         try {
-            // 1. RGBA_8888 PlaneProxy → Bitmap ARGB_8888
             ImageProxy.PlaneProxy plane = imageProxy.getPlanes()[0];
             java.nio.ByteBuffer buffer = plane.getBuffer();
             int width  = imageProxy.getWidth();
@@ -364,29 +384,70 @@ public class VRTObjectDetectorView extends View {
             Bitmap srcBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             srcBitmap.copyPixelsFromBuffer(buffer);
 
-            // 2. Scale to 640×640
             Bitmap scaledBitmap = Bitmap.createScaledBitmap(
                 srcBitmap, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true);
             srcBitmap.recycle();
 
-            // 3. Extract pixels and convert to float32 NCHW [1, 3, 640, 640]
             int pixelCount = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
             int[] pixels = new int[pixelCount];
             scaledBitmap.getPixels(pixels, 0, MODEL_INPUT_SIZE, 0, 0,
                 MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
             scaledBitmap.recycle();
 
-            float[] floatInput = new float[3 * pixelCount];
-            int rOffset = 0;
-            int gOffset = pixelCount;
-            int bOffset = 2 * pixelCount;
-
+            float[] nchw = new float[3 * pixelCount];
             for (int i = 0; i < pixelCount; i++) {
                 int px = pixels[i];
-                floatInput[rOffset + i] = ((px >> 16) & 0xFF) / 255.0f;
-                floatInput[gOffset + i] = ((px >>  8) & 0xFF) / 255.0f;
-                floatInput[bOffset + i] = ( px        & 0xFF) / 255.0f;
+                nchw[i]                  = ((px >> 16) & 0xFF) / 255.0f; // R
+                nchw[pixelCount + i]     = ((px >>  8) & 0xFF) / 255.0f; // G
+                nchw[2 * pixelCount + i] = ( px        & 0xFF) / 255.0f; // B
             }
+            return nchw;
+        } catch (Exception e) {
+            Log.e(TAG, "Preprocessing failed", e);
+            return null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Inference — ONNX Runtime, YOLOE output [1, 300, 38]
+    // -------------------------------------------------------------------------
+
+    private List<WritableMap> runInference(ImageProxy imageProxy) {
+        List<WritableMap> results = new ArrayList<>();
+
+        // Preprocess frame → float[] NCHW
+        float[] nchwData = preprocessImageProxy(imageProxy);
+        if (nchwData == null) return results;
+
+        // Priority 1: use externally registered provider (react-viro-onnx)
+        if (sInferenceProvider != null) {
+            String modelPath = mModel.startsWith("/") || mModel.startsWith("file://")
+                ? mModel.replace("file://", "")
+                : mModel;
+            List<java.util.Map<String, Object>> dets =
+                sInferenceProvider.infer(modelPath, nchwData, MODEL_INPUT_SIZE, mConfidenceThreshold);
+            for (java.util.Map<String, Object> d : dets) {
+                WritableMap det = Arguments.createMap();
+                det.putString("label", (String) d.get("label"));
+                det.putDouble("confidence", ((Number) d.get("confidence")).doubleValue());
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> bb = (java.util.Map<String, Object>) d.get("boundingBox");
+                WritableMap bbox = Arguments.createMap();
+                bbox.putDouble("x",      ((Number) bb.get("x")).doubleValue());
+                bbox.putDouble("y",      ((Number) bb.get("y")).doubleValue());
+                bbox.putDouble("width",  ((Number) bb.get("width")).doubleValue());
+                bbox.putDouble("height", ((Number) bb.get("height")).doubleValue());
+                det.putMap("boundingBox", bbox);
+                results.add(det);
+            }
+            return results;
+        }
+
+        // Fallback: built-in ORT session (if model was loaded directly)
+        if (mOrtSession == null || mOrtEnv == null) return results;
+
+        try {
+            float[] floatInput = nchwData;
 
             // 4. Create input tensor
             long[] shape = {1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE};

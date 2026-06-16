@@ -462,7 +462,9 @@ public class VRTObjectDetectorView extends View {
             inputTensor.close();
 
             // 6. Decode output0: shape [1, 300, 38]
-            float[][][] output = (float[][][]) ortResult.get("output0").getValue();
+            // ortResult.get() returns Optional<OnnxValue> — need .get() to unwrap
+            if (!ortResult.get("output0").isPresent()) { ortResult.close(); return results; }
+            float[][][] output = (float[][][]) ortResult.get("output0").get().getValue();
             ortResult.close();
 
             float scale = (float) MODEL_INPUT_SIZE; // coords are in [0, 640]

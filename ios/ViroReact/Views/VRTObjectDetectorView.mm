@@ -64,6 +64,7 @@ static VRTInferenceBlock gInferenceProvider = nil;
     // Capture session — owns its own session independent of ViroCameraTexture.
     AVCaptureSession            *_session;
     AVCaptureVideoDataOutput    *_videoOutput;
+    AVCaptureVideoPreviewLayer  *_previewLayer;
     dispatch_queue_t             _inferenceQueue;
 
     // Throttle: track the last time inference ran.
@@ -172,6 +173,10 @@ static VRTInferenceBlock gInferenceProvider = nil;
     _videoOutput = nil;
     _modelLoaded = NO;
     _readyFired = NO;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self->_previewLayer removeFromSuperlayer];
+        self->_previewLayer = nil;
+    });
 }
 
 - (void)_restartIfRunning {
@@ -236,12 +241,31 @@ static VRTInferenceBlock gInferenceProvider = nil;
     if ([session canAddInput:input])   [session addInput:input];
     if ([session canAddOutput:output]) [session addOutput:output];
 
+    // Rotate the pixel buffer to portrait before delivery — without this the buffer
+    // arrives in landscape (640×480) regardless of device orientation, causing a 90°
+    // mismatch between detection boxes and what the preview layer displays.
+    for (AVCaptureConnection *conn in output.connections) {
+        if (conn.isVideoOrientationSupported) {
+            conn.videoOrientation = AVCaptureVideoOrientationPortrait;
+        }
+    }
+
     _session     = session;
     _videoOutput = output;
 
     [_session startRunning];
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        AVCaptureVideoPreviewLayer *preview = [AVCaptureVideoPreviewLayer layerWithSession:session];
+        preview.videoGravity = AVLayerVideoGravityResizeAspectFill;
+        preview.frame = self.bounds;
+        // Keep preview orientation consistent with the rotated data output buffer.
+        if (preview.connection.isVideoOrientationSupported) {
+            preview.connection.videoOrientation = AVCaptureVideoOrientationPortrait;
+        }
+        [self.layer insertSublayer:preview atIndex:0];
+        self->_previewLayer = preview;
+
         if (!self->_readyFired) {
             self->_readyFired = YES;
             if (self->_onReadyViro) {
@@ -249,6 +273,11 @@ static VRTInferenceBlock gInferenceProvider = nil;
             }
         }
     });
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    _previewLayer.frame = self.bounds;
 }
 
 #pragma mark - Provider registration
@@ -269,7 +298,10 @@ static VRTInferenceBlock gInferenceProvider = nil;
             ? [_model substringFromIndex:7]
             : _model;
     } else {
-        modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"];
+        // Try bundle root, then common asset subdirectories.
+        modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"]
+            ?: [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx" inDirectory:@"assets/models"]
+            ?: [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx" inDirectory:@"models"];
     }
 
     if (!modelPath || ![[NSFileManager defaultManager] fileExistsAtPath:modelPath]) {
@@ -277,7 +309,7 @@ static VRTInferenceBlock gInferenceProvider = nil;
             *error = [NSError errorWithDomain:@"VRTObjectDetector"
                                          code:1
                                      userInfo:@{NSLocalizedDescriptionKey:
-                                                    [NSString stringWithFormat:@"ONNX model not found: %@", _model]}];
+                                                    [NSString stringWithFormat:@"ONNX model not found: %@. Make sure the .onnx file is added to the Xcode target's Copy Bundle Resources.", _model]}];
         }
         return NO;
     }
@@ -410,12 +442,28 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     // Priority 1: use the externally registered provider (react-viro-onnx)
     if (gInferenceProvider) {
         NSString *modelPath = _model;
-        // Resolve file:// / bare-name path for the provider
         if (![modelPath hasPrefix:@"/"] && ![modelPath hasPrefix:@"file://"]) {
-            modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"] ?: _model;
+            modelPath = [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx"]
+                ?: [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx" inDirectory:@"assets/models"]
+                ?: [[NSBundle mainBundle] pathForResource:_model ofType:@"onnx" inDirectory:@"models"]
+                ?: _model;
         }
         NSArray *result = gInferenceProvider(modelPath, nchwData, kModelInputSize, _confidenceThreshold);
         free(nchwData);
+        // Map numeric class IDs to category names when categories are provided.
+        if (_categories.count > 0 && result.count > 0) {
+            NSMutableArray *mapped = [NSMutableArray arrayWithCapacity:result.count];
+            for (NSDictionary *det in result) {
+                int classId = [det[@"label"] intValue];
+                NSString *label = (classId >= 0 && classId < (int)_categories.count)
+                    ? _categories[classId]
+                    : det[@"label"];
+                NSMutableDictionary *m = [det mutableCopy];
+                m[@"label"] = label;
+                [mapped addObject:m];
+            }
+            return [mapped copy];
+        }
         return result;
     }
 
@@ -490,7 +538,9 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         if (width <= 0.0f || height <= 0.0f) continue;
 
         int classId = (int)proposal[kClsOffset];
-        NSString *label = [NSString stringWithFormat:@"%d", classId];
+        NSString *label = (classId >= 0 && classId < (int)_categories.count)
+            ? _categories[classId]
+            : [NSString stringWithFormat:@"%d", classId];
 
         NSDictionary *bbox = @{
             @"x":      @(x1),

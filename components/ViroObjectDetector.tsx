@@ -10,7 +10,6 @@ import * as React from "react";
 import {
   NativeSyntheticEvent,
   requireNativeComponent,
-  StyleSheet,
   ViewProps,
 } from "react-native";
 
@@ -133,15 +132,17 @@ const VRTObjectDetectorView = requireNativeComponent<any>("VRTObjectDetectorView
 /**
  * ViroObjectDetector — on-device open-vocabulary object detection powered by YOLOE.
  *
- * Opens an independent camera capture session, runs YOLOE inference at `maxFPS`,
- * and fires `onDetection` with normalized bounding boxes and labels.
+ * Opens an AVCaptureSession, renders its own camera preview via
+ * AVCaptureVideoPreviewLayer (iOS) / SurfaceView (Android), and fires
+ * `onDetection` with normalized bounding boxes and labels at `maxFPS`.
  *
- * The view itself has zero visible surface (width/height 0); mount it anywhere
- * inside a ViroARScene or at the root of your component tree.
+ * Size the view explicitly — it renders a live camera feed. Pass
+ * `style={StyleSheet.absoluteFill}` for a full-screen detector.
  *
  * @example
  * ```tsx
  * <ViroObjectDetector
+ *   style={StyleSheet.absoluteFill}
  *   mode="prompt-free"
  *   confidenceThreshold={0.4}
  *   maxFPS={15}
@@ -189,7 +190,7 @@ export const ViroObjectDetector: React.FC<Props> = ({
   return (
     <VRTObjectDetectorView
       {...rest}
-      style={[styles.hidden, style]}
+      style={style}
       model={model}
       mode={mode}
       categories={categories}
@@ -203,10 +204,3 @@ export const ViroObjectDetector: React.FC<Props> = ({
     />
   );
 };
-
-const styles = StyleSheet.create({
-  hidden: {
-    width: 0,
-    height: 0,
-  },
-});

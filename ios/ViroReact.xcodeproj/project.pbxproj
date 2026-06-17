@@ -29,6 +29,9 @@
 		8A130D901E3BC0690050D83B /* VRTSoundManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A130D8F1E3BC0690050D83B /* VRTSoundManager.mm */; };
 		8A130DAE1E43A8AB0050D83B /* VRTSoundModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A130DAD1E43A8AB0050D83B /* VRTSoundModule.mm */; };
 		8A2161D02036558500D60008 /* ViroKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8AFCC4F520056B1000AD8B8D /* ViroKit.framework */; };
+		DA6F957198494F589620D748 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 521D36CF0C934D90B4F4D57E /* AVFoundation.framework */; };
+		1CDF834A1F9E45208622D752 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8FC561ECDB174BADB9A4077B /* Accelerate.framework */; };
+		987955A5808F4974B27ED9A9 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7DD84FE2538040D992D1FA2A /* CoreVideo.framework */; };
 		8A26F6C7211E471B001E7032 /* VRTARObjectMarkerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A26F6C6211E471B001E7032 /* VRTARObjectMarkerManager.mm */; };
 		8A26F6CF211E478B001E7032 /* VRTARObjectMarker.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A26F6CE211E478B001E7032 /* VRTARObjectMarker.mm */; };
 		8A2DA3C71F9438A7001FC3BA /* VRTARUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 8A2DA3C61F9438A7001FC3BA /* VRTARUtils.m */; };
@@ -970,6 +973,9 @@
 		8AFC1C351EC1001C0000F7EB /* VRTPolyline.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTPolyline.h; path = ViroReact/Views/VRTPolyline.h; sourceTree = "<group>"; };
 		8AFC1C361EC1001C0000F7EB /* VRTPolyline.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTPolyline.mm; path = ViroReact/Views/VRTPolyline.mm; sourceTree = "<group>"; };
 		8AFCC4F520056B1000AD8B8D /* ViroKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ViroKit.framework; path = dist/ViroRenderer/ViroKit.framework; sourceTree = "<group>"; };
+		521D36CF0C934D90B4F4D57E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		8FC561ECDB174BADB9A4077B /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		7DD84FE2538040D992D1FA2A /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
 		8AFCC4F620056B1100AD8B8D /* ViroKit.podspec */ = {isa = PBXFileReference; lastKnownFileType = text; name = ViroKit.podspec; path = dist/ViroRenderer/ViroKit.podspec; sourceTree = "<group>"; };
 		8B78C9851F9DE61900967DF1 /* VRTARHitTestUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTARHitTestUtil.h; path = ViroReact/Utility/VRTARHitTestUtil.h; sourceTree = "<group>"; };
 		8B78C9881F9DE61A00967DF1 /* VRTARHitTestUtil.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTARHitTestUtil.mm; path = ViroReact/Utility/VRTARHitTestUtil.mm; sourceTree = "<group>"; };
@@ -1181,6 +1187,9 @@
 			files = (
 				8A2161D02036558500D60008 /* ViroKit.framework in Frameworks */,
 				59B520CD9761AD39BC81C7CB /* libPods-ViroReact.a in Frameworks */,
+				DA6F957198494F589620D748 /* AVFoundation.framework in Frameworks */,
+				1CDF834A1F9E45208622D752 /* Accelerate.framework in Frameworks */,
+				987955A5808F4974B27ED9A9 /* CoreVideo.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1641,6 +1650,12 @@
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
+			children = (
+				8AFCC4F520056B1000AD8B8D /* ViroKit.framework */,
+				521D36CF0C934D90B4F4D57E /* AVFoundation.framework */,
+				8FC561ECDB174BADB9A4077B /* Accelerate.framework */,
+				7DD84FE2538040D992D1FA2A /* CoreVideo.framework */,
+			);
 		};
 /* End PBXGroup section */
 

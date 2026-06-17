@@ -18,6 +18,10 @@ Pod::Spec.new do |s|
   # visionOS: CompositorServices drives the immersive render loop.
   s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
 
+  # iOS: frameworks required by source files compiled from the pod
+  # (VRTObjectDetectorView uses AVFoundation + Accelerate; CoreVideo for CVPixelBuffer)
+  s.ios.frameworks = ['AVFoundation', 'Accelerate', 'CoreVideo']
+
   # Base source files (always included)
   source_files_array = ['ViroReact/**/*.{h,m,mm,swift}']
   header_files_array = ['ViroReact/**/*.h']

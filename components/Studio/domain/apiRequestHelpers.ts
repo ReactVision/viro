@@ -108,6 +108,22 @@ const substitute = (
   return { ok: true, value };
 };
 
+/**
+ * Fail-soft interpolation for display strings (alert title / message). Unlike
+ * the request templates this never errors: a well-formed {{name}} whose value
+ * is missing is left verbatim, so a stale or mistyped reference stays visible
+ * rather than blanking the field or suppressing the whole alert. Malformed
+ * braces (not a valid placeholder) are left untouched.
+ */
+export const interpolateDisplayTemplate = (
+  template: string,
+  get: ValueLookup,
+): string =>
+  template.replace(PLACEHOLDER_GLOBAL, (whole, name: string) => {
+    const resolved = get(name);
+    return resolved === undefined ? whole : String(resolved);
+  });
+
 // ── URL templates ───────────────────────────────────────────────────────────
 
 // Static origin grammar: https://host[:port] with >= 2 lowercase ASCII labels

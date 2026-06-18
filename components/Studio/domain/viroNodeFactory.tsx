@@ -9,9 +9,14 @@ import {
   executeFunctionWithRelations,
   SequenceRuntimeContext,
 } from "./sceneNavigationHandler";
+import {
+  extractPlaceholders,
+  interpolateDisplayTemplate,
+} from "./apiRequestHelpers";
 import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
 import { DragConfiguration } from "./dragConfiguration";
 import { buildViroPhysicsBody, parsePhysicsBodyConfig } from "./physicsConfig";
+import { StudioVariableStore } from "./variableStore";
 
 type SceneNavigator = any;
 
@@ -242,14 +247,33 @@ function createImage(
   );
 }
 
-function createText(
-  asset: StudioAsset,
-  config: NodeConfig
-): React.ReactElement {
+/**
+ * TEXT node whose content is a {{variable}} template (the asset name). It
+ * re-interpolates and repaints whenever a referenced variable changes (and only
+ * subscribes when the template actually has placeholders). Resolution is
+ * fail-soft: unknown names stay literal.
+ */
+const VariableText: React.FC<{
+  asset: StudioAsset;
+  config: NodeConfig;
+  store?: StudioVariableStore;
+}> = ({ asset, config, store }) => {
+  const template = asset.name ?? "";
+  const compute = () =>
+    store ? interpolateDisplayTemplate(template, (n) => store.get(n)) : template;
+  const [text, setText] = React.useState(compute);
+
+  React.useEffect(() => {
+    if (!store || extractPlaceholders(template).length === 0) return;
+    // Resync any write that landed between first render and subscribe.
+    setText(compute());
+    return store.subscribe(() => setText(compute()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, template]);
+
   return (
     <ViroText
-      key={asset.id}
-      text={asset.name ?? ""}
+      text={text}
       position={config.position}
       rotation={config.rotation}
       scale={config.scale}
@@ -265,6 +289,14 @@ function createText(
       {...(config.dragType ? { onDrag: () => {} } : {})}
     />
   );
+};
+
+function createText(
+  asset: StudioAsset,
+  config: NodeConfig,
+  store?: StudioVariableStore
+): React.ReactElement {
+  return <VariableText key={asset.id} asset={asset} config={config} store={store} />;
 }
 
 function createVideo(
@@ -329,7 +361,7 @@ export function createNode(
     case "IMAGE":
       return createImage(asset, config, onAssetLoaded);
     case "TEXT":
-      return createText(asset, config);
+      return createText(asset, config, runtimeCtx?.variableStore);
     case "VIDEO":
       return createVideo(asset, config);
     default:

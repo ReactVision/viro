@@ -9,7 +9,7 @@ import {
   StudioSequenceStep,
 } from "../types";
 import { VRTStudioModule } from "../VRTStudioModule";
-import { applyBindings } from "./apiRequestHelpers";
+import { applyBindings, interpolateDisplayTemplate } from "./apiRequestHelpers";
 import {
   evaluate,
   evaluateBranchCondition,
@@ -105,7 +105,10 @@ export class SequenceScheduler {
       if (timer.handle === null) continue;
       clearTimeout(timer.handle);
       timer.handle = null;
-      timer.remainingMs = Math.max(0, timer.remainingMs - (now - timer.startedAt));
+      timer.remainingMs = Math.max(
+        0,
+        timer.remainingMs - (now - timer.startedAt)
+      );
     }
   }
 
@@ -164,15 +167,15 @@ type StepRunnerDeps = {
 
 /**
  * Walks an ordered step list with two continuations: onDone when the list
- * completes, onAbort on early termination (NAVIGATION leaves the scene; the
- * top caller releases its beginSequence guard either way, so a failed async
- * navigation can't leave a sequence permanently blocked).
+ * completes, onAbort on early termination (NAVIGATION leaves the scene, STOP
+ * halts in place; the top caller releases its beginSequence guard either way,
+ * so a failed async navigation can't leave a sequence permanently blocked).
  */
 function runSteps(
   steps: StudioSequenceStep[],
   deps: StepRunnerDeps,
   onDone: () => void,
-  onAbort: () => void,
+  onAbort: () => void
 ): void {
   const ordered = [...steps].sort((a, b) => a.step_order - b.step_order);
   const runStep = (i: number): void => {
@@ -183,7 +186,18 @@ function runSteps(
     const step = ordered[i];
     if (step.step_type === "WAIT") {
       // Non-blocking: the rest of the list continues after the timer.
-      deps.runtimeCtx.scheduler.schedule(() => runStep(i + 1), step.duration_ms ?? 0);
+      deps.runtimeCtx.scheduler.schedule(
+        () => runStep(i + 1),
+        step.duration_ms ?? 0
+      );
+      return;
+    }
+    if (step.step_type === "STOP") {
+      // Explicit terminal: halt the whole run. onAbort is threaded unchanged
+      // through every nested arm (branch/api/run-sequence), so it skips the
+      // outer continuations straight to the top beginSequence guard release —
+      // a STOP inside an arm ends the entire sequence, not just that arm.
+      onAbort();
       return;
     }
     // ACTION: dispatch the action, then advance.
@@ -204,7 +218,12 @@ function runSteps(
       // sequence's steps inline (not begin-guarded, like an arm); the outer
       // list resumes only after it completes. The depth guard bounds chains.
       if (step.function.function_type === "SEQUENCE") {
-        runReferencedSequence(step.function, deps, () => runStep(i + 1), onAbort);
+        runReferencedSequence(
+          step.function,
+          deps,
+          () => runStep(i + 1),
+          onAbort
+        );
         return;
       }
       executeFunctionWithRelations(
@@ -214,7 +233,7 @@ function runSteps(
         deps.onAnimationTrigger,
         deps.depth + 1,
         deps.onSceneChange,
-        deps.runtimeCtx,
+        deps.runtimeCtx
       );
       // A step list is scoped to one scene. NAVIGATION leaves it, so the walk
       // ends here; remaining steps belong to the scene we just left.
@@ -247,7 +266,7 @@ function runBranch(
   fn: StudioSceneFunction,
   deps: StepRunnerDeps,
   onDone: () => void,
-  onAbort: () => void,
+  onAbort: () => void
 ): void {
   const branch = fn.scene_branch;
   if (!branch) {
@@ -281,7 +300,7 @@ function runBranch(
         compare_literal: condition.compare_literal,
         compare_variable_name: condition.compare_variable_name,
       },
-      (name) => store.get(name),
+      (name) => store.get(name)
     );
     if (!result.ok) {
       console.warn(
@@ -290,7 +309,12 @@ function runBranch(
       continue;
     }
     if (result.value) {
-      runSteps(condition.sequence.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+      runSteps(
+        condition.sequence.steps,
+        { ...deps, depth: branchDepth },
+        onDone,
+        onAbort
+      );
       return;
     }
   }
@@ -313,7 +337,7 @@ function runReferencedSequence(
   fn: StudioSceneFunction,
   deps: StepRunnerDeps,
   onDone: () => void,
-  onAbort: () => void,
+  onAbort: () => void
 ): void {
   const seq = fn.scene_sequence;
   if (!seq) {
@@ -343,7 +367,7 @@ function runApiRequest(
   fn: StudioSceneFunction,
   deps: StepRunnerDeps,
   onDone: () => void,
-  onAbort: () => void,
+  onAbort: () => void
 ): void {
   const apiRequest = fn.scene_api_request;
   if (!apiRequest) {
@@ -375,7 +399,10 @@ function runApiRequest(
     if (settled || scheduler.generation !== generation) return;
     settled = true;
     if (store) {
-      const { writes, warnings } = applyBindings(apiRequest.bindings ?? [], outcome);
+      const { writes, warnings } = applyBindings(
+        apiRequest.bindings ?? [],
+        outcome
+      );
       for (const warning of warnings) {
         console.warn(`[Studio] API_REQUEST ${apiRequest.id}: ${warning}`);
       }
@@ -387,7 +414,9 @@ function runApiRequest(
         `[Studio] API_REQUEST ${apiRequest.id}: no variable store; bindings skipped.`
       );
     }
-    const arm = outcome.ok ? apiRequest.success_sequence : apiRequest.failure_sequence;
+    const arm = outcome.ok
+      ? apiRequest.success_sequence
+      : apiRequest.failure_sequence;
     if (!arm) {
       onDone();
       return;
@@ -441,7 +470,7 @@ export function executeFunctionWithRelations(
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
   depth = 0,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  runtimeCtx?: SequenceRuntimeContext,
+  runtimeCtx?: SequenceRuntimeContext
 ): void {
   if (depth > ANIMATION_CHAIN_MAX_DEPTH) {
     console.warn(
@@ -464,9 +493,16 @@ export function executeFunctionWithRelations(
     const finish = () => runtimeCtx.scheduler.endSequence(seq.id);
     runSteps(
       seq.steps,
-      { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
+      {
+        sceneNavigator,
+        animations,
+        onAnimationTrigger,
+        onSceneChange,
+        runtimeCtx,
+        depth,
+      },
       finish,
-      finish,
+      finish
     );
     return;
   }
@@ -479,28 +515,36 @@ export function executeFunctionWithRelations(
       nav.navigate_to,
       animations,
       onSceneChange,
-      runtimeCtx?.variableStore,
+      runtimeCtx?.variableStore
     );
   } else if (fn.function_type === "ALERT") {
-    const alrt = fn.scene_alert;
-    if (!alrt) return;
+    const alert = fn.scene_alert;
+    if (!alert) return;
+    // Fail-soft {{variable}} interpolation: unresolved names stay literal so a
+    // stale reference never blanks or suppresses the alert.
+    const store = runtimeCtx?.variableStore;
+    const fill = (s: string | null): string =>
+      s ? interpolateDisplayTemplate(s, (name) => store?.get(name)) : "";
+    const title = fill(alert.alert_title);
+    const message = fill(alert.alert_message);
     if (isQuest) {
       // Alert.alert shows a 2D panel dialog — invisible in the VR compositor.
       // Log it so it's not silently swallowed; in-scene VR alert UI is a TODO.
       console.warn(
-        `[Studio] Alert (Quest — not shown in VR): "${alrt.alert_title}" — ${alrt.alert_message}`
+        `[Studio] Alert (Quest — not shown in VR): "${title}" — ${message}`
       );
       return;
     }
-    Alert.alert(alrt.alert_title ?? "Alert", alrt.alert_message ?? "", [
-      { text: "OK", style: "default" },
-    ]);
+    Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);
   } else if (fn.function_type === "ANIMATION") {
     const anim = fn.scene_animation;
     if (!anim || !onAnimationTrigger) return;
 
     const animLookupId = fn.animation ?? anim.id;
-    const targetAssetId = resolveAnimationTargetAssetId(animLookupId, animations);
+    const targetAssetId = resolveAnimationTargetAssetId(
+      animLookupId,
+      animations
+    );
     if (!targetAssetId) {
       console.warn(
         `[Studio] ANIMATION function ${fn.id}: could not resolve target_asset_id for animation ${anim.id}`
@@ -521,12 +565,16 @@ export function executeFunctionWithRelations(
     }
     const parsed = parseExpression(sv.expression);
     if (!parsed.ok) {
-      console.warn(`[Studio] SET_VARIABLE "${sv.name}": ${parsed.error}; skipping.`);
+      console.warn(
+        `[Studio] SET_VARIABLE "${sv.name}": ${parsed.error}; skipping.`
+      );
       return;
     }
     const result = evaluate(parsed.ast, (name) => store.get(name));
     if (!result.ok) {
-      console.warn(`[Studio] SET_VARIABLE "${sv.name}": ${result.error}; skipping.`);
+      console.warn(
+        `[Studio] SET_VARIABLE "${sv.name}": ${result.error}; skipping.`
+      );
       return;
     }
     if (!valueMatchesType(result.value, sv.type)) {
@@ -552,9 +600,16 @@ export function executeFunctionWithRelations(
     const finish = () => runtimeCtx.scheduler.endSequence(branch.id);
     runBranch(
       fn,
-      { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
+      {
+        sceneNavigator,
+        animations,
+        onAnimationTrigger,
+        onSceneChange,
+        runtimeCtx,
+        depth,
+      },
       finish,
-      finish,
+      finish
     );
   } else if (fn.function_type === "API_REQUEST") {
     // Authored in-sequence (runSteps dispatches it there with the outer
@@ -573,9 +628,16 @@ export function executeFunctionWithRelations(
     const finish = () => runtimeCtx.scheduler.endSequence(apiRequest.id);
     runApiRequest(
       fn,
-      { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth },
+      {
+        sceneNavigator,
+        animations,
+        onAnimationTrigger,
+        onSceneChange,
+        runtimeCtx,
+        depth,
+      },
       finish,
-      finish,
+      finish
     );
   }
 }
@@ -590,7 +652,7 @@ export function executeOnLoadFunction(
   animations: StudioAnimation[],
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  runtimeCtx?: SequenceRuntimeContext,
+  runtimeCtx?: SequenceRuntimeContext
 ): void {
   const fn = resolveById(functionId, functions);
   if (!fn) {
@@ -604,7 +666,7 @@ export function executeOnLoadFunction(
     onAnimationTrigger,
     0,
     onSceneChange,
-    runtimeCtx,
+    runtimeCtx
   );
 }
 
@@ -620,7 +682,7 @@ async function navigateToScene(
   targetSceneId: string,
   currentAnimations: StudioAnimation[],
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  variableStore?: StudioVariableStore,
+  variableStore?: StudioVariableStore
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");

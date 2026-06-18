@@ -24,14 +24,17 @@ export interface StudioProjectMeta {
   occlusion_mode: "NONE" | "PEOPLEONLY" | "DEPTHBASED";
 }
 
-/** One ordered step of a Sequence: an ACTION (runs a function) or a WAIT (timed pause). */
+/**
+ * One ordered step of a Sequence: an ACTION (runs a function), a WAIT (timed
+ * pause), or a STOP (explicit terminal — the run halts here).
+ */
 export interface StudioSequenceStep {
   id: string;
   step_order: number;
-  step_type: "ACTION" | "WAIT";
+  step_type: "ACTION" | "WAIT" | "STOP";
   duration_ms: number | null; // set for WAIT
   function_id: string | null; // set for ACTION
-  function: StudioSceneFunction | null; // resolved child for ACTION; null for WAIT
+  function: StudioSceneFunction | null; // resolved child for ACTION; null for WAIT/STOP
 }
 
 export interface StudioSequence {

@@ -19,6 +19,7 @@ import type {
   StudioBranchCondition,
   StudioSceneFunction,
   StudioSequence,
+  StudioSequenceStep,
 } from "../components/Studio/types";
 
 // ── Fixture builders ──────────────────────────────────────────────────────
@@ -87,6 +88,37 @@ const seqFn = (id: string, fns: StudioSceneFunction[]): StudioSceneFunction => (
   function_type: "SEQUENCE",
   sequence: `${id}-seq`,
   scene_sequence: seqOf(`${id}-seq`, fns),
+});
+
+const actionStep = (
+  order: number,
+  fn: StudioSceneFunction
+): StudioSequenceStep => ({
+  id: `step-${order}-${fn.id}`,
+  step_order: order,
+  step_type: "ACTION",
+  duration_ms: null,
+  function_id: fn.id,
+  function: fn,
+});
+
+const stopStep = (order: number): StudioSequenceStep => ({
+  id: `stop-${order}`,
+  step_order: order,
+  step_type: "STOP",
+  duration_ms: null,
+  function_id: null,
+  function: null,
+});
+
+const seqFnWithSteps = (
+  id: string,
+  steps: StudioSequenceStep[]
+): StudioSceneFunction => ({
+  ...baseFn(id),
+  function_type: "SEQUENCE",
+  sequence: `${id}-seq`,
+  scene_sequence: { id: `${id}-seq`, name: null, steps },
 });
 
 const condition = (
@@ -240,5 +272,32 @@ describe("multi-arm branch + Run Sequence walker", () => {
     ];
     expect(() => run(selfRef)).not.toThrow();
     expect(console.warn).toHaveBeenCalled();
+  });
+
+  test("STOP halts the sequence; later steps do not run", () => {
+    run(
+      seqFnWithSteps("S6", [
+        actionStep(0, setVarFn("before", "result", "5")),
+        stopStep(1),
+        actionStep(2, setVarFn("after", "after", "9")),
+      ]),
+    );
+    expect(store.get("result")).toBe(5);
+    expect(store.get("after")).toBeUndefined();
+  });
+
+  test("STOP inside an arm halts the whole sequence, not just the arm", () => {
+    const cond = condition(0, "score", "EQUALS", 7, [
+      setVarFn("armRan", "result", "5"),
+    ]);
+    cond.sequence.steps.push(stopStep(1));
+    run(
+      seqFnWithSteps("S7", [
+        actionStep(0, branchFn("b6", [cond], null)),
+        actionStep(1, setVarFn("after", "after", "9")),
+      ]),
+    );
+    expect(store.get("result")).toBe(5); // arm ran up to STOP
+    expect(store.get("after")).toBeUndefined(); // step after the branch never ran
   });
 });

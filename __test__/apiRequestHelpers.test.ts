@@ -3,6 +3,7 @@ import {
   coerceBindingValue,
   extractByPath,
   extractPlaceholders,
+  interpolateDisplayTemplate,
   interpolateHeaders,
   interpolateJsonBody,
   interpolateUrlTemplate,
@@ -51,6 +52,29 @@ describe("validateTemplateString / extractPlaceholders", () => {
       "userId",
       "name",
     ]);
+  });
+});
+
+describe("interpolateDisplayTemplate", () => {
+  test("substitutes resolved values, stringifying non-strings", () => {
+    expect(interpolateDisplayTemplate("Hi {{name}}, you are {{userId}}", get)).toBe(
+      "Hi Anna Lee, you are 42",
+    );
+    expect(interpolateDisplayTemplate("active={{active}}", get)).toBe(
+      "active=true",
+    );
+  });
+
+  test("leaves unresolved placeholders literal (fail-soft)", () => {
+    expect(interpolateDisplayTemplate("score is {{missing}}", get)).toBe(
+      "score is {{missing}}",
+    );
+  });
+
+  test("leaves malformed braces untouched", () => {
+    expect(interpolateDisplayTemplate("{{9bad}} and {{a b}}", get)).toBe(
+      "{{9bad}} and {{a b}}",
+    );
   });
 });
 

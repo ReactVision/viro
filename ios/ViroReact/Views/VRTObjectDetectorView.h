@@ -88,6 +88,22 @@ typedef NSArray<NSDictionary *> * _Nonnull (^VRTInferenceBlock)(
 /** "front" | "back". Default: "back". */
 @property (nonatomic, copy) NSString *cameraPosition;
 
+/**
+ * When YES the view does NOT open its own AVCaptureSession. Instead it subscribes
+ * to AR frames published by the nearest VRTARSceneNavigator. Use this when the
+ * component is mounted inside a ViroARSceneNavigator so that ARKit's session is
+ * shared and the AR camera feed is not duplicated.
+ * Default: NO.
+ */
+@property (nonatomic, assign) BOOL useARSession;
+
+/**
+ * When YES (and useARSession=YES) each detection includes a `worldPosition` dict
+ * {x, y, z} obtained by raycasting the bounding-box centre against the AR scene.
+ * Adds ~1ms per detection. Default: YES.
+ */
+@property (nonatomic, assign) BOOL projectToWorld;
+
 // --- RCT event callbacks ---
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onDetectionViro;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onReadyViro;

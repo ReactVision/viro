@@ -70,7 +70,7 @@ const VRTObjectDetectorView = (0, react_native_1.requireNativeComponent)("VRTObj
  * />
  * ```
  */
-const ViroObjectDetector = ({ model = "yoloe-26s", mode = "prompt-free", categories = [], confidenceThreshold = 0.4, iouThreshold = 0.45, maxFPS = 15, cameraPosition = "back", onDetection, onReady, onError, style, ...rest }) => {
+const ViroObjectDetector = ({ model = "yoloe-26s", mode = "prompt-free", categories = [], confidenceThreshold = 0.4, iouThreshold = 0.45, maxFPS = 15, cameraPosition = "back", useARSession = false, projectToWorld = true, onDetection, onReady, onError, style, ...rest }) => {
     const handleDetection = React.useCallback((event) => {
         onDetection?.(event.nativeEvent);
     }, [onDetection]);
@@ -80,6 +80,6 @@ const ViroObjectDetector = ({ model = "yoloe-26s", mode = "prompt-free", categor
     const handleError = React.useCallback((event) => {
         onError?.(event.nativeEvent);
     }, [onError]);
-    return (<VRTObjectDetectorView {...rest} style={style} model={model} mode={mode} categories={categories} confidenceThreshold={confidenceThreshold} iouThreshold={iouThreshold} maxFPS={maxFPS} cameraPosition={cameraPosition} onDetectionViro={onDetection ? handleDetection : undefined} onReadyViro={onReady ? handleReady : undefined} onErrorViro={onError ? handleError : undefined}/>);
+    return (<VRTObjectDetectorView {...rest} style={style} model={model} mode={mode} categories={categories} confidenceThreshold={confidenceThreshold} iouThreshold={iouThreshold} maxFPS={maxFPS} cameraPosition={cameraPosition} useARSession={useARSession} projectToWorld={projectToWorld} onDetectionViro={onDetection ? handleDetection : undefined} onReadyViro={onReady ? handleReady : undefined} onErrorViro={onError ? handleError : undefined}/>);
 };
 exports.ViroObjectDetector = ViroObjectDetector;

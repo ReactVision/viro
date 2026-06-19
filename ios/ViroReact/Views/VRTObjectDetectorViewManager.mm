@@ -55,6 +55,10 @@ RCT_EXPORT_VIEW_PROPERTY(maxFPS, NSInteger)
 // "front" | "back"
 RCT_EXPORT_VIEW_PROPERTY(cameraPosition, NSString *)
 
+// AR integration
+RCT_EXPORT_VIEW_PROPERTY(useARSession, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(projectToWorld, BOOL)
+
 // JS callbacks
 RCT_EXPORT_VIEW_PROPERTY(onDetectionViro, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onReadyViro, RCTDirectEventBlock)

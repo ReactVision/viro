@@ -32,6 +32,14 @@ export type ViroDetectedObject = {
   label: string;
   confidence: number;
   boundingBox: ViroDetectionBoundingBox;
+  /** 3D world position (metres) — only present when useARSession + projectToWorld are true. */
+  worldPosition?: { x: number; y: number; z: number };
+  /**
+   * Bounding box in screen pixels (portrait), pre-computed via ARFrame.displayTransform.
+   * Only present when useARSession + projectToWorld are true.
+   * Use directly as { left, top, width, height } in an absolute-positioned View.
+   */
+  screenBoundingBox?: { x: number; y: number; width: number; height: number };
 };
 
 export type ViroDetectionEvent = {
@@ -99,6 +107,23 @@ type Props = ViewProps & {
   cameraPosition?: "front" | "back";
 
   /**
+   * When true, the component does NOT open its own AVCaptureSession.
+   * Instead it taps into the AR session managed by the enclosing
+   * ViroARSceneNavigator, receiving ARFrame.capturedImage on every tick.
+   * The component renders nothing (no camera preview layer).
+   * Use this when embedding ViroObjectDetector inside a ViroARScene.
+   * Defaults to false.
+   */
+  useARSession?: boolean;
+
+  /**
+   * When true (and useARSession=true), each detection includes a `worldPosition`
+   * {x, y, z} obtained by raycasting the bbox centre against the AR scene.
+   * Defaults to true.
+   */
+  projectToWorld?: boolean;
+
+  /**
    * Called every time the detector produces a new set of detections.
    * May be called with an empty array if nothing is detected in a frame.
    */
@@ -160,6 +185,8 @@ export const ViroObjectDetector: React.FC<Props> = ({
   iouThreshold = 0.45,
   maxFPS = 15,
   cameraPosition = "back",
+  useARSession = false,
+  projectToWorld = true,
   onDetection,
   onReady,
   onError,
@@ -198,6 +225,8 @@ export const ViroObjectDetector: React.FC<Props> = ({
       iouThreshold={iouThreshold}
       maxFPS={maxFPS}
       cameraPosition={cameraPosition}
+      useARSession={useARSession}
+      projectToWorld={projectToWorld}
       onDetectionViro={onDetection ? handleDetection : undefined}
       onReadyViro={onReady ? handleReady : undefined}
       onErrorViro={onError ? handleError : undefined}

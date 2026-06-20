@@ -176,6 +176,12 @@ class ViroARScene extends ViroBase_1.ViroBase {
         this.props.onAmbientLightUpdate &&
             this.props.onAmbientLightUpdate(event.nativeEvent.ambientLightInfo);
     };
+    /**
+     * Fired once when depth data first becomes available for hit testing.
+     */
+    _onDepthReady = (_event) => {
+        this.props.onDepthReady && this.props.onDepthReady();
+    };
     _onAnchorFound = (event) => {
         // TODO: this is in a different format than the other onAnchorFound methods
         this.props.onAnchorFound &&
@@ -334,7 +340,7 @@ class ViroARScene extends ViroBase_1.ViroBase {
                 },
             }}>
         <VRTARScene {...this.props} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
-                this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canFuse={this.props.onFuse != undefined} canCameraARHitTest={this.props.onCameraARHitTest != undefined} canARPointCloudUpdate={this.props.onARPointCloudUpdate != undefined} canCameraTransformUpdate={this.props.onCameraTransformUpdate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onFuseViro={this._onFuse} onCameraARHitTestViro={this._onCameraARHitTest} onARPointCloudUpdateViro={this._onARPointCloudUpdate} onCameraTransformUpdateViro={this._onCameraTransformUpdate} onPlatformUpdateViro={this._onPlatformUpdate} onTrackingUpdatedViro={this._onTrackingUpdated} onAmbientLightUpdateViro={this._onAmbientLightUpdate} onAnchorFoundViro={this._onAnchorFound} onAnchorUpdatedViro={this._onAnchorUpdated} onAnchorRemovedViro={this._onAnchorRemoved} timeToFuse={timeToFuse} anchorDetectionTypes={anchorDetectionTypes} displayPointCloud={displayPointCloud} pointCloudImage={pointCloudImage} pointCloudScale={pointCloudScale} pointCloudMaxPoints={pointCloudMaxPoints}/>
+                this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canFuse={this.props.onFuse != undefined} canCameraARHitTest={this.props.onCameraARHitTest != undefined} canARPointCloudUpdate={this.props.onARPointCloudUpdate != undefined} canCameraTransformUpdate={this.props.onCameraTransformUpdate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onFuseViro={this._onFuse} onCameraARHitTestViro={this._onCameraARHitTest} onARPointCloudUpdateViro={this._onARPointCloudUpdate} onCameraTransformUpdateViro={this._onCameraTransformUpdate} onPlatformUpdateViro={this._onPlatformUpdate} onTrackingUpdatedViro={this._onTrackingUpdated} onAmbientLightUpdateViro={this._onAmbientLightUpdate} onDepthReadyViro={this._onDepthReady} onAnchorFoundViro={this._onAnchorFound} onAnchorUpdatedViro={this._onAnchorUpdated} onAnchorRemovedViro={this._onAnchorRemoved} timeToFuse={timeToFuse} anchorDetectionTypes={anchorDetectionTypes} displayPointCloud={displayPointCloud} pointCloudImage={pointCloudImage} pointCloudScale={pointCloudScale} pointCloudMaxPoints={pointCloudMaxPoints}/>
       </ViroSceneContext_1.ViroSceneContext.Provider>);
     }
 }
@@ -368,6 +374,7 @@ ViroARScene, {
         onTrackingInitializedViro: true,
         onTrackingUpdatedViro: true,
         onAmbientLightUpdateViro: true,
+        onDepthReadyViro: true,
         onAnchorFoundViro: true,
         onAnchorUpdatedViro: true,
         onAnchorRemovedViro: true,

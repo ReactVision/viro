@@ -25,7 +25,6 @@
 
 #import "VRTObjectDetectorView.h"
 #import <CoreVideo/CoreVideo.h>
-#import <Accelerate/Accelerate.h>
 #import <ARKit/ARKit.h>
 #include <stdatomic.h>
 
@@ -103,14 +102,6 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 // ---------------------------------------------------------------------------
 
 @implementation VRTObjectDetectorView {
-    // --- Standalone camera mode ---
-    AVCaptureSession            *_session;
-    AVCaptureVideoDataOutput    *_videoOutput;
-    AVCaptureVideoPreviewLayer  *_previewLayer;
-
-    // --- AR session mode ---
-
-    // --- Shared ---
     dispatch_queue_t             _inferenceQueue;
     CFTimeInterval               _lastInferenceTime;
     BOOL                         _readyFired;
@@ -141,8 +132,6 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
         _iouThreshold        = kDefaultIou;
         _maxFPS              = kDefaultMaxFPS;
         _maxDetections       = kDefaultMaxDetections;
-        _cameraPosition      = @"back";
-        _useARSession        = NO;
         _projectToWorld      = YES;
         _lastInferenceTime   = 0;
         _readyFired          = NO;
@@ -162,12 +151,9 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 }
 
 - (void)dealloc {
-    if (_useARSession) {
-        [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                        name:kVROARFrameNotification
-                                                      object:nil];
-    }
-    [self _stopSession];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:kVROARFrameNotification
+                                                  object:nil];
 }
 
 #pragma mark - React lifecycle
@@ -175,23 +161,9 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 - (void)didMoveToWindow {
     [super didMoveToWindow];
     if (self.window) {
-        if (_useARSession) {
-            [self _startARMode];
-        } else {
-            [self _startSession];
-        }
+        [self _startARMode];
     } else {
-        if (_useARSession) {
-            _active = NO;
-            [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                            name:kVROARFrameNotification
-                                                          object:nil];
-            _readyFired  = NO;
-            _modelLoaded = NO;
-            // ORT sessions kept resident — see _stopSession comment.
-        } else {
-            [self _stopSession];
-        }
+        [self _stopARMode];
     }
 }
 
@@ -230,13 +202,18 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
     _maxDetections = maxDetections;
 }
 
-- (void)setCameraPosition:(NSString *)cameraPosition {
-    if ([_cameraPosition isEqualToString:cameraPosition]) return;
-    _cameraPosition = cameraPosition;
-    [self _restartIfRunning];
-}
-
 #pragma mark - AR session mode
+
+- (void)_stopARMode {
+    _active = NO;
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:kVROARFrameNotification
+                                                  object:nil];
+    _readyFired  = NO;
+    _modelLoaded = NO;
+    // ORT sessions kept resident — reloading the ~2GB session on every remount would
+    // spike memory and risk an OS kill. Memory is reclaimed when the app terminates.
+}
 
 - (void)_startARMode {
     _active = YES;
@@ -515,130 +492,11 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 
 #pragma mark - Session management
 
-- (void)_startSession {
-    if (_session) return;
-
-    dispatch_async(_inferenceQueue, ^{
-        [self _loadModelAndStartCapture];
-    });
-}
-
-- (void)_stopSession {
-    if (!_session) return;
-    [_session stopRunning];
-    _session = nil;
-    _videoOutput = nil;
-    _modelLoaded = NO;
-    _readyFired = NO;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self->_previewLayer removeFromSuperlayer];
-        self->_previewLayer = nil;
-    });
-    // Note: we intentionally do NOT clear the ORT sessions here.
-    // The 2GB ORT session stays resident in memory so that subsequent entries
-    // (including the AR mode) don't trigger a reload spike that would cause the
-    // OS to kill the app. Memory is freed when the app terminates.
-}
-
+// Model/mode prop changes restart the AR pipeline so they take effect without a remount.
 - (void)_restartIfRunning {
-    if (!_session) return;
-    [self _stopSession];
-    [self _startSession];
-}
-
-- (void)_loadModelAndStartCapture {
-    // --- 1. Load model ---
-    NSError *modelError = nil;
-    BOOL loaded = [self _loadModel:&modelError];
-    if (!loaded) {
-        NSString *msg = modelError.localizedDescription ?: @"Failed to load YOLOE model";
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self->_onErrorViro) {
-                self->_onErrorViro(@{@"error": msg});
-            }
-        });
-        return;
-    }
-    _modelLoaded = YES;
-
-    // --- 2. Configure AVCaptureSession ---
-    AVCaptureSession *session = [[AVCaptureSession alloc] init];
-    session.sessionPreset = AVCaptureSessionPreset640x480;
-
-    AVCaptureDevicePosition position = [_cameraPosition isEqualToString:@"front"]
-        ? AVCaptureDevicePositionFront
-        : AVCaptureDevicePositionBack;
-
-    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInWideAngleCamera
-                                                                 mediaType:AVMediaTypeVideo
-                                                                  position:position];
-    if (!device) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self->_onErrorViro) {
-                self->_onErrorViro(@{@"error": @"Camera device not available"});
-            }
-        });
-        return;
-    }
-
-    NSError *inputError = nil;
-    AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&inputError];
-    if (!input) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self->_onErrorViro) {
-                self->_onErrorViro(@{@"error": inputError.localizedDescription ?: @"Camera input error"});
-            }
-        });
-        return;
-    }
-
-    AVCaptureVideoDataOutput *output = [[AVCaptureVideoDataOutput alloc] init];
-    output.videoSettings = @{
-        (NSString *)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA)
-    };
-    output.alwaysDiscardsLateVideoFrames = YES;
-    [output setSampleBufferDelegate:self queue:_inferenceQueue];
-
-    if ([session canAddInput:input])   [session addInput:input];
-    if ([session canAddOutput:output]) [session addOutput:output];
-
-    // Rotate the pixel buffer to portrait before delivery — without this the buffer
-    // arrives in landscape (640×480) regardless of device orientation, causing a 90°
-    // mismatch between detection boxes and what the preview layer displays.
-    for (AVCaptureConnection *conn in output.connections) {
-        if (conn.isVideoOrientationSupported) {
-            conn.videoOrientation = AVCaptureVideoOrientationPortrait;
-        }
-    }
-
-    _session     = session;
-    _videoOutput = output;
-
-    [_session startRunning];
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        AVCaptureVideoPreviewLayer *preview = [AVCaptureVideoPreviewLayer layerWithSession:session];
-        preview.videoGravity = AVLayerVideoGravityResizeAspectFill;
-        preview.frame = self.bounds;
-        // Keep preview orientation consistent with the rotated data output buffer.
-        if (preview.connection.isVideoOrientationSupported) {
-            preview.connection.videoOrientation = AVCaptureVideoOrientationPortrait;
-        }
-        [self.layer insertSublayer:preview atIndex:0];
-        self->_previewLayer = preview;
-
-        if (!self->_readyFired) {
-            self->_readyFired = YES;
-            if (self->_onReadyViro) {
-                self->_onReadyViro(@{});
-            }
-        }
-    });
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    _previewLayer.frame = self.bounds;
+    if (!self.window) return;
+    [self _stopARMode];
+    [self _startARMode];
 }
 
 #pragma mark - Provider registration
@@ -695,114 +553,9 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 #endif
 }
 
-#pragma mark - AVCaptureVideoDataOutputSampleBufferDelegate
-
-- (void)captureOutput:(AVCaptureOutput *)output
-didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
-       fromConnection:(AVCaptureConnection *)connection {
-
-    // Throttle to maxFPS.
-    CFTimeInterval now = CACurrentMediaTime();
-    CFTimeInterval minInterval = 1.0 / (double)(_maxFPS > 0 ? _maxFPS : kDefaultMaxFPS);
-    if ((now - _lastInferenceTime) < minInterval) return;
-    _lastInferenceTime = now;
-
-    if (!_modelLoaded) return;
-
-    // Extract pixel buffer and run inference.
-    CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-    if (!pixelBuffer) return;
-
-    NSArray<NSDictionary *> *detections = [self _runInferenceOnPixelBuffer:pixelBuffer];
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (self->_onDetectionViro) {
-            self->_onDetectionViro(@{@"detections": detections});
-        }
-    });
-}
-
-#pragma mark - Preprocessing
-
-// Resize BGRA CVPixelBuffer to 640x640 using vImage, then convert to
-// Float32 NCHW [1, 3, 640, 640] normalised to [0, 1].
-// Returns nil on failure; caller is responsible for freeing the returned buffer.
-- (float *)_preprocessPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-
-    size_t srcWidth  = CVPixelBufferGetWidth(pixelBuffer);
-    size_t srcHeight = CVPixelBufferGetHeight(pixelBuffer);
-    size_t srcRowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
-    void  *srcBaseAddr = CVPixelBufferGetBaseAddress(pixelBuffer);
-
-    // --- Resize BGRA to 640x640 using vImage bilinear ---
-    vImage_Buffer srcBuf = {
-        .data     = srcBaseAddr,
-        .height   = srcHeight,
-        .width    = srcWidth,
-        .rowBytes = srcRowBytes
-    };
-
-    const size_t dstSize = kModelInputSize * kModelInputSize * 4; // BGRA
-    uint8_t *resizedBGRA = (uint8_t *)malloc(dstSize);
-    if (!resizedBGRA) {
-        CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-        return nil;
-    }
-
-    vImage_Buffer dstBuf = {
-        .data     = resizedBGRA,
-        .height   = (vImagePixelCount)kModelInputSize,
-        .width    = (vImagePixelCount)kModelInputSize,
-        .rowBytes = (size_t)kModelInputSize * 4
-    };
-
-    vImage_Error vErr = vImageScale_ARGB8888(&srcBuf, &dstBuf, NULL, kvImageHighQualityResampling);
-    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-
-    if (vErr != kvImageNoError) {
-        free(resizedBGRA);
-        return nil;
-    }
-
-    // --- Convert BGRA uint8 -> Float32 NCHW [1, 3, H, W] normalised to [0,1] ---
-    // BGRA channel order: B=0, G=1, R=2, A=3
-    const int numPixels = kModelInputSize * kModelInputSize;
-    float *nchwBuffer = (float *)malloc(sizeof(float) * 3 * numPixels);
-    if (!nchwBuffer) {
-        free(resizedBGRA);
-        return nil;
-    }
-
-    float *rPlane = nchwBuffer + 0 * numPixels;
-    float *gPlane = nchwBuffer + 1 * numPixels;
-    float *bPlane = nchwBuffer + 2 * numPixels;
-
-    const float inv255 = 1.0f / 255.0f;
-    for (int i = 0; i < numPixels; i++) {
-        uint8_t b = resizedBGRA[i * 4 + 0];
-        uint8_t g = resizedBGRA[i * 4 + 1];
-        uint8_t r = resizedBGRA[i * 4 + 2];
-        // A channel ignored
-        rPlane[i] = (float)r * inv255;
-        gPlane[i] = (float)g * inv255;
-        bPlane[i] = (float)b * inv255;
-    }
-
-    free(resizedBGRA);
-    return nchwBuffer; // caller must free()
-}
-
 #pragma mark - Inference
 
-// Thin wrapper: preprocess BGRA pixel buffer → run inference.
-- (NSArray<NSDictionary *> *)_runInferenceOnPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-    float *nchwData = [self _preprocessPixelBuffer:pixelBuffer];
-    if (!nchwData) return @[];
-    return [self _runInferenceWithNCHW:nchwData];
-}
-
-// Core inference method shared by standalone and AR modes.
+// Core inference method (AR path).
 // Takes ownership of `nchwData` and free()s it before returning.
 - (NSArray<NSDictionary *> *)_runInferenceWithNCHW:(float *)nchwData {
     // Priority 1: externally registered provider (react-viro-onnx).

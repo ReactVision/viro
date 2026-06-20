@@ -38,6 +38,8 @@
 - (void)onAnchorFound:(std::shared_ptr<VROARAnchor>)anchor;
 - (void)onAnchorUpdated:(std::shared_ptr<VROARAnchor>)anchor;
 - (void)onAnchorRemoved:(std::shared_ptr<VROARAnchor>)anchor;
+@optional
+- (void)onDepthReady;
 @end
 
 class VROARSceneDelegateiOS : public VROARSceneDelegate, public VROARDeclarativeSessionDelegate {
@@ -69,6 +71,12 @@ public:
 
     virtual void onAmbientLightUpdate(float intensity, VROVector3f color) {
         [_delegate onAmbientLightUpdate:intensity color:color];
+    }
+
+    virtual void onDepthReady() {
+        if ([_delegate respondsToSelector:@selector(onDepthReady)]) {
+            [_delegate onDepthReady];
+        }
     }
 
 private:

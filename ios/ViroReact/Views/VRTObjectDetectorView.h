@@ -24,7 +24,6 @@
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #import <UIKit/UIKit.h>
-#import <AVFoundation/AVFoundation.h>
 #import <React/RCTView.h>
 #import <React/RCTBridgeModule.h>
 
@@ -50,14 +49,16 @@ typedef NSArray<NSDictionary *> * _Nonnull (^VRTInferenceBlock)(
 );
 
 /**
- * VRTObjectDetectorView — zero-size UIView that manages an AVCaptureSession,
- * samples frames at `maxFPS`, runs YOLOE inference on each frame, and emits
- * detection results to JS via RCT direct event callbacks.
+ * VRTObjectDetectorView — zero-size UIView that taps the enclosing AR session's
+ * camera frames (published by VRTARSceneNavigator), samples them at `maxFPS`, runs
+ * YOLOE inference on each frame, and emits detection results to JS via RCT direct
+ * event callbacks. It renders nothing of its own.
  *
- * By default, inference returns empty results. Install @reactvision/react-viro-onnx
- * and call ViroONNX.install() to activate real ONNX Runtime inference.
+ * Works only in AR: mount it inside (or alongside) a ViroARSceneNavigator. Inference
+ * is delegated to a registered provider (@reactvision/react-viro-onnx); without one,
+ * detection returns empty results.
  */
-@interface VRTObjectDetectorView : RCTView <AVCaptureVideoDataOutputSampleBufferDelegate>
+@interface VRTObjectDetectorView : RCTView
 
 /**
  * Register a pluggable inference provider (e.g. ONNX Runtime from react-viro-onnx).
@@ -88,22 +89,10 @@ typedef NSArray<NSDictionary *> * _Nonnull (^VRTInferenceBlock)(
 /** Maximum detections emitted per frame (top-N by confidence). Default: 20. */
 @property (nonatomic, assign) NSInteger maxDetections;
 
-/** "front" | "back". Default: "back". */
-@property (nonatomic, copy) NSString *cameraPosition;
-
 /**
- * When YES the view does NOT open its own AVCaptureSession. Instead it subscribes
- * to AR frames published by the nearest VRTARSceneNavigator. Use this when the
- * component is mounted inside a ViroARSceneNavigator so that ARKit's session is
- * shared and the AR camera feed is not duplicated.
- * Default: NO.
- */
-@property (nonatomic, assign) BOOL useARSession;
-
-/**
- * When YES (and useARSession=YES) each detection includes a `worldPosition` dict
- * {x, y, z} obtained by raycasting the bounding-box centre against the AR scene.
- * Adds ~1ms per detection. Default: YES.
+ * When YES each detection includes a `worldPosition` dict {x, y, z} obtained by
+ * raycasting the bounding-box centre against the AR scene. Adds ~1ms per detection.
+ * Default: YES.
  */
 @property (nonatomic, assign) BOOL projectToWorld;
 

@@ -50,27 +50,27 @@ const VRTObjectDetectorView = (0, react_native_1.requireNativeComponent)("VRTObj
 /**
  * ViroObjectDetector — on-device open-vocabulary object detection powered by YOLOE.
  *
- * Opens an AVCaptureSession, renders its own camera preview via
- * AVCaptureVideoPreviewLayer (iOS) / SurfaceView (Android), and fires
- * `onDetection` with normalized bounding boxes and labels at `maxFPS`.
- *
- * Size the view explicitly — it renders a live camera feed. Pass
- * `style={StyleSheet.absoluteFill}` for a full-screen detector.
+ * Runs **only in AR**: it shares the camera feed of the enclosing
+ * `ViroARSceneNavigator` (no separate camera session, no preview of its own) and
+ * fires `onDetection` with labels, normalized bounding boxes, and an on-screen
+ * `screenBoundingBox` (dp) at up to `maxFPS`. Mount it as a child or sibling of a
+ * `ViroARSceneNavigator`; it renders nothing itself, so give it `width: 0, height: 0`.
  *
  * @example
  * ```tsx
+ * <ViroARSceneNavigator initialScene={{ scene: MyScene }} />
  * <ViroObjectDetector
- *   style={StyleSheet.absoluteFill}
+ *   style={{ position: "absolute", width: 0, height: 0 }}
  *   mode="prompt-free"
  *   confidenceThreshold={0.4}
  *   maxFPS={15}
  *   onDetection={({ detections }) => {
- *     detections.forEach(d => console.log(d.label, d.confidence));
+ *     detections.forEach(d => console.log(d.label, d.confidence, d.screenBoundingBox));
  *   }}
  * />
  * ```
  */
-const ViroObjectDetector = ({ model = "yoloe-26s", mode = "prompt-free", categories = [], confidenceThreshold = 0.4, iouThreshold = 0.45, maxFPS = 15, maxDetections = 20, cameraPosition = "back", useARSession = false, projectToWorld = true, onDetection, onReady, onError, style, ...rest }) => {
+const ViroObjectDetector = ({ model = "yoloe-26s", mode = "prompt-free", categories = [], confidenceThreshold = 0.4, iouThreshold = 0.45, maxFPS = 15, maxDetections = 20, projectToWorld = true, onDetection, onReady, onError, style, ...rest }) => {
     const handleDetection = React.useCallback((event) => {
         onDetection?.(event.nativeEvent);
     }, [onDetection]);
@@ -80,6 +80,6 @@ const ViroObjectDetector = ({ model = "yoloe-26s", mode = "prompt-free", categor
     const handleError = React.useCallback((event) => {
         onError?.(event.nativeEvent);
     }, [onError]);
-    return (<VRTObjectDetectorView {...rest} style={style} model={model} mode={mode} categories={categories} confidenceThreshold={confidenceThreshold} iouThreshold={iouThreshold} maxFPS={maxFPS} maxDetections={maxDetections} cameraPosition={cameraPosition} useARSession={useARSession} projectToWorld={projectToWorld} onDetectionViro={onDetection ? handleDetection : undefined} onReadyViro={onReady ? handleReady : undefined} onErrorViro={onError ? handleError : undefined}/>);
+    return (<VRTObjectDetectorView {...rest} style={style} model={model} mode={mode} categories={categories} confidenceThreshold={confidenceThreshold} iouThreshold={iouThreshold} maxFPS={maxFPS} maxDetections={maxDetections} projectToWorld={projectToWorld} onDetectionViro={onDetection ? handleDetection : undefined} onReadyViro={onReady ? handleReady : undefined} onErrorViro={onError ? handleError : undefined}/>);
 };
 exports.ViroObjectDetector = ViroObjectDetector;

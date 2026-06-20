@@ -18,6 +18,14 @@ type Props = ViroCommonProps & {
     onPlatformUpdate?: (platformInfoViro: ViroPlatformInfo) => void;
     onAmbientLightUpdate?: (update: ViroAmbientLightInfo) => void;
     /**
+     * Fired once when depth data (LiDAR or monocular depth estimation) first becomes
+     * available for the session — i.e. hit tests can now return DepthPoints. Useful for
+     * hiding an "initializing depth…" state instead of acting on early, inaccurate
+     * feature points. On devices using monocular depth estimation, this can take a few
+     * seconds after the AR screen appears while the model warms up.
+     */
+    onDepthReady?: () => void;
+    /**
      * Describes the acoustic properties of the room around the user
      */
     soundRoom?: ViroSoundRoom;
@@ -47,6 +55,10 @@ export declare class ViroARScene extends ViroBase<Props> {
      * Returns object w/ "intensity" and "color" keys
      */
     _onAmbientLightUpdate: (event: NativeSyntheticEvent<ViroAmbientLightUpdateEvent>) => void;
+    /**
+     * Fired once when depth data first becomes available for hit testing.
+     */
+    _onDepthReady: (_event: NativeSyntheticEvent<{}>) => void;
     _onAnchorFound: (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => void;
     _onAnchorUpdated: (event: NativeSyntheticEvent<ViroARAnchorUpdatedEvent>) => void;
     _onAnchorRemoved: (event: NativeSyntheticEvent<ViroARAnchorRemovedEvent>) => void;

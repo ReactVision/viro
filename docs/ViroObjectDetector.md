@@ -2,7 +2,7 @@
 
 On-device, open-vocabulary object detection powered by [YOLOE](https://docs.ultralytics.com/models/yoloe/) running through ONNX Runtime. Runs fully offline — no network, no cloud.
 
-The component opens a camera feed (its own `AVCaptureSession`/CameraX, or the shared AR session), runs inference at a throttled frame rate, and fires `onDetection` with bounding boxes and labels.
+`ViroObjectDetector` works **only in AR**: it shares the camera feed of an enclosing `ViroARSceneNavigator` (it never opens a camera of its own), runs inference at a throttled frame rate, and fires `onDetection` with bounding boxes and labels. It renders nothing itself — mount it as a child or sibling of the navigator and give it `width: 0, height: 0`.
 
 > **Inference provider required.** `ViroObjectDetector` ships the camera + plumbing, but the actual ONNX inference lives in the companion package **[`@reactvision/react-viro-onnx`](../../react-viro-onnx/README.md)**. There is **no built-in fallback** on either platform: without the provider the detector produces no detections and fires `onError` ("No ONNX inference provider registered…"). Add it to your `plugins` and it auto-registers (see its README).
 
@@ -37,24 +37,26 @@ For native details (iOS pod / onnxruntime AAR), custom-model export, NNAPI, and 
 
 ## Quick start
 
+Mount the detector alongside a `ViroARSceneNavigator`. It shares the AR camera feed and renders nothing itself, so give it a zero size (see [AR mode](#ar-mode)).
+
 ```tsx
-import { ViroObjectDetector, type ViroDetectedObject } from "@reactvision/react-viro";
-import { StyleSheet } from "react-native";
+import { ViroARSceneNavigator, ViroObjectDetector, type ViroDetectedObject } from "@reactvision/react-viro";
 
-<ViroObjectDetector
-  style={StyleSheet.absoluteFill}
-  model="yoloe-26n"
-  mode="prompt-free"
-  confidenceThreshold={0.45}
-  maxFPS={15}
-  maxDetections={20}
-  onDetection={({ detections }) =>
-    detections.forEach((d) => console.log(d.label, d.confidence, d.boundingBox))
-  }
-/>
+<>
+  <ViroARSceneNavigator initialScene={{ scene: MyScene }} />
+  <ViroObjectDetector
+    style={{ position: "absolute", width: 0, height: 0 }}
+    model="yoloe-26n"
+    mode="prompt-free"
+    confidenceThreshold={0.45}
+    maxFPS={15}
+    maxDetections={20}
+    onDetection={({ detections }) =>
+      detections.forEach((d) => console.log(d.label, d.confidence, d.screenBoundingBox))
+    }
+  />
+</>
 ```
-
-For an AR overlay that shares the ARKit/ARCore session, mount it inside a `ViroARSceneNavigator` with `useARSession` (see [AR mode](#ar-mode)).
 
 ---
 
@@ -67,11 +69,9 @@ For an AR overlay that shares the ARKit/ARCore session, mount it inside a `ViroA
 | `categories` | `string[]` | `[]` | Class names to keep in `"text"` mode. Matched by whole word, case-insensitive. |
 | `confidenceThreshold` | `number` | `0.4` | Minimum score `[0,1]` to emit a detection. |
 | `iouThreshold` | `number` | `0.45` | IoU threshold for NMS de-duplication. |
-| `maxFPS` | `number` | `15` | Max inference calls/sec. The camera runs at native FPS; this throttles the inference thread so it doesn't saturate the CPU/NPU while the renderer runs. |
+| `maxFPS` | `number` | `15` | Max inference calls/sec. The AR session runs at native FPS; this throttles the inference thread so it doesn't saturate the CPU/NPU while the renderer runs. |
 | `maxDetections` | `number` | `20` | Max detections emitted per frame, kept as the top-N by confidence (after NMS). |
-| `cameraPosition` | `"front" \| "back"` | `"back"` | Camera to sample (standalone mode only). |
-| `useARSession` | `boolean` | `false` | When `true`, do **not** open a camera; subscribe to the enclosing `ViroARSceneNavigator`'s AR frames instead. iOS **and** Android. |
-| `projectToWorld` | `boolean` | `true` | When `true` (and `useARSession`), raycast each detection to 3D and include `worldPosition`. iOS only (Android emits `screenBoundingBox` but not yet `worldPosition`). |
+| `projectToWorld` | `boolean` | `true` | When `true`, raycast each detection to 3D and include `worldPosition`. iOS only (Android emits `screenBoundingBox` but not yet `worldPosition`). |
 | `onDetection` | `(e: { detections: ViroDetectedObject[] }) => void` | — | Fired each processed frame (possibly with an empty array). |
 | `onReady` | `() => void` | — | Fired once the model is loaded and the pipeline is running. |
 | `onError` | `(e: { error: string }) => void` | — | Fired on model-load / camera failure. |
@@ -83,8 +83,8 @@ type ViroDetectedObject = {
   label: string;
   confidence: number;                       // [0,1]
   boundingBox: { x; y; width; height };        // normalized [0,1], model input space
-  screenBoundingBox?: { x; y; width; height }; // dp/points, AR mode (iOS + Android)
-  worldPosition?: { x; y; z };                 // metres, AR mode + projectToWorld (iOS only)
+  screenBoundingBox?: { x; y; width; height }; // dp/points, aligned to the AR preview (iOS + Android)
+  worldPosition?: { x; y; z };                 // metres, with projectToWorld (iOS only)
 };
 ```
 
@@ -95,7 +95,9 @@ type ViroDetectedObject = {
 - **`prompt-free`** — the model detects everything in its baked vocabulary (the stock `yoloe-26n` prompt-free export carries **4,585** classes). Rich but noisy; labels can be fine-grained or scene-level.
 - **`text`** — keep only detections whose label matches one of `categories` (whole-word, case-insensitive: `"phone"` matches `"cell phone"`, `"cup"` matches `"coffee cup"`, but `"pen"` does **not** match `"pencil"`).
 
-  > ⚠️ `text` mode is a **post-filter** over the model's output. It can only surface classes the loaded model already emits. The stock prompt-free model rarely emits common nouns with high recall, so `text` mode on it returns very little. For real text-targeted detection, export a **text-prompt (RepRTA) model** with your classes baked in — see [`react-viro-onnx`'s model export guide](../../react-viro-onnx/README.md#exporting-a-text-prompt-model). With such a model, `text` mode (or even `prompt-free`) yields high recall on your classes.
+  > ⚠️ `text` mode is purely a **label post-filter**. It runs after inference and keeps only the detections whose label word-matches one of `categories`; it does **not** prompt the model at runtime (there is no CLIP/text encoder in the inference path, and the model's class set is fixed at export time). So it can only surface classes the loaded model already emits — and on the stock prompt-free model, which rarely emits common nouns with high recall, it returns very little.
+  >
+  > To actually target classes by text, bake them into the model at **export** time: run [`react-viro-onnx`'s `export_text_model.py`](../../react-viro-onnx/README.md#exporting-a-text-prompt-model), which reparametrizes the detection head (RepRTA) against your class list. With such a model you usually don't need `text` mode at all — **`prompt-free` already returns only your baked classes** with high recall. Use `text` + `categories` on top of it only when you want to narrow the output to a subset of those classes.
 
 - **`visual`** — reference-image prompting (SAVPE). Reserved; not yet wired.
 
@@ -104,20 +106,18 @@ type ViroDetectedObject = {
 ## Coordinate system
 
 - `boundingBox` is always present and **normalized `[0,1]`** in the model's (portrait) input space.
-- In **AR mode** the native side additionally computes `screenBoundingBox` in **density-independent points (dp)**, aligned to the on-screen AR preview — drop it straight into the `{ left, top, width, height }` of an absolutely-positioned overlay `View` (React Native lays out in dp, so **no density math on your side**). It can be negative or exceed the view bounds when an object extends past the visible edges; the overlay simply clips it.
+- The native side also computes `screenBoundingBox` in **density-independent points (dp)**, aligned to the on-screen AR preview — drop it straight into the `{ left, top, width, height }` of an absolutely-positioned overlay `View` (React Native lays out in dp, so **no density math on your side**). It can be negative or exceed the view bounds when an object extends past the visible edges; the overlay simply clips it.
   - **iOS:** maps detections through ARKit's `displayTransform` (points) and inverts the center-square crop.
   - **Android:** the renderer hands the detector the **full, uncropped** rotated camera frame plus the **viewport crop rectangle**; the detector inverts the center-square crop → full-frame pixels → maps through the crop rect to the view (the Android equivalent of `displayTransform`) → converts to dp. Boxes land on the visible objects without manual calibration.
-- `worldPosition` (AR + `projectToWorld`, iOS) is the ARKit hit-test of the box center, in world metres.
-
-In standalone (non-AR) mode, map the normalized `boundingBox` to the preview yourself using the preview layer's `resizeAspectFill` geometry (the camera is shown via `PreviewView` FILL_CENTER on Android / `AVCaptureVideoPreviewLayer` on iOS).
+- `worldPosition` (with `projectToWorld`, iOS) is the ARKit hit-test of the box center, in world metres.
 
 ---
 
 ## AR mode
 
-Mount inside a `ViroARSceneNavigator` and set `useARSession`. The detector subscribes to the shared AR camera feed instead of opening its own (no duplicate feed, no camera contention): on iOS it taps ARKit's `currentFrame.capturedImage`; on Android it attaches a camera-image listener to the enclosing `ViroViewARCore`. Each detection then carries `screenBoundingBox` (and `worldPosition` on iOS).
+The detector shares the enclosing `ViroARSceneNavigator`'s camera feed (no duplicate feed, no camera contention): on iOS it taps ARKit's `currentFrame.capturedImage`; on Android it attaches a camera-image listener to the enclosing `ViroViewARCore`. Each detection carries `screenBoundingBox` (and `worldPosition` on iOS).
 
-> The detector can be a **sibling** of `ViroARSceneNavigator` (it doesn't need to be a child) — it finds the AR view by walking the tree. Give it `width: 0, height: 0`; it renders nothing itself.
+> The detector can be a **sibling** of `ViroARSceneNavigator` (it doesn't need to be a child) — it finds the AR view by walking the tree. Give it `width: 0, height: 0`; it renders nothing itself. If no `ViroARSceneNavigator` is found in the tree, it fires `onError`.
 
 ```tsx
 <ViroARSceneNavigator initialScene={{ scene: MyScene }} />
@@ -126,7 +126,6 @@ Mount inside a `ViroARSceneNavigator` and set `useARSession`. The detector subsc
   model="yoloe-26n-text"
   mode="text"
   categories={["cup", "laptop", "keyboard", "mouse", "monitor", "book"]}
-  useARSession
   projectToWorld
   onDetection={drawBoxes}
 />
@@ -140,11 +139,10 @@ Draw the overlay from `screenBoundingBox`. For stable boxes across frames, bind 
 
 | Capability | iOS | Android |
 |------------|-----|---------|
-| Standalone camera detection | ✅ | ✅ (CameraX) |
+| AR-session detection (shared camera feed) | ✅ (ARKit `currentFrame`) | ✅ (`ViroViewARCore` listener) |
 | ONNX inference + NMS + class names from metadata | ✅ | ✅ |
 | `text` mode category filter, `maxDetections` | ✅ | ✅ |
 | Center-square crop preprocessing | ✅ | ✅ |
-| **AR-session mode** (`useARSession`) | ✅ | ✅ (shares the `ViroViewARCore` camera feed) |
 | `screenBoundingBox` (dp, aligned) | ✅ (ARKit `displayTransform`) | ✅ (uncropped frame + viewport crop rect) |
 | `worldPosition` | ✅ (ARKit hit-test) | ⏳ not yet (use `screenBoundingBox`) |
 

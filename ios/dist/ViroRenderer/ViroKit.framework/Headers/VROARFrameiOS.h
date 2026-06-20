@@ -144,6 +144,15 @@ private:
      */
     float sampleDepthTextureAtUV(std::shared_ptr<VROTexture> texture, float u, float v) const;
 
+    /*
+     Unproject a camera-image-space point (normalized [0,1] in ARKit's landscape image
+     space, the same space used for [ARFrame hitTest:]) at a given metric depth (meters
+     along the optical axis) to a world-space position. Returns false if camera
+     intrinsics are unavailable. Used to build a depth-derived DepthPoint hit result.
+     */
+    bool unprojectToWorld(VROVector3f cameraImagePoint, float depthMeters,
+                          VROVector3f &outWorld) const;
+
 };
 
 #endif

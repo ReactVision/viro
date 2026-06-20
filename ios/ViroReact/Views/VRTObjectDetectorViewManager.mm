@@ -55,11 +55,7 @@ RCT_EXPORT_VIEW_PROPERTY(maxFPS, NSInteger)
 // Maximum detections emitted per frame (top-N by confidence).
 RCT_EXPORT_VIEW_PROPERTY(maxDetections, NSInteger)
 
-// "front" | "back"
-RCT_EXPORT_VIEW_PROPERTY(cameraPosition, NSString *)
-
-// AR integration
-RCT_EXPORT_VIEW_PROPERTY(useARSession, BOOL)
+// AR raycast → worldPosition (iOS).
 RCT_EXPORT_VIEW_PROPERTY(projectToWorld, BOOL)
 
 // JS callbacks

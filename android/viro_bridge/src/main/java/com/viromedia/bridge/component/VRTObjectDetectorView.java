@@ -13,7 +13,6 @@
 
 package com.viromedia.bridge.component;
 
-import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Handler;
@@ -23,16 +22,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
-import androidx.annotation.NonNull;
-import androidx.camera.core.CameraSelector;
-import androidx.camera.core.ImageAnalysis;
-import androidx.camera.core.ImageProxy;
-import androidx.camera.core.Preview;
-import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.PreviewView;
-import androidx.core.content.ContextCompat;
-import androidx.lifecycle.LifecycleOwner;
-
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
@@ -41,21 +30,19 @@ import com.facebook.react.bridge.WritableMap;
 import com.viromedia.bridge.utility.ViroEvents;
 import com.viromedia.bridge.utility.ViroEventEmitter;
 
-import com.google.common.util.concurrent.ListenableFuture;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * FrameLayout that opens a CameraX Preview + ImageAnalysis pipeline (or, in AR
- * mode, taps the enclosing ViroViewARCore's camera feed), throttles frame
- * delivery to maxFPS, runs YOLOE inference via ONNX Runtime on a background
- * thread, and emits detection results to JS via ViroEventEmitter. In standalone
- * mode it renders the live camera into a child PreviewView (iOS counterpart:
- * AVCaptureVideoPreviewLayer).
+ * Zero-size view that taps the enclosing ViroViewARCore's camera feed, throttles
+ * frame delivery to maxFPS, runs YOLOE inference via the registered provider on a
+ * background thread, and emits detection results to JS via ViroEventEmitter. It
+ * renders nothing of its own — the AR scene navigator owns the camera preview.
+ *
+ * The detector works only in AR: it must be mounted as a child or sibling of a
+ * <ViroARSceneNavigator>, whose ViroViewARCore it attaches a camera-image listener to.
  *
  * Props (set by VRTObjectDetectorViewManager via @ReactProp):
  *   model               — ONNX model path or asset name (without extension)
@@ -64,7 +51,6 @@ import java.util.concurrent.Executors;
  *   confidenceThreshold — float [0,1], default 0.4
  *   iouThreshold        — float [0,1], default 0.45
  *   maxFPS              — int, default 15
- *   cameraPosition      — "back" | "front"
  */
 public class VRTObjectDetectorView extends FrameLayout {
 
@@ -109,8 +95,6 @@ public class VRTObjectDetectorView extends FrameLayout {
     private float        mIouThreshold        = DEFAULT_IOU;
     private int          mMaxFPS              = DEFAULT_MAX_FPS;
     private int          mMaxDetections       = DEFAULT_MAX_DETS;
-    private String       mCameraPosition      = "back";
-    private boolean      mUseARSession        = false;
     private boolean      mProjectToWorld      = true;
 
     // --- State ---
@@ -136,17 +120,11 @@ public class VRTObjectDetectorView extends FrameLayout {
     private final java.util.concurrent.atomic.AtomicBoolean mArBusy =
         new java.util.concurrent.atomic.AtomicBoolean(false);
 
-    // --- Standalone preview (rendered camera; null in AR mode) ---
-    private PreviewView mPreviewView = null;
-
     // --- Diagnostics (temporary): trace the AR camera-feed → inference → emit path ---
     private long mArFrameCount = 0;
     private long mArSkipBusy   = 0;
 
-    // --- ONNX Runtime ---
-
-    // --- Camera ---
-    private ProcessCameraProvider mCameraProvider;
+    // Background thread for preprocessing + inference (the AR feed arrives on the render thread).
     private ExecutorService       mCameraExecutor;
     private long                  mLastInferenceMs = 0;
 
@@ -195,16 +173,6 @@ public class VRTObjectDetectorView extends FrameLayout {
         mMaxDetections = maxDetections;
     }
 
-    public void setCameraPosition(String cameraPosition) {
-        if (mCameraPosition.equals(cameraPosition)) return;
-        mCameraPosition = cameraPosition;
-        restartIfRunning();
-    }
-
-    public void setUseARSession(boolean useARSession) {
-        mUseARSession = useARSession;
-    }
-
     public void setProjectToWorld(boolean projectToWorld) {
         mProjectToWorld = projectToWorld;
     }
@@ -244,11 +212,7 @@ public class VRTObjectDetectorView extends FrameLayout {
                 return;
             }
             mModelLoaded = true;
-            if (mUseARSession) {
-                mMainHandler.post(this::startARMode);
-            } else {
-                startCameraX();
-            }
+            mMainHandler.post(this::startARMode);
         });
     }
 
@@ -258,8 +222,8 @@ public class VRTObjectDetectorView extends FrameLayout {
     // -------------------------------------------------------------------------
 
     private void startARMode() {
-        // May have been torn down (or switched out of AR) while a retry was pending.
-        if (!mSessionStarted || !mUseARSession) return;
+        // May have been torn down while a retry was pending.
+        if (!mSessionStarted) return;
 
         com.viro.core.ViroViewARCore arView = findARView();
         if (arView == null) {
@@ -371,17 +335,6 @@ public class VRTObjectDetectorView extends FrameLayout {
         if (mArListenerActive) {
             mMainHandler.post(this::stopARMode);
         }
-
-        if (mCameraProvider != null) {
-            mCameraProvider.unbindAll();
-            mCameraProvider = null;
-        }
-
-        if (mPreviewView != null) {
-            final PreviewView pv = mPreviewView;
-            mPreviewView = null;
-            mMainHandler.post(() -> removeView(pv));
-        }
     }
 
     private void restartIfRunning() {
@@ -391,122 +344,8 @@ public class VRTObjectDetectorView extends FrameLayout {
     }
 
     // -------------------------------------------------------------------------
-    // CameraX setup
+    // Preprocessing
     // -------------------------------------------------------------------------
-
-    private void startCameraX() {
-        Context context = getContext();
-        ListenableFuture<ProcessCameraProvider> future =
-            ProcessCameraProvider.getInstance(context);
-
-        future.addListener(() -> {
-            try {
-                mCameraProvider = future.get();
-
-                CameraSelector cameraSelector = mCameraPosition.equals("front")
-                    ? CameraSelector.DEFAULT_FRONT_CAMERA
-                    : CameraSelector.DEFAULT_BACK_CAMERA;
-
-                // Render the live camera into a child PreviewView so the user actually sees
-                // it (iOS uses an AVCaptureVideoPreviewLayer). FILL_CENTER ≈ iOS
-                // resizeAspectFill, so the normalized boundingBox maps the same on both.
-                if (mPreviewView == null) {
-                    mPreviewView = new PreviewView(getContext());
-                    mPreviewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
-                    // TextureView (not SurfaceView) so the RN bounding-box overlay views
-                    // composite cleanly above the camera preview.
-                    mPreviewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
-                    addView(mPreviewView, new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT));
-                }
-
-                Preview preview = new Preview.Builder().build();
-                preview.setSurfaceProvider(mPreviewView.getSurfaceProvider());
-
-                ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
-                    .setTargetResolution(new android.util.Size(640, 480))
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                    .build();
-
-                imageAnalysis.setAnalyzer(mCameraExecutor, this::analyzeFrame);
-
-                mCameraProvider.unbindAll();
-
-                // Obtain the LifecycleOwner from the Activity (AppCompatActivity implements it)
-                ReactContext reactContext = (ReactContext) getContext();
-                Activity activity = reactContext.getCurrentActivity();
-
-                if (activity instanceof LifecycleOwner) {
-                    mCameraProvider.bindToLifecycle(
-                        (LifecycleOwner) activity,
-                        cameraSelector,
-                        preview,
-                        imageAnalysis
-                    );
-                } else {
-                    emitError("Activity is not a LifecycleOwner — cannot bind CameraX");
-                    return;
-                }
-
-                if (!mReadyFired) {
-                    mReadyFired = true;
-                    emitReady();
-                }
-
-            } catch (ExecutionException | InterruptedException e) {
-                Log.e(TAG, "CameraX provider error", e);
-                emitError("CameraX error: " + e.getMessage());
-            }
-        }, ContextCompat.getMainExecutor(context));
-    }
-
-    // -------------------------------------------------------------------------
-    // Frame analysis
-    // -------------------------------------------------------------------------
-
-    private void analyzeFrame(@NonNull ImageProxy imageProxy) {
-        try {
-            // Throttle to maxFPS
-            long now = System.currentTimeMillis();
-            long minIntervalMs = 1000L / (mMaxFPS > 0 ? mMaxFPS : DEFAULT_MAX_FPS);
-            if ((now - mLastInferenceMs) < minIntervalMs) return;
-            mLastInferenceMs = now;
-
-            if (!mModelLoaded) return;
-
-            float[] nchw = preprocessImageProxy(imageProxy);
-            if (nchw == null) return;
-            emitDetections(runInference(nchw));
-
-        } finally {
-            imageProxy.close();
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Preprocessing — RGBA_8888 ImageProxy → float[] NCHW [1,3,640,640]
-    // -------------------------------------------------------------------------
-
-    private float[] preprocessImageProxy(ImageProxy imageProxy) {
-        try {
-            ImageProxy.PlaneProxy plane = imageProxy.getPlanes()[0];
-            java.nio.ByteBuffer buffer = plane.getBuffer();
-            int width  = imageProxy.getWidth();
-            int height = imageProxy.getHeight();
-
-            Bitmap srcBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            srcBitmap.copyPixelsFromBuffer(buffer);
-            mLastSrcW = width;
-            mLastSrcH = height;
-
-            return preprocessBitmap(srcBitmap);
-        } catch (Exception e) {
-            Log.e(TAG, "Preprocessing failed", e);
-            return null;
-        }
-    }
 
     // Center-square crop → scale to 640 → Float32 NCHW [1,3,640,640], normalized [0,1].
     //
@@ -588,10 +427,9 @@ public class VRTObjectDetectorView extends FrameLayout {
     // delivered camera frame, then stretching that frame directly onto the AR view. The
     // delivered frame is already the exact on-screen region (native cropImage matched it
     // to the ARCore background texcoords + viewport), so the renderer stretches it to fill
-    // the view and we map with the same plain stretch. Only emitted in AR mode where a
-    // viewport (the ViroViewARCore) is available.
+    // the view and we map with the same plain stretch.
     private void addScreenBox(WritableMap det, String label, double nx, double ny, double nw, double nh) {
-        if (!mUseARSession || mViroView == null || mLastSrcW <= 0 || mLastSrcH <= 0) return;
+        if (mViroView == null || mLastSrcW <= 0 || mLastSrcH <= 0) return;
         int viewW = mViroView.getWidth();
         int viewH = mViroView.getHeight();
         if (viewW <= 0 || viewH <= 0) return;

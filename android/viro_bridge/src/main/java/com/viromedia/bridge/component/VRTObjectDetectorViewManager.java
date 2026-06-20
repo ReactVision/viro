@@ -74,16 +74,6 @@ public class VRTObjectDetectorViewManager extends SimpleViewManager<VRTObjectDet
         view.setMaxDetections(maxDetections);
     }
 
-    @ReactProp(name = "cameraPosition")
-    public void setCameraPosition(VRTObjectDetectorView view, String position) {
-        view.setCameraPosition(position);
-    }
-
-    @ReactProp(name = "useARSession", defaultBoolean = false)
-    public void setUseARSession(VRTObjectDetectorView view, boolean useARSession) {
-        view.setUseARSession(useARSession);
-    }
-
     @ReactProp(name = "projectToWorld", defaultBoolean = true)
     public void setProjectToWorld(VRTObjectDetectorView view, boolean projectToWorld) {
         view.setProjectToWorld(projectToWorld);

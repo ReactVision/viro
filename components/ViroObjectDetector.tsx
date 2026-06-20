@@ -32,12 +32,12 @@ export type ViroDetectedObject = {
   label: string;
   confidence: number;
   boundingBox: ViroDetectionBoundingBox;
-  /** 3D world position (metres) — only present when useARSession + projectToWorld are true. */
+  /** 3D world position (metres), from raycasting the bbox centre. Present when `projectToWorld` is true (iOS only). */
   worldPosition?: { x: number; y: number; z: number };
   /**
-   * Bounding box in screen pixels (portrait), pre-computed via ARFrame.displayTransform.
-   * Only present when useARSession + projectToWorld are true.
-   * Use directly as { left, top, width, height } in an absolute-positioned View.
+   * Bounding box in density-independent points (dp), aligned to the on-screen AR
+   * camera preview. Use directly as { left, top, width, height } in an
+   * absolute-positioned View. Present on iOS and Android.
    */
   screenBoundingBox?: { x: number; y: number; width: number; height: number };
 };
@@ -54,13 +54,9 @@ export type ViroDetectorErrorEvent = {
 
 type Props = ViewProps & {
   /**
-   * Path to the YOLOE model file.
-   * - iOS:     name of the .mlpackage bundle (CoreML) inside the app bundle,
-   *            e.g. "yoloe-26s" (no extension needed for CoreML),
-   *            or an absolute path to a .onnx file.
-   * - Android: relative path inside assets/, e.g. "models/yoloe-26s.onnx".
-   * Defaults to "yoloe-26s" (expects the bundled CoreML model on iOS,
-   * and assets/models/yoloe-26s.onnx on Android).
+   * The YOLOE model to run. Either a bundled model **name** (resolved natively as
+   * `<name>.onnx` in the app bundle / Android assets), or an absolute `/`-path or
+   * `file://` URL to an `.onnx` file. Defaults to "yoloe-26s".
    */
   model?: string;
 
@@ -109,24 +105,9 @@ type Props = ViewProps & {
   maxDetections?: number;
 
   /**
-   * Which camera to sample frames from.
-   * Defaults to "back".
-   */
-  cameraPosition?: "front" | "back";
-
-  /**
-   * When true, the component does NOT open its own AVCaptureSession.
-   * Instead it taps into the AR session managed by the enclosing
-   * ViroARSceneNavigator, receiving ARFrame.capturedImage on every tick.
-   * The component renders nothing (no camera preview layer).
-   * Use this when embedding ViroObjectDetector inside a ViroARScene.
-   * Defaults to false.
-   */
-  useARSession?: boolean;
-
-  /**
-   * When true (and useARSession=true), each detection includes a `worldPosition`
-   * {x, y, z} obtained by raycasting the bbox centre against the AR scene.
+   * When true, each detection includes a `worldPosition` {x, y, z} obtained by
+   * raycasting the bbox centre against the AR scene. iOS only (Android emits
+   * `screenBoundingBox` but not yet `worldPosition`).
    * Defaults to true.
    */
   projectToWorld?: boolean;
@@ -165,22 +146,22 @@ const VRTObjectDetectorView = requireNativeComponent<any>("VRTObjectDetectorView
 /**
  * ViroObjectDetector — on-device open-vocabulary object detection powered by YOLOE.
  *
- * Opens an AVCaptureSession, renders its own camera preview via
- * AVCaptureVideoPreviewLayer (iOS) / SurfaceView (Android), and fires
- * `onDetection` with normalized bounding boxes and labels at `maxFPS`.
- *
- * Size the view explicitly — it renders a live camera feed. Pass
- * `style={StyleSheet.absoluteFill}` for a full-screen detector.
+ * Runs **only in AR**: it shares the camera feed of the enclosing
+ * `ViroARSceneNavigator` (no separate camera session, no preview of its own) and
+ * fires `onDetection` with labels, normalized bounding boxes, and an on-screen
+ * `screenBoundingBox` (dp) at up to `maxFPS`. Mount it as a child or sibling of a
+ * `ViroARSceneNavigator`; it renders nothing itself, so give it `width: 0, height: 0`.
  *
  * @example
  * ```tsx
+ * <ViroARSceneNavigator initialScene={{ scene: MyScene }} />
  * <ViroObjectDetector
- *   style={StyleSheet.absoluteFill}
+ *   style={{ position: "absolute", width: 0, height: 0 }}
  *   mode="prompt-free"
  *   confidenceThreshold={0.4}
  *   maxFPS={15}
  *   onDetection={({ detections }) => {
- *     detections.forEach(d => console.log(d.label, d.confidence));
+ *     detections.forEach(d => console.log(d.label, d.confidence, d.screenBoundingBox));
  *   }}
  * />
  * ```
@@ -193,8 +174,6 @@ export const ViroObjectDetector: React.FC<Props> = ({
   iouThreshold = 0.45,
   maxFPS = 15,
   maxDetections = 20,
-  cameraPosition = "back",
-  useARSession = false,
   projectToWorld = true,
   onDetection,
   onReady,
@@ -234,8 +213,6 @@ export const ViroObjectDetector: React.FC<Props> = ({
       iouThreshold={iouThreshold}
       maxFPS={maxFPS}
       maxDetections={maxDetections}
-      cameraPosition={cameraPosition}
-      useARSession={useARSession}
       projectToWorld={projectToWorld}
       onDetectionViro={onDetection ? handleDetection : undefined}
       onReadyViro={onReady ? handleReady : undefined}

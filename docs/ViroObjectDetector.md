@@ -1,10 +1,10 @@
 # ViroObjectDetector
 
-On-device, open-vocabulary object detection powered by [YOLOE](https://docs.ultralytics.com/models/yoloe/) running through ONNX Runtime. Runs fully offline — no network, no cloud.
+On-device, open-vocabulary object detection powered by [YOLOE](https://docs.ultralytics.com/models/yoloe/) running through ONNX Runtime. Everything runs locally on the device.
 
 `ViroObjectDetector` works **only in AR**: it shares the camera feed of an enclosing `ViroARSceneNavigator` (it never opens a camera of its own), runs inference at a throttled frame rate, and fires `onDetection` with bounding boxes and labels. It renders nothing itself — mount it as a child or sibling of the navigator and give it `width: 0, height: 0`.
 
-> **Inference provider required.** `ViroObjectDetector` ships the camera + plumbing, but the actual ONNX inference lives in the companion package **[`@reactvision/react-viro-onnx`](../../react-viro-onnx/README.md)**. There is **no built-in fallback** on either platform: without the provider the detector produces no detections and fires `onError` ("No ONNX inference provider registered…"). Add it to your `plugins` and it auto-registers (see its README).
+> **Inference provider required.** `ViroObjectDetector` ships the camera + plumbing, but the actual ONNX inference lives in the companion package **[`@reactvision/react-viro-onnx`](../../react-viro-onnx/README.md)**. Neither platform falls back to anything if it's missing: the detector stays silent and fires `onError` ("No ONNX inference provider registered…"). Add the package to your `plugins` and it auto-registers (see its README).
 
 ---
 
@@ -106,7 +106,7 @@ type ViroDetectedObject = {
 ## Coordinate system
 
 - `boundingBox` is always present and **normalized `[0,1]`** in the model's (portrait) input space.
-- The native side also computes `screenBoundingBox` in **density-independent points (dp)**, aligned to the on-screen AR preview — drop it straight into the `{ left, top, width, height }` of an absolutely-positioned overlay `View` (React Native lays out in dp, so **no density math on your side**). It can be negative or exceed the view bounds when an object extends past the visible edges; the overlay simply clips it.
+- The native side also computes `screenBoundingBox` in **density-independent points (dp)**, aligned to the on-screen AR preview — drop it straight into the `{ left, top, width, height }` of an absolutely-positioned overlay `View`. Since React Native already lays out in dp, you don't have to convert anything yourself. The values can go negative or exceed the view bounds when an object extends past the visible edges; the overlay simply clips it.
   - **iOS:** maps detections through ARKit's `displayTransform` (points) and inverts the center-square crop.
   - **Android:** the renderer hands the detector the **full, uncropped** rotated camera frame plus the **viewport crop rectangle**; the detector inverts the center-square crop → full-frame pixels → maps through the crop rect to the view (the Android equivalent of `displayTransform`) → converts to dp. Boxes land on the visible objects without manual calibration.
 - `worldPosition` (with `projectToWorld`, iOS) is the ARKit hit-test of the box center, in world metres.
@@ -115,7 +115,7 @@ type ViroDetectedObject = {
 
 ## AR mode
 
-The detector shares the enclosing `ViroARSceneNavigator`'s camera feed (no duplicate feed, no camera contention): on iOS it taps ARKit's `currentFrame.capturedImage`; on Android it attaches a camera-image listener to the enclosing `ViroViewARCore`. Each detection carries `screenBoundingBox` (and `worldPosition` on iOS).
+The detector reuses the enclosing `ViroARSceneNavigator`'s camera feed rather than opening a second one, so the two don't contend for the camera: on iOS it taps ARKit's `currentFrame.capturedImage`; on Android it attaches a camera-image listener to the enclosing `ViroViewARCore`. Each detection carries `screenBoundingBox` (and `worldPosition` on iOS).
 
 > The detector can be a **sibling** of `ViroARSceneNavigator` (it doesn't need to be a child) — it finds the AR view by walking the tree. Give it `width: 0, height: 0`; it renders nothing itself. If no `ViroARSceneNavigator` is found in the tree, it fires `onError`.
 

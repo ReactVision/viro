@@ -15,7 +15,6 @@ package com.viromedia.bridge.component;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
@@ -44,19 +43,11 @@ import com.viromedia.bridge.utility.ViroEventEmitter;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import ai.onnxruntime.OnnxTensor;
-import ai.onnxruntime.OrtEnvironment;
-import ai.onnxruntime.OrtException;
-import ai.onnxruntime.OrtSession;
 
 /**
  * FrameLayout that opens a CameraX Preview + ImageAnalysis pipeline (or, in AR
@@ -110,16 +101,6 @@ public class VRTObjectDetectorView extends FrameLayout {
     private static final float DEFAULT_IOU        = 0.45f;
     private static final int   MODEL_INPUT_SIZE   = 640;
 
-    // YOLOE output: [1, 300, 38]  — 38 = xyxy(4) + conf(1) + cls(1) + mask_coefs(32)
-    private static final int OUTPUT_ROWS        = 300;
-    private static final int OUTPUT_COLS        = 38;
-    private static final int IDX_X1             = 0;
-    private static final int IDX_Y1             = 1;
-    private static final int IDX_X2             = 2;
-    private static final int IDX_Y2             = 3;
-    private static final int IDX_CONF           = 4;
-    private static final int IDX_CLS            = 5;
-
     // --- Props ---
     private String       mModel               = "yoloe-26s";
     private String       mMode                = "prompt-free";
@@ -163,8 +144,6 @@ public class VRTObjectDetectorView extends FrameLayout {
     private long mArSkipBusy   = 0;
 
     // --- ONNX Runtime ---
-    private OrtEnvironment mOrtEnv     = null;
-    private OrtSession     mOrtSession = null;
 
     // --- Camera ---
     private ProcessCameraProvider mCameraProvider;
@@ -256,14 +235,12 @@ public class VRTObjectDetectorView extends FrameLayout {
         mArRetryCount = 0;
 
         mCameraExecutor.execute(() -> {
-            // When react-viro-onnx is installed it owns model loading + inference
-            // (it resolves models/<name>.onnx from assets itself), so skip the
-            // built-in ORT session — mirrors iOS where _loadModel is a no-op
-            // without the bundled ORT. Only fall back to the built-in loader when
-            // no provider is registered.
-            boolean loaded = (sInferenceProvider != null) || loadModel();
-            if (!loaded) {
-                emitError("Failed to load YOLOE model: " + mModel);
+            // The inference provider (react-viro-onnx) owns model loading + inference; it
+            // resolves models/<name>.onnx from assets itself. There is no built-in ORT
+            // fallback — without the provider the detector does nothing (mirrors iOS).
+            if (sInferenceProvider == null) {
+                emitError("No ONNX inference provider registered — install "
+                    + "@reactvision/react-viro-onnx.");
                 return;
             }
             mModelLoaded = true;
@@ -405,71 +382,12 @@ public class VRTObjectDetectorView extends FrameLayout {
             mPreviewView = null;
             mMainHandler.post(() -> removeView(pv));
         }
-
-        // Close ONNX session
-        try {
-            if (mOrtSession != null) { mOrtSession.close(); mOrtSession = null; }
-            if (mOrtEnv    != null) { mOrtEnv.close();    mOrtEnv    = null; }
-        } catch (OrtException e) {
-            Log.w(TAG, "Error closing ORT session", e);
-        }
     }
 
     private void restartIfRunning() {
         if (!mSessionStarted) return;
         stopSession();
         startSession();
-    }
-
-    // -------------------------------------------------------------------------
-    // Model loading — ONNX Runtime
-    // -------------------------------------------------------------------------
-
-    private boolean loadModel() {
-        try {
-            mOrtEnv = OrtEnvironment.getEnvironment();
-            OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
-            opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT);
-
-            byte[] modelBytes;
-
-            if (mModel.startsWith("/") || mModel.startsWith("file://")) {
-                // Absolute path on device
-                String path = mModel.startsWith("file://") ? mModel.substring(7) : mModel;
-                java.io.File f = new java.io.File(path);
-                modelBytes = new byte[(int) f.length()];
-                try (java.io.FileInputStream fis = new java.io.FileInputStream(f)) {
-                    //noinspection ResultOfMethodCallIgnored
-                    fis.read(modelBytes);
-                }
-            } else {
-                // Load from assets: models/<mModel>.onnx
-                String assetPath = "models/" + mModel + ".onnx";
-                AssetManager assets = getContext().getAssets();
-                try (InputStream is = assets.open(assetPath)) {
-                    modelBytes = readAllBytes(is);
-                }
-            }
-
-            mOrtSession = mOrtEnv.createSession(modelBytes, opts);
-            Log.i(TAG, "ONNX model loaded: " + mModel);
-            return true;
-
-        } catch (OrtException | IOException e) {
-            Log.e(TAG, "loadModel failed", e);
-            return false;
-        }
-    }
-
-    /** Reads all bytes from an InputStream (compatible with API 24+). */
-    private static byte[] readAllBytes(InputStream is) throws IOException {
-        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
-        byte[] chunk = new byte[8192];
-        int n;
-        while ((n = is.read(chunk)) != -1) {
-            buf.write(chunk, 0, n);
-        }
-        return buf.toByteArray();
     }
 
     // -------------------------------------------------------------------------
@@ -627,110 +545,38 @@ public class VRTObjectDetectorView extends FrameLayout {
     }
 
     // -------------------------------------------------------------------------
-    // Inference — ONNX Runtime, YOLOE output [1, 300, 38]
+    // Inference — delegated entirely to the registered provider (react-viro-onnx).
+    // No built-in ONNX Runtime fallback: without a provider the detector emits nothing.
     // -------------------------------------------------------------------------
 
     private List<WritableMap> runInference(float[] nchwData) {
         List<WritableMap> results = new ArrayList<>();
-        if (nchwData == null) return results;
+        if (nchwData == null || sInferenceProvider == null) return results;
 
-        // Priority 1: use externally registered provider (react-viro-onnx)
-        if (sInferenceProvider != null) {
-            String modelPath = mModel.startsWith("/") || mModel.startsWith("file://")
-                ? mModel.replace("file://", "")
-                : mModel;
-            List<java.util.Map<String, Object>> dets =
-                sInferenceProvider.infer(modelPath, nchwData, MODEL_INPUT_SIZE, mConfidenceThreshold);
-            for (java.util.Map<String, Object> d : dets) {
-                String label = (String) d.get("label");
-                if (!matchesCategories(label)) continue;
-                WritableMap det = Arguments.createMap();
-                det.putString("label", label);
-                det.putDouble("confidence", ((Number) d.get("confidence")).doubleValue());
-                @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> bb = (java.util.Map<String, Object>) d.get("boundingBox");
-                double nx = ((Number) bb.get("x")).doubleValue();
-                double ny = ((Number) bb.get("y")).doubleValue();
-                double nw = ((Number) bb.get("width")).doubleValue();
-                double nh = ((Number) bb.get("height")).doubleValue();
-                WritableMap bbox = Arguments.createMap();
-                bbox.putDouble("x", nx); bbox.putDouble("y", ny);
-                bbox.putDouble("width", nw); bbox.putDouble("height", nh);
-                det.putMap("boundingBox", bbox);
-                addScreenBox(det, label, nx, ny, nw, nh);
-                results.add(det);
-            }
-            return capToMax(results);
+        String modelPath = mModel.startsWith("/") || mModel.startsWith("file://")
+            ? mModel.replace("file://", "")
+            : mModel;
+        List<java.util.Map<String, Object>> dets =
+            sInferenceProvider.infer(modelPath, nchwData, MODEL_INPUT_SIZE, mConfidenceThreshold);
+        for (java.util.Map<String, Object> d : dets) {
+            String label = (String) d.get("label");
+            if (!matchesCategories(label)) continue;
+            WritableMap det = Arguments.createMap();
+            det.putString("label", label);
+            det.putDouble("confidence", ((Number) d.get("confidence")).doubleValue());
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> bb = (java.util.Map<String, Object>) d.get("boundingBox");
+            double nx = ((Number) bb.get("x")).doubleValue();
+            double ny = ((Number) bb.get("y")).doubleValue();
+            double nw = ((Number) bb.get("width")).doubleValue();
+            double nh = ((Number) bb.get("height")).doubleValue();
+            WritableMap bbox = Arguments.createMap();
+            bbox.putDouble("x", nx); bbox.putDouble("y", ny);
+            bbox.putDouble("width", nw); bbox.putDouble("height", nh);
+            det.putMap("boundingBox", bbox);
+            addScreenBox(det, label, nx, ny, nw, nh);
+            results.add(det);
         }
-
-        // Fallback: built-in ORT session (if model was loaded directly)
-        if (mOrtSession == null || mOrtEnv == null) return results;
-
-        try {
-            float[] floatInput = nchwData;
-
-            // 4. Create input tensor
-            long[] shape = {1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE};
-            OnnxTensor inputTensor = OnnxTensor.createTensor(
-                mOrtEnv, FloatBuffer.wrap(floatInput), shape);
-
-            // 5. Run inference
-            java.util.Map<String, OnnxTensor> inputs = new java.util.HashMap<>();
-            inputs.put("images", inputTensor);
-
-            OrtSession.Result ortResult = mOrtSession.run(inputs);
-            inputTensor.close();
-
-            // 6. Decode output0: shape [1, 300, 38]
-            // ortResult.get() returns Optional<OnnxValue> — need .get() to unwrap
-            if (!ortResult.get("output0").isPresent()) { ortResult.close(); return results; }
-            float[][][] output = (float[][][]) ortResult.get("output0").get().getValue();
-            ortResult.close();
-
-            float scale = (float) MODEL_INPUT_SIZE; // coords are in [0, 640]
-
-            for (int i = 0; i < OUTPUT_ROWS; i++) {
-                float conf  = output[0][i][IDX_CONF];
-                if (conf < mConfidenceThreshold) continue;
-
-                float x1 = output[0][i][IDX_X1] / scale;
-                float y1 = output[0][i][IDX_Y1] / scale;
-                float x2 = output[0][i][IDX_X2] / scale;
-                float y2 = output[0][i][IDX_Y2] / scale;
-
-                // Clamp to [0, 1]
-                x1 = Math.max(0f, Math.min(1f, x1));
-                y1 = Math.max(0f, Math.min(1f, y1));
-                x2 = Math.max(0f, Math.min(1f, x2));
-                y2 = Math.max(0f, Math.min(1f, y2));
-
-                float normW = x2 - x1;
-                float normH = y2 - y1;
-                if (normW <= 0 || normH <= 0) continue;
-
-                int clsId = (int) output[0][i][IDX_CLS];
-                String label = String.valueOf(clsId);
-                if (!matchesCategories(label)) continue;
-
-                WritableMap bbox = Arguments.createMap();
-                bbox.putDouble("x",      x1);
-                bbox.putDouble("y",      y1);
-                bbox.putDouble("width",  normW);
-                bbox.putDouble("height", normH);
-
-                WritableMap detection = Arguments.createMap();
-                detection.putString("label",       label);
-                detection.putDouble("confidence",  conf);
-                detection.putMap("boundingBox",    bbox);
-                addScreenBox(detection, label, x1, y1, normW, normH);
-
-                results.add(detection);
-            }
-
-        } catch (OrtException e) {
-            Log.e(TAG, "Inference error", e);
-        }
-
         return capToMax(results);
     }
 

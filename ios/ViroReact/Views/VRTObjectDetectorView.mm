@@ -47,6 +47,7 @@ NSString * const VRODetectorSessionReleasedNotification = @"VRODetectorSessionRe
 // ---------------------------------------------------------------------------
 
 static const NSInteger kDefaultMaxFPS        = 15;
+static const NSInteger kDefaultMaxDetections = 20;
 static const float     kDefaultConfidence    = 0.4f;
 static const float     kDefaultIou           = 0.45f;
 // Model input size expected by YOLOE (640x640 square).
@@ -64,6 +65,38 @@ static const int       kClsOffset            = 5;
 // ---------------------------------------------------------------------------
 
 static VRTInferenceBlock gInferenceProvider = nil;
+
+// ---------------------------------------------------------------------------
+// Center-square crop (AR path)
+//
+// The AR camera frame is a very wide landscape (e.g. 3840x2160 / 16:9). Squishing
+// or letterboxing that whole FOV into the square model input leaves objects tiny
+// (a 360px-wide letterbox content gives ~2x-smaller objects than a center crop),
+// so the detector misses them — whereas the standalone path uses a narrow 4:3 feed
+// where objects fill the frame and detect fine.
+//
+// Instead we crop the centre square (side = min(srcW, srcH)) and feed that to the
+// model: objects keep their aspect ratio AND stay large (the central scene fills
+// the 640x640 input). The centre square is also roughly what the portrait screen
+// shows under aspectFill, so detections line up with the visible region. Both the
+// preprocessor and the coordinate mapper recompute this identically from the frame
+// dimensions, so they stay in sync without threading state.
+// ---------------------------------------------------------------------------
+
+typedef struct {
+    float side;     // side length of the centre square crop (px, in source space)
+    float cropX0;   // left edge of the crop in the source frame (px)
+    float cropY0;   // top  edge of the crop in the source frame (px)
+} VROCenterCrop;
+
+static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
+    const float side = (float)MIN(srcW, srcH);
+    VROCenterCrop c;
+    c.side   = side;
+    c.cropX0 = ((float)srcW - side) * 0.5f;
+    c.cropY0 = ((float)srcH - side) * 0.5f;
+    return c;
+}
 
 // ---------------------------------------------------------------------------
 // Implementation
@@ -107,6 +140,7 @@ static VRTInferenceBlock gInferenceProvider = nil;
         _confidenceThreshold = kDefaultConfidence;
         _iouThreshold        = kDefaultIou;
         _maxFPS              = kDefaultMaxFPS;
+        _maxDetections       = kDefaultMaxDetections;
         _cameraPosition      = @"back";
         _useARSession        = NO;
         _projectToWorld      = YES;
@@ -192,6 +226,10 @@ static VRTInferenceBlock gInferenceProvider = nil;
     _maxFPS = maxFPS;
 }
 
+- (void)setMaxDetections:(NSInteger)maxDetections {
+    _maxDetections = maxDetections;
+}
+
 - (void)setCameraPosition:(NSString *)cameraPosition {
     if ([_cameraPosition isEqualToString:cameraPosition]) return;
     _cameraPosition = cameraPosition;
@@ -201,7 +239,6 @@ static VRTInferenceBlock gInferenceProvider = nil;
 #pragma mark - AR session mode
 
 - (void)_startARMode {
-    NSLog(@"[ViroObjDet] _startARMode — subscribing to AR frames");
     _active = YES;
     __weak VRTObjectDetectorView *weakSelf = self;
     dispatch_async(_inferenceQueue, ^{
@@ -233,11 +270,6 @@ static VRTInferenceBlock gInferenceProvider = nil;
 }
 
 - (void)_onARFrame:(NSNotification *)note {
-    static dispatch_once_t firstNotif;
-    dispatch_once(&firstNotif, ^{
-        NSLog(@"[ViroObjDet] _onARFrame first call — active=%d modelLoaded=%d",
-              self->_active, self->_modelLoaded);
-    });
     if (!_active || !_modelLoaded) return;
 
     ARSession *arSession = note.userInfo[@"session"];
@@ -256,22 +288,15 @@ static VRTInferenceBlock gInferenceProvider = nil;
     bool expected = false;
     if (!atomic_compare_exchange_strong(&_inferenceRunning, &expected, true)) {
         // Already running — skip this frame.
-        static dispatch_once_t skipOnce;
-        dispatch_once(&skipOnce, ^{ NSLog(@"[ViroObjDet] inference already running, skipping frame"); });
         return;
     }
 
-    NSLog(@"[ViroObjDet] dispatching inference block to queue");
     CVPixelBufferRef yuv = snapshot.capturedImage;
     CVPixelBufferRetain(yuv);
 
     __weak VRTObjectDetectorView *weakSelf = self;
     dispatch_async(_inferenceQueue, ^{
         VRTObjectDetectorView *s = weakSelf; // must assign to strong before any dereference
-        NSLog(@"[ViroObjDet] inference block running on queue — active=%d provider=%s",
-              s ? (int)s->_active : -1,
-              gInferenceProvider ? "SET" : "NIL");
-
         if (!s || !s->_active) {
             CVPixelBufferRelease(yuv);
             if (s) atomic_store(&s->_inferenceRunning, false);
@@ -280,16 +305,13 @@ static VRTInferenceBlock gInferenceProvider = nil;
 
         float *nchw = [s _preprocessARPixelBuffer:yuv];
         CVPixelBufferRelease(yuv);
-        NSLog(@"[ViroObjDet] preprocessing done: nchw=%s", nchw ? "OK" : "NULL");
 
         if (!nchw) {
             atomic_store(&s->_inferenceRunning, false);
             return;
         }
 
-        NSLog(@"[ViroObjDet] calling runInference");
         NSArray *rawDetections = [s _runInferenceWithNCHW:nchw];
-        NSLog(@"[ViroObjDet] inference returned %d detections", (int)rawDetections.count);
 
         atomic_store(&s->_inferenceRunning, false);
 
@@ -338,22 +360,27 @@ static VRTInferenceBlock gInferenceProvider = nil;
     const float inv255   = 1.0f / 255.0f;
     const size_t cbcrW   = srcW / 2;
     const size_t cbcrH   = srcH / 2;
-    // 90° CCW rotation: portrait pixel (px, py) samples landscape buffer at:
-    //   sx = (1 - py/(N-1)) * (srcW-1)   — landscape right → portrait top
-    //   sy = (px/(N-1))     * (srcH-1)   — landscape top   → portrait left
-    // iPhone back camera delivers landscape where scene-up = landscape-right,
-    // so CCW corrects it to portrait. After this, YOLOE box coords are in portrait space.
 
+    // Center-square crop: sample only the central side×side region of the source, so
+    // objects stay large and undistorted in the 640×640 input (see VROCenterCrop note).
+    const VROCenterCrop crop = VROCenterCropCompute(srcW, srcH);
+
+    // 90° CCW rotation within the crop: model pixel (px,py), normalized (nx,ny), samples
+    //   sx = cropX0 + (1 - ny) * (side-1)   — landscape right → portrait top
+    //   sy = cropY0 + nx       * (side-1)   — landscape top   → portrait left
+    // iPhone back camera delivers landscape where scene-up = landscape-right, so CCW
+    // corrects it to portrait. Box coords come back normalized within the crop.
     for (int py = 0; py < N; py++) {
-        float portraitYNorm = (float)py / (float)(N - 1);
+        const float ny = (float)py / (float)(N - 1);
 
         for (int px = 0; px < N; px++) {
-            float portraitXNorm = (float)px / (float)(N - 1);
+            const int i = py * N + px;
+            const float nx = (float)px / (float)(N - 1);
 
-            int sx = (int)((1.0f - portraitYNorm) * (float)(srcW - 1));
-            int sy = (int)(portraitXNorm           * (float)(srcH - 1));
-            if (sx >= (int)srcW) sx = (int)srcW - 1;
-            if (sy >= (int)srcH) sy = (int)srcH - 1;
+            int sx = (int)(crop.cropX0 + (1.0f - ny) * (crop.side - 1.0f));
+            int sy = (int)(crop.cropY0 + nx          * (crop.side - 1.0f));
+            if (sx < 0) sx = 0; else if (sx >= (int)srcW) sx = (int)srcW - 1;
+            if (sy < 0) sy = 0; else if (sy >= (int)srcH) sy = (int)srcH - 1;
             int chromaX = sx / 2;
             int chromaY = sy / 2;
             if (chromaX >= (int)cbcrW) chromaX = (int)cbcrW - 1;
@@ -372,7 +399,6 @@ static VRTInferenceBlock gInferenceProvider = nil;
             g = g < 0 ? 0 : (g > 255 ? 255 : g);
             b = b < 0 ? 0 : (b > 255 ? 255 : b);
 
-            const int i  = py * N + px;
             rPlane[i] = (float)r * inv255;
             gPlane[i] = (float)g * inv255;
             bPlane[i] = (float)b * inv255;
@@ -397,24 +423,34 @@ static VRTInferenceBlock gInferenceProvider = nil;
 
     CGSize vp = [UIScreen mainScreen].bounds.size;
 
-    // Camera frame dimensions (always landscape from ARKit).
-    CVPixelBufferRef bufRef = frame.capturedImage;
-    float srcWf = (float)CVPixelBufferGetWidth(bufRef);   // landscape width  = portrait height
-    float srcHf = (float)CVPixelBufferGetHeight(bufRef);  // landscape height = portrait width
+    // Map detection boxes to screen pixels using ARKit's own displayTransform.
+    //
+    // The previous hand-rolled "aspectFill of the full capturedImage" assumption did
+    // NOT match what ARKit actually renders: ARKit crops capturedImage to its camera
+    // projection FOV, which is generally narrower than a plain aspectFill of the full
+    // sensor frame. That mismatch made boxes land offset from the visible objects.
+    //
+    // displayTransformForOrientation:viewportSize: converts normalized capturedImage
+    // coords (landscape, native orientation, top-left origin) to normalized view coords
+    // for the current orientation+viewport, accounting for the exact crop ARKit uses.
+    CGAffineTransform displayTransform =
+        [frame displayTransformForOrientation:UIInterfaceOrientationPortrait
+                                 viewportSize:vp];
 
-    // resizeAspectFill mapping (landscape ARKit frame → portrait device screen):
-    //   fillScale = screenH / srcW   (fill portrait height using landscape width)
-    //   contentW  = srcH * fillScale (portrait content width, may exceed screenW)
-    //   cropX     = (contentW - screenW) / 2
-    float fillScale = (float)vp.height / srcWf;
-    float contentW  = srcHf * fillScale;
-    float cropX     = (contentW - (float)vp.width) * 0.5f;
-
-    static dispatch_once_t diagOnce;
-    dispatch_once(&diagOnce, ^{
-        NSLog(@"[ViroObjDet] AR mapping: frame=%.0fx%.0f vp=%.0fx%.0f contentW=%.0f cropX=%.0f",
-              srcWf, srcHf, vp.width, vp.height, contentW, cropX);
-    });
+    // Box coords are normalized within the centre-square crop [0,1]. Invert the crop
+    // (recomputed identically to _preprocessARPixelBuffer:) to recover the
+    // capturedImage-normalized coords ARKit's displayTransform expects.
+    CVPixelBufferRef cap = frame.capturedImage;
+    const size_t srcW = CVPixelBufferGetWidth(cap);
+    const size_t srcH = CVPixelBufferGetHeight(cap);
+    const VROCenterCrop crop = VROCenterCropCompute(srcW, srcH);
+    // crop-normalized (nx, ny) → capturedImage-normalized (landscape), inverse of the
+    // 90° CCW rotation:  sx = cropX0 + (1-ny)*side,  sy = cropY0 + nx*side.
+    CGPoint (^imgCoord)(float, float) = ^CGPoint(float nx, float ny) {
+        float sx = crop.cropX0 + (1.0f - ny) * (crop.side - 1.0f);
+        float sy = crop.cropY0 + nx          * (crop.side - 1.0f);
+        return CGPointMake(sx / (float)(srcW - 1), sy / (float)(srcH - 1));
+    };
 
     NSMutableArray *out = [NSMutableArray arrayWithCapacity:dets.count];
     for (NSDictionary *det in dets) {
@@ -429,25 +465,34 @@ static VRTInferenceBlock gInferenceProvider = nil;
         float cx = bx + bw * 0.5f;
         float cy = by + bh * 0.5f;
 
-        // --- 2D screenBoundingBox: direct portrait space → screen pixels ---
-        float screenCX = cx * contentW - cropX;
-        float screenCY = cy * (float)vp.height;
-        float sw = bw * contentW;
-        float sh = bh * (float)vp.height;
+        // --- 2D screenBoundingBox via letterbox-inverse + ARKit displayTransform ---
+        // Transform all four corners (the rotation makes a pure scale insufficient) and
+        // take the axis-aligned bounding rect in view space.
+        const float pxs[4] = { bx, bx + bw, bx,      bx + bw };
+        const float pys[4] = { by, by,      by + bh, by + bh };
+        CGFloat minX = CGFLOAT_MAX, minY = CGFLOAT_MAX, maxX = -CGFLOAT_MAX, maxY = -CGFLOAT_MAX;
+        for (int k = 0; k < 4; k++) {
+            CGPoint imgPt  = imgCoord(pxs[k], pys[k]);
+            CGPoint viewPt = CGPointApplyAffineTransform(imgPt, displayTransform);
+            CGFloat spx = viewPt.x * vp.width;
+            CGFloat spy = viewPt.y * vp.height;
+            minX = MIN(minX, spx); maxX = MAX(maxX, spx);
+            minY = MIN(minY, spy); maxY = MAX(maxY, spy);
+        }
         d[@"screenBoundingBox"] = @{
-            @"x":      @(screenCX - sw * 0.5f),
-            @"y":      @(screenCY - sh * 0.5f),
-            @"width":  @(sw),
-            @"height": @(sh)
+            @"x":      @(minX),
+            @"y":      @(minY),
+            @"width":  @(maxX - minX),
+            @"height": @(maxY - minY)
         };
 
         // --- worldPosition via ARKit hitTest (optional) ---
-        // Convert portrait (cx, cy) to landscape normalized coords (inverse of 90° CW rotation):
-        //   landscape_x = 1 - cy_portrait
-        //   landscape_y = cx_portrait
+        // hitTest takes capturedImage-normalized coords — invert the letterbox on the
+        // box centre the same way as the corners above.
         if (_projectToWorld) {
-            float hitX = 1.0f - cy;
-            float hitY = cx;
+            CGPoint hit = imgCoord(cx, cy);
+            float hitX = hit.x;
+            float hitY = hit.y;
             ARHitTestResultType types =
                 ARHitTestResultTypeEstimatedHorizontalPlane |
                 ARHitTestResultTypeExistingPlaneUsingExtent |
@@ -462,9 +507,6 @@ static VRTInferenceBlock gInferenceProvider = nil;
                 d[@"worldPosition"] = @{@"x": @(wpos.x), @"y": @(wpos.y), @"z": @(wpos.z)};
             }
         }
-
-        NSLog(@"[ViroObjDet] det '%@' portrait(%.2f,%.2f) screen(%.0f,%.0f) sz(%.0f×%.0f)",
-              det[@"label"], cx, cy, screenCX, screenCY, sw, sh);
 
         [out addObject:[d copy]];
     }
@@ -496,7 +538,6 @@ static VRTInferenceBlock gInferenceProvider = nil;
     // The 2GB ORT session stays resident in memory so that subsequent entries
     // (including the AR mode) don't trigger a reload spike that would cause the
     // OS to kill the app. Memory is freed when the app terminates.
-    NSLog(@"[ViroObjDet] _stopSession — keeping ORT sessions resident");
 }
 
 - (void)_restartIfRunning {
@@ -775,7 +816,10 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         }
         NSArray *result = gInferenceProvider(modelPath, nchwData, kModelInputSize, _confidenceThreshold);
         free(nchwData);
-        return [self _mapLabels:result];
+        // _mapLabels: numeric id → category name; _filterByCategories: when mode="text",
+        // keep only requested categories (no-op in prompt-free mode); _capToMax: keep
+        // the top-N (results are confidence-sorted by the provider).
+        return [self _capToMax:[self _filterByCategories:[self _mapLabels:result]]];
     }
 
 #if !VIRO_ONNXRUNTIME_AVAILABLE
@@ -839,8 +883,16 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
             @"boundingBox": @{@"x": @(x1), @"y": @(y1), @"width": @(w), @"height": @(h)}
         }];
     }
-    return [detections copy];
+    return [self _capToMax:[detections copy]];
 #endif
+}
+
+// Keeps the first _maxDetections entries (provider returns them confidence-sorted).
+- (NSArray<NSDictionary *> *)_capToMax:(NSArray<NSDictionary *> *)results {
+    if (_maxDetections > 0 && (NSInteger)results.count > _maxDetections) {
+        return [results subarrayWithRange:NSMakeRange(0, (NSUInteger)_maxDetections)];
+    }
+    return results;
 }
 
 // Maps numeric labels to category names — only when the label is a bare integer.
@@ -876,10 +928,27 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     if (![_mode isEqualToString:@"text"] || !_categories.count || !results.count) {
         return results;
     }
-    NSSet<NSString *> *wanted = [NSSet setWithArray:_categories];
+    // Word-token matching (case-insensitive). The prompt-free model emits open-vocab
+    // labels like "cell phone" / "dining table" / "laptop computer" that rarely equal
+    // the requested category strings verbatim. Matching on shared whole words lets
+    // "phone"↔"cell phone" and "table"↔"dining table" match, while avoiding substring
+    // false positives ("pen" does NOT match "pencil").
+    NSCharacterSet *sep = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+    NSMutableSet<NSString *> *wantedTokens = [NSMutableSet set];
+    for (NSString *cat in _categories) {
+        for (NSString *w in [cat.lowercaseString componentsSeparatedByCharactersInSet:sep]) {
+            if (w.length) [wantedTokens addObject:w];
+        }
+    }
     NSMutableArray *out = [NSMutableArray array];
     for (NSDictionary *det in results) {
-        if ([wanted containsObject:det[@"label"]]) [out addObject:det];
+        NSString *label = [det[@"label"] lowercaseString];
+        for (NSString *w in [label componentsSeparatedByCharactersInSet:sep]) {
+            if (w.length && [wantedTokens containsObject:w]) {
+                [out addObject:det];
+                break;
+            }
+        }
     }
     return [out copy];
 }

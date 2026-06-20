@@ -85,6 +85,9 @@ typedef NSArray<NSDictionary *> * _Nonnull (^VRTInferenceBlock)(
 /** Maximum inference calls per second. Default: 15. */
 @property (nonatomic, assign) NSInteger maxFPS;
 
+/** Maximum detections emitted per frame (top-N by confidence). Default: 20. */
+@property (nonatomic, assign) NSInteger maxDetections;
+
 /** "front" | "back". Default: "back". */
 @property (nonatomic, copy) NSString *cameraPosition;
 

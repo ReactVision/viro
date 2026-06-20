@@ -52,6 +52,9 @@ RCT_EXPORT_VIEW_PROPERTY(iouThreshold, float)
 // Maximum inference calls per second.
 RCT_EXPORT_VIEW_PROPERTY(maxFPS, NSInteger)
 
+// Maximum detections emitted per frame (top-N by confidence).
+RCT_EXPORT_VIEW_PROPERTY(maxDetections, NSInteger)
+
 // "front" | "back"
 RCT_EXPORT_VIEW_PROPERTY(cameraPosition, NSString *)
 

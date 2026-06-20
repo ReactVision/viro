@@ -88,6 +88,13 @@ type Props = ViewProps & {
      */
     maxFPS?: number;
     /**
+     * Maximum number of detections reported per frame, kept as the top-N by
+     * confidence (after NMS). Lower this to reduce clutter, raise it to surface
+     * more objects.
+     * Defaults to 20.
+     */
+    maxDetections?: number;
+    /**
      * Which camera to sample frames from.
      * Defaults to "back".
      */

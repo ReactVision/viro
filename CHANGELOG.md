@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## v2.57.0 — 19 June 2026
+
+### Added
+
+- **`ViroObjectDetector` — on-device object detection.** A new component that runs open-vocabulary [YOLOE](https://docs.ultralytics.com/models/yoloe/) detection through ONNX Runtime, fully offline (no network, no cloud). It works standalone (its own CameraX / `AVCaptureSession` feed) or shares the AR session (`useARSession`), and fires `onDetection` with labels, confidences, and bounding boxes. In AR mode each detection also carries a `screenBoundingBox` in density-independent points (dp), aligned to the on-screen camera preview, so boxes drop straight into an absolutely-positioned overlay. iOS and Android reach parity for detection and the 2D overlay (`worldPosition` 3D raycast remains iOS-only for now). Inference is delegated to the companion package **`@reactvision/react-viro-onnx`** (Android uses the NNAPI execution provider with FP16); there is no built-in fallback — without the provider the detector emits no detections and fires `onError`. See `docs/ViroObjectDetector.md`.
+
+- **`onDepthReady` event on `ViroARScene`.** Fires once, when AR depth first becomes available, on both iOS and Android. Use it to gate depth-dependent features (occlusion, hit-testing) until the depth subsystem is actually producing data.
+
+- **Expo SDK 56 support.** The config plugin and prebuilt artifacts now build against Expo 56 / React Native's new architecture.
+
+### Improved
+
+- **iOS depth precision.** Depth points are now derived directly from the AR depth map rather than approximated, and the monocular depth model is warmed up ahead of first use — eliminating inaccurate/late depth on the first frames and tightening occlusion and hit-test accuracy on non-LiDAR devices.
+
+### Fixed
+
+- **Layered / stacked GLB animations freezing instead of playing (VIRO-5741).** glTF skeletal clips whose channels mixed STEP and LINEAR interpolation or sat on multiple independent time-grids (common in Blender exports with layered animations) were being dropped or flattened, causing the animation to freeze. Channels are now resampled onto a single common time-grid and merged per joint into one index-aligned keyframe animation, with a per-frame density cap to bound skinning cost on pathological assets. Affected clips now play through fully.
+
+- **16 KB page-size alignment for `libopenxr_loader.so` (Android).** The bundled OpenXR loader library, `libopenxr_loader.so`, previously used 4 KB alignment and failed the 16 KB memory-page requirement for Android 15+ devices, blocking Google Play / Meta Quest Store submission. The loader was updated from 1.1.38 to 1.1.49, which is 16 KB-page aligned. Apps that don't use XR are unaffected.
+
+- **VR controller input** — upgraded the VR event listener path to the new architecture, restoring controller controls in VR.
+
+- **`onDrag` in `StudioSceneNavigator`** — drag events now fire correctly.
+
+- **iOS pod build** — visionOS-only sources are now excluded from the iOS CocoaPods build, fixing compile errors in iOS-only targets.
+
+### Experimental / Preview
+
+- **visionOS renderer.** Initial visionOS support landed: a Metal-based renderer/driver, the React Native bindings, and the renderer bridge. This is a work-in-progress foundation and not yet production-ready.
+
+---
+
 ## v2.56.0 — 04 June 2026
 
 ### Added

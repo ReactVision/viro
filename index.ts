@@ -48,6 +48,8 @@ import {
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroCameraTexture } from "./components/ViroCameraTexture";
 export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
+import { ViroObjectDetector } from "./components/ViroObjectDetector";
+export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
 import { ViroOrbitCamera } from "./components/ViroOrbitCamera";
@@ -223,6 +225,7 @@ export {
   ViroARCamera,
   ViroMaterialVideo,
   ViroCameraTexture,
+  ViroObjectDetector,
   ViroNode,
   ViroOmniLight,
   ViroOrbitCamera,

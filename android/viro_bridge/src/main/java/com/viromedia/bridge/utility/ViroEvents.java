@@ -74,4 +74,9 @@ public class ViroEvents {
     public static final String ON_PRESS_IN     = "onPressIn";
     public static final String ON_PRESS_OUT    = "onPressOut";
 
+    // Object detector events
+    public static final String ON_DETECTION    = "onDetectionViro";
+    public static final String ON_DETECTOR_READY = "onReadyViro";
+    public static final String ON_DETECTOR_ERROR = "onErrorViro";
+
 }

@@ -53,6 +53,7 @@ public class ViroEvents {
     public static final String ON_TRANSFORM_DELEGATE = "onNativeTransformDelegateViro";
     public static final String ON_TRACKING_UPDATED = "onTrackingUpdatedViro";
     public static final String ON_AMBIENT_LIGHT_UPDATE = "onAmbientLightUpdateViro";
+    public static final String ON_DEPTH_READY = "onDepthReadyViro";
     public static final String ON_ANCHOR_FOUND = "onAnchorFoundViro";
     public static final String ON_ANCHOR_UPDATED = "onAnchorUpdatedViro";
     public static final String ON_ANCHOR_REMOVED = "onAnchorRemovedViro";

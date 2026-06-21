@@ -6,7 +6,6 @@ import {
   withDangerousMod,
   withProjectBuildGradle,
   withSettingsGradle,
-  WarningAggregator,
 } from "@expo/config-plugins";
 import type { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
@@ -160,15 +159,6 @@ const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config) => {
 
 const withViroProjectBuildGradle = (config: ExpoConfig) =>
   withProjectBuildGradle(config, async (newConfig) => {
-    // Enforce New Architecture requirement
-    if (!newConfig.modResults.contents.includes("newArchEnabled=true")) {
-      WarningAggregator.addWarningAndroid(
-        "withViroAndroid",
-        "ViroReact requires New Architecture to be enabled. " +
-          'Please add "newArchEnabled=true" to your android/gradle.properties file.'
-      );
-    }
-
     newConfig.modResults.contents = newConfig.modResults.contents.replace(
       /minSdkVersion.*/,
       `minSdkVersion = 24`

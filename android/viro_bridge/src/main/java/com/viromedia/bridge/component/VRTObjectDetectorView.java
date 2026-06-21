@@ -86,6 +86,9 @@ public class VRTObjectDetectorView extends FrameLayout {
     private static final float DEFAULT_CONFIDENCE = 0.4f;
     private static final float DEFAULT_IOU        = 0.45f;
     private static final int   MODEL_INPUT_SIZE   = 640;
+    // Verbose per-frame / per-detection logging. Keep false in shipping builds — the
+    // screen-box log alone fires up to maxDetections × maxFPS times per second.
+    private static final boolean DEBUG = false;
 
     // --- Props ---
     private String       mModel               = "yoloe-26s";
@@ -120,13 +123,23 @@ public class VRTObjectDetectorView extends FrameLayout {
     private final java.util.concurrent.atomic.AtomicBoolean mArBusy =
         new java.util.concurrent.atomic.AtomicBoolean(false);
 
-    // --- Diagnostics (temporary): trace the AR camera-feed → inference → emit path ---
-    private long mArFrameCount = 0;
-    private long mArSkipBusy   = 0;
-
     // Background thread for preprocessing + inference (the AR feed arrives on the render thread).
     private ExecutorService       mCameraExecutor;
     private long                  mLastInferenceMs = 0;
+
+    // Reused across frames to keep the hot path allocation-free. Only ever touched within a
+    // single inference cycle: the mArBusy guard blocks a new frame from writing these while
+    // inference is still reading them, so no extra synchronization is needed.
+    private Bitmap                mFrameBitmap;   // matches the delivered frame size
+    private Bitmap                mScaledBitmap;  // 640x640 model input
+    private android.graphics.Canvas mScaleCanvas;
+    private final android.graphics.Rect  mSrcRect = new android.graphics.Rect();
+    private final android.graphics.Rect  mDstRect =
+        new android.graphics.Rect(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+    private final android.graphics.Paint mScalePaint =
+        new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+    private int[]                 mPixels;        // int[640*640], reused
+    private float[]               mNchw;          // float[3*640*640], reused
 
     private final Handler mMainHandler = new Handler(Looper.getMainLooper());
 
@@ -248,8 +261,16 @@ public class VRTObjectDetectorView extends FrameLayout {
 
     private void stopARMode() {
         if (mViroView != null && mArListenerActive) {
-            try { mViroView.setCameraImageListener(mViroView.getViroContext(), null); }
-            catch (Exception ignored) {}
+            // Teardown race: when the AR scene unmounts (or the app is backgrounded), the
+            // ViroContext/renderer can be disposed before this detach runs (it's posted to the
+            // main Handler). Passing a freed native context ref to nativeSetCameraImageListener
+            // crashes natively (SIGSEGV, not catchable by try/catch). A disposed context has
+            // nativeRef == 0 — skip the native call in that case.
+            com.viro.core.ViroContext ctx = mViroView.getViroContext();
+            if (ctx != null && ctx.getNativeRef() != 0) {
+                try { mViroView.setCameraImageListener(ctx, null); }
+                catch (Exception ignored) {}
+            }
         }
         mArListenerActive = false;
         mViroView = null;
@@ -295,15 +316,19 @@ public class VRTObjectDetectorView extends FrameLayout {
         if ((now - mLastInferenceMs) < minIntervalMs) return;
         mLastInferenceMs = now;
 
-        // Skip if a previous inference is still in flight (the buffer is reused next frame,
-        // so copy it now into a Bitmap before handing off to the inference thread).
-        if (!mArBusy.compareAndSet(false, true)) { mArSkipBusy++; return; }
+        // Skip if a previous inference is still in flight. The guard also guarantees the
+        // reusable bitmap below is only written here when no inference thread is reading it
+        // (the buffer is recycled by the caller next frame, so we must copy it now).
+        if (!mArBusy.compareAndSet(false, true)) return;
 
-        Bitmap src;
         try {
-            src = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            if (mFrameBitmap == null
+                || mFrameBitmap.getWidth() != width || mFrameBitmap.getHeight() != height) {
+                if (mFrameBitmap != null) mFrameBitmap.recycle();
+                mFrameBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            }
             buffer.rewind();
-            src.copyPixelsFromBuffer(buffer);
+            mFrameBitmap.copyPixelsFromBuffer(buffer);
         } catch (Exception e) {
             Log.w(TAG, "AR frame copy failed", e);
             mArBusy.set(false);
@@ -315,7 +340,7 @@ public class VRTObjectDetectorView extends FrameLayout {
 
         mCameraExecutor.execute(() -> {
             try {
-                float[] nchw = preprocessBitmap(src); // recycles src
+                float[] nchw = preprocessFrame();
                 List<WritableMap> dets = runInference(nchw);
                 emitDetections(dets);
             } catch (Exception e) {
@@ -352,28 +377,34 @@ public class VRTObjectDetectorView extends FrameLayout {
     // Crops the central side×side region (side = min(w,h)) instead of stretching the
     // whole frame: a wide camera frame squished to a square shrinks objects ~2x and the
     // detector stops recognising them. Cropping keeps objects large and undistorted.
-    // The screen-coordinate mapping (see addScreenBox) inverts this crop. Mirrors iOS.
-    private float[] preprocessBitmap(Bitmap srcBitmap) {
-        int width  = srcBitmap.getWidth();
-        int height = srcBitmap.getHeight();
-        int side   = Math.min(width, height);
-        int cropX  = (width  - side) / 2;
-        int cropY  = (height - side) / 2;
+    // The crop+downscale is a single filtered Canvas blit into a reused 640x640 bitmap
+    // (no intermediate bitmaps), and the pixel/NCHW buffers are reused across frames, so
+    // the per-frame allocation is zero in steady state. The screen-coordinate mapping
+    // (see addScreenBox) inverts this crop. Mirrors iOS.
+    private float[] preprocessFrame() {
+        final int width  = mFrameBitmap.getWidth();
+        final int height = mFrameBitmap.getHeight();
+        final int side   = Math.min(width, height);
+        final int cropX  = (width  - side) / 2;
+        final int cropY  = (height - side) / 2;
 
-        Bitmap cropped = Bitmap.createBitmap(srcBitmap, cropX, cropY, side, side);
-        if (cropped != srcBitmap) srcBitmap.recycle();
+        if (mScaledBitmap == null) {
+            mScaledBitmap = Bitmap.createBitmap(
+                MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, Bitmap.Config.ARGB_8888);
+            mScaleCanvas = new android.graphics.Canvas(mScaledBitmap);
+        }
+        // Center-square crop + downscale to 640 in one bilinear blit.
+        mSrcRect.set(cropX, cropY, cropX + side, cropY + side);
+        mScaleCanvas.drawBitmap(mFrameBitmap, mSrcRect, mDstRect, mScalePaint);
 
-        Bitmap scaledBitmap = Bitmap.createScaledBitmap(
-            cropped, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true);
-        if (scaledBitmap != cropped) cropped.recycle();
-
-        int pixelCount = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
-        int[] pixels = new int[pixelCount];
-        scaledBitmap.getPixels(pixels, 0, MODEL_INPUT_SIZE, 0, 0,
+        final int pixelCount = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
+        if (mPixels == null) mPixels = new int[pixelCount];
+        if (mNchw == null)   mNchw   = new float[3 * pixelCount];
+        mScaledBitmap.getPixels(mPixels, 0, MODEL_INPUT_SIZE, 0, 0,
             MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
-        scaledBitmap.recycle();
 
-        float[] nchw = new float[3 * pixelCount];
+        final int[] pixels = mPixels;
+        final float[] nchw = mNchw;
         for (int i = 0; i < pixelCount; i++) {
             int px = pixels[i];
             nchw[i]                  = ((px >> 16) & 0xFF) / 255.0f; // R
@@ -435,7 +466,7 @@ public class VRTObjectDetectorView extends FrameLayout {
         if (viewW <= 0 || viewH <= 0) return;
 
         // 1. crop-normalized → FULL-frame pixels. The model input is the center-square crop of the
-        //    full (uncropped) frame (see preprocessBitmap, side=min(w,h)), so invert that crop.
+        //    full (uncropped) frame (see preprocessFrame, side=min(w,h)), so invert that crop.
         double side = Math.min(mLastSrcW, mLastSrcH);
         double cropX0 = (mLastSrcW - side) / 2.0;
         double cropY0 = (mLastSrcH - side) / 2.0;
@@ -480,10 +511,12 @@ public class VRTObjectDetectorView extends FrameLayout {
         double dx = sx / density, dy = sy / density, dw = sw / density, dh = sh / density;
 
         // Diagnostic: compare dp=[x,y,w,h] against where the object actually sits on the dp screen.
-        Log.i(TAG, String.format(java.util.Locale.US,
-            "BOX %s norm=[%.3f,%.3f,%.3f,%.3f] src=%dx%d crop=[%d,%d,%d,%d] view=%dx%d dens=%.2f dp=[%.0f,%.0f,%.0f,%.0f]",
-            label, nx, ny, nw, nh, mLastSrcW, mLastSrcH, mCropL, mCropT, mCropW, mCropH,
-            viewW, viewH, density, dx, dy, dw, dh));
+        if (DEBUG) {
+            Log.i(TAG, String.format(java.util.Locale.US,
+                "BOX %s norm=[%.3f,%.3f,%.3f,%.3f] src=%dx%d crop=[%d,%d,%d,%d] view=%dx%d dens=%.2f dp=[%.0f,%.0f,%.0f,%.0f]",
+                label, nx, ny, nw, nh, mLastSrcW, mLastSrcH, mCropL, mCropT, mCropW, mCropH,
+                viewW, viewH, density, dx, dy, dw, dh));
+        }
 
         WritableMap sb = Arguments.createMap();
         sb.putDouble("x",      dx);

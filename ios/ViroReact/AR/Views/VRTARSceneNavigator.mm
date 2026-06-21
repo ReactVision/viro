@@ -396,6 +396,9 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
         return;
     }
     _hasCleanedUp = YES;
+    // Verification log: if this does NOT appear when leaving the AR screen, the navigator
+    // (and the VROViewAR it owns) is being retained and deleteGL never runs → GPU stays.
+    NSLog(@"[Viro] cleanupViroResources ran (releasing AR view + GPU resources)");
 
     // CRITICAL: Clear currentViews to break retain cycle
     if (_currentViews) {
@@ -414,6 +417,11 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
     if (_bridge) {
         VRTMaterialManager *materialManager = [_bridge materialManager];
         [materialManager clearAllMaterials];
+        // RCTPerfMonitor (dev) holds a STRONG ref to the AR view (set in initWithBridge via
+        // [_bridge.perfMonitor setView:_vroView]). If left set, it keeps VROViewAR alive
+        // after unmount, so the view's dealloc/deleteGL never runs and the renderer's
+        // Metal/GPU resources stay resident. Release it before dropping _bridge.
+        [_bridge.perfMonitor setView:nil];
         _bridge = nil;
     }
 

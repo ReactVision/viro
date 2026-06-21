@@ -113,6 +113,11 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
     // dispatch_semaphore_t associated with a lower-QoS queue would trigger.
     atomic_bool                  _inferenceRunning;
 
+    // Reused NCHW buffer (3·640·640 floats), allocated once. Only the inference queue
+    // touches it, and the atomic guard ensures a single inference at a time, so reusing
+    // it across frames is safe and avoids a ~4.7 MB malloc/free per frame.
+    float                       *_nchwBuffer;
+
     // ONNX Runtime objects (present only when VIRO_ONNXRUNTIME_AVAILABLE is defined).
 #if VIRO_ONNXRUNTIME_AVAILABLE
     ORTEnv                      *_ortEnv;
@@ -146,6 +151,7 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
             dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,
                                                     QOS_CLASS_UTILITY, 0));
         atomic_init(&_inferenceRunning, false);
+        _nchwBuffer = NULL;
     }
     return self;
 }
@@ -154,6 +160,7 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:kVROARFrameNotification
                                                   object:nil];
+    if (_nchwBuffer) { free(_nchwBuffer); _nchwBuffer = NULL; }
 }
 
 #pragma mark - React lifecycle
@@ -324,11 +331,16 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 
     const int   N   = kModelInputSize;          // 640
     const int   N2  = N * N;
-    float *nchw = (float *)malloc(sizeof(float) * 3 * N2);
-    if (!nchw) {
-        CVPixelBufferUnlockBaseAddress(yuv, kCVPixelBufferLock_ReadOnly);
-        return nil;
+    // Reuse the buffer across frames (fixed size). Allocated lazily on the inference
+    // queue; freed in dealloc. Safe because only one inference runs at a time.
+    if (!_nchwBuffer) {
+        _nchwBuffer = (float *)malloc(sizeof(float) * 3 * N2);
+        if (!_nchwBuffer) {
+            CVPixelBufferUnlockBaseAddress(yuv, kCVPixelBufferLock_ReadOnly);
+            return nil;
+        }
     }
+    float *nchw = _nchwBuffer;
 
     float *rPlane = nchw + 0 * N2;
     float *gPlane = nchw + 1 * N2;
@@ -556,7 +568,7 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 #pragma mark - Inference
 
 // Core inference method (AR path).
-// Takes ownership of `nchwData` and free()s it before returning.
+// `nchwData` is the view-owned reusable buffer (see _nchwBuffer); it is NOT freed here.
 - (NSArray<NSDictionary *> *)_runInferenceWithNCHW:(float *)nchwData {
     // Priority 1: externally registered provider (react-viro-onnx).
     if (gInferenceProvider) {
@@ -568,7 +580,6 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
                 ?: _model;
         }
         NSArray *result = gInferenceProvider(modelPath, nchwData, kModelInputSize, _confidenceThreshold);
-        free(nchwData);
         // _mapLabels: numeric id → category name; _filterByCategories: when mode="text",
         // keep only requested categories (no-op in prompt-free mode); _capToMax: keep
         // the top-N (results are confidence-sorted by the provider).
@@ -576,16 +587,14 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
     }
 
 #if !VIRO_ONNXRUNTIME_AVAILABLE
-    free(nchwData);
     return @[];
 #else
-    if (!_ortSession) { free(nchwData); return @[]; }
+    if (!_ortSession) { return @[]; }
 
     NSError *ortError = nil;
     NSArray<NSNumber *> *shapeArray = @[@1, @3, @(kModelInputSize), @(kModelInputSize)];
     NSMutableData *inputNSData = [NSMutableData dataWithBytes:nchwData
                                                        length:sizeof(float) * 3 * kModelInputSize * kModelInputSize];
-    free(nchwData);
 
     ORTValue *inputTensor = [ORTValue tensorWithData:inputNSData
                                         elementType:ORTTensorElementDataTypeFloat

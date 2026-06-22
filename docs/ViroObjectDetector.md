@@ -4,7 +4,7 @@ On-device, open-vocabulary object detection powered by [YOLOE](https://docs.ultr
 
 `ViroObjectDetector` works **only in AR**: it shares the camera feed of an enclosing `ViroARSceneNavigator` (it never opens a camera of its own), runs inference at a throttled frame rate, and fires `onDetection` with bounding boxes and labels. It renders nothing itself — mount it as a child or sibling of the navigator and give it `width: 0, height: 0`.
 
-> **Inference provider required.** `ViroObjectDetector` ships the camera + plumbing, but the actual ONNX inference lives in the companion package **[`@reactvision/react-viro-onnx`](../../react-viro-onnx/README.md)**. Neither platform falls back to anything if it's missing: the detector stays silent and fires `onError` ("No ONNX inference provider registered…"). Add the package to your `plugins` and it auto-registers (see its README).
+> **Inference provider required.** `ViroObjectDetector` ships the camera + plumbing, but the actual ONNX inference lives in the companion package **[`@reactvision/react-viro-onnx`](https://github.com/ReactVision/react-viro-onnx)**. Neither platform falls back to anything if it's missing: the detector stays silent and fires `onError` ("No ONNX inference provider registered…"). Add the package to your `plugins` and it auto-registers (see its README).
 
 ---
 
@@ -31,7 +31,7 @@ You need **two** packages: this component (`@reactvision/react-viro`) and the ON
    npx expo run:android     # / run:ios
    ```
 
-For native details (iOS pod / onnxruntime AAR), custom-model export, NNAPI, and **local development** of the provider (it installs from a packed tarball — changes require a re-pack), see the provider's **[README](../../react-viro-onnx/README.md)**.
+For native details (iOS pod / onnxruntime AAR), custom-model export, NNAPI, and **local development** of the provider (it installs from a packed tarball — changes require a re-pack), see the provider's **[README](https://github.com/ReactVision/react-viro-onnx)**.
 
 ---
 
@@ -97,7 +97,7 @@ type ViroDetectedObject = {
 
   > ⚠️ `text` mode is purely a **label post-filter**. It runs after inference and keeps only the detections whose label word-matches one of `categories`; it does **not** prompt the model at runtime (there is no CLIP/text encoder in the inference path, and the model's class set is fixed at export time). So it can only surface classes the loaded model already emits — and on the stock prompt-free model, which rarely emits common nouns with high recall, it returns very little.
   >
-  > To actually target classes by text, bake them into the model at **export** time: run [`react-viro-onnx`'s `export_text_model.py`](../../react-viro-onnx/README.md#exporting-a-text-prompt-model), which reparametrizes the detection head (RepRTA) against your class list. With such a model you usually don't need `text` mode at all — **`prompt-free` already returns only your baked classes** with high recall. Use `text` + `categories` on top of it only when you want to narrow the output to a subset of those classes.
+  > To actually target classes by text, bake them into the model at **export** time: run [`react-viro-onnx`'s `export_text_model.py`](https://github.com/ReactVision/react-viro-onnx#exporting-a-text-prompt-model), which reparametrizes the detection head (RepRTA) against your class list. With such a model you usually don't need `text` mode at all — **`prompt-free` already returns only your baked classes** with high recall. Use `text` + `categories` on top of it only when you want to narrow the output to a subset of those classes.
 
 - **`visual`** — reference-image prompting (SAVPE). Reserved; not yet wired.
 
@@ -179,4 +179,4 @@ Alternatively pass an **absolute path or `file://` URL** as `model` (e.g. a mode
 > ```
 > Then list `"./plugins/with-onnx-models"` in `app.json` `plugins`. (Listing `onnx` in `metro.config.js` `assetExts` only affects `require()`-style loading, not the native name lookup.)
 
-See [`react-viro-onnx`](../../react-viro-onnx/README.md) for installing the inference provider and exporting custom models.
+See [`react-viro-onnx`](https://github.com/ReactVision/react-viro-onnx) for installing the inference provider and exporting custom models.

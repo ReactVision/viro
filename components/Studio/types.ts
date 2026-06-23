@@ -150,7 +150,8 @@ export interface StudioSceneFunction {
     | "SET_VARIABLE"
     | "BRANCH"
     | "API_REQUEST"
-    | "SET_VISIBILITY";
+    | "SET_VISIBILITY"
+    | "SOUND";
   navigation: string | null;
   alert: string | null;
   animation: string | null;
@@ -159,6 +160,7 @@ export interface StudioSceneFunction {
   branch: string | null;
   api_request: string | null;
   set_visibility: string | null;
+  sound: string | null;
   scene_navigation: { id: string; navigate_to: string } | null;
   scene_alert: {
     id: string;
@@ -187,6 +189,16 @@ export interface StudioSceneFunction {
     id: string;
     target_asset_id: string;
     state: "VISIBLE" | "HIDDEN" | "TOGGLE";
+  } | null;
+  scene_sound: {
+    id: string;
+    action: "PLAY" | "STOP";
+    audio_asset_id: string | null;
+    audio_url: string | null;
+    target_asset_id: string | null;
+    volume: number;
+    loop: boolean;
+    stop_other_sounds: boolean;
   } | null;
 }
 

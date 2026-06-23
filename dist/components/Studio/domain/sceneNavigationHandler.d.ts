@@ -1,4 +1,5 @@
 import { StudioAnimation, StudioApiRequestExecutor, StudioSceneFunction } from "../types";
+import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 type SceneNavigator = any;
@@ -29,6 +30,8 @@ export type SequenceRuntimeContext = {
     variableStore?: StudioVariableStore;
     apiRequestExecutor?: StudioApiRequestExecutor;
     visibilityStore?: StudioVisibilityStore;
+    soundManager?: StudioSoundManager;
+    getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
 };
 /**
  * Single dispatcher for all scene function types.

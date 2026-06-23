@@ -16,6 +16,7 @@ import {
   parseExpression,
   valueMatchesType,
 } from "./expressionEvaluator";
+import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 
@@ -145,6 +146,8 @@ export type SequenceRuntimeContext = {
   variableStore?: StudioVariableStore;
   apiRequestExecutor?: StudioApiRequestExecutor;
   visibilityStore?: StudioVisibilityStore;
+  soundManager?: StudioSoundManager;
+  getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
 };
 
 /**
@@ -656,6 +659,42 @@ export function executeFunctionWithRelations(
       return;
     }
     store.apply(sv.target_asset_id, sv.state);
+  } else if (fn.function_type === "SOUND") {
+    // Non-blocking ACTION: PLAY adds a sound (spatial when a target asset gives
+    // a position), STOP removes by clip (null = all). Fire-and-forget like
+    // SET_VISIBILITY; the walk advances immediately. Failure policy: warn + skip.
+    const s = fn.scene_sound;
+    const manager = runtimeCtx?.soundManager;
+    if (!s) return;
+    if (!manager) {
+      console.warn(
+        `[Studio] SOUND function ${fn.id} needs a runtime context (sound manager); skipping.`
+      );
+      return;
+    }
+    if (s.action === "PLAY") {
+      if (!s.audio_url) {
+        // Missing or cross-org clip: the resolve RPC nulls the url org-guarded.
+        console.warn(
+          `[Studio] SOUND function ${fn.id}: PLAY has no audio_url (missing/cross-org clip); skipping.`
+        );
+        return;
+      }
+      const position = s.target_asset_id
+        ? runtimeCtx?.getAssetPosition?.(s.target_asset_id)
+        : undefined;
+      manager.play({
+        // PLAY always has audio_asset_id per the scene_sounds CHECK constraint.
+        audioAssetId: s.audio_asset_id ?? "",
+        url: s.audio_url,
+        position,
+        volume: s.volume,
+        loop: s.loop,
+        stopOthers: s.stop_other_sounds,
+      });
+    } else {
+      manager.stop(s.audio_asset_id ?? null); // null = all sounds
+    }
   }
 }
 

@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioVariableStore = void 0;
 const expressionEvaluator_1 = require("./expressionEvaluator");
-const isDev = () => typeof __DEV__ !== "undefined" && __DEV__;
+const utils_1 = require("./utils");
 /**
  * Per-session variable store. One instance is owned by the navigator and
  * survives scene pushes; it resets only when the AR/VR session ends.
@@ -37,7 +37,7 @@ class StudioVariableStore {
         if (Object.is(this.values.get(name), value))
             return;
         this.values.set(name, value);
-        if (isDev()) {
+        if ((0, utils_1.isDev)()) {
             console.log(`[Studio] Variable "${name}" =`, value);
         }
         this.notify();

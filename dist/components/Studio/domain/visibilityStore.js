@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioVisibilityStore = void 0;
-const isDev = () => typeof __DEV__ !== "undefined" && __DEV__;
+const utils_1 = require("./utils");
 /**
  * Per-scene visibility store, keyed by scene asset placement id. Seeded from
  * each asset's author-time `hidden_on_load` default at scene load; Set
@@ -59,7 +59,7 @@ class StudioVisibilityStore {
         if (this.visible.get(assetId) === next)
             return;
         this.visible.set(assetId, next);
-        if (isDev()) {
+        if ((0, utils_1.isDev)()) {
             console.log(`[Studio] Visibility "${assetId}" =`, next);
         }
         this.notify(assetId);

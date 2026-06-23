@@ -25,6 +25,8 @@ import {
 } from "./domain/sceneNavigationHandler";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioVisibilityStore } from "./domain/visibilityStore";
+import { StudioSoundManager } from "./domain/soundManager";
+import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
@@ -116,14 +118,40 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
+  // ─── Sound manager ────────────────────────────────────────────────────────
+  // Per-scene. PLAY/STOP scene-function actions drive it; <StudioSounds> renders
+  // the active list. Reset on scene change so sounds don't leak across a
+  // navigation (sounds, unlike variables, are not session-scoped).
+  const soundManagerRef = useRef<StudioSoundManager | null>(null);
+  if (soundManagerRef.current === null) {
+    soundManagerRef.current = new StudioSoundManager();
+  }
+  useEffect(() => {
+    soundManagerRef.current?.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
+
+  // Position for a spatial PLAY: look up the placed target asset (matches the
+  // node factory's position derivation, position_z defaulting to -2).
+  const getAssetPosition = useCallback(
+    (assetId: string): [number, number, number] | undefined => {
+      const a = assets.find((x) => x.id === assetId);
+      if (!a) return undefined;
+      return [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2];
+    },
+    [assets]
+  );
+
   const runtimeCtx = useMemo(
     () => ({
       scheduler: schedulerRef.current!,
       variableStore: variableStoreRef.current!,
       apiRequestExecutor: defaultApiRequestExecutor,
       visibilityStore: visibilityStoreRef.current!,
+      soundManager: soundManagerRef.current!,
+      getAssetPosition,
     }),
-    []
+    [getAssetPosition]
   );
 
   // Cancel this scene's pending WAITs before handing off to the next scene.
@@ -508,6 +536,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       <ViroAmbientLight color="#ffffff" intensity={1000} />
       {renderAssets()}
       {renderedImageTriggeredAssets}
+      <StudioSounds manager={soundManagerRef.current!} />
       {assets.length === 0 && (
         <ViroText
           text="No assets to display"

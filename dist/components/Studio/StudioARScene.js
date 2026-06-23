@@ -55,6 +55,8 @@ const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor"
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const visibilityStore_1 = require("./domain/visibilityStore");
+const soundManager_1 = require("./domain/soundManager");
+const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
@@ -112,12 +114,34 @@ const StudioARSceneInner = (props) => {
         visibilityStoreRef.current?.reseed(assets);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
+    // ─── Sound manager ────────────────────────────────────────────────────────
+    // Per-scene. PLAY/STOP scene-function actions drive it; <StudioSounds> renders
+    // the active list. Reset on scene change so sounds don't leak across a
+    // navigation (sounds, unlike variables, are not session-scoped).
+    const soundManagerRef = (0, react_1.useRef)(null);
+    if (soundManagerRef.current === null) {
+        soundManagerRef.current = new soundManager_1.StudioSoundManager();
+    }
+    (0, react_1.useEffect)(() => {
+        soundManagerRef.current?.reset();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
+    // Position for a spatial PLAY: look up the placed target asset (matches the
+    // node factory's position derivation, position_z defaulting to -2).
+    const getAssetPosition = (0, react_1.useCallback)((assetId) => {
+        const a = assets.find((x) => x.id === assetId);
+        if (!a)
+            return undefined;
+        return [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2];
+    }, [assets]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
         variableStore: variableStoreRef.current,
         apiRequestExecutor: defaultApiRequestExecutor_1.defaultApiRequestExecutor,
         visibilityStore: visibilityStoreRef.current,
-    }), []);
+        soundManager: soundManagerRef.current,
+        getAssetPosition,
+    }), [getAssetPosition]);
     // Cancel this scene's pending WAITs before handing off to the next scene.
     const handleSceneChange = (0, react_1.useCallback)((sceneId, sceneName) => {
         schedulerRef.current?.cancelAll();
@@ -383,6 +407,7 @@ const StudioARSceneInner = (props) => {
       <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
       {renderAssets()}
       {renderedImageTriggeredAssets}
+      <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_1.ViroText text="No assets to display" position={[0, 0, -2]} style={{
                 fontFamily: "Arial",
                 fontSize: 16,

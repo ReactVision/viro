@@ -3,8 +3,7 @@ import {
   StudioVariableValue,
   valueMatchesType,
 } from "./expressionEvaluator";
-
-const isDev = (): boolean => typeof __DEV__ !== "undefined" && __DEV__;
+import { isDev } from "./utils";
 
 /**
  * Per-session variable store. One instance is owned by the navigator and

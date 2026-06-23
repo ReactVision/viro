@@ -149,7 +149,8 @@ export interface StudioSceneFunction {
     | "SEQUENCE"
     | "SET_VARIABLE"
     | "BRANCH"
-    | "API_REQUEST";
+    | "API_REQUEST"
+    | "SET_VISIBILITY";
   navigation: string | null;
   alert: string | null;
   animation: string | null;
@@ -157,6 +158,7 @@ export interface StudioSceneFunction {
   set_variable: string | null;
   branch: string | null;
   api_request: string | null;
+  set_visibility: string | null;
   scene_navigation: { id: string; navigate_to: string } | null;
   scene_alert: {
     id: string;
@@ -181,6 +183,11 @@ export interface StudioSceneFunction {
   } | null;
   scene_branch: StudioSceneBranch | null;
   scene_api_request: StudioSceneApiRequest | null;
+  scene_set_visibility: {
+    id: string;
+    target_asset_id: string;
+    state: "VISIBLE" | "HIDDEN" | "TOGGLE";
+  } | null;
 }
 
 export interface StudioAsset {
@@ -200,6 +207,8 @@ export interface StudioAsset {
   latitude: number | null;
   longitude: number | null;
   is_draggable: boolean;
+  /** Author-time "hidden on start"; the runtime seeds visibility from it. */
+  hidden_on_load: boolean | null;
   trigger_image_url: string | null;
   trigger_image_orientation: "Up" | "Down" | "Left" | "Right" | null;
   trigger_image_physical_width_m: number | null;

@@ -1,5 +1,6 @@
 import { StudioAnimation, StudioApiRequestExecutor, StudioSceneFunction } from "../types";
 import { StudioVariableStore } from "./variableStore";
+import { StudioVisibilityStore } from "./visibilityStore";
 type SceneNavigator = any;
 export declare class SequenceScheduler {
     private timers;
@@ -27,6 +28,7 @@ export type SequenceRuntimeContext = {
     scheduler: SequenceScheduler;
     variableStore?: StudioVariableStore;
     apiRequestExecutor?: StudioApiRequestExecutor;
+    visibilityStore?: StudioVisibilityStore;
 };
 /**
  * Single dispatcher for all scene function types.

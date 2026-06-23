@@ -58,6 +58,14 @@ export declare const extractPlaceholders: (template: string) => string[];
  */
 export declare const validateTemplateString: (template: string) => TemplateValidation;
 export type ValueLookup = (name: string) => ApiPrimitiveValue | undefined;
+/**
+ * Fail-soft interpolation for display strings (alert title / message). Unlike
+ * the request templates this never errors: a well-formed {{name}} whose value
+ * is missing is left verbatim, so a stale or mistyped reference stays visible
+ * rather than blanking the field or suppressing the whole alert. Malformed
+ * braces (not a valid placeholder) are left untouched.
+ */
+export declare const interpolateDisplayTemplate: (template: string, get: ValueLookup) => string;
 export type UrlTemplateValidation = {
     ok: true;
     host: string;

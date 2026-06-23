@@ -13,14 +13,34 @@ const isDev = () => typeof __DEV__ !== "undefined" && __DEV__;
  */
 class StudioVariableStore {
     values = new Map();
+    listeners = new Set();
     get(name) {
         return this.values.get(name);
     }
+    /**
+     * Subscribe to value changes (set/reset); returns an unsubscribe fn. Reactive
+     * TEXT nodes use this to repaint when a referenced variable changes.
+     */
+    subscribe(listener) {
+        this.listeners.add(listener);
+        return () => {
+            this.listeners.delete(listener);
+        };
+    }
+    notify() {
+        // Snapshot first: a listener may (un)subscribe during its own callback.
+        [...this.listeners].forEach((fn) => fn());
+    }
     set(name, value) {
+        // Values are primitives; skip the no-op write so unchanged values don't
+        // log or wake subscribers.
+        if (Object.is(this.values.get(name), value))
+            return;
         this.values.set(name, value);
         if (isDev()) {
             console.log(`[Studio] Variable "${name}" =`, value);
         }
+        this.notify();
     }
     seed(declarations) {
         for (const decl of declarations) {
@@ -42,6 +62,7 @@ class StudioVariableStore {
     }
     reset() {
         this.values.clear();
+        this.notify();
     }
     snapshot() {
         const out = {};

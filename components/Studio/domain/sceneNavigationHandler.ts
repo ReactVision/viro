@@ -17,6 +17,7 @@ import {
   valueMatchesType,
 } from "./expressionEvaluator";
 import { StudioVariableStore } from "./variableStore";
+import { StudioVisibilityStore } from "./visibilityStore";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
@@ -143,6 +144,7 @@ export type SequenceRuntimeContext = {
   scheduler: SequenceScheduler;
   variableStore?: StudioVariableStore;
   apiRequestExecutor?: StudioApiRequestExecutor;
+  visibilityStore?: StudioVisibilityStore;
 };
 
 /**
@@ -639,6 +641,21 @@ export function executeFunctionWithRelations(
       finish,
       finish
     );
+  } else if (fn.function_type === "SET_VISIBILITY") {
+    // Instant show / hide / toggle. Fire-and-forget: as a sequence step it
+    // dispatches and the walk advances immediately (no duration to wait on).
+    // TOGGLE reads the live runtime value from the store, never the author
+    // default. Failure policy: warn + skip, never throw.
+    const sv = fn.scene_set_visibility;
+    const store = runtimeCtx?.visibilityStore;
+    if (!sv) return;
+    if (!store) {
+      console.warn(
+        `[Studio] SET_VISIBILITY function ${fn.id} needs a runtime context (visibility store); skipping.`
+      );
+      return;
+    }
+    store.apply(sv.target_asset_id, sv.state);
   }
 }
 

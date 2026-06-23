@@ -54,6 +54,7 @@ const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
+const visibilityStore_1 = require("./domain/visibilityStore");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
@@ -97,12 +98,25 @@ const StudioARSceneInner = (props) => {
         variableStoreRef.current = variableStore ?? new variableStore_1.StudioVariableStore();
         variableStoreRef.current.seed(sceneData.variables ?? []);
     }
+    // ─── Visibility store ─────────────────────────────────────────────────────
+    // Scene-scoped (asset placements are per-scene), keyed by asset id. Seeded
+    // from each asset's author-time hidden_on_load default; Set Visibility
+    // actions flip it at runtime. Re-seeded on scene change so a persisted
+    // instance doesn't carry stale visibility across a navigation.
+    const visibilityStoreRef = (0, react_1.useRef)(null);
+    if (visibilityStoreRef.current === null) {
+        visibilityStoreRef.current = new visibilityStore_1.StudioVisibilityStore();
+        visibilityStoreRef.current.seed(assets);
+    }
+    (0, react_1.useEffect)(() => {
+        visibilityStoreRef.current?.reseed(assets);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
         variableStore: variableStoreRef.current,
-        // Seamless API_REQUEST transport: native RVApiKey POST to the egress
-        // proxy. No host setup required.
         apiRequestExecutor: defaultApiRequestExecutor_1.defaultApiRequestExecutor,
+        visibilityStore: visibilityStoreRef.current,
     }), []);
     // Cancel this scene's pending WAITs before handing off to the next scene.
     const handleSceneChange = (0, react_1.useCallback)((sceneId, sceneName) => {
@@ -140,7 +154,10 @@ const StudioARSceneInner = (props) => {
     const triggerAnimation = (0, react_1.useCallback)((targetAssetId, animationKey) => {
         // Viro's animation prop is edge-triggered on false→true. Force false first,
         // then flip to true on the next frame so a re-trigger of the same key fires.
-        setAnimOverrides((prev) => ({ ...prev, [targetAssetId]: { key: animationKey, run: false } }));
+        setAnimOverrides((prev) => ({
+            ...prev,
+            [targetAssetId]: { key: animationKey, run: false },
+        }));
         const handle = requestAnimationFrame(() => {
             triggerHandlesRef.current.delete(handle);
             setAnimOverrides((prev) => {
@@ -193,7 +210,15 @@ const StudioARSceneInner = (props) => {
             };
         }
         return states;
-    }, [animations, animOverrides, loadedAssetIds, functions, sceneNavigator, handleSceneChange, runtimeCtx]);
+    }, [
+        animations,
+        animOverrides,
+        loadedAssetIds,
+        functions,
+        sceneNavigator,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
     // ─── on_load_function ─────────────────────────────────────────────────────
     const onLoadExecutedRef = (0, react_1.useRef)(false);
     (0, react_1.useEffect)(() => {
@@ -226,7 +251,14 @@ const StudioARSceneInner = (props) => {
         if (!collisionAssetIds.has(placementId))
             return undefined;
         return (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(placementId, bindingsByPairKey, sceneNavigator, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
-    }, [bindingsByPairKey, collisionAssetIds, sceneNavigator, animations, handleSceneChange, runtimeCtx]);
+    }, [
+        bindingsByPairKey,
+        collisionAssetIds,
+        sceneNavigator,
+        animations,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
     // ─── Trigger image targets ────────────────────────────────────────────────
     const { planeAssets, imageTriggeredAssets } = (0, react_1.useMemo)(() => {
         const plane = assets.filter((a) => !a.trigger_image_url);
@@ -258,7 +290,9 @@ const StudioARSceneInner = (props) => {
         };
     }, [imageTriggeredAssets]);
     // ─── Ready callback ───────────────────────────────────────────────────────
-    (0, react_1.useEffect)(() => { onReady?.(); }, []);
+    (0, react_1.useEffect)(() => {
+        onReady?.();
+    }, []);
     // ─── Render helpers ───────────────────────────────────────────────────────
     const maxModels = react_native_1.Platform.OS === "android" ? ANDROID_MAX_3D_MODELS : IOS_MAX_3D_MODELS;
     const renderedPlaneAssets = (0, react_1.useMemo)(() => {
@@ -275,7 +309,17 @@ const StudioARSceneInner = (props) => {
             return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), handleSceneChange, runtimeCtx);
         })
             .filter(Boolean);
-    }, [planeAssets, sceneNavigator, animations, animationStates, handleAssetLoaded, getCollisionHandler, maxModels, handleSceneChange, runtimeCtx]);
+    }, [
+        planeAssets,
+        sceneNavigator,
+        animations,
+        animationStates,
+        handleAssetLoaded,
+        getCollisionHandler,
+        maxModels,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
     const renderedImageTriggeredAssets = (0, react_1.useMemo)(() => {
         if (ViroPlatform_1.isQuest)
             return [];
@@ -292,7 +336,17 @@ const StudioARSceneInner = (props) => {
           </ViroARImageMarker_1.ViroARImageMarker>);
         })
             .filter(Boolean);
-    }, [urlToTargetName, imageTriggeredAssets, sceneNavigator, animations, animationStates, handleAssetLoaded, getCollisionHandler, handleSceneChange, runtimeCtx]);
+    }, [
+        urlToTargetName,
+        imageTriggeredAssets,
+        sceneNavigator,
+        animations,
+        animationStates,
+        handleAssetLoaded,
+        getCollisionHandler,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
     // ─── Plane detection (AR only) ────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
@@ -320,14 +374,21 @@ const StudioARSceneInner = (props) => {
     const physicsWorld = physicsWorldConfig?.enabled
         ? (0, physicsConfig_1.buildViroPhysicsWorld)(physicsWorldConfig)
         : undefined;
-    const physicsProps = physicsWorld ? { physicsWorld: physicsWorld } : {};
+    const physicsProps = physicsWorld
+        ? { physicsWorld: physicsWorld }
+        : {};
     // ─── Render ───────────────────────────────────────────────────────────────
     const children = (<>
       {ViroPlatform_1.isQuest && <ViroController_1.ViroController controllerVisibility reticleVisibility/>}
       <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
       {renderAssets()}
       {renderedImageTriggeredAssets}
-      {assets.length === 0 && (<ViroText_1.ViroText text="No assets to display" position={[0, 0, -2]} style={{ fontFamily: "Arial", fontSize: 16, color: "#CCCCCC", textAlign: "center" }}/>)}
+      {assets.length === 0 && (<ViroText_1.ViroText text="No assets to display" position={[0, 0, -2]} style={{
+                fontFamily: "Arial",
+                fontSize: 16,
+                color: "#CCCCCC",
+                textAlign: "center",
+            }}/>)}
     </>);
     if (ViroPlatform_1.isQuest) {
         return <ViroScene_1.ViroScene {...physicsProps}>{children}</ViroScene_1.ViroScene>;

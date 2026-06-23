@@ -24,6 +24,7 @@ import {
   SequenceScheduler,
 } from "./domain/sceneNavigationHandler";
 import { StudioVariableStore } from "./domain/variableStore";
+import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
@@ -100,11 +101,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     variableStoreRef.current.seed(sceneData.variables ?? []);
   }
 
+  // ─── Visibility store ─────────────────────────────────────────────────────
+  // Scene-scoped (asset placements are per-scene), keyed by asset id. Seeded
+  // from each asset's author-time hidden_on_load default; Set Visibility
+  // actions flip it at runtime. Re-seeded on scene change so a persisted
+  // instance doesn't carry stale visibility across a navigation.
+  const visibilityStoreRef = useRef<StudioVisibilityStore | null>(null);
+  if (visibilityStoreRef.current === null) {
+    visibilityStoreRef.current = new StudioVisibilityStore();
+    visibilityStoreRef.current.seed(assets);
+  }
+  useEffect(() => {
+    visibilityStoreRef.current?.reseed(assets);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
+
   const runtimeCtx = useMemo(
     () => ({
       scheduler: schedulerRef.current!,
       variableStore: variableStoreRef.current!,
       apiRequestExecutor: defaultApiRequestExecutor,
+      visibilityStore: visibilityStoreRef.current!,
     }),
     []
   );

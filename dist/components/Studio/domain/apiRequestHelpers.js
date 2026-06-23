@@ -24,7 +24,7 @@
  *     structural injection impossible.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.applyBindings = exports.coerceBindingValue = exports.extractByPath = exports.validateSelector = exports.isHostAllowlisted = exports.matchHostPattern = exports.interpolateJsonBody = exports.validateBodyTemplate = exports.interpolateHeaders = exports.validateHeaderTemplates = exports.isForbiddenHeaderName = exports.HEADER_NAME_PATTERN = exports.interpolateUrlTemplate = exports.validateUrlTemplate = exports.validateTemplateString = exports.extractPlaceholders = exports.API_REQUEST_METHODS = exports.API_REQUEST_MAX_VARIABLE_VALUE_LENGTH = exports.API_REQUEST_MAX_VARIABLES = exports.API_REQUEST_MAX_SELECTOR_LENGTH = exports.API_REQUEST_MAX_BODY_LENGTH = exports.API_REQUEST_MAX_URL_LENGTH = exports.API_REQUEST_TIMEOUT_DEFAULT_MS = exports.API_REQUEST_TIMEOUT_MAX_MS = exports.API_REQUEST_TIMEOUT_MIN_MS = void 0;
+exports.applyBindings = exports.coerceBindingValue = exports.extractByPath = exports.validateSelector = exports.isHostAllowlisted = exports.matchHostPattern = exports.interpolateJsonBody = exports.validateBodyTemplate = exports.interpolateHeaders = exports.validateHeaderTemplates = exports.isForbiddenHeaderName = exports.HEADER_NAME_PATTERN = exports.interpolateUrlTemplate = exports.validateUrlTemplate = exports.interpolateDisplayTemplate = exports.validateTemplateString = exports.extractPlaceholders = exports.API_REQUEST_METHODS = exports.API_REQUEST_MAX_VARIABLE_VALUE_LENGTH = exports.API_REQUEST_MAX_VARIABLES = exports.API_REQUEST_MAX_SELECTOR_LENGTH = exports.API_REQUEST_MAX_BODY_LENGTH = exports.API_REQUEST_MAX_URL_LENGTH = exports.API_REQUEST_TIMEOUT_DEFAULT_MS = exports.API_REQUEST_TIMEOUT_MAX_MS = exports.API_REQUEST_TIMEOUT_MIN_MS = void 0;
 exports.API_REQUEST_TIMEOUT_MIN_MS = 1000;
 exports.API_REQUEST_TIMEOUT_MAX_MS = 30000;
 exports.API_REQUEST_TIMEOUT_DEFAULT_MS = 10000;
@@ -84,6 +84,18 @@ const substitute = (template, get, encode) => {
         return fail(`Unknown variable {{${missing}}}`);
     return { ok: true, value };
 };
+/**
+ * Fail-soft interpolation for display strings (alert title / message). Unlike
+ * the request templates this never errors: a well-formed {{name}} whose value
+ * is missing is left verbatim, so a stale or mistyped reference stays visible
+ * rather than blanking the field or suppressing the whole alert. Malformed
+ * braces (not a valid placeholder) are left untouched.
+ */
+const interpolateDisplayTemplate = (template, get) => template.replace(PLACEHOLDER_GLOBAL, (whole, name) => {
+    const resolved = get(name);
+    return resolved === undefined ? whole : String(resolved);
+});
+exports.interpolateDisplayTemplate = interpolateDisplayTemplate;
 // ── URL templates ───────────────────────────────────────────────────────────
 // Static origin grammar: https://host[:port] with >= 2 lowercase ASCII labels
 // (same grammar as allowlist patterns; IDNs must be pre-punycoded).

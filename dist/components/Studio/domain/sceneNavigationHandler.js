@@ -106,9 +106,9 @@ function resolveById(id, fns) {
 }
 /**
  * Walks an ordered step list with two continuations: onDone when the list
- * completes, onAbort on early termination (NAVIGATION leaves the scene; the
- * top caller releases its beginSequence guard either way, so a failed async
- * navigation can't leave a sequence permanently blocked).
+ * completes, onAbort on early termination (NAVIGATION leaves the scene, STOP
+ * halts in place; the top caller releases its beginSequence guard either way,
+ * so a failed async navigation can't leave a sequence permanently blocked).
  */
 function runSteps(steps, deps, onDone, onAbort) {
     const ordered = [...steps].sort((a, b) => a.step_order - b.step_order);
@@ -123,6 +123,14 @@ function runSteps(steps, deps, onDone, onAbort) {
             deps.runtimeCtx.scheduler.schedule(() => runStep(i + 1), step.duration_ms ?? 0);
             return;
         }
+        if (step.step_type === "STOP") {
+            // Explicit terminal: halt the whole run. onAbort is threaded unchanged
+            // through every nested arm (branch/api/run-sequence), so it skips the
+            // outer continuations straight to the top beginSequence guard release —
+            // a STOP inside an arm ends the entire sequence, not just that arm.
+            onAbort();
+            return;
+        }
         // ACTION: dispatch the action, then advance.
         if (step.function) {
             // BRANCH needs the continuation: the outer list resumes only after the
@@ -135,6 +143,13 @@ function runSteps(steps, deps, onDone, onAbort) {
             // resolves and the chosen outcome arm completes.
             if (step.function.function_type === "API_REQUEST") {
                 runApiRequest(step.function, deps, () => runStep(i + 1), onAbort);
+                return;
+            }
+            // RUN_SEQUENCE: a step referencing a named SEQUENCE function runs that
+            // sequence's steps inline (not begin-guarded, like an arm); the outer
+            // list resumes only after it completes. The depth guard bounds chains.
+            if (step.function.function_type === "SEQUENCE") {
+                runReferencedSequence(step.function, deps, () => runStep(i + 1), onAbort);
                 return;
             }
             executeFunctionWithRelations(step.function, deps.sceneNavigator, deps.animations, deps.onAnimationTrigger, deps.depth + 1, deps.onSceneChange, deps.runtimeCtx);
@@ -159,8 +174,10 @@ function runSteps(steps, deps, onDone, onAbort) {
     runStep(0);
 }
 /**
- * Evaluates a BRANCH condition and runs the chosen arm like a nested sequence.
- * Failure policy: warn + skip both arms + continue the outer list, never throw.
+ * Evaluates a BRANCH's conditions in eval order (first match wins) and runs the
+ * matched arm, or the no-match arm if none match, like a nested sequence.
+ * Failure policy: a condition that fails to evaluate warns and is treated as
+ * not matched (fall through to the next condition); never throws.
  */
 function runBranch(fn, deps, onDone, onAbort) {
     const branch = fn.scene_branch;
@@ -180,23 +197,50 @@ function runBranch(fn, deps, onDone, onAbort) {
         onDone();
         return;
     }
-    const result = (0, expressionEvaluator_1.evaluateBranchCondition)({
-        comparison: branch.comparison,
-        variable_name: branch.variable_name,
-        compare_literal: branch.compare_literal,
-        compare_variable_name: branch.compare_variable_name,
-    }, (name) => store.get(name));
-    if (!result.ok) {
-        console.warn(`[Studio] BRANCH ${branch.id}: ${result.error}; skipping both arms.`);
-        onDone();
-        return;
+    const conditions = [...branch.conditions].sort((a, b) => a.eval_order - b.eval_order);
+    for (const condition of conditions) {
+        const result = (0, expressionEvaluator_1.evaluateBranchCondition)({
+            comparison: condition.comparison,
+            variable_name: condition.variable_name,
+            compare_literal: condition.compare_literal,
+            compare_variable_name: condition.compare_variable_name,
+        }, (name) => store.get(name));
+        if (!result.ok) {
+            console.warn(`[Studio] BRANCH ${branch.id} condition ${condition.eval_order}: ${result.error}; treating as not matched.`);
+            continue;
+        }
+        if (result.value) {
+            runSteps(condition.sequence.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+            return;
+        }
     }
-    const arm = result.value ? branch.then_sequence : branch.else_sequence;
+    // No condition matched: run the no-match arm if present, else continue.
+    const arm = branch.no_match_sequence;
     if (!arm) {
         onDone();
         return;
     }
     runSteps(arm.steps, { ...deps, depth: branchDepth }, onDone, onAbort);
+}
+/**
+ * Runs a named SEQUENCE function's steps inline as a Run Sequence step. Unlike
+ * a trigger-dispatched sequence it is NOT begin-guarded (it composes like a
+ * branch arm); the depth guard bounds reference chains the editor's cycle
+ * filter and the resolve RPC also defend against.
+ */
+function runReferencedSequence(fn, deps, onDone, onAbort) {
+    const seq = fn.scene_sequence;
+    if (!seq) {
+        onDone();
+        return;
+    }
+    const seqDepth = deps.depth + 1;
+    if (seqDepth > ANIMATION_CHAIN_MAX_DEPTH) {
+        console.warn(`[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for sequence ${seq.id}.`);
+        onDone();
+        return;
+    }
+    runSteps(seq.steps, { ...deps, depth: seqDepth }, onDone, onAbort);
 }
 /**
  * Executes an API_REQUEST through the injected executor and runs the matching
@@ -244,7 +288,9 @@ function runApiRequest(fn, deps, onDone, onAbort) {
         else if ((apiRequest.bindings ?? []).length > 0) {
             console.warn(`[Studio] API_REQUEST ${apiRequest.id}: no variable store; bindings skipped.`);
         }
-        const arm = outcome.ok ? apiRequest.success_sequence : apiRequest.failure_sequence;
+        const arm = outcome.ok
+            ? apiRequest.success_sequence
+            : apiRequest.failure_sequence;
         if (!arm) {
             onDone();
             return;
@@ -300,7 +346,14 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         if (!runtimeCtx.scheduler.beginSequence(seq.id))
             return;
         const finish = () => runtimeCtx.scheduler.endSequence(seq.id);
-        runSteps(seq.steps, { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth }, finish, finish);
+        runSteps(seq.steps, {
+            sceneNavigator,
+            animations,
+            onAnimationTrigger,
+            onSceneChange,
+            runtimeCtx,
+            depth,
+        }, finish, finish);
         return;
     }
     if (fn.function_type === "NAVIGATION") {
@@ -310,18 +363,22 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange, runtimeCtx?.variableStore);
     }
     else if (fn.function_type === "ALERT") {
-        const alrt = fn.scene_alert;
-        if (!alrt)
+        const alert = fn.scene_alert;
+        if (!alert)
             return;
+        // Fail-soft {{variable}} interpolation: unresolved names stay literal so a
+        // stale reference never blanks or suppresses the alert.
+        const store = runtimeCtx?.variableStore;
+        const fill = (s) => s ? (0, apiRequestHelpers_1.interpolateDisplayTemplate)(s, (name) => store?.get(name)) : "";
+        const title = fill(alert.alert_title);
+        const message = fill(alert.alert_message);
         if (ViroPlatform_1.isQuest) {
             // Alert.alert shows a 2D panel dialog — invisible in the VR compositor.
             // Log it so it's not silently swallowed; in-scene VR alert UI is a TODO.
-            console.warn(`[Studio] Alert (Quest — not shown in VR): "${alrt.alert_title}" — ${alrt.alert_message}`);
+            console.warn(`[Studio] Alert (Quest — not shown in VR): "${title}" — ${message}`);
             return;
         }
-        react_native_1.Alert.alert(alrt.alert_title ?? "Alert", alrt.alert_message ?? "", [
-            { text: "OK", style: "default" },
-        ]);
+        react_native_1.Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);
     }
     else if (fn.function_type === "ANIMATION") {
         const anim = fn.scene_animation;
@@ -375,7 +432,14 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         if (!runtimeCtx.scheduler.beginSequence(branch.id))
             return;
         const finish = () => runtimeCtx.scheduler.endSequence(branch.id);
-        runBranch(fn, { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth }, finish, finish);
+        runBranch(fn, {
+            sceneNavigator,
+            animations,
+            onAnimationTrigger,
+            onSceneChange,
+            runtimeCtx,
+            depth,
+        }, finish, finish);
     }
     else if (fn.function_type === "API_REQUEST") {
         // Authored in-sequence (runSteps dispatches it there with the outer
@@ -392,7 +456,29 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         if (!runtimeCtx.scheduler.beginSequence(apiRequest.id))
             return;
         const finish = () => runtimeCtx.scheduler.endSequence(apiRequest.id);
-        runApiRequest(fn, { sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx, depth }, finish, finish);
+        runApiRequest(fn, {
+            sceneNavigator,
+            animations,
+            onAnimationTrigger,
+            onSceneChange,
+            runtimeCtx,
+            depth,
+        }, finish, finish);
+    }
+    else if (fn.function_type === "SET_VISIBILITY") {
+        // Instant show / hide / toggle. Fire-and-forget: as a sequence step it
+        // dispatches and the walk advances immediately (no duration to wait on).
+        // TOGGLE reads the live runtime value from the store, never the author
+        // default. Failure policy: warn + skip, never throw.
+        const sv = fn.scene_set_visibility;
+        const store = runtimeCtx?.visibilityStore;
+        if (!sv)
+            return;
+        if (!store) {
+            console.warn(`[Studio] SET_VISIBILITY function ${fn.id} needs a runtime context (visibility store); skipping.`);
+            return;
+        }
+        store.apply(sv.target_asset_id, sv.state);
     }
 }
 /**

@@ -18,11 +18,14 @@ export interface StudioProjectMeta {
     id: string;
     occlusion_mode: "NONE" | "PEOPLEONLY" | "DEPTHBASED";
 }
-/** One ordered step of a Sequence: an ACTION (runs a function) or a WAIT (timed pause). */
+/**
+ * One ordered step of a Sequence: an ACTION (runs a function), a WAIT (timed
+ * pause), or a STOP (explicit terminal — the run halts here).
+ */
 export interface StudioSequenceStep {
     id: string;
     step_order: number;
-    step_type: "ACTION" | "WAIT";
+    step_type: "ACTION" | "WAIT" | "STOP";
     duration_ms: number | null;
     function_id: string | null;
     function: StudioSceneFunction | null;
@@ -40,11 +43,13 @@ export interface StudioSceneVariable {
     initial_value: boolean | number | string;
 }
 /**
- * BRANCH payload. Variable names/types are joined from scene_variables so they
- * follow renames. Arms are owned, headless sequences run like nested sequences.
+ * One ordered predicate arm of a BRANCH. Variable names/types are joined from
+ * project_variables so they follow renames. The arm is an owned, headless
+ * sequence run like a nested sequence.
  */
-export interface StudioSceneBranch {
+export interface StudioBranchCondition {
     id: string;
+    eval_order: number;
     variable_id: string;
     variable_name: string;
     variable_type: "BOOLEAN" | "NUMBER" | "STRING";
@@ -53,8 +58,17 @@ export interface StudioSceneBranch {
     compare_variable_id: string | null;
     compare_variable_name: string | null;
     compare_variable_type: "BOOLEAN" | "NUMBER" | "STRING" | null;
-    then_sequence: StudioSequence;
-    else_sequence: StudioSequence | null;
+    sequence: StudioSequence;
+}
+/**
+ * BRANCH payload. Conditions are evaluated in eval_order (first match wins),
+ * falling through to the optional no-match arm. Arms are owned, headless
+ * sequences run like nested sequences.
+ */
+export interface StudioSceneBranch {
+    id: string;
+    conditions: StudioBranchCondition[];
+    no_match_sequence: StudioSequence | null;
 }
 /** One response->variable binding of an API_REQUEST function. */
 export interface StudioApiRequestBinding {
@@ -105,7 +119,7 @@ export type StudioApiRequestExecutor = (functionId: string, variables: Record<st
 export interface StudioSceneFunction {
     id: string;
     scene: string;
-    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH" | "API_REQUEST";
+    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH" | "API_REQUEST" | "SET_VISIBILITY";
     navigation: string | null;
     alert: string | null;
     animation: string | null;
@@ -113,6 +127,7 @@ export interface StudioSceneFunction {
     set_variable: string | null;
     branch: string | null;
     api_request: string | null;
+    set_visibility: string | null;
     scene_navigation: {
         id: string;
         navigate_to: string;
@@ -140,6 +155,11 @@ export interface StudioSceneFunction {
     } | null;
     scene_branch: StudioSceneBranch | null;
     scene_api_request: StudioSceneApiRequest | null;
+    scene_set_visibility: {
+        id: string;
+        target_asset_id: string;
+        state: "VISIBLE" | "HIDDEN" | "TOGGLE";
+    } | null;
 }
 export interface StudioAsset {
     id: string;
@@ -158,6 +178,8 @@ export interface StudioAsset {
     latitude: number | null;
     longitude: number | null;
     is_draggable: boolean;
+    /** Author-time "hidden on start"; the runtime seeds visibility from it. */
+    hidden_on_load: boolean | null;
     trigger_image_url: string | null;
     trigger_image_orientation: "Up" | "Down" | "Left" | "Right" | null;
     trigger_image_physical_width_m: number | null;

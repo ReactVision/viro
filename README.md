@@ -45,6 +45,14 @@ For Expo projects, the easiest way to start is to clone the official starter kit
 
 For step-by-step setup instructions, including platform-specific permissions and build configuration, see the full installation guide in the docs: <https://viro-community.readme.io/docs/installation-instructions>
 
+## MCP Server
+
+If you're building AR, VR or XR apps with ViroReact, our MCP server is the fastest way to get moving. Think of it as a living guide to ViroReact, always current, that plugs straight into the tools you already use.
+
+Connect it to Claude, Codex, Cursor or any other coding agent, and your agent instantly understands how to work with ViroReact's cross-platform rendering. No hunting through docs, no guesswork. (Our documentation is still a great companion, but the MCP is the most up to date source there is.)
+
+[MCP Setup Instructions](https://viro-community.readme.io/docs/viroreact-mcp-server)
+
 ## Features
 
 ViroReact ships with a complete spatial computing toolkit out of the box — no third-party plugins, no paid add-ons.

@@ -78,7 +78,7 @@
     "jest": "^29.7.0",
     "react": "~19.2.3",
     "react-native": "~0.85.3",
-    "release-it": "^17.1.1",
+    "release-it": "^20.2.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
   },

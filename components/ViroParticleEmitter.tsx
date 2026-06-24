@@ -344,6 +344,7 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
       };
       nativeProps.particleAppearance.rotation = newAppearanceRotMod;
     }
+    nativeProps.onClick = undefined;
     nativeProps.ref = (component: ViroNativeRef) => {
       this._component = component;
     };

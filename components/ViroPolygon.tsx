@@ -104,6 +104,7 @@ export class ViroPolygon extends ViroBase<Props> {
     nativeProps.style = [this.props.style];
     nativeProps.onHoverViro = this._onHover;
     nativeProps.onClickViro = this._onClickState;
+    nativeProps.onClick = undefined;
     nativeProps.onTouchViro = this._onTouch;
     nativeProps.onScrollViro = this._onScroll;
     nativeProps.onSwipeViro = this._onSwipe;

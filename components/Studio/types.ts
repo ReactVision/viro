@@ -35,6 +35,9 @@ export interface StudioSequenceStep {
   duration_ms: number | null; // set for WAIT
   function_id: string | null; // set for ACTION
   function: StudioSceneFunction | null; // resolved child for ACTION; null for WAIT/STOP
+  // false (default) = wait for this step's effect to finish before the next
+  // step; true = fire-and-forget. Ignored for instant/terminal kinds.
+  advance_immediately: boolean;
 }
 
 export interface StudioSequence {
@@ -87,6 +90,16 @@ export interface StudioSceneBranch {
   id: string;
   conditions: StudioBranchCondition[];
   no_match_sequence: StudioSequence | null;
+}
+
+/**
+ * GROUP payload. Owns N lanes, each an owned headless sequence run like a
+ * nested sequence. Lanes run concurrently; the group completes when all lanes
+ * complete (barrier join).
+ */
+export interface StudioSceneGroup {
+  id: string;
+  lanes: { lane_order: number; sequence: StudioSequence }[];
 }
 
 /** One response->variable binding of an API_REQUEST function. */
@@ -151,7 +164,8 @@ export interface StudioSceneFunction {
     | "BRANCH"
     | "API_REQUEST"
     | "SET_VISIBILITY"
-    | "SOUND";
+    | "SOUND"
+    | "GROUP";
   navigation: string | null;
   alert: string | null;
   animation: string | null;
@@ -161,6 +175,8 @@ export interface StudioSceneFunction {
   api_request: string | null;
   set_visibility: string | null;
   sound: string | null;
+  // Named group_fn because `group` is a reserved SQL keyword.
+  group_fn: string | null;
   scene_navigation: { id: string; navigate_to: string } | null;
   scene_alert: {
     id: string;
@@ -200,6 +216,7 @@ export interface StudioSceneFunction {
     loop: boolean;
     stop_other_sounds: boolean;
   } | null;
+  scene_group: StudioSceneGroup | null;
 }
 
 export interface StudioAsset {

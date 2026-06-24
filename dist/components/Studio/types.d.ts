@@ -29,6 +29,7 @@ export interface StudioSequenceStep {
     duration_ms: number | null;
     function_id: string | null;
     function: StudioSceneFunction | null;
+    advance_immediately: boolean;
 }
 export interface StudioSequence {
     id: string;
@@ -69,6 +70,18 @@ export interface StudioSceneBranch {
     id: string;
     conditions: StudioBranchCondition[];
     no_match_sequence: StudioSequence | null;
+}
+/**
+ * GROUP payload. Owns N lanes, each an owned headless sequence run like a
+ * nested sequence. Lanes run concurrently; the group completes when all lanes
+ * complete (barrier join).
+ */
+export interface StudioSceneGroup {
+    id: string;
+    lanes: {
+        lane_order: number;
+        sequence: StudioSequence;
+    }[];
 }
 /** One response->variable binding of an API_REQUEST function. */
 export interface StudioApiRequestBinding {
@@ -119,7 +132,7 @@ export type StudioApiRequestExecutor = (functionId: string, variables: Record<st
 export interface StudioSceneFunction {
     id: string;
     scene: string;
-    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH" | "API_REQUEST" | "SET_VISIBILITY" | "SOUND";
+    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH" | "API_REQUEST" | "SET_VISIBILITY" | "SOUND" | "GROUP";
     navigation: string | null;
     alert: string | null;
     animation: string | null;
@@ -129,6 +142,7 @@ export interface StudioSceneFunction {
     api_request: string | null;
     set_visibility: string | null;
     sound: string | null;
+    group_fn: string | null;
     scene_navigation: {
         id: string;
         navigate_to: string;
@@ -171,6 +185,7 @@ export interface StudioSceneFunction {
         loop: boolean;
         stop_other_sounds: boolean;
     } | null;
+    scene_group: StudioSceneGroup | null;
 }
 export interface StudioAsset {
     id: string;

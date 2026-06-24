@@ -168,6 +168,10 @@ type StepRunnerDeps = {
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   runtimeCtx: SequenceRuntimeContext;
   depth: number;
+  // Set true by an aborting sibling lane (STOP/NAV) so mid-flight pending work
+  // in OTHER lanes of the same group (WAIT timers, waitable-sound onFinish, API
+  // proceed) short-circuits instead of running into the halted sequence.
+  isCancelled?: () => boolean;
 };
 
 /**
@@ -184,6 +188,9 @@ function runSteps(
 ): void {
   const ordered = [...steps].sort((a, b) => a.step_order - b.step_order);
   const runStep = (i: number): void => {
+    // A sibling lane aborting (STOP/NAV) cancels this lane too: bail before
+    // running any further step, including from a pending timer/async callback.
+    if (deps.isCancelled?.()) return;
     if (i >= ordered.length) {
       onDone();
       return;
@@ -191,48 +198,130 @@ function runSteps(
     const step = ordered[i];
     if (step.step_type === "WAIT") {
       // Non-blocking: the rest of the list continues after the timer.
-      deps.runtimeCtx.scheduler.schedule(
-        () => runStep(i + 1),
-        step.duration_ms ?? 0
-      );
+      deps.runtimeCtx.scheduler.schedule(() => {
+        if (deps.isCancelled?.()) return;
+        runStep(i + 1);
+      }, step.duration_ms ?? 0);
       return;
     }
     if (step.step_type === "STOP") {
       // Explicit terminal: halt the whole run. onAbort is threaded unchanged
-      // through every nested arm (branch/api/run-sequence), so it skips the
-      // outer continuations straight to the top beginSequence guard release —
-      // a STOP inside an arm ends the entire sequence, not just that arm.
+      // through every nested arm (branch/api/run-sequence/group), so it skips
+      // the outer continuations straight to the top beginSequence guard release
+      // — a STOP inside an arm ends the entire sequence, not just that arm.
       onAbort();
       return;
     }
-    // ACTION: dispatch the action, then advance.
+
+    // ACTION: dispatch the effect, then decide advance. Wait-by-default; the
+    // per-step advance_immediately flag opts out (fire-and-forget / overlap).
     if (step.function) {
-      // BRANCH needs the continuation: the outer list resumes only after the
-      // chosen arm completes (arm WAITs delay later outer steps).
-      if (step.function.function_type === "BRANCH") {
-        runBranch(step.function, deps, () => runStep(i + 1), onAbort);
+      const fn = step.function;
+      const immediate = step.advance_immediately === true; // false = wait
+      let advanced = false;
+      const advance = (): void => {
+        // Single-fire guard: the outer continuation runs at most once even if
+        // a detached arm and the immediate path both try to advance.
+        if (advanced) return;
+        advanced = true;
+        runStep(i + 1);
+      };
+
+      // Control-flow + Group: gate on completion by default, or run detached
+      // (own no-op onDone, swallow its abort) and advance now when immediate.
+      const gateOrDetach = (
+        run: (onDone: () => void, onAbort: () => void) => void
+      ): void => {
+        if (immediate) {
+          run(
+            () => {},
+            () => {}
+          );
+          advance();
+        } else {
+          // Gate: outer resumes on the arm/lane onDone; a STOP/NAV inside still
+          // bubbles to the top via onAbort.
+          run(advance, onAbort);
+        }
+      };
+
+      if (fn.function_type === "BRANCH") {
+        gateOrDetach((d, a) => runBranch(fn, deps, d, a));
         return;
       }
-      // API_REQUEST blocks the outer list until the response (or timeout)
-      // resolves and the chosen outcome arm completes.
-      if (step.function.function_type === "API_REQUEST") {
-        runApiRequest(step.function, deps, () => runStep(i + 1), onAbort);
+      if (fn.function_type === "API_REQUEST") {
+        gateOrDetach((d, a) => runApiRequest(fn, deps, d, a));
         return;
       }
-      // RUN_SEQUENCE: a step referencing a named SEQUENCE function runs that
-      // sequence's steps inline (not begin-guarded, like an arm); the outer
-      // list resumes only after it completes. The depth guard bounds chains.
-      if (step.function.function_type === "SEQUENCE") {
-        runReferencedSequence(
-          step.function,
-          deps,
-          () => runStep(i + 1),
-          onAbort
+      if (fn.function_type === "SEQUENCE") {
+        gateOrDetach((d, a) => runReferencedSequence(fn, deps, d, a));
+        return;
+      }
+      if (fn.function_type === "GROUP") {
+        gateOrDetach((d, a) => runGroup(fn, deps, d, a));
+        return;
+      }
+
+      // SOUND: a non-looping PLAY is waitable (the clip ends); looping PLAY and
+      // STOP are always instant. Dispatch the waitable case inline so the
+      // manager's onFinish can resume the walk; everything else goes through
+      // the single dispatcher.
+      if (fn.function_type === "SOUND") {
+        const s = fn.scene_sound;
+        const manager = deps.runtimeCtx.soundManager;
+        const waitable =
+          !!s && s.action === "PLAY" && !s.loop && !immediate && !!manager;
+        if (waitable && s && manager) {
+          if (!s.audio_url) {
+            // Missing/cross-org clip (resolve RPC nulls the url org-guarded):
+            // nothing to play or wait on; continue.
+            console.warn(
+              `[Studio] SOUND function ${fn.id}: PLAY has no audio_url (missing/cross-org clip); skipping.`
+            );
+            advance();
+            return;
+          }
+          const position = s.target_asset_id
+            ? deps.runtimeCtx.getAssetPosition?.(s.target_asset_id)
+            : undefined;
+          const scheduler = deps.runtimeCtx.scheduler;
+          const generation = scheduler.generation;
+          manager.play(
+            {
+              audioAssetId: s.audio_asset_id ?? "",
+              url: s.audio_url,
+              position,
+              volume: s.volume,
+              loop: s.loop,
+              stopOthers: s.stop_other_sounds,
+            },
+            () => {
+              // Drop a stale advance after scene-change/abort, like runApiRequest.
+              if (scheduler.generation !== generation) return;
+              // A sibling lane aborted while this clip was playing: don't advance.
+              if (deps.isCancelled?.()) return;
+              advance();
+            }
+          );
+          return;
+        }
+        // Loop PLAY / STOP / no manager: fire-and-forget through the dispatcher.
+        executeFunctionWithRelations(
+          fn,
+          deps.sceneNavigator,
+          deps.animations,
+          deps.onAnimationTrigger,
+          deps.depth + 1,
+          deps.onSceneChange,
+          deps.runtimeCtx
         );
+        advance();
         return;
       }
+
+      // All remaining types dispatch synchronously through the single dispatcher.
       executeFunctionWithRelations(
-        step.function,
+        fn,
         deps.sceneNavigator,
         deps.animations,
         deps.onAnimationTrigger,
@@ -240,21 +329,31 @@ function runSteps(
         deps.onSceneChange,
         deps.runtimeCtx
       );
+
       // A step list is scoped to one scene. NAVIGATION leaves it, so the walk
       // ends here; remaining steps belong to the scene we just left.
       // Author follow-on steps as the target scene's on_load sequence.
-      if (step.function.function_type === "NAVIGATION") {
+      if (fn.function_type === "NAVIGATION") {
         onAbort();
         return;
       }
+
       // ANIMATION: hold the walk for the animation's run time so later steps
-      // (including WAIT) begin when it finishes, not when it starts.
-      if (step.function.function_type === "ANIMATION") {
-        const anim = step.function.scene_animation;
+      // begin when it finishes, not when it starts (unless opted out).
+      if (fn.function_type === "ANIMATION") {
+        if (immediate) {
+          advance();
+          return;
+        }
+        const anim = fn.scene_animation;
         const runMs = (anim?.delay_ms ?? 0) + (anim?.duration_ms ?? 0);
-        deps.runtimeCtx.scheduler.schedule(() => runStep(i + 1), runMs);
+        deps.runtimeCtx.scheduler.schedule(advance, runMs);
         return;
       }
+
+      // SET_VARIABLE / SET_VISIBILITY / ALERT: instant.
+      advance();
+      return;
     }
     runStep(i + 1);
   };
@@ -361,6 +460,61 @@ function runReferencedSequence(
 }
 
 /**
+ * Runs a GROUP's lanes concurrently and completes when ALL lanes complete
+ * (barrier join). Each lane is an owned headless sequence run like a nested
+ * sequence. A NAVIGATION/STOP inside any lane ends the whole walk via onAbort;
+ * the aborted flag stops a late laneDone from also firing onDone afterwards.
+ * Fire-and-forget lanes (all-immediate steps) call laneDone synchronously, so a
+ * single-instant-step lane never deadlocks.
+ */
+function runGroup(
+  fn: StudioSceneFunction,
+  deps: StepRunnerDeps,
+  onDone: () => void,
+  onAbort: () => void
+): void {
+  const group = fn.scene_group;
+  if (!group || group.lanes.length === 0) {
+    onDone();
+    return;
+  }
+  const groupDepth = deps.depth + 1;
+  if (groupDepth > ANIMATION_CHAIN_MAX_DEPTH) {
+    console.warn(
+      `[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for group ${group.id}.`
+    );
+    onDone();
+    return;
+  }
+  let remaining = group.lanes.length;
+  let aborted = false;
+  // Threaded into every lane's walk so an abort in one lane also halts the
+  // pending async work (timers, sound onFinish, API proceed) of its siblings,
+  // not just the join below. Also honours an outer cancel (nested groups).
+  let cancelled = false;
+  const isCancelled = (): boolean => cancelled || !!deps.isCancelled?.();
+  const laneDone = (): void => {
+    if (aborted) return;
+    remaining -= 1;
+    if (remaining === 0) onDone();
+  };
+  const laneAbort = (): void => {
+    if (aborted) return;
+    aborted = true;
+    cancelled = true;
+    onAbort();
+  };
+  for (const lane of group.lanes) {
+    runSteps(
+      lane.sequence.steps,
+      { ...deps, depth: groupDepth, isCancelled },
+      laneDone,
+      laneAbort
+    );
+  }
+}
+
+/**
  * Executes an API_REQUEST through the injected executor and runs the matching
  * outcome arm like a nested sequence. The proxy enforces the real timeout; a
  * scheduler backstop covers an unreachable proxy. Failure policy mirrors
@@ -402,6 +556,8 @@ function runApiRequest(
 
   const proceed = (outcome: StudioApiRequestOutcome): void => {
     if (settled || scheduler.generation !== generation) return;
+    // A sibling lane aborted while the request was in flight: drop the arm.
+    if (deps.isCancelled?.()) return;
     settled = true;
     if (store) {
       const { writes, warnings } = applyBindings(
@@ -604,6 +760,33 @@ export function executeFunctionWithRelations(
     if (!runtimeCtx.scheduler.beginSequence(branch.id)) return;
     const finish = () => runtimeCtx.scheduler.endSequence(branch.id);
     runBranch(
+      fn,
+      {
+        sceneNavigator,
+        animations,
+        onAnimationTrigger,
+        onSceneChange,
+        runtimeCtx,
+        depth,
+      },
+      finish,
+      finish
+    );
+  } else if (fn.function_type === "GROUP") {
+    // Group is authored in-sequence (runSteps dispatches it there with the
+    // outer continuation); this path covers a trigger wired directly to a
+    // GROUP function. Guard like a sequence so a re-trigger can't stack runs.
+    const group = fn.scene_group;
+    if (!group) return;
+    if (!runtimeCtx) {
+      console.warn(
+        `[Studio] GROUP function ${fn.id} needs a runtime context (scheduler); skipping.`
+      );
+      return;
+    }
+    if (!runtimeCtx.scheduler.beginSequence(group.id)) return;
+    const finish = () => runtimeCtx.scheduler.endSequence(group.id);
+    runGroup(
       fn,
       {
         sceneNavigator,

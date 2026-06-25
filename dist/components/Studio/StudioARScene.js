@@ -88,6 +88,10 @@ const StudioARSceneInner = (props) => {
         return () => {
             schedulerRef.current?.dispose();
             schedulerRef.current = null;
+            // dispose() bumps the scheduler generation first; reset() then clears any
+            // pending sound backstop timers and fires their callbacks, which now
+            // no-op via the generation guard so unmount can't advance a waited step.
+            soundManagerRef.current?.reset();
         };
     }, []);
     // ─── Variable store ───────────────────────────────────────────────────────

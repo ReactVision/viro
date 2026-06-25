@@ -42,7 +42,8 @@ const ViroSpatialSound_1 = require("../../ViroSpatialSound");
  * manager and force-renders on change (the whole list re-paints, like the
  * reactive variable-text nodes). A positioned PLAY uses ViroSpatialSound;
  * otherwise a non-spatial ViroSound. Non-looping sounds remove themselves
- * from the manager on finish.
+ * from the manager on finish; any sound removes itself on error so a clip that
+ * fails to load releases a waiting step instead of stalling the sequence.
  */
 const StudioSounds = ({ manager, }) => {
     const [, force] = React.useReducer((n) => n + 1, 0);
@@ -51,9 +52,15 @@ const StudioSounds = ({ manager, }) => {
       {manager.getActive().map((s) => s.position ? (<ViroSpatialSound_1.ViroSpatialSound key={s.playId} source={{ uri: s.url }} position={s.position} volume={s.volume} loop={s.loop} paused={false} onFinish={() => {
                 if (!s.loop)
                     manager.remove(s.playId);
+            }} onError={(e) => {
+                console.warn(`[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`, e?.nativeEvent?.error);
+                manager.remove(s.playId);
             }}/>) : (<ViroSound_1.ViroSound key={s.playId} source={{ uri: s.url }} volume={s.volume} loop={s.loop} paused={false} onFinish={() => {
                 if (!s.loop)
                     manager.remove(s.playId);
+            }} onError={(e) => {
+                console.warn(`[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`, e?.nativeEvent?.error);
+                manager.remove(s.playId);
             }}/>))}
     </>);
 };

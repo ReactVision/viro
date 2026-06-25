@@ -1,7 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StudioSoundManager = void 0;
+exports.StudioSoundManager = exports.SOUND_WAIT_BACKSTOP_MS = void 0;
 const utils_1 = require("./utils");
+/**
+ * Last-resort cap on how long a step waits for a non-looping PLAY to finish. A
+ * clip that fails to load fires onError (released at once); a clip whose native
+ * finish/error event is dropped or never arrives would otherwise stall the walk
+ * forever, so the manager force-releases the waiter after this many ms.
+ * Generous on purpose: it must outlast any realistic single clip so it never
+ * cuts one short, only catches a genuine stall.
+ */
+exports.SOUND_WAIT_BACKSTOP_MS = 5 * 60 * 1000;
 /**
  * Per-scene sound store. PLAY adds an entry under a fresh playId; STOP removes
  * by audio asset id (null = all). The whole <StudioSounds> list re-renders on
@@ -15,6 +24,9 @@ class StudioSoundManager {
     // Fired on natural finish (via remove) AND when the sound is cut short by a
     // stop/stopOthers/reset, so a waited-on sound never stalls the walk.
     finishCallbacks = new Map();
+    // Backstop timer per waited playId; cleared whenever its callback fires so a
+    // sound whose native finish/error event never arrives can't stall the walk.
+    finishTimers = new Map();
     /** Subscribe to any add/remove; returns an unsubscribe fn. */
     subscribe(listener) {
         this.listeners.add(listener);
@@ -31,6 +43,11 @@ class StudioSoundManager {
     }
     /** Pull and invoke the stored completion callback (if any) for a playId. */
     fire(playId) {
+        const timer = this.finishTimers.get(playId);
+        if (timer !== undefined) {
+            clearTimeout(timer);
+            this.finishTimers.delete(playId);
+        }
         const cb = this.finishCallbacks.get(playId);
         if (!cb)
             return;
@@ -59,8 +76,14 @@ class StudioSoundManager {
             volume: entry.volume,
             loop: entry.loop,
         });
-        if (onFinish)
+        if (onFinish) {
             this.finishCallbacks.set(playId, onFinish);
+            // Non-looping waited sound: arm the stall backstop. A looping sound is
+            // never awaited, so it gets no timer.
+            if (!entry.loop) {
+                this.finishTimers.set(playId, setTimeout(() => this.remove(playId), exports.SOUND_WAIT_BACKSTOP_MS));
+            }
+        }
         if ((0, utils_1.isDev)()) {
             console.log(`[Studio] Sound play "${entry.audioAssetId}" (#${playId})`);
         }

@@ -8,7 +8,8 @@ import { StudioSoundManager } from "./soundManager";
  * manager and force-renders on change (the whole list re-paints, like the
  * reactive variable-text nodes). A positioned PLAY uses ViroSpatialSound;
  * otherwise a non-spatial ViroSound. Non-looping sounds remove themselves
- * from the manager on finish.
+ * from the manager on finish; any sound removes itself on error so a clip that
+ * fails to load releases a waiting step instead of stalling the sequence.
  */
 export const StudioSounds: React.FC<{ manager: StudioSoundManager }> = ({
   manager,
@@ -29,6 +30,13 @@ export const StudioSounds: React.FC<{ manager: StudioSoundManager }> = ({
             onFinish={() => {
               if (!s.loop) manager.remove(s.playId);
             }}
+            onError={(e) => {
+              console.warn(
+                `[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`,
+                e?.nativeEvent?.error
+              );
+              manager.remove(s.playId);
+            }}
           />
         ) : (
           <ViroSound
@@ -39,6 +47,13 @@ export const StudioSounds: React.FC<{ manager: StudioSoundManager }> = ({
             paused={false}
             onFinish={() => {
               if (!s.loop) manager.remove(s.playId);
+            }}
+            onError={(e) => {
+              console.warn(
+                `[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`,
+                e?.nativeEvent?.error
+              );
+              manager.remove(s.playId);
             }}
           />
         )

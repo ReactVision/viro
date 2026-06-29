@@ -12,12 +12,8 @@ export declare class StudioVariableStore {
     private values;
     private listeners;
     get(name: string): StudioVariableValue | undefined;
-    /**
-     * Subscribe to value changes (set/reset); returns an unsubscribe fn. Reactive
-     * TEXT nodes use this to repaint when a referenced variable changes.
-     */
+    /** Subscribe to value changes (set/reset); returns an unsubscribe fn. */
     subscribe(listener: () => void): () => void;
-    private notify;
     set(name: string, value: StudioVariableValue): void;
     seed(declarations: StudioSceneVariable[]): void;
     reset(): void;

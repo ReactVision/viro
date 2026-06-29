@@ -3,7 +3,7 @@ import {
   StudioVariableValue,
   valueMatchesType,
 } from "./expressionEvaluator";
-import { isDev } from "./utils";
+import { GlobalListeners, isDev } from "./utils";
 
 /**
  * Per-session variable store. One instance is owned by the navigator and
@@ -15,26 +15,15 @@ import { isDev } from "./utils";
  */
 export class StudioVariableStore {
   private values = new Map<string, StudioVariableValue>();
-  private listeners = new Set<() => void>();
+  private listeners = new GlobalListeners();
 
   get(name: string): StudioVariableValue | undefined {
     return this.values.get(name);
   }
 
-  /**
-   * Subscribe to value changes (set/reset); returns an unsubscribe fn. Reactive
-   * TEXT nodes use this to repaint when a referenced variable changes.
-   */
+  /** Subscribe to value changes (set/reset); returns an unsubscribe fn. */
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
-
-  private notify(): void {
-    // Snapshot first: a listener may (un)subscribe during its own callback.
-    [...this.listeners].forEach((fn) => fn());
+    return this.listeners.subscribe(listener);
   }
 
   set(name: string, value: StudioVariableValue): void {
@@ -45,7 +34,7 @@ export class StudioVariableStore {
     if (isDev()) {
       console.log(`[Studio] Variable "${name}" =`, value);
     }
-    this.notify();
+    this.listeners.notify();
   }
 
   seed(declarations: StudioSceneVariable[]): void {
@@ -72,7 +61,7 @@ export class StudioVariableStore {
 
   reset(): void {
     this.values.clear();
-    this.notify();
+    this.listeners.notify();
   }
 
   snapshot(): Record<string, StudioVariableValue> {

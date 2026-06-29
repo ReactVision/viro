@@ -29,7 +29,6 @@ export declare class StudioSoundManager {
     private finishTimers;
     /** Subscribe to any add/remove; returns an unsubscribe fn. */
     subscribe(listener: () => void): () => void;
-    private notify;
     getActive(): StudioSoundEntry[];
     /** Pull and invoke the stored completion callback (if any) for a playId. */
     private fire;

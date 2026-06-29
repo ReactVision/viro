@@ -1,5 +1,5 @@
 import { StudioAsset } from "../types";
-import { isDev } from "./utils";
+import { KeyedListeners, isDev } from "./utils";
 
 /**
  * Per-scene visibility store, keyed by scene asset placement id. Seeded from
@@ -13,33 +13,16 @@ import { isDev } from "./utils";
  */
 export class StudioVisibilityStore {
   private visible = new Map<string, boolean>();
-  private listeners = new Map<string, Set<() => void>>();
+  private listeners = new KeyedListeners();
 
   /** Current visibility; defaults to visible for assets never seeded/set. */
   isVisible(assetId: string): boolean {
     return this.visible.get(assetId) ?? true;
   }
 
-  /**
-   * Subscribe to changes for one asset; returns an unsubscribe fn. The visible
-   * node wrapper uses this to repaint when its object is shown/hidden.
-   */
+  /** Subscribe to changes for one asset; returns an unsubscribe fn. */
   subscribe(assetId: string, listener: () => void): () => void {
-    let set = this.listeners.get(assetId);
-    if (!set) {
-      set = new Set();
-      this.listeners.set(assetId, set);
-    }
-    set.add(listener);
-    return () => {
-      set?.delete(listener);
-    };
-  }
-
-  private notify(assetId: string): void {
-    // Snapshot first: a listener may (un)subscribe during its own callback.
-    const set = this.listeners.get(assetId);
-    if (set) [...set].forEach((fn) => fn());
+    return this.listeners.subscribe(assetId, listener);
   }
 
   /** Initialise-if-absent from author-time defaults (idempotent, strict-mode safe). */
@@ -63,7 +46,7 @@ export class StudioVisibilityStore {
     if (isDev()) {
       console.log(`[Studio] Visibility "${assetId}" =`, next);
     }
-    this.notify(assetId);
+    this.listeners.notify(assetId);
   }
 
   /**
@@ -78,6 +61,6 @@ export class StudioVisibilityStore {
       if (!asset?.id) continue;
       this.visible.set(asset.id, !asset.hidden_on_load);
     }
-    this.listeners.forEach((set) => [...set].forEach((fn) => fn()));
+    this.listeners.notifyAll();
   }
 }

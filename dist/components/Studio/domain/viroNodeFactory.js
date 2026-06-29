@@ -46,10 +46,7 @@ const apiRequestHelpers_1 = require("./apiRequestHelpers");
 const materialConfig_1 = require("./materialConfig");
 const dragConfiguration_1 = require("./dragConfiguration");
 const physicsConfig_1 = require("./physicsConfig");
-/**
- * Derives the transform config for an asset.
- * Clamps Z to -2 for non-trigger assets to guarantee visibility.
- */
+/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange, runtimeCtx) {
     const hasTriggerImage = !!asset.trigger_image_url;
     let posZ = asset.position_z ?? -2;
@@ -126,11 +123,9 @@ function createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrig
     }
     return () => (0, sceneNavigationHandler_1.executeFunctionWithRelations)(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange, runtimeCtx);
 }
-/** Resolves asset type from asset_type_name. */
 function resolveType(asset) {
     return asset.asset_type_name ?? null;
 }
-/** Infers 3D model format from file extension. */
 function inferModelType(url) {
     const ext = url.toLowerCase().split(".").pop();
     if (ext === "gltf")
@@ -226,9 +221,6 @@ function createVideo(asset, config) {
     }
     return (<ViroVideo_1.ViroVideo key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
 }
-/**
- * Creates the appropriate Viro component for a StudioAsset.
- */
 function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, onSceneChange, runtimeCtx) {
     const type = resolveType(asset);
     const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange, runtimeCtx);

@@ -17,13 +17,7 @@ export type NodeConfig = {
     onClick?: () => void;
     animation?: ViroAnimationProp;
 };
-/**
- * Derives the transform config for an asset.
- * Clamps Z to -2 for non-trigger assets to guarantee visibility.
- */
+/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 export declare function createNodeConfig(asset: StudioAsset, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], scene: StudioSceneMeta | null, onAnimationTrigger?: (targetAssetId: string, animKey: string) => void, animationStates?: Record<string, ViroAnimationProp>, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext): NodeConfig;
-/**
- * Creates the appropriate Viro component for a StudioAsset.
- */
 export declare function createNode(asset: StudioAsset, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], scene: StudioSceneMeta | null, onAnimationTrigger?: (targetAssetId: string, animKey: string) => void, animationStates?: Record<string, ViroAnimationProp>, onAssetLoaded?: (id: string) => void, onCollision?: (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext): React.ReactElement | null;
 export {};

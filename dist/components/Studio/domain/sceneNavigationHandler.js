@@ -98,9 +98,6 @@ class SequenceScheduler {
     }
 }
 exports.SequenceScheduler = SequenceScheduler;
-/**
- * Resolves a scene function by ID from a flat list.
- */
 function resolveById(id, fns) {
     return fns.find((f) => f.id === id);
 }
@@ -455,28 +452,24 @@ function runApiRequest(fn, deps, onDone, onAbort) {
 function resolveAnimationTargetAssetId(animationId, animations) {
     return animations.find((a) => a.id === animationId)?.target_asset_id;
 }
-/**
- * Single dispatcher for all scene function types.
- * Used by onClick, onCollision, and on_load_function triggers.
- */
+/** Used by onClick, onCollision, and on_load_function triggers. */
 function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, depth = 0, onSceneChange, runtimeCtx) {
     if (depth > ANIMATION_CHAIN_MAX_DEPTH) {
         console.warn(`[Studio] Max chain depth (${ANIMATION_CHAIN_MAX_DEPTH}) exceeded for function ${fn.id}.`);
         return;
     }
-    if (fn.function_type === "SEQUENCE") {
-        const seq = fn.scene_sequence;
-        if (!seq)
+    // Shared direct-trigger dispatch for SEQUENCE/BRANCH/GROUP/API_REQUEST.
+    const runBeginGuarded = (label, payload, run) => {
+        if (!payload)
             return;
         if (!runtimeCtx) {
-            console.warn(`[Studio] SEQUENCE function ${fn.id} needs a runtime context (scheduler); skipping.`);
+            console.warn(`[Studio] ${label} function ${fn.id} needs a runtime context (scheduler); skipping.`);
             return;
         }
-        // Ignore a re-trigger while this sequence is still running (no stacking).
-        if (!runtimeCtx.scheduler.beginSequence(seq.id))
+        if (!runtimeCtx.scheduler.beginSequence(payload.id))
             return;
-        const finish = () => runtimeCtx.scheduler.endSequence(seq.id);
-        runSteps(seq.steps, {
+        const finish = () => runtimeCtx.scheduler.endSequence(payload.id);
+        run(payload, {
             sceneNavigator,
             animations,
             onAnimationTrigger,
@@ -484,6 +477,9 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
             runtimeCtx,
             depth,
         }, finish, finish);
+    };
+    if (fn.function_type === "SEQUENCE") {
+        runBeginGuarded("SEQUENCE", fn.scene_sequence, (seq, deps, onDone, onAbort) => runSteps(seq.steps, deps, onDone, onAbort));
         return;
     }
     if (fn.function_type === "NAVIGATION") {
@@ -549,74 +545,13 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         store.set(sv.name, result.value);
     }
     else if (fn.function_type === "BRANCH") {
-        // Branch is authored in-sequence (runSteps dispatches it there with the
-        // outer continuation); this path covers a trigger wired directly to a
-        // BRANCH function. Guard like a sequence so arm WAITs can't stack runs.
-        const branch = fn.scene_branch;
-        if (!branch)
-            return;
-        if (!runtimeCtx) {
-            console.warn(`[Studio] BRANCH function ${fn.id} needs a runtime context (scheduler); skipping.`);
-            return;
-        }
-        if (!runtimeCtx.scheduler.beginSequence(branch.id))
-            return;
-        const finish = () => runtimeCtx.scheduler.endSequence(branch.id);
-        runBranch(fn, {
-            sceneNavigator,
-            animations,
-            onAnimationTrigger,
-            onSceneChange,
-            runtimeCtx,
-            depth,
-        }, finish, finish);
+        runBeginGuarded("BRANCH", fn.scene_branch, (_branch, deps, onDone, onAbort) => runBranch(fn, deps, onDone, onAbort));
     }
     else if (fn.function_type === "GROUP") {
-        // Group is authored in-sequence (runSteps dispatches it there with the
-        // outer continuation); this path covers a trigger wired directly to a
-        // GROUP function. Guard like a sequence so a re-trigger can't stack runs.
-        const group = fn.scene_group;
-        if (!group)
-            return;
-        if (!runtimeCtx) {
-            console.warn(`[Studio] GROUP function ${fn.id} needs a runtime context (scheduler); skipping.`);
-            return;
-        }
-        if (!runtimeCtx.scheduler.beginSequence(group.id))
-            return;
-        const finish = () => runtimeCtx.scheduler.endSequence(group.id);
-        runGroup(fn, {
-            sceneNavigator,
-            animations,
-            onAnimationTrigger,
-            onSceneChange,
-            runtimeCtx,
-            depth,
-        }, finish, finish);
+        runBeginGuarded("GROUP", fn.scene_group, (_group, deps, onDone, onAbort) => runGroup(fn, deps, onDone, onAbort));
     }
     else if (fn.function_type === "API_REQUEST") {
-        // Authored in-sequence (runSteps dispatches it there with the outer
-        // continuation); this path covers a trigger wired directly to an
-        // API_REQUEST function. Guard like a sequence so a re-trigger can't
-        // stack runs while a request (or an arm WAIT) is in flight.
-        const apiRequest = fn.scene_api_request;
-        if (!apiRequest)
-            return;
-        if (!runtimeCtx) {
-            console.warn(`[Studio] API_REQUEST function ${fn.id} needs a runtime context (scheduler); skipping.`);
-            return;
-        }
-        if (!runtimeCtx.scheduler.beginSequence(apiRequest.id))
-            return;
-        const finish = () => runtimeCtx.scheduler.endSequence(apiRequest.id);
-        runApiRequest(fn, {
-            sceneNavigator,
-            animations,
-            onAnimationTrigger,
-            onSceneChange,
-            runtimeCtx,
-            depth,
-        }, finish, finish);
+        runBeginGuarded("API_REQUEST", fn.scene_api_request, (_request, deps, onDone, onAbort) => runApiRequest(fn, deps, onDone, onAbort));
     }
     else if (fn.function_type === "SET_VISIBILITY") {
         // Instant show / hide / toggle. Fire-and-forget: as a sequence step it
@@ -669,9 +604,6 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         }
     }
 }
-/**
- * Executes the scene's on_load_function if set.
- */
 function executeOnLoadFunction(functionId, functions, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx) {
     const fn = resolveById(functionId, functions);
     if (!fn) {

@@ -14,31 +14,14 @@ const utils_1 = require("./utils");
  */
 class StudioVisibilityStore {
     visible = new Map();
-    listeners = new Map();
+    listeners = new utils_1.KeyedListeners();
     /** Current visibility; defaults to visible for assets never seeded/set. */
     isVisible(assetId) {
         return this.visible.get(assetId) ?? true;
     }
-    /**
-     * Subscribe to changes for one asset; returns an unsubscribe fn. The visible
-     * node wrapper uses this to repaint when its object is shown/hidden.
-     */
+    /** Subscribe to changes for one asset; returns an unsubscribe fn. */
     subscribe(assetId, listener) {
-        let set = this.listeners.get(assetId);
-        if (!set) {
-            set = new Set();
-            this.listeners.set(assetId, set);
-        }
-        set.add(listener);
-        return () => {
-            set?.delete(listener);
-        };
-    }
-    notify(assetId) {
-        // Snapshot first: a listener may (un)subscribe during its own callback.
-        const set = this.listeners.get(assetId);
-        if (set)
-            [...set].forEach((fn) => fn());
+        return this.listeners.subscribe(assetId, listener);
     }
     /** Initialise-if-absent from author-time defaults (idempotent, strict-mode safe). */
     seed(assets) {
@@ -62,7 +45,7 @@ class StudioVisibilityStore {
         if ((0, utils_1.isDev)()) {
             console.log(`[Studio] Visibility "${assetId}" =`, next);
         }
-        this.notify(assetId);
+        this.listeners.notify(assetId);
     }
     /**
      * Re-initialise for a new scene: replace all values from author-time
@@ -77,7 +60,7 @@ class StudioVisibilityStore {
                 continue;
             this.visible.set(asset.id, !asset.hidden_on_load);
         }
-        this.listeners.forEach((set) => [...set].forEach((fn) => fn()));
+        this.listeners.notifyAll();
     }
 }
 exports.StudioVisibilityStore = StudioVisibilityStore;

@@ -1,14 +1,14 @@
 import * as React from "react";
+import { NativeSyntheticEvent } from "react-native";
+import { ViroErrorEvent } from "../../Types/ViroEvents";
 import { ViroSound } from "../../ViroSound";
 import { ViroSpatialSound } from "../../ViroSpatialSound";
 import { StudioSoundManager } from "./soundManager";
 
 /**
- * Renders every actively-playing sound from the manager. Subscribes to the
- * manager and force-renders on change (the whole list re-paints, like the
- * reactive variable-text nodes). A positioned PLAY uses ViroSpatialSound;
- * otherwise a non-spatial ViroSound. Non-looping sounds remove themselves
- * from the manager on finish; any sound removes itself on error so a clip that
+ * Renders every actively-playing sound from the manager, re-painting the whole
+ * list on any change (like the reactive variable-text nodes). Non-looping sounds
+ * remove themselves on finish; any sound removes itself on error so a clip that
  * fails to load releases a waiting step instead of stalling the sequence.
  */
 export const StudioSounds: React.FC<{ manager: StudioSoundManager }> = ({
@@ -18,46 +18,29 @@ export const StudioSounds: React.FC<{ manager: StudioSoundManager }> = ({
   React.useEffect(() => manager.subscribe(force), [manager]);
   return (
     <>
-      {manager.getActive().map((s) =>
-        s.position ? (
-          <ViroSpatialSound
-            key={s.playId}
-            source={{ uri: s.url }}
-            position={s.position}
-            volume={s.volume}
-            loop={s.loop}
-            paused={false}
-            onFinish={() => {
-              if (!s.loop) manager.remove(s.playId);
-            }}
-            onError={(e) => {
-              console.warn(
-                `[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`,
-                e?.nativeEvent?.error
-              );
-              manager.remove(s.playId);
-            }}
-          />
+      {manager.getActive().map((s) => {
+        const shared = {
+          source: { uri: s.url },
+          volume: s.volume,
+          loop: s.loop,
+          paused: false,
+          onFinish: () => {
+            if (!s.loop) manager.remove(s.playId);
+          },
+          onError: (e: NativeSyntheticEvent<ViroErrorEvent>) => {
+            console.warn(
+              `[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`,
+              e?.nativeEvent?.error
+            );
+            manager.remove(s.playId);
+          },
+        };
+        return s.position ? (
+          <ViroSpatialSound key={s.playId} position={s.position} {...shared} />
         ) : (
-          <ViroSound
-            key={s.playId}
-            source={{ uri: s.url }}
-            volume={s.volume}
-            loop={s.loop}
-            paused={false}
-            onFinish={() => {
-              if (!s.loop) manager.remove(s.playId);
-            }}
-            onError={(e) => {
-              console.warn(
-                `[Studio] Sound failed: ${s.audioAssetId} (#${s.playId})`,
-                e?.nativeEvent?.error
-              );
-              manager.remove(s.playId);
-            }}
-          />
-        )
-      )}
+          <ViroSound key={s.playId} {...shared} />
+        );
+      })}
     </>
   );
 };

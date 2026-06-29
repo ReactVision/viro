@@ -14,12 +14,8 @@ export declare class StudioVisibilityStore {
     private listeners;
     /** Current visibility; defaults to visible for assets never seeded/set. */
     isVisible(assetId: string): boolean;
-    /**
-     * Subscribe to changes for one asset; returns an unsubscribe fn. The visible
-     * node wrapper uses this to repaint when its object is shown/hidden.
-     */
+    /** Subscribe to changes for one asset; returns an unsubscribe fn. */
     subscribe(assetId: string, listener: () => void): () => void;
-    private notify;
     /** Initialise-if-absent from author-time defaults (idempotent, strict-mode safe). */
     seed(assets: StudioAsset[]): void;
     /**

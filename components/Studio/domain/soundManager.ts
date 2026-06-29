@@ -1,4 +1,4 @@
-import { isDev } from "./utils";
+import { GlobalListeners, isDev } from "./utils";
 
 /**
  * Last-resort cap on how long a step waits for a non-looping PLAY to finish. A
@@ -27,7 +27,7 @@ export type StudioSoundEntry = {
  */
 export class StudioSoundManager {
   private sounds = new Map<number, StudioSoundEntry>();
-  private listeners = new Set<() => void>();
+  private listeners = new GlobalListeners();
   private nextPlayId = 1;
   // Per-playId completion callback for a step waiting on a non-looping PLAY.
   // Fired on natural finish (via remove) AND when the sound is cut short by a
@@ -39,15 +39,7 @@ export class StudioSoundManager {
 
   /** Subscribe to any add/remove; returns an unsubscribe fn. */
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
-
-  private notify(): void {
-    // Snapshot first: a listener may (un)subscribe during its own callback.
-    [...this.listeners].forEach((fn) => fn());
+    return this.listeners.subscribe(listener);
   }
 
   getActive(): StudioSoundEntry[] {
@@ -112,7 +104,7 @@ export class StudioSoundManager {
     if (isDev()) {
       console.log(`[Studio] Sound play "${entry.audioAssetId}" (#${playId})`);
     }
-    this.notify();
+    this.listeners.notify();
     return playId;
   }
 
@@ -125,14 +117,14 @@ export class StudioSoundManager {
         removed.push(id);
       }
     }
-    this.notify();
+    this.listeners.notify();
     // Resolve any waiters cut short by the stop.
     for (const id of removed) this.fire(id);
   }
 
   /** Drop one entry; onFinish calls this for non-looping sounds. */
   remove(playId: number): void {
-    if (this.sounds.delete(playId)) this.notify();
+    if (this.sounds.delete(playId)) this.listeners.notify();
     // Fire the stored callback whether or not the entry was still present
     // (natural finish path: resolves the waiting step).
     this.fire(playId);
@@ -141,7 +133,7 @@ export class StudioSoundManager {
   reset(): void {
     const pending = [...this.finishCallbacks.keys()];
     this.sounds.clear();
-    this.notify();
+    this.listeners.notify();
     // Belt-and-suspenders: the runtime's generation guard no-ops these after a
     // scene-change cancelAll, but fire so nothing leaks on bare resets.
     for (const id of pending) this.fire(id);

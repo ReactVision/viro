@@ -46,10 +46,7 @@ export type NodeConfig = {
   animation?: ViroAnimationProp;
 };
 
-/**
- * Derives the transform config for an asset.
- * Clamps Z to -2 for non-trigger assets to guarantee visibility.
- */
+/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 export function createNodeConfig(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
@@ -179,14 +176,12 @@ function createOnClickHandler(
     );
 }
 
-/** Resolves asset type from asset_type_name. */
 function resolveType(
   asset: StudioAsset
 ): "3D-MODEL" | "TEXT" | "IMAGE" | "VIDEO" | null {
   return asset.asset_type_name ?? null;
 }
 
-/** Infers 3D model format from file extension. */
 function inferModelType(url: string): "GLB" | "GLTF" | "OBJ" | "VRX" {
   const ext = url.toLowerCase().split(".").pop();
   if (ext === "gltf") return "GLTF";
@@ -396,9 +391,6 @@ function createVideo(
   );
 }
 
-/**
- * Creates the appropriate Viro component for a StudioAsset.
- */
 export function createNode(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,

@@ -13,23 +13,13 @@ const utils_1 = require("./utils");
  */
 class StudioVariableStore {
     values = new Map();
-    listeners = new Set();
+    listeners = new utils_1.GlobalListeners();
     get(name) {
         return this.values.get(name);
     }
-    /**
-     * Subscribe to value changes (set/reset); returns an unsubscribe fn. Reactive
-     * TEXT nodes use this to repaint when a referenced variable changes.
-     */
+    /** Subscribe to value changes (set/reset); returns an unsubscribe fn. */
     subscribe(listener) {
-        this.listeners.add(listener);
-        return () => {
-            this.listeners.delete(listener);
-        };
-    }
-    notify() {
-        // Snapshot first: a listener may (un)subscribe during its own callback.
-        [...this.listeners].forEach((fn) => fn());
+        return this.listeners.subscribe(listener);
     }
     set(name, value) {
         // Values are primitives; skip the no-op write so unchanged values don't
@@ -40,7 +30,7 @@ class StudioVariableStore {
         if ((0, utils_1.isDev)()) {
             console.log(`[Studio] Variable "${name}" =`, value);
         }
-        this.notify();
+        this.listeners.notify();
     }
     seed(declarations) {
         for (const decl of declarations) {
@@ -62,7 +52,7 @@ class StudioVariableStore {
     }
     reset() {
         this.values.clear();
-        this.notify();
+        this.listeners.notify();
     }
     snapshot() {
         const out = {};

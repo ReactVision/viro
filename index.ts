@@ -48,6 +48,8 @@ import {
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroCameraTexture } from "./components/ViroCameraTexture";
 export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
+import { ViroObjectDetector } from "./components/ViroObjectDetector";
+export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
 import { ViroOrbitCamera } from "./components/ViroOrbitCamera";
@@ -185,8 +187,8 @@ import { ViroSceneNavigator } from "./components/ViroSceneNavigator";
 import { VIRO_VERSION } from "./components/Utilities/ViroVersion";
 import { ViroQuestEntryPoint } from "./components/ViroQuestEntryPoint";
 import { VRQuestNavigatorBridge } from "./components/Utilities/VRQuestNavigatorBridge";
-import { VRModuleOpenXR, useVRViewTag, exitVRScene } from "./components/Utilities/VRModuleOpenXR";
-import type { VRModuleOpenXRType } from "./components/Utilities/VRModuleOpenXR";
+import { VRModuleOpenXR, useVRViewTag, exitVRScene, setPassthroughStyle } from "./components/Utilities/VRModuleOpenXR";
+import type { VRModuleOpenXRType, ViroPassthroughStyle } from "./components/Utilities/VRModuleOpenXR";
 import { StreamingAudioManager } from "./components/Utilities/StreamingAudioManager";
 import { AppRegistry } from "react-native";
 
@@ -223,6 +225,7 @@ export {
   ViroARCamera,
   ViroMaterialVideo,
   ViroCameraTexture,
+  ViroObjectDetector,
   ViroNode,
   ViroOmniLight,
   ViroOrbitCamera,
@@ -259,6 +262,7 @@ export {
   VRModuleOpenXR,
   useVRViewTag,
   exitVRScene,
+  setPassthroughStyle,
   Viro3DSceneNavigator,
   // Streaming audio
   StreamingAudioManager,
@@ -388,7 +392,7 @@ export {
   exitImmersiveSpace,
 };
 
-export type { VRModuleOpenXRType };
+export type { VRModuleOpenXRType, ViroPassthroughStyle };
 export type { ImmersiveSpaceStyle } from "./components/VisionOS/ViroVisionOSModule";
 
 export type {

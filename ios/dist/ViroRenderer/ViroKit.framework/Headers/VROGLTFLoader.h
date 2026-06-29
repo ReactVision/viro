@@ -188,7 +188,11 @@ private:
     static bool processAnimations(const tinygltf::Model &gModel);
     static bool processKeyFrameAnimations(const tinygltf::Model &gModel,
                                          std::map<int, std::map<int, std::vector<int>>> &gltfAnimatedNodes);
-    static void flattenSkeletalKeyframeAnimations(
+    // Resample all of a skin's animation channels onto a single common time-grid and merge each
+    // joint's per-property channels into one index-aligned VROKeyframeAnimation. Replaces the old
+    // drop-mismatched-channels flatten (VIRO-5741) so mixed STEP/LINEAR, multi-time-grid glTF
+    // animations (e.g. Blender exports) play fully instead of freezing.
+    static void resampleSkeletalChannelsToCommonGrid(
             std::map<int, std::pair<int, std::vector<int>>> &skeletalAnimToNodeSkinPair,
             int skinIndex);
     static std::shared_ptr<VROKeyframeAnimation> convertChannelToKeyFrameAnimation(

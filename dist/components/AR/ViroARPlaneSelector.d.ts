@@ -293,7 +293,7 @@ export declare class ViroARPlaneSelector extends React.Component<Props, State> {
      */
     _worldToLocal: (world: [number, number, number], anchorPosition: [number, number, number], rotationDeg: [number, number, number]) => [number, number, number];
     _passesAlignmentFilter: (anchor: ViroAnchor) => boolean;
-    render(): React.JSX.Element | null;
+    render(): React.JSX.Element;
     _renderPlanes(): React.JSX.Element[];
 }
 export {};

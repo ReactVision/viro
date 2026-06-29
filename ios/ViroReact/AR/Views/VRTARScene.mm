@@ -112,6 +112,12 @@ static NSString *const kPointCloudKey = @"pointCloud";
     }
 }
 
+- (void)onDepthReady {
+    if (self.onDepthReadyViro) {
+        self.onDepthReadyViro(@{});
+    }
+}
+
 - (void)onAmbientLightUpdate:(float)intensity color:(VROVector3f)color {
     if (self.onAmbientLightUpdateViro) {
         NSString *lightColor = [NSString stringWithFormat:@"#%02x%02x%02x",

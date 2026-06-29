@@ -130,7 +130,7 @@ export default function MyScreen() {
 
 | Component | iOS | Android (non-Quest) | Meta Quest |
 |---|---|---|---|
-| `ViroXRSceneNavigator` | AR (ViroARSceneNavigator) | AR (ViroARSceneNavigator) | Launches VRActivity, renders null in panel |
+| `ViroXRSceneNavigator` | AR (ViroARSceneNavigator) | AR (ViroARSceneNavigator) | Launches VRActivity; mounts a `ViroScene` (VR) or `ViroARScene` (MR + plane detection) root |
 | `ViroVRSceneNavigator` | _(OVR/Cardboard only — not for Quest)_ | OVR/Cardboard VR | Used internally by VRActivity |
 | `StudioSceneNavigator` | AR + Studio content | AR + Studio content | VR + Studio content via VRActivity |
 
@@ -299,6 +299,146 @@ function MyVRScene() {
 }
 ```
 
+### Passthrough styling
+
+`setPassthroughStyle(viewTag, style)` tunes the passthrough layer at runtime
+(`XR_FB_passthrough` → `xrPassthroughLayerSetStyleFB`). `opacity` is the texture
+opacity factor `[0,1]`; `edgeColor` is an `[r,g,b,a]` edge-highlight colour (alpha
+`0` disables the edge effect). No-op off-Quest.
+
+```tsx
+import { setPassthroughStyle, useVRViewTag } from "@reactvision/react-viro";
+
+function MyVRScene() {
+  const viewTag = useVRViewTag();
+
+  // Dim the room to 80% and outline real-world edges in cyan.
+  if (viewTag != null) {
+    setPassthroughStyle(viewTag, { opacity: 0.8, edgeColor: [0, 1, 1, 1] });
+  }
+
+  return <ViroScene>...</ViroScene>;
+}
+```
+
+## 7b. Plane detection & mixed reality on Quest
+
+Quest 3 / 3S can run **mixed-reality AR scenes** through the same OpenXR renderer,
+with plane detection backed by the Quest **room model** (`XR_FB_scene`). This lights
+up the standard Viro AR component API on Quest:
+
+- `ViroARScene` as the scene root (instead of `ViroScene`)
+- `onAnchorFound` / `onAnchorUpdated` / `onAnchorRemoved`
+- `ViroARPlane` / `ViroARPlaneSelector` anchored to detected floors, walls,
+  ceilings and tables
+
+There is **no separate API** — pass an AR scene to `ViroXRSceneNavigator` and it
+works on both phones (ARCore) and Quest (OpenXR). Passthrough is enabled
+automatically when an AR scene is mounted on Quest, so the room is visible behind
+virtual content.
+
+```tsx
+import {
+  ViroXRSceneNavigator,
+  ViroARScene,
+  ViroARPlane,
+  ViroQuad,
+  ViroMaterials,
+} from "@reactvision/react-viro";
+
+function MRScene() {
+  return (
+    <ViroARScene
+      onAnchorFound={(anchor) => console.log("plane found", anchor)}
+    >
+      {/* Auto-anchors to the first detected horizontal plane */}
+      <ViroARPlane minHeight={0.5} minWidth={0.5} alignment="Horizontal">
+        <ViroQuad
+          rotation={[-90, 0, 0]}
+          width={1}
+          height={1}
+          materials={["grid"]}
+        />
+      </ViroARPlane>
+    </ViroARScene>
+  );
+}
+
+// Single scene, both platforms: ARCore on phones, OpenXR plane detection on Quest.
+<ViroXRSceneNavigator initialScene={{ scene: MRScene }} style={{ flex: 1 }} />
+```
+
+Notes & current limitations:
+
+- **Plane data comes from the room model**, not live detection. Planes are the
+  spatial-entity scene captured by **Space Setup** on the headset, exposed via
+  `XR_FB_scene`. You must run Space Setup once (Settings → Physical Space → Space
+  Setup) or the query returns no planes. Meta labels map to Viro classifications
+  (`FLOOR`→Floor, `WALL_FACE`→Wall, `CEILING`→Ceiling, `DESK`/`TABLE`→Table, …).
+- **Permission:** add `horizonos.permission.USE_ANCHOR_API` (the Expo plugin
+  declares it for Quest). It is runtime-granted — request it in-app or
+  `adb shell pm grant <pkg> horizonos.permission.USE_ANCHOR_API`.
+- **Set `hdrEnabled={false}`** on `ViroXRSceneNavigator` for MR scenes. The
+  HDR/bloom post-process path renders to an intermediate target and forces an
+  opaque final composite, which hides passthrough (black background). Direct
+  rendering preserves the transparent clear. (Lifting this restriction is planned.)
+- `XR_EXT_plane_detection` (live, dynamic planes) is also wired as a fallback for
+  runtimes that expose it; current Horizon OS does not, so the room-model path is
+  the active one.
+- **Stereo + non-depth-writing transparency (engine note).** On Quest's tiled GPU,
+  rendering *many* transparent objects with `writesToDepthBuffer: false` breaks the
+  **second (right) eye's entire render** — the whole eye goes black/garbage while
+  the left eye is correct. A single such object is fine; it only manifests at
+  quantity (≈dozens). `ViroARPlaneSelector` hit this with its per-plane overlays;
+  it now uses `writesToDepthBuffer: true` for its overlay material **on Quest only**
+  (phone keeps `false` for clean coplanar blending). If you build custom Quest AR
+  content with many translucent surfaces, have them write depth. The underlying
+  engine bug (non-depth-writing transparent pass breaking stereo at quantity) needs
+  on-device GPU capture to pin down and is tracked as a follow-up.
+- Image markers (`ViroARImageMarker`), persistent/cloud anchors and geospatial
+  are **not yet** bridged on Quest — see `META_HORIZON_PLAN.md` M5.
+
+## 7c. Object detection on Quest
+
+`ViroObjectDetector` runs on Quest 3 / 3S. There's no ARCore camera and the
+passthrough layer isn't app-readable, so frames come from the **Meta Passthrough
+Camera API** (Camera2, Horizon OS v74+). The detector view is a zero-size RN view
+and the camera is independent of the renderer, so it can run alongside an immersive
+`ViroXRSceneNavigator` — `onDetection` results can be bridged into the VR scene
+(both Activities share one JS engine; a module-level store works, like
+`VRQuestNavigatorBridge`).
+
+```tsx
+import { ViroObjectDetector } from "@reactvision/react-viro";
+import { PermissionsAndroid } from "react-native";
+
+// Request the headset-camera permission once before mounting the detector.
+await PermissionsAndroid.requestMultiple([
+  "android.permission.CAMERA",
+  "horizonos.permission.HEADSET_CAMERA",
+]);
+
+<ViroObjectDetector
+  model="yoloe-26n"          // a bundled model name (assets/models/<name>.onnx)
+  mode="prompt-free"
+  confidenceThreshold={0.4}
+  maxFPS={10}
+  onDetection={({ detections }) => {/* label + normalized boundingBox */}}
+/>
+```
+
+Notes & current limitations:
+
+- **Permission:** `horizonos.permission.HEADSET_CAMERA` (Expo plugin declares it;
+  runtime-granted). Quest 3 / 3S + Horizon OS v74+ only.
+- **v1 emits `label` + normalized `boundingBox` only** — no `worldPosition` /
+  `screenBoundingBox` (those need camera extrinsics + a raycast; the camera has its
+  own FOV distinct from the rendered view).
+- Inference falls back to CPU if the NNAPI execution provider lacks a kernel for the
+  model (works, just slower).
+- The styling/opacity of passthrough does not affect detection — the camera feed is
+  independent of the composited passthrough layer.
+
 ## 8. (Optional) Custom VR root
 
 The library auto-registers `ViroQuestEntryPoint` as `"VRQuestScene"`. If you
@@ -365,8 +505,11 @@ export default function VRQuestRoot() {
   `com.oculus.intent.category.VR`. The session stays in `IDLE`, you see a black
   region, and logcat shows errors. Use `ViroXRSceneNavigator` for panel screens;
   `ViroVRSceneNavigator` is for OVR/Cardboard and for the VRActivity context only.
-- **Rendering `ViroARScene` as the root of a VR scene** → renders nothing on Quest.
-  VR scenes must use `ViroScene` as root. `StudioARScene` handles this automatically.
+- **Pure VR vs mixed-reality root** → a fully-virtual VR scene uses `ViroScene` as
+  its root. For mixed reality on Quest (passthrough + plane detection + anchors),
+  use `ViroARScene` as the root instead — see §7b. Both work through
+  `ViroXRSceneNavigator`; pick the root that matches whether you want the room
+  visible and plane anchors.
 - **Calling `launchVRScene()` from a component that's also rendered in
   VRActivity** → don't. The launch belongs in the panel surface only.
 - **Wrong APK on the Quest** → if you ship without `xRMode: ["QUEST"]` in the

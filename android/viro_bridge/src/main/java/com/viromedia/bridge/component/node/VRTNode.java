@@ -86,6 +86,7 @@ import static com.viromedia.bridge.component.node.VRTNodeManager.s2DUnitPer3DUni
 public class VRTNode extends VRTComponent {
     private static final String TAG = "Viro";
     private static final boolean DEBUG_ANCHORING = false;
+    private static final boolean DEBUG_SHADER_UNIFORM = false;
 
     /**
      * If an anchored node is moved to a position less than this value away from the
@@ -1292,11 +1293,11 @@ public class VRTNode extends VRTComponent {
         if (lastUpdate != null && Boolean.TRUE.equals(lastSuccess) &&
             (currentTime - lastUpdate) < UNIFORM_UPDATE_THROTTLE_MS) {
             // Skip this update - too soon since last successful update
-            Log.d(TAG, "THROTTLED: " + materialName + "." + uniformName + " (last update " + (currentTime - lastUpdate) + "ms ago)");
+            if (DEBUG_SHADER_UNIFORM) { Log.d(TAG, "THROTTLED: " + materialName + "." + uniformName + " (last update " + (currentTime - lastUpdate) + "ms ago)"); }
             return;
         }
 
-        Log.d(TAG, "updateShaderOverrideUniform: " + materialName + "." + uniformName + " = " + value + " (lastSuccess=" + lastSuccess + ")");
+        if (DEBUG_SHADER_UNIFORM) { Log.d(TAG, "updateShaderOverrideUniform: " + materialName + "." + uniformName + " = " + value + " (lastSuccess=" + lastSuccess + ")"); }
 
         int totalUpdated = 0;
         int totalNodesInRegistry = 0;
@@ -1316,7 +1317,7 @@ public class VRTNode extends VRTComponent {
 
             if (node.mShaderOverrides == null || !node.mShaderOverrides.contains(materialName)) {
                 if (node.mShaderOverrides != null) {
-                    Log.d(TAG, "  Node has overrides " + node.mShaderOverrides + " but not " + materialName);
+                    if (DEBUG_SHADER_UNIFORM) { Log.d(TAG, "  Node has overrides " + node.mShaderOverrides + " but not " + materialName); }
                 }
                 continue;
             }
@@ -1324,8 +1325,8 @@ public class VRTNode extends VRTComponent {
             totalNodesWithMaterial++;
 
             if (node.mShaderOverrideMap == null || !node.mShaderOverrideMap.containsKey(materialName)) {
-                Log.d(TAG, "  Node has material in list but not in map! map=" +
-                      (node.mShaderOverrideMap == null ? "null" : node.mShaderOverrideMap.keySet()));
+                if (DEBUG_SHADER_UNIFORM) { Log.d(TAG, "  Node has material in list but not in map! map=" +
+                      (node.mShaderOverrideMap == null ? "null" : node.mShaderOverrideMap.keySet())); }
                 continue;
             }
 
@@ -1358,12 +1359,12 @@ public class VRTNode extends VRTComponent {
         if (totalUpdated > 0) {
             sLastUniformUpdateTime.put(throttleKey, currentTime);
             sLastUniformUpdateSuccess.put(throttleKey, Boolean.TRUE);
-            Log.d(TAG, "Updated uniform '" + uniformName + "' on " + totalUpdated + " cloned materials for " + materialName +
-                  " (registry=" + totalNodesInRegistry + ", withMaterial=" + totalNodesWithMaterial + ")");
+            if (DEBUG_SHADER_UNIFORM) { Log.d(TAG, "Updated uniform '" + uniformName + "' on " + totalUpdated + " cloned materials for " + materialName +
+                  " (registry=" + totalNodesInRegistry + ", withMaterial=" + totalNodesWithMaterial + ")"); }
         } else {
             sLastUniformUpdateSuccess.put(throttleKey, Boolean.FALSE);
-            Log.d(TAG, "NO materials found for " + materialName + "." + uniformName +
-                  " (registry=" + totalNodesInRegistry + ", withMaterial=" + totalNodesWithMaterial + ")");
+            if (DEBUG_SHADER_UNIFORM) { Log.d(TAG, "NO materials found for " + materialName + "." + uniformName +
+                  " (registry=" + totalNodesInRegistry + ", withMaterial=" + totalNodesWithMaterial + ")"); }
         }
     }
 

@@ -208,6 +208,11 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
     }
 
     @Override
+    public void onDepthReady() {
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_DEPTH_READY, Arguments.createMap());
+    }
+
+    @Override
     public void onTrackingInitialized() {
         //No-op
     }

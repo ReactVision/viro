@@ -50,8 +50,8 @@ echo '========================================================================='
 echo 'Checking for build artifacts'
 echo '========================================================================='
 if [ ! -f android/viro_bridge/build/outputs/aar/viro_bridge-release.aar ]; then
-    echo -e "Unable to find viro-bridge release output!"
-    exit
+    echo -e "Unable to find viro-bridge release output!" >&2
+    exit 1
 fi
 
 echo '========================================================================='

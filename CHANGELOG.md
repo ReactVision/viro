@@ -1,5 +1,57 @@
 # CHANGELOG
 
+## v2.57.1 — 27 June 2026
+
+### Added
+
+- **Mixed Reality on Meta Quest 3 / 3S.** AR scenes now run through the OpenXR renderer with passthrough, lighting up the standard Viro AR component API on Quest with **no separate API**: pass a `ViroARScene` to `ViroXRSceneNavigator` and the same scene runs on phones (ARCore) and Quest (OpenXR). `onAnchorFound` / `onAnchorUpdated` / `onAnchorRemoved`, `ViroARPlane`, and `ViroARPlaneSelector` all fire from the room's detected floors, walls, ceilings, and tables; passthrough is enabled automatically when an AR scene is mounted. Plane data comes from the Quest **room model** (the spatial-entity scene captured in Space Setup), so it requires `horizonos.permission.USE_ANCHOR_API` and a completed Space Setup on the headset. See `docs/QUEST_SETUP.md` §7b.
+
+- **Object detection on Meta Quest.** `ViroObjectDetector` now runs on Quest 3 / 3S. Because there's no ARCore camera and the passthrough layer isn't app-readable, frames come from the **Meta Passthrough Camera API** (Camera2, Horizon OS v74+). The entire YOLOE/ONNX preprocess → inference → `onDetection` pipeline is reused unchanged; v1 emits `label` + normalized `boundingBox` (no `worldPosition` / `screenBoundingBox` yet — those need camera extrinsics + raycast). Requires `horizonos.permission.HEADSET_CAMERA` (runtime-granted). See `docs/ViroObjectDetector.md`.
+
+- **Passthrough styling API.** `setPassthroughStyle(viewTag, { opacity, edgeColor })` styles the Quest passthrough layer (texture opacity + edge-highlight colour) via `XR_FB_passthrough`'s `xrPassthroughLayerSetStyleFB`. Exported alongside `useVRViewTag()` and the new `ViroPassthroughStyle` type. No-op off-Quest.
+
+### Fixed
+
+- **Passthrough showed a black background on Quest.** Mixed-reality scenes have no skybox or camera quad to fill the view, so the projection layer stayed opaque and hid the passthrough layer beneath it. The OpenXR display now clears transparent (alpha 0) when passthrough is enabled and the projection composition layer is submitted with the source-alpha blend flag, so empty regions reveal the room.
+
+- **`passthroughEnabled` / `handTrackingEnabled` dropped when set before the renderer existed.** On Quest the native renderer is created lazily (deferred to the host Activity's first resume), so an initial `passthroughEnabled` prop set during mount was silently ignored. These values are now cached and re-applied once the renderer initializes — passthrough engages reliably from the first frame.
+
+- **`ViroARPlaneSelector` content rendered in only one eye on Quest.** The selector's plane overlays use a translucent material with `writesToDepthBuffer: false`. On Quest's tiled GPU, rendering many non-depth-writing transparent objects breaks the second (right) eye's entire render — the whole eye goes black/garbage (taking any other scene content, e.g. a model on the selected plane, with it), while the left eye is correct. The overlay material now writes depth **on Quest only** (`writesToDepthBuffer: isQuest`), which renders correctly in both eyes; phone AR keeps `false` for clean coplanar overlay blending and is unchanged. (The underlying engine bug — a non-depth-writing transparent pass breaking stereo at quantity — needs on-device GPU capture and is tracked as a follow-up; see `docs/QUEST_SETUP.md` §7b.)
+
+---
+
+## v2.57.0 — 19 June 2026
+
+### Added
+
+- **`ViroObjectDetector` — on-device object detection.** A new component that runs open-vocabulary [YOLOE](https://docs.ultralytics.com/models/yoloe/) detection through ONNX Runtime, on-device and offline. It runs inside an AR session — sharing the enclosing `ViroARSceneNavigator`'s camera feed — and fires `onDetection` with labels, confidences, and bounding boxes. Each detection also carries a `screenBoundingBox` in density-independent points (dp), aligned to the on-screen camera preview, so boxes drop straight into an absolutely-positioned overlay. iOS and Android reach parity for detection and the 2D overlay (`worldPosition` 3D raycast remains iOS-only for now). Inference is delegated to the companion package **`@reactvision/react-viro-onnx`** (Android uses the NNAPI execution provider with FP16); without the provider the detector emits no detections and fires `onError`. See `docs/ViroObjectDetector.md`.
+
+- **`onDepthReady` event on `ViroARScene`.** Fires once, when AR depth first becomes available, on both iOS and Android. Use it to gate depth-dependent features (occlusion, hit-testing) until the depth subsystem is actually producing data.
+
+- **Expo SDK 56 support.** The config plugin and prebuilt artifacts now build against Expo 56 / React Native's new architecture.
+
+### Improved
+
+- **iOS depth precision.** Depth points are now derived directly from the AR depth map rather than approximated, and the monocular depth model is warmed up ahead of first use — eliminating inaccurate/late depth on the first frames and tightening occlusion and hit-test accuracy on non-LiDAR devices.
+
+### Fixed
+
+- **Layered / stacked GLB animations freezing instead of playing (VIRO-5741).** glTF skeletal clips whose channels mixed STEP and LINEAR interpolation or sat on multiple independent time-grids (common in Blender exports with layered animations) were being dropped or flattened, causing the animation to freeze. Channels are now resampled onto a single common time-grid and merged per joint into one index-aligned keyframe animation, with a per-frame density cap to bound skinning cost on pathological assets. Affected clips now play through fully.
+
+- **16 KB page-size alignment for `libopenxr_loader.so` (Android).** The bundled OpenXR loader library, `libopenxr_loader.so`, previously used 4 KB alignment and failed the 16 KB memory-page requirement for Android 15+ devices, blocking Google Play / Meta Quest Store submission. The loader was updated from 1.1.38 to 1.1.49, which is 16 KB-page aligned. Apps that don't use XR are unaffected.
+
+- **VR controller input** — upgraded the VR event listener path to the new architecture, restoring controller controls in VR.
+
+- **`onDrag` in `StudioSceneNavigator`** — drag events now fire correctly.
+
+- **iOS pod build** — visionOS-only sources are now excluded from the iOS CocoaPods build, fixing compile errors in iOS-only targets.
+
+### Experimental / Preview
+
+- **visionOS renderer.** Initial visionOS support landed: a Metal-based renderer/driver, the React Native bindings, and the renderer bridge. This is a work-in-progress foundation and not yet production-ready.
+
+---
+
 ## v2.56.0 — 04 June 2026
 
 ### Added

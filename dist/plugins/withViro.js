@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULTS = void 0;
-const config_plugins_1 = require("@expo/config-plugins");
 const withViroAndroid_1 = require("./withViroAndroid");
 const withViroIos_1 = require("./withViroIos");
 const CAMERA_USAGE = "Allow $(PRODUCT_NAME) to use your camera";
@@ -34,20 +33,8 @@ exports.DEFAULTS = {
  * @returns expo configuration
  */
 const withViro = (config, props) => {
-    // Validate New Architecture is enabled
-    const newArchEnabled = config.plugins?.some((plugin) => Array.isArray(plugin) &&
-        plugin[0] === "expo-dev-client" &&
-        plugin[1]?.newArchEnabled === true) || config.newArchEnabled === true;
-    if (!newArchEnabled) {
-        config_plugins_1.WarningAggregator.addWarningAndroid("withViro", "ViroReact requires React Native New Architecture (Fabric) to be enabled. " +
-            "Please enable New Architecture in your app configuration. " +
-            'Add "newArchEnabled": true to your app.json/app.config.js expo configuration, ' +
-            "or ensure your React Native project has New Architecture enabled.");
-        config_plugins_1.WarningAggregator.addWarningIOS("withViro", "ViroReact requires React Native New Architecture (Fabric) to be enabled. " +
-            "Please enable New Architecture in your app configuration. " +
-            'Add "newArchEnabled": true to your app.json/app.config.js expo configuration, ' +
-            "or ensure your React Native project has New Architecture enabled.");
-    }
+    // New Architecture is the only architecture in Expo SDK 53+ (and the React
+    // Native versions ViroReact supports), so there is nothing to validate here.
     // Apply platform-specific configurations
     config = (0, withViroIos_1.withViroIos)(config, props);
     config = (0, withViroAndroid_1.withViroAndroid)(config, props);

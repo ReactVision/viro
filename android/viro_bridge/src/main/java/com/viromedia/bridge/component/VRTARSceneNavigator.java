@@ -327,8 +327,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
     public void setAutoFocusEnabled(boolean enabled) {
         mAutoFocusEnabled = enabled;
-        if (mGLInitialized) {
-            ((ViroViewARCore)mViroView).setCameraAutoFocusEnabled(mAutoFocusEnabled);
+        // mGLInitialized can be true while the AR view has already been torn down (e.g. the
+        // renderer-start callback fires after a background/foreground transition or after the
+        // navigator was detached). Guard against a null view to avoid an NPE in
+        // setCameraAutoFocusEnabled (GitHub #478); defer until the view is available again.
+        ViroViewARCore arView = getARView();
+        if (mGLInitialized && arView != null) {
+            arView.setCameraAutoFocusEnabled(mAutoFocusEnabled);
         } else {
             mNeedsAutoFocusToggle = true;
         }

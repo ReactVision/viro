@@ -179,6 +179,17 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
     }
 
     /**
+     * Style the passthrough layer (opacity + edge-highlight colour).
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setPassthroughStyle(float opacity, float edgeR, float edgeG,
+                                    float edgeB, float edgeA) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setPassthroughStyle(opacity, edgeR, edgeG, edgeB, edgeA);
+        }
+    }
+
+    /**
      * Enable or disable skeletal hand tracking.
      * No-op when the underlying view is not a {@link ViroViewOpenXR}.
      */

@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v2.57.3 — 2 July 2026
+
+### Fixed
+
+- **`ViroARImageMarker` no longer crashes the app when its `target` is registered after the marker mounts (viro#478).** Registering targets from a React `useEffect` (the common pattern) runs *after* the marker's native view is committed, so `VRTARImageMarker` looked up a target that did not exist yet and threw an `IllegalArgumentException` from inside a Fabric prop update — which is fatal under the New Architecture (bridgeless) and tore down the entire `ReactHost`, terminating the app. The marker no longer throws (matching iOS, which only `RCTLogError`s); instead it registers interest by target name with `ARTrackingTargetsModule`, which now queues waiters for not-yet-registered targets and flushes them when `createTargets(...)` runs. The marker therefore attaches automatically regardless of whether `createTargets` runs before or after it mounts.
+- **Android 15+ 16 KB launch crash on all apps — removed the non-compliant `libvrapi.so` (viro#491).** v2.57.2 aligned every `PT_LOAD` segment to ≥ 16 KB, but the prebuilt `libvrapi.so` (Meta VrApi / Oculus Mobile SDK) still had a `PT_GNU_RELRO` segment ending on a 4 KB (not 16 KB) boundary, which the Android 15+ linker rejects (`dlopen … "libvrapi.so" program alignment (4096) cannot be smaller than system page size (16384)`). Because `libviro_renderer.so` listed `libvrapi.so` as a `NEEDED` dependency, it was force-loaded on **every** launch — so the crash affected all Android apps on 16 KB-page devices, not just VR. A prebuilt binary's RELRO padding cannot be re-aligned by a field patch, so the fix removes the dependency entirely.
+
+### Removed
+
+- **Deprecated the Oculus Mobile SDK (VrApi) path — `ViroPlatform.OVR_MOBILE` / `ViroViewOVR`.** VrApi targets EOL hardware (GearVR / Oculus Go) and was superseded by the OpenXR path (`ViroPlatform.QUEST` / `ViroViewOpenXR`), which covers all current Meta headsets (Quest 1/2/3/Pro). `OVR_MOBILE` and `ViroViewOVR` are now `@Deprecated` and no longer create a native renderer; selecting `OVR_MOBILE` logs a warning. Companion to `@reactvision/virocore` 2.57.3, which drops `libvrapi.so` and the VrApi renderer from the native build.
+
+---
+
 ## v2.57.2 — 29 June 2026
 
 ### Fixed

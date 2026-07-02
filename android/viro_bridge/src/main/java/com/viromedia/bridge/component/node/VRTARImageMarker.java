@@ -82,13 +82,22 @@ public class VRTARImageMarker extends VRTARNode {
     private void updateARDeclarativeImageNode(final boolean shouldAddToScene) {
         android.util.Log.d("ViroARImageMarker", "updateARDeclarativeImageNode called for target: " + mTargetName);
         ARTrackingTargetsModule trackingTargetsModule = getReactContext().getNativeModule(ARTrackingTargetsModule.class);
-        ARTrackingTargetsModule.ARTargetPromise promise = trackingTargetsModule.getARTargetPromise(mTargetName);
-        android.util.Log.d("ViroARImageMarker", "Promise for target '" + mTargetName + "': " + (promise != null ? "found" : "NOT FOUND"));
-        if (promise != null) {
-            promise.wait(new ARTrackingTargetsModule.ARTargetPromiseListener() {
+        // Register interest in the target by name. If it is already registered the listener
+        // fires (now or when its image finishes downloading); if it is not registered yet
+        // (e.g. createTargets runs in a useEffect after this marker mounts — a common race),
+        // the module queues the listener and fires it once createTargets registers the target.
+        // This must never throw: this runs inside a Fabric prop update and an unhandled
+        // exception would tear down the ReactHost and crash the app (GitHub #478).
+        trackingTargetsModule.addTargetPromiseListener(mTargetName,
+            new ARTrackingTargetsModule.ARTargetPromiseListener() {
                 @Override
                 public void onComplete(String key, ARImageTarget newTarget) {
                     android.util.Log.d("ViroARImageMarker", "Promise onComplete - key: " + key + ", newTarget: " + (newTarget != null ? "valid" : "NULL"));
+                    // The listener may fire after the marker/scene was torn down (deferred
+                    // registration, navigation away). Guard against a null scene.
+                    if (mScene == null) {
+                        return;
+                    }
                     ARDeclarativeImageNode imageNode = (ARDeclarativeImageNode) getNodeJni();
                     android.util.Log.d("ViroARImageMarker", "imageNode: " + (imageNode != null ? "valid" : "NULL"));
                     if (imageNode != null) {
@@ -117,13 +126,12 @@ public class VRTARImageMarker extends VRTARNode {
 
                 @Override
                 public void onError(Exception e) {
-                    android.util.Log.e("ViroARImageMarker", "Promise onError", e);
-                    throw new IllegalStateException("ARImageMarker - unable to fetch target", e);
+                    // Never rethrow here: this callback runs on the main thread inside a
+                    // Fabric prop update, so an unhandled exception tears down the ReactHost
+                    // and crashes the whole app under the New Architecture (GitHub #478).
+                    android.util.Log.e("ViroARImageMarker",
+                        "ARImageMarker - unable to fetch target [" + mTargetName + "]", e);
                 }
             });
-        } else {
-            android.util.Log.e("ViroARImageMarker", "Unknown target: " + mTargetName);
-            throw new IllegalArgumentException("ARImageMarker - unknown target [" + mTargetName + "]");
-        }
     }
 }

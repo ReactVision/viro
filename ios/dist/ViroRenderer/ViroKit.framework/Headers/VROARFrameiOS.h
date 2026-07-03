@@ -145,6 +145,14 @@ private:
     float sampleDepthTextureAtUV(std::shared_ptr<VROTexture> texture, float u, float v) const;
 
     /*
+     Sample the LiDAR depth confidence at normalized UV coordinates (0-1 range).
+     Reads ARKit's ARDepthData.confidenceMap (ARConfidenceLevel: 0=low, 1=medium, 2=high)
+     and normalizes to [0,1] (low=0.0, medium=0.5, high=1.0). Returns -1.0 when confidence
+     is unavailable (no LiDAR / no confidence map).
+     */
+    float sampleConfidenceAtUV(float u, float v) const;
+
+    /*
      Unproject a camera-image-space point (normalized [0,1] in ARKit's landscape image
      space, the same space used for [ARFrame hitTest:]) at a given metric depth (meters
      along the optical axis) to a world-space position. Returns false if camera

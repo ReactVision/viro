@@ -2,6 +2,10 @@
 
 ## v2.57.3 — 2 July 2026
 
+### Added
+
+- **Expo SDK 57 / React Native 0.86 support (viro#492).** Widened `peerDependencies` (`expo` to `<58.0.0`, `react-native` to `<0.87.0`) and `engines`, and bumped the build/test toolchain (`expo` 57, `react-native` 0.86, `@react-native/*` 0.86, `@expo/config-plugins` 57). RN 0.86 ships no breaking changes and the Android bridge resolves the host app's RN version dynamically, so no native changes were required.
+
 ### Fixed
 
 - **`ViroARImageMarker` no longer crashes the app when its `target` is registered after the marker mounts (viro#478).** Registering targets from a React `useEffect` (the common pattern) runs *after* the marker's native view is committed, so `VRTARImageMarker` looked up a target that did not exist yet and threw an `IllegalArgumentException` from inside a Fabric prop update — which is fatal under the New Architecture (bridgeless) and tore down the entire `ReactHost`, terminating the app. The marker no longer throws (matching iOS, which only `RCTLogError`s); instead it registers interest by target name with `ARTrackingTargetsModule`, which now queues waiters for not-yet-registered targets and flushes them when `createTargets(...)` runs. The marker therefore attaches automatically regardless of whether `createTargets` runs before or after it mounts.

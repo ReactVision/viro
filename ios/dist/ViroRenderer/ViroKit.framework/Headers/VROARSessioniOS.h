@@ -126,8 +126,19 @@ public:
     void setPreferMonocularDepth(bool prefer);
     bool isPreferMonocularDepth() const;
 
-    // Use the front (TrueDepth) camera via ARFaceTrackingConfiguration.
-    // When true, world tracking, planes, and LiDAR are unavailable.
+    // Front-camera AR is supplied by an optional external module so that ViroKit
+    // itself never references the ARKit face-tracking / TrueDepth API. Apps that
+    // need it install @reactvision/react-viro-face-tracking, which registers a
+    // provider here. The provider returns a ready-to-run front-camera
+    // ARConfiguration (or nil if the device is unsupported). When no provider is
+    // registered, setFrontCameraEnabled(true) has no effect and AR falls through
+    // to world tracking.
+    typedef ARConfiguration * _Nullable (^VROARFrontCameraConfigProvider)(void);
+    static void setFrontCameraConfigProvider(VROARFrontCameraConfigProvider provider);
+
+    // Enable/disable front-camera AR. Requires a registered config provider
+    // (see setFrontCameraConfigProvider); otherwise it is a no-op. When active,
+    // world tracking, planes, and LiDAR are unavailable.
     void setFrontCameraEnabled(bool enabled);
     bool isFrontCameraEnabled() const { return _frontCameraEnabled; }
 
@@ -371,7 +382,7 @@ private:
     std::shared_ptr<VROMonocularDepthEstimator> _monocularDepthEstimator;
     bool _monocularDepthEnabled;
     bool _preferMonocularDepth;  // When true, use monocular even on LiDAR devices
-    bool _frontCameraEnabled;    // When true, use ARFaceTrackingConfiguration (front camera)
+    bool _frontCameraEnabled;    // When true and a config provider is registered, use front-camera AR
     bool _monocularDepthLoading;
     float _monocularDepthScale;  // Multiplied into depth values (1.0 = no change)
     int   _monocularDepthTargetFPS;  // 0 = use estimator default

@@ -401,16 +401,21 @@ Both features deliver a front-camera feed, but they serve different use cases:
 | **Selfie mirror effect** | ✅ Quad/sphere with camera texture | ❌ Not a mirror — whole scene is front camera |
 | **Face filter / overlay** | ❌ No face tracking | ✅ ARFaceTracking (iOS) / Augmented Faces (Android) |
 | **Capture photo/video** | ✅ `capturePhoto()`, `startRecording()` | ❌ Not supported |
+| **Uses the TrueDepth API (iOS)** | ❌ No — AVFoundation only | ✅ Yes — `ARFaceTrackingConfiguration` |
+| **Extra package needed** | ❌ Built into core | ✅ iOS: [`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking) |
+| **App Store 2.5.1 review** | Passes with no TrueDepth declaration | Reviewed for TrueDepth — needs a real feature + `NSCameraUsageDescription` |
 | **Typical use case** | Picture-in-picture, VR mirror, AR viewport | Selfie AR, face effects, front-facing scenes |
 
 **Use `ViroCameraTexture` when:**
 - You want to show a camera feed on a specific surface (mirror, screen, viewport)
 - You need to keep the back-camera AR world active simultaneously
 - You want photo or video capture from the front camera
+- You want a selfie feed **without** pulling the TrueDepth API into your binary (no App Store 2.5.1 review for it, no extra package)
 
 **Use `frontCameraEnabled` when:**
 - The entire scene should use the front camera as background
 - You want face-tracking behavior (content anchored relative to face or gravity)
 - No geometry-level camera texture needed
+- On iOS: you've installed [`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking) and your app has a genuine front-camera feature (Apple will review it under Guideline 2.5.1 for TrueDepth usage)
 
 See [`PLATFORM_EXTENSIONS.md`](./PLATFORM_EXTENSIONS.md) for the `frontCameraEnabled` API reference.

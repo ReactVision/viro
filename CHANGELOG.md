@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v2.57.2 — 29 June 2026
+
+### Fixed
+
+- **16 KB page-size alignment completed for all bundled native libraries (Android).** Companion to the renderer fix in `@reactvision/virocore` 2.57.2. v2.57.0 aligned `libopenxr_loader.so`, but the prebuilt `libc++_shared.so` inside the renderer AAR was still 4 KB-aligned (`2**12`) and failed the 16 KB memory-page requirement for Android 15+ / Google Play. The renderer's Android NDK was bumped from r25 to r27 — whose `libc++_shared.so` is 16 KB-aligned — and the prebuilt AARs (`viro_renderer-release.aar`, `react_viro-release.aar`) were regenerated. Every 64-bit (`arm64-v8a`) library now reports ≥ 16 KB segment alignment (16 KB / `2**14` for most libs, 64 KB / `2**16` for `libvrapi` / `libgvr`), verified with Google's `check_elf_alignment.sh` (0 unaligned). This unblocks Google Play / Meta Quest Store submission for 16 KB devices.
+
+---
+
 ## v2.57.1 — 27 June 2026
 
 ### Added

@@ -92,6 +92,14 @@ You can get a Studio account, which includes Platform access, for free at <https
 - Cloud Anchors guide: <https://viro-community.readme.io/docs/cloud-anchors>
 - Geospatial Anchors guide: <https://viro-community.readme.io/docs/geospatial-anchors>
 
+## Optional Packages
+
+Two capabilities are shipped as separate, opt-in packages rather than in core — install them only if you need them:
+
+- **[`@reactvision/react-viro-onnx`](https://www.npmjs.com/package/@reactvision/react-viro-onnx)** — on-device object detection. It provides the ONNX Runtime inference engine behind [`ViroObjectDetector`](https://github.com/ReactVision/viro/blob/main/docs/ViroObjectDetector.md) (model inference, NMS, class-name decoding). Without it, `ViroObjectDetector` returns no detections. Keeping it separate avoids bundling ONNX Runtime (~tens of MB) into apps that don't use detection.
+
+- **[`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking)** — front-camera (ARKit face-tracking) AR. It backs the `frontCameraEnabled` prop on `ViroARSceneNavigator`. On iOS ARKit reaches the front camera only through the **TrueDepth** API, which Apple statically scans for under App Store review Guideline 2.5.1 — so it's kept out of the core binary. Apps that don't use front-camera AR stay TrueDepth-free and pass review with no configuration; install this package (and declare TrueDepth) only when you need it. For a selfie *feed* without face tracking, use [`ViroCameraTexture`](https://github.com/ReactVision/viro/blob/main/docs/ViroCameraTexture.md) with `cameraPosition="front"` — that's in core and uses AVFoundation, no TrueDepth.
+
 ## Studio
 
 [ReactVision Studio](https://studio.reactvision.xyz) is our browser-based visual scene editor for AR and VR. Build scenes visually in Studio, then embed them inside your own ViroReact app with a single component. Designers and developers can iterate on a scene in Studio and have it update in production without a new app build.

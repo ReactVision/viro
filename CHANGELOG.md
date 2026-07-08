@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## v2.57.3 — 2 July 2026
+
+### Added
+
+- **Expo SDK 57 / React Native 0.86 support (viro#492).** Widened `peerDependencies` (`expo` to `<58.0.0`, `react-native` to `<0.87.0`) and `engines`, and bumped the build/test toolchain (`expo` 57, `react-native` 0.86, `@react-native/*` 0.86, `@expo/config-plugins` 57). RN 0.86 ships no breaking changes and the Android bridge resolves the host app's RN version dynamically, so no native changes were required.
+
+### Changed
+
+- **`frontCameraEnabled` on iOS now requires the optional [`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking) package.** ARKit exposes the front camera only through `ARFaceTrackingConfiguration` (the TrueDepth API), and Apple's App Store review (Guideline 2.5.1) statically scans the binary for it — so bundling it in core caused *every* app, including rear-camera-only ones (image markers, world tracking), to be flagged for unused TrueDepth code. That path has been extracted from core (companion to `@reactvision/virocore` 2.57.3's provider seam) into a plug-and-play package whose Expo config plugin adds the pod and injects `NSCameraUsageDescription`. Apps that need front-camera face tracking install it and declare TrueDepth to Apple; everyone else ships a TrueDepth-free binary that passes 2.5.1 with no configuration. Without the package, `frontCameraEnabled` is a no-op on iOS (falls through to world tracking). **Android is unchanged** — front-camera AR (ARCore) stays in core, as there's no Play Store TrueDepth restriction. For a selfie *feed* without face tracking, use `ViroCameraTexture` with `cameraPosition="front"` (AVFoundation, no TrueDepth). See `docs/PLATFORM_EXTENSIONS.md`.
+
+### Fixed
+
+- **ViroVideo no longer crashes or freezes around Android lifecycle transitions (viro#478).** With a `ViroVideo` in the scene, a background/foreground transition could crash the app (ExoPlayer listener callbacks reaching freed native memory after the video was torn down) and leaving the screen could freeze/ANR (the GL render thread blocked calling ExoPlayer on the main thread while the main thread waited for the GL thread in `GLSurfaceView.surfaceDestroyed()`). Fixed in `@reactvision/virocore` 2.57.3 via a post-destroy callback guard, a main-thread-refreshed cache for per-frame position/duration, and fire-and-forget play/pause.
+- **`ViroARImageMarker` no longer crashes the app when its `target` is registered after the marker mounts.** Registering targets from a React `useEffect` (the common pattern) runs *after* the marker's native view is committed, so `VRTARImageMarker` looked up a target that did not exist yet and threw an `IllegalArgumentException` from inside a Fabric prop update — which is fatal under the New Architecture (bridgeless) and tore down the entire `ReactHost`, terminating the app. The marker no longer throws (matching iOS, which only `RCTLogError`s); instead it registers interest by target name with `ARTrackingTargetsModule`, which now queues waiters for not-yet-registered targets and flushes them when `createTargets(...)` runs. The marker therefore attaches automatically regardless of whether `createTargets` runs before or after it mounts.
+- **Removed the non-compliant `libvrapi.so` (viro#491).** v2.57.2 aligned every `PT_LOAD` segment to ≥ 16 KB, but the prebuilt `libvrapi.so` (Meta VrApi / Oculus Mobile SDK) still had a `PT_GNU_RELRO` segment ending on a 4 KB boundary, which the Android 15+ linker rejects (`dlopen … "libvrapi.so" program alignment (4096) cannot be smaller than system page size (16384)`). Because `libviro_renderer.so` listed `libvrapi.so` as a `NEEDED` dependency, it was force-loaded on **every** launch — so the crash affected all Android apps, not just VR. A prebuilt binary's RELRO padding cannot be re-aligned by a field patch, so the fix removes the dependency entirely.
+
+### Removed
+
+- **Deprecated the Oculus Mobile SDK (VrApi) path — `ViroPlatform.OVR_MOBILE` / `ViroViewOVR`.** VrApi targets EOL hardware (GearVR / Oculus Go) and was superseded by the OpenXR path (`ViroPlatform.QUEST` / `ViroViewOpenXR`), which covers all current Meta headsets (Quest 1/2/3/Pro). `OVR_MOBILE` and `ViroViewOVR` are now `@Deprecated` and no longer create a native renderer; selecting `OVR_MOBILE` logs a warning. Companion to `@reactvision/virocore` 2.57.3, which drops `libvrapi.so` and the VrApi renderer from the native build.
+
+---
+
 ## v2.57.2 — 29 June 2026
 
 ### Fixed

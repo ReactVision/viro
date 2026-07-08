@@ -150,6 +150,12 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
     protected ViroView createViroView(ReactContext reactContext) {
         switch (mPlatform) {
             case OVR_MOBILE:
+                // Deprecated in 2.57.3: the Oculus Mobile SDK (VrApi) path targets EOL hardware
+                // (GearVR / Oculus Go) and its libvrapi.so is not 16 KB page-size compliant
+                // (viro#491). Use the QUEST (OpenXR) platform instead. ViroViewOVR no longer
+                // creates a native renderer.
+                ViroLog.warn(TAG, "ViroPlatform.OVR_MOBILE is deprecated and no longer supported; "
+                        + "use ViroPlatform.QUEST (OpenXR) for Meta headsets.");
                 return new ViroViewOVR(reactContext.getCurrentActivity(),
                         new StartupListenerOVR(this));
             case QUEST:

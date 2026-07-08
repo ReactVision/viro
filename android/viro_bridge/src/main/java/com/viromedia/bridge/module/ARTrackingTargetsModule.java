@@ -142,8 +142,44 @@ public class ARTrackingTargetsModule extends ReactContextBaseJavaModule {
      TODO: change this back to non-static. Required for VIRO-3474.
      */
     private static HashMap<String, ARTargetPromise> sPromiseMap = new HashMap<>();
+
+    // Listeners waiting for a target that has not been registered yet. A marker can mount
+    // and query its target before createTargets() runs (e.g. createTargets is called from a
+    // React useEffect, which fires after the marker's native view is committed — a common
+    // race). Instead of failing, the marker queues a waiter here; createTargets() flushes it
+    // once the target is registered. See VRTARImageMarker / GitHub #478.
+    private static HashMap<String, ArrayList<ARTargetPromiseListener>> sPendingWaiters = new HashMap<>();
+
+    // createTargets() runs on the native-modules thread while markers register from the UI
+    // thread; guard the maps so "get-or-queue" is atomic against "register-and-flush".
+    private static final Object sLock = new Object();
+
     public void clearTargets() {
-        sPromiseMap = new HashMap<>();
+        synchronized (sLock) {
+            sPromiseMap = new HashMap<>();
+            sPendingWaiters = new HashMap<>();
+        }
+    }
+
+    /**
+     * Register a listener for a target by name. If the target is already registered the
+     * listener fires (immediately or when its image finishes downloading). If it is not
+     * registered yet, the listener is queued and fires when createTargets() registers it.
+     */
+    public void addTargetPromiseListener(String targetName, ARTargetPromiseListener listener) {
+        synchronized (sLock) {
+            ARTargetPromise promise = sPromiseMap.get(targetName);
+            if (promise != null) {
+                promise.wait(listener);
+            } else {
+                ArrayList<ARTargetPromiseListener> waiters = sPendingWaiters.get(targetName);
+                if (waiters == null) {
+                    waiters = new ArrayList<>();
+                    sPendingWaiters.put(targetName, waiters);
+                }
+                waiters.add(listener);
+            }
+        }
     }
 
     public ARTrackingTargetsModule(ReactApplicationContext reactContext) {
@@ -196,13 +232,25 @@ public class ARTrackingTargetsModule extends ReactContextBaseJavaModule {
             ARTargetPromise promise = new ARTargetPromise(key, source, orientation, physicalWidth);
             promise.fetch(getReactApplicationContext());
 
-            sPromiseMap.put(key, promise);
+            synchronized (sLock) {
+                sPromiseMap.put(key, promise);
+
+                // Flush any markers that mounted and asked for this target before it existed.
+                ArrayList<ARTargetPromiseListener> waiters = sPendingWaiters.remove(key);
+                if (waiters != null) {
+                    for (ARTargetPromiseListener waiter : waiters) {
+                        promise.wait(waiter);
+                    }
+                }
+            }
         }
     }
 
     @ReactMethod
     public void deleteTarget(final String targetName) {
-        sPromiseMap.remove(targetName);
+        synchronized (sLock) {
+            sPromiseMap.remove(targetName);
+        }
     }
 
     public ARTargetPromise getARTargetPromise(String targetName) {

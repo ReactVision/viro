@@ -392,9 +392,13 @@ Switch the AR session to use the front-facing camera.
 | -------------------- | --------- | ------- | ----------------------------------------------------------- |
 | `frontCameraEnabled` | `boolean` | `false` | Use the front (selfie) camera as the AR session background. |
 
+> **iOS requires the [`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking) package.** The front camera on iOS is only reachable through ARKit's `ARFaceTrackingConfiguration`, which uses the **TrueDepth** API. That API is deliberately **not** in the core `@reactvision/react-viro` binary — otherwise every app would be flagged under App Store review Guideline 2.5.1. Install the optional package (≥ `react-viro` 2.57.3) to add it back and declare the TrueDepth usage. Without it, `frontCameraEnabled` is a no-op on iOS and the session falls through to world tracking. On **Android** the package is not needed — front-camera AR ships in core.
+>
+> If you only want a selfie **feed** (no face tracking), don't set `frontCameraEnabled` at all — use [`ViroCameraTexture`](./ViroCameraTexture.md) with `cameraPosition="front"`, which uses AVFoundation and never touches the TrueDepth API.
+
 **Platform behavior:**
 
-- **iOS:** Uses `ARFaceTrackingConfiguration` (TrueDepth camera). Gravity-aligned world coordinate system is preserved — 3D content at fixed world positions is world-locked. Requires iPhone X or newer. Plane detection and LiDAR are unavailable.
+- **iOS:** Uses `ARFaceTrackingConfiguration` (TrueDepth camera), supplied by the `@reactvision/react-viro-face-tracking` package. Gravity-aligned world coordinate system is preserved — 3D content at fixed world positions is world-locked. Requires iPhone X or newer. Plane detection and LiDAR are unavailable.
 - **Android:** Uses ARCore Augmented Faces (`AR_AUGMENTED_FACE_MODE_MESH3D`) with front camera. Falls back to front-camera-only mode if Augmented Faces is not supported by the device.
 
 **What still works with `frontCameraEnabled=true`:**
@@ -488,7 +492,7 @@ function MirrorScene() {
 | `monocularDepthScale`     | ✅  | ❌      | iOS only                                  |
 | `monocularDepthTargetFPS` | ✅  | ❌      | iOS only                                  |
 | `depthDebugEnabled`       | ✅  | ❌      | iOS only                                  |
-| `frontCameraEnabled`      | ✅  | ✅      | Android requires ARCore-certified device  |
+| `frontCameraEnabled`      | ✅  | ✅      | iOS needs `@reactvision/react-viro-face-tracking`; Android requires ARCore-certified device |
 | `ViroCameraTexture`       | ✅  | ✅      |                                           |
 
 ---
@@ -528,6 +532,10 @@ Call `pushSamples` with at least one chunk **before** `play`. If the ring buffer
 
 The world mesh physics body is managed directly by `VROARWorldMesh` in C++ and does not require `physicsWorld` on `ViroARScene`. However, JS `physicsBody` components **do** require `physicsWorld={{ gravity: [0,-9.81,0] }}` on the scene.
 
+### frontCameraEnabled — iOS package requirement
+
+On iOS, `frontCameraEnabled` does nothing unless [`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking) is installed — the core binary intentionally omits the ARKit TrueDepth API to pass App Store review 2.5.1. If the prop seems ignored on iOS, check the logs for `[ViroFaceTracking] … not found` (package missing or its native files not added to the ViroKit build) and confirm `react-viro` ≥ 2.57.3. Android needs no extra package.
+
 ### frontCameraEnabled — world tracking limitation
 
 With `frontCameraEnabled=true`, ViroNodes placed at fixed world positions appear world-locked on iOS (gravity alignment) but may appear screen-fixed on Android devices that fall back from Augmented Faces to front-camera-only mode. Do not use `ViroARPlane` or plane detection callbacks — they will not fire.
@@ -548,7 +556,7 @@ The following features have been implemented but lack user-facing documentation:
 
 3. **`ViroCameraTexture` capture methods** — `capturePhoto()` and `startRecording()`/`stopRecording()` are implemented natively but lack comprehensive usage examples and error-handling documentation.
 
-4. **Face anchors with `frontCameraEnabled`** — When `ARFaceTrackingConfiguration` is active on iOS, `ARFaceAnchor` objects are created. These are not currently exposed to JS. A future `ViroFaceAnchor` component could allow content to follow the detected face.
+4. **Face anchors with `frontCameraEnabled`** — When `ARFaceTrackingConfiguration` is active on iOS (via the `@reactvision/react-viro-face-tracking` package), `ARFaceAnchor` objects are created. These are not currently exposed to JS. A future `ViroFaceAnchor` component — most likely surfaced through that package — could allow content to follow the detected face.
 
 5. **`useVirtualController(id)` hook** — Planned but not yet implemented. Would allow reading `VROInputState` from JS at 30 Hz without passing callbacks through every component.
 

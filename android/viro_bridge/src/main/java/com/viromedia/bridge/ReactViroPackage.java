@@ -106,7 +106,16 @@ public class ReactViroPackage implements ReactPackage {
     public static final String ON_EXIT_VIRO_BROADCAST ="com.viromedia.bridge.broadcast.OnExitViro";
 
     public enum ViroPlatform {
-        GVR, OVR_MOBILE, AR, QUEST
+        GVR,
+        /**
+         * @deprecated Deprecated in 2.57.3 — the Oculus Mobile SDK (VrApi) path targets EOL
+         * hardware (GearVR / Oculus Go) and its {@code libvrapi.so} is not 16 KB page-size
+         * compliant (viro#491). Use {@link #QUEST} (OpenXR) for all current Meta headsets.
+         */
+        @Deprecated
+        OVR_MOBILE,
+        AR,
+        QUEST
     }
 
     private final ViroPlatform mViroPlatform;

@@ -9,6 +9,12 @@ static const NSTimeInterval kTimeout = 30.0;
 // transport must outlive the proxy's own timeout or valid requests get cut off.
 static const NSTimeInterval kApiRequestTimeout = 40.0;
 
+// @internal session auth for first-party apps (e.g. StudioGo). When set, the
+// fetch methods target this base URL with Authorization: Bearer + x-rv-client
+// and send NO x-api-key, so the server's resolveApiAuth takes the JWT path.
+// Immutable snapshot; module methods run serially on one methodQueue.
+static NSDictionary *gStudioSession = nil;
+
 @implementation VRTStudioModule
 
 RCT_EXPORT_MODULE(VRTStudio);
@@ -22,13 +28,31 @@ RCT_EXPORT_MODULE(VRTStudio);
 - (NSString *)readApiKey    { return [self readInfoString:kApiKeyKey]; }
 - (NSString *)readProjectId { return [self readInfoString:kProjectIdKey]; }
 
-- (void)runGet:(NSString *)url apiKey:(NSString *)apiKey resolve:(RCTPromiseResolveBlock)resolve {
+// Resolves { baseUrl, headers } for the active auth mode. A set session wins
+// over the manifest RVApiKey. Returns nil when neither is available.
+- (NSDictionary *)authContext {
+    NSDictionary *session = gStudioSession;
+    if (session) {
+        NSMutableDictionary *headers = [NSMutableDictionary new];
+        headers[@"Authorization"] = [NSString stringWithFormat:@"Bearer %@", session[@"accessToken"]];
+        NSString *clientTag = session[@"clientTag"];
+        if (clientTag.length > 0) headers[@"x-rv-client"] = clientTag;
+        return @{@"baseUrl": session[@"baseUrl"], @"headers": headers};
+    }
+    NSString *apiKey = [self readApiKey];
+    if (!apiKey) return nil;
+    return @{@"baseUrl": kBaseUrl, @"headers": @{@"x-api-key": apiKey}};
+}
+
+- (void)runGet:(NSString *)url headers:(NSDictionary *)headers resolve:(RCTPromiseResolveBlock)resolve {
     NSURL *nsUrl = [NSURL URLWithString:url];
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nsUrl
                                                        cachePolicy:NSURLRequestUseProtocolCachePolicy
                                                    timeoutInterval:kTimeout];
     [req setHTTPMethod:@"GET"];
-    [req setValue:apiKey forHTTPHeaderField:@"x-api-key"];
+    [headers enumerateKeysAndObjectsUsingBlock:^(NSString *name, NSString *value, BOOL *stop) {
+        [req setValue:value forHTTPHeaderField:name];
+    }];
 
     NSURLSession *session = [NSURLSession sharedSession];
     [[session dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
@@ -56,15 +80,17 @@ RCT_EXPORT_MODULE(VRTStudio);
 
 - (void)runPost:(NSString *)url
            body:(NSString *)bodyJson
-         apiKey:(NSString *)apiKey
+        headers:(NSDictionary *)headers
         resolve:(RCTPromiseResolveBlock)resolve {
     NSURL *nsUrl = [NSURL URLWithString:url];
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nsUrl
                                                        cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                                    timeoutInterval:kApiRequestTimeout];
     [req setHTTPMethod:@"POST"];
-    [req setValue:apiKey forHTTPHeaderField:@"x-api-key"];
     [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [headers enumerateKeysAndObjectsUsingBlock:^(NSString *name, NSString *value, BOOL *stop) {
+        [req setValue:value forHTTPHeaderField:name];
+    }];
     [req setHTTPBody:[bodyJson dataUsingEncoding:NSUTF8StringEncoding]];
 
     NSURLSession *session = [NSURLSession sharedSession];
@@ -97,33 +123,33 @@ RCT_EXPORT_MODULE(VRTStudio);
 RCT_EXPORT_METHOD(rvStudioApiRequest:(NSString *)bodyJson
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    NSString *apiKey = [self readApiKey];
-    if (!apiKey) {
+    NSDictionary *ctx = [self authContext];
+    if (!ctx) {
         resolve(@{@"success": @NO, @"error": @"RVApiKey not set in Info.plist"});
         return;
     }
-    NSString *url = [NSString stringWithFormat:@"%@/functions/v1/scene-api-request", kBaseUrl];
-    [self runPost:url body:bodyJson apiKey:apiKey resolve:resolve];
+    NSString *url = [NSString stringWithFormat:@"%@/functions/v1/scene-api-request", ctx[@"baseUrl"]];
+    [self runPost:url body:bodyJson headers:ctx[@"headers"] resolve:resolve];
 }
 
 RCT_EXPORT_METHOD(rvGetScene:(NSString *)sceneId
                      resolve:(RCTPromiseResolveBlock)resolve
                       reject:(RCTPromiseRejectBlock)reject) {
-    NSString *apiKey = [self readApiKey];
-    if (!apiKey) {
+    NSDictionary *ctx = [self authContext];
+    if (!ctx) {
         resolve(@{@"success": @NO, @"error": @"RVApiKey not set in Info.plist"});
         return;
     }
     NSString *url = [NSString stringWithFormat:@"%@/functions/v1/scenes/%@",
-                     kBaseUrl,
+                     ctx[@"baseUrl"],
                      [sceneId stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet]];
-    [self runGet:url apiKey:apiKey resolve:resolve];
+    [self runGet:url headers:ctx[@"headers"] resolve:resolve];
 }
 
 RCT_EXPORT_METHOD(rvGetProject:(RCTPromiseResolveBlock)resolve
                         reject:(RCTPromiseRejectBlock)reject) {
-    NSString *apiKey = [self readApiKey];
-    if (!apiKey) {
+    NSDictionary *ctx = [self authContext];
+    if (!ctx) {
         resolve(@{@"success": @NO, @"error": @"RVApiKey not set in Info.plist"});
         return;
     }
@@ -133,15 +159,39 @@ RCT_EXPORT_METHOD(rvGetProject:(RCTPromiseResolveBlock)resolve
         return;
     }
     NSString *url = [NSString stringWithFormat:@"%@/functions/v1/projects/%@",
-                     kBaseUrl,
+                     ctx[@"baseUrl"],
                      [projectId stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet]];
-    [self runGet:url apiKey:apiKey resolve:resolve];
+    [self runGet:url headers:ctx[@"headers"] resolve:resolve];
 }
 
 RCT_EXPORT_METHOD(rvGetProjectId:(RCTPromiseResolveBlock)resolve
                           reject:(RCTPromiseRejectBlock)reject) {
     NSString *projectId = [self readProjectId];
     resolve(projectId ?: [NSNull null]);
+}
+
+// @internal — sets/clears the first-party session auth (see gStudioSession).
+// A dict { baseUrl, accessToken, clientTag? } enables session mode; null /
+// NSNull / malformed reverts to manifest RVApiKey mode.
+RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
+                             resolve:(RCTPromiseResolveBlock)resolve
+                              reject:(RCTPromiseRejectBlock)reject) {
+    NSString *baseUrl     = [config isKindOfClass:[NSDictionary class]] ? config[@"baseUrl"] : nil;
+    NSString *accessToken = [config isKindOfClass:[NSDictionary class]] ? config[@"accessToken"] : nil;
+    if (baseUrl.length == 0 || accessToken.length == 0) {
+        gStudioSession = nil;
+        resolve([NSNull null]);
+        return;
+    }
+    while ([baseUrl hasSuffix:@"/"]) {
+        baseUrl = [baseUrl substringToIndex:baseUrl.length - 1];
+    }
+    NSMutableDictionary *snapshot =
+        [@{ @"baseUrl": baseUrl, @"accessToken": accessToken } mutableCopy];
+    NSString *clientTag = config[@"clientTag"];
+    if (clientTag.length > 0) snapshot[@"clientTag"] = clientTag;
+    gStudioSession = [snapshot copy];
+    resolve([NSNull null]);
 }
 
 @end

@@ -1,5 +1,12 @@
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { ActivityIndicator, StyleSheet, View, ViewStyle } from "react-native";
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
@@ -15,6 +22,22 @@ import { VRTStudioModule } from "./VRTStudioModule";
 function LoadingARScene() { return <ViroARScene />; }
 function LoadingVRScene() { return <ViroScene />; }
 
+type ViroOcclusionMode = "peopleOnly" | "depthBased" | undefined;
+
+/** Maps a project's occlusion_mode to the Viro navigator's occlusionMode. */
+function mapOcclusionMode(
+  dbValue: string | null | undefined
+): ViroOcclusionMode {
+  switch (dbValue) {
+    case "PEOPLEONLY":
+      return "peopleOnly";
+    case "DEPTHBASED":
+      return "depthBased";
+    default:
+      return undefined;
+  }
+}
+
 const styles = StyleSheet.create({
   loader: {
     position: "absolute",
@@ -24,6 +47,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
   },
 });
+
+/** Imperative handle exposed via ref. */
+export interface StudioSceneNavigatorHandle {
+  /** Screenshots the AR renderer. Resolves `{ success: false }` (no-op) on Quest. */
+  takeScreenshot: (
+    fileName: string,
+    saveToCameraRoll: boolean
+  ) => Promise<{ success: boolean; url?: string; errorCode?: string }>;
+}
 
 interface StudioSceneNavigatorProps {
   /**
@@ -38,6 +70,12 @@ interface StudioSceneNavigatorProps {
   onError?: (err: Error) => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onExitViro?: () => void;
+  /** Fired after the scene is fetched and parsed, before it is pushed. */
+  onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
+  /** Threaded to the initial scene's StudioARScene (initial scene only). */
+  onPlaneDetected?: () => void;
+  onPlaneSelected?: () => void;
+  noAssetsMessage?: string;
 }
 
 /**
@@ -53,16 +91,26 @@ interface StudioSceneNavigatorProps {
  * ready. This means VRActivity always launches with the actual content scene
  * as its initial scene, avoiding the LoadingVRScene → replace timing race.
  */
-export function StudioSceneNavigator({
-  sceneId,
-  worldAlignment = "Gravity",
-  autofocus = true,
-  style,
-  onSceneReady,
-  onError,
-  onSceneChange,
-  onExitViro,
-}: StudioSceneNavigatorProps) {
+export const StudioSceneNavigator = forwardRef<
+  StudioSceneNavigatorHandle,
+  StudioSceneNavigatorProps
+>(function StudioSceneNavigator(
+  {
+    sceneId,
+    worldAlignment = "Gravity",
+    autofocus = true,
+    style,
+    onSceneReady,
+    onError,
+    onSceneChange,
+    onExitViro,
+    onSceneLoaded,
+    onPlaneDetected,
+    onPlaneSelected,
+    noAssetsMessage,
+  },
+  ref
+) {
   const navigatorRef = useRef<any>(null);
   const loadedSceneIdRef = useRef<string | null>(null);
 
@@ -82,13 +130,45 @@ export function StudioSceneNavigator({
   const onSceneReadyRef = useRef(onSceneReady);
   const onErrorRef = useRef(onError);
   const onSceneChangeRef = useRef(onSceneChange);
+  const onSceneLoadedRef = useRef(onSceneLoaded);
+  const onPlaneDetectedRef = useRef(onPlaneDetected);
+  const onPlaneSelectedRef = useRef(onPlaneSelected);
+  const noAssetsMessageRef = useRef(noAssetsMessage);
   onSceneReadyRef.current = onSceneReady;
   onErrorRef.current = onError;
   onSceneChangeRef.current = onSceneChange;
+  onSceneLoadedRef.current = onSceneLoaded;
+  onPlaneDetectedRef.current = onPlaneDetected;
+  onPlaneSelectedRef.current = onPlaneSelected;
+  noAssetsMessageRef.current = noAssetsMessage;
 
   // On Quest: holds the resolved scene entry. ViroXRSceneNavigator is not
   // rendered until this is non-null, so VRActivity always launches into content.
   const [vrSceneEntry, setVrSceneEntry] = useState<{ scene: any; passProps?: any } | null>(null);
+
+  // Host config derived from the loaded scene; native setters apply post-mount,
+  // so setting these after the navigator mounts is fine.
+  const [occlusionMode, setOcclusionMode] =
+    useState<ViroOcclusionMode>(undefined);
+  const [numberOfTrackedImages, setNumberOfTrackedImages] = useState<
+    number | undefined
+  >(undefined);
+
+  useImperativeHandle(
+    ref,
+    (): StudioSceneNavigatorHandle => ({
+      takeScreenshot: (fileName, saveToCameraRoll) => {
+        // On AR the handle is the ViroARSceneNavigator instance (has
+        // arSceneNavigator.takeScreenshot); on Quest it's a bridge without it.
+        const nav = navigatorRef.current?.arSceneNavigator;
+        if (typeof nav?.takeScreenshot !== "function") {
+          return Promise.resolve({ success: false });
+        }
+        return nav.takeScreenshot(fileName, saveToCameraRoll);
+      },
+    }),
+    []
+  );
 
   const resolveSceneId = useCallback(async (): Promise<string> => {
     if (sceneId) return sceneId;
@@ -136,6 +216,17 @@ export function StudioSceneNavigator({
 
       loadedSceneIdRef.current = resolvedSceneId;
 
+      // Derive host config from the scene (occlusion + image tracking).
+      const triggerImageCount = sceneData.assets.filter(
+        (a) => !!a.trigger_image_url
+      ).length;
+      setNumberOfTrackedImages(
+        triggerImageCount > 0 ? Math.min(triggerImageCount, 5) : undefined
+      );
+      setOcclusionMode(mapOcclusionMode(sceneData.project?.occlusion_mode));
+
+      onSceneLoadedRef.current?.(sceneData);
+
       // On Quest: pre-register animations and materials before VRActivity launches.
       // This mirrors the module-level registration pattern used by XRSceneContent —
       // native registrations complete before any Viro components mount, eliminating
@@ -152,6 +243,9 @@ export function StudioSceneNavigator({
           sceneData,
           onReady: onSceneReadyRef.current,
           onSceneChange: onSceneChangeRef.current,
+          onPlaneDetected: onPlaneDetectedRef.current,
+          onPlaneSelected: onPlaneSelectedRef.current,
+          noAssetsMessage: noAssetsMessageRef.current,
           variableStore: variableStoreRef.current,
         },
       };
@@ -199,8 +293,10 @@ export function StudioSceneNavigator({
       vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }}
       worldAlignment={worldAlignment}
       autofocus={autofocus}
+      numberOfTrackedImages={numberOfTrackedImages}
+      occlusionMode={occlusionMode}
       onExitViro={onExitViro}
       style={style ?? StyleSheet.absoluteFill}
     />
   );
-}
+});

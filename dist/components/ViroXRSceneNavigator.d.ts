@@ -47,6 +47,8 @@ export declare const ViroXRSceneNavigator: React.ForwardRefExoticComponent<ViewP
     autofocus?: boolean;
     videoQuality?: "High" | "Low";
     numberOfTrackedImages?: number;
+    /** AR depth/people occlusion. Flows via ...rest to ViroARSceneNavigator. */
+    occlusionMode?: "peopleOnly" | "depthBased";
     vrModeEnabled?: boolean;
     passthroughEnabled?: boolean;
     handTrackingEnabled?: boolean;

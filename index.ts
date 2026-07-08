@@ -403,4 +403,5 @@ export type {
   StudioSceneFunction,
   StudioSceneMeta,
   StudioProjectMeta,
+  StudioSceneNavigatorHandle,
 } from "./components/Studio";

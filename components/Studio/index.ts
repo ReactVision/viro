@@ -1,5 +1,6 @@
 export { StudioARScene } from "./StudioARScene";
 export { StudioSceneNavigator } from "./StudioSceneNavigator";
+export type { StudioSceneNavigatorHandle } from "./StudioSceneNavigator";
 export type {
   StudioAnimation,
   StudioAsset,

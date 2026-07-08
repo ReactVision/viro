@@ -25,7 +25,6 @@ function LoadingVRScene() { return <ViroScene />; }
 
 type ViroOcclusionMode = "peopleOnly" | "depthBased" | undefined;
 
-/** Maps a project's occlusion_mode to the Viro navigator's occlusionMode. */
 function mapOcclusionMode(
   dbValue: string | null | undefined
 ): ViroOcclusionMode {
@@ -84,7 +83,7 @@ export interface StudioSceneNavigatorProps {
   loadingView?: React.ReactNode;
   /**
    * Opt-in UI for a caught render error. The boundary always catches and calls
-   * `onError`; when this is omitted it renders nothing (children are gone).
+   * `onError`; when this is omitted it renders nothing.
    */
   renderError?: (error: Error) => React.ReactNode;
 }
@@ -127,7 +126,6 @@ export const StudioSceneNavigator = forwardRef<
   const navigatorRef = useRef<any>(null);
   const loadedSceneIdRef = useRef<string | null>(null);
 
-  // Drives the loading overlay: false until StudioARScene reports onReady.
   const [isSceneReady, setIsSceneReady] = useState(false);
 
   // Session-scoped variable store: outlives every scene push, resets when the
@@ -239,7 +237,6 @@ export const StudioSceneNavigator = forwardRef<
 
       loadedSceneIdRef.current = resolvedSceneId;
 
-      // Derive host config from the scene (occlusion + image tracking).
       const triggerImageCount = sceneData.assets.filter(
         (a) => !!a.trigger_image_url
       ).length;
@@ -250,11 +247,10 @@ export const StudioSceneNavigator = forwardRef<
 
       onSceneLoadedRef.current?.(sceneData);
 
-      // On Quest: pre-register animations and materials before VRActivity launches.
-      // This mirrors the module-level registration pattern used by XRSceneContent —
-      // native registrations complete before any Viro components mount, eliminating
-      // the race between registerAnimations/createMaterials native calls and the
-      // Fabric commit that creates those components.
+      // On Quest, pre-register animations and materials before VRActivity
+      // launches so the native registrations land before any Viro component
+      // mounts; otherwise registerAnimations/createMaterials races the Fabric
+      // commit that creates those components.
       if (isQuest) {
         registerSceneAnimations(sceneData.animations);
         registerStudioMaterialsForAssets(sceneData.assets);
@@ -274,8 +270,8 @@ export const StudioSceneNavigator = forwardRef<
       };
 
       if (isQuest) {
-        // On Quest: setting vrSceneEntry triggers ViroXRSceneNavigator to mount
-        // with StudioARScene as vrInitialScene — VRActivity gets content immediately.
+        // Setting vrSceneEntry mounts ViroXRSceneNavigator with StudioARScene as
+        // vrInitialScene, so VRActivity launches straight into content.
         setVrSceneEntry(entry);
       } else {
         navigatorRef.current?.arSceneNavigator?.push(entry);
@@ -299,10 +295,9 @@ export const StudioSceneNavigator = forwardRef<
     return () => { cancelled = true; };
   }, [sceneId, loadScene]);
 
-  // On Quest: show an overlay until scene data is ready, then mount
-  // ViroXRSceneNavigator (which launches VRActivity with content immediately).
-  // Quest has no camera passthrough, so it always needs something on screen —
-  // the caller's loadingView if provided, else a built-in spinner.
+  // Quest has no camera passthrough, so during load it always needs something
+  // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
+  // live camera, so its overlay stays opt-in.)
   if (isQuest && !vrSceneEntry) {
     return (
       <View style={styles.loader}>
@@ -329,8 +324,8 @@ export const StudioSceneNavigator = forwardRef<
           onExitViro={onExitViro}
           style={StyleSheet.absoluteFill}
         />
-        {/* Opt-in overlay; nothing on AR during load when absent (= camera feed).
-            Absolutely filled so it covers the navigator instead of taking flow. */}
+        {/* Absolutely filled so the overlay covers the navigator instead of
+            taking flow space beneath it. */}
         {!isSceneReady && loadingView && (
           <View style={StyleSheet.absoluteFill}>{loadingView}</View>
         )}

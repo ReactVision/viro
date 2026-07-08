@@ -32,9 +32,7 @@ test/ios/ViroExample/ViroExample.xcworkspace/xcuserdata/
 test/ios/ViroExample/Pods/
 ios/ngrokendpoint.txt
 ios/ViroRenderer/ViroKit.framework/_CodeSignature/
-# Machine-local Xcode node path (RN convention — never commit; hardcodes an absolute node path)
 .xcode.env.local
-# derivedData for the local `yarn viro:sync` loop (studio-go/scripts/sync-viro.sh)
 /ios/build-dev/
 
 # Figment Android

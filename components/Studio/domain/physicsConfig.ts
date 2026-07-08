@@ -1,6 +1,5 @@
 /**
  * Studio physics_config and physics_world_config parsing and Viro prop building.
- * Ported from studio-go/domain/physicsConfig.ts — no zod dependency.
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -12,7 +11,15 @@ type ForceEntry = { value: Vec3; position?: Vec3 };
 type PhysicsShape =
   | { type: "Box"; params: [number, number, number] }
   | { type: "Sphere"; params: [number] }
-  | { type: "Compound"; children: Array<{ type: "Box" | "Sphere"; params: number[]; position: Vec3; rotation?: Vec3 }> };
+  | {
+      type: "Compound";
+      children: Array<{
+        type: "Box" | "Sphere";
+        params: number[];
+        position: Vec3;
+        rotation?: Vec3;
+      }>;
+    };
 
 export type PhysicsBodyConfig = {
   enabled: boolean;
@@ -42,7 +49,9 @@ export type BuildViroPhysicsBodyOptions = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isVec3(v: unknown): v is Vec3 {
-  return Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === "number");
+  return (
+    Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === "number")
+  );
 }
 
 function parseShape(raw: unknown): PhysicsShape | undefined {
@@ -56,11 +65,24 @@ function parseShape(raw: unknown): PhysicsShape | undefined {
     return { type: "Sphere", params: [r.params[0] as number] };
   }
   if (r.type === "Compound" && Array.isArray(r.children)) {
-    const children = (r.children as unknown[]).filter((c): c is { type: "Box" | "Sphere"; params: number[]; position: Vec3; rotation?: Vec3 } => {
-      if (!c || typeof c !== "object") return false;
-      const ch = c as Record<string, unknown>;
-      return (ch.type === "Box" || ch.type === "Sphere") && Array.isArray(ch.params) && isVec3(ch.position);
-    });
+    const children = (r.children as unknown[]).filter(
+      (
+        c
+      ): c is {
+        type: "Box" | "Sphere";
+        params: number[];
+        position: Vec3;
+        rotation?: Vec3;
+      } => {
+        if (!c || typeof c !== "object") return false;
+        const ch = c as Record<string, unknown>;
+        return (
+          (ch.type === "Box" || ch.type === "Sphere") &&
+          Array.isArray(ch.params) &&
+          isVec3(ch.position)
+        );
+      }
+    );
     if (children.length > 0) return { type: "Compound", children };
   }
   return undefined;
@@ -68,12 +90,17 @@ function parseShape(raw: unknown): PhysicsShape | undefined {
 
 function mapShapeToViro(shape: PhysicsShape): Record<string, unknown> {
   if (shape.type === "Box") return { type: "Box", params: [...shape.params] };
-  if (shape.type === "Sphere") return { type: "Sphere", params: [...shape.params] };
+  if (shape.type === "Sphere")
+    return { type: "Sphere", params: [...shape.params] };
   return {
     type: "Compound",
     params: [],
     children: shape.children.map((c) => {
-      const base: Record<string, unknown> = { type: c.type, params: [...c.params], position: [...c.position] };
+      const base: Record<string, unknown> = {
+        type: c.type,
+        params: [...c.params],
+        position: [...c.position],
+      };
       if (c.rotation) base.rotation = [...c.rotation];
       return base;
     }),
@@ -84,13 +111,15 @@ function normalizeTorque(torque: Vec3 | Vec3[]): Vec3 {
   if (Array.isArray(torque[0])) {
     return (torque as Vec3[]).reduce<Vec3>(
       (acc, t) => [acc[0] + t[0], acc[1] + t[1], acc[2] + t[2]],
-      [0, 0, 0],
+      [0, 0, 0]
     );
   }
   return [...(torque as Vec3)] as Vec3;
 }
 
-function normalizeForce(force: ForceEntry | ForceEntry[]): Array<{ value: number[]; position?: number[] }> {
+function normalizeForce(
+  force: ForceEntry | ForceEntry[]
+): Array<{ value: number[]; position?: number[] }> {
   const arr = Array.isArray(force) ? force : [force];
   return arr.map((f) => ({
     value: [...f.value],
@@ -103,7 +132,9 @@ function normalizeForce(force: ForceEntry | ForceEntry[]): Array<{ value: number
 /**
  * Parses `scene.physics_world_config` JSON. Returns null if missing or invalid.
  */
-export function parsePhysicsWorldConfig(raw: unknown): PhysicsWorldConfig | null {
+export function parsePhysicsWorldConfig(
+  raw: unknown
+): PhysicsWorldConfig | null {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   try {
@@ -124,9 +155,11 @@ export function parsePhysicsBodyConfig(raw: unknown): PhysicsBodyConfig | null {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   try {
-    const type = (["Dynamic", "Kinematic", "Static"].includes(r.type as string)
-      ? r.type
-      : undefined) as PhysicsBodyConfig["type"] | undefined;
+    const type = (
+      ["Dynamic", "Kinematic", "Static"].includes(r.type as string)
+        ? r.type
+        : undefined
+    ) as PhysicsBodyConfig["type"] | undefined;
     if (!type) return null;
 
     const mass = typeof r.mass === "number" ? r.mass : 0;
@@ -139,12 +172,12 @@ export function parsePhysicsBodyConfig(raw: unknown): PhysicsBodyConfig | null {
     const shape = parseShape(r.shape);
     if (shape) config.shape = shape;
     if (typeof r.restitution === "number") config.restitution = r.restitution;
-    if (typeof r.friction === "number")    config.friction    = r.friction;
-    if (typeof r.useGravity === "boolean") config.useGravity  = r.useGravity;
-    if (typeof r.viroTag === "string")     config.viroTag     = r.viroTag;
-    if (isVec3(r.velocity))               config.velocity    = r.velocity;
-    if (r.torque != null)                 config.torque      = r.torque as Vec3 | Vec3[];
-    if (r.force != null)                  config.force       = r.force as ForceEntry | ForceEntry[];
+    if (typeof r.friction === "number") config.friction = r.friction;
+    if (typeof r.useGravity === "boolean") config.useGravity = r.useGravity;
+    if (typeof r.viroTag === "string") config.viroTag = r.viroTag;
+    if (isVec3(r.velocity)) config.velocity = r.velocity;
+    if (r.torque != null) config.torque = r.torque as Vec3 | Vec3[];
+    if (r.force != null) config.force = r.force as ForceEntry | ForceEntry[];
 
     return config;
   } catch {
@@ -166,23 +199,33 @@ export function buildViroPhysicsWorld(config: PhysicsWorldConfig): {
 /** Maps validated Studio physics_config to Viro `physicsBody` prop. */
 export function buildViroPhysicsBody(
   config: PhysicsBodyConfig,
-  options?: BuildViroPhysicsBodyOptions,
+  options?: BuildViroPhysicsBodyOptions
 ): Record<string, unknown> {
   const kinematicDrag =
-    options?.kinematicDragOverride === true && config.type === "Dynamic" && config.enabled;
+    options?.kinematicDragOverride === true &&
+    config.type === "Dynamic" &&
+    config.enabled;
 
   const type = kinematicDrag ? "Kinematic" : config.type;
   const mass = kinematicDrag ? 0 : config.mass;
-  const shape = mapShapeToViro(config.shape ?? { type: "Box", params: [1, 1, 1] });
+  const shape = mapShapeToViro(
+    config.shape ?? { type: "Box", params: [1, 1, 1] }
+  );
 
-  const body: Record<string, unknown> = { type, mass, shape, enabled: config.enabled };
+  const body: Record<string, unknown> = {
+    type,
+    mass,
+    shape,
+    enabled: config.enabled,
+  };
 
   if (config.restitution !== undefined) body.restitution = config.restitution;
-  if (config.friction    !== undefined) body.friction    = config.friction;
-  if (config.useGravity  !== undefined) body.useGravity  = kinematicDrag ? false : config.useGravity;
-  if (config.velocity    !== undefined) body.velocity    = [...config.velocity];
-  if (config.torque      !== undefined) body.torque      = normalizeTorque(config.torque);
-  if (config.force       !== undefined) body.force       = normalizeForce(config.force);
+  if (config.friction !== undefined) body.friction = config.friction;
+  if (config.useGravity !== undefined)
+    body.useGravity = kinematicDrag ? false : config.useGravity;
+  if (config.velocity !== undefined) body.velocity = [...config.velocity];
+  if (config.torque !== undefined) body.torque = normalizeTorque(config.torque);
+  if (config.force !== undefined) body.force = normalizeForce(config.force);
 
   return body;
 }
@@ -193,7 +236,7 @@ export function buildViroPhysicsBody(
  */
 export function shouldUseKinematicPhysicsDrag(
   asset: { is_draggable: boolean },
-  config: PhysicsBodyConfig | null,
+  config: PhysicsBodyConfig | null
 ): boolean {
   return (
     asset.is_draggable === true &&

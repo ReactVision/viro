@@ -16,6 +16,7 @@ import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioARScene } from "./StudioARScene";
+import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
 
@@ -57,7 +58,7 @@ export interface StudioSceneNavigatorHandle {
   ) => Promise<{ success: boolean; url?: string; errorCode?: string }>;
 }
 
-interface StudioSceneNavigatorProps {
+export interface StudioSceneNavigatorProps {
   /**
    * UUID of a specific scene to load. If omitted, the navigator fetches the
    * project configured in the app manifest and uses its opening scene.
@@ -76,6 +77,16 @@ interface StudioSceneNavigatorProps {
   onPlaneDetected?: () => void;
   onPlaneSelected?: () => void;
   noAssetsMessage?: string;
+  /**
+   * Opt-in overlay shown until the scene mounts. Omit to render nothing on AR
+   * during load (the camera feed); Quest falls back to a built-in spinner.
+   */
+  loadingView?: React.ReactNode;
+  /**
+   * Opt-in UI for a caught render error. The boundary always catches and calls
+   * `onError`; when this is omitted it renders nothing (children are gone).
+   */
+  renderError?: (error: Error) => React.ReactNode;
 }
 
 /**
@@ -108,11 +119,16 @@ export const StudioSceneNavigator = forwardRef<
     onPlaneDetected,
     onPlaneSelected,
     noAssetsMessage,
+    loadingView,
+    renderError,
   },
   ref
 ) {
   const navigatorRef = useRef<any>(null);
   const loadedSceneIdRef = useRef<string | null>(null);
+
+  // Drives the loading overlay: false until StudioARScene reports onReady.
+  const [isSceneReady, setIsSceneReady] = useState(false);
 
   // Session-scoped variable store: outlives every scene push, resets when the
   // navigator (= the AR/VR session) unmounts.
@@ -141,6 +157,13 @@ export const StudioSceneNavigator = forwardRef<
   onPlaneDetectedRef.current = onPlaneDetected;
   onPlaneSelectedRef.current = onPlaneSelected;
   noAssetsMessageRef.current = noAssetsMessage;
+
+  // Stable so passProps stays referentially steady across renders. Idempotent,
+  // so StrictMode's dev double-invoke of StudioARScene's onReady effect is safe.
+  const handleSceneReady = useCallback(() => {
+    setIsSceneReady(true);
+    onSceneReadyRef.current?.();
+  }, []);
 
   // On Quest: holds the resolved scene entry. ViroXRSceneNavigator is not
   // rendered until this is non-null, so VRActivity always launches into content.
@@ -241,7 +264,7 @@ export const StudioSceneNavigator = forwardRef<
         scene: StudioARScene,
         passProps: {
           sceneData,
-          onReady: onSceneReadyRef.current,
+          onReady: handleSceneReady,
           onSceneChange: onSceneChangeRef.current,
           onPlaneDetected: onPlaneDetectedRef.current,
           onPlaneSelected: onPlaneSelectedRef.current,
@@ -258,7 +281,7 @@ export const StudioSceneNavigator = forwardRef<
         navigatorRef.current?.arSceneNavigator?.push(entry);
       }
     },
-    [resolveSceneId]
+    [resolveSceneId, handleSceneReady]
   );
 
   useEffect(() => {
@@ -276,27 +299,42 @@ export const StudioSceneNavigator = forwardRef<
     return () => { cancelled = true; };
   }, [sceneId, loadScene]);
 
-  // On Quest: show a spinner until scene data is ready, then mount
+  // On Quest: show an overlay until scene data is ready, then mount
   // ViroXRSceneNavigator (which launches VRActivity with content immediately).
+  // Quest has no camera passthrough, so it always needs something on screen —
+  // the caller's loadingView if provided, else a built-in spinner.
   if (isQuest && !vrSceneEntry) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#ffffff" />
+        {loadingView ?? <ActivityIndicator size="large" color="#ffffff" />}
       </View>
     );
   }
 
   return (
-    <ViroXRSceneNavigator
-      ref={navigatorRef}
-      arInitialScene={{ scene: LoadingARScene }}
-      vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }}
-      worldAlignment={worldAlignment}
-      autofocus={autofocus}
-      numberOfTrackedImages={numberOfTrackedImages}
-      occlusionMode={occlusionMode}
-      onExitViro={onExitViro}
-      style={style ?? StyleSheet.absoluteFill}
-    />
+    <StudioSceneErrorBoundary
+      sceneId={sceneId}
+      onError={onError}
+      renderError={renderError}
+    >
+      <View style={style ?? StyleSheet.absoluteFill}>
+        <ViroXRSceneNavigator
+          ref={navigatorRef}
+          arInitialScene={{ scene: LoadingARScene }}
+          vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }}
+          worldAlignment={worldAlignment}
+          autofocus={autofocus}
+          numberOfTrackedImages={numberOfTrackedImages}
+          occlusionMode={occlusionMode}
+          onExitViro={onExitViro}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Opt-in overlay; nothing on AR during load when absent (= camera feed).
+            Absolutely filled so it covers the navigator instead of taking flow. */}
+        {!isSceneReady && loadingView && (
+          <View style={StyleSheet.absoluteFill}>{loadingView}</View>
+        )}
+      </View>
+    </StudioSceneErrorBoundary>
   );
 });

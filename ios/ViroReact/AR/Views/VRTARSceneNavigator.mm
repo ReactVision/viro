@@ -28,6 +28,7 @@
 #import <ViroKit/ViroKit.h>
 #import <ViroKit/VROARSessioniOS.h>
 #import "VRTARSceneNavigator.h"
+#import "RVStudioWatermarkState.h"
 #import <React/RCTAssert.h>
 #import <React/RCTLog.h>
 #import "VRTARScene.h"
@@ -43,6 +44,10 @@
 
 // Notification name that VRTObjectDetectorView subscribes to in AR mode.
 static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
+
+// Free-tier "Powered by ReactVision Studio" watermark target.
+static NSString * const kRVWatermarkURL =
+    @"https://studio.reactvision.xyz/?utm_source=scenenavigator-banner";
 
 @implementation VRTARSceneNavigator {
     id <VROView> _vroView;
@@ -68,6 +73,9 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
 
     // AR frame distribution for ViroObjectDetector (useARSession mode).
     CADisplayLink *_detectorLink;
+
+    // Free-tier watermark overlay (native; visibility driven by RVStudioWatermarkState).
+    UIView *_watermarkView;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -162,6 +170,11 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
         
         [self addSubview:(UIView *)_vroView];
 
+        // Native Free-tier watermark, layered above the AR surface. Visibility
+        // is gated by RVStudioWatermarkState (set only from the native
+        // rvGetScene response), so it cannot be stripped from JavaScript.
+        [self setupWatermarkOverlay];
+
         [_bridge.perfMonitor setView:_vroView];
 
         // set the scene if it was set before this view was created (not likely)
@@ -233,6 +246,69 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
 
 - (UIView *)rootVROView {
     return (UIView *)_vroView;
+}
+
+#pragma mark - Free-tier watermark (native, not strippable from JS)
+
+- (void)setupWatermarkOverlay {
+    if (_watermarkView) {
+        [self bringSubviewToFront:_watermarkView];
+        return;
+    }
+
+    UIView *pill = [[UIView alloc] init];
+    pill.translatesAutoresizingMaskIntoConstraints = NO;
+    pill.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.6];
+    pill.layer.cornerRadius = 14.0;
+    pill.clipsToBounds = YES;
+    pill.userInteractionEnabled = YES;
+
+    UILabel *label = [[UILabel alloc] init];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.text = @"Powered by ReactVision Studio";
+    label.textColor = [UIColor whiteColor];
+    label.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [pill addSubview:label];
+
+    UITapGestureRecognizer *tap =
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_watermarkTapped)];
+    [pill addGestureRecognizer:tap];
+
+    [self addSubview:pill];
+    _watermarkView = pill;
+
+    [NSLayoutConstraint activateConstraints:@[
+        [label.topAnchor constraintEqualToAnchor:pill.topAnchor constant:6],
+        [label.bottomAnchor constraintEqualToAnchor:pill.bottomAnchor constant:-6],
+        [label.leadingAnchor constraintEqualToAnchor:pill.leadingAnchor constant:14],
+        [label.trailingAnchor constraintEqualToAnchor:pill.trailingAnchor constant:-14],
+        [pill.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
+        [pill.bottomAnchor constraintEqualToAnchor:self.safeAreaLayoutGuide.bottomAnchor constant:-16],
+    ]];
+
+    [self _updateWatermarkVisibility:nil];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(_updateWatermarkVisibility:)
+                                                 name:RVStudioWatermarkDidChangeNotification
+                                               object:nil];
+}
+
+- (void)_updateWatermarkVisibility:(NSNotification *)note {
+    BOOL show = [RVStudioWatermarkState sharedState].freeTier;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self->_watermarkView.hidden = !show;
+        if (show) {
+            [self bringSubviewToFront:self->_watermarkView];
+        }
+    });
+}
+
+- (void)_watermarkTapped {
+    NSURL *url = [NSURL URLWithString:kRVWatermarkURL];
+    if (url) {
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    }
 }
 
 //VROComponent overrides...
@@ -333,8 +409,53 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
            saveToCameraRoll:(BOOL)saveToCameraRoll
                     onError:(RCTResponseSenderBlock)onError {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR startVideoRecording:fileName saveToCameraRoll:saveToCameraRoll errorBlock:^(NSInteger errorCode) {
+    void (^errorBlock)(NSInteger) = ^(NSInteger errorCode) {
         onError(@[@(errorCode)]);
+    };
+
+    // Free-tier recordings are watermarked inside the recorder pipeline so the
+    // mark is baked into the encoded video (the UIView overlay is not captured
+    // by the GL recorder, and a JS consumer cannot strip this).
+    if ([RVStudioWatermarkState sharedState].freeTier) {
+        UIImage *mark = [self watermarkImage];
+        CGSize viewSize = self.bounds.size;
+        // watermarkFrame is in view points; centre it just above the bottom.
+        // May need per-device tuning against the recorder's coordinate space.
+        CGRect frame = CGRectMake((viewSize.width - mark.size.width) / 2.0,
+                                  viewSize.height - mark.size.height - 24.0,
+                                  mark.size.width, mark.size.height);
+        [viewAR startVideoRecording:fileName
+                      withWatermark:mark
+                          withFrame:frame
+                   saveToCameraRoll:saveToCameraRoll
+                         errorBlock:errorBlock];
+    } else {
+        [viewAR startVideoRecording:fileName
+                   saveToCameraRoll:saveToCameraRoll
+                         errorBlock:errorBlock];
+    }
+}
+
+// Renders the "Powered by ReactVision Studio" pill to a UIImage for the video
+// recorder watermark (matches the live overlay styling).
+- (UIImage *)watermarkImage {
+    NSString *text = @"Powered by ReactVision Studio";
+    UIFont *font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    NSDictionary *attrs = @{ NSFontAttributeName: font,
+                             NSForegroundColorAttributeName: [UIColor whiteColor] };
+    CGSize textSize = [text sizeWithAttributes:attrs];
+    CGFloat padX = 14.0, padY = 6.0;
+    CGSize size = CGSizeMake(ceil(textSize.width) + padX * 2,
+                             ceil(textSize.height) + padY * 2);
+
+    UIGraphicsImageRenderer *renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        CGRect rect = CGRectMake(0, 0, size.width, size.height);
+        UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:14.0];
+        [[UIColor colorWithWhite:0.0 alpha:0.6] setFill];
+        [path fill];
+        [text drawAtPoint:CGPointMake(padX, padY) withAttributes:attrs];
     }];
 }
 
@@ -396,6 +517,12 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
         return;
     }
     _hasCleanedUp = YES;
+
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:RVStudioWatermarkDidChangeNotification
+                                                  object:nil];
+    _watermarkView = nil;
+
     // Verification log: if this does NOT appear when leaving the AR screen, the navigator
     // (and the VROViewAR it owns) is being retained and deleteGL never runs → GPU stays.
     NSLog(@"[Viro] cleanupViroResources ran (releasing AR view + GPU resources)");

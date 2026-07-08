@@ -46,12 +46,19 @@ const studioMaterials_1 = require("./domain/studioMaterials");
 const variableStore_1 = require("./domain/variableStore");
 const StudioARScene_1 = require("./StudioARScene");
 const VRTStudioModule_1 = require("./VRTStudioModule");
-function LoadingARScene() { return <ViroARScene_1.ViroARScene />; }
-function LoadingVRScene() { return <ViroScene_1.ViroScene />; }
+function LoadingARScene() {
+    return <ViroARScene_1.ViroARScene />;
+}
+function LoadingVRScene() {
+    return <ViroScene_1.ViroScene />;
+}
 const styles = react_native_1.StyleSheet.create({
     loader: {
         position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "#000000",
@@ -175,7 +182,9 @@ function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus =
             else
                 console.error("[Studio] Failed to load scene:", err);
         });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [sceneId, loadScene]);
     // On Quest: show a spinner until scene data is ready, then mount
     // ViroXRSceneNavigator (which launches VRActivity with content immediately).

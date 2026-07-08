@@ -55,7 +55,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
             return;
         }
         String url = BASE_URL + "/functions/v1/scenes/" + encode(sceneId);
-        runGet(url, apiKey, promise);
+        runGet(url, apiKey, promise, true);
     }
 
     @ReactMethod
@@ -71,7 +71,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
             return;
         }
         String url = BASE_URL + "/functions/v1/projects/" + encode(projectId);
-        runGet(url, apiKey, promise);
+        runGet(url, apiKey, promise, false);
     }
 
     @ReactMethod
@@ -113,7 +113,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     // Internals
     // -----------------------------------------------------------------------
 
-    private void runGet(String url, String apiKey, Promise promise) {
+    private void runGet(String url, String apiKey, Promise promise, boolean parseWatermark) {
         new Thread(() -> {
             try {
                 String[] result = RVHttpClient.send(
@@ -122,6 +122,9 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
                         TIMEOUT_SEC, null, null);
                 int status = Integer.parseInt(result[0]);
                 boolean ok = status >= 200 && status < 300;
+                if (parseWatermark && ok) {
+                    RVStudioWatermarkState.getInstance().updateFromSceneJson(result[1]);
+                }
                 resolve(promise, ok, ok ? result[1] : null,
                         ok ? null : (result[2].isEmpty() ? result[1] : result[2]));
             } catch (Exception e) {

@@ -12,13 +12,20 @@ import { StudioARScene } from "./StudioARScene";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
 
-function LoadingARScene() { return <ViroARScene />; }
-function LoadingVRScene() { return <ViroScene />; }
+function LoadingARScene() {
+  return <ViroARScene />;
+}
+function LoadingVRScene() {
+  return <ViroScene />;
+}
 
 const styles = StyleSheet.create({
   loader: {
     position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000000",
@@ -88,7 +95,10 @@ export function StudioSceneNavigator({
 
   // On Quest: holds the resolved scene entry. ViroXRSceneNavigator is not
   // rendered until this is non-null, so VRActivity always launches into content.
-  const [vrSceneEntry, setVrSceneEntry] = useState<{ scene: any; passProps?: any } | null>(null);
+  const [vrSceneEntry, setVrSceneEntry] = useState<{
+    scene: any;
+    passProps?: any;
+  } | null>(null);
 
   const resolveSceneId = useCallback(async (): Promise<string> => {
     if (sceneId) return sceneId;
@@ -101,7 +111,9 @@ export function StudioSceneNavigator({
       throw new Error("rvGetProject returned no data");
     }
 
-    const { project } = JSON.parse(projectResult.data) as StudioProjectApiResponse;
+    const { project } = JSON.parse(
+      projectResult.data
+    ) as StudioProjectApiResponse;
 
     if (project.opening_scene?.id) {
       return project.opening_scene.id;
@@ -114,7 +126,9 @@ export function StudioSceneNavigator({
 
   const loadScene = useCallback(
     async (isCancelled: () => boolean) => {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
       if (isCancelled()) return;
 
       const resolvedSceneId = await resolveSceneId();
@@ -179,7 +193,9 @@ export function StudioSceneNavigator({
       else console.error("[Studio] Failed to load scene:", err);
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [sceneId, loadScene]);
 
   // On Quest: show a spinner until scene data is ready, then mount

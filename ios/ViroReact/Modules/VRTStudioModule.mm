@@ -1,4 +1,5 @@
 #import "VRTStudioModule.h"
+#import "RVStudioWatermarkState.h"
 #import <React/RCTUtils.h>
 
 static NSString *const kBaseUrl      = @"https://platform.reactvision.xyz";
@@ -117,7 +118,15 @@ RCT_EXPORT_METHOD(rvGetScene:(NSString *)sceneId
     NSString *url = [NSString stringWithFormat:@"%@/functions/v1/scenes/%@",
                      kBaseUrl,
                      [sceneId stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet]];
-    [self runGet:url apiKey:apiKey resolve:resolve];
+    // Derive the Free-tier watermark flag natively from the server response so
+    // it cannot be suppressed from JS, then forward the payload to JS unchanged.
+    RCTPromiseResolveBlock watermarkAware = ^(id result) {
+        if ([result isKindOfClass:[NSDictionary class]]) {
+            [[RVStudioWatermarkState sharedState] updateFromSceneResponse:result];
+        }
+        resolve(result);
+    };
+    [self runGet:url apiKey:apiKey resolve:watermarkAware];
 }
 
 RCT_EXPORT_METHOD(rvGetProject:(RCTPromiseResolveBlock)resolve

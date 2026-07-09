@@ -36,7 +36,7 @@ export interface StudioSceneNavigatorProps {
     loadingView?: React.ReactNode;
     /**
      * Opt-in UI for a caught render error. The boundary always catches and calls
-     * `onError`; when this is omitted it renders nothing (children are gone).
+     * `onError`; when this is omitted it renders nothing.
      */
     renderError?: (error: Error) => React.ReactNode;
 }

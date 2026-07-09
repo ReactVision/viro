@@ -39,9 +39,9 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     private static final int    TIMEOUT_SEC       = 30;
     private static final int    API_REQUEST_TIMEOUT_SEC = 40;
 
-    // @internal session auth for first-party apps (e.g. StudioGo). When set, the
-    // fetch methods target this base URL with Authorization: Bearer + x-rv-client
-    // and send NO x-api-key, so the server's resolveApiAuth takes the JWT path.
+    // @internal session auth for first-party apps. When set, the fetch methods
+    // target this base URL with Authorization: Bearer + x-rv-client and send NO
+    // x-api-key, so the server's resolveApiAuth takes the JWT path.
     // Immutable snapshot captured per call before spawning the worker thread.
     private static volatile StudioSession studioSession = null;
 
@@ -87,7 +87,9 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
             return;
         }
         String url = auth.baseUrl + "/functions/v1/scenes/" + encode(sceneId);
-        runGet(url, auth, promise, true);
+        // Watermark applies only to API-key (SDK) consumers; session auth is
+        // exempt. Native-gated so a JS consumer can't strip it or opt in.
+        runGet(url, auth, promise, auth.apiKey != null);
     }
 
     @ReactMethod

@@ -42,8 +42,7 @@ NSString *const RVStudioWatermarkDidChangeNotification =
   [self setFreeTier:freeTier];
 }
 
-// Custom setter: only notifies on an actual change, always on the main queue
-// (the rvGetScene completion handler runs on a background URLSession queue).
+// Change-gated; notifies on the main queue (callers run on a background queue).
 - (void)setFreeTier:(BOOL)freeTier {
   @synchronized(self) {
     if (_freeTier == freeTier) {

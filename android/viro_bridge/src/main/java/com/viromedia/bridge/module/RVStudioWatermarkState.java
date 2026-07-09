@@ -7,17 +7,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * RVStudioWatermarkState
- *
- * Process-wide, native-only source of truth for whether the currently loaded
- * Studio scene belongs to a Free-tier org and must therefore display the
- * "Powered by ReactVision Studio" watermark.
- *
- * The flag is written ONLY from the native rvGetScene response (see
- * VRTStudioModule), never from JavaScript, so an SDK consumer cannot strip the
- * watermark by editing JS. The AR scene navigator registers a Listener to
- * show/hide its native overlay. Listeners may be invoked on a background
- * thread; UI work must be posted to the main thread by the listener.
+ * Process-wide source of truth for the Free-tier "Powered by ReactVision
+ * Studio" watermark. Written only from the native rvGetScene response, never
+ * from JS, so a consumer cannot strip the watermark by editing JS. Listeners
+ * may fire on a background thread; post UI work to the main thread.
  */
 public final class RVStudioWatermarkState {
 
@@ -49,10 +42,7 @@ public final class RVStudioWatermarkState {
         mListeners.remove(listener);
     }
 
-    /**
-     * Parses a scenes endpoint response body and updates the flag from its
-     * {@code is_free_tier} field. Malformed/absent → not free (no watermark).
-     */
+    // Malformed/absent is_free_tier defaults to false (no watermark).
     public void updateFromSceneJson(String json) {
         boolean freeTier = false;
         if (json != null) {
@@ -60,7 +50,6 @@ public final class RVStudioWatermarkState {
                 JSONObject obj = new JSONObject(json);
                 freeTier = obj.optBoolean("is_free_tier", false);
             } catch (Exception ignored) {
-                // Leave freeTier = false on parse failure.
             }
         }
         setFreeTier(freeTier);

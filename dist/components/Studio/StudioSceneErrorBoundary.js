@@ -9,7 +9,7 @@ const react_1 = require("react");
  *
  * AR-only in effect: on Quest, ViroXRSceneNavigator forwards to a separate
  * React root (VRActivity), so scene errors there are outside this boundary.
- * Native and async errors are also out of a React boundary's reach — async
+ * Native and async errors are also out of a React boundary's reach; async
  * scene-load failures route through onError in StudioSceneNavigator instead.
  */
 class StudioSceneErrorBoundary extends react_1.Component {

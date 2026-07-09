@@ -1,7 +1,6 @@
 "use strict";
 /**
  * Studio physics_config and physics_world_config parsing and Viro prop building.
- * Ported from studio-go/domain/physicsConfig.ts — no zod dependency.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parsePhysicsWorldConfig = parsePhysicsWorldConfig;
@@ -11,7 +10,7 @@ exports.buildViroPhysicsBody = buildViroPhysicsBody;
 exports.shouldUseKinematicPhysicsDrag = shouldUseKinematicPhysicsDrag;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function isVec3(v) {
-    return Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === "number");
+    return (Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === "number"));
 }
 function parseShape(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw))
@@ -28,7 +27,9 @@ function parseShape(raw) {
             if (!c || typeof c !== "object")
                 return false;
             const ch = c;
-            return (ch.type === "Box" || ch.type === "Sphere") && Array.isArray(ch.params) && isVec3(ch.position);
+            return ((ch.type === "Box" || ch.type === "Sphere") &&
+                Array.isArray(ch.params) &&
+                isVec3(ch.position));
         });
         if (children.length > 0)
             return { type: "Compound", children };
@@ -44,7 +45,11 @@ function mapShapeToViro(shape) {
         type: "Compound",
         params: [],
         children: shape.children.map((c) => {
-            const base = { type: c.type, params: [...c.params], position: [...c.position] };
+            const base = {
+                type: c.type,
+                params: [...c.params],
+                position: [...c.position],
+            };
             if (c.rotation)
                 base.rotation = [...c.rotation];
             return base;
@@ -134,11 +139,18 @@ function buildViroPhysicsWorld(config) {
 }
 /** Maps validated Studio physics_config to Viro `physicsBody` prop. */
 function buildViroPhysicsBody(config, options) {
-    const kinematicDrag = options?.kinematicDragOverride === true && config.type === "Dynamic" && config.enabled;
+    const kinematicDrag = options?.kinematicDragOverride === true &&
+        config.type === "Dynamic" &&
+        config.enabled;
     const type = kinematicDrag ? "Kinematic" : config.type;
     const mass = kinematicDrag ? 0 : config.mass;
     const shape = mapShapeToViro(config.shape ?? { type: "Box", params: [1, 1, 1] });
-    const body = { type, mass, shape, enabled: config.enabled };
+    const body = {
+        type,
+        mass,
+        shape,
+        enabled: config.enabled,
+    };
     if (config.restitution !== undefined)
         body.restitution = config.restitution;
     if (config.friction !== undefined)

@@ -10,9 +10,9 @@ static const NSTimeInterval kTimeout = 30.0;
 // transport must outlive the proxy's own timeout or valid requests get cut off.
 static const NSTimeInterval kApiRequestTimeout = 40.0;
 
-// @internal session auth for first-party apps (e.g. StudioGo). When set, the
-// fetch methods target this base URL with Authorization: Bearer + x-rv-client
-// and send NO x-api-key, so the server's resolveApiAuth takes the JWT path.
+// @internal session auth for first-party apps. When set, the fetch methods
+// target this base URL with Authorization: Bearer + x-rv-client and send NO
+// x-api-key, so the server's resolveApiAuth takes the JWT path.
 // Immutable snapshot; module methods run serially on one methodQueue.
 static NSDictionary *gStudioSession = nil;
 
@@ -144,15 +144,19 @@ RCT_EXPORT_METHOD(rvGetScene:(NSString *)sceneId
     NSString *url = [NSString stringWithFormat:@"%@/functions/v1/scenes/%@",
                      ctx[@"baseUrl"],
                      [sceneId stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet]];
-    // Derive the Free-tier watermark flag natively from the server response so
-    // it cannot be suppressed from JS, then forward the payload to JS unchanged.
-    RCTPromiseResolveBlock watermarkAware = ^(id result) {
-        if ([result isKindOfClass:[NSDictionary class]]) {
-            [[RVStudioWatermarkState sharedState] updateFromSceneResponse:result];
-        }
-        resolve(result);
-    };
-    [self runGet:url headers:ctx[@"headers"] resolve:watermarkAware];
+    // Watermark applies only to API-key (SDK) consumers; session auth is exempt.
+    // Derived and gated natively so a JS consumer can't strip it or opt in.
+    BOOL deriveWatermark = (gStudioSession == nil);
+    RCTPromiseResolveBlock cb = resolve;
+    if (deriveWatermark) {
+        cb = ^(id result) {
+            if ([result isKindOfClass:[NSDictionary class]]) {
+                [[RVStudioWatermarkState sharedState] updateFromSceneResponse:result];
+            }
+            resolve(result);
+        };
+    }
+    [self runGet:url headers:ctx[@"headers"] resolve:cb];
 }
 
 RCT_EXPORT_METHOD(rvGetProject:(RCTPromiseResolveBlock)resolve

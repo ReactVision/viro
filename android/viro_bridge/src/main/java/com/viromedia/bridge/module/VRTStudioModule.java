@@ -87,7 +87,9 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
             return;
         }
         String url = auth.baseUrl + "/functions/v1/scenes/" + encode(sceneId);
-        runGet(url, auth, promise);
+        // Watermark applies only to API-key (SDK) consumers; session auth is
+        // exempt. Native-gated so a JS consumer can't strip it or opt in.
+        runGet(url, auth, promise, auth.apiKey != null);
     }
 
     @ReactMethod
@@ -103,7 +105,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
             return;
         }
         String url = auth.baseUrl + "/functions/v1/projects/" + encode(projectId);
-        runGet(url, auth, promise);
+        runGet(url, auth, promise, false);
     }
 
     @ReactMethod
@@ -165,7 +167,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     // Internals
     // -----------------------------------------------------------------------
 
-    private void runGet(String url, RequestAuth auth, Promise promise) {
+    private void runGet(String url, RequestAuth auth, Promise promise, boolean parseWatermark) {
         new Thread(() -> {
             try {
                 String[] result = RVHttpClient.send(
@@ -174,6 +176,9 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
                         TIMEOUT_SEC, auth.headerNames, auth.headerValues);
                 int status = Integer.parseInt(result[0]);
                 boolean ok = status >= 200 && status < 300;
+                if (parseWatermark && ok) {
+                    RVStudioWatermarkState.getInstance().updateFromSceneJson(result[1]);
+                }
                 resolve(promise, ok, ok ? result[1] : null,
                         ok ? null : (result[2].isEmpty() ? result[1] : result[2]));
             } catch (Exception e) {

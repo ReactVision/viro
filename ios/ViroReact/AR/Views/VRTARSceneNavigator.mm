@@ -28,6 +28,7 @@
 #import <ViroKit/ViroKit.h>
 #import <ViroKit/VROARSessioniOS.h>
 #import "VRTARSceneNavigator.h"
+#import "RVStudioWatermarkState.h"
 #import <React/RCTAssert.h>
 #import <React/RCTLog.h>
 #import "VRTARScene.h"
@@ -43,6 +44,10 @@
 
 // Notification name that VRTObjectDetectorView subscribes to in AR mode.
 static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
+
+// Free-tier "Powered by ReactVision Studio" watermark target.
+static NSString * const kRVWatermarkURL =
+    @"https://www.reactvision.xyz/studio/?utm_source=scenenavigator-banner";
 
 @implementation VRTARSceneNavigator {
     id <VROView> _vroView;
@@ -68,6 +73,11 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
 
     // AR frame distribution for ViroObjectDetector (useARSession mode).
     CADisplayLink *_detectorLink;
+
+    // Free-tier watermark overlay; visibility driven by RVStudioWatermarkState,
+    // laid out manually in layoutSubviews.
+    UIView *_watermarkView;
+    UILabel *_watermarkLabel;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -162,6 +172,9 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
         
         [self addSubview:(UIView *)_vroView];
 
+        // Added after _vroView so it layers above the AR surface.
+        [self setupWatermarkOverlay];
+
         [_bridge.perfMonitor setView:_vroView];
 
         // set the scene if it was set before this view was created (not likely)
@@ -233,6 +246,76 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
 
 - (UIView *)rootVROView {
     return (UIView *)_vroView;
+}
+
+#pragma mark - Free-tier watermark
+
+- (void)setupWatermarkOverlay {
+    if (_watermarkView) {
+        [self bringSubviewToFront:_watermarkView];
+        return;
+    }
+
+    UIView *pill = [[UIView alloc] init];
+    pill.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.6];
+    pill.userInteractionEnabled = YES;
+
+    UILabel *label = [[UILabel alloc] init];
+    label.text = @"Powered by ReactVision Studio";
+    label.textColor = [UIColor whiteColor];
+    label.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    label.textAlignment = NSTextAlignmentCenter;
+    [pill addSubview:label];
+
+    UITapGestureRecognizer *tap =
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_watermarkTapped)];
+    [pill addGestureRecognizer:tap];
+
+    [self addSubview:pill];
+    _watermarkView = pill;
+    _watermarkLabel = label;
+
+    [self _updateWatermarkVisibility:nil];
+    [self setNeedsLayout];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(_updateWatermarkVisibility:)
+                                                 name:RVStudioWatermarkDidChangeNotification
+                                               object:nil];
+}
+
+// Manual layout: RN sets frames directly (Yoga), so Auto Layout on this native
+// subview never runs. Full-width bar pinned to the bottom; text centred.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (!_watermarkView || !_watermarkLabel) {
+        return;
+    }
+    const CGFloat padY = 6.0, bottomMargin = 16.0;
+    CGSize textSize = [_watermarkLabel.text sizeWithAttributes:@{ NSFontAttributeName: _watermarkLabel.font }];
+    CGFloat labelH = ceil(textSize.height);
+    CGFloat barW = self.bounds.size.width;
+    CGFloat barH = labelH + padY * 2;
+    CGFloat y = self.bounds.size.height - self.safeAreaInsets.bottom - bottomMargin - barH;
+    _watermarkView.frame = CGRectMake(0, y, barW, barH);
+    _watermarkLabel.frame = CGRectMake(0, padY, barW, labelH);
+}
+
+- (void)_updateWatermarkVisibility:(NSNotification *)note {
+    BOOL show = [RVStudioWatermarkState sharedState].freeTier;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self->_watermarkView.hidden = !show;
+        if (show) {
+            [self bringSubviewToFront:self->_watermarkView];
+        }
+    });
+}
+
+- (void)_watermarkTapped {
+    NSURL *url = [NSURL URLWithString:kRVWatermarkURL];
+    if (url) {
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    }
 }
 
 //VROComponent overrides...
@@ -333,8 +416,71 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
            saveToCameraRoll:(BOOL)saveToCameraRoll
                     onError:(RCTResponseSenderBlock)onError {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR startVideoRecording:fileName saveToCameraRoll:saveToCameraRoll errorBlock:^(NSInteger errorCode) {
+    void (^errorBlock)(NSInteger) = ^(NSInteger errorCode) {
         onError(@[@(errorCode)]);
+    };
+
+    // The UIView overlay isn't captured by the GL recorder, so bake the mark
+    // into the encoded video.
+    if ([RVStudioWatermarkState sharedState].freeTier) {
+        CGSize viewSize = self.bounds.size;
+        UIImage *mark = [self watermarkBarOfWidth:viewSize.width fontSize:12.0];
+        // Frame is in view points, full-width just above the bottom.
+        CGRect frame = CGRectMake(0,
+                                  viewSize.height - mark.size.height - 24.0,
+                                  mark.size.width, mark.size.height);
+        [viewAR startVideoRecording:fileName
+                      withWatermark:mark
+                          withFrame:frame
+                   saveToCameraRoll:saveToCameraRoll
+                         errorBlock:errorBlock];
+    } else {
+        [viewAR startVideoRecording:fileName
+                   saveToCameraRoll:saveToCameraRoll
+                         errorBlock:errorBlock];
+    }
+}
+
+// Full-width watermark bar of the given width with centred text. Larger fonts
+// (for screenshots) stay legible; vertical padding scales off the 12pt baseline.
+- (UIImage *)watermarkBarOfWidth:(CGFloat)width fontSize:(CGFloat)fontSize {
+    NSString *text = @"Powered by ReactVision Studio";
+    UIFont *font = [UIFont systemFontOfSize:fontSize weight:UIFontWeightMedium];
+    NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
+    para.alignment = NSTextAlignmentCenter;
+    NSDictionary *attrs = @{ NSFontAttributeName: font,
+                             NSForegroundColorAttributeName: [UIColor whiteColor],
+                             NSParagraphStyleAttributeName: para };
+    CGFloat padY = 6.0 * (fontSize / 12.0);
+    CGFloat labelH = ceil([text sizeWithAttributes:attrs].height);
+    CGSize size = CGSizeMake(width, labelH + padY * 2);
+
+    UIGraphicsImageRenderer *renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [[UIColor colorWithWhite:0.0 alpha:0.6] setFill];
+        UIRectFill(CGRectMake(0, 0, size.width, size.height));
+        [text drawInRect:CGRectMake(0, padY, size.width, labelH) withAttributes:attrs];
+    }];
+}
+
+- (UIImage *)imageByWatermarking:(UIImage *)source {
+    CGSize imgSize = source.size;
+    CGFloat fontSize = MAX(14.0, imgSize.width * 0.030);
+    UIImage *bar = [self watermarkBarOfWidth:imgSize.width fontSize:fontSize];
+
+    UIGraphicsImageRendererFormat *fmt = [UIGraphicsImageRendererFormat defaultFormat];
+    fmt.scale = source.scale;
+    fmt.opaque = YES;
+    UIGraphicsImageRenderer *renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:imgSize format:fmt];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [source drawInRect:CGRectMake(0, 0, imgSize.width, imgSize.height)];
+        CGFloat margin = imgSize.width * 0.04;
+        CGRect barRect = CGRectMake(0,
+                                    imgSize.height - bar.size.height - margin,
+                                    bar.size.width, bar.size.height);
+        [bar drawInRect:barRect];
     }];
 }
 
@@ -347,8 +493,30 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
       saveToCameraRoll:(BOOL)saveToCameraRoll
      completionHandler:(VROViewWriteMediaFinishBlock)completionHandler {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR takeScreenshot:fileName saveToCameraRoll:saveToCameraRoll withCompletionHandler:completionHandler];
-    
+
+    if (![RVStudioWatermarkState sharedState].freeTier) {
+        [viewAR takeScreenshot:fileName saveToCameraRoll:saveToCameraRoll withCompletionHandler:completionHandler];
+        return;
+    }
+
+    // The core screenshot has no withWatermark: path, so capture to a file only
+    // (saveToCameraRoll:NO), burn the mark in, then save that to the camera roll
+    // ourselves. Otherwise the core writes an unmarked copy.
+    [viewAR takeScreenshot:fileName saveToCameraRoll:NO withCompletionHandler:
+        ^(BOOL success, NSURL *filePath, NSURL *gifPath, NSInteger errorCode) {
+            UIImage *shot = (success && filePath) ? [UIImage imageWithContentsOfFile:filePath.path] : nil;
+            if (shot == nil) {
+                completionHandler(success, filePath, gifPath, errorCode);
+                return;
+            }
+            UIImage *marked = [self imageByWatermarking:shot];
+            NSData *jpeg = UIImageJPEGRepresentation(marked, 1.0);
+            [jpeg writeToURL:filePath atomically:YES];
+            if (saveToCameraRoll) {
+                UIImageWriteToSavedPhotosAlbum(marked, nil, nil, nil);
+            }
+            completionHandler(YES, filePath, gifPath, errorCode);
+        }];
 }
 
 - (void)setSceneView:(VRTScene *)sceneView {
@@ -396,6 +564,13 @@ static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
         return;
     }
     _hasCleanedUp = YES;
+
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:RVStudioWatermarkDidChangeNotification
+                                                  object:nil];
+    _watermarkView = nil;
+    _watermarkLabel = nil;
+
     // Verification log: if this does NOT appear when leaving the AR screen, the navigator
     // (and the VROViewAR it owns) is being retained and deleteGL never runs → GPU stays.
     NSLog(@"[Viro] cleanupViroResources ran (releasing AR view + GPU resources)");

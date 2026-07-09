@@ -1,6 +1,5 @@
 /**
  * Studio material_config parsing and Viro material definition building.
- * Ported from studio-go/domain/materialConfig.ts — no zod dependency.
  */
 type ShaderModifierStage = {
     uniforms?: string;

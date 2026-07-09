@@ -1,4 +1,5 @@
 #import "VRTStudioModule.h"
+#import "RVStudioWatermarkState.h"
 #import <React/RCTUtils.h>
 
 static NSString *const kBaseUrl      = @"https://platform.reactvision.xyz";
@@ -143,7 +144,19 @@ RCT_EXPORT_METHOD(rvGetScene:(NSString *)sceneId
     NSString *url = [NSString stringWithFormat:@"%@/functions/v1/scenes/%@",
                      ctx[@"baseUrl"],
                      [sceneId stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet]];
-    [self runGet:url headers:ctx[@"headers"] resolve:resolve];
+    // Watermark applies only to API-key (SDK) consumers; session auth is exempt.
+    // Derived and gated natively so a JS consumer can't strip it or opt in.
+    BOOL deriveWatermark = (gStudioSession == nil);
+    RCTPromiseResolveBlock cb = resolve;
+    if (deriveWatermark) {
+        cb = ^(id result) {
+            if ([result isKindOfClass:[NSDictionary class]]) {
+                [[RVStudioWatermarkState sharedState] updateFromSceneResponse:result];
+            }
+            resolve(result);
+        };
+    }
+    [self runGet:url headers:ctx[@"headers"] resolve:cb];
 }
 
 RCT_EXPORT_METHOD(rvGetProject:(RCTPromiseResolveBlock)resolve

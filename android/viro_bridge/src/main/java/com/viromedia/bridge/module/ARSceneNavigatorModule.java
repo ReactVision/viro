@@ -27,6 +27,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -237,8 +241,14 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 arView.takeScreenshotWithPixelCopy(new ViroViewARCore.PixelCopyScreenshotListener() {
                     @Override
                     public void onSuccess(Bitmap bitmap) {
-                        // Save the bitmap to file
-                        String filePath = saveScreenshotToFile(bitmap, fileName, saveToCameraRoll);
+                        // PixelCopy doesn't capture the overlay View, so burn the
+                        // mark into the bitmap (covers both the file and camera roll).
+                        Bitmap output = bitmap;
+                        if (RVStudioWatermarkState.getInstance().isFreeTier()) {
+                            output = drawWatermark(bitmap);
+                        }
+
+                        String filePath = saveScreenshotToFile(output, fileName, saveToCameraRoll);
 
                         WritableMap returnMap = Arguments.createMap();
                         if (filePath != null) {
@@ -249,6 +259,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                             returnMap.putBoolean(RECORDING_SUCCESS_KEY, false);
                             returnMap.putInt(RECORDING_ERROR_KEY, Error.WRITE_TO_FILE.toInt());
                             returnMap.putString(RECORDING_URL_KEY, null);
+                        }
+                        if (output != bitmap) {
+                            output.recycle();
                         }
                         bitmap.recycle();
                         promise.resolve(returnMap);
@@ -265,6 +278,42 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 });
             }
         });
+    }
+
+    // Composites the pill bottom-centre; returns the source unchanged if a
+    // mutable copy can't be allocated.
+    private Bitmap drawWatermark(Bitmap source) {
+        Bitmap result = source.copy(Bitmap.Config.ARGB_8888, true);
+        if (result == null) {
+            return source;
+        }
+        Canvas canvas = new Canvas(result);
+        float w = result.getWidth();
+        float h = result.getHeight();
+
+        String text = "Powered by ReactVision Studio";
+        float textSize = Math.max(28f, w * 0.030f);
+        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setTextSize(textSize);
+        textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
+        textPaint.setTextAlign(Paint.Align.CENTER);
+
+        Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float textHeight = fm.descent - fm.ascent;
+
+        // Vertical padding scaled off the 12sp live-overlay baseline (6dp).
+        float padY = textSize * (6f / 12f);
+        float barH = textHeight + padY * 2;
+        float margin = w * 0.04f;
+        float top = h - barH - margin;
+
+        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bgPaint.setColor(Color.argb(153, 0, 0, 0)); // ~60% black
+        canvas.drawRect(0, top, w, top + barH, bgPaint);
+        canvas.drawText(text, w / 2f, top + padY - fm.ascent, textPaint);
+
+        return result;
     }
 
     /**

@@ -282,6 +282,7 @@ export interface StudioSceneResponse {
     functions: StudioSceneFunction[];
     /** Absent in responses from backends predating the Variables feature. */
     variables?: StudioSceneVariable[];
+    is_free_tier?: boolean;
     meta: {
         request_id: string;
     };

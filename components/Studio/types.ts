@@ -149,7 +149,7 @@ export interface StudioApiRequestOutcome {
  */
 export type StudioApiRequestExecutor = (
   functionId: string,
-  variables: Record<string, boolean | number | string>,
+  variables: Record<string, boolean | number | string>
 ) => Promise<StudioApiRequestOutcome>;
 
 export interface StudioSceneFunction {
@@ -267,13 +267,7 @@ export interface StudioAnimation {
   properties: Record<string, unknown>; // Viro keyframe format
   duration_ms: number | null;
   delay_ms: number | null;
-  easing:
-    | "Linear"
-    | "EaseIn"
-    | "EaseOut"
-    | "EaseInEaseOut"
-    | "Bounce"
-    | null;
+  easing: "Linear" | "EaseIn" | "EaseOut" | "EaseInEaseOut" | "Bounce" | null;
   loop: boolean;
   interruptible: boolean;
   on_start_function: string | null;
@@ -326,6 +320,7 @@ export interface StudioSceneResponse {
   functions: StudioSceneFunction[];
   /** Absent in responses from backends predating the Variables feature. */
   variables?: StudioSceneVariable[];
+  is_free_tier?: boolean;
   meta: { request_id: string };
 }
 

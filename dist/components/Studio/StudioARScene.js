@@ -75,7 +75,7 @@ const StudioARScene = (props) => {
 };
 exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
-    const { sceneNavigator, sceneData, onReady, onSceneChange, variableStore } = props;
+    const { sceneNavigator, sceneData, onReady, onSceneChange, onPlaneDetected, onPlaneSelected, noAssetsMessage, variableStore, } = props;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
     // ─── Sequence scheduler ───────────────────────────────────────────────────
     // One per scene. Drives WAIT steps; cancelled on unmount and on navigation so
@@ -169,6 +169,38 @@ const StudioARSceneInner = (props) => {
     // ─── Animation runtime state ──────────────────────────────────────────────
     const [animOverrides, setAnimOverrides] = (0, react_1.useState)({});
     const [loadedAssetIds, setLoadedAssetIds] = (0, react_1.useState)({});
+    // ─── Drag-active state (debounced) ────────────────────────────────────────
+    // Viro's onDrag fires per-frame. Track a Record<assetId, true> cleared 220ms
+    // after the last drag event; the node factory reads isDragActive to pass
+    // kinematicDragOverride so Dynamic-physics bodies don't fight the gesture.
+    // The onDrag callback's mere presence is also what unlocks native drag.
+    const [dragActiveByAssetId, setDragActiveByAssetId] = (0, react_1.useState)({});
+    const dragTimersRef = (0, react_1.useRef)(new Map());
+    const notifyPhysicsDrag = (0, react_1.useCallback)((assetId) => {
+        setDragActiveByAssetId((prev) => prev[assetId] ? prev : { ...prev, [assetId]: true });
+        const existing = dragTimersRef.current.get(assetId);
+        if (existing)
+            clearTimeout(existing);
+        const t = setTimeout(() => {
+            setDragActiveByAssetId((prev) => {
+                if (!prev[assetId])
+                    return prev;
+                const next = { ...prev };
+                delete next[assetId];
+                return next;
+            });
+            dragTimersRef.current.delete(assetId);
+        }, 220);
+        dragTimersRef.current.set(assetId, t);
+    }, []);
+    const isDragActive = (0, react_1.useCallback)((assetId) => !!dragActiveByAssetId[assetId], [dragActiveByAssetId]);
+    (0, react_1.useEffect)(() => {
+        const timers = dragTimersRef.current;
+        return () => {
+            timers.forEach((timer) => clearTimeout(timer));
+            timers.clear();
+        };
+    }, []);
     const handleAssetLoaded = (0, react_1.useCallback)((assetId) => {
         setLoadedAssetIds((prev) => prev[assetId] ? prev : { ...prev, [assetId]: true });
     }, []);
@@ -334,7 +366,7 @@ const StudioARSceneInner = (props) => {
                     return null;
                 }
             }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), handleSceneChange, runtimeCtx);
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx);
         })
             .filter(Boolean);
     }, [
@@ -344,6 +376,8 @@ const StudioARSceneInner = (props) => {
         animationStates,
         handleAssetLoaded,
         getCollisionHandler,
+        isDragActive,
+        notifyPhysicsDrag,
         maxModels,
         handleSceneChange,
         runtimeCtx,
@@ -356,7 +390,7 @@ const StudioARSceneInner = (props) => {
             const targetName = urlToTargetName.get(asset.trigger_image_url);
             if (!targetName)
                 return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), handleSceneChange, runtimeCtx);
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx);
             if (!node)
                 return null;
             return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
@@ -372,12 +406,71 @@ const StudioARSceneInner = (props) => {
         animationStates,
         handleAssetLoaded,
         getCollisionHandler,
+        isDragActive,
+        notifyPhysicsDrag,
         handleSceneChange,
         runtimeCtx,
     ]);
     // ─── Plane detection (AR only) ────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
+    // Native plane anchor types for ViroARScene (lowercase matches Viro defaults).
+    const anchorDetectionTypes = (0, react_1.useMemo)(() => {
+        if (planeDetectionMode !== "AUTOMATIC" && planeDetectionMode !== "MANUAL") {
+            return undefined;
+        }
+        const dir = (scene.plane_direction ?? "Horizontal").toLowerCase();
+        if (dir === "vertical")
+            return ["planesVertical"];
+        if (dir.includes("horizontal"))
+            return ["planesHorizontal"];
+        return ["planesHorizontal", "planesVertical"];
+    }, [planeDetectionMode, scene.plane_direction]);
+    // ViroARPlaneSelector (react-viro 2.54+) no longer receives scene anchors
+    // automatically; ViroARScene forwards them here via ref. Also surfaces
+    // onPlaneDetected / onPlaneSelected to the host.
+    const planeSelectorRef = (0, react_1.useRef)(null);
+    const handleAnchorFound = (0, react_1.useCallback)((anchor) => {
+        try {
+            if (planeDetectionMode === "MANUAL") {
+                planeSelectorRef.current?.handleAnchorFound(anchor);
+            }
+            if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
+                onPlaneDetected?.();
+            }
+        }
+        catch (error) {
+            console.error("[Studio] handleAnchorFound failed:", error);
+        }
+    }, [planeDetectionMode, onPlaneDetected]);
+    const handleAnchorUpdated = (0, react_1.useCallback)((anchor) => {
+        try {
+            if (planeDetectionMode === "MANUAL") {
+                planeSelectorRef.current?.handleAnchorUpdated(anchor);
+            }
+        }
+        catch (error) {
+            console.error("[Studio] handleAnchorUpdated failed:", error);
+        }
+    }, [planeDetectionMode]);
+    const handleAnchorRemoved = (0, react_1.useCallback)((anchor) => {
+        try {
+            if (planeDetectionMode === "MANUAL" && anchor) {
+                planeSelectorRef.current?.handleAnchorRemoved(anchor);
+            }
+        }
+        catch (error) {
+            console.error("[Studio] handleAnchorRemoved failed:", error);
+        }
+    }, [planeDetectionMode]);
+    const handlePlaneSelected = (0, react_1.useCallback)(() => {
+        onPlaneSelected?.();
+    }, [onPlaneSelected]);
+    // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
+    const handlePlaneDetectedForSelector = (0, react_1.useCallback)(() => {
+        onPlaneDetected?.();
+        return true;
+    }, [onPlaneDetected]);
     const renderAssets = () => {
         if (ViroPlatform_1.isQuest) {
             if (planeDetectionMode !== "NONE") {
@@ -391,7 +484,7 @@ const StudioARSceneInner = (props) => {
         </ViroARPlane_1.ViroARPlane>);
         }
         if (planeDetectionMode === "MANUAL") {
-            return (<ViroARPlaneSelector_1.ViroARPlaneSelector minHeight={0.1} minWidth={0.1} alignment={planeAlignment}>
+            return (<ViroARPlaneSelector_1.ViroARPlaneSelector ref={planeSelectorRef} minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onPlaneDetected={handlePlaneDetectedForSelector} onPlaneSelected={handlePlaneSelected}>
           {renderedPlaneAssets}
         </ViroARPlaneSelector_1.ViroARPlaneSelector>);
         }
@@ -412,7 +505,7 @@ const StudioARSceneInner = (props) => {
       {renderAssets()}
       {renderedImageTriggeredAssets}
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
-      {assets.length === 0 && (<ViroText_1.ViroText text="No assets to display" position={[0, 0, -2]} style={{
+      {assets.length === 0 && (<ViroText_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{
                 fontFamily: "Arial",
                 fontSize: 16,
                 color: "#CCCCCC",
@@ -422,5 +515,7 @@ const StudioARSceneInner = (props) => {
     if (ViroPlatform_1.isQuest) {
         return <ViroScene_1.ViroScene {...physicsProps}>{children}</ViroScene_1.ViroScene>;
     }
-    return <ViroARScene_1.ViroARScene {...physicsProps}>{children}</ViroARScene_1.ViroARScene>;
+    return (<ViroARScene_1.ViroARScene {...physicsProps} {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+      {children}
+    </ViroARScene_1.ViroARScene>);
 };

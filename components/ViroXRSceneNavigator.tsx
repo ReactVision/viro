@@ -75,6 +75,8 @@ type Props = ViewProps & {
   autofocus?: boolean;
   videoQuality?: "High" | "Low";
   numberOfTrackedImages?: number;
+  /** AR depth/people occlusion. Flows via ...rest to ViroARSceneNavigator. */
+  occlusionMode?: "peopleOnly" | "depthBased";
 
   // ── Forwarded to ViroVRSceneNavigator (Quest path via bridge) ──────────────
   vrModeEnabled?: boolean;

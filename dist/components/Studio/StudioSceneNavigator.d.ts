@@ -1,6 +1,16 @@
 import * as React from "react";
 import { ViewStyle } from "react-native";
-interface StudioSceneNavigatorProps {
+import { StudioSceneResponse } from "./types";
+/** Imperative handle exposed via ref. */
+export interface StudioSceneNavigatorHandle {
+    /** Screenshots the AR renderer. Resolves `{ success: false }` (no-op) on Quest. */
+    takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<{
+        success: boolean;
+        url?: string;
+        errorCode?: string;
+    }>;
+}
+export interface StudioSceneNavigatorProps {
     /**
      * UUID of a specific scene to load. If omitted, the navigator fetches the
      * project configured in the app manifest and uses its opening scene.
@@ -13,6 +23,22 @@ interface StudioSceneNavigatorProps {
     onError?: (err: Error) => void;
     onSceneChange?: (sceneId: string, sceneName: string) => void;
     onExitViro?: () => void;
+    /** Fired after the scene is fetched and parsed, before it is pushed. */
+    onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
+    /** Threaded to the initial scene's StudioARScene (initial scene only). */
+    onPlaneDetected?: () => void;
+    onPlaneSelected?: () => void;
+    noAssetsMessage?: string;
+    /**
+     * Opt-in overlay shown until the scene mounts. Omit to render nothing on AR
+     * during load (the camera feed); Quest falls back to a built-in spinner.
+     */
+    loadingView?: React.ReactNode;
+    /**
+     * Opt-in UI for a caught render error. The boundary always catches and calls
+     * `onError`; when this is omitted it renders nothing (children are gone).
+     */
+    renderError?: (error: Error) => React.ReactNode;
 }
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on
@@ -27,5 +53,4 @@ interface StudioSceneNavigatorProps {
  * ready. This means VRActivity always launches with the actual content scene
  * as its initial scene, avoiding the LoadingVRScene → replace timing race.
  */
-export declare function StudioSceneNavigator({ sceneId, worldAlignment, autofocus, style, onSceneReady, onError, onSceneChange, onExitViro, }: StudioSceneNavigatorProps): React.JSX.Element;
-export {};
+export declare const StudioSceneNavigator: React.ForwardRefExoticComponent<StudioSceneNavigatorProps & React.RefAttributes<StudioSceneNavigatorHandle>>;

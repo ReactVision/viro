@@ -105,6 +105,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                     if (nav != null) {
                         nav.mGLInitialized = true;
                         nav.setViroContext();
+                        nav.refreshCameraBackground();
                     }
                 }
             });
@@ -225,6 +226,25 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void resetARSession() {
         ViroViewARCore arView = getARView();
         // No-op for now.
+    }
+
+    // First-mount ordering race in the renderer: on a cold AR mount the ARCore
+    // session can bind its camera texture before the GL thread creates that
+    // texture (onSurfaceCreated), so the passthrough stays black while 3D content
+    // still renders. Replaying pause->resume re-binds it against the now-valid
+    // surface. Call only from onSuccess (onAttachedToWindow / early onHostResume
+    // run before the texture exists). Proper fix belongs in the renderer.
+    private void refreshCameraBackground() {
+        ViroViewARCore arView = getARView();
+        if (arView == null) {
+            return;
+        }
+        android.app.Activity activity = mReactContext.getCurrentActivity();
+        if (activity == null) {
+            return;
+        }
+        arView.onActivityPaused(activity);
+        arView.onActivityResumed(activity);
     }
 
     @Override

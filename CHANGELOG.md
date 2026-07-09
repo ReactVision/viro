@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.57.4 — 9 July 2026
+
+- Stability improvements
+
 ## v2.57.3 — 2 July 2026
 
 ### Added

@@ -47,7 +47,7 @@ const materialConfig_1 = require("./materialConfig");
 const dragConfiguration_1 = require("./dragConfiguration");
 const physicsConfig_1 = require("./physicsConfig");
 /** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
-function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange, runtimeCtx) {
+function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx) {
     const hasTriggerImage = !!asset.trigger_image_url;
     let posZ = asset.position_z ?? -2;
     if (!hasTriggerImage && posZ > -0.5) {
@@ -87,8 +87,11 @@ function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationT
         dragPlane = dragConfiguration_1.DragConfiguration.getDragPlane(scene?.plane_direction ?? "Horizontal", position);
     }
     const parsedPhysics = (0, physicsConfig_1.parsePhysicsBodyConfig)(asset.physics_config);
+    const dragActive = isDragActive?.(asset.id) ?? false;
     const physicsBody = parsedPhysics
-        ? (0, physicsConfig_1.buildViroPhysicsBody)(parsedPhysics)
+        ? (0, physicsConfig_1.buildViroPhysicsBody)(parsedPhysics, {
+            kinematicDragOverride: dragActive && (0, physicsConfig_1.shouldUseKinematicPhysicsDrag)(asset, parsedPhysics),
+        })
         : undefined;
     const viroTag = parsedPhysics ? asset.id : undefined;
     const onClick = createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx);
@@ -136,7 +139,7 @@ function inferModelType(url) {
         return "VRX";
     return "GLB";
 }
-function create3DObject(asset, config, onAssetLoaded, onCollision) {
+function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision) {
     if (!asset.file_url) {
         console.warn(`[Studio] 3D model "${asset.name}" has no file_url`);
         return null;
@@ -157,16 +160,20 @@ function create3DObject(asset, config, onAssetLoaded, onCollision) {
     return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
     // Viro derives native canDrag from `onDrag != undefined`; without this prop
     // the drag recognizer is never attached, even when dragType is set.
-    {...(config.dragType ? { onDrag: () => { } } : {})} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody
+    {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
         : {})} {...(onCollision ? { onCollision: onCollision } : {})}/>);
 }
-function createImage(asset, config, onAssetLoaded) {
+function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag) {
     if (!asset.file_url) {
         console.warn(`[Studio] Image "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroImage_1.ViroImage key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
+    return (<ViroImage_1.ViroImage key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}/>);
 }
 /**
  * TEXT node whose content is a {{variable}} template (the asset name). It
@@ -174,7 +181,7 @@ function createImage(asset, config, onAssetLoaded) {
  * subscribes when the template actually has placeholders). Resolution is
  * fail-soft: unknown names stay literal.
  */
-const VariableText = ({ asset, config, store, visible }) => {
+const VariableText = ({ asset, config, store, notifyPhysicsDrag, visible }) => {
     const template = asset.name ?? "";
     const compute = () => store
         ? (0, apiRequestHelpers_1.interpolateDisplayTemplate)(template, (n) => store.get(n))
@@ -193,7 +200,9 @@ const VariableText = ({ asset, config, store, visible }) => {
             fontSize: 20,
             color: "#FFFFFF",
             textAlign: "center",
-        }} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
+        }} {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}/>);
 };
 /**
  * Wraps a created node and drives its `visible` prop from the per-scene
@@ -211,32 +220,36 @@ const VisibleNode = ({ assetId, store, children }) => {
     }, [store, assetId]);
     return React.cloneElement(children, { visible });
 };
-function createText(asset, config, store) {
-    return (<VariableText key={asset.id} asset={asset} config={config} store={store}/>);
+function createText(asset, config, notifyPhysicsDrag, store) {
+    return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag}/>);
 }
-function createVideo(asset, config) {
+function createVideo(asset, config, notifyPhysicsDrag) {
     if (!asset.file_url) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType ? { onDrag: () => { } } : {})}/>);
+    return (<ViroVideo_1.ViroVideo key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}/>);
 }
-function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, onSceneChange, runtimeCtx) {
+function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, isDragActive, notifyPhysicsDrag, onSceneChange, runtimeCtx) {
     const type = resolveType(asset);
-    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onSceneChange, runtimeCtx);
+    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx);
     let node;
     switch (type) {
         case "3D-MODEL":
-            node = create3DObject(asset, config, onAssetLoaded, onCollision);
+            // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep both;
+            // a drag-only merge here once silently killed collisions.
+            node = create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision);
             break;
         case "IMAGE":
-            node = createImage(asset, config, onAssetLoaded);
+            node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag);
             break;
         case "TEXT":
-            node = createText(asset, config, runtimeCtx?.variableStore);
+            node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore);
             break;
         case "VIDEO":
-            node = createVideo(asset, config);
+            node = createVideo(asset, config, notifyPhysicsDrag);
             break;
         default:
             console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);

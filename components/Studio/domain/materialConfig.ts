@@ -1,6 +1,5 @@
 /**
  * Studio material_config parsing and Viro material definition building.
- * Ported from studio-go/domain/materialConfig.ts — no zod dependency.
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,7 +50,9 @@ const TEXTURE_KEYS = [
   "specularTexture",
 ] as const;
 
-function textureToViro(uri: string | null | undefined): { uri: string } | undefined {
+function textureToViro(
+  uri: string | null | undefined
+): { uri: string } | undefined {
   if (uri == null || uri === "") return undefined;
   return { uri };
 }
@@ -76,7 +77,9 @@ const TIME_WORD_RE = /\btime\b/i;
 const CAMERA_TEXTURE_RE = /\bcamera_texture\b/;
 const RF_VIEWPORT_RE = /\b_rf_vpw\b|\b_rf_vph\b/;
 
-export function materialConfigNeedsTimeUniform(config: MaterialConfig): boolean {
+export function materialConfigNeedsTimeUniform(
+  config: MaterialConfig
+): boolean {
   if (config.materialUniforms?.some((u) => u.name === "time")) return true;
   return collectShaderModifierStrings(config).some((s) => TIME_WORD_RE.test(s));
 }
@@ -85,8 +88,12 @@ export function materialConfigNeedsTimeUniform(config: MaterialConfig): boolean 
  * True if the shader uses _rf_vpw/_rf_vph viewport uniforms.
  * These must be pushed via ViroMaterials.updateShaderUniform on mount and orientation change.
  */
-export function materialConfigNeedsViewportUniforms(config: MaterialConfig): boolean {
-  return collectShaderModifierStrings(config).some((s) => RF_VIEWPORT_RE.test(s));
+export function materialConfigNeedsViewportUniforms(
+  config: MaterialConfig
+): boolean {
+  return collectShaderModifierStrings(config).some((s) =>
+    RF_VIEWPORT_RE.test(s)
+  );
 }
 
 /**
@@ -101,7 +108,8 @@ function injectMissingGlslDeclarations(uniforms: string, body: string): string {
       result;
   }
   if (RF_VIEWPORT_RE.test(body) && !/\b_rf_vpw\b/.test(result)) {
-    result = "uniform highp float _rf_vpw;\nuniform highp float _rf_vph;\n" + result;
+    result =
+      "uniform highp float _rf_vpw;\nuniform highp float _rf_vph;\n" + result;
   }
   return result;
 }
@@ -112,13 +120,20 @@ function injectMissingGlslDeclarations(uniforms: string, body: string): string {
  * GLSL only, we add the runtime binding here.
  */
 function mergeMaterialUniformsForViro(
-  config: MaterialConfig,
+  config: MaterialConfig
 ): Array<{ name: string; type: string; value: unknown }> | undefined {
   const list = config.materialUniforms
-    ? config.materialUniforms.map((u) => ({ name: u.name, type: u.type, value: u.value }))
+    ? config.materialUniforms.map((u) => ({
+        name: u.name,
+        type: u.type,
+        value: u.value,
+      }))
     : [];
 
-  if (materialConfigNeedsTimeUniform(config) && !list.some((u) => u.name === "time")) {
+  if (
+    materialConfigNeedsTimeUniform(config) &&
+    !list.some((u) => u.name === "time")
+  ) {
     list.push({ name: "time", type: "float", value: 0 });
   }
 
@@ -139,7 +154,7 @@ function mergeMaterialUniformsForViro(
  * layer binds the camera feed even when the DB JSON omits `requiresCameraTexture`.
  */
 function normalizeShaderModifiersForViro(
-  mods: NonNullable<MaterialConfig["shaderModifiers"]>,
+  mods: NonNullable<MaterialConfig["shaderModifiers"]>
 ): Record<string, string | object> {
   const out: Record<string, string | object> = {};
   for (const [key, stage] of Object.entries(mods)) {
@@ -199,39 +214,51 @@ export function parseMaterialConfig(raw: unknown): MaterialConfig | null {
 
   try {
     const config: MaterialConfig = {
-      lightingModel:
-        (["Constant", "Lambert", "Blinn", "Phong", "PBR"].includes(r.lightingModel as string)
-          ? r.lightingModel
-          : "PBR") as MaterialConfig["lightingModel"],
+      lightingModel: (["Constant", "Lambert", "Blinn", "Phong", "PBR"].includes(
+        r.lightingModel as string
+      )
+        ? r.lightingModel
+        : "PBR") as MaterialConfig["lightingModel"],
     };
 
-    if (typeof r.presetName === "string")    config.presetName    = r.presetName;
-    if (typeof r.diffuseColor === "string")  config.diffuseColor  = r.diffuseColor;
-    if (typeof r.roughness === "number")     config.roughness     = r.roughness;
-    if (typeof r.metalness === "number")     config.metalness     = r.metalness;
-    if (typeof r.shininess === "number")     config.shininess     = r.shininess;
-    if (typeof r.alpha === "number")         config.alpha         = r.alpha;
-    if (typeof r.blendMode === "string")     config.blendMode     = r.blendMode;
+    if (typeof r.presetName === "string") config.presetName = r.presetName;
+    if (typeof r.diffuseColor === "string")
+      config.diffuseColor = r.diffuseColor;
+    if (typeof r.roughness === "number") config.roughness = r.roughness;
+    if (typeof r.metalness === "number") config.metalness = r.metalness;
+    if (typeof r.shininess === "number") config.shininess = r.shininess;
+    if (typeof r.alpha === "number") config.alpha = r.alpha;
+    if (typeof r.blendMode === "string") config.blendMode = r.blendMode;
     if (r.bloomThreshold != null && typeof r.bloomThreshold === "number")
-                                             config.bloomThreshold = r.bloomThreshold;
-    if (["Clamp","Repeat","Mirror"].includes(r.wrapS as string)) config.wrapS = r.wrapS as any;
-    if (["Clamp","Repeat","Mirror"].includes(r.wrapT as string)) config.wrapT = r.wrapT as any;
-    if (typeof r.transparencyMode === "string") config.transparencyMode = r.transparencyMode;
-    if (typeof r.cullMode === "string")      config.cullMode      = r.cullMode;
+      config.bloomThreshold = r.bloomThreshold;
+    if (["Clamp", "Repeat", "Mirror"].includes(r.wrapS as string))
+      config.wrapS = r.wrapS as any;
+    if (["Clamp", "Repeat", "Mirror"].includes(r.wrapT as string))
+      config.wrapT = r.wrapT as any;
+    if (typeof r.transparencyMode === "string")
+      config.transparencyMode = r.transparencyMode;
+    if (typeof r.cullMode === "string") config.cullMode = r.cullMode;
 
     for (const key of TEXTURE_KEYS) {
       const v = r[key];
       if (typeof v === "string" || v === null) (config as any)[key] = v;
     }
 
-    if (r.shaderModifiers && typeof r.shaderModifiers === "object" && !Array.isArray(r.shaderModifiers)) {
-      config.shaderModifiers = r.shaderModifiers as Record<string, ShaderModifierStage | string>;
+    if (
+      r.shaderModifiers &&
+      typeof r.shaderModifiers === "object" &&
+      !Array.isArray(r.shaderModifiers)
+    ) {
+      config.shaderModifiers = r.shaderModifiers as Record<
+        string,
+        ShaderModifierStage | string
+      >;
     }
 
     if (Array.isArray(r.materialUniforms)) {
       config.materialUniforms = r.materialUniforms.filter(
         (u): u is { name: string; type: string; value: unknown } =>
-          u && typeof u.name === "string" && typeof u.type === "string",
+          u && typeof u.name === "string" && typeof u.type === "string"
       );
     }
 
@@ -245,20 +272,24 @@ export function parseMaterialConfig(raw: unknown): MaterialConfig | null {
 /**
  * Maps a validated Studio material_config to Viro's `createMaterials` definition shape.
  */
-export function buildViroMaterialDefinition(config: MaterialConfig): ViroMaterialDefinition {
+export function buildViroMaterialDefinition(
+  config: MaterialConfig
+): ViroMaterialDefinition {
   const out: ViroMaterialDefinition = { lightingModel: config.lightingModel };
 
-  if (config.diffuseColor  !== undefined) out.diffuseColor  = config.diffuseColor;
-  if (config.roughness     !== undefined) out.roughness     = config.roughness;
-  if (config.metalness     !== undefined) out.metalness     = config.metalness;
-  if (config.shininess     !== undefined) out.shininess     = config.shininess;
-  if (config.alpha         !== undefined) out.alpha         = config.alpha;
-  if (config.blendMode     !== undefined) out.blendMode     = config.blendMode;
-  if (config.bloomThreshold!= undefined) out.bloomThreshold = config.bloomThreshold;
-  if (config.wrapS         !== undefined) out.wrapS         = config.wrapS;
-  if (config.wrapT         !== undefined) out.wrapT         = config.wrapT;
-  if (config.transparencyMode !== undefined) out.transparencyMode = config.transparencyMode;
-  if (config.cullMode      !== undefined) out.cullMode      = config.cullMode;
+  if (config.diffuseColor !== undefined) out.diffuseColor = config.diffuseColor;
+  if (config.roughness !== undefined) out.roughness = config.roughness;
+  if (config.metalness !== undefined) out.metalness = config.metalness;
+  if (config.shininess !== undefined) out.shininess = config.shininess;
+  if (config.alpha !== undefined) out.alpha = config.alpha;
+  if (config.blendMode !== undefined) out.blendMode = config.blendMode;
+  if (config.bloomThreshold != undefined)
+    out.bloomThreshold = config.bloomThreshold;
+  if (config.wrapS !== undefined) out.wrapS = config.wrapS;
+  if (config.wrapT !== undefined) out.wrapT = config.wrapT;
+  if (config.transparencyMode !== undefined)
+    out.transparencyMode = config.transparencyMode;
+  if (config.cullMode !== undefined) out.cullMode = config.cullMode;
 
   for (const key of TEXTURE_KEYS) {
     const mapped = textureToViro((config as any)[key]);
@@ -266,7 +297,9 @@ export function buildViroMaterialDefinition(config: MaterialConfig): ViroMateria
   }
 
   if (config.shaderModifiers !== undefined) {
-    out.shaderModifiers = normalizeShaderModifiersForViro(config.shaderModifiers);
+    out.shaderModifiers = normalizeShaderModifiersForViro(
+      config.shaderModifiers
+    );
   }
 
   const mergedUniforms = mergeMaterialUniformsForViro(config);

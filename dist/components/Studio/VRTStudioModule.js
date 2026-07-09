@@ -38,4 +38,18 @@ exports.VRTStudioModule = {
             return Promise.resolve(NOT_AVAILABLE);
         return native.rvStudioApiRequest(bodyJson);
     },
+    /**
+     * @internal — sets/clears an internal session so the fetch methods use
+     * `${baseUrl}/functions/v1/...` with `Authorization: Bearer` (and no
+     * `x-api-key`) instead of the manifest RVApiKey. Pass null to revert to
+     * API-key mode. Session auth wins over any manifest key.
+     */
+    rvSetStudioSession: (config) => {
+        // Method-level guard, not just `!native`: JS can OTA ahead of the native
+        // binary, so an older build has VRTStudio present but without this (newer)
+        // method. No-op then, and viro stays in manifest API-key mode.
+        if (typeof native?.rvSetStudioSession !== "function")
+            return Promise.resolve();
+        return native.rvSetStudioSession(config);
+    },
 };

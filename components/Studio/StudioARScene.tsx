@@ -10,6 +10,7 @@ import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
+import type { ViroAnchor } from "../Types/ViroEvents";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
@@ -51,6 +52,12 @@ interface StudioARSceneProps {
   onReady?: () => void;
   onError?: (err: Error) => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
+  /** Fired on first AR plane detection (AUTOMATIC) / plane accept (MANUAL). */
+  onPlaneDetected?: () => void;
+  /** Fired when the user taps to select a plane (MANUAL mode). */
+  onPlaneSelected?: () => void;
+  /** Text shown when the scene has no assets. Defaults to "No assets to display". */
+  noAssetsMessage?: string;
   /** Session-scoped store owned by the navigator; survives scene pushes. */
   variableStore?: StudioVariableStore;
 }
@@ -73,8 +80,16 @@ interface StudioARSceneInnerProps extends StudioARSceneProps {
 }
 
 const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
-  const { sceneNavigator, sceneData, onReady, onSceneChange, variableStore } =
-    props;
+  const {
+    sceneNavigator,
+    sceneData,
+    onReady,
+    onSceneChange,
+    onPlaneDetected,
+    onPlaneSelected,
+    noAssetsMessage,
+    variableStore,
+  } = props;
   const { scene, assets, animations, collision_bindings, functions } =
     sceneData;
 
@@ -192,6 +207,49 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const [loadedAssetIds, setLoadedAssetIds] = useState<Record<string, true>>(
     {}
   );
+
+  // ─── Drag-active state (debounced) ────────────────────────────────────────
+  // Viro's onDrag fires per-frame. Track a Record<assetId, true> cleared 220ms
+  // after the last drag event; the node factory reads isDragActive to pass
+  // kinematicDragOverride so Dynamic-physics bodies don't fight the gesture.
+  // The onDrag callback's mere presence is also what unlocks native drag.
+  const [dragActiveByAssetId, setDragActiveByAssetId] = useState<
+    Record<string, true>
+  >({});
+  const dragTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
+
+  const notifyPhysicsDrag = useCallback((assetId: string) => {
+    setDragActiveByAssetId((prev) =>
+      prev[assetId] ? prev : { ...prev, [assetId]: true }
+    );
+    const existing = dragTimersRef.current.get(assetId);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      setDragActiveByAssetId((prev) => {
+        if (!prev[assetId]) return prev;
+        const next = { ...prev };
+        delete next[assetId];
+        return next;
+      });
+      dragTimersRef.current.delete(assetId);
+    }, 220);
+    dragTimersRef.current.set(assetId, t);
+  }, []);
+
+  const isDragActive = useCallback(
+    (assetId: string) => !!dragActiveByAssetId[assetId],
+    [dragActiveByAssetId]
+  );
+
+  useEffect(() => {
+    const timers = dragTimersRef.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
 
   const handleAssetLoaded = useCallback((assetId: string) => {
     setLoadedAssetIds((prev) =>
@@ -429,6 +487,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           animationStates,
           handleAssetLoaded,
           getCollisionHandler(asset.id),
+          isDragActive,
+          notifyPhysicsDrag,
           handleSceneChange,
           runtimeCtx
         );
@@ -441,6 +501,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     animationStates,
     handleAssetLoaded,
     getCollisionHandler,
+    isDragActive,
+    notifyPhysicsDrag,
     maxModels,
     handleSceneChange,
     runtimeCtx,
@@ -461,6 +523,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           animationStates,
           handleAssetLoaded,
           getCollisionHandler(asset.id),
+          isDragActive,
+          notifyPhysicsDrag,
           handleSceneChange,
           runtimeCtx
         );
@@ -480,6 +544,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     animationStates,
     handleAssetLoaded,
     getCollisionHandler,
+    isDragActive,
+    notifyPhysicsDrag,
     handleSceneChange,
     runtimeCtx,
   ]);
@@ -489,6 +555,76 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     (scene.plane_detection as string) ?? "NONE"
   ).toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
+
+  // Native plane anchor types for ViroARScene (lowercase matches Viro defaults).
+  const anchorDetectionTypes = useMemo((): string[] | undefined => {
+    if (planeDetectionMode !== "AUTOMATIC" && planeDetectionMode !== "MANUAL") {
+      return undefined;
+    }
+    const dir = (scene.plane_direction ?? "Horizontal").toLowerCase();
+    if (dir === "vertical") return ["planesVertical"];
+    if (dir.includes("horizontal")) return ["planesHorizontal"];
+    return ["planesHorizontal", "planesVertical"];
+  }, [planeDetectionMode, scene.plane_direction]);
+
+  // ViroARPlaneSelector (react-viro 2.54+) no longer receives scene anchors
+  // automatically; ViroARScene forwards them here via ref. Also surfaces
+  // onPlaneDetected / onPlaneSelected to the host.
+  const planeSelectorRef = useRef<InstanceType<
+    typeof ViroARPlaneSelector
+  > | null>(null);
+
+  const handleAnchorFound = useCallback(
+    (anchor: ViroAnchor) => {
+      try {
+        if (planeDetectionMode === "MANUAL") {
+          planeSelectorRef.current?.handleAnchorFound(anchor);
+        }
+        if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
+          onPlaneDetected?.();
+        }
+      } catch (error) {
+        console.error("[Studio] handleAnchorFound failed:", error);
+      }
+    },
+    [planeDetectionMode, onPlaneDetected]
+  );
+
+  const handleAnchorUpdated = useCallback(
+    (anchor: ViroAnchor) => {
+      try {
+        if (planeDetectionMode === "MANUAL") {
+          planeSelectorRef.current?.handleAnchorUpdated(anchor);
+        }
+      } catch (error) {
+        console.error("[Studio] handleAnchorUpdated failed:", error);
+      }
+    },
+    [planeDetectionMode]
+  );
+
+  const handleAnchorRemoved = useCallback(
+    (anchor?: ViroAnchor) => {
+      try {
+        if (planeDetectionMode === "MANUAL" && anchor) {
+          planeSelectorRef.current?.handleAnchorRemoved(anchor);
+        }
+      } catch (error) {
+        console.error("[Studio] handleAnchorRemoved failed:", error);
+      }
+    },
+    [planeDetectionMode]
+  );
+
+  const handlePlaneSelected = useCallback(() => {
+    onPlaneSelected?.();
+  }, [onPlaneSelected]);
+
+  // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
+  const handlePlaneDetectedForSelector = useCallback(() => {
+    onPlaneDetected?.();
+    return true;
+  }, [onPlaneDetected]);
 
   const renderAssets = () => {
     if (isQuest) {
@@ -510,9 +646,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     if (planeDetectionMode === "MANUAL") {
       return (
         <ViroARPlaneSelector
+          ref={planeSelectorRef}
           minHeight={0.1}
           minWidth={0.1}
           alignment={planeAlignment}
+          onPlaneDetected={handlePlaneDetectedForSelector}
+          onPlaneSelected={handlePlaneSelected}
         >
           {renderedPlaneAssets}
         </ViroARPlaneSelector>
@@ -543,7 +682,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       <StudioSounds manager={soundManagerRef.current!} />
       {assets.length === 0 && (
         <ViroText
-          text="No assets to display"
+          text={noAssetsMessage ?? "No assets to display"}
           position={[0, 0, -2]}
           style={{
             fontFamily: "Arial",
@@ -559,5 +698,15 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   if (isQuest) {
     return <ViroScene {...physicsProps}>{children}</ViroScene>;
   }
-  return <ViroARScene {...physicsProps}>{children}</ViroARScene>;
+  return (
+    <ViroARScene
+      {...physicsProps}
+      {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})}
+      onAnchorFound={handleAnchorFound}
+      onAnchorUpdated={handleAnchorUpdated}
+      onAnchorRemoved={handleAnchorRemoved}
+    >
+      {children}
+    </ViroARScene>
+  );
 };

@@ -158,7 +158,11 @@ public class RVHttpClient {
         conn.setRequestMethod(method.toUpperCase());
         conn.setConnectTimeout(timeoutSec * 1000);
         conn.setReadTimeout(timeoutSec * 1000);
-        conn.setRequestProperty("x-api-key", apiKey);
+        // Session callers pass null and supply Authorization via headerNames/Values;
+        // JNI callers always pass a real key. Only set the header when present.
+        if (apiKey != null) {
+            conn.setRequestProperty("x-api-key", apiKey);
+        }
         conn.setInstanceFollowRedirects(true);
         return conn;
     }

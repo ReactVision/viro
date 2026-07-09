@@ -32,6 +32,8 @@ test/ios/ViroExample/ViroExample.xcworkspace/xcuserdata/
 test/ios/ViroExample/Pods/
 ios/ngrokendpoint.txt
 ios/ViroRenderer/ViroKit.framework/_CodeSignature/
+.xcode.env.local
+/ios/build-dev/
 
 # Figment Android
 Figment/android/.idea

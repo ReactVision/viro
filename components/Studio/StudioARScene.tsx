@@ -15,6 +15,11 @@ import { registerSceneAnimations } from "./domain/animationRegistry";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
 import {
+  evaluateProximityBindings,
+  ProximityRuntimeState,
+} from "./domain/proximityBindingsRuntime";
+import { ViroCameraTransform } from "../Types/ViroEvents";
+import {
   cleanupTriggerImageTargets,
   registerTriggerImageTargets,
 } from "./domain/triggerImageRegistry";
@@ -43,6 +48,10 @@ import {
 
 const ANDROID_MAX_3D_MODELS = 3;
 const IOS_MAX_3D_MODELS = 10;
+
+// The native camera-transform event can fire per frame; throttle the proximity
+// distance sweep to this cadence.
+const PROXIMITY_EVAL_INTERVAL_MS = 100;
 
 type AnimOverride = { key: string; run: boolean };
 
@@ -419,6 +428,101 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     ]
   );
 
+  // ─── Proximity bindings ───────────────────────────────────────────────────
+  // Fire a function when the user's world position comes within `distance` of a
+  // target object. Camera pose is uniform world-space across every locomotion
+  // mode; the target side reads a live world transform (getTransformAsync)
+  // rather than the parent-anchor-local DB position, so the metres are correct
+  // regardless of anchor (plane / image marker / moved rig).
+  const proximityBindings = useMemo(
+    () => sceneData.proximity_bindings ?? [],
+    [sceneData]
+  );
+  const proximityTargetIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const b of proximityBindings) s.add(b.target_asset_id);
+    return s;
+  }, [proximityBindings]);
+
+  // Per-binding latches (inside/fired/primed) — reset on scene change so a
+  // navigation doesn't carry a one-shot's spent state into the next scene.
+  const proximityStateRef = useRef<Map<string, ProximityRuntimeState>>(
+    new Map()
+  );
+  useEffect(() => {
+    proximityStateRef.current.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
+
+  // Live target node refs + a cached world position per target. Refs self-manage
+  // via the node factory's mount/unmount ref callback; the cache is refreshed on
+  // register and whenever an AR anchor moves, so the camera hot path stays sync.
+  const proximityTargetRefsRef = useRef<Map<string, any>>(new Map());
+  const proximityTargetTransformsRef = useRef<
+    Map<string, [number, number, number]>
+  >(new Map());
+
+  const refreshTargetTransform = useCallback(async (assetId: string) => {
+    const ref = proximityTargetRefsRef.current.get(assetId);
+    if (!ref?.getTransformAsync) return;
+    try {
+      const tr = await ref.getTransformAsync();
+      const pos = tr?.position ?? tr?.transform?.position;
+      if (Array.isArray(pos) && pos.length >= 3) {
+        proximityTargetTransformsRef.current.set(assetId, [
+          pos[0],
+          pos[1],
+          pos[2],
+        ]);
+      }
+    } catch {
+      // Node may not be mounted/anchored yet; the next anchor update retries.
+    }
+  }, []);
+
+  const refreshAllTargetTransforms = useCallback(() => {
+    for (const id of proximityTargetRefsRef.current.keys()) {
+      void refreshTargetTransform(id);
+    }
+  }, [refreshTargetTransform]);
+
+  const registerProximityTarget = useCallback(
+    (assetId: string, ref: unknown) => {
+      if (ref) {
+        proximityTargetRefsRef.current.set(assetId, ref);
+        void refreshTargetTransform(assetId);
+      } else {
+        proximityTargetRefsRef.current.delete(assetId);
+        proximityTargetTransformsRef.current.delete(assetId);
+      }
+    },
+    [refreshTargetTransform]
+  );
+
+  const lastProximityEvalRef = useRef(0);
+  const handleCameraTransformUpdate = useCallback(
+    (t: ViroCameraTransform) => {
+      if (!proximityBindings.length) return;
+      const now = Date.now();
+      if (now - lastProximityEvalRef.current < PROXIMITY_EVAL_INTERVAL_MS)
+        return;
+      lastProximityEvalRef.current = now;
+      evaluateProximityBindings({
+        cameraPosition: t.position,
+        bindings: proximityBindings,
+        getTargetWorldPosition: (id) =>
+          proximityTargetTransformsRef.current.get(id),
+        stateRef: proximityStateRef,
+        sceneNavigator,
+        animations,
+        onSceneChange: handleSceneChange,
+        onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+        runtimeCtx,
+      });
+    },
+    [proximityBindings, sceneNavigator, animations, handleSceneChange, runtimeCtx]
+  );
+
   // ─── Trigger image targets ────────────────────────────────────────────────
   const { planeAssets, imageTriggeredAssets } = useMemo(() => {
     const plane = assets.filter((a) => !a.trigger_image_url);
@@ -490,7 +594,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           isDragActive,
           notifyPhysicsDrag,
           handleSceneChange,
-          runtimeCtx
+          runtimeCtx,
+          proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined
         );
       })
       .filter(Boolean) as React.ReactElement[];
@@ -506,6 +611,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     maxModels,
     handleSceneChange,
     runtimeCtx,
+    proximityTargetIds,
+    registerProximityTarget,
   ]);
 
   const renderedImageTriggeredAssets = useMemo(() => {
@@ -526,7 +633,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           isDragActive,
           notifyPhysicsDrag,
           handleSceneChange,
-          runtimeCtx
+          runtimeCtx,
+          proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined
         );
         if (!node) return null;
         return (
@@ -548,6 +656,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     notifyPhysicsDrag,
     handleSceneChange,
     runtimeCtx,
+    proximityTargetIds,
+    registerProximityTarget,
   ]);
 
   // ─── Plane detection (AR only) ────────────────────────────────────────────
@@ -583,11 +693,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
           onPlaneDetected?.();
         }
+        // Anchoring places content in world space — refresh cached target
+        // positions so proximity metres stay correct once the anchor lands.
+        refreshAllTargetTransforms();
       } catch (error) {
         console.error("[Studio] handleAnchorFound failed:", error);
       }
     },
-    [planeDetectionMode, onPlaneDetected]
+    [planeDetectionMode, onPlaneDetected, refreshAllTargetTransforms]
   );
 
   const handleAnchorUpdated = useCallback(
@@ -596,11 +709,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         if (planeDetectionMode === "MANUAL") {
           planeSelectorRef.current?.handleAnchorUpdated(anchor);
         }
+        refreshAllTargetTransforms();
       } catch (error) {
         console.error("[Studio] handleAnchorUpdated failed:", error);
       }
     },
-    [planeDetectionMode]
+    [planeDetectionMode, refreshAllTargetTransforms]
   );
 
   const handleAnchorRemoved = useCallback(
@@ -695,12 +809,23 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     </>
   );
 
+  // Only wire the camera event when a proximity trigger needs it — native gates
+  // the per-frame transform stream on this prop being present.
+  const cameraTransformProp = proximityBindings.length
+    ? { onCameraTransformUpdate: handleCameraTransformUpdate }
+    : {};
+
   if (isQuest) {
-    return <ViroScene {...physicsProps}>{children}</ViroScene>;
+    return (
+      <ViroScene {...physicsProps} {...cameraTransformProp}>
+        {children}
+      </ViroScene>
+    );
   }
   return (
     <ViroARScene
       {...physicsProps}
+      {...cameraTransformProp}
       {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})}
       onAnchorFound={handleAnchorFound}
       onAnchorUpdated={handleAnchorUpdated}

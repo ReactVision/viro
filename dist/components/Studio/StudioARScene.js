@@ -49,6 +49,7 @@ const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const collisionBindingsRuntime_1 = require("./domain/collisionBindingsRuntime");
 const collisionPairKey_1 = require("./domain/collisionPairKey");
+const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
@@ -63,6 +64,9 @@ const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewp
 const physicsConfig_1 = require("./domain/physicsConfig");
 const ANDROID_MAX_3D_MODELS = 3;
 const IOS_MAX_3D_MODELS = 10;
+// The native camera-transform event can fire per frame; throttle the proximity
+// distance sweep to this cadence.
+const PROXIMITY_EVAL_INTERVAL_MS = 100;
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until
  * sceneData is available, avoiding a Rules of Hooks violation.
@@ -319,6 +323,85 @@ const StudioARSceneInner = (props) => {
         handleSceneChange,
         runtimeCtx,
     ]);
+    // ─── Proximity bindings ───────────────────────────────────────────────────
+    // Fire a function when the user's world position comes within `distance` of a
+    // target object. Camera pose is uniform world-space across every locomotion
+    // mode; the target side reads a live world transform (getTransformAsync)
+    // rather than the parent-anchor-local DB position, so the metres are correct
+    // regardless of anchor (plane / image marker / moved rig).
+    const proximityBindings = (0, react_1.useMemo)(() => sceneData.proximity_bindings ?? [], [sceneData]);
+    const proximityTargetIds = (0, react_1.useMemo)(() => {
+        const s = new Set();
+        for (const b of proximityBindings)
+            s.add(b.target_asset_id);
+        return s;
+    }, [proximityBindings]);
+    // Per-binding latches (inside/fired/primed) — reset on scene change so a
+    // navigation doesn't carry a one-shot's spent state into the next scene.
+    const proximityStateRef = (0, react_1.useRef)(new Map());
+    (0, react_1.useEffect)(() => {
+        proximityStateRef.current.clear();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
+    // Live target node refs + a cached world position per target. Refs self-manage
+    // via the node factory's mount/unmount ref callback; the cache is refreshed on
+    // register and whenever an AR anchor moves, so the camera hot path stays sync.
+    const proximityTargetRefsRef = (0, react_1.useRef)(new Map());
+    const proximityTargetTransformsRef = (0, react_1.useRef)(new Map());
+    const refreshTargetTransform = (0, react_1.useCallback)(async (assetId) => {
+        const ref = proximityTargetRefsRef.current.get(assetId);
+        if (!ref?.getTransformAsync)
+            return;
+        try {
+            const tr = await ref.getTransformAsync();
+            const pos = tr?.position ?? tr?.transform?.position;
+            if (Array.isArray(pos) && pos.length >= 3) {
+                proximityTargetTransformsRef.current.set(assetId, [
+                    pos[0],
+                    pos[1],
+                    pos[2],
+                ]);
+            }
+        }
+        catch {
+            // Node may not be mounted/anchored yet; the next anchor update retries.
+        }
+    }, []);
+    const refreshAllTargetTransforms = (0, react_1.useCallback)(() => {
+        for (const id of proximityTargetRefsRef.current.keys()) {
+            void refreshTargetTransform(id);
+        }
+    }, [refreshTargetTransform]);
+    const registerProximityTarget = (0, react_1.useCallback)((assetId, ref) => {
+        if (ref) {
+            proximityTargetRefsRef.current.set(assetId, ref);
+            void refreshTargetTransform(assetId);
+        }
+        else {
+            proximityTargetRefsRef.current.delete(assetId);
+            proximityTargetTransformsRef.current.delete(assetId);
+        }
+    }, [refreshTargetTransform]);
+    const lastProximityEvalRef = (0, react_1.useRef)(0);
+    const handleCameraTransformUpdate = (0, react_1.useCallback)((t) => {
+        if (!proximityBindings.length)
+            return;
+        const now = Date.now();
+        if (now - lastProximityEvalRef.current < PROXIMITY_EVAL_INTERVAL_MS)
+            return;
+        lastProximityEvalRef.current = now;
+        (0, proximityBindingsRuntime_1.evaluateProximityBindings)({
+            cameraPosition: t.position,
+            bindings: proximityBindings,
+            getTargetWorldPosition: (id) => proximityTargetTransformsRef.current.get(id),
+            stateRef: proximityStateRef,
+            sceneNavigator,
+            animations,
+            onSceneChange: handleSceneChange,
+            onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+            runtimeCtx,
+        });
+    }, [proximityBindings, sceneNavigator, animations, handleSceneChange, runtimeCtx]);
     // ─── Trigger image targets ────────────────────────────────────────────────
     const { planeAssets, imageTriggeredAssets } = (0, react_1.useMemo)(() => {
         const plane = assets.filter((a) => !a.trigger_image_url);
@@ -366,7 +449,7 @@ const StudioARSceneInner = (props) => {
                     return null;
                 }
             }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx);
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined);
         })
             .filter(Boolean);
     }, [
@@ -381,6 +464,8 @@ const StudioARSceneInner = (props) => {
         maxModels,
         handleSceneChange,
         runtimeCtx,
+        proximityTargetIds,
+        registerProximityTarget,
     ]);
     const renderedImageTriggeredAssets = (0, react_1.useMemo)(() => {
         if (ViroPlatform_1.isQuest)
@@ -390,7 +475,7 @@ const StudioARSceneInner = (props) => {
             const targetName = urlToTargetName.get(asset.trigger_image_url);
             if (!targetName)
                 return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx);
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined);
             if (!node)
                 return null;
             return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
@@ -410,6 +495,8 @@ const StudioARSceneInner = (props) => {
         notifyPhysicsDrag,
         handleSceneChange,
         runtimeCtx,
+        proximityTargetIds,
+        registerProximityTarget,
     ]);
     // ─── Plane detection (AR only) ────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();
@@ -438,21 +525,25 @@ const StudioARSceneInner = (props) => {
             if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
                 onPlaneDetected?.();
             }
+            // Anchoring places content in world space — refresh cached target
+            // positions so proximity metres stay correct once the anchor lands.
+            refreshAllTargetTransforms();
         }
         catch (error) {
             console.error("[Studio] handleAnchorFound failed:", error);
         }
-    }, [planeDetectionMode, onPlaneDetected]);
+    }, [planeDetectionMode, onPlaneDetected, refreshAllTargetTransforms]);
     const handleAnchorUpdated = (0, react_1.useCallback)((anchor) => {
         try {
             if (planeDetectionMode === "MANUAL") {
                 planeSelectorRef.current?.handleAnchorUpdated(anchor);
             }
+            refreshAllTargetTransforms();
         }
         catch (error) {
             console.error("[Studio] handleAnchorUpdated failed:", error);
         }
-    }, [planeDetectionMode]);
+    }, [planeDetectionMode, refreshAllTargetTransforms]);
     const handleAnchorRemoved = (0, react_1.useCallback)((anchor) => {
         try {
             if (planeDetectionMode === "MANUAL" && anchor) {
@@ -512,10 +603,17 @@ const StudioARSceneInner = (props) => {
                 textAlign: "center",
             }}/>)}
     </>);
+    // Only wire the camera event when a proximity trigger needs it — native gates
+    // the per-frame transform stream on this prop being present.
+    const cameraTransformProp = proximityBindings.length
+        ? { onCameraTransformUpdate: handleCameraTransformUpdate }
+        : {};
     if (ViroPlatform_1.isQuest) {
-        return <ViroScene_1.ViroScene {...physicsProps}>{children}</ViroScene_1.ViroScene>;
+        return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp}>
+        {children}
+      </ViroScene_1.ViroScene>);
     }
-    return (<ViroARScene_1.ViroARScene {...physicsProps} {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+    return (<ViroARScene_1.ViroARScene {...physicsProps} {...cameraTransformProp} {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
       {children}
     </ViroARScene_1.ViroARScene>);
 };

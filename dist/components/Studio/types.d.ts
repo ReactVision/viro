@@ -225,6 +225,18 @@ export interface StudioCollisionBinding {
     asset_y_id: string;
     scene_function: StudioSceneFunction;
 }
+export type StudioProximityDirection = "entering" | "exiting" | "either";
+export type StudioProximityFireMode = "one_shot" | "repeating";
+export interface StudioProximityBinding {
+    id: string;
+    scene_id: string;
+    function_id: string;
+    target_asset_id: string;
+    distance: number;
+    direction: StudioProximityDirection;
+    fire_mode: StudioProximityFireMode;
+    scene_function: StudioSceneFunction;
+}
 export interface StudioAnimation {
     id: string;
     scene_id: string;
@@ -278,6 +290,8 @@ export interface StudioSceneResponse {
     project: StudioProjectMeta;
     assets: StudioAsset[];
     collision_bindings: StudioCollisionBinding[];
+    /** Absent in responses from backends predating the On Proximity feature. */
+    proximity_bindings?: StudioProximityBinding[];
     animations: StudioAnimation[];
     functions: StudioSceneFunction[];
     /** Absent in responses from backends predating the Variables feature. */

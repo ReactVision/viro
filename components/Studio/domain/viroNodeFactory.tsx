@@ -208,7 +208,8 @@ function create3DObject(
     viroTag: string,
     collidedPoint: [number, number, number],
     collidedNormal: [number, number, number]
-  ) => void
+  ) => void,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
     console.warn(`[Studio] 3D model "${asset.name}" has no file_url`);
@@ -235,6 +236,7 @@ function create3DObject(
   return (
     <Viro3DObject
       key={asset.id}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
@@ -267,7 +269,8 @@ function createImage(
   asset: StudioAsset,
   config: NodeConfig,
   onAssetLoaded?: (id: string) => void,
-  notifyPhysicsDrag?: (assetId: string) => void
+  notifyPhysicsDrag?: (assetId: string) => void,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
     console.warn(`[Studio] Image "${asset.name}" has no file_url`);
@@ -277,6 +280,7 @@ function createImage(
   return (
     <ViroImage
       key={asset.id}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
@@ -304,10 +308,11 @@ const VariableText: React.FC<{
   config: NodeConfig;
   store?: StudioVariableStore;
   notifyPhysicsDrag?: (assetId: string) => void;
+  nodeRef?: (ref: unknown) => void;
   // Injected by VisibleNode via cloneElement; TEXT is the only node type that
   // is a component wrapper, so it forwards visibility to its ViroText.
   visible?: boolean;
-}> = ({ asset, config, store, notifyPhysicsDrag, visible }) => {
+}> = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visible }) => {
   const template = asset.name ?? "";
   const compute = () =>
     store
@@ -325,6 +330,7 @@ const VariableText: React.FC<{
 
   return (
     <ViroText
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       text={text}
       position={config.position}
       rotation={config.rotation}
@@ -376,7 +382,8 @@ function createText(
   asset: StudioAsset,
   config: NodeConfig,
   notifyPhysicsDrag?: (assetId: string) => void,
-  store?: StudioVariableStore
+  store?: StudioVariableStore,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement {
   return (
     <VariableText
@@ -385,6 +392,7 @@ function createText(
       config={config}
       store={store}
       notifyPhysicsDrag={notifyPhysicsDrag}
+      nodeRef={nodeRef}
     />
   );
 }
@@ -392,7 +400,8 @@ function createText(
 function createVideo(
   asset: StudioAsset,
   config: NodeConfig,
-  notifyPhysicsDrag?: (assetId: string) => void
+  notifyPhysicsDrag?: (assetId: string) => void,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
     console.warn(`[Studio] Video "${asset.name}" has no file_url`);
@@ -402,6 +411,7 @@ function createVideo(
   return (
     <ViroVideo
       key={asset.id}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
@@ -435,7 +445,10 @@ export function createNode(
   isDragActive?: (assetId: string) => boolean,
   notifyPhysicsDrag?: (assetId: string) => void,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  runtimeCtx?: SequenceRuntimeContext
+  runtimeCtx?: SequenceRuntimeContext,
+  // When set (proximity-target assets), captures the live Viro node so the host
+  // can read its world transform for the distance check.
+  registerProximityTarget?: (assetId: string, ref: unknown) => void
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -450,6 +463,10 @@ export function createNode(
     runtimeCtx
   );
 
+  const proximityRef = registerProximityTarget
+    ? (ref: unknown) => registerProximityTarget(asset.id, ref)
+    : undefined;
+
   let node: React.ReactElement | null;
   switch (type) {
     case "3D-MODEL":
@@ -460,17 +477,30 @@ export function createNode(
         config,
         onAssetLoaded,
         notifyPhysicsDrag,
-        onCollision
+        onCollision,
+        proximityRef
       );
       break;
     case "IMAGE":
-      node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag);
+      node = createImage(
+        asset,
+        config,
+        onAssetLoaded,
+        notifyPhysicsDrag,
+        proximityRef
+      );
       break;
     case "TEXT":
-      node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore);
+      node = createText(
+        asset,
+        config,
+        notifyPhysicsDrag,
+        runtimeCtx?.variableStore,
+        proximityRef
+      );
       break;
     case "VIDEO":
-      node = createVideo(asset, config, notifyPhysicsDrag);
+      node = createVideo(asset, config, notifyPhysicsDrag, proximityRef);
       break;
     default:
       console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);

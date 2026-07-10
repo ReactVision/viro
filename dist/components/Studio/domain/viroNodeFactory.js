@@ -139,7 +139,7 @@ function inferModelType(url) {
         return "VRX";
     return "GLB";
 }
-function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision) {
+function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] 3D model "${asset.name}" has no file_url`);
         return null;
@@ -157,7 +157,7 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
     const shaderOverrides = hasMaterialConfig
         ? [(0, materialConfig_1.studioMaterialName)(asset.id)]
         : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
     // Viro derives native canDrag from `onDrag != undefined`; without this prop
     // the drag recognizer is never attached, even when dragType is set.
     {...(config.dragType
@@ -166,12 +166,12 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
         : {})} {...(onCollision ? { onCollision: onCollision } : {})}/>);
 }
-function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag) {
+function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] Image "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroImage_1.ViroImage key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
+    return (<ViroImage_1.ViroImage key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}/>);
 }
@@ -181,7 +181,7 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag) {
  * subscribes when the template actually has placeholders). Resolution is
  * fail-soft: unknown names stay literal.
  */
-const VariableText = ({ asset, config, store, notifyPhysicsDrag, visible }) => {
+const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visible }) => {
     const template = asset.name ?? "";
     const compute = () => store
         ? (0, apiRequestHelpers_1.interpolateDisplayTemplate)(template, (n) => store.get(n))
@@ -195,7 +195,7 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, visible }) => {
         return store.subscribe(() => setText(compute()));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store, template]);
-    return (<ViroText_1.ViroText text={text} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(visible === undefined ? {} : { visible })} style={{
+    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(visible === undefined ? {} : { visible })} style={{
             fontFamily: "Arial",
             fontSize: 20,
             color: "#FFFFFF",
@@ -220,36 +220,42 @@ const VisibleNode = ({ assetId, store, children }) => {
     }, [store, assetId]);
     return React.cloneElement(children, { visible });
 };
-function createText(asset, config, notifyPhysicsDrag, store) {
-    return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag}/>);
+function createText(asset, config, notifyPhysicsDrag, store, nodeRef) {
+    return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag} nodeRef={nodeRef}/>);
 }
-function createVideo(asset, config, notifyPhysicsDrag) {
+function createVideo(asset, config, notifyPhysicsDrag, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
+    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}/>);
 }
-function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, isDragActive, notifyPhysicsDrag, onSceneChange, runtimeCtx) {
+function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, isDragActive, notifyPhysicsDrag, onSceneChange, runtimeCtx, 
+// When set (proximity-target assets), captures the live Viro node so the host
+// can read its world transform for the distance check.
+registerProximityTarget) {
     const type = resolveType(asset);
     const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx);
+    const proximityRef = registerProximityTarget
+        ? (ref) => registerProximityTarget(asset.id, ref)
+        : undefined;
     let node;
     switch (type) {
         case "3D-MODEL":
             // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep both;
             // a drag-only merge here once silently killed collisions.
-            node = create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision);
+            node = create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, proximityRef);
             break;
         case "IMAGE":
-            node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag);
+            node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, proximityRef);
             break;
         case "TEXT":
-            node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore);
+            node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore, proximityRef);
             break;
         case "VIDEO":
-            node = createVideo(asset, config, notifyPhysicsDrag);
+            node = createVideo(asset, config, notifyPhysicsDrag, proximityRef);
             break;
         default:
             console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);

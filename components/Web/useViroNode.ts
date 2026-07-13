@@ -8,11 +8,18 @@
  * even though React runs child effects before parent effects.
  */
 import { useState, useEffect, useRef } from "react";
-import type { ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
-import { useViroScene, useViroParentNode } from "./ViroWebContext";
+import {
+  ViroEventAction,
+  ViroClickState,
+  type ViroHandle,
+  type ViroSceneApi,
+} from "@reactvision/viro-web-renderer";
+import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
 import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 
 const DEG2RAD = Math.PI / 180;
+
+type ViroPosition = [number, number, number];
 
 export interface ViroWebNodeProps {
   position?: [number, number, number];
@@ -21,6 +28,14 @@ export interface ViroWebNodeProps {
   opacity?: number;
   visible?: boolean;
   materials?: string | string[];
+  // Events (world-space position, input source id).
+  onClick?: (position: ViroPosition, source: number) => void;
+  onClickState?: (
+    clickState: number,
+    position: ViroPosition,
+    source: number,
+  ) => void;
+  onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;
 }
 
 export function useViroNode(
@@ -28,6 +43,7 @@ export function useViroNode(
   createGeometry?: (scene: ViroSceneApi) => ViroHandle,
 ): ViroHandle {
   const scene = useViroScene();
+  const renderer = useViroRenderer();
   const parent = useViroParentNode();
 
   const [node] = useState<ViroHandle>(() => scene.createNode());
@@ -66,6 +82,32 @@ export function useViroNode(
     scene.setNodeVisible(node, visible);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, px, py, pz, rx, ry, rz, sx, sy, sz, opacity, visible]);
+
+  // Events: register handlers once (reading latest props from a ref so changing
+  // callback identities don't re-subscribe), and enable the needed event types.
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const hasClick = !!(props.onClick || props.onClickState);
+  const hasHover = !!props.onHover;
+  useEffect(() => {
+    if (!hasClick && !hasHover) return;
+    renderer.setNodeEventHandlers(node, {
+      onClick: (clickState, source, position) => {
+        const p = propsRef.current;
+        p.onClickState?.(clickState, position, source);
+        if (clickState === ViroClickState.Clicked) {
+          p.onClick?.(position, source);
+        }
+      },
+      onHover: (isHovering, source, position) => {
+        propsRef.current.onHover?.(isHovering, position, source);
+      },
+    });
+    if (hasClick) scene.setNodeEventEnabled(node, ViroEventAction.Click, true);
+    if (hasHover) scene.setNodeEventEnabled(node, ViroEventAction.Hover, true);
+    return () => renderer.clearNodeEventHandlers(node);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, hasClick, hasHover]);
 
   // Materials (first material applied to the geometry; MVP scope).
   const materialsKey = Array.isArray(props.materials)

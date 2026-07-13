@@ -37,6 +37,7 @@ ViroMaterials.createMaterials({
 
 function DemoScene() {
   const [angle, setAngle] = useState(0);
+  const [tapped, setTapped] = useState(false);
   useEffect(() => {
     const id = setInterval(() => setAngle((a) => a + 2), 16);
     return () => clearInterval(id);
@@ -48,7 +49,12 @@ function DemoScene() {
         <ViroBox
           scale={[1.5, 1.5, 1.5]}
           rotation={[0, angle, 0]}
-          materials={["blueBox"]}
+          materials={[tapped ? "redBox" : "blueBox"]}
+          onClick={() => {
+            console.log("[harness] box clicked");
+            setTapped((t) => !t);
+          }}
+          onHover={(isHovering) => console.log("[harness] hover:", isHovering)}
         />
         <ViroBox
           position={[2.5, 0, 0]}

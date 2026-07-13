@@ -30,6 +30,8 @@ import { ViroBox } from "../components/ViroBox";
 import { ViroSphere } from "../components/ViroSphere";
 import { ViroSurface } from "../components/ViroSurface";
 import { ViroNode } from "../components/ViroNode";
+import { ViroAmbientLight } from "../components/ViroAmbientLight";
+import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
 
 ViroMaterials.createMaterials({
@@ -47,6 +49,13 @@ function DemoScene() {
 
   return (
     <ViroScene>
+      <ViroAmbientLight color="#ffffff" intensity={300} />
+      <ViroDirectionalLight
+        color="#ffffff"
+        intensity={1000}
+        direction={[0, -1, -0.6]}
+        castsShadow
+      />
       <ViroNode position={[0, 0, -5]} rotation={[0, angle * 0.4, 0]}>
         <ViroBox
           scale={[1.5, 1.5, 1.5]}

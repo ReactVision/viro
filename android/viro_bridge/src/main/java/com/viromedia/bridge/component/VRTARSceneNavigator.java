@@ -473,6 +473,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private double mLastAlt = 0.0;
     private double mLastHorizAcc = 0.0;
     private double mLastVertAcc = 0.0;
+    // WS-D: Android equivalent of iOS's "reduced accuracy" (Precise Location off) —
+    // only ACCESS_COARSE_LOCATION granted, forcing NETWORK_PROVIDER instead of GPS_PROVIDER,
+    // so horizontalAccuracy will stay coarse and never cross the geospatial threshold.
+    private boolean mLocationAccuracyReduced = false;
 
     public void setCloudAnchorProvider(String provider) {
         // Improvement 5: reset so credentials are re-applied on next host/resolve
@@ -758,6 +762,16 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    /**
+     * WS-D: true if only approximate location is granted (ACCESS_COARSE_LOCATION
+     * without ACCESS_FINE_LOCATION) — horizontalAccuracy will stay coarse and
+     * geospatial tracking will never leave Localizing. App should surface an
+     * explicit error instead of waiting.
+     */
+    public boolean isLocationAccuracyReduced() {
+        return mLocationAccuracyReduced;
+    }
+
     public boolean isGeospatialModeSupported() {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
@@ -816,9 +830,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             boolean hasCoarse = ctx.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                                 == PackageManager.PERMISSION_GRANTED;
             if (hasFine) {
+                mLocationAccuracyReduced = false;
                 mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
                         1000L, 0f, mLocationListener, Looper.getMainLooper());
             } else if (hasCoarse) {
+                mLocationAccuracyReduced = true;
                 mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,
                         1000L, 0f, mLocationListener, Looper.getMainLooper());
             } else {

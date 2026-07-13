@@ -632,6 +632,17 @@ export type ViroGeospatialSupportResult = {
 };
 
 /**
+ * Result of checking whether only approximate location is granted (WS-D).
+ * When true, horizontalAccuracy will stay coarse and geospatial tracking
+ * will never leave "Localizing" — surface an explicit error instead of
+ * waiting on it to resolve on its own.
+ */
+export type ViroLocationAccuracyResult = {
+  reduced: boolean;
+  error?: string;
+};
+
+/**
  * Result of getting Earth tracking state.
  */
 export type ViroEarthTrackingStateResult = {

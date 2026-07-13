@@ -1062,6 +1062,20 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     return arSession->isGeospatialModeSupported();
 }
 
+- (BOOL)isLocationAccuracyReduced {
+    if (!_vroView) {
+        return NO;
+    }
+
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        return NO;
+    }
+
+    return arSession->isLocationAccuracyReduced();
+}
+
 - (void)setGeospatialModeEnabled:(BOOL)enabled {
     _pendingGeospatialModeEnabled = enabled;
 

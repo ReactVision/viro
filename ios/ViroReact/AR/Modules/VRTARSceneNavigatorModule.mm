@@ -474,6 +474,27 @@ RCT_EXPORT_METHOD(isGeospatialModeSupported:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(isLocationAccuracyReduced:(nonnull NSNumber *)reactTag
+                                     resolve:(RCTPromiseResolveBlock)resolve
+                                      reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"reduced": @NO, @"error": @"Invalid view type"});
+                return;
+            }
+
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            BOOL reduced = [component isLocationAccuracyReduced];
+            resolve(@{@"reduced": @(reduced)});
+        } @catch (NSException *exception) {
+            resolve(@{@"reduced": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(setGeospatialModeEnabled:(nonnull NSNumber *)reactTag
                                    enabled:(BOOL)enabled) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,

@@ -31,6 +31,7 @@ import {
   ViroResolveCloudAnchorResult,
   ViroFinishScanResult,
   ViroGeospatialSupportResult,
+  ViroLocationAccuracyResult,
   ViroEarthTrackingStateResult,
   ViroGeospatialPoseResult,
   ViroVPSAvailabilityResult,
@@ -900,6 +901,21 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     };
 
   /**
+   * Check if only approximate location is granted (iOS 14+ "Precise
+   * Location" off, or Android's ACCESS_COARSE_LOCATION without
+   * ACCESS_FINE_LOCATION). When true, geospatial tracking will never
+   * converge — show the user an explicit error instead of waiting (WS-D).
+   *
+   * @returns Promise resolving to the reduced-accuracy status
+   */
+  _isLocationAccuracyReduced =
+    async (): Promise<ViroLocationAccuracyResult> => {
+      return await ViroARSceneNavigatorModule.isLocationAccuracyReduced(
+        findNodeHandle(this)
+      );
+    };
+
+  /**
    * Enable or disable geospatial mode.
    * When enabled, the session will track the device's position relative to the Earth.
    *
@@ -1489,6 +1505,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     finishScan: this._finishScan,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
+    isLocationAccuracyReduced: this._isLocationAccuracyReduced,
     setGeospatialModeEnabled: this._setGeospatialModeEnabled,
     getEarthTrackingState: this._getEarthTrackingState,
     getCameraGeospatialPose: this._getCameraGeospatialPose,
@@ -1552,6 +1569,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     finishScan: this._finishScan,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
+    isLocationAccuracyReduced: this._isLocationAccuracyReduced,
     setGeospatialModeEnabled: this._setGeospatialModeEnabled,
     getEarthTrackingState: this._getEarthTrackingState,
     getCameraGeospatialPose: this._getCameraGeospatialPose,

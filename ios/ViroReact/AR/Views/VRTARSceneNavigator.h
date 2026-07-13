@@ -121,6 +121,7 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 
 // Geospatial mode
 - (BOOL)isGeospatialModeSupported;
+- (BOOL)isLocationAccuracyReduced;
 - (void)setGeospatialModeEnabled:(BOOL)enabled;
 
 // Earth tracking state

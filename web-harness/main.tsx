@@ -34,9 +34,27 @@ import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
 
+// Procedural checkerboard texture (data URL) to exercise the texture pipeline
+// without shipping an image asset.
+function makeCheckerDataUrl(): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+  const cells = 8;
+  const s = canvas.width / cells;
+  for (let y = 0; y < cells; y++) {
+    for (let x = 0; x < cells; x++) {
+      ctx.fillStyle = (x + y) % 2 ? "#ffffff" : "#3399ff";
+      ctx.fillRect(x * s, y * s, s, s);
+    }
+  }
+  return canvas.toDataURL();
+}
+
 ViroMaterials.createMaterials({
   blueBox: { lightingModel: "Blinn", diffuseColor: "#3399ff" },
   redBox: { lightingModel: "Blinn", diffuseColor: "#ff5533" },
+  checker: { lightingModel: "Lambert", diffuseTexture: makeCheckerDataUrl() },
 });
 
 function DemoScene() {
@@ -82,7 +100,7 @@ function DemoScene() {
           rotation={[-90, 0, 0]}
           width={8}
           height={8}
-          materials={["redBox"]}
+          materials={["checker"]}
         />
       </ViroNode>
     </ViroScene>

@@ -4,11 +4,21 @@
  * native module, so ViroMaterials.web stores definitions here, and node
  * components resolve them by name to build materials through the C API.
  *
- * MVP scope: diffuseColor + lightingModel. Textures/PBR maps are follow-ups.
+ * Supports color, lighting model, scalar properties (shininess/fresnel/
+ * roughness/metalness/cull/blend/depth), and textures (diffuse + PBR maps).
+ * Textures load asynchronously and are applied when ready.
  */
 import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
-import { ViroLightingModel } from "@reactvision/viro-web-renderer";
+import {
+  ViroLightingModel,
+  ViroCullMode,
+  ViroBlendMode,
+  ViroWrapMode,
+  ViroFilterMode,
+  ViroTextureChannel,
+} from "@reactvision/viro-web-renderer";
 import { parseColorToRGBA } from "./viroColor";
+import { loadImageRGBA, resolveImageSource } from "./viroImageLoader";
 
 export interface ViroWebMaterialDef {
   diffuseColor?: string | number;
@@ -42,9 +52,73 @@ function lightingModelValue(model?: string): ViroLightingModel {
   }
 }
 
+function cullModeValue(mode?: string): ViroCullMode | undefined {
+  switch (mode) {
+    case "None": return ViroCullMode.None;
+    case "Front": return ViroCullMode.Front;
+    case "Back": return ViroCullMode.Back;
+    default: return undefined;
+  }
+}
+
+function blendModeValue(mode?: string): ViroBlendMode | undefined {
+  switch (mode) {
+    case "None": return ViroBlendMode.None;
+    case "Alpha": return ViroBlendMode.Alpha;
+    case "Add": return ViroBlendMode.Add;
+    case "Subtract": return ViroBlendMode.Subtract;
+    case "Multiply": return ViroBlendMode.Multiply;
+    case "Screen": return ViroBlendMode.Screen;
+    default: return undefined;
+  }
+}
+
+function wrapValue(mode?: string): ViroWrapMode {
+  switch (mode) {
+    case "Repeat": return ViroWrapMode.Repeat;
+    case "Mirror": return ViroWrapMode.Mirror;
+    default: return ViroWrapMode.Clamp;
+  }
+}
+
+function filterValue(mode?: string): ViroFilterMode {
+  return mode === "Nearest" ? ViroFilterMode.Nearest : ViroFilterMode.Linear;
+}
+
+// Texture channels: (material def key, C API channel, is-color/sRGB).
+const TEXTURE_CHANNELS: Array<[string, ViroTextureChannel, boolean]> = [
+  ["diffuseTexture", ViroTextureChannel.Diffuse, true],
+  ["specularTexture", ViroTextureChannel.Specular, false],
+  ["normalTexture", ViroTextureChannel.Normal, false],
+  ["roughnessTexture", ViroTextureChannel.Roughness, false],
+  ["metalnessTexture", ViroTextureChannel.Metalness, false],
+  ["ambientOcclusionTexture", ViroTextureChannel.AmbientOcclusion, false],
+];
+
+function applyTextures(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  const wrapS = wrapValue(def.wrapS as string | undefined);
+  const wrapT = wrapValue(def.wrapT as string | undefined);
+  const minF = filterValue(def.minificationFilter as string | undefined);
+  const magF = filterValue(def.magnificationFilter as string | undefined);
+  const mipF = filterValue(def.mipFilter as string | undefined);
+
+  for (const [key, channel, sRGB] of TEXTURE_CHANNELS) {
+    const url = resolveImageSource(def[key]);
+    if (!url) continue;
+    loadImageRGBA(url)
+      .then((img) => {
+        const tex = scene.createTextureRGBA(img.pixels, img.width, img.height, sRGB);
+        scene.setTextureWrap(tex, wrapS, wrapT);
+        scene.setTextureFilter(tex, minF, magF, mipF);
+        scene.setMaterialTexture(material, channel, tex);
+      })
+      .catch((err) => console.warn(`[Viro web] texture "${key}" failed:`, err));
+  }
+}
+
 /**
  * Build a native material from a registered definition and return its handle,
- * or 0 if the name isn't registered.
+ * or 0 if the name isn't registered. Textures apply asynchronously.
  */
 export function createMaterialFromRegistry(
   scene: ViroSceneApi,
@@ -57,9 +131,25 @@ export function createMaterialFromRegistry(
   }
   const material = scene.createMaterial();
   scene.setMaterialLightingModel(material, lightingModelValue(def.lightingModel));
+
   if (def.diffuseColor !== undefined) {
     const [r, g, b, a] = parseColorToRGBA(def.diffuseColor);
     scene.setMaterialDiffuseColor(material, r, g, b, a);
   }
+
+  // Scalar properties.
+  if (typeof def.shininess === "number") scene.setMaterialShininess(material, def.shininess);
+  if (typeof def.fresnelExponent === "number") scene.setMaterialFresnelExponent(material, def.fresnelExponent);
+  if (typeof def.roughness === "number") scene.setMaterialRoughness(material, def.roughness);
+  if (typeof def.metalness === "number") scene.setMaterialMetalness(material, def.metalness);
+  if (typeof def.diffuseIntensity === "number") scene.setMaterialDiffuseIntensity(material, def.diffuseIntensity);
+  if (typeof def.writesToDepthBuffer === "boolean") scene.setMaterialWritesToDepthBuffer(material, def.writesToDepthBuffer);
+  if (typeof def.readsFromDepthBuffer === "boolean") scene.setMaterialReadsFromDepthBuffer(material, def.readsFromDepthBuffer);
+  const cull = cullModeValue(def.cullMode as string | undefined);
+  if (cull !== undefined) scene.setMaterialCullMode(material, cull);
+  const blend = blendModeValue(def.blendMode as string | undefined);
+  if (blend !== undefined) scene.setMaterialBlendMode(material, blend);
+
+  applyTextures(scene, material, def);
   return material;
 }

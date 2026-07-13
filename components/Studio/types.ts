@@ -165,7 +165,8 @@ export interface StudioSceneFunction {
     | "API_REQUEST"
     | "SET_VISIBILITY"
     | "SOUND"
-    | "GROUP";
+    | "GROUP"
+    | "TAKE_PHOTO";
   navigation: string | null;
   alert: string | null;
   animation: string | null;

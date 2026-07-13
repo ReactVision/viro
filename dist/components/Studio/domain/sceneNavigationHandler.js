@@ -603,6 +603,32 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
             manager.stop(s.audio_asset_id ?? null); // null = all sounds
         }
     }
+    else if (fn.function_type === "TAKE_PHOTO") {
+        // Captures the AR view via the navigator's native takeScreenshot, which
+        // saves to the camera roll and burns in the free-tier watermark natively.
+        // Fire-and-forget: as a sequence step the walk advances immediately (no
+        // duration to wait on), like SET_VISIBILITY / SOUND. Quest exposes no
+        // takeScreenshot, so warn + skip there. Failure policy: warn + skip, and
+        // surface save/permission failure to the end user via Alert (the only
+        // user-visible feedback — success is silent so the AR view isn't
+        // interrupted; the photo just appears in the camera roll).
+        if (typeof sceneNavigator?.takeScreenshot !== "function") {
+            console.warn(`[Studio] TAKE_PHOTO function ${fn.id}: navigator has no takeScreenshot (Quest / unmounted); skipping.`);
+            return;
+        }
+        const fileName = `studio_photo_${Date.now()}`;
+        void Promise.resolve(sceneNavigator.takeScreenshot(fileName, true))
+            .then((result) => {
+            if (result?.success)
+                return;
+            console.warn(`[Studio] TAKE_PHOTO function ${fn.id} failed (errorCode=${result?.errorCode}).`);
+            react_native_1.Alert.alert("Couldn't Save Photo", "The photo could not be saved. Check that photo access is allowed and try again.", [{ text: "OK" }]);
+        })
+            .catch((err) => {
+            console.warn(`[Studio] TAKE_PHOTO function ${fn.id} error:`, err);
+            react_native_1.Alert.alert("Couldn't Save Photo", "The photo could not be saved. Check that photo access is allowed and try again.", [{ text: "OK" }]);
+        });
+    }
 }
 function executeOnLoadFunction(functionId, functions, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx) {
     const fn = resolveById(functionId, functions);

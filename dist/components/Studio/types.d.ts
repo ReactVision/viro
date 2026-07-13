@@ -132,7 +132,7 @@ export type StudioApiRequestExecutor = (functionId: string, variables: Record<st
 export interface StudioSceneFunction {
     id: string;
     scene: string;
-    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH" | "API_REQUEST" | "SET_VISIBILITY" | "SOUND" | "GROUP";
+    function_type: "NAVIGATION" | "ALERT" | "ANIMATION" | "SEQUENCE" | "SET_VARIABLE" | "BRANCH" | "API_REQUEST" | "SET_VISIBILITY" | "SOUND" | "GROUP" | "TAKE_PHOTO";
     navigation: string | null;
     alert: string | null;
     animation: string | null;

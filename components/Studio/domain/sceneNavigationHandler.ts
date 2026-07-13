@@ -670,8 +670,10 @@ export function executeFunctionWithRelations(
   };
 
   if (fn.function_type === "SEQUENCE") {
-    runBeginGuarded("SEQUENCE", fn.scene_sequence, (seq, deps, onDone, onAbort) =>
-      runSteps(seq.steps, deps, onDone, onAbort)
+    runBeginGuarded(
+      "SEQUENCE",
+      fn.scene_sequence,
+      (seq, deps, onDone, onAbort) => runSteps(seq.steps, deps, onDone, onAbort)
     );
     return;
   }
@@ -754,8 +756,10 @@ export function executeFunctionWithRelations(
     }
     store.set(sv.name, result.value);
   } else if (fn.function_type === "BRANCH") {
-    runBeginGuarded("BRANCH", fn.scene_branch, (_branch, deps, onDone, onAbort) =>
-      runBranch(fn, deps, onDone, onAbort)
+    runBeginGuarded(
+      "BRANCH",
+      fn.scene_branch,
+      (_branch, deps, onDone, onAbort) => runBranch(fn, deps, onDone, onAbort)
     );
   } else if (fn.function_type === "GROUP") {
     runBeginGuarded("GROUP", fn.scene_group, (_group, deps, onDone, onAbort) =>
@@ -819,6 +823,38 @@ export function executeFunctionWithRelations(
     } else {
       manager.stop(s.audio_asset_id ?? null); // null = all sounds
     }
+  } else if (fn.function_type === "TAKE_PHOTO") {
+    // Captures the AR view via the navigator's native takeScreenshot, which
+    // saves to the camera roll and burns in the free-tier watermark natively.
+    // Fire-and-forget: as a sequence step the walk advances immediately
+    // Failure policy: warn + skip, and surface save/permission failure to the end user via Alert
+    if (typeof sceneNavigator?.takeScreenshot !== "function") {
+      console.warn(
+        `[Studio] TAKE_PHOTO function ${fn.id}: navigator has no takeScreenshot (Quest / unmounted); skipping.`
+      );
+      return;
+    }
+    const fileName = `studio_photo_${Date.now()}`;
+    void Promise.resolve(sceneNavigator.takeScreenshot(fileName, true))
+      .then((result: { success: boolean; errorCode?: string | number }) => {
+        if (result?.success) return;
+        console.warn(
+          `[Studio] TAKE_PHOTO function ${fn.id} failed (errorCode=${result?.errorCode}).`
+        );
+        Alert.alert(
+          "Couldn't Save Photo",
+          "The photo could not be saved. Check that photo access is allowed and try again.",
+          [{ text: "OK" }]
+        );
+      })
+      .catch((err: unknown) => {
+        console.warn(`[Studio] TAKE_PHOTO function ${fn.id} error:`, err);
+        Alert.alert(
+          "Couldn't Save Photo",
+          "The photo could not be saved. Check that photo access is allowed and try again.",
+          [{ text: "OK" }]
+        );
+      });
   }
 }
 

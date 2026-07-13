@@ -76,3 +76,7 @@ test/android/fastlane/README.md
 test/android/fastlane/report.xml
 /android/viro_bridge/.cxx/Debug
 /ios/dist/ViroRenderer/armv7_arm64
+
+# Web bridge harness — local WASM assets (copied from viro-web-renderer) and build output
+web-harness/wasm/
+web-harness/dist/

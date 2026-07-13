@@ -41,6 +41,7 @@ const ViroARScene_1 = require("../AR/ViroARScene");
 const ViroScene_1 = require("../ViroScene");
 const ViroXRSceneNavigator_1 = require("../ViroXRSceneNavigator");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+const StudioRecordingIndicator_1 = require("./StudioRecordingIndicator");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const variableStore_1 = require("./domain/variableStore");
@@ -63,6 +64,10 @@ function mapOcclusionMode(dbValue) {
             return undefined;
     }
 }
+// Approximate top inset for the built-in recording indicator. Dependency-free
+// (viro takes no safe-area-context peer dep); hosts wanting exact placement set
+// recordingIndicator={false} and render <StudioRecordingIndicator /> themselves.
+const DEFAULT_RECORDING_TOP = react_native_1.Platform.OS === "android" ? (react_native_1.StatusBar.currentHeight ?? 24) + 8 : 52;
 const styles = react_native_1.StyleSheet.create({
     loader: {
         position: "absolute",
@@ -73,6 +78,12 @@ const styles = react_native_1.StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "#000000",
+    },
+    recordingOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        alignItems: "center",
     },
 });
 /**
@@ -88,7 +99,7 @@ const styles = react_native_1.StyleSheet.create({
  * ready. This means VRActivity always launches with the actual content scene
  * as its initial scene, avoiding the LoadingVRScene → replace timing race.
  */
-exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, }, ref) {
+exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, recordingIndicator = true, }, ref) {
     const navigatorRef = (0, react_1.useRef)(null);
     const loadedSceneIdRef = (0, react_1.useRef)(null);
     const [isSceneReady, setIsSceneReady] = (0, react_1.useState)(false);
@@ -247,6 +258,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         {/* Absolutely filled so the overlay covers the navigator instead of
             taking flow space beneath it. */}
         {!isSceneReady && loadingView && (<react_native_1.View style={react_native_1.StyleSheet.absoluteFill}>{loadingView}</react_native_1.View>)}
+        {recordingIndicator && (<react_native_1.View pointerEvents="box-none" style={[styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }]}>
+            <StudioRecordingIndicator_1.StudioRecordingIndicator />
+          </react_native_1.View>)}
       </react_native_1.View>
     </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);
 });

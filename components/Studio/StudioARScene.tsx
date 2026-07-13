@@ -27,6 +27,7 @@ import { createNode } from "./domain/viroNodeFactory";
 import { defaultApiRequestExecutor } from "./domain/defaultApiRequestExecutor";
 import {
   executeOnLoadFunction,
+  resetVideoRecordingState,
   SequenceScheduler,
 } from "./domain/sceneNavigationHandler";
 import { StudioVariableStore } from "./domain/variableStore";
@@ -117,6 +118,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       // pending sound backstop timers and fires their callbacks, which now
       // no-op via the generation guard so unmount can't advance a waited step.
       soundManagerRef.current?.reset();
+      // Clear a dangling video-recording flag so leaving the experience mid-
+      // recording can't block the next session's RECORD_VIDEO toggle.
+      resetVideoRecordingState();
     };
   }, []);
 

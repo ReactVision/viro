@@ -3,6 +3,7 @@ import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 type SceneNavigator = any;
+export declare function resetVideoRecordingState(): void;
 export declare class SequenceScheduler {
     private timers;
     private appStateSub;

@@ -1,7 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StudioSceneNavigator = exports.StudioARScene = void 0;
+exports.useStudioRecording = exports.StudioSceneNavigator = exports.StudioRecordingIndicator = exports.StudioARScene = void 0;
 var StudioARScene_1 = require("./StudioARScene");
 Object.defineProperty(exports, "StudioARScene", { enumerable: true, get: function () { return StudioARScene_1.StudioARScene; } });
+var StudioRecordingIndicator_1 = require("./StudioRecordingIndicator");
+Object.defineProperty(exports, "StudioRecordingIndicator", { enumerable: true, get: function () { return StudioRecordingIndicator_1.StudioRecordingIndicator; } });
 var StudioSceneNavigator_1 = require("./StudioSceneNavigator");
 Object.defineProperty(exports, "StudioSceneNavigator", { enumerable: true, get: function () { return StudioSceneNavigator_1.StudioSceneNavigator; } });
+var useStudioRecording_1 = require("./useStudioRecording");
+Object.defineProperty(exports, "useStudioRecording", { enumerable: true, get: function () { return useStudioRecording_1.useStudioRecording; } });

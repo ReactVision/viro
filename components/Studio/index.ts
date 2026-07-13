@@ -1,5 +1,7 @@
 export { StudioARScene } from "./StudioARScene";
+export { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 export { StudioSceneNavigator } from "./StudioSceneNavigator";
+export { useStudioRecording } from "./useStudioRecording";
 export type {
   StudioSceneNavigatorHandle,
   StudioSceneNavigatorProps,

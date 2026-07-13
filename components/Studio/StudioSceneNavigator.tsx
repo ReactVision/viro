@@ -7,11 +7,19 @@ import {
   useRef,
   useState,
 } from "react";
-import { ActivityIndicator, StyleSheet, View, ViewStyle } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  View,
+  ViewStyle,
+} from "react-native";
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
 import { isQuest } from "../Utilities/ViroPlatform";
+import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
@@ -42,6 +50,12 @@ function mapOcclusionMode(
   }
 }
 
+// Approximate top inset for the built-in recording indicator. Dependency-free
+// (viro takes no safe-area-context peer dep); hosts wanting exact placement set
+// recordingIndicator={false} and render <StudioRecordingIndicator /> themselves.
+const DEFAULT_RECORDING_TOP =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) + 8 : 52;
+
 const styles = StyleSheet.create({
   loader: {
     position: "absolute",
@@ -52,6 +66,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000000",
+  },
+  recordingOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
   },
 });
 
@@ -93,6 +113,14 @@ export interface StudioSceneNavigatorProps {
    * `onError`; when this is omitted it renders nothing.
    */
   renderError?: (error: Error) => React.ReactNode;
+  /**
+   * Show the built-in "recording" indicator (a REC pill) while a RECORD_VIDEO
+   * action is recording. Default true, positioned top-centre with an approximate
+   * safe-area inset. Set false if the host draws its own top-of-screen chrome
+   * there and renders `<StudioRecordingIndicator />` (or a custom UI via
+   * `useStudioRecording()`) itself.
+   */
+  recordingIndicator?: boolean;
 }
 
 /**
@@ -127,6 +155,7 @@ export const StudioSceneNavigator = forwardRef<
     noAssetsMessage,
     loadingView,
     renderError,
+    recordingIndicator = true,
   },
   ref
 ) {
@@ -344,6 +373,14 @@ export const StudioSceneNavigator = forwardRef<
             taking flow space beneath it. */}
         {!isSceneReady && loadingView && (
           <View style={StyleSheet.absoluteFill}>{loadingView}</View>
+        )}
+        {recordingIndicator && (
+          <View
+            pointerEvents="box-none"
+            style={[styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }]}
+          >
+            <StudioRecordingIndicator />
+          </View>
         )}
       </View>
     </StudioSceneErrorBoundary>

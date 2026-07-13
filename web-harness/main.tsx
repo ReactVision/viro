@@ -27,6 +27,8 @@ const webRendererOptions = {
 import { Viro3DSceneNavigator } from "../components/Viro3DSceneNavigator";
 import { ViroScene } from "../components/ViroScene";
 import { ViroBox } from "../components/ViroBox";
+import { ViroSphere } from "../components/ViroSphere";
+import { ViroSurface } from "../components/ViroSurface";
 import { ViroNode } from "../components/ViroNode";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
 
@@ -45,7 +47,7 @@ function DemoScene() {
 
   return (
     <ViroScene>
-      <ViroNode position={[0, 0, -5]}>
+      <ViroNode position={[0, 0, -5]} rotation={[0, angle * 0.4, 0]}>
         <ViroBox
           scale={[1.5, 1.5, 1.5]}
           rotation={[0, angle, 0]}
@@ -59,6 +61,18 @@ function DemoScene() {
         <ViroBox
           position={[2.5, 0, 0]}
           rotation={[angle, angle, 0]}
+          materials={["redBox"]}
+        />
+        <ViroSphere
+          position={[-2.5, 0, 0]}
+          radius={0.9}
+          materials={["blueBox"]}
+        />
+        <ViroSurface
+          position={[0, -1.8, 0]}
+          rotation={[-90, 0, 0]}
+          width={8}
+          height={8}
           materials={["redBox"]}
         />
       </ViroNode>

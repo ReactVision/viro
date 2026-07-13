@@ -527,6 +527,17 @@ export type ViroFinishScanResult = {
 };
 
 /**
+ * Result of snapshotWorldMeshToFile() (WS-C). filePath points at a local
+ * cache file — pass it straight into rvUploadAsset() to persist it as a
+ * cloud anchor asset.
+ */
+export type ViroWorldMeshSnapshotResult = {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+};
+
+/**
  * Result of a resolve cloud anchor operation. See {@link ViroCloudAnchor} for
  * how `anchor`'s pose relates to the original hosting method.
  */

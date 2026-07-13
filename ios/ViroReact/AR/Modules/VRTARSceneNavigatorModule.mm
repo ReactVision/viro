@@ -910,6 +910,26 @@ RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
+                                     resolve:(RCTPromiseResolveBlock)resolve
+                                      reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            NSString *filePath = [(VRTARSceneNavigator *)view rvSnapshotWorldMeshToFile];
+            if (filePath) {
+                resolve(@{@"success": @YES, @"filePath": filePath});
+            } else {
+                resolve(@{@"success": @NO, @"error": @"No world mesh available to snapshot"});
+            }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvDeleteGeospatialAnchor:(nonnull NSNumber *)reactTag
                                   anchorId:(NSString *)anchorId
                                    resolve:(RCTPromiseResolveBlock)resolve

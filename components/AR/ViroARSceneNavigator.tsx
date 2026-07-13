@@ -30,6 +30,7 @@ import {
   ViroHostCloudAnchorResult,
   ViroResolveCloudAnchorResult,
   ViroFinishScanResult,
+  ViroWorldMeshSnapshotResult,
   ViroGeospatialSupportResult,
   ViroLocationAccuracyResult,
   ViroEarthTrackingStateResult,
@@ -884,6 +885,20 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     );
   };
 
+  /**
+   * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
+   * local cache file (WS-C). Pass the returned filePath straight into
+   * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
+   * cloud anchor hosted via hostCloudAnchor() or finishScan().
+   *
+   * @returns Promise resolving to the snapshot result with filePath
+   */
+  _snapshotWorldMeshToFile = async (): Promise<ViroWorldMeshSnapshotResult> => {
+    return await ViroARSceneNavigatorModule.rvSnapshotWorldMeshToFile(
+      findNodeHandle(this)
+    );
+  };
+
   // ===========================================================================
   // Geospatial API Methods
   // ===========================================================================
@@ -1503,6 +1518,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
     isLocationAccuracyReduced: this._isLocationAccuracyReduced,
@@ -1567,6 +1583,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
     isLocationAccuracyReduced: this._isLocationAccuracyReduced,

@@ -2042,6 +2042,42 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 
 #pragma mark - World Mesh API Methods
 
+// WS-C: serialize the current world mesh to a temp file, returning its path
+// (or nil on failure/no mesh) — ready to pass straight into rvUploadAsset().
+- (NSString *)rvSnapshotWorldMeshToFile {
+    if (!_vroView || !_currentScene) {
+        return nil;
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return nil;
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return nil;
+    }
+
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (!worldMesh) {
+        return nil;
+    }
+
+    std::vector<uint8_t> bytes = worldMesh->serializeCurrentMesh();
+    if (bytes.empty()) {
+        return nil;
+    }
+
+    NSData *data = [NSData dataWithBytes:bytes.data() length:bytes.size()];
+    NSString *fileName = [NSString stringWithFormat:@"rvmesh_%@.bin", [[NSUUID UUID] UUIDString]];
+    NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+    if (![data writeToFile:filePath atomically:YES]) {
+        return nil;
+    }
+    return filePath;
+}
+
 - (void)setWorldMeshEnabled:(BOOL)worldMeshEnabled {
     _worldMeshEnabled = worldMeshEnabled;
     _pendingWorldMeshEnabled = worldMeshEnabled;

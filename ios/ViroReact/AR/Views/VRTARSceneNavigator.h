@@ -188,6 +188,9 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
              fileName:(NSString *)fileName
            appUserId:(NSString *)appUserId
     completionHandler:(void (^)(BOOL success, NSString *userAssetId, NSString *fileUrl, NSString *error))completionHandler;
+// WS-C: serialize the current world mesh to a temp file — pass the returned
+// path straight into rvUploadAsset(). Returns nil if there is no current mesh.
+- (NSString *)rvSnapshotWorldMeshToFile;
 - (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
                completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
 - (void)rvListGeospatialAnchors:(int)limit

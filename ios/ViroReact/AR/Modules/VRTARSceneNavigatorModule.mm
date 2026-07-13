@@ -911,6 +911,7 @@ RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
 }
 
 RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
+                        locationTransform:(NSString *)locationTransformCsv
                                      resolve:(RCTPromiseResolveBlock)resolve
                                       reject:(RCTPromiseRejectBlock)reject) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
@@ -920,7 +921,7 @@ RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
-            NSString *filePath = [(VRTARSceneNavigator *)view rvSnapshotWorldMeshToFile];
+            NSString *filePath = [(VRTARSceneNavigator *)view rvSnapshotWorldMeshToFile:locationTransformCsv];
             if (filePath) {
                 resolve(@{@"success": @YES, @"filePath": filePath});
             } else {
@@ -1005,11 +1006,13 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
             [(VRTARSceneNavigator *)view rvFinishScan:ttlDays
-                completionHandler:^(BOOL success, NSString *cloudAnchorId, NSString *error) {
+                completionHandler:^(BOOL success, NSString *cloudAnchorId,
+                                    NSString *locationTransformCsv, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                if (cloudAnchorId) [r setObject:cloudAnchorId forKey:@"cloudAnchorId"];
-                if (error)         [r setObject:error         forKey:@"error"];
+                if (cloudAnchorId)         [r setObject:cloudAnchorId         forKey:@"cloudAnchorId"];
+                if (locationTransformCsv)  [r setObject:locationTransformCsv  forKey:@"locationTransform"];
+                if (error)                 [r setObject:error                forKey:@"error"];
                 resolve(r);
             }];
         } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }

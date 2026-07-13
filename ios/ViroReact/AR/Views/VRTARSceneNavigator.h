@@ -189,8 +189,11 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
            appUserId:(NSString *)appUserId
     completionHandler:(void (^)(BOOL success, NSString *userAssetId, NSString *fileUrl, NSString *error))completionHandler;
 // WS-C: serialize the current world mesh to a temp file — pass the returned
-// path straight into rvUploadAsset(). Returns nil if there is no current mesh.
-- (NSString *)rvSnapshotWorldMeshToFile;
+// path straight into rvUploadAsset(). locationTransformCsv is the value
+// finishScan()'s success callback returned (16 comma-separated floats);
+// there is no placed anchor for a finishScan()-hosted mesh to read a
+// transform from otherwise. Returns nil if there is no current mesh.
+- (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv;
 - (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
                completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
 - (void)rvListGeospatialAnchors:(int)limit
@@ -200,7 +203,8 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 // Cloud anchor management
 - (void)rvStartScan;
 - (void)rvFinishScan:(NSInteger)ttlDays
-   completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId, NSString *error))completionHandler;
+   completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId,
+                               NSString *locationTransformCsv, NSString *error))completionHandler;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

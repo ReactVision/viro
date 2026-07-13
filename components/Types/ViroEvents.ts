@@ -523,6 +523,13 @@ export type ViroHostCloudAnchorResult = {
 export type ViroFinishScanResult = {
   success: boolean;
   cloudAnchorId?: string;
+  /**
+   * Opaque token identifying the location frame this scan was hosted in.
+   * Pass it straight into snapshotWorldMeshToFile() if attaching a mesh —
+   * there is no placed anchor to derive one from otherwise. Treat as opaque;
+   * do not parse or construct this value.
+   */
+  locationTransform?: string;
   error?: string;
 };
 

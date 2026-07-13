@@ -1612,11 +1612,15 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 try {
                     View view = viewResolver.resolveView(sceneNavTag);
                     if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
-                    ((VRTARSceneNavigator) view).rvFinishScan(ttlDays, (success, cloudAnchorId, error) -> {
+                    ((VRTARSceneNavigator) view).rvFinishScan(ttlDays, (success, cloudAnchorId, locationTransformCsv, error) -> {
                         WritableMap r = Arguments.createMap();
                         r.putBoolean("success", success);
-                        if (success) r.putString("cloudAnchorId", cloudAnchorId);
-                        else         r.putString("error", error);
+                        if (success) {
+                            r.putString("cloudAnchorId", cloudAnchorId);
+                            r.putString("locationTransform", locationTransformCsv);
+                        } else {
+                            r.putString("error", error);
+                        }
                         promise.resolve(r);
                     });
                 } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }
@@ -1625,7 +1629,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void rvSnapshotWorldMeshToFile(final int sceneNavTag, final Promise promise) {
+    public void rvSnapshotWorldMeshToFile(final int sceneNavTag, final String locationTransform, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
@@ -1633,7 +1637,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 try {
                     View view = viewResolver.resolveView(sceneNavTag);
                     if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
-                    String filePath = ((VRTARSceneNavigator) view).rvSnapshotWorldMeshToFile();
+                    String filePath = ((VRTARSceneNavigator) view).rvSnapshotWorldMeshToFile(locationTransform);
                     WritableMap r = Arguments.createMap();
                     if (filePath != null) {
                         r.putBoolean("success", true);

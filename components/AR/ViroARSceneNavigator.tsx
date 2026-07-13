@@ -889,13 +889,19 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
    * local cache file (WS-C). Pass the returned filePath straight into
    * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
-   * cloud anchor hosted via hostCloudAnchor() or finishScan().
+   * cloud anchor hosted via finishScan().
    *
+   * @param locationTransform - The `locationTransform` returned by finishScan()'s
+   *        success result. Required — there is no placed anchor to derive a
+   *        transform from for a finishScan()-hosted mesh.
    * @returns Promise resolving to the snapshot result with filePath
    */
-  _snapshotWorldMeshToFile = async (): Promise<ViroWorldMeshSnapshotResult> => {
+  _snapshotWorldMeshToFile = async (
+    locationTransform: string
+  ): Promise<ViroWorldMeshSnapshotResult> => {
     return await ViroARSceneNavigatorModule.rvSnapshotWorldMeshToFile(
-      findNodeHandle(this)
+      findNodeHandle(this),
+      locationTransform
     );
   };
 

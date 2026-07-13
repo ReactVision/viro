@@ -1683,16 +1683,18 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 }
 
 - (void)rvFinishScan:(NSInteger)ttlDays
-   completionHandler:(void (^)(BOOL, NSString *, NSString *))completionHandler {
-    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
+   completionHandler:(void (^)(BOOL, NSString *, NSString *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, nil, @"AR view not initialized"); return; }
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
-    if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, nil, @"AR session not available"); return; }
     arSession->rvFinishScan((int)ttlDays,
-        [completionHandler](bool success, std::string cloudAnchorId, std::string error) {
+        [completionHandler](bool success, std::string cloudAnchorId,
+                             std::string locationTransformCsv, std::string error) {
             if (completionHandler) {
                 completionHandler(success,
                     success ? [NSString stringWithUTF8String:cloudAnchorId.c_str()] : nil,
+                    success ? [NSString stringWithUTF8String:locationTransformCsv.c_str()] : nil,
                     success ? nil : [NSString stringWithUTF8String:error.c_str()]);
             }
         });
@@ -2042,10 +2044,26 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 
 #pragma mark - World Mesh API Methods
 
+// WS-C: parses the CSV produced by rvMatrixToCsv() (virocore, VROARSessioniOS.cpp)
+// back into a VROMatrix4f. Returns identity (and logs) if malformed.
+static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
+    NSArray<NSString *> *parts = [csv componentsSeparatedByString:@","];
+    if (parts.count != 16) {
+        RCTLogWarn(@"[ViroAR] rvSnapshotWorldMeshToFile: malformed locationTransformCsv (%lu values, expected 16)",
+                   (unsigned long)parts.count);
+        return VROMatrix4f();
+    }
+    float values[16];
+    for (int i = 0; i < 16; i++) {
+        values[i] = [parts[i] floatValue];
+    }
+    return VROMatrix4f(values);
+}
+
 // WS-C: serialize the current world mesh to a temp file, returning its path
 // (or nil on failure/no mesh) — ready to pass straight into rvUploadAsset().
-- (NSString *)rvSnapshotWorldMeshToFile {
-    if (!_vroView || !_currentScene) {
+- (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv {
+    if (!_vroView || !_currentScene || !locationTransformCsv) {
         return nil;
     }
 
@@ -2064,7 +2082,8 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         return nil;
     }
 
-    std::vector<uint8_t> bytes = worldMesh->serializeCurrentMesh();
+    VROMatrix4f locationTransform = rvParseMatrixCsv(locationTransformCsv);
+    std::vector<uint8_t> bytes = worldMesh->serializeCurrentMesh(locationTransform);
     if (bytes.empty()) {
         return nil;
     }

@@ -1175,9 +1175,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.rvStartScan();
     }
 
-    public void rvFinishScan(int ttlDays, ARScene.RvCloudAnchorCallback callback) {
+    public void rvFinishScan(int ttlDays, ARScene.RvFinishScanCallback callback) {
         ARScene arScene = getCurrentARScene();
-        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
         ensureRvConfigApplied(arScene);
         arScene.rvFinishScan(ttlDays, callback);
     }
@@ -1185,13 +1185,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     /**
      * WS-C: serialize the current world mesh to a cache file, returning its
      * path (or null on failure/no mesh) — ready to pass straight into
-     * rvUploadAsset().
+     * rvUploadAsset(). locationTransformCsv is the value
+     * {@link ARScene.RvFinishScanCallback} returned.
      */
-    public String rvSnapshotWorldMeshToFile() {
+    public String rvSnapshotWorldMeshToFile(String locationTransformCsv) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) return null;
 
-        byte[] bytes = arScene.rvSnapshotWorldMesh();
+        byte[] bytes = arScene.rvSnapshotWorldMesh(locationTransformCsv);
         if (bytes == null || bytes.length == 0) return null;
 
         try {

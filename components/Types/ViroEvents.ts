@@ -481,6 +481,15 @@ export type ViroCloudAnchorProvider = ViroProvider;
 
 /**
  * Represents a cloud-hosted AR anchor.
+ *
+ * `position`/`rotation` are always in world coordinates at resolve time — how
+ * that world pose was originally anchored depends on how the anchor was
+ * hosted: `hostCloudAnchor()` ties it to a hand-placed physical anchor;
+ * `finishScan()` (room/building-scale scans, no placed anchor) ties it to a
+ * self-defined location frame instead (origin at the scan's camera-position
+ * centroid, oriented by the first keyframe's heading). Callers do not need to
+ * know which one produced a given `cloudAnchorId` — both resolve to the same
+ * world-space shape.
  */
 export type ViroCloudAnchor = {
   /** The local anchor ID */
@@ -508,7 +517,18 @@ export type ViroHostCloudAnchorResult = {
 };
 
 /**
- * Result of a resolve cloud anchor operation.
+ * Result of a finishScan() operation (WS-A room/building-scale scan, the
+ * counterpart to ViroHostCloudAnchorResult for scans with no placed anchor).
+ */
+export type ViroFinishScanResult = {
+  success: boolean;
+  cloudAnchorId?: string;
+  error?: string;
+};
+
+/**
+ * Result of a resolve cloud anchor operation. See {@link ViroCloudAnchor} for
+ * how `anchor`'s pose relates to the original hosting method.
  */
 export type ViroResolveCloudAnchorResult = {
   success: boolean;
@@ -538,7 +558,11 @@ export type ViroGeospatialAnchorProvider = ViroProvider;
  * Earth tracking state.
  * Maps to GARSessionEarthState (iOS) and Earth.EarthState (Android)
  */
-export type ViroEarthTrackingState = "Enabled" | "Paused" | "Stopped";
+export type ViroEarthTrackingState =
+  | "Enabled"
+  | "Paused"
+  | "Stopped"
+  | "Localizing";
 
 /**
  * VPS (Visual Positioning System) availability at a location.

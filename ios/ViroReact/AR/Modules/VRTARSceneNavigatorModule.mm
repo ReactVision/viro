@@ -941,6 +941,40 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
 
 // ── Cloud anchor management ───────────────────────────────────────────────────
 
+RCT_EXPORT_METHOD(rvStartScan:(nonnull NSNumber *)reactTag) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
+            [(VRTARSceneNavigator *)view rvStartScan];
+        } @catch (NSException *ex) { /* no-op — startScan has no promise to reject */ }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
+                        ttlDays:(NSInteger)ttlDays
+                        resolve:(RCTPromiseResolveBlock)resolve
+                         reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvFinishScan:ttlDays
+                completionHandler:^(BOOL success, NSString *cloudAnchorId, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (cloudAnchorId) [r setObject:cloudAnchorId forKey:@"cloudAnchorId"];
+                if (error)         [r setObject:error         forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                            anchorId:(NSString *)anchorId
                             resolve:(RCTPromiseResolveBlock)resolve

@@ -29,6 +29,7 @@ import {
   ViroCloudAnchorStateChangeEvent,
   ViroHostCloudAnchorResult,
   ViroResolveCloudAnchorResult,
+  ViroFinishScanResult,
   ViroGeospatialSupportResult,
   ViroEarthTrackingStateResult,
   ViroGeospatialPoseResult,
@@ -855,6 +856,33 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     );
   };
 
+  /**
+   * Begin a room/building-scale scan that defines its own location frame,
+   * independent of any placed anchor (WS-A). Call this before walking the
+   * space, then call finishScan() when done. Unlike hostCloudAnchor(), this
+   * does not require tapping/placing an anchor first.
+   */
+  _startScan = () => {
+    ViroARSceneNavigatorModule.rvStartScan(findNodeHandle(this));
+  };
+
+  /**
+   * Finish a scan started with startScan() and host it to the cloud. Same
+   * pipeline as hostCloudAnchor(), but positions content in the scan's own
+   * location frame instead of relative to a placed anchor.
+   *
+   * @param ttlDays - Time-to-live in days (1-365)
+   * @returns Promise resolving to the hosting result with cloudAnchorId
+   */
+  _finishScan = async (
+    ttlDays: number = 1
+  ): Promise<ViroFinishScanResult> => {
+    return await ViroARSceneNavigatorModule.rvFinishScan(
+      findNodeHandle(this),
+      Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
+    );
+  };
+
   // ===========================================================================
   // Geospatial API Methods
   // ===========================================================================
@@ -1457,6 +1485,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     hostCloudAnchor: this._hostCloudAnchor,
     resolveCloudAnchor: this._resolveCloudAnchor,
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
+    startScan: this._startScan,
+    finishScan: this._finishScan,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
     setGeospatialModeEnabled: this._setGeospatialModeEnabled,
@@ -1518,6 +1548,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     hostCloudAnchor: this._hostCloudAnchor,
     resolveCloudAnchor: this._resolveCloudAnchor,
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
+    startScan: this._startScan,
+    finishScan: this._finishScan,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
     setGeospatialModeEnabled: this._setGeospatialModeEnabled,

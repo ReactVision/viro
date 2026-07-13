@@ -893,6 +893,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 return "Enabled";
             case PAUSED:
                 return "Paused";
+            case LOCALIZING:
+                return "Localizing";
             case STOPPED:
             default:
                 return "Stopped";
@@ -1150,6 +1152,20 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     // Cloud anchor management
+    public void rvStartScan() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return;
+        ensureRvConfigApplied(arScene);
+        arScene.rvStartScan();
+    }
+
+    public void rvFinishScan(int ttlDays, ARScene.RvCloudAnchorCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
+        arScene.rvFinishScan(ttlDays, callback);
+    }
+
     public void rvGetCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }

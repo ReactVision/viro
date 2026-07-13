@@ -1115,6 +1115,8 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
             return @"Enabled";
         case VROEarthTrackingState::Paused:
             return @"Paused";
+        case VROEarthTrackingState::Localizing:
+            return @"Localizing";
         case VROEarthTrackingState::Stopped:
         default:
             return @"Stopped";
@@ -1657,6 +1659,30 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 }
 
 // ── Cloud anchor management ───────────────────────────────────────────────────
+
+- (void)rvStartScan {
+    if (!_vroView) return;
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) return;
+    arSession->rvStartScan();
+}
+
+- (void)rvFinishScan:(NSInteger)ttlDays
+   completionHandler:(void (^)(BOOL, NSString *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
+    arSession->rvFinishScan((int)ttlDays,
+        [completionHandler](bool success, std::string cloudAnchorId, std::string error) {
+            if (completionHandler) {
+                completionHandler(success,
+                    success ? [NSString stringWithUTF8String:cloudAnchorId.c_str()] : nil,
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
 
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {

@@ -194,6 +194,9 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
               completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
 
 // Cloud anchor management
+- (void)rvStartScan;
+- (void)rvFinishScan:(NSInteger)ttlDays
+   completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId, NSString *error))completionHandler;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

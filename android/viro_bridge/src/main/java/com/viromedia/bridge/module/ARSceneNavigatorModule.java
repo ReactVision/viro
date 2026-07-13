@@ -1549,6 +1549,42 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     // ── Cloud anchor management ───────────────────────────────────────────────
 
     @ReactMethod
+    public void rvStartScan(final int sceneNavTag) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) return;
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) return;
+                    ((VRTARSceneNavigator) view).rvStartScan();
+                } catch (Exception e) { /* no-op — startScan has no promise to reject */ }
+            }
+        });
+    }
+
+    @ReactMethod
+    public void rvFinishScan(final int sceneNavTag, final int ttlDays, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
+                    ((VRTARSceneNavigator) view).rvFinishScan(ttlDays, (success, cloudAnchorId, error) -> {
+                        WritableMap r = Arguments.createMap();
+                        r.putBoolean("success", success);
+                        if (success) r.putString("cloudAnchorId", cloudAnchorId);
+                        else         r.putString("error", error);
+                        promise.resolve(r);
+                    });
+                } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }
+            }
+        });
+    }
+
+    @ReactMethod
     public void rvGetCloudAnchor(final int sceneNavTag, final String anchorId, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }

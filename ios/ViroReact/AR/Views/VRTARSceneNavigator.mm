@@ -2097,6 +2097,48 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
     return filePath;
 }
 
+// WS-C: reverse of rvSnapshotWorldMeshToFile — load a resolved mesh snapshot
+// and attach it for physics + visual occlusion. See VROARWorldMesh::
+// attachResolvedMesh() for the (compile-verified only, not visually tested)
+// occlusion geometry construction.
+- (BOOL)rvLoadWorldMeshFromFile:(NSString *)filePath
+              resolvedTransform:(NSString *)resolvedTransformCsv {
+    if (!_vroView || !_currentScene || !filePath || !resolvedTransformCsv) {
+        return NO;
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return NO;
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return NO;
+    }
+
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (!worldMesh) {
+        RCTLogWarn(@"[ViroAR] rvLoadWorldMeshFromFile: no world mesh — call setWorldMeshEnabled(true) first");
+        return NO;
+    }
+
+    NSData *data = [NSData dataWithContentsOfFile:filePath];
+    if (!data) {
+        return NO;
+    }
+    std::vector<uint8_t> bytes((const uint8_t *)data.bytes, (const uint8_t *)data.bytes + data.length);
+
+    VROMatrix4f resolvedTransform = rvParseMatrixCsv(resolvedTransformCsv);
+    std::shared_ptr<VROARDepthMesh> mesh = VROARWorldMesh::loadMeshSnapshot(bytes, resolvedTransform);
+    if (!mesh) {
+        return NO;
+    }
+
+    worldMesh->attachResolvedMesh(mesh, arScene);
+    return YES;
+}
+
 - (void)setWorldMeshEnabled:(BOOL)worldMeshEnabled {
     _worldMeshEnabled = worldMeshEnabled;
     _pendingWorldMeshEnabled = worldMeshEnabled;

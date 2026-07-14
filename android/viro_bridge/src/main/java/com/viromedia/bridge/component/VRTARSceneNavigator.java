@@ -1208,6 +1208,32 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    /**
+     * WS-C: reverse of {@link #rvSnapshotWorldMeshToFile} — read a resolved
+     * mesh snapshot from a local file (downloaded by the app from the
+     * resolved anchor's asset fileUrl) and attach it for physics + visual
+     * occlusion. Requires world mesh to be enabled.
+     */
+    public boolean rvLoadWorldMeshFromFile(String filePath, String resolvedTransformCsv) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return false;
+
+        java.io.File inFile = new java.io.File(filePath);
+        byte[] bytes = new byte[(int) inFile.length()];
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(inFile)) {
+            int totalRead = 0;
+            while (totalRead < bytes.length) {
+                int n = fis.read(bytes, totalRead, bytes.length - totalRead);
+                if (n < 0) break;
+                totalRead += n;
+            }
+            return arScene.rvLoadWorldMesh(bytes, resolvedTransformCsv);
+        } catch (java.io.IOException e) {
+            Log.w(TAG, "rvLoadWorldMeshFromFile: failed to read file", e);
+            return false;
+        }
+    }
+
     public void rvGetCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }

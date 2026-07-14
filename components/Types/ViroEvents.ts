@@ -545,6 +545,16 @@ export type ViroWorldMeshSnapshotResult = {
 };
 
 /**
+ * Result of loadWorldMeshFromFile() (WS-C). success is false if there was no
+ * AR scene, world mesh was not enabled (see setWorldMeshEnabled), or the
+ * file was malformed.
+ */
+export type ViroWorldMeshLoadResult = {
+  success: boolean;
+  error?: string;
+};
+
+/**
  * Result of a resolve cloud anchor operation. See {@link ViroCloudAnchor} for
  * how `anchor`'s pose relates to the original hosting method.
  */

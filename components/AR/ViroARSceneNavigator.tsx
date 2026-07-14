@@ -31,6 +31,7 @@ import {
   ViroResolveCloudAnchorResult,
   ViroFinishScanResult,
   ViroWorldMeshSnapshotResult,
+  ViroWorldMeshLoadResult,
   ViroGeospatialSupportResult,
   ViroLocationAccuracyResult,
   ViroEarthTrackingStateResult,
@@ -905,6 +906,31 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     );
   };
 
+  /**
+   * Load a mesh snapshot downloaded from a resolved cloud anchor's mesh
+   * asset and attach it for physics collision + visual occlusion (WS-C).
+   * Requires `worldMeshEnabled` to be true on this navigator's AR scene.
+   *
+   * The app is responsible for downloading the asset's `fileUrl` (from
+   * `rvGetCloudAnchor()`'s `assets`) to a local file itself — pass that
+   * local path here, not the remote URL.
+   *
+   * @param filePath - Local path to the downloaded mesh snapshot bytes.
+   * @param resolvedTransform - The resolved anchor's transform, as returned
+   *        by `resolveCloudAnchor()`.
+   * @returns Promise resolving to the load result
+   */
+  _loadWorldMeshFromFile = async (
+    filePath: string,
+    resolvedTransform: string
+  ): Promise<ViroWorldMeshLoadResult> => {
+    return await ViroARSceneNavigatorModule.rvLoadWorldMeshFromFile(
+      findNodeHandle(this),
+      filePath,
+      resolvedTransform
+    );
+  };
+
   // ===========================================================================
   // Geospatial API Methods
   // ===========================================================================
@@ -1525,6 +1551,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startScan: this._startScan,
     finishScan: this._finishScan,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
+    loadWorldMeshFromFile: this._loadWorldMeshFromFile,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
     isLocationAccuracyReduced: this._isLocationAccuracyReduced,
@@ -1590,6 +1617,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startScan: this._startScan,
     finishScan: this._finishScan,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
+    loadWorldMeshFromFile: this._loadWorldMeshFromFile,
     // Geospatial API
     isGeospatialModeSupported: this._isGeospatialModeSupported,
     isLocationAccuracyReduced: this._isLocationAccuracyReduced,

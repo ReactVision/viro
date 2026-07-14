@@ -194,6 +194,14 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 // there is no placed anchor for a finishScan()-hosted mesh to read a
 // transform from otherwise. Returns nil if there is no current mesh.
 - (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv;
+// WS-C: load a mesh snapshot (downloaded to filePath by the app from the
+// resolved anchor's asset fileUrl) and attach it for both physics collision
+// and visual occlusion. resolvedTransformCsv is the resolved anchor's
+// transform (16 comma-separated floats). Requires worldMeshEnabled to be
+// true. Returns NO if there is no AR scene, no world mesh, or the file is
+// malformed.
+- (BOOL)rvLoadWorldMeshFromFile:(NSString *)filePath
+              resolvedTransform:(NSString *)resolvedTransformCsv;
 - (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
                completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
 - (void)rvListGeospatialAnchors:(int)limit

@@ -27,12 +27,26 @@ const webRendererOptions = {
 import { Viro3DSceneNavigator } from "../components/Viro3DSceneNavigator";
 import { ViroScene } from "../components/ViroScene";
 import { ViroBox } from "../components/ViroBox";
-import { ViroSphere } from "../components/ViroSphere";
 import { ViroSurface } from "../components/ViroSurface";
 import { ViroNode } from "../components/ViroNode";
+import { Viro3DObject } from "../components/Viro3DObject";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
+
+import helmetUrl from "./models/DamagedHelmet.glb?url";
+
+// VRX + its external PNG textures are served unhashed from public/ so the names
+// match what the .vrx references.
+const dragonBase = "/models/dragon";
+const dragonUrl = `${dragonBase}/object_dragon_pbr_anim.vrx`;
+const dragonResources = [
+  `${dragonBase}/object_dragon_pbr_Base_Color.png`,
+  `${dragonBase}/object_dragon_pbr_Metallic.png`,
+  `${dragonBase}/object_dragon_pbr_Roughness.png`,
+  `${dragonBase}/object_dragon_pbr_Mixed_AO.png`,
+  `${dragonBase}/object_dragon_pbr_Normal_OpenGL.png`,
+];
 
 // Procedural checkerboard texture (data URL) to exercise the texture pipeline
 // without shipping an image asset.
@@ -75,25 +89,33 @@ function DemoScene() {
         castsShadow
       />
       <ViroNode position={[0, 0, -5]} rotation={[0, angle * 0.4, 0]}>
-        <ViroBox
-          scale={[1.5, 1.5, 1.5]}
+        {/* Loaded GLB model (PBR, self-contained) at the center. */}
+        <Viro3DObject
+          source={{ uri: helmetUrl }}
+          type="GLB"
+          scale={[1.6, 1.6, 1.6]}
           rotation={[0, angle, 0]}
+          onLoadEnd={() => console.log("[harness] helmet loaded")}
+          onError={(e) => console.error("[harness] helmet error", e)}
+        />
+        {/* VRX model (FBX/protobuf/gzip path) to the side. */}
+        <Viro3DObject
+          source={{ uri: dragonUrl }}
+          type="VRX"
+          resources={dragonResources.map((uri) => ({ uri }))}
+          position={[3.5, -1.5, 0]}
+          scale={[0.2, 0.2, 0.2]}
+          onLoadEnd={() => console.log("[harness] dragon loaded")}
+          onError={(e) => console.error("[harness] dragon error", e)}
+        />
+        {/* A tappable cube to the side to keep event coverage. */}
+        <ViroBox
+          position={[-3, 0, 0]}
           materials={[tapped ? "redBox" : "blueBox"]}
           onClick={() => {
             console.log("[harness] box clicked");
             setTapped((t) => !t);
           }}
-          onHover={(isHovering) => console.log("[harness] hover:", isHovering)}
-        />
-        <ViroBox
-          position={[2.5, 0, 0]}
-          rotation={[angle, angle, 0]}
-          materials={["redBox"]}
-        />
-        <ViroSphere
-          position={[-2.5, 0, 0]}
-          radius={0.9}
-          materials={["blueBox"]}
         />
         <ViroSurface
           position={[0, -1.8, 0]}

@@ -80,3 +80,6 @@ test/android/fastlane/report.xml
 # Web bridge harness — local WASM assets (copied from viro-web-renderer) and build output
 web-harness/wasm/
 web-harness/dist/
+
+web-harness/models/
+web-harness/public/

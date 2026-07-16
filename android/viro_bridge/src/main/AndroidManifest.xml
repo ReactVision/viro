@@ -1,5 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.viromedia.bridge">
+
+    <!-- Audio track for video recording (ViroMediaRecorder / startVideoRecording). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Only needed on API <= 28 for the legacy public-gallery copy. On API 29+
+         media is written to app-specific storage and published via MediaStore,
+         which require no storage permission. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <meta-data android:name="com.google.ar.core" android:value="optional" />
 
     <application android:label="@string/app_name"

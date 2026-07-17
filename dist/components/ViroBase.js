@@ -37,11 +37,19 @@ exports.ViroBase = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroEvents_1 = require("./Types/ViroEvents");
+const ViroUtils_1 = require("./Types/ViroUtils");
 class ViroBase extends React.Component {
     _component = null;
     _onHover = (event) => {
         this.props.onHover &&
             this.props.onHover(event.nativeEvent.isHovering, event.nativeEvent.position, event.nativeEvent.source);
+        // Route eye-gaze hovers (Quest Pro) to the dedicated onGaze callback. onHover
+        // above still fires for every source; onGaze fires only for the eye-gaze ray.
+        if (this.props.onGaze &&
+            event.nativeEvent.source ===
+                ViroUtils_1.ViroEventSource.EYE_GAZE) {
+            this.props.onGaze(event.nativeEvent.isHovering, event.nativeEvent.position, event.nativeEvent.source);
+        }
     };
     _onClick = (event) => {
         this.props.onClick &&

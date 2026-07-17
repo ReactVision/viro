@@ -162,7 +162,7 @@ class ViroScene extends ViroBase_1.ViroBase {
             }}>
         <VRTScene {...this.props} ref={(component) => {
                 this._component = component;
-            }} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
+            }} canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)} canClick={this.props.onClick != undefined ||
                 this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canFuse={this.props.onFuse != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canCameraTransformUpdate={this.props.onCameraTransformUpdate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onFuseViro={this._onFuse} onDragViro={this._onDrag} onRotateViro={this._onRotate} onPinchViro={this._onPinch} onPlatformUpdateViro={this._onPlatformUpdate} onCameraTransformUpdateViro={this._onCameraTransformUpdate} timeToFuse={timeToFuse}/>
       </ViroSceneContext_1.ViroSceneContext.Provider>);
     }

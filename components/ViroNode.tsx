@@ -51,7 +51,7 @@ export class ViroNode extends ViroBase<{}> {
         onNativeTransformDelegateViro={transformDelegate}
         hasTransformDelegate={this.props.onTransformUpdate != undefined}
         transformBehaviors={transformBehaviors}
-        canHover={this.props.onHover != undefined}
+        canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
         canClick={
           this.props.onClick != undefined ||
           this.props.onClickState != undefined

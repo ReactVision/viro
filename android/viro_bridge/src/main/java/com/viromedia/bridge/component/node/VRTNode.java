@@ -174,7 +174,24 @@ public class VRTNode extends VRTComponent {
                 return false;
             }
 
-            final ARScene scene = (ARScene) ((VRTARScene) node.getParent()).getNativeScene();
+            // Guard against the parent AR scene being torn down while this retry is
+            // still queued. On scene teardown VRTScene.onTearDown() calls
+            // mNativeScene.dispose() (which zeroes the native ref) before mTornDown
+            // flips, freeing the native VROARSceneController. A queued retry calling
+            // scene.createAnchoredNode() afterwards would deref a zero/stale ref
+            // natively and crash (SIGSEGV in nativeCreateAnchoredNode). Checking both
+            // getNativeRef()==0 and isTornDown() covers the dispose-before-flag window.
+            // Teardown and this retry both run on the main looper, so this closes the
+            // race deterministically. NOTE: getNativeScene()==null is NOT a valid check
+            // here — the Java Scene object is never nulled on teardown, only its ref.
+            final ViewParent parent = node.getParent();
+            if (!(parent instanceof VRTARScene) || ((VRTARScene) parent).isTornDown()) {
+                return false;
+            }
+            final ARScene scene = (ARScene) ((VRTARScene) parent).getNativeScene();
+            if (scene == null || scene.getNativeRef() == 0) {
+                return false;
+            }
             if (node.mViroContext == null) {
                 if (DEBUG_ANCHORING) {
                     Log.i(TAG, "   Delaying anchoring: ViroContext is null");
@@ -367,6 +384,27 @@ public class VRTNode extends VRTComponent {
 
     public Node getNodeJni() {
         return mNodeJni;
+    }
+
+    /**
+     * Cancels any pending anchor retry on this node and, recursively, on all of its
+     * descendant nodes. Called from {@link VRTARScene#onTearDown()} before the native
+     * scene is disposed so that a queued 1s retry can't fire against a freed native
+     * VROARSceneController. This is complementary to the guard in
+     * {@link AnchorAttempt#anchorNode}: the guard makes any surviving retry a no-op,
+     * this stops them from being (re)scheduled during teardown.
+     */
+    public void cancelPendingAnchorAttempts() {
+        if (mAnchorAttempt != null) {
+            mAnchorAttempt.cancel();
+            mAnchorAttempt = null;
+        }
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof VRTNode) {
+                ((VRTNode) child).cancelPendingAnchorAttempts();
+            }
+        }
     }
 
     @Override

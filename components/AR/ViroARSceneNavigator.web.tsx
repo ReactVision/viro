@@ -30,7 +30,9 @@ import {
 import {
   ViroRendererContext,
   ViroParentNodeContext,
+  ViroARContext,
 } from "../Web/ViroWebContext";
+import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
 type ArOptions = Partial<
@@ -42,6 +44,8 @@ type ArOptions = Partial<
     | "intrinsics"
     | "tuning"
     | "showCameraBackground"
+    | "detectPlanes"
+    | "maxPlanes"
   >
 >;
 
@@ -158,6 +162,7 @@ export function ViroARSceneNavigator(props: Props) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<ViroTrackingState>(ViroTrackingState.Unavailable);
+  const [anchors, setAnchors] = useState<ArPlaneAnchor[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +230,7 @@ export function ViroARSceneNavigator(props: Props) {
       loadSlam: resolveLoadSlam(),
       ...props.arOptions,
       onStatus: (state) => setTracking(state),
+      onAnchorsUpdated: (next) => setAnchors(next),
       onError: (err) => {
         console.error("[Viro web AR] session error:", err);
         setError(err.message);
@@ -255,9 +261,13 @@ export function ViroARSceneNavigator(props: Props) {
 
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>
-          <ViroParentNodeContext.Provider value={rootNode}>
-            <SceneComponent sceneNavigator={sceneNavigator} {...props.viroAppProps} />
-          </ViroParentNodeContext.Provider>
+          <ViroARContext.Provider
+            value={{ session: sessionRef.current, anchors, trackingState: tracking }}
+          >
+            <ViroParentNodeContext.Provider value={rootNode}>
+              <SceneComponent sceneNavigator={sceneNavigator} {...props.viroAppProps} />
+            </ViroParentNodeContext.Provider>
+          </ViroARContext.Provider>
         </ViroRendererContext.Provider>
       ) : null}
 

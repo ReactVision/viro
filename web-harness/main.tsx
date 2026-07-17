@@ -26,6 +26,8 @@ const webRendererOptions = {
 
 import { Viro3DSceneNavigator } from "../components/Viro3DSceneNavigator";
 import { ViroARSceneNavigator } from "../components/AR/ViroARSceneNavigator";
+import { ViroARScene } from "../components/AR/ViroARScene";
+import { ViroARPlane } from "../components/AR/ViroARPlane";
 import { ViroScene } from "../components/ViroScene";
 import { ViroBox } from "../components/ViroBox";
 import { ViroSurface } from "../components/ViroSurface";
@@ -144,15 +146,31 @@ function DemoScene() {
   );
 }
 
-// AR demo: a single cube fixed 1m ahead in the world. As slam tracks the device
-// and injects poses, moving the device should move the view around the cube.
+// AR demo: a cube fixed 1m ahead (proves pose tracking) + a ViroARPlane that
+// binds to the first detected plane and drops a red box on it (proves the
+// declarative plane API: slam planes → anchors → matched node transform).
 function ARDemoScene() {
   return (
-    <ViroScene>
+    <ViroARScene
+      onTrackingUpdated={(state, reason) =>
+        console.log("[harness AR] tracking", state, reason)
+      }
+      onAnchorFound={(a) => console.log("[harness AR] anchor found", a.anchorId, a.alignment)}
+      onAnchorRemoved={(a) => console.log("[harness AR] anchor removed", a.anchorId)}
+    >
       <ViroAmbientLight color="#ffffff" intensity={400} />
       <ViroDirectionalLight color="#ffffff" intensity={1000} direction={[0, -1, -0.6]} />
+      {/* World-fixed cube for pose validation. */}
       <ViroBox position={[0, 0, -1]} scale={[0.2, 0.2, 0.2]} materials={["blueBox"]} />
-    </ViroScene>
+      {/* Auto-bound plane: a box sits at the plane origin once detected. */}
+      <ViroARPlane
+        minWidth={0.1}
+        minHeight={0.1}
+        onAnchorFound={(a) => console.log("[harness AR] plane bound", a.anchorId, a.width, a.height)}
+      >
+        <ViroBox position={[0, 0.05, 0]} scale={[0.1, 0.1, 0.1]} materials={["redBox"]} />
+      </ViroARPlane>
+    </ViroARScene>
   );
 }
 
@@ -190,6 +208,7 @@ function App() {
           // slam-wasm served from public/. Build it and copy slam_wasm.js/.wasm there:
           //   cd ../slam && <build web target> && cp .../slam_wasm.{js,wasm} web-harness/public/
           slamScriptUrl="/slam_wasm.js"
+          arOptions={{ detectPlanes: true }}
         />
       )}
     </div>

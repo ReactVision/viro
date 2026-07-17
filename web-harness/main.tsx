@@ -25,6 +25,7 @@ const webRendererOptions = {
 };
 
 import { Viro3DSceneNavigator } from "../components/Viro3DSceneNavigator";
+import { ViroARSceneNavigator } from "../components/AR/ViroARSceneNavigator";
 import { ViroScene } from "../components/ViroScene";
 import { ViroBox } from "../components/ViroBox";
 import { ViroSurface } from "../components/ViroSurface";
@@ -143,12 +144,55 @@ function DemoScene() {
   );
 }
 
-function App() {
+// AR demo: a single cube fixed 1m ahead in the world. As slam tracks the device
+// and injects poses, moving the device should move the view around the cube.
+function ARDemoScene() {
   return (
-    <Viro3DSceneNavigator
-      initialScene={{ scene: DemoScene }}
-      webRendererOptions={webRendererOptions}
-    />
+    <ViroScene>
+      <ViroAmbientLight color="#ffffff" intensity={400} />
+      <ViroDirectionalLight color="#ffffff" intensity={1000} direction={[0, -1, -0.6]} />
+      <ViroBox position={[0, 0, -1]} scale={[0.2, 0.2, 0.2]} materials={["blueBox"]} />
+    </ViroScene>
+  );
+}
+
+function App() {
+  const [mode, setMode] = useState<"3d" | "ar">("3d");
+
+  const toggle: React.CSSProperties = {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    padding: "8px 16px",
+    borderRadius: 999,
+    border: "none",
+    background: "#111",
+    color: "#fff",
+    font: "600 13px system-ui, sans-serif",
+    cursor: "pointer",
+  };
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <button style={toggle} onClick={() => setMode((m) => (m === "3d" ? "ar" : "3d"))}>
+        {mode === "3d" ? "Probar AR" : "Volver a 3D"}
+      </button>
+      {mode === "3d" ? (
+        <Viro3DSceneNavigator
+          initialScene={{ scene: DemoScene }}
+          webRendererOptions={webRendererOptions}
+        />
+      ) : (
+        <ViroARSceneNavigator
+          initialScene={{ scene: ARDemoScene }}
+          webRendererOptions={webRendererOptions}
+          // slam-wasm served from public/. Build it and copy slam_wasm.js/.wasm there:
+          //   cd ../slam && <build web target> && cp .../slam_wasm.{js,wasm} web-harness/public/
+          slamScriptUrl="/slam_wasm.js"
+        />
+      )}
+    </div>
   );
 }
 

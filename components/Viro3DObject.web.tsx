@@ -7,8 +7,9 @@
  * (follow-up). OBJ and external-resource glTF are not supported yet.
  */
 import * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
+import { useViroAnimation, type ViroAnimationProp } from "./Web/useViroAnimation";
 import { useViroRenderer, ViroParentNodeContext } from "./Web/ViroWebContext";
 import {
   resolveModelSource,
@@ -21,6 +22,7 @@ type Props = ViroWebNodeProps & {
   source: unknown;
   type?: string; // "GLB" | "GLTF" | "VRX"
   resources?: unknown[]; // external files (e.g. VRX textures) referenced by name
+  animation?: ViroAnimationProp;
   onLoadStart?: () => void;
   onLoadEnd?: (success?: boolean) => void;
   onError?: (error: unknown) => void;
@@ -31,6 +33,10 @@ type Props = ViroWebNodeProps & {
 export function Viro3DObject(props: Props) {
   const node = useViroNode(props);
   const renderer = useViroRenderer();
+  const [loaded, setLoaded] = useState(false);
+
+  // Model animations become available once the model has loaded.
+  useViroAnimation(node, props.animation, loaded);
 
   const url = resolveModelSource(props.source);
   const { onLoadStart, onLoadEnd, onError, type } = props;
@@ -63,8 +69,12 @@ export function Viro3DObject(props: Props) {
     })()
       .then((success) => {
         if (cancelled) return;
-        if (success) onLoadEnd?.(true);
-        else onError?.(new Error("model load failed"));
+        if (success) {
+          setLoaded(true);
+          onLoadEnd?.(true);
+        } else {
+          onError?.(new Error("model load failed"));
+        }
       })
       .catch((err) => {
         if (!cancelled) onError?.(err);

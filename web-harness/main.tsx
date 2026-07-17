@@ -105,6 +105,7 @@ function DemoScene() {
           resources={dragonResources.map((uri) => ({ uri }))}
           position={[3.5, -1.5, 0]}
           scale={[0.2, 0.2, 0.2]}
+          animation={{ name: "*", run: true, loop: true, onStart: () => console.log("[harness] dragon anim start") }}
           onLoadEnd={() => console.log("[harness] dragon loaded")}
           onError={(e) => console.error("[harness] dragon error", e)}
         />

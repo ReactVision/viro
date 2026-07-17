@@ -5,12 +5,15 @@ build of the Viro renderer (`@reactvision/viro-web-renderer`). Components resolv
 to `.web.tsx` implementations that drive the renderer through a scene C API — no
 native module, no DOM-per-view.
 
-> Status: Phase 2 (MVP-1). 3D scenes only (no AR yet). Supported so far:
+> Status: Phase 3 (MVP-2, experimental AR). Supported so far:
 > `Viro3DSceneNavigator`, `ViroScene`, `ViroNode`, `ViroBox`/`ViroSphere`/
 > `ViroQuad`/`ViroSurface`, `Viro3DObject` (GLB/VRX + skinning), lights,
 > `ViroCamera`, `ViroMaterials` (color + PBR textures), `ViroAnimations`
-> (declarative) and model animations, and click/hover events.
-> Not yet: `ViroText`/`ViroImage` (need async asset loading), animation chains, AR.
+> (declarative) and model animations, and click/hover events. **AR:**
+> `ViroARSceneNavigator`, `ViroARScene`, `ViroARPlane` (camera + 6-DoF pose +
+> plane detection + hit-test via slam-wasm) — see **[WEB_AR.md](./WEB_AR.md)**.
+> Not yet: `ViroText`/`ViroImage` (need async asset loading), animation chains,
+> image/object anchors, `ViroARPlaneSelector`.
 
 ## Install
 

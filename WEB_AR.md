@@ -14,7 +14,7 @@ native (`ViroARSceneNavigator` / `ViroARScene` / `ViroARPlane`).
 ## How it works
 
 The renderer (virocore/WASM) does **not** track — it draws the scene from a pose.
-Tracking runs in a **second** WASM module, [slam-wasm](../../slam), driven from JS:
+Tracking runs in a **second** WASM module, [slam-wasm](../slam), driven from JS:
 
 ```
  <video> (getUserMedia) ─┐
@@ -28,7 +28,7 @@ Tracking runs in a **second** WASM module, [slam-wasm](../../slam), driven from 
   (tracking) load independently; JS orchestrates and injects pose/planes.
 - **Axis conversion in JS.** slam is Z-up / OpenCV; virocore is Y-up / GL. The
   bridge applies `Rx(-90°)` (world) and `Rx(180°)` (camera) — see
-  [`arSession.ts`](../../viro-web-renderer/src/arSession.ts).
+  [`arSession.ts`](../viro-web-renderer/src/arSession.ts).
 - **Plane matching in TS.** slam emits oriented-rectangle planes; the bridge
   converts them to anchors and `ViroARScene`/`ViroARPlane` do the declarative
   matching. There is no native `VROARPlaneAnchor` on web.
@@ -54,7 +54,7 @@ No COOP/COEP / cross-origin isolation required — both modules are single-threa
 
 Same as 3D — resolve `.web.tsx` first, alias `react-native` → `react-native-web`,
 and make the renderer's `.wasm`/`.data` reachable. See [WEB.md](./WEB.md) and the
-[renderer README](../../viro-web-renderer/README.md#bundler-integration).
+[renderer README](../viro-web-renderer/README.md#bundler-integration).
 
 ### 2. Build slam-wasm
 

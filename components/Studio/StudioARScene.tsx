@@ -32,6 +32,8 @@ import {
 } from "./domain/sceneNavigationHandler";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioVisibilityStore } from "./domain/visibilityStore";
+import { StudioPlacementStore } from "./domain/placementStore";
+import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
@@ -54,6 +56,61 @@ const IOS_MAX_3D_MODELS = 10;
 // distance sweep to this cadence.
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
 
+// Headset placement has no surface hit-test, so a triggered tap-to-place asset
+// lands this far along the aim ray when no controller hit point is available.
+const HEADSET_PLACEMENT_DISTANCE_M = 1.5;
+
+// Result kinds worth placing on, best first (LiDAR depth > sized plane > plane >
+// sparse feature point). Mirrors the ar-hit-test example's ranking.
+const HIT_TEST_PRIORITY = [
+  "DepthPoint",
+  "ExistingPlaneUsingExtent",
+  "ExistingPlane",
+  "FeaturePoint",
+];
+
+/** Imperative placement surface the navigator's tap overlay drives (mobile AR). */
+export type StudioPlacementApi = {
+  placeAtScreenPoint: (x: number, y: number) => Promise<"placed" | "miss">;
+};
+
+type Vec3 = [number, number, number];
+
+/** A world point is usable if finite and not the origin sentinel. */
+function isUsablePoint(p?: number[] | null): p is Vec3 {
+  return (
+    Array.isArray(p) &&
+    p.length >= 3 &&
+    p.every((n) => Number.isFinite(n)) &&
+    !(p[0] === 0 && p[1] === 0 && p[2] === 0)
+  );
+}
+
+/** Highest-priority hit-test result with a usable surface point, else null. */
+function pickBestHit(results: ViroARHitTestResult[]): ViroARHitTestResult | null {
+  if (!Array.isArray(results) || results.length === 0) return null;
+  for (const type of HIT_TEST_PRIORITY) {
+    const match = results.find(
+      (r) => r.type === type && isUsablePoint(r.transform?.position)
+    );
+    if (match) return match;
+  }
+  return null;
+}
+
+/** Fixed-distance point along the cached camera-forward ray (headset fallback). */
+function projectAlongCameraForward(
+  pose: { position: Vec3; forward: Vec3 } | null
+): Vec3 | null {
+  if (!pose) return null;
+  const { position, forward } = pose;
+  return [
+    position[0] + forward[0] * HEADSET_PLACEMENT_DISTANCE_M,
+    position[1] + forward[1] * HEADSET_PLACEMENT_DISTANCE_M,
+    position[2] + forward[2] * HEADSET_PLACEMENT_DISTANCE_M,
+  ];
+}
+
 type AnimOverride = { key: string; run: boolean };
 
 interface StudioARSceneProps {
@@ -70,6 +127,10 @@ interface StudioARSceneProps {
   noAssetsMessage?: string;
   /** Session-scoped store owned by the navigator; survives scene pushes. */
   variableStore?: StudioVariableStore;
+  /** Placement store owned by the navigator so its tap overlay can read active state. */
+  placementStore?: StudioPlacementStore;
+  /** The navigator's tap overlay writes the placement API here (mobile AR). */
+  placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
 }
 
 /**
@@ -99,6 +160,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     onPlaneSelected,
     noAssetsMessage,
     variableStore,
+    placementStore,
+    placementApiRef,
   } = props;
   const { scene, assets, animations, collision_bindings, functions } =
     sceneData;
@@ -150,6 +213,21 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
+  // ─── Placement store (tap to place) ───────────────────────────────────────
+  // Scene-scoped, seeded from each asset's author-time tap_to_place flag.
+  // Normally owned by the navigator (so its tap overlay can read active state);
+  // a host mounting this scene directly gets a scene-local fallback. Placement
+  // is ephemeral, so a scene change re-seeds every tap-to-place asset to unplaced.
+  const placementStoreRef = useRef<StudioPlacementStore | null>(null);
+  if (placementStoreRef.current === null) {
+    placementStoreRef.current = placementStore ?? new StudioPlacementStore();
+    placementStoreRef.current.seed(assets);
+  }
+  useEffect(() => {
+    placementStoreRef.current?.reseed(assets);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
+
   // ─── Sound manager ────────────────────────────────────────────────────────
   // Per-scene. PLAY/STOP scene-function actions drive it; <StudioSounds> renders
   // the active list. Reset on scene change so sounds don't leak across a
@@ -180,6 +258,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       variableStore: variableStoreRef.current!,
       apiRequestExecutor: defaultApiRequestExecutor,
       visibilityStore: visibilityStoreRef.current!,
+      placementStore: placementStoreRef.current!,
       soundManager: soundManagerRef.current!,
       getAssetPosition,
     }),
@@ -503,9 +582,38 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     [refreshTargetTransform]
   );
 
+  // ─── Tap to place ─────────────────────────────────────────────────────────
+  const arSceneRef = useRef<InstanceType<typeof ViroARScene> | null>(null);
+  // Latest camera pose, cached from the transform stream so a headset trigger
+  // can project the aim ray without an AR surface hit-test.
+  const cameraPoseRef = useRef<{
+    position: [number, number, number];
+    forward: [number, number, number];
+  } | null>(null);
+
+  // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
+  const [activePlacementId, setActivePlacementId] = useState<string | null>(
+    () => placementStoreRef.current?.activeAssetId() ?? null
+  );
+  useEffect(() => {
+    const store = placementStoreRef.current;
+    if (!store) return;
+    setActivePlacementId(store.activeAssetId());
+    return store.subscribeActive(() =>
+      setActivePlacementId(store.activeAssetId())
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
+
+  const activePlacementName = useMemo(() => {
+    if (!activePlacementId) return null;
+    return assets.find((a) => a.id === activePlacementId)?.name ?? null;
+  }, [activePlacementId, assets]);
+
   const lastProximityEvalRef = useRef(0);
   const handleCameraTransformUpdate = useCallback(
     (t: ViroCameraTransform) => {
+      cameraPoseRef.current = { position: t.position, forward: t.forward };
       if (!proximityBindings.length) return;
       const now = Date.now();
       if (now - lastProximityEvalRef.current < PROXIMITY_EVAL_INTERVAL_MS)
@@ -527,11 +635,68 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     [proximityBindings, sceneNavigator, animations, handleSceneChange, runtimeCtx]
   );
 
+  // Mobile AR: hit-test the tapped screen point and place the active asset on the
+  // best real surface. Returns "miss" when nothing usable is under the tap so the
+  // overlay can prompt the user to scan more of the space.
+  const placeAtScreenPoint = useCallback(
+    async (x: number, y: number): Promise<"placed" | "miss"> => {
+      const store = placementStoreRef.current;
+      const activeId = store?.activeAssetId();
+      if (!store || !activeId || !arSceneRef.current) return "miss";
+      let results: ViroARHitTestResult[] = [];
+      try {
+        results = await arSceneRef.current.performARHitTestWithPoint(x, y);
+      } catch {
+        return "miss";
+      }
+      const best = pickBestHit(results);
+      if (!best) return "miss";
+      store.place(activeId, best.transform.position as Vec3);
+      return "placed";
+    },
+    []
+  );
+
+  // Expose the mobile placement API to the navigator's tap overlay.
+  useEffect(() => {
+    if (!placementApiRef) return;
+    placementApiRef.current = { placeAtScreenPoint };
+    return () => {
+      if (placementApiRef.current?.placeAtScreenPoint === placeAtScreenPoint) {
+        placementApiRef.current = null;
+      }
+    };
+  }, [placementApiRef, placeAtScreenPoint]);
+
+  // Headset: the controller trigger fires this. Prefer the ray's real hit point
+  // (room mesh); fall back to a fixed distance along the cached aim ray.
+  const handleHeadsetPlaceTrigger = useCallback((hitPosition?: Vec3) => {
+    const store = placementStoreRef.current;
+    const activeId = store?.activeAssetId();
+    if (!store || !activeId) return;
+    const pos = isUsablePoint(hitPosition)
+      ? hitPosition
+      : projectAlongCameraForward(cameraPoseRef.current);
+    if (!pos) return;
+    store.place(activeId, pos);
+  }, []);
+
   // ─── Trigger image targets ────────────────────────────────────────────────
-  const { planeAssets, imageTriggeredAssets } = useMemo(() => {
-    const plane = assets.filter((a) => !a.trigger_image_url);
+  // Three groups: image-triggered (anchored to a tracked image), tap-to-place
+  // (withheld until the user places them at scene root), and the rest (plane
+  // assets, rendered inside the plane wrapper). Image triggering wins over
+  // tap-to-place since a marker already dictates the anchor.
+  const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = useMemo(() => {
     const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
-    return { planeAssets: plane, imageTriggeredAssets: imgTriggered };
+    const tapToPlace = assets.filter(
+      (a) => !a.trigger_image_url && a.tap_to_place
+    );
+    const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
+    return {
+      planeAssets: plane,
+      imageTriggeredAssets: imgTriggered,
+      tapToPlaceAssets: tapToPlace,
+    };
   }, [assets]);
 
   const [urlToTargetName, setUrlToTargetName] = useState<Map<string, string>>(
@@ -605,6 +770,54 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       .filter(Boolean) as React.ReactElement[];
   }, [
     planeAssets,
+    sceneNavigator,
+    animations,
+    animationStates,
+    handleAssetLoaded,
+    getCollisionHandler,
+    isDragActive,
+    notifyPhysicsDrag,
+    maxModels,
+    handleSceneChange,
+    runtimeCtx,
+    proximityTargetIds,
+    registerProximityTarget,
+  ]);
+
+  // Tap-to-place nodes render at scene root (world space); each is gated by the
+  // placement store (null until placed, then mounted at the placed world point).
+  const renderedTapToPlaceAssets = useMemo(() => {
+    let modelCount = 0;
+    return tapToPlaceAssets
+      .map((asset) => {
+        if (asset.asset_type_name === "3D-MODEL") {
+          modelCount++;
+          if (modelCount > maxModels) {
+            console.warn(
+              `[Studio] Skipping 3D model "${asset.name}" — ${Platform.OS} limit (${maxModels}) reached`
+            );
+            return null;
+          }
+        }
+        return createNode(
+          asset,
+          sceneNavigator,
+          animations,
+          scene,
+          (id, key) => triggerAnimationRef.current(id, key),
+          animationStates,
+          handleAssetLoaded,
+          getCollisionHandler(asset.id),
+          isDragActive,
+          notifyPhysicsDrag,
+          handleSceneChange,
+          runtimeCtx,
+          proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined
+        );
+      })
+      .filter(Boolean) as React.ReactElement[];
+  }, [
+    tapToPlaceAssets,
     sceneNavigator,
     animations,
     animationStates,
@@ -793,10 +1006,38 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // ─── Render ───────────────────────────────────────────────────────────────
   const children = (
     <>
-      {isQuest && <ViroController controllerVisibility reticleVisibility />}
+      {isQuest && (
+        <ViroController
+          controllerVisibility
+          reticleVisibility
+          {...(activePlacementId
+            ? {
+                onClick: (position: [number, number, number]) =>
+                  handleHeadsetPlaceTrigger(position),
+              }
+            : {})}
+        />
+      )}
       <ViroAmbientLight color="#ffffff" intensity={1000} />
       {renderAssets()}
+      {renderedTapToPlaceAssets}
       {renderedImageTriggeredAssets}
+      {isQuest && activePlacementId && (
+        <ViroText
+          text={`Point and pull the trigger to place: ${
+            activePlacementName ?? "object"
+          }`}
+          position={[0, 0.2, -2]}
+          width={3}
+          height={1}
+          style={{
+            fontFamily: "Arial",
+            fontSize: 14,
+            color: "#FFFFFF",
+            textAlign: "center",
+          }}
+        />
+      )}
       <StudioSounds manager={soundManagerRef.current!} />
       {assets.length === 0 && (
         <ViroText
@@ -813,11 +1054,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     </>
   );
 
-  // Only wire the camera event when a proximity trigger needs it — native gates
-  // the per-frame transform stream on this prop being present.
-  const cameraTransformProp = proximityBindings.length
-    ? { onCameraTransformUpdate: handleCameraTransformUpdate }
-    : {};
+  // Wire the camera event when a proximity trigger needs it OR tap-to-place needs
+  // the cached camera pose for headset placement — native gates the per-frame
+  // transform stream on this prop being present.
+  const cameraTransformProp =
+    proximityBindings.length || tapToPlaceAssets.length
+      ? { onCameraTransformUpdate: handleCameraTransformUpdate }
+      : {};
 
   if (isQuest) {
     return (
@@ -828,6 +1071,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   }
   return (
     <ViroARScene
+      ref={arSceneRef}
       {...physicsProps}
       {...cameraTransformProp}
       {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})}

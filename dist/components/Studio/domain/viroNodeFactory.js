@@ -220,6 +220,28 @@ const VisibleNode = ({ assetId, store, children }) => {
     }, [store, assetId]);
     return React.cloneElement(children, { visible });
 };
+/**
+ * Gates a tap-to-place node: renders nothing until the end user places the
+ * asset, then mounts it at the placed world position (overriding the author
+ * position) and hands off to VisibleNode so Set Visibility still applies. The
+ * node is rendered at scene root (world space), never inside a plane wrapper.
+ */
+const PlaceableNode = ({ assetId, store, visibilityStore, children }) => {
+    const [placed, setPlaced] = React.useState(() => store.isPlaced(assetId));
+    React.useEffect(() => {
+        setPlaced(store.isPlaced(assetId));
+        return store.subscribe(assetId, () => setPlaced(store.isPlaced(assetId)));
+    }, [store, assetId]);
+    if (!placed)
+        return null;
+    const position = store.getPosition(assetId);
+    const positioned = position
+        ? React.cloneElement(children, { position })
+        : children;
+    return (<VisibleNode assetId={assetId} store={visibilityStore}>
+      {positioned}
+    </VisibleNode>);
+};
 function createText(asset, config, notifyPhysicsDrag, store, nodeRef) {
     return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag} nodeRef={nodeRef}/>);
 }
@@ -263,6 +285,13 @@ registerProximityTarget) {
     }
     if (!node)
         return null;
+    // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
+    // node at the placed world position and wraps it in VisibleNode itself.
+    if (asset.tap_to_place && runtimeCtx?.placementStore) {
+        return (<PlaceableNode key={asset.id} assetId={asset.id} store={runtimeCtx.placementStore} visibilityStore={runtimeCtx?.visibilityStore}>
+        {node}
+      </PlaceableNode>);
+    }
     // Drive show/hide/toggle from the visibility store (Set Visibility actions);
     // seeded from the asset's author-time hidden_on_load default.
     return (<VisibleNode key={asset.id} assetId={asset.id} store={runtimeCtx?.visibilityStore}>

@@ -45,6 +45,7 @@ const StudioRecordingIndicator_1 = require("./StudioRecordingIndicator");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const variableStore_1 = require("./domain/variableStore");
+const placementStore_1 = require("./domain/placementStore");
 const StudioARScene_1 = require("./StudioARScene");
 const StudioSceneErrorBoundary_1 = require("./StudioSceneErrorBoundary");
 const VRTStudioModule_1 = require("./VRTStudioModule");
@@ -85,7 +86,90 @@ const styles = react_native_1.StyleSheet.create({
         right: 0,
         alignItems: "center",
     },
+    placementBanner: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        alignItems: "center",
+        paddingHorizontal: 24,
+    },
+    placementBannerPill: {
+        backgroundColor: "rgba(0,0,0,0.7)",
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        alignItems: "center",
+        maxWidth: "100%",
+    },
+    placementBannerText: {
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontWeight: "600",
+        textAlign: "center",
+    },
+    placementHintText: {
+        color: "#FFD27F",
+        fontSize: 13,
+        marginTop: 4,
+        textAlign: "center",
+    },
 });
+const PLACEMENT_BANNER_TOP = react_native_1.Platform.OS === "android" ? (react_native_1.StatusBar.currentHeight ?? 24) + 12 : 64;
+/**
+ * Mobile AR placement layer: a full-screen tap catcher shown while a tap-to-place
+ * asset is awaiting placement. Each tap hit-tests a real surface (via the scene's
+ * placement API); a miss prompts the user to scan more of the space. Rendered only
+ * when an asset is active, so normal object interaction is untouched otherwise.
+ * Headset placement is in-scene (controller trigger), so this never mounts there.
+ */
+const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
+    const [activeId, setActiveId] = (0, react_1.useState)(() => store.activeAssetId());
+    const [showMiss, setShowMiss] = (0, react_1.useState)(false);
+    const missTimerRef = (0, react_1.useRef)(null);
+    (0, react_1.useEffect)(() => {
+        setActiveId(store.activeAssetId());
+        return store.subscribeActive(() => setActiveId(store.activeAssetId()));
+    }, [store]);
+    (0, react_1.useEffect)(() => () => {
+        if (missTimerRef.current)
+            clearTimeout(missTimerRef.current);
+    }, []);
+    const handleRelease = (0, react_1.useCallback)((evt) => {
+        const api = apiRef.current;
+        if (!api)
+            return;
+        const { locationX, locationY } = evt.nativeEvent;
+        const ratio = react_native_1.PixelRatio.get();
+        void api
+            .placeAtScreenPoint(locationX * ratio, locationY * ratio)
+            .then((result) => {
+            if (result !== "miss") {
+                setShowMiss(false);
+                return;
+            }
+            setShowMiss(true);
+            if (missTimerRef.current)
+                clearTimeout(missTimerRef.current);
+            missTimerRef.current = setTimeout(() => setShowMiss(false), 2500);
+        });
+    }, [apiRef]);
+    if (!activeId)
+        return null;
+    const name = getName(activeId);
+    return (<react_native_1.View style={react_native_1.StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={handleRelease}>
+      <react_native_1.View style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]} pointerEvents="none">
+        <react_native_1.View style={styles.placementBannerPill}>
+          <react_native_1.Text style={styles.placementBannerText}>
+            {`Tap a surface to place${name ? `: ${name}` : ""}`}
+          </react_native_1.Text>
+          {showMiss && (<react_native_1.Text style={styles.placementHintText}>
+              Move your device to scan a surface, then tap.
+            </react_native_1.Text>)}
+        </react_native_1.View>
+      </react_native_1.View>
+    </react_native_1.View>);
+};
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on
  * both AR devices (iOS / non-Quest Android) and Meta Quest (VR).
@@ -115,6 +199,17 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
             variableStoreRef.current = null;
         };
     }, []);
+    // Tap-to-place: the store is owned here so the mobile overlay can read active
+    // state; StudioARScene re-seeds it per scene. placementApiRef receives the
+    // scene's hit-test bridge. placementNamesRef maps asset id → name for the
+    // overlay prompt. All ephemeral — placement never persists.
+    const placementStoreRef = (0, react_1.useRef)(null);
+    if (placementStoreRef.current === null) {
+        placementStoreRef.current = new placementStore_1.StudioPlacementStore();
+    }
+    const placementApiRef = (0, react_1.useRef)(null);
+    const placementNamesRef = (0, react_1.useRef)(new Map());
+    const getPlacementName = (0, react_1.useCallback)((assetId) => placementNamesRef.current.get(assetId) ?? null, []);
     const onSceneReadyRef = (0, react_1.useRef)(onSceneReady);
     const onErrorRef = (0, react_1.useRef)(onError);
     const onSceneChangeRef = (0, react_1.useRef)(onSceneChange);
@@ -194,6 +289,10 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         if (isCancelled())
             return;
         loadedSceneIdRef.current = resolvedSceneId;
+        // Names for the tap-to-place prompt (overlay reads this on placement).
+        placementNamesRef.current = new Map(sceneData.assets
+            .filter((a) => a.tap_to_place)
+            .map((a) => [a.id, a.name ?? ""]));
         const triggerImageCount = sceneData.assets.filter((a) => !!a.trigger_image_url).length;
         setNumberOfTrackedImages(triggerImageCount > 0 ? Math.min(triggerImageCount, 5) : undefined);
         setOcclusionMode(mapOcclusionMode(sceneData.project?.occlusion_mode));
@@ -216,6 +315,8 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
                 onPlaneSelected: onPlaneSelectedRef.current,
                 noAssetsMessage: noAssetsMessageRef.current,
                 variableStore: variableStoreRef.current,
+                placementStore: placementStoreRef.current,
+                placementApiRef,
             },
         };
         if (ViroPlatform_1.isQuest) {
@@ -261,6 +362,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         {recordingIndicator && (<react_native_1.View pointerEvents="box-none" style={[styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }]}>
             <StudioRecordingIndicator_1.StudioRecordingIndicator />
           </react_native_1.View>)}
+        {!ViroPlatform_1.isQuest && placementStoreRef.current && (<StudioPlacementOverlay store={placementStoreRef.current} apiRef={placementApiRef} getName={getPlacementName}/>)}
       </react_native_1.View>
     </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);
 });

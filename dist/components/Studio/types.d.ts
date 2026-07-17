@@ -206,6 +206,11 @@ export interface StudioAsset {
     is_draggable: boolean;
     /** Author-time "hidden on start"; the runtime seeds visibility from it. */
     hidden_on_load: boolean | null;
+    /**
+     * When true the asset is withheld until the end user taps (mobile) or triggers
+     * (headset) a location to place it; the placed world position is ephemeral.
+     */
+    tap_to_place: boolean | null;
     trigger_image_url: string | null;
     trigger_image_orientation: "Up" | "Down" | "Left" | "Right" | null;
     trigger_image_physical_width_m: number | null;

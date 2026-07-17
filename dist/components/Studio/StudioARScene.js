@@ -56,6 +56,7 @@ const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor"
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const visibilityStore_1 = require("./domain/visibilityStore");
+const placementStore_1 = require("./domain/placementStore");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
@@ -67,6 +68,46 @@ const IOS_MAX_3D_MODELS = 10;
 // The native camera-transform event can fire per frame; throttle the proximity
 // distance sweep to this cadence.
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
+// Headset placement has no surface hit-test, so a triggered tap-to-place asset
+// lands this far along the aim ray when no controller hit point is available.
+const HEADSET_PLACEMENT_DISTANCE_M = 1.5;
+// Result kinds worth placing on, best first (LiDAR depth > sized plane > plane >
+// sparse feature point). Mirrors the ar-hit-test example's ranking.
+const HIT_TEST_PRIORITY = [
+    "DepthPoint",
+    "ExistingPlaneUsingExtent",
+    "ExistingPlane",
+    "FeaturePoint",
+];
+/** A world point is usable if finite and not the origin sentinel. */
+function isUsablePoint(p) {
+    return (Array.isArray(p) &&
+        p.length >= 3 &&
+        p.every((n) => Number.isFinite(n)) &&
+        !(p[0] === 0 && p[1] === 0 && p[2] === 0));
+}
+/** Highest-priority hit-test result with a usable surface point, else null. */
+function pickBestHit(results) {
+    if (!Array.isArray(results) || results.length === 0)
+        return null;
+    for (const type of HIT_TEST_PRIORITY) {
+        const match = results.find((r) => r.type === type && isUsablePoint(r.transform?.position));
+        if (match)
+            return match;
+    }
+    return null;
+}
+/** Fixed-distance point along the cached camera-forward ray (headset fallback). */
+function projectAlongCameraForward(pose) {
+    if (!pose)
+        return null;
+    const { position, forward } = pose;
+    return [
+        position[0] + forward[0] * HEADSET_PLACEMENT_DISTANCE_M,
+        position[1] + forward[1] * HEADSET_PLACEMENT_DISTANCE_M,
+        position[2] + forward[2] * HEADSET_PLACEMENT_DISTANCE_M,
+    ];
+}
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until
  * sceneData is available, avoiding a Rules of Hooks violation.
@@ -79,7 +120,7 @@ const StudioARScene = (props) => {
 };
 exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
-    const { sceneNavigator, sceneData, onReady, onSceneChange, onPlaneDetected, onPlaneSelected, noAssetsMessage, variableStore, } = props;
+    const { sceneNavigator, sceneData, onReady, onSceneChange, onPlaneDetected, onPlaneSelected, noAssetsMessage, variableStore, placementStore, placementApiRef, } = props;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
     // ─── Sequence scheduler ───────────────────────────────────────────────────
     // One per scene. Drives WAIT steps; cancelled on unmount and on navigation so
@@ -125,6 +166,20 @@ const StudioARSceneInner = (props) => {
         visibilityStoreRef.current?.reseed(assets);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
+    // ─── Placement store (tap to place) ───────────────────────────────────────
+    // Scene-scoped, seeded from each asset's author-time tap_to_place flag.
+    // Normally owned by the navigator (so its tap overlay can read active state);
+    // a host mounting this scene directly gets a scene-local fallback. Placement
+    // is ephemeral, so a scene change re-seeds every tap-to-place asset to unplaced.
+    const placementStoreRef = (0, react_1.useRef)(null);
+    if (placementStoreRef.current === null) {
+        placementStoreRef.current = placementStore ?? new placementStore_1.StudioPlacementStore();
+        placementStoreRef.current.seed(assets);
+    }
+    (0, react_1.useEffect)(() => {
+        placementStoreRef.current?.reseed(assets);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
     // ─── Sound manager ────────────────────────────────────────────────────────
     // Per-scene. PLAY/STOP scene-function actions drive it; <StudioSounds> renders
     // the active list. Reset on scene change so sounds don't leak across a
@@ -150,6 +205,7 @@ const StudioARSceneInner = (props) => {
         variableStore: variableStoreRef.current,
         apiRequestExecutor: defaultApiRequestExecutor_1.defaultApiRequestExecutor,
         visibilityStore: visibilityStoreRef.current,
+        placementStore: placementStoreRef.current,
         soundManager: soundManagerRef.current,
         getAssetPosition,
     }), [getAssetPosition]);
@@ -385,8 +441,29 @@ const StudioARSceneInner = (props) => {
             proximityTargetTransformsRef.current.delete(assetId);
         }
     }, [refreshTargetTransform]);
+    // ─── Tap to place ─────────────────────────────────────────────────────────
+    const arSceneRef = (0, react_1.useRef)(null);
+    // Latest camera pose, cached from the transform stream so a headset trigger
+    // can project the aim ray without an AR surface hit-test.
+    const cameraPoseRef = (0, react_1.useRef)(null);
+    // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
+    const [activePlacementId, setActivePlacementId] = (0, react_1.useState)(() => placementStoreRef.current?.activeAssetId() ?? null);
+    (0, react_1.useEffect)(() => {
+        const store = placementStoreRef.current;
+        if (!store)
+            return;
+        setActivePlacementId(store.activeAssetId());
+        return store.subscribeActive(() => setActivePlacementId(store.activeAssetId()));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
+    const activePlacementName = (0, react_1.useMemo)(() => {
+        if (!activePlacementId)
+            return null;
+        return assets.find((a) => a.id === activePlacementId)?.name ?? null;
+    }, [activePlacementId, assets]);
     const lastProximityEvalRef = (0, react_1.useRef)(0);
     const handleCameraTransformUpdate = (0, react_1.useCallback)((t) => {
+        cameraPoseRef.current = { position: t.position, forward: t.forward };
         if (!proximityBindings.length)
             return;
         const now = Date.now();
@@ -405,11 +482,66 @@ const StudioARSceneInner = (props) => {
             runtimeCtx,
         });
     }, [proximityBindings, sceneNavigator, animations, handleSceneChange, runtimeCtx]);
+    // Mobile AR: hit-test the tapped screen point and place the active asset on the
+    // best real surface. Returns "miss" when nothing usable is under the tap so the
+    // overlay can prompt the user to scan more of the space.
+    const placeAtScreenPoint = (0, react_1.useCallback)(async (x, y) => {
+        const store = placementStoreRef.current;
+        const activeId = store?.activeAssetId();
+        if (!store || !activeId || !arSceneRef.current)
+            return "miss";
+        let results = [];
+        try {
+            results = await arSceneRef.current.performARHitTestWithPoint(x, y);
+        }
+        catch {
+            return "miss";
+        }
+        const best = pickBestHit(results);
+        if (!best)
+            return "miss";
+        store.place(activeId, best.transform.position);
+        return "placed";
+    }, []);
+    // Expose the mobile placement API to the navigator's tap overlay.
+    (0, react_1.useEffect)(() => {
+        if (!placementApiRef)
+            return;
+        placementApiRef.current = { placeAtScreenPoint };
+        return () => {
+            if (placementApiRef.current?.placeAtScreenPoint === placeAtScreenPoint) {
+                placementApiRef.current = null;
+            }
+        };
+    }, [placementApiRef, placeAtScreenPoint]);
+    // Headset: the controller trigger fires this. Prefer the ray's real hit point
+    // (room mesh); fall back to a fixed distance along the cached aim ray.
+    const handleHeadsetPlaceTrigger = (0, react_1.useCallback)((hitPosition) => {
+        const store = placementStoreRef.current;
+        const activeId = store?.activeAssetId();
+        if (!store || !activeId)
+            return;
+        const pos = isUsablePoint(hitPosition)
+            ? hitPosition
+            : projectAlongCameraForward(cameraPoseRef.current);
+        if (!pos)
+            return;
+        store.place(activeId, pos);
+    }, []);
     // ─── Trigger image targets ────────────────────────────────────────────────
-    const { planeAssets, imageTriggeredAssets } = (0, react_1.useMemo)(() => {
-        const plane = assets.filter((a) => !a.trigger_image_url);
+    // Three groups: image-triggered (anchored to a tracked image), tap-to-place
+    // (withheld until the user places them at scene root), and the rest (plane
+    // assets, rendered inside the plane wrapper). Image triggering wins over
+    // tap-to-place since a marker already dictates the anchor.
+    const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = (0, react_1.useMemo)(() => {
         const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
-        return { planeAssets: plane, imageTriggeredAssets: imgTriggered };
+        const tapToPlace = assets.filter((a) => !a.trigger_image_url && a.tap_to_place);
+        const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
+        return {
+            planeAssets: plane,
+            imageTriggeredAssets: imgTriggered,
+            tapToPlaceAssets: tapToPlace,
+        };
     }, [assets]);
     const [urlToTargetName, setUrlToTargetName] = (0, react_1.useState)(() => new Map());
     const prevTargetNamesRef = (0, react_1.useRef)([]);
@@ -457,6 +589,37 @@ const StudioARSceneInner = (props) => {
             .filter(Boolean);
     }, [
         planeAssets,
+        sceneNavigator,
+        animations,
+        animationStates,
+        handleAssetLoaded,
+        getCollisionHandler,
+        isDragActive,
+        notifyPhysicsDrag,
+        maxModels,
+        handleSceneChange,
+        runtimeCtx,
+        proximityTargetIds,
+        registerProximityTarget,
+    ]);
+    // Tap-to-place nodes render at scene root (world space); each is gated by the
+    // placement store (null until placed, then mounted at the placed world point).
+    const renderedTapToPlaceAssets = (0, react_1.useMemo)(() => {
+        let modelCount = 0;
+        return tapToPlaceAssets
+            .map((asset) => {
+            if (asset.asset_type_name === "3D-MODEL") {
+                modelCount++;
+                if (modelCount > maxModels) {
+                    console.warn(`[Studio] Skipping 3D model "${asset.name}" — ${react_native_1.Platform.OS} limit (${maxModels}) reached`);
+                    return null;
+                }
+            }
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined);
+        })
+            .filter(Boolean);
+    }, [
+        tapToPlaceAssets,
         sceneNavigator,
         animations,
         animationStates,
@@ -594,10 +757,21 @@ const StudioARSceneInner = (props) => {
         : {};
     // ─── Render ───────────────────────────────────────────────────────────────
     const children = (<>
-      {ViroPlatform_1.isQuest && <ViroController_1.ViroController controllerVisibility reticleVisibility/>}
+      {ViroPlatform_1.isQuest && (<ViroController_1.ViroController controllerVisibility reticleVisibility {...(activePlacementId
+            ? {
+                onClick: (position) => handleHeadsetPlaceTrigger(position),
+            }
+            : {})}/>)}
       <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
       {renderAssets()}
+      {renderedTapToPlaceAssets}
       {renderedImageTriggeredAssets}
+      {ViroPlatform_1.isQuest && activePlacementId && (<ViroText_1.ViroText text={`Point and pull the trigger to place: ${activePlacementName ?? "object"}`} position={[0, 0.2, -2]} width={3} height={1} style={{
+                fontFamily: "Arial",
+                fontSize: 14,
+                color: "#FFFFFF",
+                textAlign: "center",
+            }}/>)}
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{
                 fontFamily: "Arial",
@@ -606,9 +780,10 @@ const StudioARSceneInner = (props) => {
                 textAlign: "center",
             }}/>)}
     </>);
-    // Only wire the camera event when a proximity trigger needs it — native gates
-    // the per-frame transform stream on this prop being present.
-    const cameraTransformProp = proximityBindings.length
+    // Wire the camera event when a proximity trigger needs it OR tap-to-place needs
+    // the cached camera pose for headset placement — native gates the per-frame
+    // transform stream on this prop being present.
+    const cameraTransformProp = proximityBindings.length || tapToPlaceAssets.length
         ? { onCameraTransformUpdate: handleCameraTransformUpdate }
         : {};
     if (ViroPlatform_1.isQuest) {
@@ -616,7 +791,7 @@ const StudioARSceneInner = (props) => {
         {children}
       </ViroScene_1.ViroScene>);
     }
-    return (<ViroARScene_1.ViroARScene {...physicsProps} {...cameraTransformProp} {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+    return (<ViroARScene_1.ViroARScene ref={arSceneRef} {...physicsProps} {...cameraTransformProp} {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
       {children}
     </ViroARScene_1.ViroARScene>);
 };

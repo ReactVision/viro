@@ -20,6 +20,7 @@ import { studioRecordingStore } from "./recordingStore";
 import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
+import { StudioPlacementStore } from "./placementStore";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
@@ -154,6 +155,7 @@ export type SequenceRuntimeContext = {
   variableStore?: StudioVariableStore;
   apiRequestExecutor?: StudioApiRequestExecutor;
   visibilityStore?: StudioVisibilityStore;
+  placementStore?: StudioPlacementStore;
   soundManager?: StudioSoundManager;
   getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
 };

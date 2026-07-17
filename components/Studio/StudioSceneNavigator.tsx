@@ -9,9 +9,12 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  type GestureResponderEvent,
+  PixelRatio,
   Platform,
   StatusBar,
   StyleSheet,
+  Text,
   View,
   ViewStyle,
 } from "react-native";
@@ -23,7 +26,8 @@ import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
-import { StudioARScene } from "./StudioARScene";
+import { StudioPlacementStore } from "./domain/placementStore";
+import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
@@ -73,7 +77,117 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
   },
+  placementBanner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  placementBannerPill: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+    maxWidth: "100%",
+  },
+  placementBannerText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  placementHintText: {
+    color: "#FFD27F",
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: "center",
+  },
 });
+
+const PLACEMENT_BANNER_TOP =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) + 12 : 64;
+
+/**
+ * Mobile AR placement layer: a full-screen tap catcher shown while a tap-to-place
+ * asset is awaiting placement. Each tap hit-tests a real surface (via the scene's
+ * placement API); a miss prompts the user to scan more of the space. Rendered only
+ * when an asset is active, so normal object interaction is untouched otherwise.
+ * Headset placement is in-scene (controller trigger), so this never mounts there.
+ */
+const StudioPlacementOverlay: React.FC<{
+  store: StudioPlacementStore;
+  apiRef: React.MutableRefObject<StudioPlacementApi | null>;
+  getName: (assetId: string) => string | null;
+}> = ({ store, apiRef, getName }) => {
+  const [activeId, setActiveId] = useState<string | null>(() =>
+    store.activeAssetId()
+  );
+  const [showMiss, setShowMiss] = useState(false);
+  const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setActiveId(store.activeAssetId());
+    return store.subscribeActive(() => setActiveId(store.activeAssetId()));
+  }, [store]);
+
+  useEffect(
+    () => () => {
+      if (missTimerRef.current) clearTimeout(missTimerRef.current);
+    },
+    []
+  );
+
+  const handleRelease = useCallback(
+    (evt: GestureResponderEvent) => {
+      const api = apiRef.current;
+      if (!api) return;
+      const { locationX, locationY } = evt.nativeEvent;
+      const ratio = PixelRatio.get();
+      void api
+        .placeAtScreenPoint(locationX * ratio, locationY * ratio)
+        .then((result) => {
+          if (result !== "miss") {
+            setShowMiss(false);
+            return;
+          }
+          setShowMiss(true);
+          if (missTimerRef.current) clearTimeout(missTimerRef.current);
+          missTimerRef.current = setTimeout(() => setShowMiss(false), 2500);
+        });
+    },
+    [apiRef]
+  );
+
+  if (!activeId) return null;
+  const name = getName(activeId);
+
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      onStartShouldSetResponder={() => true}
+      onResponderRelease={handleRelease}
+    >
+      <View
+        style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}
+        pointerEvents="none"
+      >
+        <View style={styles.placementBannerPill}>
+          <Text style={styles.placementBannerText}>
+            {`Tap a surface to place${name ? `: ${name}` : ""}`}
+          </Text>
+          {showMiss && (
+            <Text style={styles.placementHintText}>
+              Move your device to scan a surface, then tap.
+            </Text>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+};
 
 /** Imperative handle exposed via ref. */
 export interface StudioSceneNavigatorHandle {
@@ -176,6 +290,21 @@ export const StudioSceneNavigator = forwardRef<
       variableStoreRef.current = null;
     };
   }, []);
+
+  // Tap-to-place: the store is owned here so the mobile overlay can read active
+  // state; StudioARScene re-seeds it per scene. placementApiRef receives the
+  // scene's hit-test bridge. placementNamesRef maps asset id → name for the
+  // overlay prompt. All ephemeral — placement never persists.
+  const placementStoreRef = useRef<StudioPlacementStore | null>(null);
+  if (placementStoreRef.current === null) {
+    placementStoreRef.current = new StudioPlacementStore();
+  }
+  const placementApiRef = useRef<StudioPlacementApi | null>(null);
+  const placementNamesRef = useRef<Map<string, string>>(new Map());
+  const getPlacementName = useCallback(
+    (assetId: string) => placementNamesRef.current.get(assetId) ?? null,
+    []
+  );
 
   const onSceneReadyRef = useRef(onSceneReady);
   const onErrorRef = useRef(onError);
@@ -280,6 +409,13 @@ export const StudioSceneNavigator = forwardRef<
 
       loadedSceneIdRef.current = resolvedSceneId;
 
+      // Names for the tap-to-place prompt (overlay reads this on placement).
+      placementNamesRef.current = new Map(
+        sceneData.assets
+          .filter((a) => a.tap_to_place)
+          .map((a) => [a.id, a.name ?? ""])
+      );
+
       const triggerImageCount = sceneData.assets.filter(
         (a) => !!a.trigger_image_url
       ).length;
@@ -309,6 +445,8 @@ export const StudioSceneNavigator = forwardRef<
           onPlaneSelected: onPlaneSelectedRef.current,
           noAssetsMessage: noAssetsMessageRef.current,
           variableStore: variableStoreRef.current,
+          placementStore: placementStoreRef.current,
+          placementApiRef,
         },
       };
 
@@ -381,6 +519,13 @@ export const StudioSceneNavigator = forwardRef<
           >
             <StudioRecordingIndicator />
           </View>
+        )}
+        {!isQuest && placementStoreRef.current && (
+          <StudioPlacementOverlay
+            store={placementStoreRef.current}
+            apiRef={placementApiRef}
+            getName={getPlacementName}
+          />
         )}
       </View>
     </StudioSceneErrorBoundary>

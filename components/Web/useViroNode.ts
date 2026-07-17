@@ -16,6 +16,7 @@ import {
 } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
 import { createMaterialFromRegistry } from "./viroMaterialRegistry";
+import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -36,11 +37,15 @@ export interface ViroWebNodeProps {
     source: number,
   ) => void;
   onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;
+  animation?: ViroAnimationProp;
 }
 
 export function useViroNode(
   props: ViroWebNodeProps,
   createGeometry?: (scene: ViroSceneApi) => ViroHandle,
+  // Gates model animations, which only become available after a model loads.
+  // Declarative animations don't need it (default true).
+  animationReady: boolean = true,
 ): ViroHandle {
   const scene = useViroScene();
   const renderer = useViroRenderer();
@@ -123,6 +128,14 @@ export function useViroNode(
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, materialsKey]);
+
+  // Animation (declarative ViroAnimation or model animation).
+  useViroAnimation(
+    node,
+    props.animation,
+    { position: [px, py, pz], rotation: [rx, ry, rz], scale: [sx, sy, sz], opacity },
+    animationReady,
+  );
 
   return node;
 }

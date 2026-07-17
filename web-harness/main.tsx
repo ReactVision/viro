@@ -33,6 +33,7 @@ import { Viro3DObject } from "../components/Viro3DObject";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
+import { ViroAnimations } from "../components/Animation/ViroAnimations";
 
 import helmetUrl from "./models/DamagedHelmet.glb?url";
 
@@ -69,6 +70,17 @@ ViroMaterials.createMaterials({
   blueBox: { lightingModel: "Blinn", diffuseColor: "#3399ff" },
   redBox: { lightingModel: "Blinn", diffuseColor: "#ff5533" },
   checker: { lightingModel: "Lambert", diffuseTexture: makeCheckerDataUrl() },
+});
+
+// Declarative animation: spin + bob, looping.
+ViroAnimations.registerAnimations({
+  // rotateY 0->360 loops seamlessly (360 == 0). A smooth up/down bob needs an
+  // animation chain (sequence up + down), which isn't supported on web yet.
+  spin: {
+    duration: 2000,
+    easing: "Linear",
+    properties: { rotateY: 360 },
+  },
 });
 
 function DemoScene() {
@@ -109,10 +121,11 @@ function DemoScene() {
           onLoadEnd={() => console.log("[harness] dragon loaded")}
           onError={(e) => console.error("[harness] dragon error", e)}
         />
-        {/* A tappable cube to the side to keep event coverage. */}
+        {/* A tappable cube to the side, animated with a declarative ViroAnimation. */}
         <ViroBox
           position={[-3, 0, 0]}
           materials={[tapped ? "redBox" : "blueBox"]}
+          animation={{ name: "spin", run: true, loop: true }}
           onClick={() => {
             console.log("[harness] box clicked");
             setTapped((t) => !t);

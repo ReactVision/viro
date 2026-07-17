@@ -9,7 +9,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
-import { useViroAnimation, type ViroAnimationProp } from "./Web/useViroAnimation";
+import type { ViroAnimationProp } from "./Web/useViroAnimation";
 import { useViroRenderer, ViroParentNodeContext } from "./Web/ViroWebContext";
 import {
   resolveModelSource,
@@ -31,12 +31,10 @@ type Props = ViroWebNodeProps & {
 };
 
 export function Viro3DObject(props: Props) {
-  const node = useViroNode(props);
-  const renderer = useViroRenderer();
   const [loaded, setLoaded] = useState(false);
-
-  // Model animations become available once the model has loaded.
-  useViroAnimation(node, props.animation, loaded);
+  // Pass `loaded` as animationReady so the model's animations start once loaded.
+  const node = useViroNode(props, undefined, loaded);
+  const renderer = useViroRenderer();
 
   const url = resolveModelSource(props.source);
   const { onLoadStart, onLoadEnd, onError, type } = props;

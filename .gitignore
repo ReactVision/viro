@@ -65,6 +65,9 @@ build/
 yarn.lock
 .env
 
+CLAUDE.md
+CLAUDE.local.md
+
 # Fastlane
 ios/fastlane/report.xml
 ios/fastlane/README.md

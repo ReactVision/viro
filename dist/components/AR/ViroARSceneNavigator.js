@@ -511,6 +511,58 @@ class ViroARSceneNavigator extends React.Component {
     _cancelCloudAnchorOperations = () => {
         ViroARSceneNavigatorModule.cancelCloudAnchorOperations((0, react_native_1.findNodeHandle)(this));
     };
+    /**
+     * Begin a room/building-scale scan that defines its own location frame,
+     * independent of any placed anchor (WS-A). Call this before walking the
+     * space, then call finishScan() when done. Unlike hostCloudAnchor(), this
+     * does not require tapping/placing an anchor first.
+     */
+    _startScan = () => {
+        ViroARSceneNavigatorModule.rvStartScan((0, react_native_1.findNodeHandle)(this));
+    };
+    /**
+     * Finish a scan started with startScan() and host it to the cloud. Same
+     * pipeline as hostCloudAnchor(), but positions content in the scan's own
+     * location frame instead of relative to a placed anchor.
+     *
+     * @param ttlDays - Time-to-live in days (1-365)
+     * @returns Promise resolving to the hosting result with cloudAnchorId
+     */
+    _finishScan = async (ttlDays = 1) => {
+        return await ViroARSceneNavigatorModule.rvFinishScan((0, react_native_1.findNodeHandle)(this), Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
+        );
+    };
+    /**
+     * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
+     * local cache file (WS-C). Pass the returned filePath straight into
+     * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
+     * cloud anchor hosted via finishScan().
+     *
+     * @param locationTransform - The `locationTransform` returned by finishScan()'s
+     *        success result. Required — there is no placed anchor to derive a
+     *        transform from for a finishScan()-hosted mesh.
+     * @returns Promise resolving to the snapshot result with filePath
+     */
+    _snapshotWorldMeshToFile = async (locationTransform) => {
+        return await ViroARSceneNavigatorModule.rvSnapshotWorldMeshToFile((0, react_native_1.findNodeHandle)(this), locationTransform);
+    };
+    /**
+     * Load a mesh snapshot downloaded from a resolved cloud anchor's mesh
+     * asset and attach it for physics collision + visual occlusion (WS-C).
+     * Requires `worldMeshEnabled` to be true on this navigator's AR scene.
+     *
+     * The app is responsible for downloading the asset's `fileUrl` (from
+     * `rvGetCloudAnchor()`'s `assets`) to a local file itself — pass that
+     * local path here, not the remote URL.
+     *
+     * @param filePath - Local path to the downloaded mesh snapshot bytes.
+     * @param resolvedTransform - The resolved anchor's transform, as returned
+     *        by `resolveCloudAnchor()`.
+     * @returns Promise resolving to the load result
+     */
+    _loadWorldMeshFromFile = async (filePath, resolvedTransform) => {
+        return await ViroARSceneNavigatorModule.rvLoadWorldMeshFromFile((0, react_native_1.findNodeHandle)(this), filePath, resolvedTransform);
+    };
     // ===========================================================================
     // Geospatial API Methods
     // ===========================================================================
@@ -521,6 +573,17 @@ class ViroARSceneNavigator extends React.Component {
      */
     _isGeospatialModeSupported = async () => {
         return await ViroARSceneNavigatorModule.isGeospatialModeSupported((0, react_native_1.findNodeHandle)(this));
+    };
+    /**
+     * Check if only approximate location is granted (iOS 14+ "Precise
+     * Location" off, or Android's ACCESS_COARSE_LOCATION without
+     * ACCESS_FINE_LOCATION). When true, geospatial tracking will never
+     * converge — show the user an explicit error instead of waiting (WS-D).
+     *
+     * @returns Promise resolving to the reduced-accuracy status
+     */
+    _isLocationAccuracyReduced = async () => {
+        return await ViroARSceneNavigatorModule.isLocationAccuracyReduced((0, react_native_1.findNodeHandle)(this));
     };
     /**
      * Enable or disable geospatial mode.
@@ -885,8 +948,13 @@ class ViroARSceneNavigator extends React.Component {
         hostCloudAnchor: this._hostCloudAnchor,
         resolveCloudAnchor: this._resolveCloudAnchor,
         cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
+        startScan: this._startScan,
+        finishScan: this._finishScan,
+        snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
+        loadWorldMeshFromFile: this._loadWorldMeshFromFile,
         // Geospatial API
         isGeospatialModeSupported: this._isGeospatialModeSupported,
+        isLocationAccuracyReduced: this._isLocationAccuracyReduced,
         setGeospatialModeEnabled: this._setGeospatialModeEnabled,
         getEarthTrackingState: this._getEarthTrackingState,
         getCameraGeospatialPose: this._getCameraGeospatialPose,
@@ -946,8 +1014,13 @@ class ViroARSceneNavigator extends React.Component {
         hostCloudAnchor: this._hostCloudAnchor,
         resolveCloudAnchor: this._resolveCloudAnchor,
         cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
+        startScan: this._startScan,
+        finishScan: this._finishScan,
+        snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
+        loadWorldMeshFromFile: this._loadWorldMeshFromFile,
         // Geospatial API
         isGeospatialModeSupported: this._isGeospatialModeSupported,
+        isLocationAccuracyReduced: this._isLocationAccuracyReduced,
         setGeospatialModeEnabled: this._setGeospatialModeEnabled,
         getEarthTrackingState: this._getEarthTrackingState,
         getCameraGeospatialPose: this._getCameraGeospatialPose,

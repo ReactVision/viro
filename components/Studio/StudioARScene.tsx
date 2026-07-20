@@ -589,6 +589,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const cameraPoseRef = useRef<{
     position: [number, number, number];
     forward: [number, number, number];
+    up: [number, number, number];
   } | null>(null);
 
   // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
@@ -613,7 +614,11 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const lastProximityEvalRef = useRef(0);
   const handleCameraTransformUpdate = useCallback(
     (t: ViroCameraTransform) => {
-      cameraPoseRef.current = { position: t.position, forward: t.forward };
+      cameraPoseRef.current = {
+        position: t.position,
+        forward: t.forward,
+        up: t.up,
+      };
       if (!proximityBindings.length) return;
       const now = Date.now();
       if (now - lastProximityEvalRef.current < PROXIMITY_EVAL_INTERVAL_MS)
@@ -651,7 +656,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       }
       const best = pickBestHit(results);
       if (!best) return "miss";
-      store.place(activeId, best.transform.position as Vec3);
+      store.place(
+        activeId,
+        best.transform.position as Vec3,
+        cameraPoseRef.current?.forward,
+        cameraPoseRef.current?.up
+      );
       return "placed";
     },
     []
@@ -678,7 +688,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       ? hitPosition
       : projectAlongCameraForward(cameraPoseRef.current);
     if (!pos) return;
-    store.place(activeId, pos);
+    store.place(
+      activeId,
+      pos,
+      cameraPoseRef.current?.forward,
+      cameraPoseRef.current?.up
+    );
   }, []);
 
   // ─── Trigger image targets ────────────────────────────────────────────────

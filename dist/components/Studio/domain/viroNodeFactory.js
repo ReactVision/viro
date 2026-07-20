@@ -49,8 +49,12 @@ const physicsConfig_1 = require("./physicsConfig");
 /** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx) {
     const hasTriggerImage = !!asset.trigger_image_url;
-    let posZ = asset.position_z ?? -2;
-    if (!hasTriggerImage && posZ > -0.5) {
+    // Tap-to-place stores the author position as an OFFSET from the runtime tap
+    // point (PlaceableNode adds it), so the camera-relative -2 default and the
+    // "too close" clamp — both meant for camera/plane assets — must not apply.
+    const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
+    let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
+    if (!hasTriggerImage && !isTapToPlace && posZ > -0.5) {
         console.warn(`[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`);
         posZ = -2;
     }
@@ -181,7 +185,7 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, nodeRef) {
  * subscribes when the template actually has placeholders). Resolution is
  * fail-soft: unknown names stay literal.
  */
-const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visible }) => {
+const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visible, position, rotation, }) => {
     const template = asset.name ?? "";
     const compute = () => store
         ? (0, apiRequestHelpers_1.interpolateDisplayTemplate)(template, (n) => store.get(n))
@@ -195,7 +199,7 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visibl
         return store.subscribe(() => setText(compute()));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store, template]);
-    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(visible === undefined ? {} : { visible })} style={{
+    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={position ?? config.position} rotation={rotation ?? config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(visible === undefined ? {} : { visible })} style={{
             fontFamily: "Arial",
             fontSize: 20,
             color: "#FFFFFF",
@@ -222,11 +226,13 @@ const VisibleNode = ({ assetId, store, children }) => {
 };
 /**
  * Gates a tap-to-place node: renders nothing until the end user places the
- * asset, then mounts it at the placed world position (overriding the author
- * position) and hands off to VisibleNode so Set Visibility still applies. The
- * node is rendered at scene root (world space), never inside a plane wrapper.
+ * asset, then mounts it at the tap point with the author position AND rotation
+ * applied relative to where the user was facing when they tapped (see
+ * StudioPlacementStore.resolvePlacedPosition / resolvePlacedRotation), and hands
+ * off to VisibleNode so Set Visibility still applies. Rendered at scene root
+ * (world space), never inside a plane wrapper.
  */
-const PlaceableNode = ({ assetId, store, visibilityStore, children }) => {
+const PlaceableNode = ({ assetId, store, authorPosition, authorRotation, visibilityStore, children, }) => {
     const [placed, setPlaced] = React.useState(() => store.isPlaced(assetId));
     React.useEffect(() => {
         setPlaced(store.isPlaced(assetId));
@@ -234,12 +240,10 @@ const PlaceableNode = ({ assetId, store, visibilityStore, children }) => {
     }, [store, assetId]);
     if (!placed)
         return null;
-    const position = store.getPosition(assetId);
-    const positioned = position
-        ? React.cloneElement(children, { position })
-        : children;
+    const position = store.resolvePlacedPosition(assetId, authorPosition) ?? authorPosition;
+    const rotation = store.resolvePlacedRotation(assetId, authorRotation) ?? authorRotation;
     return (<VisibleNode assetId={assetId} store={visibilityStore}>
-      {positioned}
+      {React.cloneElement(children, { position, rotation })}
     </VisibleNode>);
 };
 function createText(asset, config, notifyPhysicsDrag, store, nodeRef) {
@@ -286,9 +290,10 @@ registerProximityTarget) {
     if (!node)
         return null;
     // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
-    // node at the placed world position and wraps it in VisibleNode itself.
+    // node at the tap point with the author position and rotation applied relative
+    // to the user's facing, and wraps it in VisibleNode itself.
     if (asset.tap_to_place && runtimeCtx?.placementStore) {
-        return (<PlaceableNode key={asset.id} assetId={asset.id} store={runtimeCtx.placementStore} visibilityStore={runtimeCtx?.visibilityStore}>
+        return (<PlaceableNode key={asset.id} assetId={asset.id} store={runtimeCtx.placementStore} authorPosition={config.position} authorRotation={config.rotation} visibilityStore={runtimeCtx?.visibilityStore}>
         {node}
       </PlaceableNode>);
     }

@@ -64,9 +64,13 @@ export function createNodeConfig(
   runtimeCtx?: SequenceRuntimeContext
 ): NodeConfig {
   const hasTriggerImage = !!asset.trigger_image_url;
+  // Tap-to-place stores the author position as an OFFSET from the runtime tap
+  // point (PlaceableNode adds it), so the camera-relative -2 default and the
+  // "too close" clamp — both meant for camera/plane assets — must not apply.
+  const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
 
-  let posZ = asset.position_z ?? -2;
-  if (!hasTriggerImage && posZ > -0.5) {
+  let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
+  if (!hasTriggerImage && !isTapToPlace && posZ > -0.5) {
     console.warn(
       `[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`
     );
@@ -310,10 +314,22 @@ const VariableText: React.FC<{
   store?: StudioVariableStore;
   notifyPhysicsDrag?: (assetId: string) => void;
   nodeRef?: (ref: unknown) => void;
-  // Injected by VisibleNode via cloneElement; TEXT is the only node type that
-  // is a component wrapper, so it forwards visibility to its ViroText.
+  // Injected via cloneElement; TEXT is the only node type that is a component
+  // wrapper, so it must forward these to its ViroText: `visible` from
+  // VisibleNode, `position`/`rotation` from PlaceableNode (tap-relative placement).
   visible?: boolean;
-}> = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visible }) => {
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}> = ({
+  asset,
+  config,
+  store,
+  notifyPhysicsDrag,
+  nodeRef,
+  visible,
+  position,
+  rotation,
+}) => {
   const template = asset.name ?? "";
   const compute = () =>
     store
@@ -333,8 +349,8 @@ const VariableText: React.FC<{
     <ViroText
       {...(nodeRef ? { ref: nodeRef as any } : {})}
       text={text}
-      position={config.position}
-      rotation={config.rotation}
+      position={position ?? config.position}
+      rotation={rotation ?? config.rotation}
       scale={config.scale}
       dragType={config.dragType}
       animation={config.animation as any}
@@ -381,16 +397,27 @@ const VisibleNode: React.FC<{
 
 /**
  * Gates a tap-to-place node: renders nothing until the end user places the
- * asset, then mounts it at the placed world position (overriding the author
- * position) and hands off to VisibleNode so Set Visibility still applies. The
- * node is rendered at scene root (world space), never inside a plane wrapper.
+ * asset, then mounts it at the tap point with the author position AND rotation
+ * applied relative to where the user was facing when they tapped (see
+ * StudioPlacementStore.resolvePlacedPosition / resolvePlacedRotation), and hands
+ * off to VisibleNode so Set Visibility still applies. Rendered at scene root
+ * (world space), never inside a plane wrapper.
  */
 const PlaceableNode: React.FC<{
   assetId: string;
   store: StudioPlacementStore;
+  authorPosition: [number, number, number];
+  authorRotation: [number, number, number];
   visibilityStore?: StudioVisibilityStore;
   children: React.ReactElement<any>;
-}> = ({ assetId, store, visibilityStore, children }) => {
+}> = ({
+  assetId,
+  store,
+  authorPosition,
+  authorRotation,
+  visibilityStore,
+  children,
+}) => {
   const [placed, setPlaced] = React.useState(() => store.isPlaced(assetId));
 
   React.useEffect(() => {
@@ -400,14 +427,14 @@ const PlaceableNode: React.FC<{
 
   if (!placed) return null;
 
-  const position = store.getPosition(assetId);
-  const positioned = position
-    ? React.cloneElement(children, { position })
-    : children;
+  const position =
+    store.resolvePlacedPosition(assetId, authorPosition) ?? authorPosition;
+  const rotation =
+    store.resolvePlacedRotation(assetId, authorRotation) ?? authorRotation;
 
   return (
     <VisibleNode assetId={assetId} store={visibilityStore}>
-      {positioned}
+      {React.cloneElement(children, { position, rotation })}
     </VisibleNode>
   );
 };
@@ -544,13 +571,16 @@ export function createNode(
   if (!node) return null;
 
   // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
-  // node at the placed world position and wraps it in VisibleNode itself.
+  // node at the tap point with the author position and rotation applied relative
+  // to the user's facing, and wraps it in VisibleNode itself.
   if (asset.tap_to_place && runtimeCtx?.placementStore) {
     return (
       <PlaceableNode
         key={asset.id}
         assetId={asset.id}
         store={runtimeCtx.placementStore}
+        authorPosition={config.position}
+        authorRotation={config.rotation}
         visibilityStore={runtimeCtx?.visibilityStore}
       >
         {node}

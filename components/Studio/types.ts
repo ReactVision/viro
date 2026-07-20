@@ -245,6 +245,12 @@ export interface StudioAsset {
    * (headset) a location to place it; the placed world position is ephemeral.
    */
   tap_to_place: boolean | null;
+  /**
+   * 1-based author-defined position in the tap-to-place queue; the runtime places
+   * tap-to-place assets one at a time ascending by this value. Null unless
+   * tap_to_place (older backends omit it — the runtime falls back to load order).
+   */
+  tap_to_place_order: number | null;
   trigger_image_url: string | null;
   trigger_image_orientation: "Up" | "Down" | "Left" | "Right" | null;
   trigger_image_physical_width_m: number | null;

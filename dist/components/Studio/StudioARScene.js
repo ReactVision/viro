@@ -463,7 +463,11 @@ const StudioARSceneInner = (props) => {
     }, [activePlacementId, assets]);
     const lastProximityEvalRef = (0, react_1.useRef)(0);
     const handleCameraTransformUpdate = (0, react_1.useCallback)((t) => {
-        cameraPoseRef.current = { position: t.position, forward: t.forward };
+        cameraPoseRef.current = {
+            position: t.position,
+            forward: t.forward,
+            up: t.up,
+        };
         if (!proximityBindings.length)
             return;
         const now = Date.now();
@@ -500,7 +504,7 @@ const StudioARSceneInner = (props) => {
         const best = pickBestHit(results);
         if (!best)
             return "miss";
-        store.place(activeId, best.transform.position);
+        store.place(activeId, best.transform.position, cameraPoseRef.current?.forward, cameraPoseRef.current?.up);
         return "placed";
     }, []);
     // Expose the mobile placement API to the navigator's tap overlay.
@@ -526,7 +530,7 @@ const StudioARSceneInner = (props) => {
             : projectAlongCameraForward(cameraPoseRef.current);
         if (!pos)
             return;
-        store.place(activeId, pos);
+        store.place(activeId, pos, cameraPoseRef.current?.forward, cameraPoseRef.current?.up);
     }, []);
     // ─── Trigger image targets ────────────────────────────────────────────────
     // Three groups: image-triggered (anchored to a tracked image), tap-to-place

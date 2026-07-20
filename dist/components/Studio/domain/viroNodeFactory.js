@@ -168,7 +168,7 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
-        : {})} {...(onCollision ? { onCollision: onCollision } : {})}/>);
+        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 }
 function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, nodeRef) {
     if (!asset.file_url) {
@@ -177,7 +177,7 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, nodeRef) {
     }
     return (<ViroImage_1.ViroImage key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
-        : {})}/>);
+        : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 }
 /**
  * TEXT node whose content is a {{variable}} template (the asset name). It
@@ -206,7 +206,7 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visibl
             textAlign: "center",
         }} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
-        : {})}/>);
+        : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 };
 /**
  * Wraps a created node and drives its `visible` prop from the per-scene
@@ -256,14 +256,17 @@ function createVideo(asset, config, notifyPhysicsDrag, nodeRef) {
     }
     return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
-        : {})}/>);
+        : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 }
 function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, isDragActive, notifyPhysicsDrag, onSceneChange, runtimeCtx, 
 // When set (proximity-target assets), captures the live Viro node so the host
 // can read its world transform for the distance check.
-registerProximityTarget) {
+registerProximityTarget, 
+// When set (gaze-target assets on a headset), the node's native onGaze handler.
+onGaze) {
     const type = resolveType(asset);
     const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx);
+    config.onGaze = onGaze;
     const proximityRef = registerProximityTarget
         ? (ref) => registerProximityTarget(asset.id, ref)
         : undefined;

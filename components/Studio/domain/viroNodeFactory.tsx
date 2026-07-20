@@ -48,6 +48,12 @@ export type NodeConfig = {
   physicsBody?: Record<string, unknown>;
   viroTag?: string;
   onClick?: () => void;
+  // On Gaze (headset eye-gaze). Setting it enables the node's native canHover.
+  onGaze?: (
+    isHovering: boolean,
+    position: [number, number, number],
+    source: number
+  ) => void;
   animation?: ViroAnimationProp;
 };
 
@@ -266,6 +272,7 @@ function create3DObject(
         ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
         : {})}
       {...(onCollision ? { onCollision: onCollision as any } : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 }
@@ -298,6 +305,7 @@ function createImage(
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 }
@@ -365,6 +373,7 @@ const VariableText: React.FC<{
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 };
@@ -486,6 +495,7 @@ function createVideo(
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 }
@@ -509,7 +519,13 @@ export function createNode(
   runtimeCtx?: SequenceRuntimeContext,
   // When set (proximity-target assets), captures the live Viro node so the host
   // can read its world transform for the distance check.
-  registerProximityTarget?: (assetId: string, ref: unknown) => void
+  registerProximityTarget?: (assetId: string, ref: unknown) => void,
+  // When set (gaze-target assets on a headset), the node's native onGaze handler.
+  onGaze?: (
+    isHovering: boolean,
+    position: [number, number, number],
+    source: number
+  ) => void
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -523,6 +539,7 @@ export function createNode(
     onSceneChange,
     runtimeCtx
   );
+  config.onGaze = onGaze;
 
   const proximityRef = registerProximityTarget
     ? (ref: unknown) => registerProximityTarget(asset.id, ref)

@@ -18,6 +18,11 @@ import {
   evaluateProximityBindings,
   ProximityRuntimeState,
 } from "./domain/proximityBindingsRuntime";
+import {
+  createGazeHandler,
+  GazeRuntimeState,
+  resetGazeStates,
+} from "./domain/gazeBindingsRuntime";
 import { ViroCameraTransform } from "../Types/ViroEvents";
 import {
   cleanupTriggerImageTargets,
@@ -511,6 +516,58 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     ]
   );
 
+  // ─── Gaze bindings (On Gaze) ──────────────────────────────────────────────
+  // Headset eye-gaze only. The target node's native onGaze reports isHovering;
+  // a dwell + hysteresis/fire_mode state machine (gazeBindingsRuntime) fires the
+  // bound function. Attached only on Quest — on mobile AR the handler isn't wired,
+  // so a scene carrying On Gaze loads and runs, the trigger just never fires.
+  const gazeBindings = useMemo(
+    () => sceneData.gaze_bindings ?? [],
+    [sceneData]
+  );
+  const gazeBindingsByAsset = useMemo(() => {
+    const map = new Map<string, typeof gazeBindings>();
+    for (const b of gazeBindings) {
+      const list = map.get(b.target_asset_id);
+      if (list) list.push(b);
+      else map.set(b.target_asset_id, [b]);
+    }
+    return map;
+  }, [gazeBindings]);
+
+  const gazeStateRef = useRef<Map<string, GazeRuntimeState>>(new Map());
+  useEffect(() => {
+    resetGazeStates(gazeStateRef);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
+  useEffect(() => () => resetGazeStates(gazeStateRef), []);
+
+  const getGazeHandler = useCallback(
+    (assetId: string) => {
+      if (!isQuest) return undefined;
+      const bindings = gazeBindingsByAsset.get(assetId);
+      if (!bindings?.length) return undefined;
+      return createGazeHandler(
+        bindings,
+        {
+          sceneNavigator,
+          animations,
+          onSceneChange: handleSceneChange,
+          onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+          runtimeCtx,
+        },
+        gazeStateRef
+      );
+    },
+    [
+      gazeBindingsByAsset,
+      sceneNavigator,
+      animations,
+      handleSceneChange,
+      runtimeCtx,
+    ]
+  );
+
   // ─── Proximity bindings ───────────────────────────────────────────────────
   // Fire a function when the user's world position comes within `distance` of a
   // target object. Camera pose is uniform world-space across every locomotion
@@ -779,7 +836,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           notifyPhysicsDrag,
           handleSceneChange,
           runtimeCtx,
-          proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined
+          proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined,
+          getGazeHandler(asset.id)
         );
       })
       .filter(Boolean) as React.ReactElement[];
@@ -797,6 +857,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     runtimeCtx,
     proximityTargetIds,
     registerProximityTarget,
+    getGazeHandler,
   ]);
 
   // Tap-to-place nodes render at scene root (world space); each is gated by the
@@ -827,7 +888,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           notifyPhysicsDrag,
           handleSceneChange,
           runtimeCtx,
-          proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined
+          proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined,
+          getGazeHandler(asset.id)
         );
       })
       .filter(Boolean) as React.ReactElement[];
@@ -845,6 +909,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     runtimeCtx,
     proximityTargetIds,
     registerProximityTarget,
+    getGazeHandler,
   ]);
 
   const renderedImageTriggeredAssets = useMemo(() => {
@@ -866,7 +931,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           notifyPhysicsDrag,
           handleSceneChange,
           runtimeCtx,
-          proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined
+          proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined,
+          getGazeHandler(asset.id)
         );
         if (!node) return null;
         return (
@@ -890,6 +958,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     runtimeCtx,
     proximityTargetIds,
     registerProximityTarget,
+    getGazeHandler,
   ]);
 
   // ─── Plane detection (AR only) ────────────────────────────────────────────

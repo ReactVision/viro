@@ -248,6 +248,19 @@ export interface StudioProximityBinding {
     fire_mode: StudioProximityFireMode;
     scene_function: StudioSceneFunction;
 }
+export type StudioGazeFireMode = "one_shot" | "repeating";
+/** On Gaze: fire a function when the user looks at a target (native eye-gaze,
+ * headset-only). dwell = hold before firing; hysteresis = grace/cooldown. */
+export interface StudioGazeBinding {
+    id: string;
+    scene_id: string;
+    function_id: string;
+    target_asset_id: string;
+    dwell_seconds: number;
+    hysteresis_seconds: number;
+    fire_mode: StudioGazeFireMode;
+    scene_function: StudioSceneFunction;
+}
 export interface StudioAnimation {
     id: string;
     scene_id: string;
@@ -303,6 +316,8 @@ export interface StudioSceneResponse {
     collision_bindings: StudioCollisionBinding[];
     /** Absent in responses from backends predating the On Proximity feature. */
     proximity_bindings?: StudioProximityBinding[];
+    /** Absent in responses from backends predating the On Gaze feature. */
+    gaze_bindings?: StudioGazeBinding[];
     animations: StudioAnimation[];
     functions: StudioSceneFunction[];
     /** Absent in responses from backends predating the Variables feature. */

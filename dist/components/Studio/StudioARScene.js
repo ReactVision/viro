@@ -50,6 +50,7 @@ const animationRegistry_1 = require("./domain/animationRegistry");
 const collisionBindingsRuntime_1 = require("./domain/collisionBindingsRuntime");
 const collisionPairKey_1 = require("./domain/collisionPairKey");
 const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
+const gazeBindingsRuntime_1 = require("./domain/gazeBindingsRuntime");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
@@ -382,6 +383,49 @@ const StudioARSceneInner = (props) => {
         handleSceneChange,
         runtimeCtx,
     ]);
+    // ─── Gaze bindings (On Gaze) ──────────────────────────────────────────────
+    // Headset eye-gaze only. The target node's native onGaze reports isHovering;
+    // a dwell + hysteresis/fire_mode state machine (gazeBindingsRuntime) fires the
+    // bound function. Attached only on Quest — on mobile AR the handler isn't wired,
+    // so a scene carrying On Gaze loads and runs, the trigger just never fires.
+    const gazeBindings = (0, react_1.useMemo)(() => sceneData.gaze_bindings ?? [], [sceneData]);
+    const gazeBindingsByAsset = (0, react_1.useMemo)(() => {
+        const map = new Map();
+        for (const b of gazeBindings) {
+            const list = map.get(b.target_asset_id);
+            if (list)
+                list.push(b);
+            else
+                map.set(b.target_asset_id, [b]);
+        }
+        return map;
+    }, [gazeBindings]);
+    const gazeStateRef = (0, react_1.useRef)(new Map());
+    (0, react_1.useEffect)(() => {
+        (0, gazeBindingsRuntime_1.resetGazeStates)(gazeStateRef);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
+    (0, react_1.useEffect)(() => () => (0, gazeBindingsRuntime_1.resetGazeStates)(gazeStateRef), []);
+    const getGazeHandler = (0, react_1.useCallback)((assetId) => {
+        if (!ViroPlatform_1.isQuest)
+            return undefined;
+        const bindings = gazeBindingsByAsset.get(assetId);
+        if (!bindings?.length)
+            return undefined;
+        return (0, gazeBindingsRuntime_1.createGazeHandler)(bindings, {
+            sceneNavigator,
+            animations,
+            onSceneChange: handleSceneChange,
+            onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+            runtimeCtx,
+        }, gazeStateRef);
+    }, [
+        gazeBindingsByAsset,
+        sceneNavigator,
+        animations,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
     // ─── Proximity bindings ───────────────────────────────────────────────────
     // Fire a function when the user's world position comes within `distance` of a
     // target object. Camera pose is uniform world-space across every locomotion
@@ -588,7 +632,9 @@ const StudioARSceneInner = (props) => {
                     return null;
                 }
             }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined);
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+                ? registerProximityTarget
+                : undefined, getGazeHandler(asset.id));
         })
             .filter(Boolean);
     }, [
@@ -605,6 +651,7 @@ const StudioARSceneInner = (props) => {
         runtimeCtx,
         proximityTargetIds,
         registerProximityTarget,
+        getGazeHandler,
     ]);
     // Tap-to-place nodes render at scene root (world space); each is gated by the
     // placement store (null until placed, then mounted at the placed world point).
@@ -619,7 +666,9 @@ const StudioARSceneInner = (props) => {
                     return null;
                 }
             }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined);
+            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+                ? registerProximityTarget
+                : undefined, getGazeHandler(asset.id));
         })
             .filter(Boolean);
     }, [
@@ -636,6 +685,7 @@ const StudioARSceneInner = (props) => {
         runtimeCtx,
         proximityTargetIds,
         registerProximityTarget,
+        getGazeHandler,
     ]);
     const renderedImageTriggeredAssets = (0, react_1.useMemo)(() => {
         if (ViroPlatform_1.isQuest)
@@ -645,7 +695,9 @@ const StudioARSceneInner = (props) => {
             const targetName = urlToTargetName.get(asset.trigger_image_url);
             if (!targetName)
                 return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined);
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+                ? registerProximityTarget
+                : undefined, getGazeHandler(asset.id));
             if (!node)
                 return null;
             return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
@@ -667,6 +719,7 @@ const StudioARSceneInner = (props) => {
         runtimeCtx,
         proximityTargetIds,
         registerProximityTarget,
+        getGazeHandler,
     ]);
     // ─── Plane detection (AR only) ────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();

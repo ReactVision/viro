@@ -14,7 +14,7 @@ scene C API — no native module, no DOM-per-view. AR adds a second WASM module
 
 | Guide | For | Read it to… |
 |---|---|---|
-| **[React web 3D guide](./REACT_WEB_GUIDE.md)** | getting started | a copy-paste Vite walkthrough for a 3D scene (no AR). |
+| **[React web 3D guide](./REACT_WEB_GUIDE.md)** ([ES](./REACT_WEB_GUIDE.es.md)) | getting started | a copy-paste Vite walkthrough for a 3D scene (no AR). |
 | **[Usage](./USAGE.md)** | app developers | write Viro scenes that run on the web — components, props, events, materials, animations, AR. |
 | **[Integration](./INTEGRATION.md)** | app / platform engineers | wire Viro-web into a project — install, bundler config, WASM assets, slam-wasm build & serving, permissions, deployment. |
 | **[Internals](./INTERNALS.md)** | contributors / maintainers | understand how it works — architecture, the C API + handle model, render loops, event marshaling, the AR pose/plane pipeline, and the build flow. |

@@ -7,6 +7,7 @@ slam-wasm, no HTTPS requirement, no permission prompts.
 
 > For AR, see [Usage → AR](./USAGE.md#ar). For bundlers other than Vite
 > (webpack, Metro/Expo) and deployment, see [Integration](./INTEGRATION.md).
+> Versión en español: [REACT_WEB_GUIDE.es.md](./REACT_WEB_GUIDE.es.md).
 
 ---
 

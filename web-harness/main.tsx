@@ -39,6 +39,7 @@ import { ViroPolyline } from "../components/ViroPolyline";
 import { ViroPolygon } from "../components/ViroPolygon";
 import { ViroGeometry } from "../components/ViroGeometry";
 import { Viro360Image } from "../components/Viro360Image";
+import { ViroParticleEmitter } from "../components/ViroParticleEmitter";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -215,6 +216,19 @@ function DemoScene() {
             [0, 2, 3],
           ]}
           materials={["checker"]}
+        />
+        {/* ViroParticleEmitter: a fountain of checker sprites. */}
+        <ViroParticleEmitter
+          position={[0, 2, 0]}
+          image={{ source: { uri: checkerUrl }, width: 0.1, height: 0.1 }}
+          run
+          spawnBehavior={{
+            emissionRatePerSecond: [20, 30],
+            particleLifetime: [1500, 2500],
+            maxParticles: 300,
+            spawnVolume: { shape: "Box", params: [0.2, 0, 0.2] },
+          }}
+          particlePhysics={{ velocity: { min: [-0.2, 1, -0.2], max: [0.2, 2, 0.2] } }}
         />
       </ViroNode>
     </ViroScene>

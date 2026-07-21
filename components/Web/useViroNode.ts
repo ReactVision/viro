@@ -49,12 +49,17 @@ export function useViroNode(
   // When provided, the geometry is rebuilt whenever this key changes (e.g. text
   // re-shapes). Omit for static geometry (box/sphere/surface) — built once.
   geometryKey?: string | number,
+  // Factory for the underlying node (default `createNode`). Override for special
+  // node types, e.g. portal scenes (`createPortalScene`).
+  createNodeFn?: (scene: ViroSceneApi) => ViroHandle,
 ): ViroHandle {
   const scene = useViroScene();
   const renderer = useViroRenderer();
   const parent = useViroParentNode();
 
-  const [node] = useState<ViroHandle>(() => scene.createNode());
+  const [node] = useState<ViroHandle>(() =>
+    createNodeFn ? createNodeFn(scene) : scene.createNode(),
+  );
   const geometryRef = useRef<ViroHandle>(0);
 
   // Node lifecycle: attach to parent on mount; destroy node on unmount.

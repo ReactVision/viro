@@ -10,7 +10,8 @@ import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
-import type { ViroAnchor } from "../Types/ViroEvents";
+import { ViroTrackingStateConstants } from "../ViroConstants";
+import type { ViroAnchor, ViroTrackingState } from "../Types/ViroEvents";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
@@ -43,6 +44,11 @@ import {
 
 const ANDROID_MAX_3D_MODELS = 3;
 const IOS_MAX_3D_MODELS = 10;
+
+// AR only: if world tracking never reaches NORMAL (feature-poor room, covered
+// camera), reveal content anyway after this window so it is never withheld
+// indefinitely. Tunable; most sessions reach NORMAL within ~1-3s.
+const TRACKING_GATE_FALLBACK_MS = 6000;
 
 type AnimOverride = { key: string; run: boolean };
 
@@ -456,7 +462,39 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     };
   }, [imageTriggeredAssets]);
 
+  // ─── Tracking-readiness gate (AR, plane_detection=NONE only) ──────────────
+  // NONE assets sit at fixed scene-root coords with no anchor, so mounting them
+  // before the world origin is locked lets them ride tracking drift ("objects
+  // move with the phone"). Withhold them until tracking first hits NORMAL: their
+  // positions then commit against a stable origin and, on Android, the bridge's
+  // per-node auto-anchor (VRTNode.onTreeUpdate → createAnchoredNode) can acquire
+  // an anchor instead of failing during the not-yet-tracking window. The camera
+  // shows at mount (onReady fires there); only 3D content waits. Quest and the
+  // plane-anchored modes (AUTOMATIC/MANUAL) are drift-immune, so they start ready.
+  const [trackingReady, setTrackingReady] = useState(
+    () =>
+      isQuest ||
+      ((scene.plane_detection as string) ?? "NONE").toUpperCase() !== "NONE"
+  );
+
+  const handleTrackingUpdated = useCallback((state: ViroTrackingState) => {
+    if (state === ViroTrackingStateConstants.TRACKING_NORMAL) {
+      setTrackingReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (trackingReady) return;
+    const timer = setTimeout(
+      () => setTrackingReady(true),
+      TRACKING_GATE_FALLBACK_MS
+    );
+    return () => clearTimeout(timer);
+  }, [trackingReady]);
+
   // ─── Ready callback ───────────────────────────────────────────────────────
+  // Fires at mount so the navigator reveals the camera immediately; only the
+  // NONE-mode 3D content is held back (above), never the live camera feed.
   useEffect(() => {
     onReady?.();
   }, []);
@@ -677,7 +715,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     <>
       {isQuest && <ViroController controllerVisibility reticleVisibility />}
       <ViroAmbientLight color="#ffffff" intensity={1000} />
-      {renderAssets()}
+      {trackingReady && renderAssets()}
       {renderedImageTriggeredAssets}
       <StudioSounds manager={soundManagerRef.current!} />
       {assets.length === 0 && (
@@ -702,6 +740,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     <ViroARScene
       {...physicsProps}
       {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})}
+      onTrackingUpdated={handleTrackingUpdated}
       onAnchorFound={handleAnchorFound}
       onAnchorUpdated={handleAnchorUpdated}
       onAnchorRemoved={handleAnchorRemoved}

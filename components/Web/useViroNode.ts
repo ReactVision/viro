@@ -46,6 +46,9 @@ export function useViroNode(
   // Gates model animations, which only become available after a model loads.
   // Declarative animations don't need it (default true).
   animationReady: boolean = true,
+  // When provided, the geometry is rebuilt whenever this key changes (e.g. text
+  // re-shapes). Omit for static geometry (box/sphere/surface) — built once.
+  geometryKey?: string | number,
 ): ViroHandle {
   const scene = useViroScene();
   const renderer = useViroRenderer();
@@ -54,23 +57,28 @@ export function useViroNode(
   const [node] = useState<ViroHandle>(() => scene.createNode());
   const geometryRef = useRef<ViroHandle>(0);
 
-  // Create geometry + attach to parent once; destroy on unmount.
+  // Node lifecycle: attach to parent on mount; destroy node on unmount.
   useEffect(() => {
-    if (createGeometry) {
-      const geo = createGeometry(scene);
-      geometryRef.current = geo;
-      scene.setNodeGeometry(node, geo);
-    }
     scene.addChildNode(parent, node);
     return () => {
       scene.removeNodeFromParent(node);
-      if (geometryRef.current) {
-        scene.destroyGeometry(geometryRef.current);
-      }
       scene.destroyNode(node);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Geometry lifecycle: (re)built on mount and whenever geometryKey changes.
+  useEffect(() => {
+    if (!createGeometry) return;
+    const geo = createGeometry(scene);
+    geometryRef.current = geo;
+    scene.setNodeGeometry(node, geo);
+    return () => {
+      if (geometryRef.current === geo) geometryRef.current = 0;
+      scene.destroyGeometry(geo);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometryKey]);
 
   // Transform + visibility props.
   const [px, py, pz] = props.position ?? [0, 0, 0];

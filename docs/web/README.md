@@ -27,19 +27,20 @@ scene C API — no native module, no DOM-per-view. AR adds a second WASM module
 | Geometry | `ViroBox`, `ViroSphere`, `ViroQuad`, `ViroSurface`, `ViroPolyline`, `ViroPolygon`, `ViroGeometry` | `ViroGeometry` = custom mesh |
 | Text & images | `ViroText`, `ViroImage`, `ViroButton`, `ViroSpinner` | text uses the preloaded system font |
 | Models | `Viro3DObject` | GLB (self-contained) + VRX (protobuf/gzip + external textures) + skinning |
-| Backgrounds | `ViroSkyBox`, `Viro360Image` | cube map / equirect sphere |
-| Lights | `ViroAmbientLight`, `ViroDirectionalLight`, `ViroOmniLight`, `ViroSpotLight` | |
+| Backgrounds | `ViroSkyBox`, `Viro360Image`, `Viro360Video` | cube map / equirect sphere / equirect video |
+| Video | `ViroVideo`, `Viro360Video`, `ViroMaterialVideo` | frame-uploaded video texture |
+| Audio | `ViroSound`, `ViroSoundField`, `ViroSpatialSound` | Web Audio (spatial via PannerNode) |
+| Lights | `ViroAmbientLight`, `ViroDirectionalLight`, `ViroOmniLight`, `ViroSpotLight`, `ViroLightingEnvironment` | IBL from an `.hdr` |
 | Camera | `ViroCamera`, `ViroOrbitCamera` | |
 | Materials / animation | `ViroMaterials`, `ViroAnimations`, `ViroAnimatedComponent` | color + PBR textures; declarative + model animations |
+| Effects & containers | `ViroParticleEmitter`, `ViroPortalScene`, `ViroPortal`, `ViroFlexView` | FlexView = sized container (auto-layout is a follow-up) |
 | Utility | `ViroGameLoop` | per-frame callbacks |
 | Events | `onClick`, `onClickState`, `onHover` | |
 | AR | `ViroARPlane` | plane anchors + ray hit-test |
 
-**Not yet on web:** `ViroVideo`/`Viro360Video`/`ViroMaterialVideo` (video texture),
-`ViroSound`/`ViroSpatialSound`/`ViroSoundField` (Web Audio),
-`ViroLightingEnvironment` (IBL), `ViroFlexView` (layout), `ViroParticleEmitter`,
-`ViroPortal`/`ViroPortalScene`, `ViroARPlaneSelector`, image/object anchors,
-animation chains, multi-scene push/pop navigation.
+**Not yet on web:** `ViroFlexView` automatic flexbox layout (the container works;
+children position via their own transform), `ViroARPlaneSelector`, image/object
+anchors, animation chains, multi-scene push/pop navigation.
 
 ## Quick start
 

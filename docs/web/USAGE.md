@@ -12,9 +12,14 @@ behavior. For project setup (bundler, WASM assets, slam-wasm) see
 - [Text & images](#text--images)
 - [Backgrounds](#backgrounds)
 - [3D models](#3d-models)
+- [Video & audio](#video--audio)
 - [Lights & camera](#lights--camera)
+- [Lighting environment (IBL)](#lighting-environment-ibl)
 - [Materials](#materials)
 - [Animations](#animations)
+- [Particles](#particles)
+- [Portals](#portals)
+- [FlexView](#flexview)
 - [Events](#events)
 - [Utility](#utility)
 - [AR](#ar)
@@ -218,6 +223,32 @@ textures via `resources`). Skeletal skinning + model animations are supported.
 
 ---
 
+## Video & audio
+
+Video plays onto a surface (`ViroVideo`), the background sphere (`Viro360Video`),
+or a named material (`ViroMaterialVideo`). Frames are uploaded to a texture each
+decoded frame. Audio uses Web Audio; `ViroSpatialSound` positions the source in 3D.
+
+```tsx
+<ViroVideo source={{ uri: "/clip.mp4" }} width={2} height={1.2} loop muted />
+<Viro360Video source={{ uri: "/pano.mp4" }} loop muted />
+
+{/* Video onto the "screen" material used by some geometry. */}
+<ViroMaterialVideo material="screen" source={{ uri: "/clip.mp4" }} loop />
+
+<ViroSound source={{ uri: "/music.mp3" }} loop volume={0.8} />
+<ViroSpatialSound source={{ uri: "/beep.mp3" }} position={[2, 0, -1]} loop minDistance={1} maxDistance={20} />
+```
+
+Common playback props: `paused`, `loop`, `muted`, `volume`, `onFinish`, `onError`.
+
+> Autoplay policies: browsers may block audio/unmuted video until a user gesture;
+> `muted` video autoplays. `ViroSpatialSound`'s listener sits at the world origin
+> (camera-tracked listener is a follow-up). HTTPS is not required for video/audio
+> (only for AR camera).
+
+---
+
 ## Lights & camera
 
 ```tsx
@@ -240,6 +271,22 @@ Common light props: `color`, `intensity`, `temperature`, `direction`,
 
 > The web build does **not** add default lights — add at least an ambient or
 > directional light or your scene will be dark (matches native).
+
+---
+
+## Lighting environment (IBL)
+
+`ViroLightingEnvironment` applies an HDR image-based lighting environment —
+diffuse irradiance + specular reflections for PBR materials. `source` must be a
+radiance `.hdr` (equirectangular); the renderer fetches it, writes it to the WASM
+FS and loads it via the HDR loader.
+
+```tsx
+<ViroLightingEnvironment source={{ uri: "/studio.hdr" }} onLoadEnd={() => {}} />
+```
+
+Scene-level (renders no node); cleared on unmount. Pair with PBR materials
+(`lightingModel: "PBR"`) to see reflections/irradiance.
 
 ---
 
@@ -287,6 +334,68 @@ properties compose from the node's base transform per axis: `positionX/Y/Z`,
 `EaseInEaseOut`, `Bounce`, `PowerDecel`.
 
 > Not yet on web: animation **chains** (sequences) and animated color/material.
+
+---
+
+## Particles
+
+`ViroParticleEmitter` attaches a particle system to a node. The sprite is
+`image.source` on a quad; spawn behavior and a velocity range drive the emission.
+
+```tsx
+<ViroParticleEmitter
+  position={[0, 2, 0]}
+  image={{ source: { uri: "/spark.png" }, width: 0.1, height: 0.1 }}
+  run
+  spawnBehavior={{
+    emissionRatePerSecond: [20, 30],
+    particleLifetime: [1500, 2500],
+    maxParticles: 300,
+    spawnVolume: { shape: "Box", params: [0.2, 0, 0.2] }, // Box | Sphere | Point
+  }}
+  particlePhysics={{ velocity: { min: [-0.2, 1, -0.2], max: [0.2, 2, 0.2] } }}
+/>
+```
+
+> Appearance modifiers (color/scale/rotation/alpha over life), bursts and
+> acceleration are follow-ups.
+
+---
+
+## Portals
+
+A `ViroPortalScene` holds content seen through a doorway; its `<ViroPortal>`
+child is the entrance frame (its children are the doorway geometry).
+
+```tsx
+<ViroPortalScene passable={false}>
+  <ViroPortal position={[0, 0, -2]}>
+    <ViroSurface width={1.4} height={2} materials={["doorway"]} />
+  </ViroPortal>
+  {/* content visible through the portal */}
+  <ViroBox position={[0, 0, -4]} materials={["blue"]} />
+</ViroPortalScene>
+```
+
+---
+
+## FlexView
+
+`ViroFlexView` is a rectangular container sized by `style.width`/`height` with an
+optional background (color or materials).
+
+```tsx
+<ViroFlexView
+  position={[0, 0, -2]}
+  style={{ width: 2, height: 1, backgroundColor: "#222831" }}
+>
+  <ViroText text="Panel" width={2} height={0.4} style={{ fontSize: 24, color: "#fff" }} />
+</ViroFlexView>
+```
+
+> MVP: the container + background work; **automatic flexbox layout**
+> (flexDirection/justifyContent/alignItems/padding) is a follow-up — position
+> children via their own transform for now.
 
 ---
 

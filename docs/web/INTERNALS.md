@@ -89,6 +89,9 @@ API groups (all registered in `EMSCRIPTEN_BINDINGS(viro_web)`):
 | Materials | `viroCreateMaterial`, `viroSetMaterialDiffuseColor/LightingModel/…`, `viroSetMaterialTexture` |
 | Textures | `viroCreateTextureRGBA`, `viroCreateTextureCubeRGBA`, `viroSetTextureWrap/Filter`, `viroDestroyTexture` |
 | Background | `viroSetBackgroundSphere` (equirect), `viroSetBackgroundCube` (skybox), `viroSetBackgroundRotation` |
+| IBL | `viroLoadRadianceHDRTexture` (VROHDRLoader), `viroSetLightingEnvironment` |
+| Particles | `viroCreateParticleEmitter` (node + sprite + spawn/velocity), `viroSetParticleEmitterRun` |
+| Portals | `viroCreatePortalScene` (VROPortal), `viroCreatePortalFrame` (VROPortalFrame), `viroSetPortalEntrance`, `viroSetPortalPassable` |
 | Lights | `viroCreateLight`, `viroSetLightColor/Intensity/Direction/…`, `viroAddLightToNode` |
 | Camera | `viroSetNodeCamera`, `viroSetActiveCameraNode` |
 | Models | `viroLoadModel`, `viroSetModelLoadCallback` |
@@ -96,8 +99,19 @@ API groups (all registered in `EMSCRIPTEN_BINDINGS(viro_web)`):
 | AR | `viroInitAR`, `viroARSetPose`, `viroARSetCameraBackground`, `viroARSetCameraImageSize` |
 
 Textures cross as an RGBA8 `Uint8Array` (`viroCreateTextureRGBA` →
-`convertJSArrayToNumberVector` → `VROData` → `VROTexture`). Model files are written
-into Emscripten's virtual FS (`Module.FS`) then loaded by path.
+`convertJSArrayToNumberVector` → `VROData` → `VROTexture`). Model files (and `.hdr`
+environments) are written into Emscripten's virtual FS (`Module.FS`) then loaded
+by path.
+
+**No C API needed for video/audio.** `ViroVideo`/`Viro360Video`/`ViroMaterialVideo`
+draw each decoded `<video>` frame to a canvas and upload it via the existing
+texture C API (`createTextureRGBA` → `setMaterialTexture`/`setBackgroundSphere`),
+reusing the AR camera-background pattern; a `viroUpdateTexture` fast-path would
+avoid the per-frame texture churn. `ViroSound`/`ViroSoundField` use `<audio>`;
+`ViroSpatialSound` uses the Web Audio `PannerNode`. `ViroMaterialVideo` relies on
+**named materials being shared** — `viroMaterialRegistry` caches one handle per
+name (`getSharedMaterialHandle`), cleared via `resetMaterialCache` on navigator
+teardown.
 
 ---
 

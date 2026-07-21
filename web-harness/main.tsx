@@ -37,6 +37,7 @@ import { ViroImage } from "../components/ViroImage";
 import { ViroText } from "../components/ViroText";
 import { ViroPolyline } from "../components/ViroPolyline";
 import { ViroPolygon } from "../components/ViroPolygon";
+import { ViroGeometry } from "../components/ViroGeometry";
 import { Viro360Image } from "../components/Viro360Image";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
@@ -187,6 +188,33 @@ function DemoScene() {
             [0.5, 1],
           ]}
           materials={["blueBox"]}
+        />
+        {/* ViroGeometry: a custom quad mesh (two triangles) with normals + UVs. */}
+        <ViroGeometry
+          position={[0, -3, 0]}
+          vertices={[
+            [-0.5, -0.5, 0],
+            [0.5, -0.5, 0],
+            [0.5, 0.5, 0],
+            [-0.5, 0.5, 0],
+          ]}
+          normals={[
+            [0, 0, 1],
+            [0, 0, 1],
+            [0, 0, 1],
+            [0, 0, 1],
+          ]}
+          texcoords={[
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [0, 0],
+          ]}
+          triangleIndices={[
+            [0, 1, 2],
+            [0, 2, 3],
+          ]}
+          materials={["checker"]}
         />
       </ViroNode>
     </ViroScene>

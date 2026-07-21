@@ -34,6 +34,10 @@ import { ViroSurface } from "../components/ViroSurface";
 import { ViroNode } from "../components/ViroNode";
 import { Viro3DObject } from "../components/Viro3DObject";
 import { ViroImage } from "../components/ViroImage";
+import { ViroText } from "../components/ViroText";
+import { ViroPolyline } from "../components/ViroPolyline";
+import { ViroPolygon } from "../components/ViroPolygon";
+import { Viro360Image } from "../components/Viro360Image";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -99,6 +103,8 @@ function DemoScene() {
 
   return (
     <ViroScene>
+      {/* Viro360Image: equirect sphere background (checker as a smoke test). */}
+      <Viro360Image source={{ uri: checkerUrl }} onLoadEnd={() => console.log("[harness] 360 loaded")} />
       <ViroAmbientLight color="#ffffff" intensity={300} />
       <ViroDirectionalLight
         color="#ffffff"
@@ -151,6 +157,36 @@ function DemoScene() {
           height={1.5}
           source={{ uri: checkerUrl }}
           onLoadEnd={() => console.log("[harness] image loaded")}
+        />
+        {/* ViroText: font pipeline (preloaded Helvetica). */}
+        <ViroText
+          position={[-3, 3, 0]}
+          width={4}
+          height={1}
+          text="Hello Viro Web"
+          style={{ fontSize: 36, color: "#ffdd44", textAlign: "Center" }}
+        />
+        {/* ViroPolyline: a zig-zag line. */}
+        <ViroPolyline
+          position={[-3, -3, 0]}
+          thickness={0.05}
+          points={[
+            [0, 0, 0],
+            [1, 0.6, 0],
+            [2, 0, 0],
+            [3, 0.6, 0],
+          ]}
+          materials={["redBox"]}
+        />
+        {/* ViroPolygon: a filled triangle. */}
+        <ViroPolygon
+          position={[3, -3, 0]}
+          vertices={[
+            [0, 0],
+            [1, 0],
+            [0.5, 1],
+          ]}
+          materials={["blueBox"]}
         />
       </ViroNode>
     </ViroScene>

@@ -42,6 +42,8 @@ const ViroScene_1 = require("../ViroScene");
 const ViroXRSceneNavigator_1 = require("../ViroXRSceneNavigator");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const StudioRecordingIndicator_1 = require("./StudioRecordingIndicator");
+const StudioPlacementIndicator_1 = require("./StudioPlacementIndicator");
+const placementBannerStore_1 = require("./domain/placementBannerStore");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const variableStore_1 = require("./domain/variableStore");
@@ -94,26 +96,6 @@ const styles = react_native_1.StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 24,
     },
-    placementBannerPill: {
-        backgroundColor: "rgba(0,0,0,0.7)",
-        borderRadius: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        alignItems: "center",
-        maxWidth: "100%",
-    },
-    placementBannerText: {
-        color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "600",
-        textAlign: "center",
-    },
-    placementHintText: {
-        color: "#FFD27F",
-        fontSize: 13,
-        marginTop: 4,
-        textAlign: "center",
-    },
 });
 const PLACEMENT_BANNER_TOP = react_native_1.Platform.OS === "android" ? (react_native_1.StatusBar.currentHeight ?? 24) + 12 : 64;
 /**
@@ -122,18 +104,25 @@ const PLACEMENT_BANNER_TOP = react_native_1.Platform.OS === "android" ? (react_n
  * placement API); a miss prompts the user to scan more of the space. Rendered only
  * when an asset is active, so normal object interaction is untouched otherwise.
  * Headset placement is in-scene (controller trigger), so this never mounts there.
+ *
+ * The visible prompt is a separate position-agnostic indicator; this layer only
+ * publishes active/name/miss state to the banner store so the host can render the
+ * prompt in its own chrome.
  */
 const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
     const [activeId, setActiveId] = (0, react_1.useState)(() => store.activeAssetId());
-    const [showMiss, setShowMiss] = (0, react_1.useState)(false);
     const missTimerRef = (0, react_1.useRef)(null);
     (0, react_1.useEffect)(() => {
         setActiveId(store.activeAssetId());
         return store.subscribeActive(() => setActiveId(store.activeAssetId()));
     }, [store]);
+    (0, react_1.useEffect)(() => {
+        placementBannerStore_1.studioPlacementBannerStore.set(!!activeId, activeId ? getName(activeId) : null);
+    }, [activeId, getName]);
     (0, react_1.useEffect)(() => () => {
         if (missTimerRef.current)
             clearTimeout(missTimerRef.current);
+        placementBannerStore_1.studioPlacementBannerStore.reset();
     }, []);
     const handleRelease = (0, react_1.useCallback)((evt) => {
         const api = apiRef.current;
@@ -145,30 +134,18 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
             .placeAtScreenPoint(locationX * ratio, locationY * ratio)
             .then((result) => {
             if (result !== "miss") {
-                setShowMiss(false);
+                placementBannerStore_1.studioPlacementBannerStore.setShowMiss(false);
                 return;
             }
-            setShowMiss(true);
+            placementBannerStore_1.studioPlacementBannerStore.setShowMiss(true);
             if (missTimerRef.current)
                 clearTimeout(missTimerRef.current);
-            missTimerRef.current = setTimeout(() => setShowMiss(false), 2500);
+            missTimerRef.current = setTimeout(() => placementBannerStore_1.studioPlacementBannerStore.setShowMiss(false), 2500);
         });
     }, [apiRef]);
     if (!activeId)
         return null;
-    const name = getName(activeId);
-    return (<react_native_1.View style={react_native_1.StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={handleRelease}>
-      <react_native_1.View style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]} pointerEvents="none">
-        <react_native_1.View style={styles.placementBannerPill}>
-          <react_native_1.Text style={styles.placementBannerText}>
-            {`Tap a surface to place${name ? `: ${name}` : ""}`}
-          </react_native_1.Text>
-          {showMiss && (<react_native_1.Text style={styles.placementHintText}>
-              Move your device to scan a surface, then tap.
-            </react_native_1.Text>)}
-        </react_native_1.View>
-      </react_native_1.View>
-    </react_native_1.View>);
+    return (<react_native_1.View style={react_native_1.StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={handleRelease}/>);
 };
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on
@@ -183,7 +160,7 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
  * ready. This means VRActivity always launches with the actual content scene
  * as its initial scene, avoiding the LoadingVRScene → replace timing race.
  */
-exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, recordingIndicator = true, }, ref) {
+exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, recordingIndicator = true, placementIndicator = true, }, ref) {
     const navigatorRef = (0, react_1.useRef)(null);
     const loadedSceneIdRef = (0, react_1.useRef)(null);
     const [isSceneReady, setIsSceneReady] = (0, react_1.useState)(false);
@@ -363,6 +340,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
             <StudioRecordingIndicator_1.StudioRecordingIndicator />
           </react_native_1.View>)}
         {!ViroPlatform_1.isQuest && placementStoreRef.current && (<StudioPlacementOverlay store={placementStoreRef.current} apiRef={placementApiRef} getName={getPlacementName}/>)}
+        {placementIndicator && (<react_native_1.View pointerEvents="none" style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}>
+            <StudioPlacementIndicator_1.StudioPlacementIndicator />
+          </react_native_1.View>)}
       </react_native_1.View>
     </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);
 });

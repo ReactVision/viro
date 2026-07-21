@@ -33,66 +33,51 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StudioRecordingIndicator = StudioRecordingIndicator;
+exports.StudioPlacementIndicator = StudioPlacementIndicator;
 const React = __importStar(require("react"));
-const react_1 = require("react");
 const react_native_1 = require("react-native");
-const useStudioRecording_1 = require("./useStudioRecording");
-function formatElapsed(ms) {
-    const total = Math.max(0, Math.floor(ms / 1000));
-    const minutes = Math.floor(total / 60);
-    const seconds = total % 60;
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+const useStudioPlacement_1 = require("./useStudioPlacement");
 /**
- * REC pill for the RECORD_VIDEO toggle: a red dot + elapsed timer, shown only
- * while recording. Position-agnostic (it lays out no absolute position of its
- * own) so the embedding host controls placement.
+ * Tap-to-place prompt pill, shown only while a mobile AR asset awaits placement.
+ * Position-agnostic (it lays out no absolute position of its own) so the
+ * embedding host controls placement.
  *
- * StudioSceneNavigator renders this by default (see its `recordingIndicator`
+ * StudioSceneNavigator renders this by default (see its `placementIndicator`
  * prop). Hosts with their own top-of-screen chrome can set that prop to false
- * and render this where it fits, or build a custom UI from useStudioRecording().
- * As a RN view over the AR surface it is NOT captured into the recording.
+ * and render this where it fits, or build a custom UI from useStudioPlacement().
  */
-function StudioRecordingIndicator() {
-    const { isRecording, startedAt } = (0, useStudioRecording_1.useStudioRecording)();
-    const [elapsed, setElapsed] = (0, react_1.useState)("0:00");
-    (0, react_1.useEffect)(() => {
-        if (!isRecording)
-            return;
-        const start = startedAt ?? Date.now();
-        const tick = () => setElapsed(formatElapsed(Date.now() - start));
-        tick();
-        const id = setInterval(tick, 1000);
-        return () => clearInterval(id);
-    }, [isRecording, startedAt]);
-    if (!isRecording)
+function StudioPlacementIndicator() {
+    const { isPlacing, name, showMiss } = (0, useStudioPlacement_1.useStudioPlacement)();
+    if (!isPlacing)
         return null;
     return (<react_native_1.View style={styles.pill} pointerEvents="none">
-      <react_native_1.View style={styles.dot}/>
-      <react_native_1.Text style={styles.label}>REC {elapsed}</react_native_1.Text>
+      <react_native_1.Text style={styles.text}>
+        {`Tap a surface to place${name ? `: ${name}` : ""}`}
+      </react_native_1.Text>
+      {showMiss && (<react_native_1.Text style={styles.hint}>
+          Move your device to scan a surface, then tap.
+        </react_native_1.Text>)}
     </react_native_1.View>);
 }
 const styles = react_native_1.StyleSheet.create({
     pill: {
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "center",
-        backgroundColor: "rgba(0,0,0,0.55)",
+        backgroundColor: "rgba(0,0,0,0.7)",
         borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        alignItems: "center",
+        maxWidth: "100%",
     },
-    dot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: "#FF3B30",
-        marginRight: 8,
-    },
-    label: {
+    text: {
         color: "#FFFFFF",
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: "600",
+        textAlign: "center",
+    },
+    hint: {
+        color: "#FFD27F",
+        fontSize: 13,
+        marginTop: 4,
+        textAlign: "center",
     },
 });

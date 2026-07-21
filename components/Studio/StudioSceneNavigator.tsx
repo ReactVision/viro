@@ -14,7 +14,6 @@ import {
   Platform,
   StatusBar,
   StyleSheet,
-  Text,
   View,
   ViewStyle,
 } from "react-native";
@@ -23,6 +22,8 @@ import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
 import { isQuest } from "../Utilities/ViroPlatform";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
+import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
+import { studioPlacementBannerStore } from "./domain/placementBannerStore";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
@@ -85,26 +86,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
   },
-  placementBannerPill: {
-    backgroundColor: "rgba(0,0,0,0.7)",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: "center",
-    maxWidth: "100%",
-  },
-  placementBannerText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  placementHintText: {
-    color: "#FFD27F",
-    fontSize: 13,
-    marginTop: 4,
-    textAlign: "center",
-  },
 });
 
 const PLACEMENT_BANNER_TOP =
@@ -116,6 +97,10 @@ const PLACEMENT_BANNER_TOP =
  * placement API); a miss prompts the user to scan more of the space. Rendered only
  * when an asset is active, so normal object interaction is untouched otherwise.
  * Headset placement is in-scene (controller trigger), so this never mounts there.
+ *
+ * The visible prompt is a separate position-agnostic indicator; this layer only
+ * publishes active/name/miss state to the banner store so the host can render the
+ * prompt in its own chrome.
  */
 const StudioPlacementOverlay: React.FC<{
   store: StudioPlacementStore;
@@ -125,7 +110,6 @@ const StudioPlacementOverlay: React.FC<{
   const [activeId, setActiveId] = useState<string | null>(() =>
     store.activeAssetId()
   );
-  const [showMiss, setShowMiss] = useState(false);
   const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -133,9 +117,17 @@ const StudioPlacementOverlay: React.FC<{
     return store.subscribeActive(() => setActiveId(store.activeAssetId()));
   }, [store]);
 
+  useEffect(() => {
+    studioPlacementBannerStore.set(
+      !!activeId,
+      activeId ? getName(activeId) : null
+    );
+  }, [activeId, getName]);
+
   useEffect(
     () => () => {
       if (missTimerRef.current) clearTimeout(missTimerRef.current);
+      studioPlacementBannerStore.reset();
     },
     []
   );
@@ -150,42 +142,28 @@ const StudioPlacementOverlay: React.FC<{
         .placeAtScreenPoint(locationX * ratio, locationY * ratio)
         .then((result) => {
           if (result !== "miss") {
-            setShowMiss(false);
+            studioPlacementBannerStore.setShowMiss(false);
             return;
           }
-          setShowMiss(true);
+          studioPlacementBannerStore.setShowMiss(true);
           if (missTimerRef.current) clearTimeout(missTimerRef.current);
-          missTimerRef.current = setTimeout(() => setShowMiss(false), 2500);
+          missTimerRef.current = setTimeout(
+            () => studioPlacementBannerStore.setShowMiss(false),
+            2500
+          );
         });
     },
     [apiRef]
   );
 
   if (!activeId) return null;
-  const name = getName(activeId);
 
   return (
     <View
       style={StyleSheet.absoluteFill}
       onStartShouldSetResponder={() => true}
       onResponderRelease={handleRelease}
-    >
-      <View
-        style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}
-        pointerEvents="none"
-      >
-        <View style={styles.placementBannerPill}>
-          <Text style={styles.placementBannerText}>
-            {`Tap a surface to place${name ? `: ${name}` : ""}`}
-          </Text>
-          {showMiss && (
-            <Text style={styles.placementHintText}>
-              Move your device to scan a surface, then tap.
-            </Text>
-          )}
-        </View>
-      </View>
-    </View>
+    />
   );
 };
 
@@ -235,6 +213,14 @@ export interface StudioSceneNavigatorProps {
    * `useStudioRecording()`) itself.
    */
   recordingIndicator?: boolean;
+  /**
+   * Show the built-in tap-to-place prompt (a "Tap a surface to place …" pill)
+   * while a mobile AR asset awaits placement. Default true, positioned top-centre
+   * with an approximate safe-area inset. Set false if the host draws its own
+   * top-of-screen chrome there and renders `<StudioPlacementIndicator />` (or a
+   * custom UI via `useStudioPlacement()`) itself.
+   */
+  placementIndicator?: boolean;
 }
 
 /**
@@ -270,6 +256,7 @@ export const StudioSceneNavigator = forwardRef<
     loadingView,
     renderError,
     recordingIndicator = true,
+    placementIndicator = true,
   },
   ref
 ) {
@@ -526,6 +513,14 @@ export const StudioSceneNavigator = forwardRef<
             apiRef={placementApiRef}
             getName={getPlacementName}
           />
+        )}
+        {placementIndicator && (
+          <View
+            pointerEvents="none"
+            style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}
+          >
+            <StudioPlacementIndicator />
+          </View>
         )}
       </View>
     </StudioSceneErrorBoundary>

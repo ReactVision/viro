@@ -8,7 +8,9 @@ import {
   StudioSceneNavigator,
   StudioARScene,
   StudioRecordingIndicator,
+  StudioPlacementIndicator,
   useStudioRecording,
+  useStudioPlacement,
 } from "./components/Studio";
 import { ViroVisionOSModule, isVisionOS, enterImmersiveSpace, exitImmersiveSpace } from "./components/VisionOS/ViroVisionOSModule";
 import { Viro3DObject } from "./components/Viro3DObject";
@@ -391,7 +393,9 @@ export {
   StudioSceneNavigator,
   StudioARScene,
   StudioRecordingIndicator,
+  StudioPlacementIndicator,
   useStudioRecording,
+  useStudioPlacement,
   // VisionOS
   ViroVisionOSModule,
   isVisionOS,

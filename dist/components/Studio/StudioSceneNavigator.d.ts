@@ -47,6 +47,14 @@ export interface StudioSceneNavigatorProps {
      * `useStudioRecording()`) itself.
      */
     recordingIndicator?: boolean;
+    /**
+     * Show the built-in tap-to-place prompt (a "Tap a surface to place …" pill)
+     * while a mobile AR asset awaits placement. Default true, positioned top-centre
+     * with an approximate safe-area inset. Set false if the host draws its own
+     * top-of-screen chrome there and renders `<StudioPlacementIndicator />` (or a
+     * custom UI via `useStudioPlacement()`) itself.
+     */
+    placementIndicator?: boolean;
 }
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on

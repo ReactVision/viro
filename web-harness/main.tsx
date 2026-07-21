@@ -33,6 +33,7 @@ import { ViroBox } from "../components/ViroBox";
 import { ViroSurface } from "../components/ViroSurface";
 import { ViroNode } from "../components/ViroNode";
 import { Viro3DObject } from "../components/Viro3DObject";
+import { ViroImage } from "../components/ViroImage";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -68,6 +69,8 @@ function makeCheckerDataUrl(): string {
   }
   return canvas.toDataURL();
 }
+
+const checkerUrl = makeCheckerDataUrl();
 
 ViroMaterials.createMaterials({
   blueBox: { lightingModel: "Blinn", diffuseColor: "#3399ff" },
@@ -140,6 +143,14 @@ function DemoScene() {
           width={8}
           height={8}
           materials={["checker"]}
+        />
+        {/* ViroImage: textured surface from an image source (checker data URL). */}
+        <ViroImage
+          position={[3, 2, 0]}
+          width={1.5}
+          height={1.5}
+          source={{ uri: checkerUrl }}
+          onLoadEnd={() => console.log("[harness] image loaded")}
         />
       </ViroNode>
     </ViroScene>

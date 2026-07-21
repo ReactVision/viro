@@ -27,6 +27,9 @@ export interface ViroWebMaterialDef {
 }
 
 const registry = new Map<string, ViroWebMaterialDef>();
+// One material handle per name (shared, like native): lets geometries and
+// ViroMaterialVideo reference the same material. Cleared on renderer teardown.
+const handleCache = new Map<string, ViroHandle>();
 
 export function registerViroMaterials(
   materials: Record<string, ViroWebMaterialDef>,
@@ -38,6 +41,11 @@ export function registerViroMaterials(
 
 export function getViroMaterialDef(name: string): ViroWebMaterialDef | undefined {
   return registry.get(name);
+}
+
+/** Drop cached material handles (call when the renderer/module is disposed). */
+export function resetMaterialCache(): void {
+  handleCache.clear();
 }
 
 function lightingModelValue(model?: string): ViroLightingModel {
@@ -124,6 +132,11 @@ export function createMaterialFromRegistry(
   scene: ViroSceneApi,
   name: string,
 ): ViroHandle {
+  // Return the shared handle if this material was already built (named materials
+  // are shared, so ViroMaterialVideo can update the diffuse across all users).
+  const cached = handleCache.get(name);
+  if (cached) return cached;
+
   const def = registry.get(name);
   if (!def) {
     console.warn(`[Viro web] material "${name}" is not registered`);
@@ -151,5 +164,14 @@ export function createMaterialFromRegistry(
   if (blend !== undefined) scene.setMaterialBlendMode(material, blend);
 
   applyTextures(scene, material, def);
+  handleCache.set(name, material);
   return material;
+}
+
+/**
+ * Get (creating if needed) the shared material handle for a registered name.
+ * Used by ViroMaterialVideo to drive video frames onto a named material.
+ */
+export function getSharedMaterialHandle(scene: ViroSceneApi, name: string): ViroHandle {
+  return createMaterialFromRegistry(scene, name);
 }

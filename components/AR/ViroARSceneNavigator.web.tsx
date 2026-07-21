@@ -33,6 +33,7 @@ import {
   ViroARContext,
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
+import { resetMaterialCache } from "../Web/viroMaterialRegistry";
 
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
 type ArOptions = Partial<
@@ -190,6 +191,7 @@ export function ViroARSceneNavigator(props: Props) {
       sessionRef.current?.stop();
       sessionRef.current = null;
       created?.dispose();
+      resetMaterialCache();
     };
   }, []);
 

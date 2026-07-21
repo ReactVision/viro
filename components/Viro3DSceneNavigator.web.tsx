@@ -18,6 +18,7 @@ import {
   ViroRendererContext,
   ViroParentNodeContext,
 } from "./Web/ViroWebContext";
+import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 
 type Props = {
   initialScene: { scene: React.ComponentType<any> };
@@ -72,6 +73,7 @@ export function Viro3DSceneNavigator(props: Props) {
     return () => {
       cancelled = true;
       created?.dispose();
+      resetMaterialCache();
     };
   }, []);
 

@@ -40,6 +40,8 @@ import { ViroPolygon } from "../components/ViroPolygon";
 import { ViroGeometry } from "../components/ViroGeometry";
 import { Viro360Image } from "../components/Viro360Image";
 import { ViroParticleEmitter } from "../components/ViroParticleEmitter";
+import { ViroPortalScene } from "../components/ViroPortalScene";
+import { ViroPortal } from "../components/ViroPortal";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -230,6 +232,13 @@ function DemoScene() {
           }}
           particlePhysics={{ velocity: { min: [-0.2, 1, -0.2], max: [0.2, 2, 0.2] } }}
         />
+        {/* ViroPortalScene: a doorway (surface) with a box visible through it. */}
+        <ViroPortalScene passable={false}>
+          <ViroPortal position={[6, 0, 0]}>
+            <ViroSurface width={1.4} height={2} materials={["checker"]} />
+          </ViroPortal>
+          <ViroBox position={[6, 0, -2]} scale={[0.6, 0.6, 0.6]} materials={["redBox"]} />
+        </ViroPortalScene>
       </ViroNode>
     </ViroScene>
   );

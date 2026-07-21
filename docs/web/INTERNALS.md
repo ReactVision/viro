@@ -84,9 +84,11 @@ API groups (all registered in `EMSCRIPTEN_BINDINGS(viro_web)`):
 |---|---|
 | Lifecycle | `initViroScene`, `setViroSceneSize`, `viroOnTouch` |
 | Nodes | `viroCreateNode`, `viroGetRootNode`, `viroSetNodePosition/Rotation/Scale/Opacity/Visible`, `viroAddChildNode`, `viroDestroyNode` |
-| Geometry | `viroCreateBox/Sphere/Surface`, `viroSetNodeGeometry`, `viroSetGeometryMaterial` |
+| Geometry | `viroCreateBox/Sphere/Surface`, `viroCreatePolyline/Polygon`, `viroCreateGeometry` (custom mesh via VROGeometrySource/Element), `viroSetNodeGeometry`, `viroSetGeometryMaterial` |
+| Text | `viroCreateText` (VROText + preloaded Helvetica; UTF-8→wstring decode) |
 | Materials | `viroCreateMaterial`, `viroSetMaterialDiffuseColor/LightingModel/…`, `viroSetMaterialTexture` |
-| Textures | `viroCreateTextureRGBA`, `viroSetTextureWrap/Filter`, `viroDestroyTexture` |
+| Textures | `viroCreateTextureRGBA`, `viroCreateTextureCubeRGBA`, `viroSetTextureWrap/Filter`, `viroDestroyTexture` |
+| Background | `viroSetBackgroundSphere` (equirect), `viroSetBackgroundCube` (skybox), `viroSetBackgroundRotation` |
 | Lights | `viroCreateLight`, `viroSetLightColor/Intensity/Direction/…`, `viroAddLightToNode` |
 | Camera | `viroSetNodeCamera`, `viroSetActiveCameraNode` |
 | Models | `viroLoadModel`, `viroSetModelLoadCallback` |
@@ -136,7 +138,10 @@ There's no custom react-reconciler — plain components + context + effects:
   initializer (so children see it on first render), attaches geometry + parents it
   in an effect, applies transform/visibility/material props, wires events, and
   runs animations. Tears everything down on unmount (remove from parent, destroy
-  geometry, destroy node).
+  geometry, destroy node). Its optional 4th arg, `geometryKey`, rebuilds the
+  geometry when it changes — used by `ViroText`/`ViroPolyline`/`ViroPolygon`/
+  `ViroGeometry` so the mesh re-shapes on prop changes (static geometry like
+  `ViroBox` omits it and is built once).
 - **Registries**: `viroMaterialRegistry` (name → material handle, built lazily
   from `ViroMaterials.createMaterials` definitions), `viroAnimationRegistry`
   (declarative animation definitions), plus `viroColor` / `viroImageLoader` /

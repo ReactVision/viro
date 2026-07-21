@@ -9,11 +9,14 @@ behavior. For project setup (bundler, WASM assets, slam-wasm) see
 - [Navigators](#navigators)
 - [Nodes & transforms](#nodes--transforms)
 - [Geometry](#geometry)
+- [Text & images](#text--images)
+- [Backgrounds](#backgrounds)
 - [3D models](#3d-models)
 - [Lights & camera](#lights--camera)
 - [Materials](#materials)
 - [Animations](#animations)
 - [Events](#events)
+- [Utility](#utility)
 - [AR](#ar)
 
 ---
@@ -103,11 +106,83 @@ component shares the same transform/visibility/event/animation props:
 | `ViroSphere` | `radius` |
 | `ViroSurface` | `width`, `height` (a flat quad) |
 | `ViroQuad` | `width`, `height` |
+| `ViroPolyline` | `points` (`[x,y]` or `[x,y,z]`), `thickness` |
+| `ViroPolygon` | `vertices` (`[x,y]`), `holes` (follow-up) |
+| `ViroGeometry` | `vertices`, `normals`, `texcoords`, `triangleIndices` — custom mesh |
 
 ```tsx
 <ViroBox width={1} height={1} length={1} materials={["blue"]} />
 <ViroSphere radius={0.5} materials={["blue"]} />
 <ViroSurface position={[0, -1.8, 0]} rotation={[-90, 0, 0]} width={8} height={8} materials={["checker"]} />
+
+<ViroPolyline thickness={0.05} points={[[0,0,0],[1,0.6,0],[2,0,0]]} materials={["red"]} />
+<ViroPolygon vertices={[[0,0],[1,0],[0.5,1]]} materials={["blue"]} />
+
+<ViroGeometry
+  vertices={[[-0.5,-0.5,0],[0.5,-0.5,0],[0.5,0.5,0],[-0.5,0.5,0]]}
+  normals={[[0,0,1],[0,0,1],[0,0,1],[0,0,1]]}
+  texcoords={[[0,1],[1,1],[1,0],[0,0]]}
+  triangleIndices={[[0,1,2],[0,2,3]]}
+  materials={["checker"]}
+/>
+```
+
+---
+
+## Text & images
+
+```tsx
+<ViroText
+  text="Hello Viro Web"
+  width={4}
+  height={1}
+  style={{ fontSize: 36, color: "#ffdd44", textAlign: "Center" }}
+/>
+
+<ViroImage source={{ uri: "/photo.jpg" }} width={1.5} height={1.5} onLoadEnd={() => {}} />
+
+<ViroButton
+  source={{ uri: "/btn.png" }}
+  hoverSource={{ uri: "/btn_hover.png" }}
+  clickSource={{ uri: "/btn_down.png" }}
+  width={1}
+  height={0.4}
+  onClick={() => {}}
+/>
+
+<ViroSpinner type="Light" />
+```
+
+- **`ViroText`** — `text`, `width`/`height`, `maxLines`, `textLineBreakMode`,
+  `textClipMode`, and `style.{fontSize, color, textAlign, textAlignVertical}`.
+  Uses the preloaded system font; custom `fontFamily`, `extrusionDepth` and
+  `outerStroke` are follow-ups. The geometry re-shapes when `text`/style changes.
+- **`ViroImage`** — `source` (`{ uri }` / URL / `require`), `width`/`height`,
+  `onLoadStart`/`onLoadEnd`/`onError`. Unlit + alpha-blended. `resizeMode`,
+  `placeholderSource` are follow-ups (image stretches to width×height).
+- **`ViroButton`** — a `ViroImage` that swaps to `hoverSource`/`clickSource`
+  (a.k.a. `gazeSource`/`tapSource`) and forwards `onClick`.
+- **`ViroSpinner`** — two counter-rotating images. `type` `"Dark"`/`"Light"` picks
+  the built-in art; `source`/`sourceReverse` override it.
+
+---
+
+## Backgrounds
+
+Scene-level; place inside the scene. They set the renderer background (no node).
+
+```tsx
+{/* Equirectangular 360 image on a sphere. */}
+<Viro360Image source={{ uri: "/pano.jpg" }} rotation={[0, 90, 0]} />
+
+{/* Cube-map skybox from six faces. */}
+<ViroSkyBox
+  source={{
+    px: { uri: "/px.jpg" }, nx: { uri: "/nx.jpg" },
+    py: { uri: "/py.jpg" }, ny: { uri: "/ny.jpg" },
+    pz: { uri: "/pz.jpg" }, nz: { uri: "/nz.jpg" },
+  }}
+/>
 ```
 
 ---
@@ -156,10 +231,11 @@ Common light props: `color`, `intensity`, `temperature`, `direction`,
 `position`, `attenuationStartDistance`/`attenuationEndDistance`,
 `innerAngle`/`outerAngle`, `castsShadow`.
 
-`ViroCamera` sets the point of view:
+`ViroCamera` sets the point of view; `ViroOrbitCamera` looks at a `focalPoint`:
 
 ```tsx
 <ViroCamera position={[0, 0, 0]} active />
+<ViroOrbitCamera position={[0, 1, 4]} focalPoint={[0, 0, 0]} active />
 ```
 
 > The web build does **not** add default lights — add at least an ambient or
@@ -226,6 +302,30 @@ properties compose from the node's base transform per axis: `positionX/Y/Z`,
 
 Touches/pointer events unproject through the current view/projection to a world
 ray, hit-test the scene, and dispatch to the node's handlers.
+
+---
+
+## Utility
+
+**`ViroGameLoop`** — per-frame callbacks off `requestAnimationFrame`. Mount it
+anywhere in the scene; it stops on unmount and pauses when `paused`.
+
+```tsx
+<ViroGameLoop
+  onUpdate={({ dt, elapsed }) => {/* every frame */}}
+  fixedHz={30}
+  onFixedUpdate={({ dt }) => {/* fixed-step physics/logic */}}
+/>
+```
+
+**`ViroAnimatedComponent`** (deprecated) — injects its `animation` into its single
+child. Prefer setting `animation` on the component directly:
+
+```tsx
+<ViroAnimatedComponent animation="spin" run loop>
+  <ViroBox materials={["blue"]} />
+</ViroAnimatedComponent>
+```
 
 ---
 

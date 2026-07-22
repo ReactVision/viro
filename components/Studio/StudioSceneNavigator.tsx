@@ -71,6 +71,12 @@ export interface StudioSceneNavigatorProps {
    */
   sceneId?: string;
   worldAlignment?: "Gravity" | "GravityAndHeading" | "Camera";
+  /**
+   * AR camera autofocus. Defaults to false (fixed focus): refocusing, especially
+   * at close range, destabilizes world tracking and makes un-anchored content
+   * drift. Enable only for scenes needing close-up camera sharpness (e.g.
+   * scanning trigger images at very short range).
+   */
   autofocus?: boolean;
   style?: ViewStyle;
   onSceneReady?: () => void;
@@ -115,7 +121,7 @@ export const StudioSceneNavigator = forwardRef<
   {
     sceneId,
     worldAlignment = "Gravity",
-    autofocus = true,
+    autofocus = false,
     style,
     onSceneReady,
     onError,

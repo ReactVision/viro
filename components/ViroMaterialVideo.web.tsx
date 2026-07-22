@@ -71,12 +71,8 @@ export function ViroMaterialVideo(props: Props): null {
         }
         ctx.drawImage(video, 0, 0, w, h);
         const rgba = ctx.getImageData(0, 0, w, h).data;
-        const flipped = new Uint8Array(w * h * 4);
-        const rowBytes = w * 4;
-        for (let y = 0; y < h; y++) {
-          flipped.set(rgba.subarray(y * rowBytes, y * rowBytes + rowBytes), (h - 1 - y) * rowBytes);
-        }
-        const tex = scene.createTextureRGBA(flipped, w, h, true);
+        // Upload as-is (top-first), matching ViroImage's orientation.
+        const tex = scene.createTextureRGBA(new Uint8Array(rgba), w, h, true);
         scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, tex);
         if (currentTex) scene.destroyTexture(currentTex);
         currentTex = tex;

@@ -88,7 +88,7 @@ const styles = react_native_1.StyleSheet.create({
  * ready. This means VRActivity always launches with the actual content scene
  * as its initial scene, avoiding the LoadingVRScene → replace timing race.
  */
-exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, }, ref) {
+exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = false, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, }, ref) {
     const navigatorRef = (0, react_1.useRef)(null);
     const loadedSceneIdRef = (0, react_1.useRef)(null);
     const [isSceneReady, setIsSceneReady] = (0, react_1.useState)(false);

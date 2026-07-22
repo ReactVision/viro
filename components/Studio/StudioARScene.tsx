@@ -594,10 +594,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   ).toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
 
-  // Native plane anchor types for ViroARScene (lowercase matches Viro defaults).
-  const anchorDetectionTypes = useMemo((): string[] | undefined => {
+  // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
+  // (empty disables plane finding): omitting the prop keeps the native default
+  // of horizontal + vertical, scanning for planes the scene never uses.
+  const anchorDetectionTypes = useMemo((): string[] => {
     if (planeDetectionMode !== "AUTOMATIC" && planeDetectionMode !== "MANUAL") {
-      return undefined;
+      return [];
     }
     const dir = (scene.plane_direction ?? "Horizontal").toLowerCase();
     if (dir === "vertical") return ["planesVertical"];
@@ -739,7 +741,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   return (
     <ViroARScene
       {...physicsProps}
-      {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})}
+      anchorDetectionTypes={anchorDetectionTypes}
       onTrackingUpdated={handleTrackingUpdated}
       onAnchorFound={handleAnchorFound}
       onAnchorUpdated={handleAnchorUpdated}

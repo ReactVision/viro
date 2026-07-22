@@ -443,10 +443,12 @@ const StudioARSceneInner = (props) => {
     // ─── Plane detection (AR only) ────────────────────────────────────────────
     const planeDetectionMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
-    // Native plane anchor types for ViroARScene (lowercase matches Viro defaults).
+    // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
+    // (empty disables plane finding): omitting the prop keeps the native default
+    // of horizontal + vertical, scanning for planes the scene never uses.
     const anchorDetectionTypes = (0, react_1.useMemo)(() => {
         if (planeDetectionMode !== "AUTOMATIC" && planeDetectionMode !== "MANUAL") {
-            return undefined;
+            return [];
         }
         const dir = (scene.plane_direction ?? "Horizontal").toLowerCase();
         if (dir === "vertical")
@@ -544,7 +546,7 @@ const StudioARSceneInner = (props) => {
     if (ViroPlatform_1.isQuest) {
         return <ViroScene_1.ViroScene {...physicsProps}>{children}</ViroScene_1.ViroScene>;
     }
-    return (<ViroARScene_1.ViroARScene {...physicsProps} {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})} onTrackingUpdated={handleTrackingUpdated} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+    return (<ViroARScene_1.ViroARScene {...physicsProps} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
       {children}
     </ViroARScene_1.ViroARScene>);
 };

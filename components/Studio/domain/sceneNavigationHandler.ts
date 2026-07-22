@@ -148,6 +148,10 @@ export type SequenceRuntimeContext = {
   visibilityStore?: StudioVisibilityStore;
   soundManager?: StudioSoundManager;
   getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
+  // Scene navigation transport. When set (web host), NAVIGATION functions call
+  // this to fetch + re-render the target scene. When absent (native), the
+  // walker falls back to navigateToScene() which pushes onto the Viro navigator.
+  navigate?: (targetSceneId: string) => void;
 };
 
 function resolveById(
@@ -678,7 +682,14 @@ export function executeFunctionWithRelations(
 
   if (fn.function_type === "NAVIGATION") {
     const nav = fn.scene_navigation;
-    if (!nav?.navigate_to || !sceneNavigator) return;
+    if (!nav?.navigate_to) return;
+    // Web host injects its own navigation (JS fetch + re-render). Native has no
+    // injected navigate and falls back to the Viro navigator push path.
+    if (runtimeCtx?.navigate) {
+      runtimeCtx.navigate(nav.navigate_to);
+      return;
+    }
+    if (!sceneNavigator) return;
     void navigateToScene(
       sceneNavigator,
       nav.navigate_to,

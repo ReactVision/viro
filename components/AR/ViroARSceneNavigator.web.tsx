@@ -47,6 +47,7 @@ type ArOptions = Partial<
     | "showCameraBackground"
     | "detectPlanes"
     | "maxPlanes"
+    | "renderWhileLimited"
   >
 >;
 

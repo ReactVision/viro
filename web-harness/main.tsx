@@ -315,7 +315,9 @@ function App() {
           initialScene={{ scene: ARDemoScene }}
           webRendererOptions={webRendererOptions}
           slamScriptUrl="/slam_wasm.js"
-          arOptions={{ detectPlanes: true }}
+          // renderWhileLimited: desktop has no IMU so slam stays "Limited"; force
+          // render so the scene shows. On a real mobile device, drop this.
+          arOptions={{ detectPlanes: true, renderWhileLimited: true }}
         />
       )}
       {mode === "studio" && (

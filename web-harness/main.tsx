@@ -42,6 +42,8 @@ import { Viro360Image } from "../components/Viro360Image";
 import { ViroParticleEmitter } from "../components/ViroParticleEmitter";
 import { ViroPortalScene } from "../components/ViroPortalScene";
 import { ViroPortal } from "../components/ViroPortal";
+import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
+import { makeStudioScene } from "./studioFixture";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -272,8 +274,17 @@ function ARDemoScene() {
   );
 }
 
+const MODES = ["3d", "ar", "studio"] as const;
+type Mode = (typeof MODES)[number];
+const MODE_LABEL: Record<Mode, string> = { "3d": "3D", ar: "AR", studio: "Studio" };
+
+// Studio scene fixture (no backend): rendered through the web host to validate
+// that Studio-authored scenes play on web via our renderer + runtime.
+const studioScene = makeStudioScene({ modelUrl: helmetUrl, imageUrl: checkerUrl });
+const studioApiRequestExecutor = async () => ({ ok: true, status: 200, body: {} });
+
 function App() {
-  const [mode, setMode] = useState<"3d" | "ar">("3d");
+  const [mode, setMode] = useState<Mode>("3d");
 
   const toggle: React.CSSProperties = {
     position: "absolute",
@@ -289,24 +300,32 @@ function App() {
     cursor: "pointer",
   };
 
+  const next = () => setMode((m) => MODES[(MODES.indexOf(m) + 1) % MODES.length]);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <button style={toggle} onClick={() => setMode((m) => (m === "3d" ? "ar" : "3d"))}>
-        {mode === "3d" ? "Probar AR" : "Volver a 3D"}
+      <button style={toggle} onClick={next}>
+        {`Modo: ${MODE_LABEL[mode]} →`}
       </button>
-      {mode === "3d" ? (
-        <Viro3DSceneNavigator
-          initialScene={{ scene: DemoScene }}
-          webRendererOptions={webRendererOptions}
-        />
-      ) : (
+      {mode === "3d" && (
+        <Viro3DSceneNavigator initialScene={{ scene: DemoScene }} webRendererOptions={webRendererOptions} />
+      )}
+      {mode === "ar" && (
         <ViroARSceneNavigator
           initialScene={{ scene: ARDemoScene }}
           webRendererOptions={webRendererOptions}
-          // slam-wasm served from public/. Build it and copy slam_wasm.js/.wasm there:
-          //   cd ../slam && <build web target> && cp .../slam_wasm.{js,wasm} web-harness/public/
           slamScriptUrl="/slam_wasm.js"
           arOptions={{ detectPlanes: true }}
+        />
+      )}
+      {mode === "studio" && (
+        <StudioSceneNavigator
+          sceneData={studioScene}
+          loadScene={async () => studioScene}
+          apiRequestExecutor={studioApiRequestExecutor}
+          webRendererOptions={webRendererOptions}
+          onSceneReady={() => console.log("[harness] studio scene ready")}
+          onUnsupported={(f) => console.log("[harness] studio unsupported:", f)}
         />
       )}
     </div>

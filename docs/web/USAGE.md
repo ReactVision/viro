@@ -490,8 +490,16 @@ stays put.
 |---|---|---|
 | `slamScriptUrl` | `string` | URL to `slam_wasm.js` (injected as a `<script>`, exposes global `SlamModule`). |
 | `loadSlam` | `() => Promise<factory>` | ESM alternative to `slamScriptUrl`. |
-| `arOptions` | object | `detectPlanes`, `maxPlanes`, `facingMode`, `captureWidth/Height`, `intrinsics`, `tuning`, `showCameraBackground`. |
+| `arOptions` | object | `detectPlanes`, `maxPlanes`, `facingMode`, `captureWidth/Height`, `intrinsics`, `tuning`, `showCameraBackground`, `renderWhileLimited`. |
 | `startLabel` | `string` | Text above the Start button. |
+
+> **Desktop / dev:** slam is visual-inertial and needs an **IMU** (`devicemotion`,
+> mobile only) to reach `Normal` tracking. On a desktop the camera feed and scene
+> still render (the loop no longer gates on tracking), but the state stays
+> `Limited` and the pose won't follow the device. `arOptions.renderWhileLimited`
+> forces the slam pose to be applied before convergence (useful only on a device
+> that has an IMU but is slow to converge; leave it off on desktop for a stable
+> default pose). Real AR needs a **mobile device over HTTPS**.
 
 ### `ViroARScene`
 

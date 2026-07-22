@@ -11,6 +11,7 @@ see [Usage](./USAGE.md); for wiring it into an app see [Integration](./INTEGRATI
 - [Event marshaling](#event-marshaling)
 - [Model & animation pipeline](#model--animation-pipeline)
 - [The AR pipeline](#the-ar-pipeline)
+- [Studio scene web host](#studio-scene-web-host)
 - [Build & asset flow](#build--asset-flow)
 - [Coordinate conventions & gotchas](#coordinate-conventions--gotchas)
 
@@ -208,11 +209,34 @@ JS:
    alpha=Z, beta=X, gamma=Y).
 4. **Pose read + convert**: read slam's quaternion + position and convert Z-up/
    OpenCV → Y-up/GL, then `sceneApi.arSetPose(quat, pos, trackingState)`.
-5. **Camera background**: upload the RGBA frame as a texture (Y-flipped) and
-   `arSetCameraBackground`. (Recreated per frame today — a `viroUpdateTexture`
-   fast path is a follow-up.)
+5. **Camera background**: upload the RGBA frame as a texture (rows as-is, no
+   flip — matches ViroImage) and `arSetCameraBackground`.
 6. **Planes** (if `detectPlanes`): `fetchPlanes` → convert each to Y-up →
    `onAnchorsUpdated` when the set changes (added/removed/moved beyond ~2 cm).
+
+### Camera feed rendering (hard-won details)
+
+Getting the live feed to show on the WebGL2 build took four fixes; keep them in
+mind when touching this path:
+
+1. **Attach the `<video>` to the DOM (hidden).** Safari won't decode/paint a
+   detached `<video>`, so `drawImage` yields black frames. `ViroArSession` appends
+   a 1×1, `opacity:0` video to `document.body`.
+2. **Don't gate `renderEye` on tracking.** `drawFrameAR` renders every frame so
+   the feed shows during initialization (mirrors native ARCore); the pose is
+   applied only once tracking is `Normal`. (`renderWhileLimited` can also force a
+   pose before then — dev/desktop aid.)
+3. **`prewarm` the per-frame texture.** JS uploads a fresh `VROTexture` each frame;
+   without forcing its GPU upload (`texture->prewarm(driver)`) the one-shot
+   texture is replaced before it hydrates → the surface samples empty. (A
+   `viroUpdateTexture` that reuses one texture would remove this churn — follow-up.)
+4. **No vertical flip.** The texture/surface pipeline already samples correctly;
+   an extra row-flip renders the feed upside down.
+
+The feed is a screen-space `VROSurface` set as the scene root's background; it
+renders via the portal background path using the orthographic matrix (identity
+view). A solid-color diffuse confirmed the surface renders — the blank feed was
+purely the texture-hydration issue above.
 
 ### Axis conversion
 
@@ -252,6 +276,36 @@ injected from JS (modeled on the lightweight `VROARSessionInertial`):
 `ViroARPlane` do the declarative matching. There is no `VROARPlaneAnchor`
 injection on web — a `ViroARPlane`'s node is just a normal node whose transform is
 driven by the matched anchor.
+
+---
+
+## Studio scene web host
+
+Studio scenes (authored in the R3F editor, stored as Viro-compatible data) play
+on the web through the **same shared runtime** the native StudioGo app uses
+(`components/Studio/domain/` — the function dispatcher, variable/visibility
+stores, sound manager, and `viroNodeFactory`). That runtime is pure JS and
+renderer-agnostic; the web host just mounts its output with the `.web` components.
+
+- **`StudioSceneNavigator.web.tsx`** — picks `ViroARSceneNavigator` (AR via slam,
+  when the scene uses plane detection) or `Viro3DSceneNavigator` (3D); holds the
+  scene data in state; owns the session-scoped variable store; exposes a
+  canvas-based `takeScreenshot`.
+- **`StudioARScene.web.tsx`** — mirrors the native host: builds the stores +
+  `runtimeCtx`, registers materials/animations, and maps assets to nodes via the
+  unchanged `viroNodeFactory.createNode` (its elements resolve to `.web`). Mounts
+  in `ViroARScene`/`ViroScene` with plane-anchored content wrapped in `ViroARPlane`.
+
+**One additive seam in the shared runtime:** `SequenceRuntimeContext.navigate?`.
+The NAVIGATION handler calls it when present (web: fetch scene data + re-render);
+native leaves it unset and falls back to the `VROXRSceneNavigator` push path — so
+StudioGo is unchanged. `apiRequestExecutor` was already injectable; the web host
+supplies JS implementations for both (the data source itself is out of scope —
+the host receives scene data / a fetcher from its caller).
+
+**Web-unsupported scene features** are skipped and reported via `onUnsupported`:
+image markers, VR/Quest, native physics, occlusion (plane detection *is*
+supported via slam).
 
 ---
 

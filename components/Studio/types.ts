@@ -188,6 +188,8 @@ export interface StudioSceneFunction {
   scene_animation: {
     id: string;
     animation_key: string;
+    animation_source?: "PROPERTY" | "MODEL_CLIP";
+    clip_name?: string | null;
     duration_ms: number | null;
     delay_ms: number | null;
     properties: Record<string, unknown>;
@@ -305,8 +307,12 @@ export interface StudioAnimation {
   id: string;
   scene_id: string;
   target_asset_id: string;
-  animation_key: string; // ViroAnimations registry key
-  properties: Record<string, unknown>; // Viro keyframe format
+  animation_key: string; // stable trigger identity; also the ViroAnimations registry key for PROPERTY
+  /** "PROPERTY" tweens `properties`; "MODEL_CLIP" plays the embedded clip named by `clip_name`. */
+  animation_source?: "PROPERTY" | "MODEL_CLIP";
+  /** Embedded clip name for MODEL_CLIP animations; null/absent for PROPERTY. */
+  clip_name?: string | null;
+  properties: Record<string, unknown>; // Viro keyframe format (PROPERTY only)
   duration_ms: number | null;
   delay_ms: number | null;
   easing: "Linear" | "EaseIn" | "EaseOut" | "EaseInEaseOut" | "Bounce" | null;

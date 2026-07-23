@@ -410,7 +410,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         run = false;
       }
       states[assetId] = {
-        name: activeAnim.animation_key,
+        // MODEL_CLIP resolves against the clip baked into the model file (by its
+        // embedded name); PROPERTY resolves against the registered ViroAnimations key.
+        name:
+          activeAnim.animation_source === "MODEL_CLIP" && activeAnim.clip_name
+            ? activeAnim.clip_name
+            : activeAnim.animation_key,
         run,
         loop: activeAnim.loop,
         interruptible: activeAnim.interruptible,

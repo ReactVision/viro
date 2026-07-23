@@ -325,7 +325,11 @@ const StudioARSceneInner = (props) => {
                 run = false;
             }
             states[assetId] = {
-                name: activeAnim.animation_key,
+                // MODEL_CLIP resolves against the clip baked into the model file (by its
+                // embedded name); PROPERTY resolves against the registered ViroAnimations key.
+                name: activeAnim.animation_source === "MODEL_CLIP" && activeAnim.clip_name
+                    ? activeAnim.clip_name
+                    : activeAnim.animation_key,
                 run,
                 loop: activeAnim.loop,
                 interruptible: activeAnim.interruptible,
@@ -885,7 +889,6 @@ const StudioARSceneInner = (props) => {
       </ViroScene_1.ViroScene>);
     }
     return (<ViroARScene_1.ViroARScene ref={arSceneRef} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
-
       {children}
     </ViroARScene_1.ViroARScene>);
 };

@@ -155,6 +155,8 @@ export interface StudioSceneFunction {
     scene_animation: {
         id: string;
         animation_key: string;
+        animation_source?: "PROPERTY" | "MODEL_CLIP";
+        clip_name?: string | null;
         duration_ms: number | null;
         delay_ms: number | null;
         properties: Record<string, unknown>;
@@ -266,6 +268,10 @@ export interface StudioAnimation {
     scene_id: string;
     target_asset_id: string;
     animation_key: string;
+    /** "PROPERTY" tweens `properties`; "MODEL_CLIP" plays the embedded clip named by `clip_name`. */
+    animation_source?: "PROPERTY" | "MODEL_CLIP";
+    /** Embedded clip name for MODEL_CLIP animations; null/absent for PROPERTY. */
+    clip_name?: string | null;
     properties: Record<string, unknown>;
     duration_ms: number | null;
     delay_ms: number | null;

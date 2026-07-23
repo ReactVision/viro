@@ -1,6 +1,11 @@
 import * as React from "react";
 import { StudioVariableStore } from "./domain/variableStore";
+import { StudioPlacementStore } from "./domain/placementStore";
 import { StudioSceneResponse } from "./types";
+/** Imperative placement surface the navigator's tap overlay drives (mobile AR). */
+export type StudioPlacementApi = {
+    placeAtScreenPoint: (x: number, y: number) => Promise<"placed" | "miss">;
+};
 interface StudioARSceneProps {
     sceneNavigator?: any;
     sceneData: StudioSceneResponse | null;
@@ -15,6 +20,10 @@ interface StudioARSceneProps {
     noAssetsMessage?: string;
     /** Session-scoped store owned by the navigator; survives scene pushes. */
     variableStore?: StudioVariableStore;
+    /** Placement store owned by the navigator so its tap overlay can read active state. */
+    placementStore?: StudioPlacementStore;
+    /** The navigator's tap overlay writes the placement API here (mobile AR). */
+    placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
 }
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until

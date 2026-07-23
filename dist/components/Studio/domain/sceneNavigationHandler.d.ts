@@ -2,7 +2,9 @@ import { StudioAnimation, StudioApiRequestExecutor, StudioSceneFunction } from "
 import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
+import { StudioPlacementStore } from "./placementStore";
 type SceneNavigator = any;
+export declare function resetVideoRecordingState(): void;
 export declare class SequenceScheduler {
     private timers;
     private appStateSub;
@@ -30,6 +32,7 @@ export type SequenceRuntimeContext = {
     variableStore?: StudioVariableStore;
     apiRequestExecutor?: StudioApiRequestExecutor;
     visibilityStore?: StudioVisibilityStore;
+    placementStore?: StudioPlacementStore;
     soundManager?: StudioSoundManager;
     getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
 };

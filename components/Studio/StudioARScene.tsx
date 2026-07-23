@@ -10,7 +10,8 @@ import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
-import type { ViroAnchor } from "../Types/ViroEvents";
+import { ViroTrackingStateConstants } from "../ViroConstants";
+import type { ViroAnchor, ViroTrackingState } from "../Types/ViroEvents";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
@@ -115,6 +116,11 @@ function projectAlongCameraForward(
     position[2] + forward[2] * HEADSET_PLACEMENT_DISTANCE_M,
   ];
 }
+
+// AR only: if world tracking never reaches NORMAL (feature-poor room, covered
+// camera), reveal content anyway after this window so it is never withheld
+// indefinitely. Tunable; most sessions reach NORMAL within ~1-3s.
+const TRACKING_GATE_FALLBACK_MS = 6000;
 
 type AnimOverride = { key: string; run: boolean };
 
@@ -806,7 +812,39 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     };
   }, [imageTriggeredAssets]);
 
+  // ─── Tracking-readiness gate (AR, plane_detection=NONE only) ──────────────
+  // NONE assets sit at fixed scene-root coords with no anchor, so mounting them
+  // before the world origin is locked lets them ride tracking drift ("objects
+  // move with the phone"). Withhold them until tracking first hits NORMAL: their
+  // positions then commit against a stable origin and, on Android, the bridge's
+  // per-node auto-anchor (VRTNode.onTreeUpdate → createAnchoredNode) can acquire
+  // an anchor instead of failing during the not-yet-tracking window. The camera
+  // shows at mount (onReady fires there); only 3D content waits. Quest and the
+  // plane-anchored modes (AUTOMATIC/MANUAL) are drift-immune, so they start ready.
+  const [trackingReady, setTrackingReady] = useState(
+    () =>
+      isQuest ||
+      ((scene.plane_detection as string) ?? "NONE").toUpperCase() !== "NONE"
+  );
+
+  const handleTrackingUpdated = useCallback((state: ViroTrackingState) => {
+    if (state === ViroTrackingStateConstants.TRACKING_NORMAL) {
+      setTrackingReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (trackingReady) return;
+    const timer = setTimeout(
+      () => setTrackingReady(true),
+      TRACKING_GATE_FALLBACK_MS
+    );
+    return () => clearTimeout(timer);
+  }, [trackingReady]);
+
   // ─── Ready callback ───────────────────────────────────────────────────────
+  // Fires at mount so the navigator reveals the camera immediately; only the
+  // NONE-mode 3D content is held back (above), never the live camera feed.
   useEffect(() => {
     onReady?.();
   }, []);
@@ -972,16 +1010,23 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   ).toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
 
-  // Native plane anchor types for ViroARScene (lowercase matches Viro defaults).
-  const anchorDetectionTypes = useMemo((): string[] | undefined => {
+  // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
+  // (empty disables plane finding): omitting the prop keeps the native default
+  // of horizontal + vertical, scanning for planes the scene never uses.
+  // Exception: tap-to-place placement runs surface hit tests, which return no
+  // plane results while detection is off — keep the native default on when the
+  // scene has any tap-to-place asset.
+  const anchorDetectionTypes = useMemo((): string[] => {
     if (planeDetectionMode !== "AUTOMATIC" && planeDetectionMode !== "MANUAL") {
-      return undefined;
+      return tapToPlaceAssets.length
+        ? ["planesHorizontal", "planesVertical"]
+        : [];
     }
     const dir = (scene.plane_direction ?? "Horizontal").toLowerCase();
     if (dir === "vertical") return ["planesVertical"];
     if (dir.includes("horizontal")) return ["planesHorizontal"];
     return ["planesHorizontal", "planesVertical"];
-  }, [planeDetectionMode, scene.plane_direction]);
+  }, [planeDetectionMode, scene.plane_direction, tapToPlaceAssets]);
 
   // ViroARPlaneSelector (react-viro 2.54+) no longer receives scene anchors
   // automatically; ViroARScene forwards them here via ref. Also surfaces
@@ -1108,7 +1153,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         />
       )}
       <ViroAmbientLight color="#ffffff" intensity={1000} />
-      {renderAssets()}
+      {trackingReady && renderAssets()}
       {renderedTapToPlaceAssets}
       {renderedImageTriggeredAssets}
       {isQuest && activePlacementId && (
@@ -1163,7 +1208,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       ref={arSceneRef}
       {...physicsProps}
       {...cameraTransformProp}
-      {...(anchorDetectionTypes != null ? { anchorDetectionTypes } : {})}
+      anchorDetectionTypes={anchorDetectionTypes}
+      onTrackingUpdated={handleTrackingUpdated}
       onAnchorFound={handleAnchorFound}
       onAnchorUpdated={handleAnchorUpdated}
       onAnchorRemoved={handleAnchorRemoved}

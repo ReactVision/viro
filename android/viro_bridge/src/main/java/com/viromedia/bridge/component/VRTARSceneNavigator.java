@@ -668,8 +668,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Resolve the cloud anchor via the configured provider
         arScene.resolveCloudAnchor(cloudAnchorId, new ARScene.CloudAnchorResolveListener() {
             @Override
-            public void onSuccess(ARAnchor anchor, ARNode arNode) {
+            public void onSuccess(ARAnchor anchor, ARNode arNode, String resolvedTransform) {
                 WritableMap anchorData = ARUtils.mapFromARAnchor(anchor);
+                // WS-C: lets the caller thread this straight into loadWorldMeshFromFile().
+                anchorData.putString("resolvedTransform", resolvedTransform);
                 callback.onSuccess(anchorData);
             }
 

@@ -504,6 +504,13 @@ export type ViroCloudAnchor = {
   rotation: [number, number, number];
   /** Scale */
   scale: [number, number, number];
+  /**
+   * Opaque CSV-encoded transform for this resolved anchor (WS-C). Pass it
+   * straight into `loadWorldMeshFromFile()` as `resolvedTransform` to attach
+   * a mesh snapshot hosted alongside this anchor. Treat as opaque; do not
+   * parse or construct this value.
+   */
+  resolvedTransform?: string;
 };
 
 /**

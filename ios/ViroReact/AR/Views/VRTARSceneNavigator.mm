@@ -834,6 +834,17 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     }
 }
 
+// WS-C: mirrors rvMatrixToCsv() (virocore, VROARSessioniOS.cpp) so a resolved
+// anchor's transform can be threaded into loadWorldMeshFromFile().
+static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
+    const float *a = m.getArray();
+    NSMutableString *csv = [NSMutableString stringWithCapacity:16 * 12];
+    for (int i = 0; i < 16; i++) {
+        [csv appendFormat:i == 0 ? @"%g" : @",%g", a[i]];
+    }
+    return csv;
+}
+
 #pragma mark - Cloud Anchor Methods
 
 - (void)setCloudAnchorProvider:(NSString *)cloudAnchorProvider {
@@ -981,7 +992,9 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
                     @"state": @"Success",
                     @"position": @[@(position.x), @(position.y), @(position.z)],
                     @"rotation": @[@(toDegrees(rotation.x)), @(toDegrees(rotation.y)), @(toDegrees(rotation.z))],
-                    @"scale": @[@(scale.x), @(scale.y), @(scale.z)]
+                    @"scale": @[@(scale.x), @(scale.y), @(scale.z)],
+                    // WS-C: lets the caller thread this straight into loadWorldMeshFromFile().
+                    @"resolvedTransform": rvMatrixToCsv(transform)
                 };
                 completionHandler(YES, anchorData, nil, @"Success");
             }

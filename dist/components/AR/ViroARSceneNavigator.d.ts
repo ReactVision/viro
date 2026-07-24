@@ -460,8 +460,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      * local path here, not the remote URL.
      *
      * @param filePath - Local path to the downloaded mesh snapshot bytes.
-     * @param resolvedTransform - The resolved anchor's transform, as returned
-     *        by `resolveCloudAnchor()`.
+     * @param resolvedTransform - `result.anchor.resolvedTransform` from
+     *        `resolveCloudAnchor()`'s success result.
      * @returns Promise resolving to the load result
      */
     _loadWorldMeshFromFile: (filePath: string, resolvedTransform: string) => Promise<ViroWorldMeshLoadResult>;

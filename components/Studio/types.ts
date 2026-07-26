@@ -165,7 +165,9 @@ export interface StudioSceneFunction {
     | "API_REQUEST"
     | "SET_VISIBILITY"
     | "SOUND"
-    | "GROUP";
+    | "GROUP"
+    | "TAKE_PHOTO"
+    | "RECORD_VIDEO";
   navigation: string | null;
   alert: string | null;
   animation: string | null;
@@ -186,6 +188,8 @@ export interface StudioSceneFunction {
   scene_animation: {
     id: string;
     animation_key: string;
+    animation_source?: "PROPERTY" | "MODEL_CLIP";
+    clip_name?: string | null;
     duration_ms: number | null;
     delay_ms: number | null;
     properties: Record<string, unknown>;
@@ -238,6 +242,17 @@ export interface StudioAsset {
   is_draggable: boolean;
   /** Author-time "hidden on start"; the runtime seeds visibility from it. */
   hidden_on_load: boolean | null;
+  /**
+   * When true the asset is withheld until the end user taps (mobile) or triggers
+   * (headset) a location to place it; the placed world position is ephemeral.
+   */
+  tap_to_place: boolean | null;
+  /**
+   * 1-based author-defined position in the tap-to-place queue; the runtime places
+   * tap-to-place assets one at a time ascending by this value. Null unless
+   * tap_to_place (older backends omit it — the runtime falls back to load order).
+   */
+  tap_to_place_order: number | null;
   trigger_image_url: string | null;
   trigger_image_orientation: "Up" | "Down" | "Left" | "Right" | null;
   trigger_image_physical_width_m: number | null;
@@ -259,12 +274,45 @@ export interface StudioCollisionBinding {
   scene_function: StudioSceneFunction;
 }
 
+export type StudioProximityDirection = "entering" | "exiting" | "either";
+export type StudioProximityFireMode = "one_shot" | "repeating";
+
+export interface StudioProximityBinding {
+  id: string;
+  scene_id: string;
+  function_id: string;
+  target_asset_id: string;
+  distance: number;
+  direction: StudioProximityDirection;
+  fire_mode: StudioProximityFireMode;
+  scene_function: StudioSceneFunction;
+}
+
+export type StudioGazeFireMode = "one_shot" | "repeating";
+
+/** On Gaze: fire a function when the user looks at a target (native eye-gaze,
+ * headset-only). dwell = hold before firing; hysteresis = grace/cooldown. */
+export interface StudioGazeBinding {
+  id: string;
+  scene_id: string;
+  function_id: string;
+  target_asset_id: string;
+  dwell_seconds: number;
+  hysteresis_seconds: number;
+  fire_mode: StudioGazeFireMode;
+  scene_function: StudioSceneFunction;
+}
+
 export interface StudioAnimation {
   id: string;
   scene_id: string;
   target_asset_id: string;
-  animation_key: string; // ViroAnimations registry key
-  properties: Record<string, unknown>; // Viro keyframe format
+  animation_key: string; // stable trigger identity; also the ViroAnimations registry key for PROPERTY
+  /** "PROPERTY" tweens `properties`; "MODEL_CLIP" plays the embedded clip named by `clip_name`. */
+  animation_source?: "PROPERTY" | "MODEL_CLIP";
+  /** Embedded clip name for MODEL_CLIP animations; null/absent for PROPERTY. */
+  clip_name?: string | null;
+  properties: Record<string, unknown>; // Viro keyframe format (PROPERTY only)
   duration_ms: number | null;
   delay_ms: number | null;
   easing: "Linear" | "EaseIn" | "EaseOut" | "EaseInEaseOut" | "Bounce" | null;
@@ -316,6 +364,10 @@ export interface StudioSceneResponse {
   project: StudioProjectMeta;
   assets: StudioAsset[];
   collision_bindings: StudioCollisionBinding[];
+  /** Absent in responses from backends predating the On Proximity feature. */
+  proximity_bindings?: StudioProximityBinding[];
+  /** Absent in responses from backends predating the On Gaze feature. */
+  gaze_bindings?: StudioGazeBinding[];
   animations: StudioAnimation[];
   functions: StudioSceneFunction[];
   /** Absent in responses from backends predating the Variables feature. */

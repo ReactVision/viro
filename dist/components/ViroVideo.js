@@ -105,7 +105,7 @@ class ViroVideo extends ViroBase_1.ViroBase {
         nativeProps.onDragViro = this._onDrag;
         nativeProps.onRotateViro = this._onRotate;
         nativeProps.onPinchViro = this._onPinch;
-        nativeProps.canHover = this.props.onHover != undefined;
+        nativeProps.canHover = (this.props.onHover != undefined || this.props.onGaze != undefined);
         nativeProps.canClick =
             this.props.onClick != undefined || this.props.onClickState != undefined;
         nativeProps.canTouch = this.props.onTouch != undefined;

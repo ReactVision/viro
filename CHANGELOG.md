@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v2.57.5 — 26 July 2026
+
+### Added
+
+- **`onGaze` prop for eye-gaze hover on Meta Quest Pro.** New optional event on all Viro nodes (`onGaze?: (isHovering, position, source) => void`) that fires when the node is hovered by the eye-gaze ray specifically, backed by `@reactvision/virocore` 2.57.5's `XR_EXT_eye_gaze_interaction` support. `onHover` still fires for every input source (controllers, hands, eye gaze); `onGaze` is limited to the eye-gaze source, and setting it alone is enough to enable hover on the node. No-op on devices without eye tracking (Quest 2 / 3 / 3S).
+
+### Fixed
+
+- **AR anchor retry no longer crashes when leaving a scene (Android, SIGSEGV).** `VRTNode`'s delayed anchor-retry (a 1s main-thread handler, up to 3×) could fire after its parent AR scene had been torn down, calling `createAnchoredNode()` on a freed native `VROARSceneController` and crashing (`SEGV_MAPERR` in `nativeCreateAnchoredNode`). The retry now bails if the parent scene is gone — checking the scene's teardown flag and zeroed native ref (which covers the dispose-before-flag window) — and `VRTARScene` cancels pending child anchor retries on teardown. `@reactvision/virocore` 2.57.5 adds a matching native null-ref guard as defense-in-depth.
+- **Screenshots and video recordings are now reliably written on Android (API 29+).** Media was written with a raw `File` into the public `Pictures/` directory, which fails with `EACCES` under scoped storage — so files silently weren't created, or (with `saveToCameraRoll` off) landed in app-private storage invisible to the gallery while still reporting success. Media now writes to app-specific external storage (always succeeds, no runtime storage permission) and, when `saveToCameraRoll` is set, is published to the device gallery via `MediaStore`. The recording permission gate was corrected to request only what's needed (`RECORD_AUDIO`; `WRITE_EXTERNAL_STORAGE` only on API ≤ 28) and to stop ignoring the grant result.
+- **Free-tier watermark is now burned into recorded video on Android.** Screenshots were already watermarked, but video — rendered directly into the encoder's surface — had no per-frame hook, so recordings went out unmarked. The bridge now hands the recorder a watermark bitmap, composited natively per frame by `@reactvision/virocore` 2.57.5, matching iOS and the Android photo path. Gated on free tier like the other paths.
+- **`getTransformAsync` / `getBoundingBoxAsync` / `getMorphTargets` no longer redbox or hang when a node isn't ready.** On iOS (`VRTNodeModule`) and Android (`NodeModule`) these logged an error and returned without settling the promise when the view tag wasn't a registered node yet — a normal mount / unmount / hot-reload race (hit, e.g., by `onProximity`) that redboxed in dev and left the awaited promise unsettled (leaked). They now reject with `view_not_ready` so callers can retry or ignore the transient quietly; the Android path also tests the view type before casting (was risking a `ClassCastException`).
+
 ## v2.57.4 — 9 July 2026
 
 - Stability improvements

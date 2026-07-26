@@ -136,7 +136,13 @@ RCT_EXPORT_METHOD(getNodeTransform:(nonnull NSNumber *)viewTag
         UIView *nodeView = viewRegistry[viewTag];
         
         if (![nodeView isKindOfClass:[VRTNode class]]) {
-            RCTLogError(@"Invalid view, expected VRTNode, got [%@]", nodeView);
+            // The view tag may not be registered as a VRTNode yet: getTransformAsync()
+            // legitimately races node mount / unmount / hot-reload. Reject (don't
+            // RCTLogError — that redboxes in dev and, returning without settling,
+            // leaks the JS promise) so callers can retry/ignore this transient quietly.
+            reject(@"view_not_ready",
+                   [NSString stringWithFormat:@"Invalid view, expected VRTNode, got [%@]", nodeView],
+                   nil);
             return;
         }
 
@@ -162,10 +168,14 @@ RCT_EXPORT_METHOD(getBoundingBox:(nonnull NSNumber *)viewTag
         UIView *nodeView = viewRegistry[viewTag];
         
         if (![nodeView isKindOfClass:[VRTNode class]]) {
-            RCTLogError(@"Invalid view, expected VRTNode, got [%@]", nodeView);
+            // Transient view-lifecycle race — reject instead of redboxing + leaking
+            // the promise (see getNodeTransform).
+            reject(@"view_not_ready",
+                   [NSString stringWithFormat:@"Invalid view, expected VRTNode, got [%@]", nodeView],
+                   nil);
             return;
         }
-        
+
         VRTNode *node = (VRTNode *) nodeView;
         std::shared_ptr<VRONode> vroNode = [node node];
         VROBoundingBox boundingBox = vroNode->getUmbrellaBoundingBox();
@@ -190,10 +200,14 @@ RCT_EXPORT_METHOD(getMorphTargets:(nonnull NSNumber *)viewTag
         UIView *nodeView = viewRegistry[viewTag];
         
         if (![nodeView isKindOfClass:[VRT3DObject class]]) {
-            RCTLogError(@"Invalid view, expected VRT3DObject, got [%@]", nodeView);
+            // Transient view-lifecycle race — reject instead of redboxing + leaking
+            // the promise (see getNodeTransform).
+            reject(@"view_not_ready",
+                   [NSString stringWithFormat:@"Invalid view, expected VRT3DObject, got [%@]", nodeView],
+                   nil);
             return;
         }
-        
+
         VRTNode *node = (VRT3DObject *) nodeView;
         std::shared_ptr<VRONode> vroNode = [node node];
         std::set<std::shared_ptr<VROMorpher>> morphers = vroNode->getMorphers(true);

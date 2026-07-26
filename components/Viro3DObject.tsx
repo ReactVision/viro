@@ -110,7 +110,7 @@ export class Viro3DObject extends ViroBase<Props> {
         resources={resources}
         materials={materials}
         transformBehaviors={transformBehaviors}
-        canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
+        canHover={this.props.onHover != undefined}
         canClick={
           this.props.onClick != undefined ||
           this.props.onClickState != undefined

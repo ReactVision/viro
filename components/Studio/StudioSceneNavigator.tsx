@@ -7,28 +7,15 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ActivityIndicator,
-  type GestureResponderEvent,
-  PixelRatio,
-  Platform,
-  StatusBar,
-  StyleSheet,
-  View,
-  ViewStyle,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, View, ViewStyle } from "react-native";
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
 import { isQuest } from "../Utilities/ViroPlatform";
-import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
-import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
-import { studioPlacementBannerStore } from "./domain/placementBannerStore";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
-import { StudioPlacementStore } from "./domain/placementStore";
-import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
+import { StudioARScene } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
@@ -55,12 +42,6 @@ function mapOcclusionMode(
   }
 }
 
-// Approximate top inset for the built-in recording indicator. Dependency-free
-// (viro takes no safe-area-context peer dep); hosts wanting exact placement set
-// recordingIndicator={false} and render <StudioRecordingIndicator /> themselves.
-const DEFAULT_RECORDING_TOP =
-  Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) + 8 : 52;
-
 const styles = StyleSheet.create({
   loader: {
     position: "absolute",
@@ -72,100 +53,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#000000",
   },
-  recordingOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  placementBanner: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
 });
-
-const PLACEMENT_BANNER_TOP =
-  Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) + 12 : 64;
-
-/**
- * Mobile AR placement layer: a full-screen tap catcher shown while a tap-to-place
- * asset is awaiting placement. Each tap hit-tests a real surface (via the scene's
- * placement API); a miss prompts the user to scan more of the space. Rendered only
- * when an asset is active, so normal object interaction is untouched otherwise.
- * Headset placement is in-scene (controller trigger), so this never mounts there.
- *
- * The visible prompt is a separate position-agnostic indicator; this layer only
- * publishes active/name/miss state to the banner store so the host can render the
- * prompt in its own chrome.
- */
-const StudioPlacementOverlay: React.FC<{
-  store: StudioPlacementStore;
-  apiRef: React.MutableRefObject<StudioPlacementApi | null>;
-  getName: (assetId: string) => string | null;
-}> = ({ store, apiRef, getName }) => {
-  const [activeId, setActiveId] = useState<string | null>(() =>
-    store.activeAssetId()
-  );
-  const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setActiveId(store.activeAssetId());
-    return store.subscribeActive(() => setActiveId(store.activeAssetId()));
-  }, [store]);
-
-  useEffect(() => {
-    studioPlacementBannerStore.set(
-      !!activeId,
-      activeId ? getName(activeId) : null
-    );
-  }, [activeId, getName]);
-
-  useEffect(
-    () => () => {
-      if (missTimerRef.current) clearTimeout(missTimerRef.current);
-      studioPlacementBannerStore.reset();
-    },
-    []
-  );
-
-  const handleRelease = useCallback(
-    (evt: GestureResponderEvent) => {
-      const api = apiRef.current;
-      if (!api) return;
-      const { locationX, locationY } = evt.nativeEvent;
-      const ratio = PixelRatio.get();
-      void api
-        .placeAtScreenPoint(locationX * ratio, locationY * ratio)
-        .then((result) => {
-          if (result !== "miss") {
-            studioPlacementBannerStore.setShowMiss(false);
-            return;
-          }
-          studioPlacementBannerStore.setShowMiss(true);
-          if (missTimerRef.current) clearTimeout(missTimerRef.current);
-          missTimerRef.current = setTimeout(
-            () => studioPlacementBannerStore.setShowMiss(false),
-            2500
-          );
-        });
-    },
-    [apiRef]
-  );
-
-  if (!activeId) return null;
-
-  return (
-    <View
-      style={StyleSheet.absoluteFill}
-      onStartShouldSetResponder={() => true}
-      onResponderRelease={handleRelease}
-    />
-  );
-};
 
 /** Imperative handle exposed via ref. */
 export interface StudioSceneNavigatorHandle {
@@ -205,22 +93,6 @@ export interface StudioSceneNavigatorProps {
    * `onError`; when this is omitted it renders nothing.
    */
   renderError?: (error: Error) => React.ReactNode;
-  /**
-   * Show the built-in "recording" indicator (a REC pill) while a RECORD_VIDEO
-   * action is recording. Default true, positioned top-centre with an approximate
-   * safe-area inset. Set false if the host draws its own top-of-screen chrome
-   * there and renders `<StudioRecordingIndicator />` (or a custom UI via
-   * `useStudioRecording()`) itself.
-   */
-  recordingIndicator?: boolean;
-  /**
-   * Show the built-in tap-to-place prompt (a "Tap a surface to place …" pill)
-   * while a mobile AR asset awaits placement. Default true, positioned top-centre
-   * with an approximate safe-area inset. Set false if the host draws its own
-   * top-of-screen chrome there and renders `<StudioPlacementIndicator />` (or a
-   * custom UI via `useStudioPlacement()`) itself.
-   */
-  placementIndicator?: boolean;
 }
 
 /**
@@ -255,8 +127,6 @@ export const StudioSceneNavigator = forwardRef<
     noAssetsMessage,
     loadingView,
     renderError,
-    recordingIndicator = true,
-    placementIndicator = true,
   },
   ref
 ) {
@@ -277,21 +147,6 @@ export const StudioSceneNavigator = forwardRef<
       variableStoreRef.current = null;
     };
   }, []);
-
-  // Tap-to-place: the store is owned here so the mobile overlay can read active
-  // state; StudioARScene re-seeds it per scene. placementApiRef receives the
-  // scene's hit-test bridge. placementNamesRef maps asset id → name for the
-  // overlay prompt. All ephemeral — placement never persists.
-  const placementStoreRef = useRef<StudioPlacementStore | null>(null);
-  if (placementStoreRef.current === null) {
-    placementStoreRef.current = new StudioPlacementStore();
-  }
-  const placementApiRef = useRef<StudioPlacementApi | null>(null);
-  const placementNamesRef = useRef<Map<string, string>>(new Map());
-  const getPlacementName = useCallback(
-    (assetId: string) => placementNamesRef.current.get(assetId) ?? null,
-    []
-  );
 
   const onSceneReadyRef = useRef(onSceneReady);
   const onErrorRef = useRef(onError);
@@ -396,13 +251,6 @@ export const StudioSceneNavigator = forwardRef<
 
       loadedSceneIdRef.current = resolvedSceneId;
 
-      // Names for the tap-to-place prompt (overlay reads this on placement).
-      placementNamesRef.current = new Map(
-        sceneData.assets
-          .filter((a) => a.tap_to_place)
-          .map((a) => [a.id, a.name ?? ""])
-      );
-
       const triggerImageCount = sceneData.assets.filter(
         (a) => !!a.trigger_image_url
       ).length;
@@ -432,8 +280,6 @@ export const StudioSceneNavigator = forwardRef<
           onPlaneSelected: onPlaneSelectedRef.current,
           noAssetsMessage: noAssetsMessageRef.current,
           variableStore: variableStoreRef.current,
-          placementStore: placementStoreRef.current,
-          placementApiRef,
         },
       };
 
@@ -498,29 +344,6 @@ export const StudioSceneNavigator = forwardRef<
             taking flow space beneath it. */}
         {!isSceneReady && loadingView && (
           <View style={StyleSheet.absoluteFill}>{loadingView}</View>
-        )}
-        {recordingIndicator && (
-          <View
-            pointerEvents="box-none"
-            style={[styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }]}
-          >
-            <StudioRecordingIndicator />
-          </View>
-        )}
-        {!isQuest && placementStoreRef.current && (
-          <StudioPlacementOverlay
-            store={placementStoreRef.current}
-            apiRef={placementApiRef}
-            getName={getPlacementName}
-          />
-        )}
-        {placementIndicator && (
-          <View
-            pointerEvents="none"
-            style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}
-          >
-            <StudioPlacementIndicator />
-          </View>
         )}
       </View>
     </StudioSceneErrorBoundary>

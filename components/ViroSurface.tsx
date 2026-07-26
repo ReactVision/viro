@@ -72,7 +72,7 @@ export class ViroSurface extends ViroBase<Props> {
     nativeProps.onDragViro = this._onDrag;
     nativeProps.onPinchViro = this._onPinch;
     nativeProps.onRotateViro = this._onRotate;
-    nativeProps.canHover = (this.props.onHover != undefined || this.props.onGaze != undefined);
+    nativeProps.canHover = this.props.onHover != undefined;
     nativeProps.canClick =
       this.props.onClick != undefined || this.props.onClickState != undefined;
     nativeProps.canTouch = this.props.onTouch != undefined;

@@ -77,7 +77,7 @@ export class ViroARPlane extends ViroBase<Props> {
         ref={(component) => {
           this._component = component;
         }}
-        canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
+        canHover={this.props.onHover != undefined}
         canClick={
           this.props.onClick != undefined ||
           this.props.onClickState != undefined

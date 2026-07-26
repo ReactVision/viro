@@ -17,14 +17,6 @@ export type ViroCommonProps = ViewProps & {
         maxDistance: number;
     };
     onHover?: (isHovering: boolean, position: Viro3DPoint, source: ViroSource) => void;
-    /**
-     * Fires when the node is hovered by the eye-gaze ray specifically (Meta Quest
-     * Pro, via XR_EXT_eye_gaze_interaction). Same payload as onHover but limited to
-     * the eye-gaze input source; onHover still fires for every source (controllers,
-     * hands, eye gaze). Setting onGaze alone is enough to enable hover events on the
-     * node. No-op on devices without eye tracking.
-     */
-    onGaze?: (isHovering: boolean, position: Viro3DPoint, source: ViroSource) => void;
     onClick?: (position: Viro3DPoint, source: ViroSource) => void;
     onClickState?: (clickState: ViroClickState, position: Viro3DPoint, source: ViroSource) => void;
     onTouch?: (touchState: any, touchPos: Viro3DPoint, source: ViroSource) => void;

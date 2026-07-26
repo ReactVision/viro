@@ -507,7 +507,7 @@ export class ViroARScene extends ViroBase<Props> {
       >
         <VRTARScene
           {...this.props}
-          canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
+          canHover={this.props.onHover != undefined}
           canClick={
             this.props.onClick != undefined ||
             this.props.onClickState != undefined

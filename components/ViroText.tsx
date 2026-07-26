@@ -83,7 +83,7 @@ export class ViroText extends ViroBase<Props> {
         onNativeTransformDelegateViro={transformDelegate}
         hasTransformDelegate={this.props.onTransformUpdate != undefined}
         style={[this.props.style]}
-        canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
+        canHover={this.props.onHover != undefined}
         canClick={
           this.props.onClick != undefined ||
           this.props.onClickState != undefined

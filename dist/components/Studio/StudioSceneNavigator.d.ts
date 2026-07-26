@@ -39,22 +39,6 @@ export interface StudioSceneNavigatorProps {
      * `onError`; when this is omitted it renders nothing.
      */
     renderError?: (error: Error) => React.ReactNode;
-    /**
-     * Show the built-in "recording" indicator (a REC pill) while a RECORD_VIDEO
-     * action is recording. Default true, positioned top-centre with an approximate
-     * safe-area inset. Set false if the host draws its own top-of-screen chrome
-     * there and renders `<StudioRecordingIndicator />` (or a custom UI via
-     * `useStudioRecording()`) itself.
-     */
-    recordingIndicator?: boolean;
-    /**
-     * Show the built-in tap-to-place prompt (a "Tap a surface to place …" pill)
-     * while a mobile AR asset awaits placement. Default true, positioned top-centre
-     * with an approximate safe-area inset. Set false if the host draws its own
-     * top-of-screen chrome there and renders `<StudioPlacementIndicator />` (or a
-     * custom UI via `useStudioPlacement()`) itself.
-     */
-    placementIndicator?: boolean;
 }
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on

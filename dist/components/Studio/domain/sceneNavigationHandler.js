@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SequenceScheduler = void 0;
-exports.resetVideoRecordingState = resetVideoRecordingState;
 exports.executeFunctionWithRelations = executeFunctionWithRelations;
 exports.executeOnLoadFunction = executeOnLoadFunction;
 const react_native_1 = require("react-native");
@@ -9,17 +8,10 @@ const ViroPlatform_1 = require("../../Utilities/ViroPlatform");
 const VRTStudioModule_1 = require("../VRTStudioModule");
 const apiRequestHelpers_1 = require("./apiRequestHelpers");
 const expressionEvaluator_1 = require("./expressionEvaluator");
-const recordingStore_1 = require("./recordingStore");
 const ANIMATION_CHAIN_MAX_DEPTH = 10;
 // The proxy enforces the authored timeout server-side; the client backstop
 // only covers an unreachable/unresponsive proxy.
 const API_REQUEST_CLIENT_GRACE_MS = 5000;
-// Recording state lives in the device-global studioRecordingStore (the RECORD_VIDEO
-// arm toggles it, the REC indicator subscribes). Reset on scene unmount so a
-// recording torn down mid-flight can't wedge the flag (and indicator) on.
-function resetVideoRecordingState() {
-    recordingStore_1.studioRecordingStore.reset();
-}
 class SequenceScheduler {
     timers = new Set();
     appStateSub = null;
@@ -609,71 +601,6 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         }
         else {
             manager.stop(s.audio_asset_id ?? null); // null = all sounds
-        }
-    }
-    else if (fn.function_type === "TAKE_PHOTO") {
-        // Captures the AR view via the navigator's native takeScreenshot, which
-        // saves to the camera roll and burns in the free-tier watermark natively.
-        // Fire-and-forget: as a sequence step the walk advances immediately
-        // Failure policy: warn + skip, and surface save/permission failure to the end user via Alert
-        if (typeof sceneNavigator?.takeScreenshot !== "function") {
-            console.warn(`[Studio] TAKE_PHOTO function ${fn.id}: navigator has no takeScreenshot (Quest / unmounted); skipping.`);
-            return;
-        }
-        const fileName = `studio_photo_${Date.now()}`;
-        void Promise.resolve(sceneNavigator.takeScreenshot(fileName, true))
-            .then((result) => {
-            if (result?.success)
-                return;
-            console.warn(`[Studio] TAKE_PHOTO function ${fn.id} failed (errorCode=${result?.errorCode}).`);
-            react_native_1.Alert.alert("Couldn't Save Photo", "The photo could not be saved. Check that photo access is allowed and try again.", [{ text: "OK" }]);
-        })
-            .catch((err) => {
-            console.warn(`[Studio] TAKE_PHOTO function ${fn.id} error:`, err);
-            react_native_1.Alert.alert("Couldn't Save Photo", "The photo could not be saved. Check that photo access is allowed and try again.", [{ text: "OK" }]);
-        });
-    }
-    else if (fn.function_type === "RECORD_VIDEO") {
-        // Toggle: start recording if idle, else stop and save. Recording is device-
-        // global with no native isRecording query, so the module flag is the source
-        // of truth. Native recording saves to the camera roll (iOS also burns in the
-        // free-tier watermark). Fire-and-forget: as a sequence step the walk advances
-        // immediately. Start failure arrives via the onError callback (numeric code);
-        // stop resolves the { success, errorCode } result.
-        if (typeof sceneNavigator?.startVideoRecording !== "function" ||
-            typeof sceneNavigator?.stopVideoRecording !== "function") {
-            console.warn(`[Studio] RECORD_VIDEO function ${fn.id}: navigator has no video recording (Quest / unmounted); skipping.`);
-            return;
-        }
-        if (!recordingStore_1.studioRecordingStore.isRecording()) {
-            recordingStore_1.studioRecordingStore.start();
-            const fileName = `studio_video_${Date.now()}`;
-            try {
-                sceneNavigator.startVideoRecording(fileName, true, (errorCode) => {
-                    recordingStore_1.studioRecordingStore.stop();
-                    console.warn(`[Studio] RECORD_VIDEO function ${fn.id} failed to start (errorCode=${errorCode}).`);
-                    react_native_1.Alert.alert("Couldn't Record Video", "Video recording could not start. Check that camera and microphone access are allowed and try again.", [{ text: "OK" }]);
-                });
-            }
-            catch (err) {
-                recordingStore_1.studioRecordingStore.stop();
-                console.warn(`[Studio] RECORD_VIDEO function ${fn.id} start error:`, err);
-                react_native_1.Alert.alert("Couldn't Record Video", "Video recording could not start. Check that camera and microphone access are allowed and try again.", [{ text: "OK" }]);
-            }
-        }
-        else {
-            recordingStore_1.studioRecordingStore.stop();
-            void Promise.resolve(sceneNavigator.stopVideoRecording())
-                .then((result) => {
-                if (result?.success)
-                    return;
-                console.warn(`[Studio] RECORD_VIDEO function ${fn.id} failed to save (errorCode=${result?.errorCode}).`);
-                react_native_1.Alert.alert("Couldn't Save Video", "The video could not be saved. Check that photo access is allowed and try again.", [{ text: "OK" }]);
-            })
-                .catch((err) => {
-                console.warn(`[Studio] RECORD_VIDEO function ${fn.id} stop error:`, err);
-                react_native_1.Alert.alert("Couldn't Save Video", "The video could not be saved. Check that photo access is allowed and try again.", [{ text: "OK" }]);
-            });
         }
     }
 }

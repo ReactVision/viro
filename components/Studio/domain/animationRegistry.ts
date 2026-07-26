@@ -17,9 +17,6 @@ export function buildViroAnimationRegistry(
   const registry: Record<string, unknown> = {};
 
   for (const anim of animations) {
-    // MODEL_CLIP animations play an embedded clip by name via the object's
-    // `animation` prop and carry no property keyframes to register.
-    if (anim.animation_source === "MODEL_CLIP") continue;
     warnAnimationPerformance(anim);
     registry[anim.animation_key] = {
       properties: anim.properties,

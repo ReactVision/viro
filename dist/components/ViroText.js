@@ -82,7 +82,7 @@ class ViroText extends ViroBase_1.ViroBase {
             : undefined;
         return (<VRTText {...this.props} ref={(component) => {
                 this._component = component;
-            }} onNativeTransformDelegateViro={transformDelegate} hasTransformDelegate={this.props.onTransformUpdate != undefined} style={[this.props.style]} canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)} canClick={this.props.onClick != undefined ||
+            }} onNativeTransformDelegateViro={transformDelegate} hasTransformDelegate={this.props.onTransformUpdate != undefined} style={[this.props.style]} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
                 this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canFuse={this.props.onFuse != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} 
         // Fixes #272. for some reason, onClick was making it
         // to the native code. Other incorrect props don't make it

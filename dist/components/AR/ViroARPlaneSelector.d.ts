@@ -33,10 +33,6 @@ type Props = {
      * | `"Both"` (default) | All orientations                       |
      *
      * Default: `"Both"` (accept every plane ARKit/ARCore detects).
-     *
-     * ARKit does not classify horizontal facing (its anchors report plain
-     * "Horizontal"), so on iOS `"HorizontalUpward"` and `"HorizontalDownward"`
-     * accept any horizontal plane, matching the native behavior of ViroARPlane.
      */
     alignment?: "Horizontal" | "HorizontalUpward" | "HorizontalDownward" | "Vertical" | "Both";
     /**

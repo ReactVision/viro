@@ -118,6 +118,14 @@ export type ViroForce = {
     position: Array<number>;
 };
 export type ViroSource = ImageSourcePropType;
+/**
+ * Numeric input-source ids reported in event payloads (event.nativeEvent.source),
+ * mirroring the native ViroOculus::InputSource enum. Currently only the eye-gaze
+ * source is needed on the JS side (to route onHover -> onGaze).
+ */
+export declare const ViroEventSource: {
+    readonly EYE_GAZE: 12;
+};
 export type ViroARPlaneType = any;
 export type ViroSoundRoom = {
     size: ViroScale;

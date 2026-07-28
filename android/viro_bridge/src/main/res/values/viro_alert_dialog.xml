@@ -18,6 +18,12 @@
     <style name="ViroAlertDialogTheme" parent="ThemeOverlay.AppCompat.Dialog.Alert">
         <item name="dialogCornerRadius">28dp</item>
         <item name="android:windowBackground">@drawable/viro_alert_dialog_background</item>
+        <!-- Buttons read colorAccent, which templates rarely set (AppCompat teal by
+             default); follow the app's brand colorPrimary instead. Day only — the
+             values-night twin keeps AppCompat's night accent, because colorPrimary
+             rarely has a night variant and dark brand colors are unreadable on the
+             dark dialog surface. -->
+        <item name="colorAccent">?attr/colorPrimary</item>
         <item name="buttonBarButtonStyle">@style/ViroAlertDialogButton</item>
         <item name="android:buttonBarButtonStyle">@style/ViroAlertDialogButton</item>
     </style>

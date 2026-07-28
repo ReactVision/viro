@@ -22,7 +22,7 @@
 package com.viromedia.bridge;
 
 import android.app.Activity;
-import android.util.Log;
+import android.content.res.TypedArray;
 
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -128,7 +128,6 @@ public class ReactViroPackage implements ReactPackage {
 
     @Override
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
-        Log.e("Manish", "createNativeModules");
         installMaterial3AlertTheme(reactContext);
         List<NativeModule> modules = new java.util.ArrayList<>(Arrays.<NativeModule>asList(
                 new MaterialManager(reactContext),
@@ -166,7 +165,7 @@ public class ReactViroPackage implements ReactPackage {
             @Override
             public void onHostResume() {
                 Activity activity = reactContext.getCurrentActivity();
-                if (activity != null) {
+                if (activity != null && isAppCompatTheme(activity)) {
                     activity.getTheme().applyStyle(R.style.ViroAlertDialogThemeOverride, true);
                 }
             }
@@ -179,6 +178,21 @@ public class ReactViroPackage implements ReactPackage {
             public void onHostDestroy() {
             }
         });
+    }
+
+    // The probe RN's AlertFragment uses to pick the AppCompat dialog path. In a
+    // brownfield host whose activity theme is not AppCompat-derived, RN shows a
+    // framework dialog instead, and the override must not reach it: the dialog
+    // background resolves ?attr/colorBackgroundFloating, which only AppCompat
+    // themes define — inflating it there crashes at alert-show time.
+    private static boolean isAppCompatTheme(Activity activity) {
+        TypedArray attributes =
+                activity.obtainStyledAttributes(androidx.appcompat.R.styleable.AppCompatTheme);
+        try {
+            return attributes.hasValue(androidx.appcompat.R.styleable.AppCompatTheme_windowActionBar);
+        } finally {
+            attributes.recycle();
+        }
     }
 
     @Override

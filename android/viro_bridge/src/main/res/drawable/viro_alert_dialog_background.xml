@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- AppCompat's abc_dialog_material_background with its hardcoded white swapped for
      colorBackgroundFloating, which AppCompat guarantees and already resolves per
-     light/dark, so this needs no values-night variant. -->
+     light/dark, so this needs no values-night variant. Insets are 10dp to match
+     MaterialAlertDialog's background insets rather than AppCompat's 16dp. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:insetLeft="16dp"
-    android:insetTop="16dp"
-    android:insetRight="16dp"
-    android:insetBottom="16dp">
+    android:insetLeft="10dp"
+    android:insetTop="10dp"
+    android:insetRight="10dp"
+    android:insetBottom="10dp">
     <shape android:shape="rectangle">
         <corners android:radius="?attr/dialogCornerRadius" />
         <solid android:color="?attr/colorBackgroundFloating" />

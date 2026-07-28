@@ -1,5 +1,12 @@
 import { NativeModules, Platform } from "react-native";
 
+/**
+ * True when running on the web platform (react-native-web). Web uses the
+ * WASM/WebGL2 renderer via @reactvision/viro-web-renderer and the .web.tsx
+ * bridge instead of the native view managers.
+ */
+export const isWeb: boolean = Platform.OS === "web";
+
 type AndroidBuildInfo = {
   Manufacturer?: string;
   Brand?: string;

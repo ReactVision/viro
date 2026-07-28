@@ -834,6 +834,17 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     }
 }
 
+// WS-C: mirrors rvMatrixToCsv() (virocore, VROARSessioniOS.cpp) so a resolved
+// anchor's transform can be threaded into loadWorldMeshFromFile().
+static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
+    const float *a = m.getArray();
+    NSMutableString *csv = [NSMutableString stringWithCapacity:16 * 12];
+    for (int i = 0; i < 16; i++) {
+        [csv appendFormat:i == 0 ? @"%g" : @",%g", a[i]];
+    }
+    return csv;
+}
+
 #pragma mark - Cloud Anchor Methods
 
 - (void)setCloudAnchorProvider:(NSString *)cloudAnchorProvider {
@@ -981,7 +992,9 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
                     @"state": @"Success",
                     @"position": @[@(position.x), @(position.y), @(position.z)],
                     @"rotation": @[@(toDegrees(rotation.x)), @(toDegrees(rotation.y)), @(toDegrees(rotation.z))],
-                    @"scale": @[@(scale.x), @(scale.y), @(scale.z)]
+                    @"scale": @[@(scale.x), @(scale.y), @(scale.z)],
+                    // WS-C: lets the caller thread this straight into loadWorldMeshFromFile().
+                    @"resolvedTransform": rvMatrixToCsv(transform)
                 };
                 completionHandler(YES, anchorData, nil, @"Success");
             }
@@ -1062,6 +1075,20 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     return arSession->isGeospatialModeSupported();
 }
 
+- (BOOL)isLocationAccuracyReduced {
+    if (!_vroView) {
+        return NO;
+    }
+
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        return NO;
+    }
+
+    return arSession->isLocationAccuracyReduced();
+}
+
 - (void)setGeospatialModeEnabled:(BOOL)enabled {
     _pendingGeospatialModeEnabled = enabled;
 
@@ -1115,6 +1142,8 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
             return @"Enabled";
         case VROEarthTrackingState::Paused:
             return @"Paused";
+        case VROEarthTrackingState::Localizing:
+            return @"Localizing";
         case VROEarthTrackingState::Stopped:
         default:
             return @"Stopped";
@@ -1658,6 +1687,32 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 
 // ── Cloud anchor management ───────────────────────────────────────────────────
 
+- (void)rvStartScan {
+    if (!_vroView) return;
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) return;
+    arSession->rvStartScan();
+}
+
+- (void)rvFinishScan:(NSInteger)ttlDays
+   completionHandler:(void (^)(BOOL, NSString *, NSString *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, nil, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, nil, @"AR session not available"); return; }
+    arSession->rvFinishScan((int)ttlDays,
+        [completionHandler](bool success, std::string cloudAnchorId,
+                             std::string locationTransformCsv, std::string error) {
+            if (completionHandler) {
+                completionHandler(success,
+                    success ? [NSString stringWithUTF8String:cloudAnchorId.c_str()] : nil,
+                    success ? [NSString stringWithUTF8String:locationTransformCsv.c_str()] : nil,
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
@@ -2001,6 +2056,101 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 }
 
 #pragma mark - World Mesh API Methods
+
+// WS-C: parses the CSV produced by rvMatrixToCsv() (virocore, VROARSessioniOS.cpp)
+// back into a VROMatrix4f. Returns identity (and logs) if malformed.
+static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
+    NSArray<NSString *> *parts = [csv componentsSeparatedByString:@","];
+    if (parts.count != 16) {
+        RCTLogWarn(@"[ViroAR] rvSnapshotWorldMeshToFile: malformed locationTransformCsv (%lu values, expected 16)",
+                   (unsigned long)parts.count);
+        return VROMatrix4f();
+    }
+    float values[16];
+    for (int i = 0; i < 16; i++) {
+        values[i] = [parts[i] floatValue];
+    }
+    return VROMatrix4f(values);
+}
+
+// WS-C: serialize the current world mesh to a temp file, returning its path
+// (or nil on failure/no mesh) — ready to pass straight into rvUploadAsset().
+- (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv {
+    if (!_vroView || !_currentScene || !locationTransformCsv) {
+        return nil;
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return nil;
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return nil;
+    }
+
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (!worldMesh) {
+        return nil;
+    }
+
+    VROMatrix4f locationTransform = rvParseMatrixCsv(locationTransformCsv);
+    std::vector<uint8_t> bytes = worldMesh->serializeCurrentMesh(locationTransform);
+    if (bytes.empty()) {
+        return nil;
+    }
+
+    NSData *data = [NSData dataWithBytes:bytes.data() length:bytes.size()];
+    NSString *fileName = [NSString stringWithFormat:@"rvmesh_%@.bin", [[NSUUID UUID] UUIDString]];
+    NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+    if (![data writeToFile:filePath atomically:YES]) {
+        return nil;
+    }
+    return filePath;
+}
+
+// WS-C: reverse of rvSnapshotWorldMeshToFile — load a resolved mesh snapshot
+// and attach it for physics + visual occlusion. See VROARWorldMesh::
+// attachResolvedMesh() for the (compile-verified only, not visually tested)
+// occlusion geometry construction.
+- (BOOL)rvLoadWorldMeshFromFile:(NSString *)filePath
+              resolvedTransform:(NSString *)resolvedTransformCsv {
+    if (!_vroView || !_currentScene || !filePath || !resolvedTransformCsv) {
+        return NO;
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return NO;
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return NO;
+    }
+
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (!worldMesh) {
+        RCTLogWarn(@"[ViroAR] rvLoadWorldMeshFromFile: no world mesh — call setWorldMeshEnabled(true) first");
+        return NO;
+    }
+
+    NSData *data = [NSData dataWithContentsOfFile:filePath];
+    if (!data) {
+        return NO;
+    }
+    std::vector<uint8_t> bytes((const uint8_t *)data.bytes, (const uint8_t *)data.bytes + data.length);
+
+    VROMatrix4f resolvedTransform = rvParseMatrixCsv(resolvedTransformCsv);
+    std::shared_ptr<VROARDepthMesh> mesh = VROARWorldMesh::loadMeshSnapshot(bytes, resolvedTransform);
+    if (!mesh) {
+        return NO;
+    }
+
+    worldMesh->attachResolvedMesh(mesh, arScene);
+    return YES;
+}
 
 - (void)setWorldMeshEnabled:(BOOL)worldMeshEnabled {
     _worldMeshEnabled = worldMeshEnabled;

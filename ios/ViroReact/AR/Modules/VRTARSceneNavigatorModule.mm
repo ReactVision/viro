@@ -474,6 +474,27 @@ RCT_EXPORT_METHOD(isGeospatialModeSupported:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(isLocationAccuracyReduced:(nonnull NSNumber *)reactTag
+                                     resolve:(RCTPromiseResolveBlock)resolve
+                                      reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"reduced": @NO, @"error": @"Invalid view type"});
+                return;
+            }
+
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            BOOL reduced = [component isLocationAccuracyReduced];
+            resolve(@{@"reduced": @(reduced)});
+        } @catch (NSException *exception) {
+            resolve(@{@"reduced": @NO, @"error": exception.reason});
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(setGeospatialModeEnabled:(nonnull NSNumber *)reactTag
                                    enabled:(BOOL)enabled) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
@@ -889,6 +910,50 @@ RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
     }];
 }
 
+RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
+                        locationTransform:(NSString *)locationTransformCsv
+                                     resolve:(RCTPromiseResolveBlock)resolve
+                                      reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            NSString *filePath = [(VRTARSceneNavigator *)view rvSnapshotWorldMeshToFile:locationTransformCsv];
+            if (filePath) {
+                resolve(@{@"success": @YES, @"filePath": filePath});
+            } else {
+                resolve(@{@"success": @NO, @"error": @"No world mesh available to snapshot"});
+            }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvLoadWorldMeshFromFile:(nonnull NSNumber *)reactTag
+                                  filePath:(NSString *)filePath
+                        resolvedTransform:(NSString *)resolvedTransformCsv
+                                   resolve:(RCTPromiseResolveBlock)resolve
+                                    reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            BOOL success = [(VRTARSceneNavigator *)view rvLoadWorldMeshFromFile:filePath
+                                                              resolvedTransform:resolvedTransformCsv];
+            if (success) {
+                resolve(@{@"success": @YES});
+            } else {
+                resolve(@{@"success": @NO, @"error": @"Failed to load world mesh (no scene, no world mesh enabled, or malformed file)"});
+            }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvDeleteGeospatialAnchor:(nonnull NSNumber *)reactTag
                                   anchorId:(NSString *)anchorId
                                    resolve:(RCTPromiseResolveBlock)resolve
@@ -940,6 +1005,42 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
 }
 
 // ── Cloud anchor management ───────────────────────────────────────────────────
+
+RCT_EXPORT_METHOD(rvStartScan:(nonnull NSNumber *)reactTag) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
+            [(VRTARSceneNavigator *)view rvStartScan];
+        } @catch (NSException *ex) { /* no-op — startScan has no promise to reject */ }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
+                        ttlDays:(NSInteger)ttlDays
+                        resolve:(RCTPromiseResolveBlock)resolve
+                         reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
+            }
+            [(VRTARSceneNavigator *)view rvFinishScan:ttlDays
+                completionHandler:^(BOOL success, NSString *cloudAnchorId,
+                                    NSString *locationTransformCsv, NSString *error) {
+                NSMutableDictionary *r = [NSMutableDictionary new];
+                [r setObject:@(success) forKey:@"success"];
+                if (cloudAnchorId)         [r setObject:cloudAnchorId         forKey:@"cloudAnchorId"];
+                if (locationTransformCsv)  [r setObject:locationTransformCsv  forKey:@"locationTransform"];
+                if (error)                 [r setObject:error                forKey:@"error"];
+                resolve(r);
+            }];
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+    }];
+}
 
 RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                            anchorId:(NSString *)anchorId

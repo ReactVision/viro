@@ -444,6 +444,17 @@ public:
     }
 
     /*
+     WS-D: true if the OS has only granted approximate/reduced-accuracy location
+     (iOS 14+ "Precise Location" off) and a request for temporary full accuracy
+     was denied or is unavailable. When true, horizontalAccuracy will stay at
+     the ~km scale and getEarthTrackingState() will never leave Localizing —
+     the app should surface an explicit error instead of waiting.
+     */
+    virtual bool isLocationAccuracyReduced() const {
+        return false;
+    }
+
+    /*
      Check VPS availability at the specified location.
      The callback will be called with the availability status.
      */
@@ -592,6 +603,24 @@ public:
         const std::string& projectId,
         std::function<void(bool success, std::string jsonData, std::string error)> callback) {
         if (callback) callback(false, "", "Not supported");
+    }
+
+    // WS-A: room/building-scale scan API — defines its own location frame
+    // instead of requiring a hand-placed anchor. rvFinishScan() is the
+    // scan-based counterpart to hostCloudAnchor(); see
+    // RVCCACloudAnchorProvider::startScan()/finishScan().
+    virtual void rvStartScan() {
+        // Default implementation does nothing
+    }
+    // WS-C: locationTransform is the 16 values of the VROMatrix4f used to host
+    // this scan, comma-separated, column-major (VROMatrix4f::getArray() order).
+    // Pass it straight through to rvSnapshotWorldMeshToFile() if attaching a
+    // mesh — finishScan() has no placed anchor to read a transform from.
+    virtual void rvFinishScan(
+        int ttlDays,
+        std::function<void(bool success, std::string cloudAnchorId,
+                            std::string locationTransformCsv, std::string error)> callback) {
+        if (callback) callback(false, "", "", "Not supported");
     }
 
     // ========================================================================

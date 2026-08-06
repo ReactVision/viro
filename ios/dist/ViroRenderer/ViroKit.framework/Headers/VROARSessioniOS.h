@@ -161,6 +161,7 @@ public:
     void setGeospatialModeEnabled(bool enabled) override;
     VROEarthTrackingState getEarthTrackingState() const override;
     VROGeospatialPose getCameraGeospatialPose() const override;
+    bool isLocationAccuracyReduced() const override;
     void checkVPSAvailability(double latitude, double longitude,
                               std::function<void(VROVPSAvailability)> callback) override;
     void createGeospatialAnchor(double latitude, double longitude, double altitude,
@@ -200,6 +201,9 @@ public:
         std::function<void(bool, std::string, std::string)> callback) override;
 
     // Cloud anchor management
+    void rvStartScan() override;
+    void rvFinishScan(int ttlDays,
+        std::function<void(bool, std::string, std::string, std::string)> callback) override;
     void rvGetCloudAnchor(const std::string& anchorId,
         std::function<void(bool, std::string, std::string)> callback) override;
     void rvListCloudAnchors(int limit, int offset,

@@ -121,6 +121,7 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 
 // Geospatial mode
 - (BOOL)isGeospatialModeSupported;
+- (BOOL)isLocationAccuracyReduced;
 - (void)setGeospatialModeEnabled:(BOOL)enabled;
 
 // Earth tracking state
@@ -187,6 +188,20 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
              fileName:(NSString *)fileName
            appUserId:(NSString *)appUserId
     completionHandler:(void (^)(BOOL success, NSString *userAssetId, NSString *fileUrl, NSString *error))completionHandler;
+// WS-C: serialize the current world mesh to a temp file — pass the returned
+// path straight into rvUploadAsset(). locationTransformCsv is the value
+// finishScan()'s success callback returned (16 comma-separated floats);
+// there is no placed anchor for a finishScan()-hosted mesh to read a
+// transform from otherwise. Returns nil if there is no current mesh.
+- (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv;
+// WS-C: load a mesh snapshot (downloaded to filePath by the app from the
+// resolved anchor's asset fileUrl) and attach it for both physics collision
+// and visual occlusion. resolvedTransformCsv is the resolved anchor's
+// transform (16 comma-separated floats). Requires worldMeshEnabled to be
+// true. Returns NO if there is no AR scene, no world mesh, or the file is
+// malformed.
+- (BOOL)rvLoadWorldMeshFromFile:(NSString *)filePath
+              resolvedTransform:(NSString *)resolvedTransformCsv;
 - (void)rvDeleteGeospatialAnchor:(NSString *)anchorId
                completionHandler:(void (^)(BOOL success, NSString *error))completionHandler;
 - (void)rvListGeospatialAnchors:(int)limit
@@ -194,6 +209,10 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
               completionHandler:(void (^)(BOOL success, NSArray *anchors, NSString *error))completionHandler;
 
 // Cloud anchor management
+- (void)rvStartScan;
+- (void)rvFinishScan:(NSInteger)ttlDays
+   completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId,
+                               NSString *locationTransformCsv, NSString *error))completionHandler;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

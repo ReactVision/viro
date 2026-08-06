@@ -60,8 +60,9 @@ public:
         _frame(0),
         _frameSynchronizer(synchronizer),
         _hdrEnabled(true),
-        _pbrEnabled(true) {
-        
+        _pbrEnabled(true),
+        _bloomEnabled(false) {
+
     }
     
     int getFrame() const {
@@ -190,6 +191,13 @@ public:
     bool isHDREnabled() const {
         return _hdrEnabled;
     }
+
+    void setBloomEnabled(bool enabled) {
+        _bloomEnabled = enabled;
+    }
+    bool isBloomEnabled() const {
+        return _bloomEnabled;
+    }
     
     void setPBREnabled(bool enabled) {
         _pbrEnabled = enabled;
@@ -287,6 +295,7 @@ private:
     double _fps;
     bool _hdrEnabled;
     bool _pbrEnabled;
+    bool _bloomEnabled;
     
     /*
      The standard view and projection matrices. The view matrix is specific for

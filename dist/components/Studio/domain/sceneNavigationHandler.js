@@ -492,7 +492,15 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
     }
     if (fn.function_type === "NAVIGATION") {
         const nav = fn.scene_navigation;
-        if (!nav?.navigate_to || !sceneNavigator)
+        if (!nav?.navigate_to)
+            return;
+        // Web host injects its own navigation (JS fetch + re-render). Native has no
+        // injected navigate and falls back to the Viro navigator push path.
+        if (runtimeCtx?.navigate) {
+            runtimeCtx.navigate(nav.navigate_to);
+            return;
+        }
+        if (!sceneNavigator)
             return;
         void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange, runtimeCtx?.variableStore);
     }

@@ -8,21 +8,9 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-// Load the WASM assets the Vite way: ?url gives each file's served URL without
-// transforming it. importGlue dynamically imports the glue module from its URL;
-// locateFile points the glue at the .wasm/.data URLs.
-import glueUrl from "./wasm/viro-web.js?url";
-import wasmUrl from "./wasm/viro-web.wasm?url";
-import dataUrl from "./wasm/viro-web.data?url";
-
-const webRendererOptions = {
-  importGlue: () => import(/* @vite-ignore */ glueUrl),
-  locateFile: (path: string) => {
-    if (path.endsWith(".wasm")) return wasmUrl;
-    if (path.endsWith(".data")) return dataUrl;
-    return path;
-  },
-};
+// WASM asset-loading options for Vite (?url + importGlue/locateFile). Shared
+// with render.tsx — see wasmOptions.ts.
+import { webRendererOptions } from "./wasmOptions";
 
 import { Viro3DSceneNavigator } from "../components/Viro3DSceneNavigator";
 import { ViroARSceneNavigator } from "../components/AR/ViroARSceneNavigator";
@@ -44,6 +32,7 @@ import { ViroPortalScene } from "../components/ViroPortalScene";
 import { ViroPortal } from "../components/ViroPortal";
 import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
 import { makeStudioScene } from "./studioFixture";
+import { makeCheckerDataUrl } from "./placeholderAssets";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -64,22 +53,7 @@ const dragonResources = [
 ];
 
 // Procedural checkerboard texture (data URL) to exercise the texture pipeline
-// without shipping an image asset.
-function makeCheckerDataUrl(): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  const cells = 8;
-  const s = canvas.width / cells;
-  for (let y = 0; y < cells; y++) {
-    for (let x = 0; x < cells; x++) {
-      ctx.fillStyle = (x + y) % 2 ? "#ffffff" : "#3399ff";
-      ctx.fillRect(x * s, y * s, s, s);
-    }
-  }
-  return canvas.toDataURL();
-}
-
+// without shipping an image asset. Shared with render.tsx.
 const checkerUrl = makeCheckerDataUrl();
 
 ViroMaterials.createMaterials({

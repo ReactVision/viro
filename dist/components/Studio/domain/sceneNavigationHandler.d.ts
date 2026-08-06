@@ -35,6 +35,7 @@ export type SequenceRuntimeContext = {
     placementStore?: StudioPlacementStore;
     soundManager?: StudioSoundManager;
     getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
+    navigate?: (targetSceneId: string) => void;
 };
 /** Used by onClick, onCollision, and on_load_function triggers. */
 export declare function executeFunctionWithRelations(fn: StudioSceneFunction, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void, depth?: number, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext): void;

@@ -40,6 +40,7 @@ import { renderState, pushWarning, markReady, markError } from "./renderState";
 import { makeCheckerDataUrl, PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { webRendererOptions } from "./wasmOptions";
 import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
+import type { ArPlaybackFrame, ViroArSession } from "@reactvision/viro-web-renderer";
 import * as ViroWeb from "./viroWebComponents";
 import type { StudioSceneResponse } from "../components/Studio/types";
 
@@ -50,10 +51,32 @@ type RenderInput =
       code: string;
       navigatorType: "AR" | "VR" | "3D";
       assetOverrides?: Record<string, string>;
+    }
+  | {
+      /**
+       * Composite a Studio scene over a recorded AR session: the recording's
+       * frames as the camera background, its poses as the camera. The poses are
+       * computed offline and arrive already in virocore (Y-up/GL) space — see
+       * viro-web-renderer's README on `playback`.
+       *
+       * The driver steps frames itself through window.__playbackStep, one at a
+       * time, rather than letting anything run free: a screenshot has to line up
+       * with a known frame index, and a rAF loop cannot promise that.
+       */
+      kind: "playback";
+      scene: StudioSceneResponse;
+      videoUrl: string;
+      frames: ArPlaybackFrame[];
     };
 
 declare global {
   interface Window {
+    /**
+     * Advance the replay to one frame and resolve once it is decoded and drawn.
+     * Present only in playback mode, and only after the session has started.
+     */
+    __playbackStep?: (index: number) => Promise<boolean>;
+    __playbackFrameCount?: number;
     __RENDER_INPUT__?: RenderInput;
   }
 }
@@ -195,9 +218,50 @@ function StudioRoot({ scene, mode }: { scene: StudioSceneResponse; mode?: "ar" |
   });
 }
 
+function PlaybackRoot({
+  scene,
+  videoUrl,
+  frames,
+}: {
+  scene: StudioSceneResponse;
+  videoUrl: string;
+  frames: ArPlaybackFrame[];
+}) {
+  const onSessionReady = (session: ViroArSession) => {
+    // Hand the driver a stepper rather than letting it reach into the session.
+    // It resolves per frame, so the driver can screenshot straight after
+    // without racing the video decoder.
+    window.__playbackStep = (index: number) => session.renderPlaybackFrame(index);
+    window.__playbackFrameCount = session.playbackFrameCount;
+    markReady();
+  };
+
+  return createElement(StudioSceneNavigator, {
+    sceneData: scene,
+    // A recording is an AR session by definition; 3D mode would drop the camera
+    // background and defeat the point.
+    mode: "ar" as const,
+    webRendererOptions,
+    arOptions: { playback: { videoUrl, frames }, showCameraBackground: true },
+    onSessionReady,
+    onError: (err: Error) => markError(err),
+    onUnsupported: (features: string[]) => {
+      for (const f of features) pushWarning(`Studio scene uses unsupported feature "${f}" on web.`);
+    },
+  });
+}
+
 const input = window.__RENDER_INPUT__;
 if (!input) {
   markError(new Error("window.__RENDER_INPUT__ was not set before render.tsx ran."));
+} else if (input.kind === "playback") {
+  createRoot(document.getElementById("root")!).render(
+    createElement(PlaybackRoot, {
+      scene: input.scene,
+      videoUrl: input.videoUrl,
+      frames: input.frames,
+    }),
+  );
 } else if (input.kind === "studio") {
   createRoot(document.getElementById("root")!).render(
     createElement(StudioRoot, { scene: input.scene, mode: input.mode }),

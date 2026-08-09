@@ -48,6 +48,7 @@ type ArOptions = Partial<
     | "detectPlanes"
     | "maxPlanes"
     | "renderWhileLimited"
+    | "playback"
   >
 >;
 
@@ -65,6 +66,14 @@ type Props = {
   loadSlam?: ViroArSessionOptions["loadSlam"];
   /** Capture/tuning options for tracking. */
   arOptions?: ArOptions;
+  /**
+   * Called once the AR session is running, with the session itself.
+   *
+   * For hosts that drive the session rather than only observe it — replaying a
+   * recording means stepping frames by hand, which needs the session object.
+   * Live hosts do not need this; the session is also on ViroARContext.
+   */
+  onSessionReady?: (session: ViroArSession) => void;
   /** Overlay label for the start button. */
   startLabel?: string;
   [key: string]: any;
@@ -226,8 +235,13 @@ export function ViroARSceneNavigator(props: Props) {
     if (!renderer || starting || started) return;
     setStarting(true);
     setError(null);
-    // Request DeviceMotion permission from within this tap (required on iOS).
-    await requestDeviceMotionPermission();
+    // Replay needs neither: no camera to open, no motion events to subscribe to.
+    // Asking anyway would put a permission prompt in front of a preview that
+    // cannot use the answer.
+    if (!props.arOptions?.playback) {
+      // Request DeviceMotion permission from within this tap (required on iOS).
+      await requestDeviceMotionPermission();
+    }
     const session = new ViroArSession({
       sceneApi: renderer.scene,
       loadSlam: resolveLoadSlam(),
@@ -245,7 +259,17 @@ export function ViroARSceneNavigator(props: Props) {
     await session.start();
     setStarted(true);
     setStarting(false);
-  }, [renderer, starting, started, resolveLoadSlam, props.arOptions]);
+    props.onSessionReady?.(session);
+  }, [renderer, starting, started, resolveLoadSlam, props.arOptions, props.onSessionReady]);
+
+  // Replay starts on its own. The button exists to satisfy a browser that will
+  // not open a camera without a gesture; there is no camera here, and a preview
+  // that waits for a click nobody is there to make would simply never render.
+  useEffect(() => {
+    if (props.arOptions?.playback && renderer && !started && !starting) {
+      void startAR();
+    }
+  }, [props.arOptions?.playback, renderer, started, starting, startAR]);
 
   const SceneComponent = props.initialScene?.scene;
 

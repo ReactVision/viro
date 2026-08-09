@@ -64,6 +64,17 @@ export interface StudioSceneNavigatorWebProps {
    * Default true, matching native.
    */
   placementIndicator?: boolean;
+  /**
+   * Capture/tuning options forwarded to the AR session. Merged over the
+   * defaults this component sets, so a caller can add without restating them.
+   * Passing `playback` here replays a recording instead of opening a camera.
+   */
+  arOptions?: Record<string, unknown>;
+  /**
+   * Called with the AR session once it is running, for hosts that drive it
+   * rather than only observe it — stepping a replay, for instance.
+   */
+  onSessionReady?: (session: any) => void;
   noAssetsMessage?: string;
   loadingView?: React.ReactNode;
   renderError?: (error: Error) => React.ReactNode;
@@ -81,6 +92,8 @@ export const StudioSceneNavigator = forwardRef<
   const {
     recordingIndicator = true,
     placementIndicator = true,
+    arOptions,
+    onSessionReady,
     sceneData: injectedSceneData,
     loadScene,
     sceneId,
@@ -211,7 +224,8 @@ export const StudioSceneNavigator = forwardRef<
           initialScene={{ scene: SceneComponent }}
           webRendererOptions={webRendererOptions}
           slamScriptUrl={slamScriptUrl}
-          arOptions={{ detectPlanes: true }}
+          arOptions={{ detectPlanes: true, ...arOptions }}
+          onSessionReady={onSessionReady}
         />
       ) : (
         <Viro3DSceneNavigator

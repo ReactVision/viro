@@ -266,10 +266,13 @@ export function ViroARSceneNavigator(props: Props) {
   // not open a camera without a gesture; there is no camera here, and a preview
   // that waits for a click nobody is there to make would simply never render.
   useEffect(() => {
-    if (props.arOptions?.playback && renderer && !started && !starting) {
+    // Waits for rootNode, not just for the renderer: the live path starts from a
+    // tap, which happens long after the scene has mounted, and matching that
+    // ordering costs nothing.
+    if (props.arOptions?.playback && renderer && rootNode && !started && !starting) {
       void startAR();
     }
-  }, [props.arOptions?.playback, renderer, started, starting, startAR]);
+  }, [props.arOptions?.playback, renderer, rootNode, started, starting, startAR]);
 
   const SceneComponent = props.initialScene?.scene;
 

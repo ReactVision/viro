@@ -282,6 +282,11 @@ function createImage(
   config: NodeConfig,
   onAssetLoaded?: (id: string) => void,
   notifyPhysicsDrag?: (assetId: string) => void,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
   nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
@@ -305,6 +310,10 @@ function createImage(
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
+      {...(onCollision ? { onCollision: onCollision as any } : {})}
       {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
@@ -321,6 +330,11 @@ const VariableText: React.FC<{
   config: NodeConfig;
   store?: StudioVariableStore;
   notifyPhysicsDrag?: (assetId: string) => void;
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void;
   nodeRef?: (ref: unknown) => void;
   // Injected via cloneElement; TEXT is the only node type that is a component
   // wrapper, so it must forward these to its ViroText: `visible` from
@@ -333,6 +347,7 @@ const VariableText: React.FC<{
   config,
   store,
   notifyPhysicsDrag,
+  onCollision,
   nodeRef,
   visible,
   position,
@@ -373,6 +388,10 @@ const VariableText: React.FC<{
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
+      {...(onCollision ? { onCollision: onCollision as any } : {})}
       {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
@@ -453,6 +472,11 @@ function createText(
   config: NodeConfig,
   notifyPhysicsDrag?: (assetId: string) => void,
   store?: StudioVariableStore,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
   nodeRef?: (ref: unknown) => void
 ): React.ReactElement {
   return (
@@ -462,6 +486,7 @@ function createText(
       config={config}
       store={store}
       notifyPhysicsDrag={notifyPhysicsDrag}
+      onCollision={onCollision}
       nodeRef={nodeRef}
     />
   );
@@ -471,6 +496,11 @@ function createVideo(
   asset: StudioAsset,
   config: NodeConfig,
   notifyPhysicsDrag?: (assetId: string) => void,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
   nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
@@ -495,6 +525,10 @@ function createVideo(
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
+      {...(onCollision ? { onCollision: onCollision as any } : {})}
       {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
@@ -565,6 +599,7 @@ export function createNode(
         config,
         onAssetLoaded,
         notifyPhysicsDrag,
+        onCollision,
         proximityRef
       );
       break;
@@ -574,11 +609,18 @@ export function createNode(
         config,
         notifyPhysicsDrag,
         runtimeCtx?.variableStore,
+        onCollision,
         proximityRef
       );
       break;
     case "VIDEO":
-      node = createVideo(asset, config, notifyPhysicsDrag, proximityRef);
+      node = createVideo(
+        asset,
+        config,
+        notifyPhysicsDrag,
+        onCollision,
+        proximityRef
+      );
       break;
     default:
       console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);

@@ -15,14 +15,24 @@ export function useStudioPlacement(): {
   name: string | null;
   showMiss: boolean;
 } {
-  const isPlacing = useSyncExternalStore(subscribe, () =>
-    studioPlacementBannerStore.isActive()
+  // The third argument is the server snapshot. Without it useSyncExternalStore
+  // throws outright in any server-rendering context, which the web platform can
+  // plausibly be -- and the store is a client-side thing, so the honest server
+  // answer is "nothing is being placed" rather than a guess.
+  const isPlacing = useSyncExternalStore(
+    subscribe,
+    () => studioPlacementBannerStore.isActive(),
+    () => false
   );
-  const name = useSyncExternalStore(subscribe, () =>
-    studioPlacementBannerStore.name()
+  const name = useSyncExternalStore(
+    subscribe,
+    () => studioPlacementBannerStore.name(),
+    () => null
   );
-  const showMiss = useSyncExternalStore(subscribe, () =>
-    studioPlacementBannerStore.showMiss()
+  const showMiss = useSyncExternalStore(
+    subscribe,
+    () => studioPlacementBannerStore.showMiss(),
+    () => false
   );
   return { isPlacing, name, showMiss };
 }

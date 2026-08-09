@@ -14,11 +14,17 @@ export function useStudioRecording(): {
   isRecording: boolean;
   startedAt: number | null;
 } {
-  const isRecording = useSyncExternalStore(subscribe, () =>
-    studioRecordingStore.isRecording()
+  // Server snapshot: see the note in useStudioPlacement. Nothing is recording
+  // on a server, and saying so is better than throwing.
+  const isRecording = useSyncExternalStore(
+    subscribe,
+    () => studioRecordingStore.isRecording(),
+    () => false
   );
-  const startedAt = useSyncExternalStore(subscribe, () =>
-    studioRecordingStore.startedAt()
+  const startedAt = useSyncExternalStore(
+    subscribe,
+    () => studioRecordingStore.startedAt(),
+    () => null
   );
   return { isRecording, startedAt };
 }

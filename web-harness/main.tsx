@@ -288,7 +288,7 @@ function App() {
         <ViroARSceneNavigator
           initialScene={{ scene: ARDemoScene }}
           webRendererOptions={webRendererOptions}
-          slamScriptUrl="/slam_wasm.js"
+          slamScriptUrl="/tinyvio-slam.js"
           arOptions={{ detectPlanes: true }}
         />
       )}

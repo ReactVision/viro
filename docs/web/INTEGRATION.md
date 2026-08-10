@@ -124,26 +124,32 @@ AR needs a second WASM module, **slam-wasm**, plus device capabilities.
 ### 1. Build slam-wasm
 
 ```sh
-cd slam
+cd tinyvio
 source ~/emsdk/emsdk_env.sh
-emcmake cmake -B build-wasm -DSLAM_BUILD_WASM=ON -DSLAM_BUILD_TESTS=OFF
-emmake make -C build-wasm -j$(nproc)
+bash scripts/build_slam_wasm.sh
 ```
 
-Outputs `build-wasm/platforms/web/slam_wasm.js` + `slam_wasm.wasm`.
+Outputs `web/slam/tinyvio-slam.js` + `tinyvio-slam.wasm`, about 300 KB together.
+
+The engine is **tinyvio**, presented through the drop-in C API in its
+`platforms/slam/`. The surface this renderer drives — a `SlamModule` factory
+yielding a `SlamEngine` class — is unchanged, which is why nothing here had to
+move when the engine did. The files are named for what they are, because a
+binary called `slam_wasm.wasm` next to them is how someone ends up debugging the
+engine that was replaced.
 
 ### 2. Serve the artifacts
 
-The slam build uses `MODULARIZE + EXPORT_NAME='SlamModule'` — a classic global
+The build uses `MODULARIZE + EXPORT_NAME='SlamModule'` — a classic global
 factory loaded via a `<script>` tag. Copy both files somewhere your app serves
 static assets and keep them side by side (the `.js` resolves the `.wasm` relative
 to its own URL):
 
 ```sh
-cp build-wasm/platforms/web/slam_wasm.{js,wasm} <your-app>/public/
+cp web/slam/tinyvio-slam.{js,wasm} <your-app>/public/
 ```
 
-Serve `slam_wasm.wasm` with `Content-Type: application/wasm`.
+Serve `tinyvio-slam.wasm` with `Content-Type: application/wasm`.
 
 ### 3. Point the navigator at it
 
@@ -151,13 +157,13 @@ Serve `slam_wasm.wasm` with `Content-Type: application/wasm`.
 <ViroARSceneNavigator
   initialScene={{ scene: ARScene }}
   webRendererOptions={webRendererOptions}
-  slamScriptUrl="/slam_wasm.js"      // injected as <script>, exposes global SlamModule
+  slamScriptUrl="/tinyvio-slam.js"   // injected as <script>, exposes global SlamModule
   arOptions={{ detectPlanes: true }}
 />
 ```
 
-For an ESM/bundler-managed slam build instead, drop `slamScriptUrl` and pass
-`loadSlam: () => import("/path/slam_wasm.mjs")`.
+For an ESM/bundler-managed build instead, drop `slamScriptUrl` and pass
+`loadSlam: () => import("/path/tinyvio-slam.mjs")`.
 
 ### 4. Device requirements & permissions
 
@@ -177,7 +183,7 @@ size), `tuning` (slam noise/FAST/lost thresholds), `facingMode`
 ## Deployment
 
 - Host the renderer trio (`viro-web.js/.wasm/.data`) and, for AR, the slam pair
-  (`slam_wasm.js/.wasm`) on any static host; set `assetBaseUrl` / `slamScriptUrl`
+  (`tinyvio-slam.js/.wasm`) on any static host; set `assetBaseUrl` / `slamScriptUrl`
   accordingly.
 - Ensure `.wasm` is served as `application/wasm` and `.data` as a binary asset.
 - Serve over **HTTPS** — mandatory for camera access, and required by iOS even on

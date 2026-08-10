@@ -12,6 +12,10 @@ import { createElement, useEffect } from "react";
 import { pushWarning } from "./renderState";
 import { webRendererOptions } from "./wasmOptions";
 
+// tinyvio, built through platforms/slam's drop-in C API and served from
+// public/. Rebuild with tinyvio's scripts/build_slam_wasm.sh.
+const SLAM_SCRIPT_URL = "/tinyvio-slam.js";
+
 export { Viro360Image } from "../components/Viro360Image";
 export { Viro360Video } from "../components/Viro360Video";
 export { Viro3DObject } from "../components/Viro3DObject";
@@ -72,7 +76,15 @@ export function Viro3DSceneNavigator(props: any) {
 }
 
 export function ViroARSceneNavigator(props: any) {
-  return createElement(_ViroARSceneNavigatorRaw, { webRendererOptions, ...props });
+  // The tracking engine too, for the same reason: caller-supplied TSX has no
+  // way to know where this harness serves it from, and without a default the
+  // AR session fails at start with "slam-wasm not found" — which reads like a
+  // missing build rather than a missing prop.
+  return createElement(_ViroARSceneNavigatorRaw, {
+    webRendererOptions,
+    slamScriptUrl: SLAM_SCRIPT_URL,
+    ...props,
+  });
 }
 
 // There's no web navigator/scene for VR yet — fall back to the 3D ones and

@@ -39,6 +39,8 @@ import * as Babel from "@babel/standalone";
 import { renderState, pushWarning, markReady, markError } from "./renderState";
 import { makeCheckerDataUrl, PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { webRendererOptions } from "./wasmOptions";
+
+const SLAM_SCRIPT_URL = "/tinyvio-slam.js";
 import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
 import type { ArPlaybackFrame, ViroArSession } from "@reactvision/viro-web-renderer";
 import * as ViroWeb from "./viroWebComponents";
@@ -219,6 +221,9 @@ function StudioRoot({ scene, mode }: { scene: StudioSceneResponse; mode?: "ar" |
     sceneData: scene,
     mode,
     webRendererOptions,
+    // tinyvio, through platforms/slam's drop-in C API. Only the live AR path
+    // loads it; playback drives poses computed outside the browser.
+    slamScriptUrl: SLAM_SCRIPT_URL,
     onSceneReady: markReady,
     onError: (err: Error) => markError(err),
     onUnsupported: (features: string[]) => {

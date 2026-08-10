@@ -8,9 +8,11 @@
  * permission can only be requested from a tap. So we render a "Start AR" overlay
  * and begin tracking on tap.
  *
- * slam-wasm is loaded as a classic <script> exposing a global `SlamModule`
- * factory (matches the slam web build: MODULARIZE + EXPORT_NAME='SlamModule').
- * Override via the `loadSlam` prop for bundler/ESM setups.
+ * The tracking engine is loaded as a classic <script> exposing a global
+ * `SlamModule` factory (MODULARIZE + EXPORT_NAME='SlamModule'). That engine is
+ * tinyvio, built through its platforms/slam drop-in C API — the name is the
+ * interface's, not the implementation's, and keeping it is why this file did
+ * not change when the engine did. Override via `loadSlam` for ESM setups.
  *
  * MVP scope: single scene; camera + 6-DoF pose tracking. Planes/hit-test are a
  * follow-up.
@@ -58,7 +60,7 @@ type Props = {
   /** WASM renderer asset-loading options (bundler/ESM). See Viro3DSceneNavigator.web. */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
   /**
-   * URL to the slam-wasm glue (slam_wasm.js). Injected as a <script>; the build
+   * URL to the tracking engine's glue (tinyvio-slam.js). Injected as a <script>; the build
    * exposes a global `SlamModule` factory. Ignored if `loadSlam` is provided.
    */
   slamScriptUrl?: string;

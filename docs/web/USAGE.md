@@ -473,7 +473,7 @@ export default function App() {
     <ViroARSceneNavigator
       initialScene={{ scene: ARScene }}
       webRendererOptions={webRendererOptions}
-      slamScriptUrl="/slam_wasm.js"
+      slamScriptUrl="/tinyvio-slam.js"
       arOptions={{ detectPlanes: true }}
     />
   );
@@ -488,7 +488,7 @@ stays put.
 
 | Prop | Type | Notes |
 |---|---|---|
-| `slamScriptUrl` | `string` | URL to `slam_wasm.js` (injected as a `<script>`, exposes global `SlamModule`). |
+| `slamScriptUrl` | `string` | URL to `tinyvio-slam.js` (injected as a `<script>`, exposes global `SlamModule`). |
 | `loadSlam` | `() => Promise<factory>` | ESM alternative to `slamScriptUrl`. |
 | `arOptions` | object | `detectPlanes`, `maxPlanes`, `facingMode`, `captureWidth/Height`, `intrinsics`, `tuning`, `showCameraBackground`, `renderWhileLimited`. |
 | `startLabel` | `string` | Text above the Start button. |

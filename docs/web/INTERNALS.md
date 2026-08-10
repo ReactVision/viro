@@ -28,7 +28,7 @@ Four moving parts across three repos plus one package:
  React contexts / hooks             ViroWebRenderer (host)            WebGL2 via VRODriverOpenGLWasm
  ViroArSession (AR orchestration)   loader (Emscripten glue)
 
- slam/ (tracking C++)  ──►  slam_wasm.wasm  (SlamEngine, embind)  ◄── driven from ViroArSession (JS)
+ tinyvio (tracking C++) ─►  tinyvio-slam.wasm (SlamEngine, embind) ◄── driven from ViroArSession (JS)
 ```
 
 - **`virocore`** — the C++ renderer, compiled to `viro-web.wasm`. The web entry
@@ -39,7 +39,8 @@ Four moving parts across three repos plus one package:
   façade, and `ViroArSession` (AR orchestration).
 - **`viro`** — the React bridge: `.web.tsx` components that translate props into
   `ViroSceneApi` calls via React context + lifecycle hooks.
-- **`slam`** — the tracking engine, compiled separately to `slam_wasm.wasm`
+- **tinyvio** — the tracking engine, compiled separately to `tinyvio-slam.wasm`
+  through its `platforms/slam/` drop-in C API
   (embind `SlamEngine`). Never linked into virocore — JS bridges the two.
 
 **Two co-located WASM modules.** The renderer and slam load independently; JS
@@ -323,7 +324,7 @@ virocore/wasm  --build_web.sh (emsdk)-->  products/build/viro-web.{js,wasm,data}
 slam (for AR):
 
 ```
-slam  --emcmake/emmake-->  build-wasm/platforms/web/slam_wasm.{js,wasm}  --(copy)-->  app public/
+tinyvio  --build_slam_wasm.sh-->  web/slam/tinyvio-slam.{js,wasm}  --(copy)-->  app public/
 ```
 
 Gotchas:

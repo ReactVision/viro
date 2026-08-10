@@ -44,6 +44,7 @@ const SLAM_SCRIPT_URL = "/tinyvio-slam.js";
 import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
 import type { ArPlaybackFrame, ViroArSession } from "@reactvision/viro-web-renderer";
 import * as ViroWeb from "./viroWebComponents";
+import { setPlaybackSource } from "./viroWebComponents";
 import type { StudioSceneResponse } from "../components/Studio/types";
 
 type RenderInput =
@@ -66,7 +67,9 @@ type RenderInput =
        * with a known frame index, and a rAF loop cannot promise that.
        */
       kind: "playback";
-      scene: StudioSceneResponse;
+      /** A StudioSceneResponse, or TSX to compile. */
+      scene: StudioSceneResponse | string;
+      assetOverrides?: Record<string, string>;
       videoUrl: string;
       frames: ArPlaybackFrame[];
       /**
@@ -276,15 +279,33 @@ const input = window.__RENDER_INPUT__;
 if (!input) {
   markError(new Error("window.__RENDER_INPUT__ was not set before render.tsx ran."));
 } else if (input.kind === "playback") {
-  createRoot(document.getElementById("root")!).render(
-    createElement(PlaybackRoot, {
-      scene: input.scene,
-      videoUrl: input.videoUrl,
-      frames: input.frames,
-      intrinsics: input.intrinsics,
-      intrinsicsSize: input.intrinsicsSize,
-    }),
-  );
+  if (typeof input.scene === "string") {
+    // Caller TSX over a recording. The scene declares its own navigator, so the
+    // recording is handed to it through the wrapper in viroWebComponents rather
+    // than as a prop the caller would have had to know to pass.
+    setPlaybackSource(
+      { videoUrl: input.videoUrl, frames: input.frames,
+        intrinsics: input.intrinsics, intrinsicsSize: input.intrinsicsSize },
+      (session: any) => {
+        window.__playbackStep = (i: number) => session.renderPlaybackFrame(i);
+        window.__playbackFrameCount = session.playbackFrameCount;
+        markReady();
+      },
+    );
+    createRoot(document.getElementById("root")!).render(
+      createElement(TsxRoot, { code: input.scene, assetOverrides: input.assetOverrides }),
+    );
+  } else {
+    createRoot(document.getElementById("root")!).render(
+      createElement(PlaybackRoot, {
+        scene: input.scene,
+        videoUrl: input.videoUrl,
+        frames: input.frames,
+        intrinsics: input.intrinsics,
+        intrinsicsSize: input.intrinsicsSize,
+      }),
+    );
+  }
 } else if (input.kind === "studio") {
   createRoot(document.getElementById("root")!).render(
     createElement(StudioRoot, { scene: input.scene, mode: input.mode }),

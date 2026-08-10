@@ -75,6 +75,21 @@ export function Viro3DSceneNavigator(props: any) {
   return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
 }
 
+// A recording to drive the AR session from, when one was supplied. Caller TSX
+// declares its own <ViroARSceneNavigator> and has no way to know about any of
+// this, so the wrapper injects it -- the same reason webRendererOptions is
+// injected here rather than passed.
+let playbackSource: unknown = null;
+let onSessionReady: ((session: unknown) => void) | null = null;
+
+export function setPlaybackSource(
+  source: unknown,
+  onReady: (session: unknown) => void,
+): void {
+  playbackSource = source;
+  onSessionReady = onReady;
+}
+
 export function ViroARSceneNavigator(props: any) {
   // The tracking engine too, for the same reason: caller-supplied TSX has no
   // way to know where this harness serves it from, and without a default the
@@ -84,6 +99,14 @@ export function ViroARSceneNavigator(props: any) {
     webRendererOptions,
     slamScriptUrl: SLAM_SCRIPT_URL,
     ...props,
+    // After the caller's props, not before: a scene rendered over a recording
+    // is rendered over that recording, whatever its own JSX asked for.
+    ...(playbackSource
+      ? {
+          arOptions: { playback: playbackSource, showCameraBackground: true },
+          onSessionReady,
+        }
+      : {}),
   });
 }
 

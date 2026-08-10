@@ -67,6 +67,15 @@ type RenderInput =
       scene: StudioSceneResponse;
       videoUrl: string;
       frames: ArPlaybackFrame[];
+      /**
+       * The recording camera's intrinsics, and the resolution they were
+       * measured at. Without them the scene is projected through an assumed
+       * 60-degree field of view, which lines up with the footage only by
+       * coincidence — the camera image fills the viewport either way, so the
+       * mismatch shows up as content standing in the wrong place.
+       */
+      intrinsics?: { fx: number; fy: number; cx: number; cy: number };
+      intrinsicsSize?: { width: number; height: number };
     };
 
 declare global {
@@ -222,10 +231,14 @@ function PlaybackRoot({
   scene,
   videoUrl,
   frames,
+  intrinsics,
+  intrinsicsSize,
 }: {
   scene: StudioSceneResponse;
   videoUrl: string;
   frames: ArPlaybackFrame[];
+  intrinsics?: { fx: number; fy: number; cx: number; cy: number };
+  intrinsicsSize?: { width: number; height: number };
 }) {
   const onSessionReady = (session: ViroArSession) => {
     // Hand the driver a stepper rather than letting it reach into the session.
@@ -242,7 +255,10 @@ function PlaybackRoot({
     // background and defeat the point.
     mode: "ar" as const,
     webRendererOptions,
-    arOptions: { playback: { videoUrl, frames }, showCameraBackground: true },
+    arOptions: {
+      playback: { videoUrl, frames, intrinsics, intrinsicsSize },
+      showCameraBackground: true,
+    },
     onSessionReady,
     onError: (err: Error) => markError(err),
     onUnsupported: (features: string[]) => {
@@ -260,6 +276,8 @@ if (!input) {
       scene: input.scene,
       videoUrl: input.videoUrl,
       frames: input.frames,
+      intrinsics: input.intrinsics,
+      intrinsicsSize: input.intrinsicsSize,
     }),
   );
 } else if (input.kind === "studio") {

@@ -75,8 +75,15 @@ export function createNodeConfig(
   // "too close" clamp — both meant for camera/plane assets — must not apply.
   const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
 
+  // `world_placement` means the coordinates are a point in the world, not a
+  // camera-relative offset an author typed. The clamp below exists to stop an
+  // author putting an object inside the user's face, and it cannot tell the two
+  // apart: applied to a world coordinate it silently rewrites it to -2, which
+  // pins the object in front of the view. That reads as "the anchor does not
+  // stay fixed", and the only notice is the warning below.
+  const isWorldPlacement = !!(asset as { world_placement?: boolean }).world_placement;
   let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
-  if (!hasTriggerImage && !isTapToPlace && posZ > -0.5) {
+  if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
     console.warn(
       `[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`
     );

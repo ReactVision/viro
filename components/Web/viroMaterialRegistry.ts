@@ -8,7 +8,7 @@
  * roughness/metalness/cull/blend/depth), and textures (diffuse + PBR maps).
  * Textures load asynchronously and are applied when ready.
  */
-import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
+import type { ViroSceneApi, ViroHandle, ViroShaderEntryPoint } from "@reactvision/viro-web-renderer";
 import {
   ViroLightingModel,
   ViroCullMode,
@@ -17,12 +17,14 @@ import {
   ViroFilterMode,
   ViroTextureChannel,
 } from "@reactvision/viro-web-renderer";
+import type { ViroShaderModifier, ViroShaderModifiers } from "../Material/ViroMaterials";
 import { parseColorToRGBA } from "./viroColor";
 import { loadImageRGBA, resolveImageSource } from "./viroImageLoader";
 
 export interface ViroWebMaterialDef {
   diffuseColor?: string | number;
   lightingModel?: string;
+  shaderModifiers?: ViroShaderModifiers;
   [key: string]: unknown;
 }
 
@@ -103,6 +105,46 @@ const TEXTURE_CHANNELS: Array<[string, ViroTextureChannel, boolean]> = [
   ["ambientOcclusionTexture", ViroTextureChannel.AmbientOcclusion, false],
 ];
 
+// Mirrors MaterialManager.java::parseShaderModifiers: each key of the
+// shaderModifiers dict is a shader entry point, whose value is either the
+// modifier body directly (string form) or a dict with body/uniforms/varyings/
+// requiresSceneDepth/requiresCameraTexture. uniforms + body are concatenated
+// with a newline into the single blob the C API expects, same as native.
+function applyShaderModifiers(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  const modifiers = def.shaderModifiers;
+  if (!modifiers) return;
+
+  for (const entryPoint of Object.keys(modifiers) as Array<keyof ViroShaderModifiers>) {
+    const entry = modifiers[entryPoint];
+    if (entry === undefined) continue;
+
+    let code: string | undefined;
+    let varyings: string[] | undefined;
+    let requiresSceneDepth = false;
+    let requiresCameraTexture = false;
+
+    if (typeof entry === "string") {
+      code = entry;
+    } else {
+      const dict = entry as ViroShaderModifier;
+      code = dict.uniforms ? `${dict.uniforms}\n${dict.body ?? ""}` : dict.body;
+      varyings = dict.varyings;
+      requiresSceneDepth = dict.requiresSceneDepth ?? false;
+      requiresCameraTexture = dict.requiresCameraTexture ?? false;
+    }
+
+    if (!code) continue;
+    scene.addMaterialShaderModifier(
+      material,
+      entryPoint as ViroShaderEntryPoint,
+      code,
+      varyings,
+      requiresSceneDepth,
+      requiresCameraTexture,
+    );
+  }
+}
+
 function applyTextures(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
   const wrapS = wrapValue(def.wrapS as string | undefined);
   const wrapT = wrapValue(def.wrapT as string | undefined);
@@ -164,6 +206,7 @@ export function createMaterialFromRegistry(
   if (blend !== undefined) scene.setMaterialBlendMode(material, blend);
 
   applyTextures(scene, material, def);
+  applyShaderModifiers(scene, material, def);
   handleCache.set(name, material);
   return material;
 }

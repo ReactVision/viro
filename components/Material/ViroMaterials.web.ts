@@ -3,8 +3,11 @@
  * to the native VRTMaterialManager, it stores them in the web material registry,
  * where node components resolve them by name and build materials via the C API.
  *
- * MVP scope: diffuseColor + lightingModel. Textures/PBR maps/shader modifiers
- * are accepted but currently ignored on web.
+ * Supports diffuseColor, lightingModel, scalar properties, PBR textures, and
+ * shaderModifiers (parsed the same way as MaterialManager.java's native
+ * bridge — see viroMaterialRegistry.ts::applyShaderModifiers). Not yet
+ * implemented: updateShaderUniform (per-frame uniform value updates after a
+ * material is built) is still a no-op on web.
  */
 import { registerViroMaterials } from "../Web/viroMaterialRegistry";
 

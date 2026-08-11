@@ -350,3 +350,13 @@ Gotchas:
 - **`web-harness/` is excluded from `viro/tsconfig.json`** — the IDE may flag
   `webRendererOptions` on the AR navigator there (it resolves to the native
   `.tsx`); Vite resolves `.web.tsx` at runtime, so it's cosmetic.
+- **Every component needs a `.web.tsx`, even ones that are pure no-ops on web.**
+  `dist/index.js` is one CommonJS barrel that `require()`s every component
+  eagerly at import time. A native-only component with no `.web.tsx` sibling
+  falls through to the plain `.tsx`, whose `requireNativeComponent()` call at
+  module scope throws immediately on web — and since the whole barrel loads in
+  one pass, that one missing stub crashes *any* web usage of the package, not
+  just usage of that component. When adding a component that has no web
+  implementation (e.g. `ViroARImageMarker`, `ViroObjectDetector`,
+  `ViroVirtualJoystick`), add a minimal `.web.tsx` that renders `null` (plus a
+  dev-only `console.warn`) rather than omitting the file.

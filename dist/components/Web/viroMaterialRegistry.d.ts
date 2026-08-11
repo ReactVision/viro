@@ -9,13 +9,22 @@
  * Textures load asynchronously and are applied when ready.
  */
 import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
+import type { ViroShaderModifiers } from "../Material/ViroMaterials";
 export interface ViroWebMaterialDef {
     diffuseColor?: string | number;
     lightingModel?: string;
+    shaderModifiers?: ViroShaderModifiers;
     [key: string]: unknown;
 }
 export declare function registerViroMaterials(materials: Record<string, ViroWebMaterialDef>): void;
 export declare function getViroMaterialDef(name: string): ViroWebMaterialDef | undefined;
+/**
+ * ViroMaterials.deleteMaterials's web backend. Mirrors MaterialManager.java's
+ * deleteMaterials: for each name, if it was already built, destroy its native
+ * handle before dropping it; either way, drop the definition so a later
+ * createMaterials() for the same name starts clean.
+ */
+export declare function deleteViroMaterials(materialNames: string[]): void;
 /** Drop cached material handles (call when the renderer/module is disposed). */
 export declare function resetMaterialCache(): void;
 /**
@@ -28,3 +37,17 @@ export declare function createMaterialFromRegistry(scene: ViroSceneApi, name: st
  * Used by ViroMaterialVideo to drive video frames onto a named material.
  */
 export declare function getSharedMaterialHandle(scene: ViroSceneApi, name: string): ViroHandle;
+/**
+ * ViroMaterials.updateShaderUniform's web backend. Mirrors
+ * MaterialManager.java::updateShaderUniform: resolve the material by name,
+ * dispatch on uniformType. Requires the uniform to be declared in a
+ * shaderModifier already attached to the material (see applyShaderModifiers)
+ * — the value has nowhere to go otherwise, same as native.
+ *
+ * "vec2" is a web-only superset today: the native Android/iOS bridges don't
+ * expose it (their RN methods have no vec2 branch), but the underlying engine
+ * (VROMaterial) now has a real vec2 uniform map, added for this. Values
+ * written here won't do anything on native until those bridges add a
+ * matching branch.
+ */
+export declare function updateMaterialShaderUniform(materialName: string, uniformName: string, uniformType: "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D", value: unknown): void;

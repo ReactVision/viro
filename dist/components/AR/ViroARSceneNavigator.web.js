@@ -44,9 +44,11 @@ exports.ViroARSceneNavigator = ViroARSceneNavigator;
  * permission can only be requested from a tap. So we render a "Start AR" overlay
  * and begin tracking on tap.
  *
- * slam-wasm is loaded as a classic <script> exposing a global `SlamModule`
- * factory (matches the slam web build: MODULARIZE + EXPORT_NAME='SlamModule').
- * Override via the `loadSlam` prop for bundler/ESM setups.
+ * The tracking engine is loaded as a classic <script> exposing a global
+ * `SlamModule` factory (MODULARIZE + EXPORT_NAME='SlamModule'). That engine is
+ * tinyvio, built through its platforms/slam drop-in C API — the name is the
+ * interface's, not the implementation's, and keeping it is why this file did
+ * not change when the engine did. Override via `loadSlam` for ESM setups.
  *
  * MVP scope: single scene; camera + 6-DoF pose tracking. Planes/hit-test are a
  * follow-up.
@@ -211,8 +213,13 @@ function ViroARSceneNavigator(props) {
             return;
         setStarting(true);
         setError(null);
-        // Request DeviceMotion permission from within this tap (required on iOS).
-        await (0, viro_web_renderer_1.requestDeviceMotionPermission)();
+        // Replay needs neither: no camera to open, no motion events to subscribe to.
+        // Asking anyway would put a permission prompt in front of a preview that
+        // cannot use the answer.
+        if (!props.arOptions?.playback) {
+            // Request DeviceMotion permission from within this tap (required on iOS).
+            await (0, viro_web_renderer_1.requestDeviceMotionPermission)();
+        }
         const session = new viro_web_renderer_1.ViroArSession({
             sceneApi: renderer.scene,
             loadSlam: resolveLoadSlam(),
@@ -230,7 +237,19 @@ function ViroARSceneNavigator(props) {
         await session.start();
         setStarted(true);
         setStarting(false);
-    }, [renderer, starting, started, resolveLoadSlam, props.arOptions]);
+        props.onSessionReady?.(session);
+    }, [renderer, starting, started, resolveLoadSlam, props.arOptions, props.onSessionReady]);
+    // Replay starts on its own. The button exists to satisfy a browser that will
+    // not open a camera without a gesture; there is no camera here, and a preview
+    // that waits for a click nobody is there to make would simply never render.
+    (0, react_1.useEffect)(() => {
+        // Waits for rootNode, not just for the renderer: the live path starts from a
+        // tap, which happens long after the scene has mounted, and matching that
+        // ordering costs nothing.
+        if (props.arOptions?.playback && renderer && rootNode && !started && !starting) {
+            void startAR();
+        }
+    }, [props.arOptions?.playback, renderer, rootNode, started, starting, startAR]);
     const SceneComponent = props.initialScene?.scene;
     const sceneNavigator = {
         push: () => { },

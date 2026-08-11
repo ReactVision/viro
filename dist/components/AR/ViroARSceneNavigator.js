@@ -487,6 +487,31 @@ class ViroARSceneNavigator extends React.Component {
      *                  Note: TTL > 1 requires keyless authorization on Google Cloud.
      * @returns Promise resolving to the hosting result with cloudAnchorId
      */
+    /**
+     * Records this AR session (video + IMU + tracked pose) to local storage — see
+     * ViroWorkspace/plans/viro-ar-recording-playback-plan.md for the format. This is for
+     * offline analysis/replay; there is no in-app playback of a recording. Not to be confused
+     * with startVideoRecording, which captures the rendered screen only.
+     *
+     * @param outputDir - A directory that will contain video.mp4 + session.jsonl. Created if
+     *                    it doesn't exist.
+     * @returns Promise resolving to { success: boolean, error?: string }.
+     */
+    _startRecording = async (outputDir) => {
+        return await ViroARSceneNavigatorModule.startRecording((0, react_native_1.findNodeHandle)(this), outputDir);
+    };
+    /**
+     * Stops the recording started by startRecording and finalizes video.mp4 + session.jsonl.
+     */
+    _stopRecording = async () => {
+        return await ViroARSceneNavigatorModule.stopRecording((0, react_native_1.findNodeHandle)(this));
+    };
+    /**
+     * The current recording state: "None" | "Recording" | "IOError" | "Unsupported".
+     */
+    _getRecordingStatus = async () => {
+        return await ViroARSceneNavigatorModule.getRecordingStatus((0, react_native_1.findNodeHandle)(this));
+    };
     _hostCloudAnchor = async (anchorId, ttlDays = 1) => {
         return await ViroARSceneNavigatorModule.hostCloudAnchor((0, react_native_1.findNodeHandle)(this), anchorId, Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
         );
@@ -940,6 +965,9 @@ class ViroARSceneNavigator extends React.Component {
         replace: this.replace,
         startVideoRecording: this._startVideoRecording,
         stopVideoRecording: this._stopVideoRecording,
+        startRecording: this._startRecording,
+        stopRecording: this._stopRecording,
+        getRecordingStatus: this._getRecordingStatus,
         takeScreenshot: this._takeScreenshot,
         resetARSession: this._resetARSession,
         setWorldOrigin: this._setWorldOrigin,
@@ -1006,6 +1034,9 @@ class ViroARSceneNavigator extends React.Component {
         replace: this.replace,
         startVideoRecording: this._startVideoRecording,
         stopVideoRecording: this._stopVideoRecording,
+        startRecording: this._startRecording,
+        stopRecording: this._stopRecording,
+        getRecordingStatus: this._getRecordingStatus,
         takeScreenshot: this._takeScreenshot,
         resetARSession: this._resetARSession,
         setWorldOrigin: this._setWorldOrigin,

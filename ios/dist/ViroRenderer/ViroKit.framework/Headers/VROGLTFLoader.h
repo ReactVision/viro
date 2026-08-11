@@ -184,6 +184,17 @@ private:
                                         const tinygltf::Accessor &accessor,
                                         std::vector<unsigned char> &outputData);
 
+    // Materializes an accessor into a dense, tightly-packed buffer of exactly accessor.count
+    // elements. Needed whenever the accessor isn't one contiguous memory window: sparse
+    // accessors only encode the elements that differ from a base, and per spec that base is
+    // OPTIONAL — accessor.bufferView can legitimately be -1 when the accessor is sparse-only
+    // (base implicitly all-zero), which a plain byteOffset/byteLength window can't represent.
+    static bool materializeAccessorData(const tinygltf::Model &gModel,
+                                        const tinygltf::Accessor &accessor,
+                                        GLTFType gType,
+                                        GLTFTypeComponent gTypeComponent,
+                                        std::vector<unsigned char> &outputData);
+
     // Processing of Animation Data
     static bool processAnimations(const tinygltf::Model &gModel);
     static bool processKeyFrameAnimations(const tinygltf::Model &gModel,

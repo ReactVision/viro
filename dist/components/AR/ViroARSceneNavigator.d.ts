@@ -405,6 +405,25 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      *                  Note: TTL > 1 requires keyless authorization on Google Cloud.
      * @returns Promise resolving to the hosting result with cloudAnchorId
      */
+    /**
+     * Records this AR session (video + IMU + tracked pose) to local storage — see
+     * ViroWorkspace/plans/viro-ar-recording-playback-plan.md for the format. This is for
+     * offline analysis/replay; there is no in-app playback of a recording. Not to be confused
+     * with startVideoRecording, which captures the rendered screen only.
+     *
+     * @param outputDir - A directory that will contain video.mp4 + session.jsonl. Created if
+     *                    it doesn't exist.
+     * @returns Promise resolving to { success: boolean, error?: string }.
+     */
+    _startRecording: (outputDir: string) => Promise<any>;
+    /**
+     * Stops the recording started by startRecording and finalizes video.mp4 + session.jsonl.
+     */
+    _stopRecording: () => Promise<any>;
+    /**
+     * The current recording state: "None" | "Recording" | "IOError" | "Unsupported".
+     */
+    _getRecordingStatus: () => Promise<any>;
     _hostCloudAnchor: (anchorId: string, ttlDays?: number) => Promise<ViroHostCloudAnchorResult>;
     /**
      * Resolve a cloud anchor by its ID.
@@ -685,6 +704,9 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
         stopVideoRecording: () => Promise<any>;
+        startRecording: (outputDir: string) => Promise<any>;
+        stopRecording: () => Promise<any>;
+        getRecordingStatus: () => Promise<any>;
         takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
         resetARSession: (resetTracking: any, removeAnchors: any) => void;
         setWorldOrigin: (worldOrigin: ViroWorldOrigin) => void;
@@ -744,6 +766,9 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
         stopVideoRecording: () => Promise<any>;
+        startRecording: (outputDir: string) => Promise<any>;
+        stopRecording: () => Promise<any>;
+        getRecordingStatus: () => Promise<any>;
         takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
         resetARSession: (resetTracking: any, removeAnchors: any) => void;
         setWorldOrigin: (worldOrigin: ViroWorldOrigin) => void;

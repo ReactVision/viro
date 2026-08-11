@@ -11,7 +11,9 @@ const subscribe = (onChange) => recordingStore_1.studioRecordingStore.subscribe(
  * to it). `startedAt` is epoch ms, or null when idle.
  */
 function useStudioRecording() {
-    const isRecording = (0, react_1.useSyncExternalStore)(subscribe, () => recordingStore_1.studioRecordingStore.isRecording());
-    const startedAt = (0, react_1.useSyncExternalStore)(subscribe, () => recordingStore_1.studioRecordingStore.startedAt());
+    // Server snapshot: see the note in useStudioPlacement. Nothing is recording
+    // on a server, and saying so is better than throwing.
+    const isRecording = (0, react_1.useSyncExternalStore)(subscribe, () => recordingStore_1.studioRecordingStore.isRecording(), () => false);
+    const startedAt = (0, react_1.useSyncExternalStore)(subscribe, () => recordingStore_1.studioRecordingStore.startedAt(), () => null);
     return { isRecording, startedAt };
 }

@@ -40,6 +40,28 @@ export interface StudioSceneNavigatorWebProps {
     onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
     onPlaneDetected?: () => void;
     onUnsupported?: (features: string[]) => void;
+    /**
+     * Render the REC pill while a RECORD_VIDEO toggle is running. Default true,
+     * matching native. Hosts with their own chrome set this false and render
+     * <StudioRecordingIndicator /> where it fits.
+     */
+    recordingIndicator?: boolean;
+    /**
+     * Render the tap-to-place prompt while a scene asset awaits placement.
+     * Default true, matching native.
+     */
+    placementIndicator?: boolean;
+    /**
+     * Capture/tuning options forwarded to the AR session. Merged over the
+     * defaults this component sets, so a caller can add without restating them.
+     * Passing `playback` here replays a recording instead of opening a camera.
+     */
+    arOptions?: Record<string, unknown>;
+    /**
+     * Called with the AR session once it is running, for hosts that drive it
+     * rather than only observe it — stepping a replay, for instance.
+     */
+    onSessionReady?: (session: any) => void;
     noAssetsMessage?: string;
     loadingView?: React.ReactNode;
     renderError?: (error: Error) => React.ReactNode;

@@ -29,6 +29,7 @@
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
 #include "VROARSession.h"
+#include "VROARSessionRecorderIOS.h"
 #include "VROViewport.h"
 #include <ARKit/ARKit.h>
 #include <map>
@@ -237,6 +238,14 @@ public:
     void setSemanticModeEnabled(bool enabled) override;
     float getSemanticLabelFraction(VROSemanticLabel label) const;
 
+    // AR Session Recording API (see VROARSessionRecorderIOS)
+    bool isRecordingSupported() const override;
+    void startRecording(const VROARRecordingConfig &config,
+                         std::function<void()> onSuccess,
+                         std::function<void(std::string error)> onFailure) override;
+    void stopRecording() override;
+    VROARRecordingStatus getRecordingStatus() const override;
+
     /*
      Internal methods.
      */
@@ -263,6 +272,7 @@ private:
     ARSession *_session;
     ARConfiguration *_sessionConfiguration;
     VROARKitSessionDelegate *_delegateAR;
+    std::unique_ptr<VROARSessionRecorderIOS> _recorder;
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300
     NSMutableSet<ARReferenceImage *> *_arKitImageDetectionSet;

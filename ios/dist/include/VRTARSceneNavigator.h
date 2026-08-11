@@ -106,6 +106,24 @@ typedef void (^CloudAnchorResolveCompletionHandler)(BOOL success,
 
 - (void)cancelCloudAnchorOperations;
 
+#pragma mark - AR Session Recording Methods
+
+// Records the AR session (video + IMU + tracked pose) to local storage — see
+// ViroWorkspace/plans/viro-ar-recording-playback-plan.md. Not to be confused
+// with startVideoRecording/stopVideoRecording, which capture the rendered
+// screen only.
+typedef void (^RecordingStartCompletionHandler)(BOOL success,
+                                                 NSString * _Nullable error);
+
+- (void)startRecording:(NSString *)outputDir
+      completionHandler:(RecordingStartCompletionHandler)completionHandler;
+
+- (void)stopRecording;
+
+// One of "None", "Recording", "IOError", "Unsupported" — mirrors
+// VROARRecordingStatus (VROARSession.h).
+- (NSString *)getRecordingStatus;
+
 #pragma mark - Geospatial API Methods
 
 // Geospatial completion handler types

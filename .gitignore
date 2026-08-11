@@ -86,3 +86,6 @@ web-harness/dist/
 
 web-harness/models/
 web-harness/public/
+
+# docs/ is private — kept locally for the ReactVision MCP indexer, not versioned
+/docs/

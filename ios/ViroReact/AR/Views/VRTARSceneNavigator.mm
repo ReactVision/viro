@@ -956,6 +956,71 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
     );
 }
 
+- (void)startRecording:(NSString *)outputDir
+      completionHandler:(RecordingStartCompletionHandler)completionHandler {
+    if (!_vroView) {
+        if (completionHandler) {
+            completionHandler(NO, @"AR view not initialized");
+        }
+        return;
+    }
+
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) {
+            completionHandler(NO, @"AR session not available");
+        }
+        return;
+    }
+
+    VROARRecordingConfig config;
+    config.outputDir = std::string([outputDir UTF8String]);
+
+    arSession->startRecording(config,
+        [completionHandler] {
+            if (completionHandler) {
+                completionHandler(YES, nil);
+            }
+        },
+        [completionHandler](std::string error) {
+            if (completionHandler) {
+                NSString *errorStr = [NSString stringWithUTF8String:error.c_str()];
+                completionHandler(NO, errorStr);
+            }
+        }
+    );
+}
+
+- (void)stopRecording {
+    if (!_vroView) {
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (arSession) {
+        arSession->stopRecording();
+    }
+}
+
+- (NSString *)getRecordingStatus {
+    if (!_vroView) {
+        return @"Unsupported";
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        return @"Unsupported";
+    }
+    switch (arSession->getRecordingStatus()) {
+        case VROARRecordingStatus::Recording: return @"Recording";
+        case VROARRecordingStatus::IOError: return @"IOError";
+        case VROARRecordingStatus::Unsupported: return @"Unsupported";
+        case VROARRecordingStatus::None:
+        default: return @"None";
+    }
+}
+
 - (void)resolveCloudAnchor:(NSString *)cloudAnchorId
          completionHandler:(CloudAnchorResolveCompletionHandler)completionHandler {
     if (!_vroView) {

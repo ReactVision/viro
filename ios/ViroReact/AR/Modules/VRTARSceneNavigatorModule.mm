@@ -383,6 +383,75 @@ RCT_EXPORT_METHOD(hostCloudAnchor:(nonnull NSNumber *)reactTag
     }];
 }
 
+#pragma mark - AR Session Recording Methods
+
+RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
+                        outputDir:(NSString *)outputDir
+                          resolve:(RCTPromiseResolveBlock)resolve
+                           reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                NSDictionary *result = @{ @"success": @NO, @"error": @"Invalid view type" };
+                resolve(result);
+                return;
+            }
+
+            VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
+            if (!component.rootVROView) {
+                NSDictionary *result = @{ @"success": @NO, @"error": @"AR view has been unmounted" };
+                resolve(result);
+                return;
+            }
+
+            [component startRecording:outputDir
+                     completionHandler:^(BOOL success, NSString *error) {
+                NSMutableDictionary *result = [NSMutableDictionary new];
+                [result setObject:@(success) forKey:@"success"];
+                if (error) {
+                    [result setObject:error forKey:@"error"];
+                }
+                resolve(result);
+            }];
+        } @catch (NSException *exception) {
+            NSDictionary *result = @{
+                @"success": @NO,
+                @"error": [NSString stringWithFormat:@"Exception: %@", exception.reason]
+            };
+            resolve(result);
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(stopRecording:(nonnull NSNumber *)reactTag
+                         resolve:(RCTPromiseResolveBlock)resolve
+                          reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        VRTView *view = (VRTView *)viewRegistry[reactTag];
+        if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
+            [(VRTARSceneNavigator *)view stopRecording];
+        }
+        resolve(nil);
+    }];
+}
+
+RCT_EXPORT_METHOD(getRecordingStatus:(nonnull NSNumber *)reactTag
+                              resolve:(RCTPromiseResolveBlock)resolve
+                               reject:(RCTPromiseRejectBlock)reject) {
+    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        VRTView *view = (VRTView *)viewRegistry[reactTag];
+        if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
+            resolve([(VRTARSceneNavigator *)view getRecordingStatus]);
+        } else {
+            resolve(@"Unsupported");
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(resolveCloudAnchor:(nonnull NSNumber *)reactTag
                        cloudAnchorId:(NSString *)cloudAnchorId
                              resolve:(RCTPromiseResolveBlock)resolve

@@ -692,6 +692,91 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void startRecording(final int sceneNavTag, final String outputDir, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            WritableMap result = Arguments.createMap();
+            result.putBoolean("success", false);
+            result.putString("error", "UIManager not available");
+            promise.resolve(result);
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    WritableMap result = Arguments.createMap();
+                    result.putBoolean("success", false);
+                    result.putString("error", "Invalid view type");
+                    promise.resolve(result);
+                    return;
+                }
+
+                VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
+                sceneNavigator.startRecording(outputDir, new VRTARSceneNavigator.RecordingCallback() {
+                    @Override
+                    public void onSuccess() {
+                        WritableMap result = Arguments.createMap();
+                        result.putBoolean("success", true);
+                        promise.resolve(result);
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        WritableMap result = Arguments.createMap();
+                        result.putBoolean("success", false);
+                        result.putString("error", error);
+                        promise.resolve(result);
+                    }
+                });
+            }
+        });
+    }
+
+    @ReactMethod
+    public void stopRecording(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.resolve(null);
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
+                if (view instanceof VRTARSceneNavigator) {
+                    ((VRTARSceneNavigator) view).stopRecording();
+                }
+                promise.resolve(null);
+            }
+        });
+    }
+
+    @ReactMethod
+    public void getRecordingStatus(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.resolve("UNSUPPORTED");
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
+                if (view instanceof VRTARSceneNavigator) {
+                    promise.resolve(((VRTARSceneNavigator) view).getRecordingStatus());
+                } else {
+                    promise.resolve("UNSUPPORTED");
+                }
+            }
+        });
+    }
+
+    @ReactMethod
     public void resolveCloudAnchor(final int sceneNavTag, final String cloudAnchorId,
                                    final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);

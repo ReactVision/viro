@@ -628,6 +628,50 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         });
     }
 
+    public interface RecordingCallback {
+        void onSuccess();
+        void onFailure(String error);
+    }
+
+    /**
+     * Records the AR session (video + IMU + tracked pose) to local storage — see
+     * ViroWorkspace/plans/viro-ar-recording-playback-plan.md. Not to be confused with
+     * startVideoRecording/stopVideoRecording above, which capture the rendered screen only.
+     */
+    public void startRecording(String outputDir, RecordingCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            callback.onFailure("AR scene not available");
+            return;
+        }
+        arScene.startRecording(outputDir, getContext(), new ARScene.RecordingStartListener() {
+            @Override
+            public void onSuccess() {
+                callback.onSuccess();
+            }
+
+            @Override
+            public void onFailure(String error) {
+                callback.onFailure(error);
+            }
+        });
+    }
+
+    public void stopRecording() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene != null) {
+            arScene.stopRecording();
+        }
+    }
+
+    public String getRecordingStatus() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            return ARScene.RecordingStatus.UNSUPPORTED.name();
+        }
+        return arScene.getRecordingStatus().name();
+    }
+
     public void resolveCloudAnchor(String cloudAnchorId,
                                    ARSceneNavigatorModule.CloudAnchorResolveCallback callback) {
         if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {

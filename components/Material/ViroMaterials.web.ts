@@ -4,10 +4,11 @@
  * where node components resolve them by name and build materials via the C API.
  *
  * Supports diffuseColor, lightingModel, scalar properties, PBR textures,
- * shaderModifiers, and updateShaderUniform (parsed/dispatched the same way as
- * MaterialManager.java's native bridge — see viroMaterialRegistry.ts).
+ * shaderModifiers, updateShaderUniform, and deleteMaterials (parsed/dispatched
+ * the same way as MaterialManager.java's native bridge — see
+ * viroMaterialRegistry.ts).
  */
-import { registerViroMaterials, updateMaterialShaderUniform } from "../Web/viroMaterialRegistry";
+import { registerViroMaterials, updateMaterialShaderUniform, deleteViroMaterials } from "../Web/viroMaterialRegistry";
 
 // Type-only re-exports (erased at compile time — no native module import).
 export type {
@@ -28,8 +29,9 @@ export class ViroMaterials {
     registerViroMaterials(materials);
   }
 
-  // Not yet implemented on web; accepted as a no-op so shared code doesn't break.
-  static deleteMaterials(_materials: any) {}
+  static deleteMaterials(materials: string[]) {
+    deleteViroMaterials(materials);
+  }
 
   static updateShaderUniform(
     materialName: string,

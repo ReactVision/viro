@@ -49,6 +49,23 @@ export function getViroMaterialDef(name: string): ViroWebMaterialDef | undefined
   return registry.get(name);
 }
 
+/**
+ * ViroMaterials.deleteMaterials's web backend. Mirrors MaterialManager.java's
+ * deleteMaterials: for each name, if it was already built, destroy its native
+ * handle before dropping it; either way, drop the definition so a later
+ * createMaterials() for the same name starts clean.
+ */
+export function deleteViroMaterials(materialNames: string[]): void {
+  for (const name of materialNames) {
+    const handle = handleCache.get(name);
+    if (handle) {
+      lastScene?.destroyMaterial(handle);
+      handleCache.delete(name);
+    }
+    registry.delete(name);
+  }
+}
+
 /** Drop cached material handles (call when the renderer/module is disposed). */
 export function resetMaterialCache(): void {
   handleCache.clear();
@@ -233,9 +250,11 @@ export function getSharedMaterialHandle(scene: ViroSceneApi, name: string): Viro
  * shaderModifier already attached to the material (see applyShaderModifiers)
  * — the value has nowhere to go otherwise, same as native.
  *
- * "vec2" is accepted (matches the JS-facing type union) but a no-op: neither
- * native bridge exposes it either, because VROMaterial itself has no vec2
- * uniform map at the engine level — a real gap, not a web-only omission.
+ * "vec2" is a web-only superset today: the native Android/iOS bridges don't
+ * expose it (their RN methods have no vec2 branch), but the underlying engine
+ * (VROMaterial) now has a real vec2 uniform map, added for this. Values
+ * written here won't do anything on native until those bridges add a
+ * matching branch.
  */
 export function updateMaterialShaderUniform(
   materialName: string,
@@ -262,6 +281,15 @@ export function updateMaterialShaderUniform(
         break;
       }
       scene.setMaterialShaderUniformFloat(material, uniformName, n);
+      break;
+    }
+    case "vec2": {
+      const v = value as number[];
+      if (!Array.isArray(v) || v.length < 2 || v.slice(0, 2).some((n) => typeof n !== "number")) {
+        console.warn(`[Viro web] updateShaderUniform: "vec2" value for "${uniformName}" must be a 2-element number array`);
+        break;
+      }
+      scene.setMaterialShaderUniformVec2(material, uniformName, v[0]!, v[1]!);
       break;
     }
     case "vec3": {

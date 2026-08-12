@@ -5,7 +5,7 @@
  * pulling in native-only modules.
  */
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 // WASM asset-loading options for Vite (?url + importGlue/locateFile). Shared
@@ -31,8 +31,15 @@ import { ViroParticleEmitter } from "../components/ViroParticleEmitter";
 import { ViroPortalScene } from "../components/ViroPortalScene";
 import { ViroPortal } from "../components/ViroPortal";
 import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
+import { ViroSceneNavigator } from "../components/ViroSceneNavigator";
+import { ViroAnimatedImage } from "../components/ViroAnimatedImage";
+import { ViroCameraTexture } from "../components/ViroCameraTexture";
+import { ViroVirtualJoystick } from "../components/ViroVirtualJoystick";
+import { ViroVirtualButton } from "../components/ViroVirtualButton";
+import { useVirtualController } from "../components/Web/viroVirtualController";
+import { ViroQuad } from "../components/ViroQuad";
 import { makeStudioScene } from "./studioFixture";
-import { makeCheckerDataUrl } from "./placeholderAssets";
+import { makeCheckerDataUrl, makeAnimatedGifDataUrl } from "./placeholderAssets";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -56,10 +63,16 @@ const dragonResources = [
 // without shipping an image asset. Shared with render.tsx.
 const checkerUrl = makeCheckerDataUrl();
 
+// Procedural animated GIF (2-frame loop) for the ViroAnimatedImage demo.
+const animatedGifUrl = makeAnimatedGifDataUrl();
+
 ViroMaterials.createMaterials({
   blueBox: { lightingModel: "Blinn", diffuseColor: "#3399ff" },
   redBox: { lightingModel: "Blinn", diffuseColor: "#ff5533" },
   checker: { lightingModel: "Lambert", diffuseTexture: makeCheckerDataUrl() },
+  // ViroCameraTexture writes the live camera feed onto this material's diffuse;
+  // it only needs a lightingModel (the texture is supplied at runtime).
+  cameraFeed: { lightingModel: "Constant" },
 });
 
 // Declarative animation: spin + bob, looping.
@@ -137,6 +150,15 @@ function DemoScene() {
           height={1.5}
           source={{ uri: checkerUrl }}
           onLoadEnd={() => console.log("[harness] image loaded")}
+        />
+        {/* ViroAnimatedImage: a looping GIF (yellow dot bouncing) re-sampled per
+            frame onto a surface — proves the animated-image pipeline. */}
+        <ViroAnimatedImage
+          position={[5, 2, 0]}
+          width={1.5}
+          height={1.5}
+          source={{ uri: animatedGifUrl }}
+          onLoadEnd={() => console.log("[harness] animated image loaded")}
         />
         {/* ViroText: font pipeline (preloaded Helvetica). */}
         <ViroText
@@ -248,9 +270,107 @@ function ARDemoScene() {
   );
 }
 
-const MODES = ["3d", "ar", "studio"] as const;
+// Input demo — driven by ViroSceneNavigator (a real scene stack) plus the
+// virtual joystick/button DOM overlays. The scene reads the shared controller
+// state via useVirtualController: the left stick moves the box, button "A"
+// recolors it. A tappable "next" box pushes a second scene to exercise
+// push/pop navigation.
+function InputSceneA(props: { sceneNavigator?: any }) {
+  const controller = useVirtualController("p1");
+  const { x, y } = controller.left;
+  const pressedA = !!controller.buttons.A;
+  return (
+    <ViroScene>
+      <ViroAmbientLight color="#ffffff" intensity={400} />
+      <ViroDirectionalLight color="#ffffff" intensity={900} direction={[0, -1, -0.6]} />
+      {/* Joystick-driven box (moves with the left stick, recolors on button A). */}
+      <ViroBox
+        position={[x * 2.5, y * 2.5, -5]}
+        scale={[0.6, 0.6, 0.6]}
+        materials={[pressedA ? "redBox" : "blueBox"]}
+      />
+      {/* Tappable box → push scene B (demonstrates the navigator's scene stack). */}
+      <ViroBox
+        position={[0, -2.5, -5]}
+        scale={[0.4, 0.4, 0.4]}
+        materials={["checker"]}
+        onClick={() => {
+          console.log("[harness input] push scene B");
+          props.sceneNavigator?.push({ scene: InputSceneB });
+        }}
+      />
+      <ViroText
+        position={[0, 3, -5]}
+        width={6}
+        height={1}
+        text="Scene A — joystick moves the box, tap bottom box to push"
+        style={{ fontSize: 22, color: "#ffffff", textAlign: "Center" }}
+      />
+    </ViroScene>
+  );
+}
+
+function InputSceneB(props: { sceneNavigator?: any }) {
+  return (
+    <ViroScene>
+      <ViroAmbientLight color="#ffffff" intensity={400} />
+      <ViroDirectionalLight color="#ffffff" intensity={900} direction={[0, -1, -0.6]} />
+      <ViroBox
+        position={[0, 0, -5]}
+        materials={["redBox"]}
+        animation={{ name: "spin", run: true, loop: true }}
+        onClick={() => {
+          console.log("[harness input] pop back to scene A");
+          props.sceneNavigator?.pop();
+        }}
+      />
+      <ViroText
+        position={[0, 2.5, -5]}
+        width={6}
+        height={1}
+        text="Scene B — tap the box to pop back"
+        style={{ fontSize: 22, color: "#ffdd44", textAlign: "Center" }}
+      />
+    </ViroScene>
+  );
+}
+
+// Minimal imperative-handle shape for the camera capture API (the full type,
+// ViroCameraTextureHandle, lives in the .web module which tsc doesn't resolve
+// from the extension-less import here).
+type CameraHandle = {
+  capturePhoto(): Promise<{ success: boolean; url?: string; error?: string }>;
+  startRecording(): Promise<{ success: boolean; url?: string; error?: string }>;
+  stopRecording(): Promise<{ success: boolean; url?: string; error?: string }>;
+};
+
+// Camera demo — ViroCameraTexture binds the live feed to the "cameraFeed"
+// material shown on a quad; the capture buttons (DOM overlay) call the
+// component's imperative API through a ref passed in via viroAppProps.
+function CameraScene(props: { cameraRef?: React.Ref<CameraHandle> }) {
+  return (
+    <ViroScene>
+      <ViroQuad position={[0, 0, -2.2]} width={1.8} height={2.4} materials={["cameraFeed"]} />
+      <ViroCameraTexture
+        ref={props.cameraRef}
+        material="cameraFeed"
+        cameraPosition="front"
+        onCameraReady={() => console.log("[harness camera] camera ready")}
+        onError={(e) => console.error("[harness camera] error", e.nativeEvent.error)}
+      />
+    </ViroScene>
+  );
+}
+
+const MODES = ["3d", "ar", "studio", "input", "camera"] as const;
 type Mode = (typeof MODES)[number];
-const MODE_LABEL: Record<Mode, string> = { "3d": "3D", ar: "AR", studio: "Studio" };
+const MODE_LABEL: Record<Mode, string> = {
+  "3d": "3D",
+  ar: "AR",
+  studio: "Studio",
+  input: "Input",
+  camera: "Camera",
+};
 
 // Studio scene fixture (no backend): rendered through the web host to validate
 // that Studio-authored scenes play on web via our renderer + runtime.
@@ -259,6 +379,34 @@ const studioApiRequestExecutor = async () => ({ ok: true, status: 200, body: {} 
 
 function App() {
   const [mode, setMode] = useState<Mode>("3d");
+  const cameraRef = useRef<CameraHandle>(null);
+  const [captureMsg, setCaptureMsg] = useState<string>("");
+
+  const overlayBtn: React.CSSProperties = {
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "none",
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    font: "600 13px system-ui, sans-serif",
+    cursor: "pointer",
+  };
+
+  const onCapturePhoto = async () => {
+    const r = await cameraRef.current?.capturePhoto();
+    setCaptureMsg(r?.success ? `foto: ${(r.url ?? "").slice(0, 32)}…` : `error: ${r?.error}`);
+    console.log("[harness camera] capturePhoto", r);
+  };
+  const onStartRec = async () => {
+    const r = await cameraRef.current?.startRecording();
+    setCaptureMsg(r?.success ? "grabando…" : `error: ${r?.error}`);
+    console.log("[harness camera] startRecording", r);
+  };
+  const onStopRec = async () => {
+    const r = await cameraRef.current?.stopRecording();
+    setCaptureMsg(r?.success ? `video: ${(r.url ?? "").slice(0, 32)}…` : `error: ${r?.error}`);
+    console.log("[harness camera] stopRecording", r);
+  };
 
   const toggle: React.CSSProperties = {
     position: "absolute",
@@ -301,6 +449,63 @@ function App() {
           onSceneReady={() => console.log("[harness] studio scene ready")}
           onUnsupported={(f) => console.log("[harness] studio unsupported:", f)}
         />
+      )}
+      {mode === "input" && (
+        <>
+          <ViroSceneNavigator
+            initialScene={{ scene: InputSceneA }}
+            webRendererOptions={webRendererOptions}
+          />
+          {/* DOM overlays: write to controller "p1", read by the scene's hook. */}
+          <ViroVirtualJoystick
+            controllerId="p1"
+            stickSide="left"
+            radius={60}
+            style={{ position: "absolute", bottom: 40, left: 40, zIndex: 20 }}
+          />
+          <ViroVirtualButton
+            controllerId="p1"
+            button="A"
+            size={64}
+            style={{ position: "absolute", bottom: 56, right: 56, zIndex: 20 }}
+          />
+        </>
+      )}
+      {mode === "camera" && (
+        <>
+          <Viro3DSceneNavigator
+            initialScene={{ scene: CameraScene }}
+            viroAppProps={{ cameraRef }}
+            webRendererOptions={webRendererOptions}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: 32,
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              zIndex: 20,
+            }}
+          >
+            <button style={overlayBtn} onClick={onCapturePhoto}>
+              📸 Foto
+            </button>
+            <button style={overlayBtn} onClick={onStartRec}>
+              ⏺ Grabar
+            </button>
+            <button style={overlayBtn} onClick={onStopRec}>
+              ⏹ Detener
+            </button>
+            {captureMsg && (
+              <span style={{ color: "#fff", font: "500 12px system-ui", opacity: 0.8 }}>
+                {captureMsg}
+              </span>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

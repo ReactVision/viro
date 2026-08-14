@@ -30,6 +30,7 @@
 #include <fstream>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #import <ARKit/ARKit.h>
 #import <AVFoundation/AVFoundation.h>
@@ -92,9 +93,36 @@ private:
     std::mutex _sidecarMutex; // video/IMU/pose callbacks land on different threads
     bool _wroteHeader;
 
+    // imu/pose lines are buffered here (not written straight to _sidecar) and
+    // sorted by `t` before being flushed at stop() — see flushBufferedLinesSorted().
+    // Without this, the format's documented "monotonic timestamp_ns order"
+    // guarantee breaks: imu arrives on CMMotionManager's fast dedicated queue
+    // while pose is written from recordFrame() on the much busier AR/render
+    // callback, so pose lines land in the file tens-to-hundreds of ms later
+    // than their own timestamp would place them, even though each stream is
+    // individually monotonic.
+    struct SidecarLine { int64_t t; std::string text; };
+    std::vector<SidecarLine> _bufferedLines;
+
+    // Guards _status and the video writer pointers together, so stop() and
+    // recordFrame() can never interleave: stop() takes this lock, flips
+    // _status away from Recording, and only then hands _videoWriterInput to
+    // markAsFinished — any recordFrame() call that arrives concurrently either
+    // finishes its critical section first (this lock) or observes the new
+    // status and returns before touching the writer. Without this, a
+    // recordFrame() on the AR/render thread could append a sample buffer
+    // after markAsFinished was already called from stop()'s thread, which can
+    // leave AVAssetWriter unable to ever complete finishWriting — the writer
+    // gets released after the old fixed timeout with no moov atom ever
+    // written, producing an unplayable video.mp4 (mdat with a placeholder
+    // size and no moov — reproduced against a real recording; see
+    // ViroWorkspace/docs/AR_SESSION_RECORDING.md).
+    std::mutex _stateMutex;
+
     void writeHeaderIfNeeded(ARFrame *frame);
     void writeImuLine(double tSec, double ax, double ay, double az, double gx, double gy, double gz);
     void writePoseLine(ARFrame *frame);
+    void flushBufferedLinesSorted();
     void closeSidecar();
 };
 

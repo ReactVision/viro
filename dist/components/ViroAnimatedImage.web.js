@@ -1,57 +1,104 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ViroAnimatedImage = void 0;
+exports.ViroAnimatedImage = ViroAnimatedImage;
 /**
  * ViroAnimatedImage.web.tsx
  *
- * Not implemented on web — animated GIF/APNG playback via a native decoder
- * has no counterpart in the WASM/WebGL2 renderer yet. Exists so the
- * platform-extension resolver picks this over ViroAnimatedImage.tsx on web,
- * whose top-level requireNativeComponent() call otherwise crashes the whole
- * @reactvision/react-viro barrel import on web.
+ * Web implementation of ViroAnimatedImage — an animated image (GIF/APNG) on a
+ * flat surface. The browser decodes and advances the animation inside an
+ * <img> element on its own timeline; a per-frame draw of that <img> to a canvas
+ * samples whatever frame is currently displayed and uploads it as the surface's
+ * diffuse texture. This reuses the surface + per-frame-texture pattern from
+ * ViroImage / ViroVideo, so the animation plays without any native decoder.
+ *
+ * MVP scope: source, width/height, transform props, paused, onLoadStart/
+ * onLoadEnd/onError. `loop` follows the file's own loop count (a GIF encodes
+ * its own looping — JS can't override it here). `placeholderSource`,
+ * `resizeMode`, `stereoMode` are follow-ups, matching ViroImage.
  *
  * Copyright © 2026 ReactVision. All rights reserved.
  */
-const React = __importStar(require("react"));
-class ViroAnimatedImage extends React.Component {
-    render() {
-        if (__DEV__) {
-            console.warn("[Viro web] ViroAnimatedImage is not supported on web; rendering nothing.");
-        }
-        return null;
-    }
+const react_1 = require("react");
+const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
+const useViroNode_1 = require("./Web/useViroNode");
+const ViroWebContext_1 = require("./Web/ViroWebContext");
+const viroImageLoader_1 = require("./Web/viroImageLoader");
+function ViroAnimatedImage(props) {
+    const scene = (0, ViroWebContext_1.useViroScene)();
+    const width = props.width ?? 1;
+    const height = props.height ?? 1;
+    const url = (0, viroImageLoader_1.resolveImageSource)(props.source);
+    const geometryRef = (0, react_1.useRef)(0);
+    (0, useViroNode_1.useViroNode)(props, (s) => {
+        const geo = s.createSurface(width, height);
+        geometryRef.current = geo;
+        return geo;
+    });
+    const propsRef = (0, react_1.useRef)(props);
+    propsRef.current = props;
+    const pausedRef = (0, react_1.useRef)(props.paused ?? false);
+    pausedRef.current = props.paused ?? false;
+    (0, react_1.useEffect)(() => {
+        const geo = geometryRef.current;
+        if (!geo || !url)
+            return;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const material = scene.createMaterial();
+        scene.setMaterialLightingModel(material, viro_web_renderer_1.ViroLightingModel.Constant);
+        scene.setMaterialBlendMode(material, viro_web_renderer_1.ViroBlendMode.Alpha);
+        let currentTex = 0;
+        let rafId = 0;
+        let cancelled = false;
+        const uploadFrame = () => {
+            if (cancelled || !ctx)
+                return;
+            const w = img.naturalWidth;
+            const h = img.naturalHeight;
+            if (!pausedRef.current && w > 0 && h > 0) {
+                if (canvas.width !== w || canvas.height !== h) {
+                    canvas.width = w;
+                    canvas.height = h;
+                }
+                // Sampling the <img> each frame captures the GIF/APNG's current frame,
+                // which the browser advances on its own animation clock.
+                ctx.drawImage(img, 0, 0, w, h);
+                const rgba = ctx.getImageData(0, 0, w, h).data;
+                const tex = scene.createTextureRGBA(new Uint8Array(rgba), w, h, true);
+                scene.setMaterialTexture(material, viro_web_renderer_1.ViroTextureChannel.Diffuse, tex);
+                scene.setGeometryMaterial(geo, material);
+                if (currentTex)
+                    scene.destroyTexture(currentTex);
+                currentTex = tex;
+            }
+            rafId = requestAnimationFrame(uploadFrame);
+        };
+        propsRef.current.onLoadStart?.();
+        img.onload = () => {
+            if (cancelled)
+                return;
+            propsRef.current.onLoadEnd?.();
+            rafId = requestAnimationFrame(uploadFrame);
+        };
+        img.onerror = () => {
+            if (!cancelled)
+                propsRef.current.onError?.(new Error(`image failed: ${url}`));
+        };
+        img.src = url;
+        return () => {
+            cancelled = true;
+            if (rafId)
+                cancelAnimationFrame(rafId);
+            img.onload = null;
+            img.onerror = null;
+            img.src = "";
+            if (currentTex)
+                scene.destroyTexture(currentTex);
+            scene.destroyMaterial(material);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [url]);
+    return null;
 }
-exports.ViroAnimatedImage = ViroAnimatedImage;

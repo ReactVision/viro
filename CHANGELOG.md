@@ -4,26 +4,19 @@
 
 ### Added
 
-- **VPS-Lite v1 — geo-anchored persistent AR** (`ViroARSceneNavigator`, `provider="reactvision"`). Room/building-scale cloud anchors, discoverable by GPS, with an optional attached mesh for occlusion + physics — self-contained "island" anchors you localize to when nearby, not a continuous unified map. New imperative API: `startScan()`/`finishScan(ttlDays?)` (a scan session defines its own location frame, so it doesn't need a pre-placed anchor and isn't capped to a small radius), `snapshotWorldMeshToFile(locationTransform)`/`loadWorldMeshFromFile(filePath, resolvedTransform)` (serialize/re-attach the live world mesh for occlusion + physics), `setWorldMeshEnabled(enabled)`, and geospatial accuracy gating: `getEarthTrackingState()` now reports a real `Stopped → Localizing → Enabled/Paused` transition (gated on GPS/VPS horizontal accuracy, previously reported `Enabled` the instant a provider existed) and `isLocationAccuracyReduced()` surfaces iOS 14+ "Precise Location off" / Android coarse-location explicitly. No server SfM, no drift-correction fusion loop — reuses the existing cloud-anchor host/resolve pipeline. iOS + Android.
-
-- **Viro on the web** (`@reactvision/viro-web-renderer` peer package). `Viro3DSceneNavigator`/`ViroARSceneNavigator` render through a WASM/WebGL2 build of the Viro renderer on `Platform.OS === "web"` instead of a native view manager — the full `.web.tsx` component set (geometry, materials/textures, text, lights/camera, model loading + animation, particles, portals, IBL, video/audio, `ViroFlexView`, `ViroMaterialVideo`) plus AR on the web (plane detection + hit-test) via `tinyvio`'s monocular visual-inertial tracking compiled to a second WASM module. Studio-authored scenes play on the web through the same shared runtime StudioGo uses natively. See `docs/web/` (README/USAGE/INTEGRATION/INTERNALS).
-
 - **AR Session Recording** (`ViroARSceneNavigator`). `startRecording(outputDir)`/`stopRecording()`/`getRecordingStatus()` capture a session to local storage — `video.mp4` (the camera passthrough feed) + `session.jsonl` (raw IMU + the platform's own tracked pose as ground truth) — for **offline** analysis/replay via `tinyvio`, not in-app playback. A different feature from `ViroCameraTexture.startRecording()` (camera-feed-only MP4). iOS + Android.
 
 ### Fixed
 
-- **The entire package crashed on first import when bundled for web.** Ten native-only components (`ViroARImageMarker`, `ViroARObjectMarker`, `ViroAnimatedImage`, `ViroCameraTexture`, `ViroController`, `ViroObjectDetector`, `ViroSceneNavigator`, `ViroVRSceneNavigator`, `ViroVirtualButton`, `ViroVirtualJoystick`) called `requireNativeComponent()` at module scope with no `.web.tsx` variant to substitute — and since `dist/index.js` is a single CommonJS barrel that `require()`s every component eagerly, importing *anything* from the package on web crashed immediately via whichever of the ten loaded first, regardless of which components an app actually used. All ten now have a minimal `.web.tsx` stub (renders `null`, dev-only warning).
-- **`getEarthTrackingState()` reported `Enabled` immediately on the ARCore geospatial provider path**, regardless of GPS/VPS fix accuracy — ARCore's own tracking-state signal is a *visual* tracking lock, unrelated to fix quality. Now gated on horizontal accuracy (15m threshold), matching the ReactVision provider path.
+- **The package could crash on first import when bundled with `react-native-web`.** Ten native-only components (`ViroARImageMarker`, `ViroARObjectMarker`, `ViroAnimatedImage`, `ViroCameraTexture`, `ViroController`, `ViroObjectDetector`, `ViroSceneNavigator`, `ViroVRSceneNavigator`, `ViroVirtualButton`, `ViroVirtualJoystick`) called `requireNativeComponent()` at module scope with no `.web.tsx` variant to substitute — and since `dist/index.js` is a single CommonJS barrel that `require()`s every component eagerly, importing *anything* from the package under a web bundle crashed immediately via whichever of the ten loaded first, regardless of which components an app actually used. All ten now have a minimal `.web.tsx` stub (renders `null`, dev-only warning).
 
 ### Changed
 
-- **`docs/` moved out of the repository.** The package's markdown docs (`VPS_LITE.md`, `AR_SESSION_RECORDING.md`, `ViroObjectDetector.md`, `PLATFORM_EXTENSIONS.md`, `QUEST_SETUP.md`, `ViroCameraTexture.md`, `web/*`) are no longer tracked in this repo or shipped in the npm package — they're maintained privately alongside the workspace for internal/MCP tooling use. Older CHANGELOG entries that reference a `docs/*.md` path describe the state at that release; those files are no longer present in a fresh checkout or install.
+- **`docs/` moved out of the repository.** The package's markdown docs (`AR_SESSION_RECORDING.md`, `ViroObjectDetector.md`, `PLATFORM_EXTENSIONS.md`, `QUEST_SETUP.md`, `ViroCameraTexture.md`) are no longer tracked in this repo or shipped in the npm package — they're maintained privately alongside the workspace for internal/MCP tooling use. Older CHANGELOG entries that reference a `docs/*.md` path describe the state at that release; those files are no longer present in a fresh checkout or install.
 
 ### Migration
 
-- **No breaking changes for existing iOS/Android/Quest/visionOS consumers.** The web platform is additive: `Platform.OS !== "web"` apps are unaffected, and `@reactvision/viro-web-renderer` is only required if you target web.
-- **VPS-Lite v1 requires `provider="reactvision"`** on `ViroARSceneNavigator` (the default) — not available under `provider="arcore"`.
-- New peer dependencies: `@reactvision/viro-web-renderer` (>=0.0.1) and `react-native-web` (>=0.19.0), both optional unless you target web.
+- **No breaking changes.** Everything in this release is additive or a bug fix.
 
 ## v2.57.5 — 26 July 2026
 

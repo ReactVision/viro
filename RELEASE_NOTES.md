@@ -4,29 +4,17 @@
 
 ### Highlights
 
-**VPS-Lite v1 — geo-anchored persistent AR**
-
-- Room/building-scale cloud anchors, discoverable by GPS, with an optional attached mesh for occlusion + physics — requires `provider="reactvision"`.
-- New API: `startScan()`/`finishScan()`, `snapshotWorldMeshToFile()`/`loadWorldMeshFromFile()`, `setWorldMeshEnabled()`.
-- `getEarthTrackingState()` now reports a real `Localizing → Enabled` transition gated on GPS/VPS accuracy (previously reported `Enabled` immediately); `isLocationAccuracyReduced()` surfaces reduced-precision location explicitly.
-
-**Viro on the web**
-
-- `Viro3DSceneNavigator`/`ViroARSceneNavigator` now render through a WASM/WebGL2 build of the renderer on `Platform.OS === "web"` — the full component set, plus AR (plane detection + hit-test) via on-device visual-inertial tracking. Install the new peer package `@reactvision/viro-web-renderer` to use it.
-
 **AR Session Recording**
 
 - `startRecording()`/`stopRecording()`/`getRecordingStatus()` on `ViroARSceneNavigator` capture video + raw IMU + ground-truth pose to local storage, for offline analysis via `tinyvio` — distinct from `ViroCameraTexture`'s screen-only recording.
 
 ### Fixed
 
-- The whole package crashed immediately when bundled for web — ten native-only components had no `.web.tsx` variant and crashed the shared import barrel regardless of what an app actually used. Fixed with stub implementations for all ten.
-- `getEarthTrackingState()` no longer reports `Enabled` before the GPS/VPS fix is actually accurate on the ARCore provider path.
+- The package could crash immediately when bundled with `react-native-web` — ten native-only components had no `.web.tsx` variant and crashed the shared import barrel regardless of what an app actually used. Fixed with stub implementations for all ten.
 
 ### Migration
 
-- **No breaking changes.** Web support and VPS-Lite are both additive — existing iOS/Android/Quest/visionOS integrations are unaffected either way.
-- Building for web requires the new peer dependencies `@reactvision/viro-web-renderer` and `react-native-web`.
+- **No breaking changes.** Everything in this release is additive or a bug fix.
 - `docs/` no longer ships in this package — see the CHANGELOG's Changed section if you had bookmarked a `docs/*.md` path.
 - Pairs with `@reactvision/virocore` 2.58.0.
 

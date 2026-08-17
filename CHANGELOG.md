@@ -9,6 +9,7 @@
 ### Fixed
 
 - **The package could crash on first import when bundled with `react-native-web`.** Ten native-only components (`ViroARImageMarker`, `ViroARObjectMarker`, `ViroAnimatedImage`, `ViroCameraTexture`, `ViroController`, `ViroObjectDetector`, `ViroSceneNavigator`, `ViroVRSceneNavigator`, `ViroVirtualButton`, `ViroVirtualJoystick`) called `requireNativeComponent()` at module scope with no `.web.tsx` variant to substitute — and since `dist/index.js` is a single CommonJS barrel that `require()`s every component eagerly, importing *anything* from the package under a web bundle crashed immediately via whichever of the ten loaded first, regardless of which components an app actually used. All ten now have a minimal `.web.tsx` stub (renders `null`, dev-only warning).
+- **GLB/glTF models with sparse accessors or non-indexed (draw-arrays) primitives failed to load.** Both are legal per the glTF spec — a sparse-only accessor can leave its buffer view unset, and a primitive can omit `indices` entirely — but the loader rejected both. Fixed in `@reactvision/virocore` 2.58.0 (VIRO-3664).
 
 ### Changed
 

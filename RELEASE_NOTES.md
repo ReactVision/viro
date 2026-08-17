@@ -11,6 +11,7 @@
 ### Fixed
 
 - The package could crash immediately when bundled with `react-native-web` — ten native-only components had no `.web.tsx` variant and crashed the shared import barrel regardless of what an app actually used. Fixed with stub implementations for all ten.
+- GLB/glTF models with sparse accessors or non-indexed primitives now load correctly (previously failed) — fixed in `@reactvision/virocore` 2.58.0.
 
 ### Migration
 

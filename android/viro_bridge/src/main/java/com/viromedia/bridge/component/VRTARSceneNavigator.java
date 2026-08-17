@@ -453,6 +453,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private double mLastAlt = 0.0;
     private double mLastHorizAcc = 0.0;
     private double mLastVertAcc = 0.0;
+    // WS-D: Android equivalent of iOS's "reduced accuracy" (Precise Location off) —
+    // only ACCESS_COARSE_LOCATION granted, forcing NETWORK_PROVIDER instead of GPS_PROVIDER,
+    // so horizontalAccuracy will stay coarse and never cross the geospatial threshold.
+    private boolean mLocationAccuracyReduced = false;
 
     public void setCloudAnchorProvider(String provider) {
         // Improvement 5: reset so credentials are re-applied on next host/resolve
@@ -624,6 +628,50 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         });
     }
 
+    public interface RecordingCallback {
+        void onSuccess();
+        void onFailure(String error);
+    }
+
+    /**
+     * Records the AR session (video + IMU + tracked pose) to local storage — see
+     * ViroWorkspace/plans/viro-ar-recording-playback-plan.md. Not to be confused with
+     * startVideoRecording/stopVideoRecording above, which capture the rendered screen only.
+     */
+    public void startRecording(String outputDir, RecordingCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            callback.onFailure("AR scene not available");
+            return;
+        }
+        arScene.startRecording(outputDir, getContext(), new ARScene.RecordingStartListener() {
+            @Override
+            public void onSuccess() {
+                callback.onSuccess();
+            }
+
+            @Override
+            public void onFailure(String error) {
+                callback.onFailure(error);
+            }
+        });
+    }
+
+    public void stopRecording() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene != null) {
+            arScene.stopRecording();
+        }
+    }
+
+    public String getRecordingStatus() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            return ARScene.RecordingStatus.UNSUPPORTED.name();
+        }
+        return arScene.getRecordingStatus().name();
+    }
+
     public void resolveCloudAnchor(String cloudAnchorId,
                                    ARSceneNavigatorModule.CloudAnchorResolveCallback callback) {
         if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {
@@ -644,8 +692,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Resolve the cloud anchor via the configured provider
         arScene.resolveCloudAnchor(cloudAnchorId, new ARScene.CloudAnchorResolveListener() {
             @Override
-            public void onSuccess(ARAnchor anchor, ARNode arNode) {
+            public void onSuccess(ARAnchor anchor, ARNode arNode, String resolvedTransform) {
                 WritableMap anchorData = ARUtils.mapFromARAnchor(anchor);
+                // WS-C: lets the caller thread this straight into loadWorldMeshFromFile().
+                anchorData.putString("resolvedTransform", resolvedTransform);
                 callback.onSuccess(anchorData);
             }
 
@@ -738,6 +788,16 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    /**
+     * WS-D: true if only approximate location is granted (ACCESS_COARSE_LOCATION
+     * without ACCESS_FINE_LOCATION) — horizontalAccuracy will stay coarse and
+     * geospatial tracking will never leave Localizing. App should surface an
+     * explicit error instead of waiting.
+     */
+    public boolean isLocationAccuracyReduced() {
+        return mLocationAccuracyReduced;
+    }
+
     public boolean isGeospatialModeSupported() {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
@@ -796,9 +856,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             boolean hasCoarse = ctx.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                                 == PackageManager.PERMISSION_GRANTED;
             if (hasFine) {
+                mLocationAccuracyReduced = false;
                 mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
                         1000L, 0f, mLocationListener, Looper.getMainLooper());
             } else if (hasCoarse) {
+                mLocationAccuracyReduced = true;
                 mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,
                         1000L, 0f, mLocationListener, Looper.getMainLooper());
             } else {
@@ -873,6 +935,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 return "Enabled";
             case PAUSED:
                 return "Paused";
+            case LOCALIZING:
+                return "Localizing";
             case STOPPED:
             default:
                 return "Stopped";
@@ -1130,6 +1194,72 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     // Cloud anchor management
+    public void rvStartScan() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return;
+        ensureRvConfigApplied(arScene);
+        arScene.rvStartScan();
+    }
+
+    public void rvFinishScan(int ttlDays, ARScene.RvFinishScanCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
+        ensureRvConfigApplied(arScene);
+        arScene.rvFinishScan(ttlDays, callback);
+    }
+
+    /**
+     * WS-C: serialize the current world mesh to a cache file, returning its
+     * path (or null on failure/no mesh) — ready to pass straight into
+     * rvUploadAsset(). locationTransformCsv is the value
+     * {@link ARScene.RvFinishScanCallback} returned.
+     */
+    public String rvSnapshotWorldMeshToFile(String locationTransformCsv) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return null;
+
+        byte[] bytes = arScene.rvSnapshotWorldMesh(locationTransformCsv);
+        if (bytes == null || bytes.length == 0) return null;
+
+        try {
+            java.io.File outFile = new java.io.File(getContext().getCacheDir(),
+                    "rvmesh_" + java.util.UUID.randomUUID().toString() + ".bin");
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile)) {
+                fos.write(bytes);
+            }
+            return outFile.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            Log.w(TAG, "rvSnapshotWorldMeshToFile: failed to write cache file", e);
+            return null;
+        }
+    }
+
+    /**
+     * WS-C: reverse of {@link #rvSnapshotWorldMeshToFile} — read a resolved
+     * mesh snapshot from a local file (downloaded by the app from the
+     * resolved anchor's asset fileUrl) and attach it for physics + visual
+     * occlusion. Requires world mesh to be enabled.
+     */
+    public boolean rvLoadWorldMeshFromFile(String filePath, String resolvedTransformCsv) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return false;
+
+        java.io.File inFile = new java.io.File(filePath);
+        byte[] bytes = new byte[(int) inFile.length()];
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(inFile)) {
+            int totalRead = 0;
+            while (totalRead < bytes.length) {
+                int n = fis.read(bytes, totalRead, bytes.length - totalRead);
+                if (n < 0) break;
+                totalRead += n;
+            }
+            return arScene.rvLoadWorldMesh(bytes, resolvedTransformCsv);
+        } catch (java.io.IOException e) {
+            Log.w(TAG, "rvLoadWorldMeshFromFile: failed to read file", e);
+            return false;
+        }
+    }
+
     public void rvGetCloudAnchor(String anchorId, ARScene.RvCloudAnchorCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "AR scene not available"); return; }

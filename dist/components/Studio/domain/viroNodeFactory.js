@@ -53,8 +53,15 @@ function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationT
     // point (PlaceableNode adds it), so the camera-relative -2 default and the
     // "too close" clamp — both meant for camera/plane assets — must not apply.
     const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
+    // `world_placement` means the coordinates are a point in the world, not a
+    // camera-relative offset an author typed. The clamp below exists to stop an
+    // author putting an object inside the user's face, and it cannot tell the two
+    // apart: applied to a world coordinate it silently rewrites it to -2, which
+    // pins the object in front of the view. That reads as "the anchor does not
+    // stay fixed", and the only notice is the warning below.
+    const isWorldPlacement = !!asset.world_placement;
     let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
-    if (!hasTriggerImage && !isTapToPlace && posZ > -0.5) {
+    if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
         console.warn(`[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`);
         posZ = -2;
     }
@@ -170,14 +177,16 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
         : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 }
-function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, nodeRef) {
+function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] Image "${asset.name}" has no file_url`);
         return null;
     }
     return (<ViroImage_1.ViroImage key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
-        : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+        : {})} {...(config.physicsBody
+        ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
+        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 }
 /**
  * TEXT node whose content is a {{variable}} template (the asset name). It
@@ -185,7 +194,7 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, nodeRef) {
  * subscribes when the template actually has placeholders). Resolution is
  * fail-soft: unknown names stay literal.
  */
-const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visible, position, rotation, }) => {
+const VariableText = ({ asset, config, store, notifyPhysicsDrag, onCollision, nodeRef, visible, position, rotation, }) => {
     const template = asset.name ?? "";
     const compute = () => store
         ? (0, apiRequestHelpers_1.interpolateDisplayTemplate)(template, (n) => store.get(n))
@@ -206,7 +215,9 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, nodeRef, visibl
             textAlign: "center",
         }} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
-        : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+        : {})} {...(config.physicsBody
+        ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
+        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 };
 /**
  * Wraps a created node and drives its `visible` prop from the per-scene
@@ -246,17 +257,19 @@ const PlaceableNode = ({ assetId, store, authorPosition, authorRotation, visibil
       {React.cloneElement(children, { position, rotation })}
     </VisibleNode>);
 };
-function createText(asset, config, notifyPhysicsDrag, store, nodeRef) {
-    return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag} nodeRef={nodeRef}/>);
+function createText(asset, config, notifyPhysicsDrag, store, onCollision, nodeRef) {
+    return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag} onCollision={onCollision} nodeRef={nodeRef}/>);
 }
-function createVideo(asset, config, notifyPhysicsDrag, nodeRef) {
+function createVideo(asset, config, notifyPhysicsDrag, onCollision, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
     return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
-        : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+        : {})} {...(config.physicsBody
+        ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
+        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
 }
 function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, isDragActive, notifyPhysicsDrag, onSceneChange, runtimeCtx, 
 // When set (proximity-target assets), captures the live Viro node so the host
@@ -278,13 +291,13 @@ onGaze) {
             node = create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, proximityRef);
             break;
         case "IMAGE":
-            node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, proximityRef);
+            node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, proximityRef);
             break;
         case "TEXT":
-            node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore, proximityRef);
+            node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore, onCollision, proximityRef);
             break;
         case "VIDEO":
-            node = createVideo(asset, config, notifyPhysicsDrag, proximityRef);
+            node = createVideo(asset, config, notifyPhysicsDrag, onCollision, proximityRef);
             break;
         default:
             console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);

@@ -33,6 +33,7 @@
 #include <vector>
 #include <map>
 #include "VROMaterialVisual.h"
+#include "VROVector2f.h"
 #include "VROAnimatable.h"
 #include "VROStringUtil.h"
 #include "VROThreadRestricted.h"
@@ -394,6 +395,10 @@ public:
         // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
         // Uniforms are bound automatically during rendering via bindMaterialUniforms()
     }
+    void setShaderUniform(std::string name, VROVector2f value) {
+        _shaderUniformVec2s[name] = value;
+        // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
+    }
     void setShaderUniform(std::string name, VROVector3f value) {
         _shaderUniformVec3s[name] = value;
         // NOTE: Do NOT call updateSubstrate() - it deletes and recreates the shader binding!
@@ -414,6 +419,7 @@ public:
     }
 
     const std::map<std::string, float> &getShaderUniformFloats() const { return _shaderUniformFloats; }
+    const std::map<std::string, VROVector2f> &getShaderUniformVec2s() const { return _shaderUniformVec2s; }
     const std::map<std::string, VROVector3f> &getShaderUniformVec3s() const { return _shaderUniformVec3s; }
     const std::map<std::string, VROVector4f> &getShaderUniformVec4s() const { return _shaderUniformVec4s; }
     const std::map<std::string, VROMatrix4f> &getShaderUniformMat4s() const { return _shaderUniformMat4s; }
@@ -684,6 +690,7 @@ private:
     int _renderingOrder;
 
     std::map<std::string, float> _shaderUniformFloats;
+    std::map<std::string, VROVector2f> _shaderUniformVec2s;
     std::map<std::string, VROVector3f> _shaderUniformVec3s;
     std::map<std::string, VROVector4f> _shaderUniformVec4s;
     std::map<std::string, VROMatrix4f> _shaderUniformMat4s;

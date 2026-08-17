@@ -11,8 +11,12 @@ const subscribe = (onChange) => placementBannerStore_1.studioPlacementBannerStor
  * it). `name` is the asset awaiting placement; `showMiss` flags a missed tap.
  */
 function useStudioPlacement() {
-    const isPlacing = (0, react_1.useSyncExternalStore)(subscribe, () => placementBannerStore_1.studioPlacementBannerStore.isActive());
-    const name = (0, react_1.useSyncExternalStore)(subscribe, () => placementBannerStore_1.studioPlacementBannerStore.name());
-    const showMiss = (0, react_1.useSyncExternalStore)(subscribe, () => placementBannerStore_1.studioPlacementBannerStore.showMiss());
+    // The third argument is the server snapshot. Without it useSyncExternalStore
+    // throws outright in any server-rendering context, which the web platform can
+    // plausibly be -- and the store is a client-side thing, so the honest server
+    // answer is "nothing is being placed" rather than a guess.
+    const isPlacing = (0, react_1.useSyncExternalStore)(subscribe, () => placementBannerStore_1.studioPlacementBannerStore.isActive(), () => false);
+    const name = (0, react_1.useSyncExternalStore)(subscribe, () => placementBannerStore_1.studioPlacementBannerStore.name(), () => null);
+    const showMiss = (0, react_1.useSyncExternalStore)(subscribe, () => placementBannerStore_1.studioPlacementBannerStore.showMiss(), () => false);
     return { isPlacing, name, showMiss };
 }

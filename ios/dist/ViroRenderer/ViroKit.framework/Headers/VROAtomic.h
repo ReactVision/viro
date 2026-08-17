@@ -37,9 +37,27 @@ using VROAtomic = std::atomic<T>;
 
 #else
 
-// WebAssembly does not support atomic, and is single-threaded
+// WebAssembly is single-threaded, so real atomics aren't needed. But call sites
+// use std::atomic's API (.load()/.store()/operator T()/operator=), so we provide
+// a thin non-atomic wrapper with the same surface rather than aliasing to T.
 template <typename T>
-using VROAtomic = T;
+class VROAtomic {
+public:
+    VROAtomic() : _value() {}
+    VROAtomic(const T &value) : _value(value) {}
+    VROAtomic(const VROAtomic<T> &other) : _value(other._value) {}
+
+    VROAtomic<T> &operator=(const T &value) { _value = value; return *this; }
+    VROAtomic<T> &operator=(const VROAtomic<T> &other) { _value = other._value; return *this; }
+
+    operator T() const { return _value; }
+
+    T load() const { return _value; }
+    void store(const T &value) { _value = value; }
+
+private:
+    T _value;
+};
 
 #endif
 

@@ -34,12 +34,15 @@
 #include <mutex>
 #include <cstdint>
 #include "VROVector3f.h"
+#include "VROMatrix4f.h"
 
 class VROARDepthMesh;
 class VROARFrame;
 class VROPhysicsWorld;
 class VROPhysicsShape;
 class VROPencil;
+class VROScene;
+class VROGeometry;
 class btRigidBody;
 class btDefaultMotionState;
 
@@ -229,6 +232,84 @@ public:
      * @param pencil The pencil to use for drawing lines
      */
     void debugDraw(std::shared_ptr<VROPencil> pencil);
+
+    /**
+     * WS-C: serialize the current mesh (vertices, per-vertex confidences,
+     * triangle indices) into a compact custom binary format for persisting
+     * as a cloud anchor asset (see finishScan() and rvUploadAsset()).
+     *
+     * Not glTF: this format is only ever read back by loadMeshSnapshot() in
+     * this same class, not by third-party tools, so a minimal custom layout
+     * avoids the risk of an unvalidated hand-written glTF writer producing
+     * spec-invalid files (this repo has no way to open the result in a
+     * glTF viewer to confirm correctness).
+     *
+     * @param locationTransform The same anchor/location-frame transform used
+     *        to host this scan (RVCCACloudAnchorProvider's anchorTransform or
+     *        computeLocationTransform() result). Vertices are stored relative
+     *        to this frame (world = locationTransform * local), NOT in this
+     *        session's raw world space — a resolve on a different device has
+     *        a different, unrelated world origin, so raw world-space vertices
+     *        would be meaningless there. This mirrors how SIFT features are
+     *        already stored anchor/location-local (FeatureExtractor::toLocal).
+     *
+     * Layout (little-endian, matches all current target architectures):
+     *   [0:4)   magic "RVWM"
+     *   [4:5)   format version (1)
+     *   [5:9)   vertexCount   (uint32)
+     *   [9:13)  triangleCount (uint32)
+     *   vertices:    vertexCount   * 3 * float32 (x,y,z, relative to locationTransform)
+     *   confidences: vertexCount   * float32
+     *   indices:     triangleCount * 3 * int32
+     *
+     * @return Empty vector if there is no current mesh.
+     */
+    std::vector<uint8_t> serializeCurrentMesh(const VROMatrix4f& locationTransform) const;
+
+    /**
+     * WS-C: reconstruct a VROARDepthMesh from bytes produced by
+     * serializeCurrentMesh(), transforming vertices from the stored
+     * location-frame-relative space into this session's world space.
+     *
+     * @param resolvedTransform The transform resolveCloudAnchor() computed
+     *        for this session (the resolved anchor's world transform) —
+     *        the same role locationTransform played at host time, now
+     *        mapping local -> this session's world instead of the reverse.
+     * @return nullptr if data is malformed (bad magic/version, truncated).
+     */
+    static std::shared_ptr<VROARDepthMesh> loadMeshSnapshot(const std::vector<uint8_t>& data,
+                                                             const VROMatrix4f& resolvedTransform);
+
+    /**
+     * WS-C: attach a resolved (static) mesh snapshot loaded via
+     * loadMeshSnapshot() — the counterpart to the live per-frame mesh for
+     * mesh data recovered from a resolved cloud anchor's asset. Adds both:
+     *   - Physics: reuses applyMeshToPhysics() verbatim, the same pipeline
+     *     already used for the live mesh (clustering/decimation + async BVH).
+     *   - Visual occlusion: builds a static, invisible depth-only geometry
+     *     (see buildOcclusionGeometry()) and adds it to the scene root.
+     *     This path is NEW engine code, verified only by compilation — this
+     *     repo has no way to render an AR scene, so it has not been visually
+     *     confirmed to occlude correctly. Test on device before shipping.
+     *
+     * @param mesh The resolved mesh, already in this session's world space
+     *        (see loadMeshSnapshot()'s resolvedTransform parameter).
+     * @param scene The scene to add the occlusion geometry node to.
+     */
+    void attachResolvedMesh(std::shared_ptr<VROARDepthMesh> mesh, std::shared_ptr<VROScene> scene);
+
+    /**
+     * WS-C: build a static, invisible depth-only VROGeometry from a mesh's
+     * vertices/indices. The material writes to the depth buffer but not the
+     * color buffer (VROColorMaskNone) and disables culling (the mesh's
+     * winding was computed relative to a different session's camera, not
+     * guaranteed consistent for this session's viewpoints) — so it never
+     * appears itself but still correctly z-tests virtual content behind it.
+     * Public for testability; normally called via attachResolvedMesh().
+     *
+     * @return nullptr if mesh is null/invalid/empty.
+     */
+    static std::shared_ptr<VROGeometry> buildOcclusionGeometry(std::shared_ptr<VROARDepthMesh> mesh);
 
 private:
     std::weak_ptr<VROPhysicsWorld> _physicsWorld;

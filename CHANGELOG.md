@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## v2.58.0 — 16 August 2026
+
+### Added
+
+- **AR Session Recording** (`ViroARSceneNavigator`). `startRecording(outputDir)`/`stopRecording()`/`getRecordingStatus()` capture a session to local storage — `video.mp4` (the camera passthrough feed) + `session.jsonl` (raw IMU + the platform's own tracked pose as ground truth) — for **offline** analysis/replay via `tinyvio`, not in-app playback. A different feature from `ViroCameraTexture.startRecording()` (camera-feed-only MP4). iOS + Android.
+
+### Fixed
+
+- **The package could crash on first import when bundled with `react-native-web`.** Ten native-only components (`ViroARImageMarker`, `ViroARObjectMarker`, `ViroAnimatedImage`, `ViroCameraTexture`, `ViroController`, `ViroObjectDetector`, `ViroSceneNavigator`, `ViroVRSceneNavigator`, `ViroVirtualButton`, `ViroVirtualJoystick`) called `requireNativeComponent()` at module scope with no `.web.tsx` variant to substitute — and since `dist/index.js` is a single CommonJS barrel that `require()`s every component eagerly, importing *anything* from the package under a web bundle crashed immediately via whichever of the ten loaded first, regardless of which components an app actually used. All ten now have a minimal `.web.tsx` stub (renders `null`, dev-only warning).
+
+### Changed
+
+- **`docs/` moved out of the repository.** The package's markdown docs (`AR_SESSION_RECORDING.md`, `ViroObjectDetector.md`, `PLATFORM_EXTENSIONS.md`, `QUEST_SETUP.md`, `ViroCameraTexture.md`) are no longer tracked in this repo or shipped in the npm package — they're maintained privately alongside the workspace for internal/MCP tooling use. Older CHANGELOG entries that reference a `docs/*.md` path describe the state at that release; those files are no longer present in a fresh checkout or install.
+
+### Migration
+
+- **No breaking changes.** Everything in this release is additive or a bug fix.
+
 ## v2.57.5 — 26 July 2026
 
 ### Added

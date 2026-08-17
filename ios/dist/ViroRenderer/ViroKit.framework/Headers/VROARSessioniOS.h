@@ -29,6 +29,7 @@
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
 #include "VROARSession.h"
+#include "VROARSessionRecorderIOS.h"
 #include "VROViewport.h"
 #include <ARKit/ARKit.h>
 #include <map>
@@ -161,6 +162,7 @@ public:
     void setGeospatialModeEnabled(bool enabled) override;
     VROEarthTrackingState getEarthTrackingState() const override;
     VROGeospatialPose getCameraGeospatialPose() const override;
+    bool isLocationAccuracyReduced() const override;
     void checkVPSAvailability(double latitude, double longitude,
                               std::function<void(VROVPSAvailability)> callback) override;
     void createGeospatialAnchor(double latitude, double longitude, double altitude,
@@ -200,6 +202,9 @@ public:
         std::function<void(bool, std::string, std::string)> callback) override;
 
     // Cloud anchor management
+    void rvStartScan() override;
+    void rvFinishScan(int ttlDays,
+        std::function<void(bool, std::string, std::string, std::string)> callback) override;
     void rvGetCloudAnchor(const std::string& anchorId,
         std::function<void(bool, std::string, std::string)> callback) override;
     void rvListCloudAnchors(int limit, int offset,
@@ -233,6 +238,14 @@ public:
     void setSemanticModeEnabled(bool enabled) override;
     float getSemanticLabelFraction(VROSemanticLabel label) const;
 
+    // AR Session Recording API (see VROARSessionRecorderIOS)
+    bool isRecordingSupported() const override;
+    void startRecording(const VROARRecordingConfig &config,
+                         std::function<void()> onSuccess,
+                         std::function<void(std::string error)> onFailure) override;
+    void stopRecording() override;
+    VROARRecordingStatus getRecordingStatus() const override;
+
     /*
      Internal methods.
      */
@@ -259,6 +272,7 @@ private:
     ARSession *_session;
     ARConfiguration *_sessionConfiguration;
     VROARKitSessionDelegate *_delegateAR;
+    std::unique_ptr<VROARSessionRecorderIOS> _recorder;
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300
     NSMutableSet<ARReferenceImage *> *_arKitImageDetectionSet;

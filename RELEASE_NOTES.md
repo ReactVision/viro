@@ -1,5 +1,26 @@
 # Release Notes
 
+## v2.58.1
+
+### Fixed
+
+- **AR session recordings played sideways (iOS and Android).** Video captured by `ViroARSceneNavigator.startRecording()` carried no rotation, so it played in the camera sensor's landscape orientation however the phone was held. Both platforms now tag the file so players show it upright.
+- **AR session recordings were unusable for analysis on iOS.** The IMU was written in G while Android wrote m/s² — the same `session.jsonl` field meaning two things, off by 9.81×. iOS now writes m/s². Against tinyvio on a real recording this moved tracking from 0% of frames to 96%. A second iOS fix keeps the sidecar and the video in step: duplicate ARKit frames are dropped whole, and a pose is only written once its frame has reached the encoder.
+- **AR session recordings had scrambled colour (Android).** The same video came out sharp and correctly framed but under large green/magenta blocks — the encoder was fed a pixel layout it did not actually use. Frames are now handed to it through its real per-plane strides.
+
+All fixed in `@reactvision/virocore` 2.58.1. None of them affect `startVideoRecording()`, which records the rendered screen and was never involved.
+
+### Migration
+
+- **No breaking changes.**
+- iOS `imu.accel`/`pose.gravity` are now m/s² rather than G, matching Android; the format only shipped in 2.58.0, so there is effectively no earlier data to reconcile.
+- Tooling that decodes a recording's `video.mp4` for tracking should pass ffmpeg `-noautorotate`: the new rotation is container metadata only, so the frames still match `session.jsonl`'s intrinsics, but ffmpeg rotates by default and would leave the geometry wrong without erroring. Older recordings are unaffected by the flag.
+- Pairs with `@reactvision/virocore` 2.58.1.
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for full detail.
+
+---
+
 ## v2.58.0
 
 ### Highlights
@@ -12,6 +33,10 @@
 
 - The package could crash immediately when bundled with `react-native-web` — ten native-only components had no `.web.tsx` variant and crashed the shared import barrel regardless of what an app actually used. Fixed with stub implementations for all ten.
 - GLB/glTF models with sparse accessors or non-indexed primitives now load correctly (previously failed) — fixed in `@reactvision/virocore` 2.58.0.
+
+### Changed
+
+- Android alert dialogs now follow Material 3 instead of the Material 2 look inherited from the RN/Expo template theme (#508). Only the `alertDialogTheme` attribute is overlaid, so the rest of your app's theme is untouched. *(Shipped in 2.58.0; documented retroactively.)*
 
 ### Migration
 

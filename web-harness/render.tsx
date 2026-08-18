@@ -81,6 +81,8 @@ type RenderInput =
        */
       intrinsics?: { fx: number; fy: number; cx: number; cy: number };
       intrinsicsSize?: { width: number; height: number };
+      /** Display rotation of the video, so the renderer can orient the intrinsics. */
+      intrinsicsRotation?: number;
     };
 
 declare global {
@@ -241,12 +243,14 @@ function PlaybackRoot({
   frames,
   intrinsics,
   intrinsicsSize,
+  intrinsicsRotation,
 }: {
   scene: StudioSceneResponse;
   videoUrl: string;
   frames: ArPlaybackFrame[];
   intrinsics?: { fx: number; fy: number; cx: number; cy: number };
   intrinsicsSize?: { width: number; height: number };
+  intrinsicsRotation?: number;
 }) {
   const onSessionReady = (session: ViroArSession) => {
     // Hand the driver a stepper rather than letting it reach into the session.
@@ -264,7 +268,7 @@ function PlaybackRoot({
     mode: "ar" as const,
     webRendererOptions,
     arOptions: {
-      playback: { videoUrl, frames, intrinsics, intrinsicsSize },
+      playback: { videoUrl, frames, intrinsics, intrinsicsSize, intrinsicsRotation },
       showCameraBackground: true,
     },
     onSessionReady,
@@ -285,7 +289,8 @@ if (!input) {
     // than as a prop the caller would have had to know to pass.
     setPlaybackSource(
       { videoUrl: input.videoUrl, frames: input.frames,
-        intrinsics: input.intrinsics, intrinsicsSize: input.intrinsicsSize },
+        intrinsics: input.intrinsics, intrinsicsSize: input.intrinsicsSize,
+        intrinsicsRotation: input.intrinsicsRotation },
       (session: any) => {
         window.__playbackStep = (i: number) => session.renderPlaybackFrame(i);
         window.__playbackFrameCount = session.playbackFrameCount;
@@ -303,6 +308,7 @@ if (!input) {
         frames: input.frames,
         intrinsics: input.intrinsics,
         intrinsicsSize: input.intrinsicsSize,
+        intrinsicsRotation: input.intrinsicsRotation,
       }),
     );
   }

@@ -90,7 +90,30 @@ export function setPlaybackSource(
   onSessionReady = onReady;
 }
 
+// One render produces one output frame, so two navigators mounted at once are
+// two AR sessions over the same recording drawing into two stacked canvases:
+// both scenes appear in the one video, and the tracker runs twice for it. It
+// happens when a bundle's entry composes several scene components that each
+// declare their own navigator -- a natural way to write "show me all my
+// scenes" that this harness cannot honour. Counted here because this wrapper
+// is the single funnel every caller navigator passes through.
+let navigatorsMounted = 0;
+
 export function ViroARSceneNavigator(props: any) {
+  useEffect(() => {
+    navigatorsMounted += 1;
+    if (navigatorsMounted > 1) {
+      pushWarning(
+        "This scene mounts more than one ViroARSceneNavigator. A render draws " +
+          "one navigator over the recording, so every scene after the first is " +
+          "stacked on top of the others in the same output. Render one scene " +
+          "per run.",
+      );
+    }
+    return () => {
+      navigatorsMounted -= 1;
+    };
+  }, []);
   // The tracking engine too, for the same reason: caller-supplied TSX has no
   // way to know where this harness serves it from, and without a default the
   // AR session fails at start with "slam-wasm not found" — which reads like a

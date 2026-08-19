@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.withViroAndroid = void 0;
+exports.withViroAndroid = exports.resolveViroAndroidRelativePath = void 0;
 const config_plugins_1 = require("@expo/config-plugins");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -135,15 +135,32 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
     return config;
 });
 const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {
+    const viroAndroidRoot = resolveViroAndroidRelativePath(config.modRequest.projectRoot, config.modRequest.platformProjectRoot);
     config.modResults.contents += `
 include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
-project(':arcore_client').projectDir = new File('../node_modules/@reactvision/react-viro/android/arcore_client')
-project(':gvr_common').projectDir = new File('../node_modules/@reactvision/react-viro/android/gvr_common')
-project(':viro_renderer').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_renderer')
-project(':react_viro').projectDir = new File('../node_modules/@reactvision/react-viro/android/react_viro')
+project(':arcore_client').projectDir = new File('${viroAndroidRoot}/arcore_client')
+project(':gvr_common').projectDir = new File('${viroAndroidRoot}/gvr_common')
+project(':viro_renderer').projectDir = new File('${viroAndroidRoot}/viro_renderer')
+project(':react_viro').projectDir = new File('${viroAndroidRoot}/react_viro')
     `;
     return config;
 });
+function resolveViroAndroidRelativePath(projectRoot, androidRoot) {
+    const fallback = "../node_modules/@reactvision/react-viro/android";
+    try {
+        const pkgJson = require.resolve("@reactvision/react-viro/package.json", {
+            paths: [projectRoot],
+        });
+        const viroAndroidDir = path_1.default.join(path_1.default.dirname(pkgJson), "android");
+        // Gradle resolves relative File(...) against the settings.gradle dir (androidRoot).
+        // Always emit POSIX separators — Gradle accepts them on every platform.
+        return path_1.default.relative(androidRoot, viroAndroidDir).split(path_1.default.sep).join("/");
+    }
+    catch {
+        return fallback;
+    }
+}
+exports.resolveViroAndroidRelativePath = resolveViroAndroidRelativePath;
 const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(config, async (newConfig) => {
     const contents = newConfig.modResults;
     contents.manifest.$["xmlns:tools"] = "http://schemas.android.com/tools";

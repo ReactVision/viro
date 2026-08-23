@@ -19,6 +19,7 @@
 
 #include "VRORenderer.h"
 #include "VRODriverVisionOS.h"
+#include "VROMetalFrameTimer.h"
 #include "VRORendererConfiguration.h"
 #include "VROInputControllerBase.h"
 #include "VROInputPresenter.h"
@@ -605,6 +606,9 @@ protected:
     // (including the first-frame initRenderer path) uses the correct format.
     _driver->setColorPixelFormat(colorTexture.pixelFormat);
 
+    VROMetalFrameTimer *timer = _driver->getFrameTimerForBridge();
+    if (timer) { timer->beginPhase("prepareFrame"); }
+
     // Physics bodies are created here rather than during scene construction, because
     // VRONode::initPhysicsBody registers with the world only if the node already belongs to
     // a scene — and the scene is attached to the renderer after it is built.
@@ -692,6 +696,8 @@ protected:
                             VROFieldOfView(),
                             worldFromEyeRot, vroProj,
                             _driver);
+
+    if (timer) { timer->endPhase("prepareFrame"); }
 }
 
 // ── renderEye ─────────────────────────────────────────────────────────────────
@@ -699,8 +705,20 @@ protected:
 // Called once per eye.  Sets the active encoder on the driver so that
 // VROGeometrySubstrateMetal can issue draw calls, then invokes VRORenderer::renderEye.
 
+- (void)setFrameTimingEnabled:(BOOL)enabled {
+    _driver->setFrameTimingEnabled(enabled);
+}
+
 - (void)setFrameCommandBuffer:(id <MTLCommandBuffer>)commandBuffer {
     _driver->setFrameCommandBuffer(commandBuffer);
+    if (VROMetalFrameTimer *timer = _driver->getFrameTimerForBridge()) {
+        if (commandBuffer) {
+            timer->beginFrame(commandBuffer);
+        } else {
+            // Passed nil after the last eye is submitted, which is the end of the frame.
+            timer->endFrame();
+        }
+    }
 }
 
 - (void)renderEyeWithViewIndex:(NSUInteger)viewIndex
@@ -729,6 +747,9 @@ protected:
 
     VROEyeType eyeType = (viewIndex == 0) ? VROEyeType::Left : VROEyeType::Right;
 
+    if (VROMetalFrameTimer *timer = _driver->getFrameTimerForBridge()) {
+        timer->beginPhase("renderEye");
+    }
     _driver->beginDisplayPass(renderPass);
 
     @try {
@@ -750,6 +771,10 @@ protected:
     }
 
     _driver->endDisplayPass();
+
+    if (VROMetalFrameTimer *timer = _driver->getFrameTimerForBridge()) {
+        timer->endPhase("renderEye");
+    }
 }
 
 // ── endFrame ─────────────────────────────────────────────────────────────────

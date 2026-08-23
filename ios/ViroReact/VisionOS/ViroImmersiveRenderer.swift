@@ -53,6 +53,13 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
         self.device = device
         self.commandQueue = queue
         self.bridge = VRORendererBridge(device: device)
+
+        // Frame timing is opt-in through the VIRO_FRAME_TIMING environment variable rather
+        // than a compile-time flag, so a device build can be measured without rebuilding.
+        // Reports land in the log every 300 frames.
+        if ProcessInfo.processInfo.environment["VIRO_FRAME_TIMING"] != nil {
+            bridge.setFrameTimingEnabled(true)
+        }
     }
 
     // MARK: - Lifecycle

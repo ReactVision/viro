@@ -80,6 +80,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// Call after all eyes have been rendered.  Drives VRORenderer::endFrame().
 - (void)endFrame;
 
+/// Turn frame timing on. Off by default because it costs a counter sample buffer and a
+/// completion handler per frame. When on, a report is logged every 300 frames giving the
+/// distribution of GPU and CPU time against the 90 Hz budget, broken down per render pass
+/// where the device supports stage-boundary counter sampling.
+///
+/// This is how the M4 frame-time budget gets measured: enable it, run on device, read the log.
+- (void)setFrameTimingEnabled:(BOOL)enabled;
+
 @end
 
 NS_ASSUME_NONNULL_END

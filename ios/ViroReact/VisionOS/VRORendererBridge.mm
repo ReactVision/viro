@@ -104,17 +104,14 @@ protected:
     // colour attachment, specialised per target via function constants.
     // Bloom: the lighting shaders write a bloom buffer to a third attachment, the blur
     // pass has a Metal implementation, and the additive blend resolves to an MSL function.
-    // PBR: Cook-Torrance direct lighting is written in MSL (pbr_lighting_* in
-    // Shaders.metal) and compiles, but enabling it stops the scene from drawing —
-    // with no exception, no shader-compile failure, and no skipped-draw warning.
-    // The only behavioural difference the flag makes in VROChoreographer is adding
-    // VROIBLPreprocess, which is still a no-op stub here, so the cause is not yet
-    // identified. Left off until it is.
+    // PBR: Cook-Torrance direct lighting in MSL (pbr_lighting_* in Shaders.metal).
+    // Image-based lighting is not implemented, so the ambient term stands in for the
+    // environment contribution — a PBR material needs an analytic light to be lit.
     VRORendererConfiguration config;
     config.enableShadows        = true;
     config.enableBloom          = true;
     config.enableHDR            = true;
-    config.enablePBR            = false;
+    config.enablePBR            = true;
     config.enableMultisampling  = false;
 
     // Fallback scene lighting at buffer index 4, re-applied by the driver to every
@@ -312,6 +309,33 @@ protected:
         node->setGeometry(sphere);
         node->setPosition({0.9f, -0.2f, -1.5f});
         scene->getRootNode()->addChildNode(node);
+    }
+
+    // ── VROSphere ×2 — physically based, contrasting metalness / roughness ───
+    // Left is polished metal, right a rough dielectric. The pair makes the Cook-Torrance
+    // response legible: the metal takes its specular colour from its own albedo and keeps
+    // a tight highlight, the dielectric spreads a broader white one.
+    {
+        struct { float metalness; float roughness; float x; } variants[] = {
+            { 1.0f, 0.20f, -1.35f },
+            { 0.0f, 0.70f,  1.35f },
+        };
+        for (const auto &variant : variants) {
+            auto sphere = VROSphere::createSphere(0.14f, 24, 24, true);
+            auto mat = std::make_shared<VROMaterial>();
+            mat->setLightingModel(VROLightingModel::PhysicallyBased);
+            mat->getDiffuse().setColor({0.85f, 0.72f, 0.35f, 1.0f});
+            mat->getMetalness().setColor({variant.metalness, variant.metalness, variant.metalness, 1.0f});
+            mat->getRoughness().setColor({variant.roughness, variant.roughness, variant.roughness, 1.0f});
+            mat->getAmbientOcclusion().setColor({1.0f, 1.0f, 1.0f, 1.0f});
+            sphere->setMaterials({mat});
+            auto node = std::make_shared<VRONode>();
+            node->setGeometry(sphere);
+            // Kept out at the scene's radius: closer in, these intersect the near plane
+            // and the whole frame degenerates.
+            node->setPosition({variant.x, 0.1f, -1.6f});
+            scene->getRootNode()->addChildNode(node);
+        }
     }
 
     // ── VROSurface — back wall quad, green ───────────────────────────────────

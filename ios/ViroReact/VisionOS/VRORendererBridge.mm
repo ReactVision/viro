@@ -104,7 +104,12 @@ protected:
     // colour attachment, specialised per target via function constants.
     // Bloom: the lighting shaders write a bloom buffer to a third attachment, the blur
     // pass has a Metal implementation, and the additive blend resolves to an MSL function.
-    // PBR stays off until VROIBLPreprocess has a Metal implementation.
+    // PBR: Cook-Torrance direct lighting is written in MSL (pbr_lighting_* in
+    // Shaders.metal) and compiles, but enabling it stops the scene from drawing —
+    // with no exception, no shader-compile failure, and no skipped-draw warning.
+    // The only behavioural difference the flag makes in VROChoreographer is adding
+    // VROIBLPreprocess, which is still a no-op stub here, so the cause is not yet
+    // identified. Left off until it is.
     VRORendererConfiguration config;
     config.enableShadows        = true;
     config.enableBloom          = true;

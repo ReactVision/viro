@@ -171,6 +171,13 @@ protected:
                 auto tex = std::make_shared<VROTexture>(VROTextureType::Texture2D,
                                                         VROTextureInternalFormat::RGBA8,
                                                         std::move(substrate));
+                // Same equirectangular texture drives image-based lighting, so the PBR
+                // materials are lit by the environment they sit in rather than by a flat
+                // ambient term. VROIBLPreprocess picks it up from the active portal.
+                if (scene->getActivePortal()) {
+                    scene->getActivePortal()->setLightingEnvironment(tex);
+                }
+
                 auto bgMat = std::make_shared<VROMaterial>();
                 bgMat->setLightingModel(VROLightingModel::Constant);
                 bgMat->getDiffuse().setTexture(tex);

@@ -10,13 +10,19 @@
 //   1. Call -prepareFrameWithViewIndex:0 colorTexture:... viewTransform:... tangents:...
 //      once per frame (left-eye data drives VRORenderer::prepareFrame).
 //
-//   2. For each eye (0 = left, 1 = right):
-//        a. Create MTLRenderPassDescriptor with the eye's color + depth textures.
-//        b. Create a MTLRenderCommandEncoder from that descriptor.
-//        c. Call -renderEyeWithViewIndex:i encoder:... colorTexture:... viewTransform:... tangents:...
-//        d. Call [encoder endEncoding].
+//   2. Call -setFrameCommandBuffer: with the frame's command buffer.
 //
-//   3. Call -endFrame
+//   3. For each eye (0 = left, 1 = right):
+//        a. Build a MTLRenderPassDescriptor with the eye's color + depth textures.
+//        b. Call -renderEyeWithViewIndex:i renderPassDescriptor:... colorTexture:... ...
+//
+//      The renderer opens and closes the render command encoder itself. Do not
+//      create one: Metal allows a single render command encoder per command buffer
+//      at a time, and the renderer needs to interleave offscreen passes (bloom,
+//      shadows, tone mapping) with the display pass, which means ending and
+//      reopening the display encoder mid-eye.
+//
+//   4. Call -setFrameCommandBuffer:nil, then -endFrame
 //
 // Scene loading:
 //   The bridge starts with a hardcoded red-box test scene.  Connect your React
@@ -49,16 +55,23 @@ NS_ASSUME_NONNULL_BEGIN
                     viewTransform:(simd_float4x4)viewTransform
                          tangents:(simd_float4)tangents;
 
-/// Call once per eye.  Sets the encoder on the driver, invokes VRORenderer::renderEye(),
-/// then clears the encoder.  The caller is responsible for calling [encoder endEncoding].
+/// The command buffer for the frame about to be rendered. Every render command
+/// encoder, the display pass included, is opened from it by the renderer. Pass nil
+/// after the last eye, before -endFrame.
+- (void)setFrameCommandBuffer:(nullable id <MTLCommandBuffer>)commandBuffer;
+
+/// Call once per eye.  Opens the display render pass, invokes VRORenderer::renderEye(),
+/// then ends the pass.  The caller must NOT create or end an encoder itself.
 /// @param viewIndex    0 = left eye, 1 = right eye.
-/// @param encoder      Active MTLRenderCommandEncoder targeting the eye's textures.
+/// @param renderPass   Descriptor for the eye's colour + depth textures. Store actions
+///                     must be .store — CompositorServices needs stored depth for
+///                     late-stage reprojection.
 /// @param colorTexture The eye's colour render-target (used for dimensions and pixel format).
 /// @param depthTexture The eye's depth render-target (used for pixel format).
 /// @param viewTransform The device-anchor → eye-space transform from CompositorServices.
 /// @param tangents     Frustum half-angle tangents (left, right, up, down).
 - (void)renderEyeWithViewIndex:(NSUInteger)viewIndex
-                       encoder:(id <MTLRenderCommandEncoder>)encoder
+          renderPassDescriptor:(MTLRenderPassDescriptor *)renderPass
                   colorTexture:(id <MTLTexture>)colorTexture
                   depthTexture:(id <MTLTexture>)depthTexture
                  viewTransform:(simd_float4x4)viewTransform

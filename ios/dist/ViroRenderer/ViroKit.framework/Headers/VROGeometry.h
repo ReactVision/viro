@@ -171,7 +171,7 @@ public:
     virtual void setMaterials(std::vector<std::shared_ptr<VROMaterial>> materials) {
         _materials = materials;
     }
-    const std::vector<std::shared_ptr<VROMaterial>> &getMaterials() {
+    const std::vector<std::shared_ptr<VROMaterial>> &getMaterials() const {
         return _materials;
     }
        

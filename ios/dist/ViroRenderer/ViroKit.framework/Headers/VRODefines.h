@@ -19,50 +19,75 @@
 //  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 //  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 //  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-//  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-//  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #ifndef VRODefines_h
 #define VRODefines_h
 
-#ifdef __OBJC__
-#import "TargetConditionals.h" 
-#if TARGET_IPHONE_SIMULATOR || TARGET_OS_IPHONE
-#define VRO_PLATFORM_ANDROID 0
-#define VRO_PLATFORM_IOS 1
-#define VRO_PLATFORM_WASM 0
-#define VRO_PLATFORM_MACOS 0
+// ── Platform detection ────────────────────────────────────────────────────────
+//
+// Supports five compilation environments:
+//   ObjC / ObjC++ on Apple  (iOS, visionOS, macOS)
+//   Plain C++ on Apple      (same target, non-.mm files)
+//   WebAssembly (Emscripten)
+//   Android (NDK)
+
+#if defined(__OBJC__) || defined(__APPLE__)
+
+#include <TargetConditionals.h>
+
+#if TARGET_OS_VISION
+  #define VRO_PLATFORM_ANDROID 0
+  #define VRO_PLATFORM_IOS     0
+  #define VRO_PLATFORM_VISION  1
+  #define VRO_PLATFORM_WASM    0
+  #define VRO_PLATFORM_MACOS   0
+
+#elif TARGET_IPHONE_SIMULATOR || TARGET_OS_IPHONE
+  #define VRO_PLATFORM_ANDROID 0
+  #define VRO_PLATFORM_IOS     1
+  #define VRO_PLATFORM_VISION  0
+  #define VRO_PLATFORM_WASM    0
+  #define VRO_PLATFORM_MACOS   0
+
 #else
-#define VRO_PLATFORM_ANDROID 0
-#define VRO_PLATFORM_IOS 0
-#define VRO_PLATFORM_WASM 0
-#define VRO_PLATFORM_MACOS 1
-#endif // __OBJC__
-#else
-#ifdef WASM_PLATFORM
-#define VRO_PLATFORM_ANDROID 0
-#define VRO_PLATFORM_IOS 0
-#define VRO_PLATFORM_WASM 1
-#define VRO_PLATFORM_MACOS 0
-
-#define VRO_C_INCLUDE "VROWasmCAPI.h"
-
-#else  // !WASM_PLATFORM
-#define VRO_PLATFORM_ANDROID 1
-#define VRO_PLATFORM_IOS 0
-#define VRO_PLATFORM_WASM 0
-#define VRO_PLATFORM_MACOS 0
-
-#define VRO_C_INCLUDE "VROAndroidCAPI.h"
-
+  // macOS (or any other Apple platform)
+  #define VRO_PLATFORM_ANDROID 0
+  #define VRO_PLATFORM_IOS     0
+  #define VRO_PLATFORM_VISION  0
+  #define VRO_PLATFORM_WASM    0
+  #define VRO_PLATFORM_MACOS   1
 #endif
-#endif // !__OBJC __
 
-#define VRO_METAL 0
+#elif defined(WASM_PLATFORM)
+  #define VRO_PLATFORM_ANDROID 0
+  #define VRO_PLATFORM_IOS     0
+  #define VRO_PLATFORM_VISION  0
+  #define VRO_PLATFORM_WASM    1
+  #define VRO_PLATFORM_MACOS   0
 
-// True if building for Posemoji
+  #define VRO_C_INCLUDE "VROWasmCAPI.h"
+
+#else
+  // Android / NDK
+  #define VRO_PLATFORM_ANDROID 1
+  #define VRO_PLATFORM_IOS     0
+  #define VRO_PLATFORM_VISION  0
+  #define VRO_PLATFORM_WASM    0
+  #define VRO_PLATFORM_MACOS   0
+
+  #define VRO_C_INCLUDE "VROAndroidCAPI.h"
+#endif
+
+// ── VRO_METAL ─────────────────────────────────────────────────────────────────
+//
+// Default to 0.  The ViroKitVisionOS (and ViroKit iOS Metal) Xcode targets pass
+// -DVRO_METAL=1 via GCC_PREPROCESSOR_DEFINITIONS.  Using #ifndef lets that
+// build-system flag take effect instead of being clobbered by this header.
+#ifndef VRO_METAL
+  #define VRO_METAL 0
+#endif
+
+// ── VRO_POSEMOJI ─────────────────────────────────────────────────────────────
 #define VRO_POSEMOJI 1
 
 #endif /* VRODefines_h */

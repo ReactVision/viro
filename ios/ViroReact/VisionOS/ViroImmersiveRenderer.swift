@@ -162,6 +162,11 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
             guard drawable.state == .rendering else { continue }
             guard let commandBuffer = commandQueue.makeCommandBuffer() else { continue }
 
+            // Every render command encoder — the display pass included — is opened
+            // by the renderer from this buffer, so it must be handed over before any
+            // eye is rendered.
+            bridge.setFrameCommandBuffer(commandBuffer)
+
             commandBuffer.addCompletedHandler { cb in
                 if let error = cb.error {
                     NSLog("[Viro] commandBuffer GPU error: \(error)")
@@ -197,25 +202,19 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 // .dontCare silently causes the compositor to discard the frame → black screen.
                 renderPass.depthAttachment.storeAction = .store
 
-                guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else {
-                    NSLog("[Viro] ERROR: makeRenderCommandEncoder nil view=%d fmt=%d type=%d slice=%d",
-                          i,
-                          colorTexture.pixelFormat.rawValue,
-                          colorTexture.textureType.rawValue,
-                          colorSlice)
-                    continue
-                }
-
+                // The encoder is deliberately NOT created here. The renderer opens it
+                // when the base render pass binds its output target, so that an
+                // offscreen pass (bloom, shadows, tone mapping) can interleave —
+                // Metal permits one render command encoder per command buffer at a
+                // time, so a detour has to end the display encoder and reopen it.
                 let eyeFromWorld = view.transform * deviceFromWorld
                 bridge.renderEye(
                     withViewIndex: UInt(i),
-                    encoder: encoder,
+                    renderPassDescriptor: renderPass,
                     colorTexture: colorTexture,
                     depthTexture: depthTexture,
                     viewTransform: eyeFromWorld,
                     tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
-
-                encoder.endEncoding()
             }
 
             // Required: set device anchor before encodePresent so CompositorServices
@@ -224,6 +223,7 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
             drawable.deviceAnchor = deviceAnchor
             drawable.encodePresent(commandBuffer: commandBuffer)
             commandBuffer.commit()
+            bridge.setFrameCommandBuffer(nil)
         }
 
         frame.endSubmission()

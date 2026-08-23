@@ -82,6 +82,13 @@ private:
     AVAssetWriterInput *_videoWriterInput;
     AVAssetWriterInputPixelBufferAdaptor *_videoAdaptor;
     bool _loggedPixelFormatMismatch;
+    // Writer failed; skip video for the rest of the session, keep session.jsonl.
+    bool _videoDisabled;
+    // Geometry the writer was created with, for reporting append mismatches.
+    size_t _videoWidth;
+    size_t _videoHeight;
+    // Last recorded ARFrame.timestamp; drops duplicates so poses match frames 1:1.
+    double _lastFrameTimestamp;
 
     // --- Raw IMU tap (independent of ARKit; CMMotionManager's raw, un-fused
     // accelerometer/gyro APIs, not the fused CMDeviceMotion path) ---

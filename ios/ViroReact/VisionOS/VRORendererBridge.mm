@@ -499,8 +499,12 @@ protected:
 // Called once per eye.  Sets the active encoder on the driver so that
 // VROGeometrySubstrateMetal can issue draw calls, then invokes VRORenderer::renderEye.
 
+- (void)setFrameCommandBuffer:(id <MTLCommandBuffer>)commandBuffer {
+    _driver->setFrameCommandBuffer(commandBuffer);
+}
+
 - (void)renderEyeWithViewIndex:(NSUInteger)viewIndex
-                       encoder:(id <MTLRenderCommandEncoder>)encoder
+          renderPassDescriptor:(MTLRenderPassDescriptor *)renderPass
                   colorTexture:(id <MTLTexture>)colorTexture
                   depthTexture:(id <MTLTexture>)depthTexture
                  viewTransform:(simd_float4x4)viewTransform
@@ -514,8 +518,6 @@ protected:
     _driver->setColorPixelFormat(colorTexture.pixelFormat);
     _driver->setDepthPixelFormat(depthTexture.pixelFormat);
 
-    _driver->setActiveEncoder(encoder);
-
     NSUInteger width  = colorTexture.width;
     NSUInteger height = colorTexture.height;
     VROViewport viewport(0, 0, (int)width, (int)height);
@@ -527,10 +529,13 @@ protected:
 
     VROEyeType eyeType = (viewIndex == 0) ? VROEyeType::Left : VROEyeType::Right;
 
-    // Pre-bind scene lighting uniforms at buffer index 4.
-    // bindShader() / bindLights() will overwrite this per draw call for Phong materials,
-    // but a valid fallback here prevents unset-buffer reads if any shader reads index 4
-    // before bindLights() fires (e.g., Constant shaders, or early-exit paths).
+    // Fallback scene lighting uniforms at buffer index 4.
+    // bindShader() / bindLights() overwrite this per draw call for Phong materials,
+    // but a valid fallback prevents unset-buffer reads if any shader reads index 4
+    // before bindLights() fires (e.g. Constant shaders, or early-exit paths).
+    // The driver re-applies it to every encoder it opens, because Metal buffer
+    // bindings do not survive the end of a render pass and an offscreen pass can
+    // end the display encoder mid-eye.
     {
         VROSceneLightingUniformsMM lightingUniforms = {};
         // Ambient component (matches the VROLight::Ambient added to the scene).
@@ -542,9 +547,10 @@ protected:
         // normalize({0, -1, -0.5}) = {0, -0.894, -0.447}
         lightingUniforms.lights[0].direction = { 0.0f, -0.894427f, -0.447214f };
         lightingUniforms.lights[0].attenuation_falloff_exp = 1.0f;
-        [encoder setVertexBytes:&lightingUniforms length:sizeof(lightingUniforms) atIndex:4];
-        [encoder setFragmentBytes:&lightingUniforms length:sizeof(lightingUniforms) atIndex:4];
+        _driver->setFallbackUniformBytes(4, &lightingUniforms, sizeof(lightingUniforms));
     }
+
+    _driver->beginDisplayPass(renderPass);
 
     @try {
         try {
@@ -558,7 +564,7 @@ protected:
         NSLog(@"[ViroBridge] renderEye NSException: %@ — %@ (frame=%d)", e.name, e.reason, _frameNumber);
     }
 
-    _driver->setActiveEncoder(nil);
+    _driver->endDisplayPass();
 }
 
 // ── endFrame ─────────────────────────────────────────────────────────────────

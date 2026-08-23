@@ -29,7 +29,7 @@
 
 #include "VRODefines.h"
 
-#if VRO_PLATFORM_IOS || VRO_PLATFORM_MACOS || VRO_PLATFORM_ANDROID
+#if VRO_PLATFORM_IOS || VRO_PLATFORM_MACOS || VRO_PLATFORM_ANDROID || VRO_PLATFORM_VISION
 #include <atomic>
 
 template <typename T>

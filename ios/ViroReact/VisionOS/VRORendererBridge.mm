@@ -102,12 +102,12 @@ protected:
     // in the lighting shaders are all in place on Metal.
     // HDR: the lighting fragment functions write the tone-mapping mask to a second
     // colour attachment, specialised per target via function constants.
-    // Bloom stays off — it needs a third attachment plus the additive-blend
-    // post-process that the choreographer builds from a GLSL VROShaderProgram.
+    // Bloom: the lighting shaders write a bloom buffer to a third attachment, the blur
+    // pass has a Metal implementation, and the additive blend resolves to an MSL function.
     // PBR stays off until VROIBLPreprocess has a Metal implementation.
     VRORendererConfiguration config;
     config.enableShadows        = true;
-    config.enableBloom          = false;
+    config.enableBloom          = true;
     config.enableHDR            = true;
     config.enablePBR            = false;
     config.enableMultisampling  = false;
@@ -286,6 +286,9 @@ protected:
         auto mat = std::make_shared<VROMaterial>();
         mat->setLightingModel(VROLightingModel::Phong);
         mat->getDiffuse().setColor({0.9f, 0.15f, 0.15f, 1.0f});
+        // Low threshold so this box, which is large and unoccluded, clearly exercises
+        // the bloom chain in the test scene.
+        mat->setBloomThreshold(0.1f);
         box->setMaterials({mat});
         auto node = std::make_shared<VRONode>();
         node->setGeometry(box);
@@ -342,6 +345,9 @@ protected:
         auto mat = std::make_shared<VROMaterial>();
         mat->setLightingModel(VROLightingModel::Phong);
         mat->getDiffuse().setColor({0.95f, 0.85f, 0.1f, 1.0f});
+        // Bright enough to cross the bloom threshold, so the bloom path has something
+        // to glow in the test scene.
+        mat->setBloomThreshold(0.4f);
         box->setMaterials({mat});
         auto node = std::make_shared<VRONode>();
         node->setGeometry(box);

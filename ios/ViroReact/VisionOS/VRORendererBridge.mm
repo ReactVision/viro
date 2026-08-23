@@ -345,6 +345,49 @@ protected:
         }
     }
 
+    // ── Blend-mode strip — one quad per VROBlendMode over a light backdrop ───
+    // M2.6-A mapped all seven VROBlendMode values onto MTLBlendFactor pairs but was never
+    // checked visually. Each quad uses the same half-transparent orange over the same
+    // white plate, so the modes have to look different from each other; if two match,
+    // the mapping for one of them is wrong.
+    {
+        // Backdrop: a white plate the blends composite against.
+        auto plate = VROSurface::createSurface(1.5f, 0.26f);
+        auto plateMat = std::make_shared<VROMaterial>();
+        plateMat->setLightingModel(VROLightingModel::Constant);
+        plateMat->getDiffuse().setColor({0.85f, 0.85f, 0.85f, 1.0f});
+        plateMat->setBlendMode(VROBlendMode::None);
+        plateMat->setWritesToDepthBuffer(false);
+        plate->setMaterials({plateMat});
+        auto plateNode = std::make_shared<VRONode>();
+        plateNode->setGeometry(plate);
+        plateNode->setPosition({0.0f, 0.72f, -1.6f});
+        plateNode->setRenderingOrder(10);
+        scene->getRootNode()->addChildNode(plateNode);
+
+        const VROBlendMode modes[] = {
+            VROBlendMode::None, VROBlendMode::Alpha, VROBlendMode::Add,
+            VROBlendMode::Multiply, VROBlendMode::Subtract, VROBlendMode::Screen,
+            VROBlendMode::PremultiplyAlpha,
+        };
+        const int count = (int)(sizeof(modes) / sizeof(modes[0]));
+        for (int i = 0; i < count; i++) {
+            auto quad = VROSurface::createSurface(0.16f, 0.16f);
+            auto mat = std::make_shared<VROMaterial>();
+            mat->setLightingModel(VROLightingModel::Constant);
+            mat->getDiffuse().setColor({0.95f, 0.45f, 0.1f, 0.5f});
+            mat->setBlendMode(modes[i]);
+            mat->setWritesToDepthBuffer(false);
+            quad->setMaterials({mat});
+            auto node = std::make_shared<VRONode>();
+            node->setGeometry(quad);
+            node->setPosition({-0.6f + 0.2f * i, 0.72f, -1.58f});
+            // Drawn after the plate so each mode composites against it.
+            node->setRenderingOrder(11);
+            scene->getRootNode()->addChildNode(node);
+        }
+    }
+
     // ── VROSurface — back wall quad, green ───────────────────────────────────
     {
         auto quad = VROSurface::createSurface(1.2f, 0.8f);

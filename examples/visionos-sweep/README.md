@@ -14,12 +14,14 @@ Not committed — point them at whatever the host app already ships:
 | `assets/particle.png` | page 3 | any small texture; `ViroParticleEmitter.image` is required |
 | `assets/button.png` | page 5 | any small texture |
 
-## Before it can run
+## Backgrounds
 
-`VROPortal::setBackgroundCube` / `setBackgroundSphere` / `setBackgroundRotation` are declared in
-`VROPortal.h` and defined nowhere in the visionOS target. This scene avoids the three components
-that call them (`ViroSkyBox`, `Viro360Image`, `Viro360Video`), so it should link — but any host app
-that renders a skybox will not. See the blocker section of the triage doc.
+The portal background API was implemented on 2026-08-23 (virocore `3803fab7`), so `ViroSkyBox` and
+`Viro360Image` now link and render. They are not in this scene yet — add them once the sweep has
+run once as-is, so a background failure cannot be confused with a component failure.
+
+`Viro360Video` still does not work, for the unrelated reason that `VROVideoTextureiOS` is not in
+the visionOS target.
 
 ## The feature toggles
 

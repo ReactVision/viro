@@ -37,6 +37,8 @@
 #include "VROBox.h"
 #include "VROSphere.h"
 #include "VROSurface.h"
+#include "VROText.h"
+#include "VROTypeface.h"
 #include "VROLight.h"
 #include "VROMaterial.h"
 #include "VROGLTFLoader.h"
@@ -385,6 +387,33 @@ protected:
             // Drawn after the plate so each mode composites against it.
             node->setRenderingOrder(11);
             scene->getRootNode()->addChildNode(node);
+        }
+    }
+
+    // ── VROText — freetype + VROGlyphMetal (M5) ──────────────────────────────
+    // The whole point of the M5 static-library work: before freetype was built for xros,
+    // VRODriverVisionOS::newTypefaceCollection called pabort() and any ViroText took the
+    // app down.
+    {
+        std::shared_ptr<VRODriver> driver = _driver;
+        auto text = VROText::createSingleLineText(L"ViroText on visionOS",
+                                                  "Helvetica", 14,
+                                                  VROFontStyle::Normal, VROFontWeight::Regular,
+                                                  {1.0f, 0.95f, 0.75f, 1.0f}, 0,
+                                                  2.0f,
+                                                  VROTextHorizontalAlignment::Center,
+                                                  VROTextClipMode::None,
+                                                  driver);
+        if (text) {
+            auto node = std::make_shared<VRONode>();
+            node->setGeometry(text);
+            // No node scale: VROText already builds its geometry in world units via
+            // kTextPointToWorldScale (0.01), so a 24pt font is 0.24 units tall.
+            // Below the SwiftUI panel and above the floor, where it is unobstructed.
+            node->setPosition({0.0f, -0.50f, -1.10f});
+            scene->getRootNode()->addChildNode(node);
+        } else {
+            NSLog(@"[ViroBridge] ViroText creation returned null");
         }
     }
 

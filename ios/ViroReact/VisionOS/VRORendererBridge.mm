@@ -163,9 +163,11 @@ protected:
     dirLight->setShadowMapSize(1024);
     scene->getRootNode()->addLight(dirLight);
 
-    // ── 360° equirectangular background sphere ────────────────────────────────
-    // VROPortal::setBackgroundSphere is absent from libViroKitVisionOS.a, so we
-    // use a large inverted sphere as a workaround.
+    // ── 360° equirectangular background ──────────────────────────────────────
+    // Uses the real VROPortal::setBackgroundSphere now that it is implemented for this target
+    // (VROVisionOSRenderStubs.cpp). The previous workaround — a 50 m inverted sphere added as a
+    // scene node with renderingOrder -1 — is gone: it lived in this test app, so the library
+    // still could not link an app that rendered a skybox through the VRT layer.
     {
         NSURL *bgURL = [[NSBundle mainBundle] URLForResource:@"360_space" withExtension:@"jpg"];
         if (bgURL) {
@@ -180,40 +182,13 @@ protected:
                 auto tex = std::make_shared<VROTexture>(VROTextureType::Texture2D,
                                                         VROTextureInternalFormat::RGBA8,
                                                         std::move(substrate));
-                // Same equirectangular texture drives image-based lighting, so the PBR
-                // materials are lit by the environment they sit in rather than by a flat
-                // ambient term. VROIBLPreprocess picks it up from the active portal.
                 if (scene->getActivePortal()) {
+                    // Same equirectangular texture drives image-based lighting, so the PBR
+                    // materials are lit by the environment they sit in rather than by a flat
+                    // ambient term. VROIBLPreprocess picks it up from the active portal.
                     scene->getActivePortal()->setLightingEnvironment(tex);
+                    scene->getActivePortal()->setBackgroundSphere(tex);
                 }
-
-                auto bgMat = std::make_shared<VROMaterial>();
-                bgMat->setLightingModel(VROLightingModel::Constant);
-                bgMat->getDiffuse().setTexture(tex);
-                // Skybox must not write depth — it should never occlude foreground objects.
-                bgMat->setWritesToDepthBuffer(false);
-                // VROBlendMode::None writes fragment alpha directly (no src*src blend squaring).
-                bgMat->setBlendMode(VROBlendMode::None);
-                // Force output alpha=1 so CompositorServices shows the skybox as opaque
-                // passthrough content rather than transparent in .mixed mode.
-                auto forceAlpha = std::make_shared<VROShaderModifier>(
-                    VROShaderEntryPoint::Fragment,
-                    std::vector<std::string>{"_output_color.a = 1.0;"});
-                forceAlpha->setName("skybox_alpha");
-                bgMat->addShaderModifier(forceAlpha);
-
-                auto bgSphere = VROSphere::createSphere(50.0f, 30, 30, false);
-                // Camera enclosure: render the sphere using rotation-only view matrix so
-                // the skybox always surrounds the camera regardless of world position.
-                // Without this, sphere verts span the near plane → clipped triangles
-                // project to small NDC depths → incorrect depth test against foreground.
-                bgSphere->setCameraEnclosure(true);
-                bgSphere->setMaterials({bgMat});
-                auto bgNode = std::make_shared<VRONode>();
-                bgNode->setGeometry(bgSphere);
-                // Render skybox before everything else (renderingOrder -1 < default 0).
-                bgNode->setRenderingOrder(-1);
-                scene->getRootNode()->addChildNode(bgNode);
             } else {
                 NSLog(@"[ViroBridge] 360_space.jpg texture load failed: %@", err);
             }

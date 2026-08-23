@@ -9,7 +9,12 @@ import Foundation
 import CompositorServices
 import Metal
 import ARKit
+// When built as part of the ViroReact pod, VRORendererBridge arrives as a module.
+// The standalone ViroKitVisionOSTest app compiles this file directly and exposes the
+// bridge through its bridging header instead, so the module is not available there.
+#if canImport(ViroReact)
 import ViroReact
+#endif
 
 public final class ViroImmersiveRenderer: @unchecked Sendable {
 

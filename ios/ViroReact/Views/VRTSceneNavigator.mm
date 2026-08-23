@@ -82,7 +82,13 @@
    // [viewCardboard setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
     _vroView.renderDelegate = self;
     
+#if TARGET_OS_VISION
+    // No UIScreen on visionOS: there is no single screen to match, and this view is not the
+    // render surface — the ImmersiveSpace owns the geometry and VRORendererBridge drives the
+    // renderer. Leaving the frame to the layout system is the correct behaviour here.
+#else
     [self setFrame:[UIScreen mainScreen].bounds];
+#endif
     [self setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
     
   //  [self addSubview:viewCardboard];

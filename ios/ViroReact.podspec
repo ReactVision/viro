@@ -41,7 +41,63 @@ Pod::Spec.new do |s|
   # visionOS: Swift SwiftUI files are owned by ViroReactUI pod so the app can
   # `import ViroReactUI` (pure-Swift pod → importable without use_frameworks!).
   # ViroReact keeps the ObjC/C++ bridge (VRORendererBridge) on visionOS.
-  s.visionos.exclude_files = ['ViroReact/VisionOS/*.swift']
+  # visionOS: the Swift SwiftUI files are owned by ViroReactUI (above), plus every source
+  # whose backend is absent from the visionOS renderer. Measured, not guessed: each group
+  # below is a set of files that cannot compile or link for xros, established by compiling
+  # all 116 .mm files against the visionOS xcframework (2026-08-23). 88 of them do compile;
+  # these are the other 28.
+  #
+  # See development_docs/VISIONOS_BUILD_AND_DISTRIBUTION.md and
+  # plans/visionos-component-sweep.md for the per-component consequences.
+  s.visionos.exclude_files = [
+    'ViroReact/VisionOS/*.swift',
+
+    # AR — the entire subsystem is excluded from the visionOS renderer target, so ~30
+    # VROAR* classes have no symbols. visionOS ARKit is a different API surface; a real
+    # port is its own milestone, not a build fix.
+    'ViroReact/AR/**/*',
+    'ViroReact/Utility/VRTARHitTestUtil.mm',
+
+    # Video — VROVideoTextureiOS.cpp is not in the renderer target, and not by oversight:
+    # it needs AVAsset tracksWithMediaType:, the synchronous AVPlayerItem seekToTime:, and
+    # a __weak delegate the ARC-off renderer cannot hold. All three are unavailable on
+    # xros. Porting means moving to the async AVFoundation API.
+    'ViroReact/Views/VRT360Video.mm',
+    'ViroReact/Views/VRTMaterialVideo.mm',
+    'ViroReact/Views/VRTVideoSurface.mm',
+
+    # Audio — VROAudioPlayeriOS/VROAudioPlayerStreamiOS are not in the renderer target and
+    # the GVR sound backend is excluded outright.
+    'ViroReact/Views/VRTSound.mm',
+    'ViroReact/Modules/VRTSoundModule.mm',
+    'ViroReact/Modules/VRTStreamingAudioModule.mm',
+    'ViroReact/VRTSoundManager.mm',
+
+    # Camera and vision — visionOS grants no passthrough camera access without an
+    # enterprise entitlement, so this is structural rather than a porting gap.
+    # VRTObjectDetectorView additionally imports iOS ARKit and needs VROObjectRecognizer.
+    'ViroReact/Views/VRTCameraTexture.mm',
+    'ViroReact/Views/VRTObjectDetectorView.mm',
+
+    # Animated images — only VROAnimatedTextureOpenGL exists; there is no Metal equivalent
+    # yet. This one is a genuine gap rather than a platform limit.
+    'ViroReact/Views/VRTAnimatedImage.mm',
+
+    # Portals — VROPortal::traversePortals returns the root and stops on visionOS, so
+    # nested portals do not exist. A portal is recursive by definition.
+    'ViroReact/Views/VRTPortal.mm',
+
+    # HUD — sizes itself from [UIScreen mainScreen] applicationFrame, and the renderer's
+    # VRODebugHUD is excluded anyway. Neither has a meaning in an ImmersiveSpace.
+    'ViroReact/Views/VRTHUDComponent.mm',
+
+    # These two import headers that do not exist anywhere in the repository
+    # (VRTButton.h, VROTextManager.h). That is not a visionOS problem — the podspec globs
+    # them into every platform, so they cannot compile for iOS either. Excluded here to
+    # unblock xros; the real fix is to delete them or restore the headers.
+    'ViroReact/Views/VRTButton.mm',
+    'ViroReact/VROTextManager.mm',
+  ]
 
   if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
     s.ios.vendored_libraries = 'dist/lib/libViroReact.a'

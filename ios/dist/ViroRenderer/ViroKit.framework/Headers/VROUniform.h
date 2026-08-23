@@ -30,6 +30,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include "VROVector2f.h"
 #include "VROVector3f.h"
 #include "VROVector4f.h"
 #include "VROMatrix4f.h"
@@ -99,6 +100,14 @@ public:
         //sublcass to reset any cached value
     }
     
+    void setVec2(VROVector2f value) {
+        if (_location == -1) {
+            return;
+        }
+        float array[2] = { value.x, value.y };
+        set(array);
+    }
+
     void setVec3(VROVector3f value) {
         if (_location == -1) {
             return;

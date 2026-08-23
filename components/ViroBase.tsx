@@ -29,6 +29,7 @@ import {
   Viro3DPoint,
   ViroTorque,
   ViroVelocity,
+  ViroEventSource,
 } from "./Types/ViroUtils";
 
 export type ViroBaseProps = ViroCommonProps & ViroObjectProps;
@@ -43,6 +44,20 @@ export class ViroBase<T> extends React.Component<ViroBaseProps & T> {
         event.nativeEvent.position,
         event.nativeEvent.source
       );
+
+    // Route eye-gaze hovers (Quest Pro) to the dedicated onGaze callback. onHover
+    // above still fires for every source; onGaze fires only for the eye-gaze ray.
+    if (
+      this.props.onGaze &&
+      (event.nativeEvent.source as unknown as number) ===
+        ViroEventSource.EYE_GAZE
+    ) {
+      this.props.onGaze(
+        event.nativeEvent.isHovering,
+        event.nativeEvent.position,
+        event.nativeEvent.source
+      );
+    }
   };
 
   _onClick = (event: NativeSyntheticEvent<ViroClickEvent>) => {

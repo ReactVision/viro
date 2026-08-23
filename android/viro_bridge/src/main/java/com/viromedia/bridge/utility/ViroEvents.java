@@ -53,6 +53,7 @@ public class ViroEvents {
     public static final String ON_TRANSFORM_DELEGATE = "onNativeTransformDelegateViro";
     public static final String ON_TRACKING_UPDATED = "onTrackingUpdatedViro";
     public static final String ON_AMBIENT_LIGHT_UPDATE = "onAmbientLightUpdateViro";
+    public static final String ON_DEPTH_READY = "onDepthReadyViro";
     public static final String ON_ANCHOR_FOUND = "onAnchorFoundViro";
     public static final String ON_ANCHOR_UPDATED = "onAnchorUpdatedViro";
     public static final String ON_ANCHOR_REMOVED = "onAnchorRemovedViro";
@@ -73,5 +74,10 @@ public class ViroEvents {
     public static final String ON_STICK_CHANGE = "onStickChange";
     public static final String ON_PRESS_IN     = "onPressIn";
     public static final String ON_PRESS_OUT    = "onPressOut";
+
+    // Object detector events
+    public static final String ON_DETECTION    = "onDetectionViro";
+    public static final String ON_DETECTOR_READY = "onReadyViro";
+    public static final String ON_DETECTOR_ERROR = "onErrorViro";
 
 }

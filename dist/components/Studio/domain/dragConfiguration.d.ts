@@ -1,5 +1,5 @@
 import { StudioAsset, StudioSceneMeta } from "../types";
-export type DragType = "FixedToWorld" | "FixedToPlane" | undefined;
+export type DragType = "FixedToPlane" | "FixedDistance" | undefined;
 export type DragPlane = {
     planePoint: [number, number, number];
     planeNormal: [number, number, number];
@@ -7,8 +7,10 @@ export type DragPlane = {
 };
 export declare class DragConfiguration {
     /**
-     * Chooses FixedToPlane when the scene uses plane detection, FixedToWorld otherwise.
-     * Returns undefined if the asset is not draggable.
+     * FixedToPlane when the scene uses plane detection; otherwise FixedDistance,
+     * which keeps the object at its grab distance and follows the finger.
+     * (FixedToWorld raycast-snapped objects toward the camera on drag start, so
+     * they appeared to grow and were hard to place.) undefined if not draggable.
      */
     static getDragType(asset: StudioAsset, scene: StudioSceneMeta | null): DragType;
     /**

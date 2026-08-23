@@ -88,4 +88,27 @@ public class VRModuleOpenXR extends ReactContextBaseJavaModule {
             }
         });
     }
+
+    /**
+     * Style the passthrough layer. opacity ∈ [0,1]; edge[RGBA] is the edge
+     * highlight colour (alpha 0 disables the edge effect).
+     */
+    @ReactMethod
+    public void setPassthroughStyle(final int sceneNavTag, final float opacity,
+                                    final float edgeR, final float edgeG,
+                                    final float edgeB, final float edgeA) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
+                if (view instanceof VRTVRSceneNavigator) {
+                    ((VRTVRSceneNavigator) view).setPassthroughStyle(opacity, edgeR, edgeG, edgeB, edgeA);
+                }
+            }
+        });
+    }
 }

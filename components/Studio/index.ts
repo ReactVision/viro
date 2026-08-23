@@ -1,5 +1,13 @@
 export { StudioARScene } from "./StudioARScene";
+export { StudioRecordingIndicator } from "./StudioRecordingIndicator";
+export { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 export { StudioSceneNavigator } from "./StudioSceneNavigator";
+export { useStudioRecording } from "./useStudioRecording";
+export { useStudioPlacement } from "./useStudioPlacement";
+export type {
+  StudioSceneNavigatorHandle,
+  StudioSceneNavigatorProps,
+} from "./StudioSceneNavigator";
 export type {
   StudioAnimation,
   StudioAsset,
@@ -14,5 +22,6 @@ export type {
   StudioSceneFunction,
   StudioSceneMeta,
   StudioSceneResponse,
+  StudioSceneVariable,
   ViroAnimationProp,
 } from "./types";

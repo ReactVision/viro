@@ -73,6 +73,14 @@ type Props = ViroCommonProps & {
   onPlatformUpdate?: (platformInfoViro: ViroPlatformInfo) => void;
   onAmbientLightUpdate?: (update: ViroAmbientLightInfo) => void;
   /**
+   * Fired once when depth data (LiDAR or monocular depth estimation) first becomes
+   * available for the session — i.e. hit tests can now return DepthPoints. Useful for
+   * hiding an "initializing depth…" state instead of acting on early, inaccurate
+   * feature points. On devices using monocular depth estimation, this can take a few
+   * seconds after the AR screen appears while the model warms up.
+   */
+  onDepthReady?: () => void;
+  /**
    * Describes the acoustic properties of the room around the user
    */
   soundRoom?: ViroSoundRoom;
@@ -235,6 +243,13 @@ export class ViroARScene extends ViroBase<Props> {
   ) => {
     this.props.onAmbientLightUpdate &&
       this.props.onAmbientLightUpdate(event.nativeEvent.ambientLightInfo);
+  };
+
+  /**
+   * Fired once when depth data first becomes available for hit testing.
+   */
+  _onDepthReady = (_event: NativeSyntheticEvent<{}>) => {
+    this.props.onDepthReady && this.props.onDepthReady();
   };
 
   _onAnchorFound = (event: NativeSyntheticEvent<ViroARAnchorFoundEvent>) => {
@@ -414,10 +429,8 @@ export class ViroARScene extends ViroBase<Props> {
   };
 
   render() {
-    if (isQuest) {
-      console.warn("[Viro] ViroARScene is not supported on Quest and will not render. Use ViroScene instead.");
-      return null;
-    }
+    // On Meta Quest, ViroARScene renders as a mixed-reality scene through the
+    // OpenXR renderer (passthrough + XR_FB_scene plane anchors). No longer gated.
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroARScene", this.props);
 
@@ -494,7 +507,7 @@ export class ViroARScene extends ViroBase<Props> {
       >
         <VRTARScene
           {...this.props}
-          canHover={this.props.onHover != undefined}
+          canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
           canClick={
             this.props.onClick != undefined ||
             this.props.onClickState != undefined
@@ -527,6 +540,7 @@ export class ViroARScene extends ViroBase<Props> {
           onPlatformUpdateViro={this._onPlatformUpdate}
           onTrackingUpdatedViro={this._onTrackingUpdated}
           onAmbientLightUpdateViro={this._onAmbientLightUpdate}
+          onDepthReadyViro={this._onDepthReady}
           onAnchorFoundViro={this._onAnchorFound}
           onAnchorUpdatedViro={this._onAnchorUpdated}
           onAnchorRemovedViro={this._onAnchorRemoved}
@@ -573,6 +587,7 @@ var VRTARScene = requireNativeComponent<any>(
       onTrackingInitializedViro: true,
       onTrackingUpdatedViro: true,
       onAmbientLightUpdateViro: true,
+      onDepthReadyViro: true,
       onAnchorFoundViro: true,
       onAnchorUpdatedViro: true,
       onAnchorRemovedViro: true,

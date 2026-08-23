@@ -32,6 +32,8 @@ test/ios/ViroExample/ViroExample.xcworkspace/xcuserdata/
 test/ios/ViroExample/Pods/
 ios/ngrokendpoint.txt
 ios/ViroRenderer/ViroKit.framework/_CodeSignature/
+.xcode.env.local
+/ios/build-dev/
 
 # Figment Android
 Figment/android/.idea
@@ -63,6 +65,9 @@ build/
 yarn.lock
 .env
 
+CLAUDE.md
+CLAUDE.local.md
+
 # Fastlane
 ios/fastlane/report.xml
 ios/fastlane/README.md
@@ -74,4 +79,13 @@ test/android/fastlane/README.md
 test/android/fastlane/report.xml
 /android/viro_bridge/.cxx/Debug
 /ios/dist/ViroRenderer/armv7_arm64
-/ios/dist/ViroRendererVisionOS/
+# visionOS: ignore the built xcframework, keep ViroKit.podspec tracked (the
+# withViroVisionOS plugin points Podfile at that directory and does not generate it).
+/ios/dist/ViroRendererVisionOS/ViroKit.xcframework/
+
+# Web bridge harness — local WASM assets (copied from viro-web-renderer) and build output
+web-harness/wasm/
+web-harness/dist/
+
+web-harness/models/
+web-harness/public/

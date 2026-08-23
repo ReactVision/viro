@@ -77,7 +77,7 @@ class ViroSphere extends ViroBase_1.ViroBase {
         }
         return (<VRTSphere {...this.props} ref={(component) => {
                 this._component = component;
-            }} highAccuracyEvents={highAccuracyEvents} materials={materials} transformBehaviors={transformBehaviors} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
+            }} highAccuracyEvents={highAccuracyEvents} materials={materials} transformBehaviors={transformBehaviors} canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)} canClick={this.props.onClick != undefined ||
                 this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canFuse={this.props.onFuse != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onFuseViro={this._onFuse} canCollide={this.props.onCollision != undefined} onCollisionViro={this._onCollision} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} onNativeTransformDelegateViro={transformDelegate} hasTransformDelegate={this.props.onTransformUpdate != undefined} timeToFuse={timeToFuse}/>);
     }
 }

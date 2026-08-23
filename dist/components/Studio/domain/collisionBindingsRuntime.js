@@ -13,7 +13,7 @@ function pairCooldownKey(pairKey, functionId) {
  * Cooldown prevents per-frame spam while physics contacts overlap.
  */
 function dispatchCollisionBindingActions(params) {
-    const { selfPlacementId, otherTag, bindingsByPairKey, sceneNavigator, animations, onSceneChange, onAnimationTrigger, cooldownMs = DEFAULT_COOLDOWN_MS, lastFiredRef, } = params;
+    const { selfPlacementId, otherTag, bindingsByPairKey, sceneNavigator, animations, onSceneChange, onAnimationTrigger, cooldownMs = DEFAULT_COOLDOWN_MS, lastFiredRef, runtimeCtx, } = params;
     if (!otherTag)
         return;
     const { asset_x_id, asset_y_id } = (0, collisionPairKey_1.canonicalizeCollisionAssetIds)(selfPlacementId, otherTag);
@@ -32,13 +32,13 @@ function dispatchCollisionBindingActions(params) {
         if (now - last < cooldownMs)
             continue;
         map.set(ck, now);
-        (0, sceneNavigationHandler_1.executeFunctionWithRelations)(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
+        (0, sceneNavigationHandler_1.executeFunctionWithRelations)(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange, runtimeCtx);
     }
 }
 /**
  * Returns an onCollision handler for a given placement asset ID.
  */
-function createPlacementCollisionHandler(placementId, bindingsByPairKey, sceneNavigator, animations, lastFiredRef, onAnimationTrigger, onSceneChange) {
+function createPlacementCollisionHandler(placementId, bindingsByPairKey, sceneNavigator, animations, lastFiredRef, onAnimationTrigger, onSceneChange, runtimeCtx) {
     return (viroTag) => {
         dispatchCollisionBindingActions({
             selfPlacementId: placementId,
@@ -49,6 +49,7 @@ function createPlacementCollisionHandler(placementId, bindingsByPairKey, sceneNa
             onSceneChange,
             onAnimationTrigger,
             lastFiredRef,
+            runtimeCtx,
         });
     };
 }

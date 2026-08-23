@@ -135,6 +135,16 @@ public:
      */
     void update(const VROARFrame *frame);
 
+    /**
+     * Run a single throwaway inference on a blank image to force CoreML / Neural Engine
+     * model specialization up front. Without this, the FIRST real inference pays the
+     * full ANE compile cost (many seconds on A-series chips) — the dominant cause of the
+     * long delay before the first depth frame appears. Safe to call once right after
+     * initWithModel(); runs asynchronously on the depth queue and does not touch the
+     * live depth buffers (it uses a private throwaway request).
+     */
+    void warmup();
+
     #pragma mark - Depth Output
 
     /**

@@ -27,8 +27,10 @@
 #ifndef VROARSession_h
 #define VROARSession_h
 
+#include <functional>
 #include <memory>
 #include <set>
+#include <string>
 #include "VROLog.h"
 #include "VROMatrix4f.h"
 #include "VROARImageDatabase.h"
@@ -115,6 +117,27 @@ enum class VROOcclusionMode {
     DepthBased,     // Use depth data to occlude virtual objects behind real-world surfaces
     PeopleOnly,     // Only occlude virtual objects behind detected people (iOS 13+/Android with ARCore)
     DepthOnly       // Activates depth sensing WITHOUT occlusion rendering (depth data available, no visual occlusion)
+};
+
+/*
+ The state of an in-progress (or not-yet-started) AR session recording. See
+ startRecording() below.
+ */
+enum class VROARRecordingStatus {
+    None,           // Never started (or stopped and cleaned up)
+    Recording,      // Actively writing video.mp4 + session.jsonl
+    IOError,        // Recording halted because a write failed
+    Unsupported     // This platform/session cannot record
+};
+
+/*
+ Where an AR session recording is written. See
+ ViroWorkspace/plans/viro-ar-recording-playback-plan.md §2.2 for the format
+ written into outputDir: video.mp4 (H.264) + session.jsonl (header/imu/pose/
+ anchor records, one JSON object per line).
+ */
+struct VROARRecordingConfig {
+    std::string outputDir;
 };
 
 /*
@@ -444,6 +467,17 @@ public:
     }
 
     /*
+     WS-D: true if the OS has only granted approximate/reduced-accuracy location
+     (iOS 14+ "Precise Location" off) and a request for temporary full accuracy
+     was denied or is unavailable. When true, horizontalAccuracy will stay at
+     the ~km scale and getEarthTrackingState() will never leave Localizing —
+     the app should surface an explicit error instead of waiting.
+     */
+    virtual bool isLocationAccuracyReduced() const {
+        return false;
+    }
+
+    /*
      Check VPS availability at the specified location.
      The callback will be called with the availability status.
      */
@@ -594,6 +628,24 @@ public:
         if (callback) callback(false, "", "Not supported");
     }
 
+    // WS-A: room/building-scale scan API — defines its own location frame
+    // instead of requiring a hand-placed anchor. rvFinishScan() is the
+    // scan-based counterpart to hostCloudAnchor(); see
+    // RVCCACloudAnchorProvider::startScan()/finishScan().
+    virtual void rvStartScan() {
+        // Default implementation does nothing
+    }
+    // WS-C: locationTransform is the 16 values of the VROMatrix4f used to host
+    // this scan, comma-separated, column-major (VROMatrix4f::getArray() order).
+    // Pass it straight through to rvSnapshotWorldMeshToFile() if attaching a
+    // mesh — finishScan() has no placed anchor to read a transform from.
+    virtual void rvFinishScan(
+        int ttlDays,
+        std::function<void(bool success, std::string cloudAnchorId,
+                            std::string locationTransformCsv, std::string error)> callback) {
+        if (callback) callback(false, "", "", "Not supported");
+    }
+
     // ========================================================================
     // ReactVision Geospatial CRUD API
     // These methods route directly to the ReactVision backend and are only
@@ -709,6 +761,49 @@ public:
      */
     virtual bool isSemanticModeEnabled() const {
         return _semanticModeEnabled;
+    }
+
+    // ========================================================================
+    // AR Session Recording API
+    // Records the session to local storage for later offline analysis/replay
+    // (see ViroWorkspace/plans/viro-ar-recording-playback-plan.md). This is a
+    // capture-only surface — there is no in-app playback; nothing here re-feeds
+    // a live session. Default implementation is unsupported; iOS and Android
+    // override to actually record.
+    // ========================================================================
+
+    /*
+     Returns true if this session can record (device + platform support).
+     */
+    virtual bool isRecordingSupported() const {
+        return false;
+    }
+
+    /*
+     Start recording video + IMU + ground-truth pose/anchors to config.outputDir.
+     onSuccess is invoked once recording has actually started (files created,
+     writers running); onFailure with a message otherwise — including
+     immediately, synchronously, if isRecordingSupported() is false.
+     */
+    virtual void startRecording(const VROARRecordingConfig &config,
+                                 std::function<void()> onSuccess,
+                                 std::function<void(std::string error)> onFailure) {
+        if (onFailure) {
+            onFailure("Recording not supported");
+        }
+    }
+
+    /*
+     Stop recording and finalize video.mp4 + session.jsonl. No-op if not
+     currently recording.
+     */
+    virtual void stopRecording() {}
+
+    /*
+     The current recording state. See VROARRecordingStatus.
+     */
+    virtual VROARRecordingStatus getRecordingStatus() const {
+        return VROARRecordingStatus::Unsupported;
     }
 
 protected:

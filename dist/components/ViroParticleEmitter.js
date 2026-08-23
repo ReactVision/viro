@@ -102,6 +102,7 @@ class ViroParticleEmitter extends React.Component {
             : undefined;
         // Create native props object.
         let nativeProps = Object.assign({}, this.props);
+        nativeProps.onClick = undefined;
         nativeProps.position = this.state.propsPositionState;
         nativeProps.onNativeTransformDelegateViro = transformDelegate;
         nativeProps.hasTransformDelegate =
@@ -175,6 +176,7 @@ class ViroParticleEmitter extends React.Component {
             };
             nativeProps.particleAppearance.rotation = newAppearanceRotMod;
         }
+        nativeProps.onClick = undefined;
         nativeProps.ref = (component) => {
             this._component = component;
         };

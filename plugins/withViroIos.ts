@@ -5,7 +5,6 @@ import {
   withDangerousMod,
   withPlugins,
   withXcodeProject,
-  WarningAggregator,
 } from "@expo/config-plugins";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
@@ -44,18 +43,6 @@ const withViroPods = (config: ExpoConfig) => {
       }
 
       fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
-        // Check for New Architecture environment variable
-        if (
-          !data.includes('ENV["RCT_NEW_ARCH_ENABLED"]') &&
-          !data.includes("RCT_NEW_ARCH_ENABLED=1")
-        ) {
-          WarningAggregator.addWarningIOS(
-            "withViroIos",
-            "ViroReact requires New Architecture to be enabled. " +
-              "Please set RCT_NEW_ARCH_ENABLED=1 in your ios/.xcode.env file."
-          );
-        }
-
         // ViroReact with integrated Fabric support
         let viroPods =
           `  # ViroReact with integrated New Architecture (Fabric) support\n` +

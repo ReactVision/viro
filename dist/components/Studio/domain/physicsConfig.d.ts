@@ -1,6 +1,5 @@
 /**
  * Studio physics_config and physics_world_config parsing and Viro prop building.
- * Ported from studio-go/domain/physicsConfig.ts — no zod dependency.
  */
 type Vec3 = [number, number, number];
 type ForceEntry = {

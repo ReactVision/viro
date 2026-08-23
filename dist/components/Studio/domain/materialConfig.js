@@ -1,7 +1,6 @@
 "use strict";
 /**
  * Studio material_config parsing and Viro material definition building.
- * Ported from studio-go/domain/materialConfig.ts — no zod dependency.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.materialConfigNeedsTimeUniform = materialConfigNeedsTimeUniform;
@@ -69,7 +68,8 @@ function injectMissingGlslDeclarations(uniforms, body) {
                 result;
     }
     if (RF_VIEWPORT_RE.test(body) && !/\b_rf_vpw\b/.test(result)) {
-        result = "uniform highp float _rf_vpw;\nuniform highp float _rf_vph;\n" + result;
+        result =
+            "uniform highp float _rf_vpw;\nuniform highp float _rf_vph;\n" + result;
     }
     return result;
 }
@@ -80,9 +80,14 @@ function injectMissingGlslDeclarations(uniforms, body) {
  */
 function mergeMaterialUniformsForViro(config) {
     const list = config.materialUniforms
-        ? config.materialUniforms.map((u) => ({ name: u.name, type: u.type, value: u.value }))
+        ? config.materialUniforms.map((u) => ({
+            name: u.name,
+            type: u.type,
+            value: u.value,
+        }))
         : [];
-    if (materialConfigNeedsTimeUniform(config) && !list.some((u) => u.name === "time")) {
+    if (materialConfigNeedsTimeUniform(config) &&
+        !list.some((u) => u.name === "time")) {
         list.push({ name: "time", type: "float", value: 0 });
     }
     if (materialConfigNeedsViewportUniforms(config)) {
@@ -184,7 +189,9 @@ function parseMaterialConfig(raw) {
             if (typeof v === "string" || v === null)
                 config[key] = v;
         }
-        if (r.shaderModifiers && typeof r.shaderModifiers === "object" && !Array.isArray(r.shaderModifiers)) {
+        if (r.shaderModifiers &&
+            typeof r.shaderModifiers === "object" &&
+            !Array.isArray(r.shaderModifiers)) {
             config.shaderModifiers = r.shaderModifiers;
         }
         if (Array.isArray(r.materialUniforms)) {

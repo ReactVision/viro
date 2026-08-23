@@ -165,10 +165,13 @@ public class NodeModule extends ReactContextBaseJavaModule {
              @Override
              public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                  View viroView = viewResolver.resolveView(viewTag);
-                 VRTNode nodeView = (VRTNode) viroView;
-                 if (!(viroView instanceof VRTNode)){
-                     throw new IllegalViewOperationException("Invalid view, expected VRTNode!");
+                 if (!(viroView instanceof VRTNode)) {
+                     // Transient view-lifecycle race: reject so the JS await settles (throwing in
+                     // the UIBlock leaked the promise; casting first risked ClassCastException).
+                     promise.reject("view_not_ready", "Node view not registered yet");
+                     return;
                  }
+                 VRTNode nodeView = (VRTNode) viroView;
 
                  Node nodeJNI = nodeView.getNodeJni();
                  Matrix matrix = nodeJNI.getWorldTransformRealTime();
@@ -212,10 +215,13 @@ public class NodeModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View viroView = viewResolver.resolveView(viewTag);
-                VRTNode nodeView = (VRTNode) viroView;
-                if (!(viroView instanceof VRTNode)){
-                    throw new IllegalViewOperationException("Invalid view, expected VRTNode!");
+                if (!(viroView instanceof VRTNode)) {
+                    // Transient view-lifecycle race: reject so the JS await settles (throwing in
+                    // the UIBlock leaked the promise; casting first risked ClassCastException).
+                    promise.reject("view_not_ready", "Node view not registered yet");
+                    return;
                 }
+                VRTNode nodeView = (VRTNode) viroView;
 
                 Node nodeJNI = nodeView.getNodeJni();
                 BoundingBox box = nodeJNI.getBoundingBox();
@@ -245,10 +251,12 @@ public class NodeModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View viroView = viewResolver.resolveView(viewTag);
-                VRT3DObject nodeView = (VRT3DObject) viroView;
                 if (!(viroView instanceof VRT3DObject)) {
-                    throw new IllegalViewOperationException("Invalid view, expected VRT3DObject!");
+                    // Transient view-lifecycle race: reject instead of throwing (see getNodeTransform).
+                    promise.reject("view_not_ready", "Node view not registered yet");
+                    return;
                 }
+                VRT3DObject nodeView = (VRT3DObject) viroView;
                 Object3D node = (Object3D)nodeView.getNodeJni();
                 Set<String> keys = node.getMorphTargetKeys();
                 WritableMap returnMap = Arguments.createMap();

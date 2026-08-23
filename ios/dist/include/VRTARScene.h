@@ -36,6 +36,7 @@
 @property (nonatomic, copy, nullable) NSArray<NSString *> *anchorDetectionTypes;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onTrackingUpdatedViro;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onAmbientLightUpdateViro;
+@property (nonatomic, copy, nullable) RCTDirectEventBlock onDepthReadyViro;
 
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onAnchorFoundViro;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onAnchorUpdatedViro;

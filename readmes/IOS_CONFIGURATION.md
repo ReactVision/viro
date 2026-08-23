@@ -329,6 +329,5 @@ If you see errors about framework linkage when using ARCore, ensure you're not f
 ## See Also
 
 - [Installation Guide](./INSTALL.md)
-- [Android Configuration](./ANDROID_CONFIGURATION.md)
 - [ARCore Cloud Anchors Documentation](https://developers.google.com/ar/develop/cloud-anchors)
 - [ARCore Geospatial API Documentation](https://developers.google.com/ar/develop/geospatial)

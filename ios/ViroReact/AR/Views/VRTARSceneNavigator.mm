@@ -26,7 +26,9 @@
 //
 
 #import <ViroKit/ViroKit.h>
+#import <ViroKit/VROARSessioniOS.h>
 #import "VRTARSceneNavigator.h"
+#import "RVStudioWatermarkState.h"
 #import <React/RCTAssert.h>
 #import <React/RCTLog.h>
 #import "VRTARScene.h"
@@ -39,6 +41,13 @@
 #import <ViroKit/VROSemantics.h>
 #import <ViroKit/VROARScene.h>
 #import <ViroKit/VROARWorldMesh.h>
+
+// Notification name that VRTObjectDetectorView subscribes to in AR mode.
+static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
+
+// Free-tier "Powered by ReactVision Studio" watermark target.
+static NSString * const kRVWatermarkURL =
+    @"https://www.reactvision.xyz/studio/?utm_source=scenenavigator-banner";
 
 @implementation VRTARSceneNavigator {
     id <VROView> _vroView;
@@ -61,6 +70,14 @@
 
     // depthEnabled: activate depth sensing without occlusion rendering
     BOOL _depthEnabled;
+
+    // AR frame distribution for ViroObjectDetector (useARSession mode).
+    CADisplayLink *_detectorLink;
+
+    // Free-tier watermark overlay; visibility driven by RVStudioWatermarkState,
+    // laid out manually in layoutSubviews.
+    UIView *_watermarkView;
+    UILabel *_watermarkLabel;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -155,6 +172,9 @@
         
         [self addSubview:(UIView *)_vroView];
 
+        // Added after _vroView so it layers above the AR surface.
+        [self setupWatermarkOverlay];
+
         [_bridge.perfMonitor setView:_vroView];
 
         // set the scene if it was set before this view was created (not likely)
@@ -216,11 +236,86 @@
             [self applyGeospatialModeEnabled];
             _needsGeospatialModeApply = NO;
         }
+
+        // Start the AR frame distribution link for ViroObjectDetector (useARSession mode).
+        // Must be called here (after _vroView and ARSession are ready) rather than in
+        // setupRendererWithDriver: which VROViewAR does not call on the render delegate.
+        [self _startDetectorLink];
     }
 }
 
 - (UIView *)rootVROView {
     return (UIView *)_vroView;
+}
+
+#pragma mark - Free-tier watermark
+
+- (void)setupWatermarkOverlay {
+    if (_watermarkView) {
+        [self bringSubviewToFront:_watermarkView];
+        return;
+    }
+
+    UIView *pill = [[UIView alloc] init];
+    pill.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.6];
+    pill.userInteractionEnabled = YES;
+
+    UILabel *label = [[UILabel alloc] init];
+    label.text = @"Powered by ReactVision Studio";
+    label.textColor = [UIColor whiteColor];
+    label.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    label.textAlignment = NSTextAlignmentCenter;
+    [pill addSubview:label];
+
+    UITapGestureRecognizer *tap =
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_watermarkTapped)];
+    [pill addGestureRecognizer:tap];
+
+    [self addSubview:pill];
+    _watermarkView = pill;
+    _watermarkLabel = label;
+
+    [self _updateWatermarkVisibility:nil];
+    [self setNeedsLayout];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(_updateWatermarkVisibility:)
+                                                 name:RVStudioWatermarkDidChangeNotification
+                                               object:nil];
+}
+
+// Manual layout: RN sets frames directly (Yoga), so Auto Layout on this native
+// subview never runs. Full-width bar pinned to the bottom; text centred.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (!_watermarkView || !_watermarkLabel) {
+        return;
+    }
+    const CGFloat padY = 6.0, bottomMargin = 16.0;
+    CGSize textSize = [_watermarkLabel.text sizeWithAttributes:@{ NSFontAttributeName: _watermarkLabel.font }];
+    CGFloat labelH = ceil(textSize.height);
+    CGFloat barW = self.bounds.size.width;
+    CGFloat barH = labelH + padY * 2;
+    CGFloat y = self.bounds.size.height - self.safeAreaInsets.bottom - bottomMargin - barH;
+    _watermarkView.frame = CGRectMake(0, y, barW, barH);
+    _watermarkLabel.frame = CGRectMake(0, padY, barW, labelH);
+}
+
+- (void)_updateWatermarkVisibility:(NSNotification *)note {
+    BOOL show = [RVStudioWatermarkState sharedState].freeTier;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self->_watermarkView.hidden = !show;
+        if (show) {
+            [self bringSubviewToFront:self->_watermarkView];
+        }
+    });
+}
+
+- (void)_watermarkTapped {
+    NSURL *url = [NSURL URLWithString:kRVWatermarkURL];
+    if (url) {
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    }
 }
 
 //VROComponent overrides...
@@ -269,15 +364,123 @@
 #pragma mark - VRORenderDelegate methods
 
 - (void)setupRendererWithDriver:(std::shared_ptr<VRODriver>)driver {
-    
+    // VROViewAR does not call this on the render delegate — startup moved to didSetProps:.
+}
+
+#pragma mark - AR frame distribution (ViroObjectDetector useARSession support)
+
+- (void)_startDetectorLink {
+    if (_detectorLink) return;
+    _detectorLink = [CADisplayLink displayLinkWithTarget:self
+                                               selector:@selector(_detectorTick:)];
+    // 30 fps cap — VRTObjectDetectorView throttles to its own maxFPS.
+    _detectorLink.preferredFramesPerSecond = 30;
+    [_detectorLink addToRunLoop:[NSRunLoop mainRunLoop]
+                        forMode:NSRunLoopCommonModes];
+}
+
+- (void)_stopDetectorLink {
+    [_detectorLink invalidate];
+    _detectorLink = nil;
+}
+
+- (void)_detectorTick:(CADisplayLink *)link {
+    if (!_vroView) return;
+
+    VROViewAR *viewAR = (VROViewAR *)_vroView;
+    std::shared_ptr<VROARSession> session = [viewAR getARSession];
+    if (!session) return;
+
+    // Use static_pointer_cast instead of dynamic_pointer_cast.
+    // ViroKit may be compiled with -fno-rtti, which makes dynamic_pointer_cast
+    // always return nullptr. On iOS with ARKit available the session is always
+    // VROARSessioniOS, so the static cast is safe.
+    std::shared_ptr<VROARSessioniOS> sessioniOS =
+        std::static_pointer_cast<VROARSessioniOS>(session);
+
+    ARSession *nativeSession = sessioniOS->getARSession();
+    if (!nativeSession || !nativeSession.currentFrame) return;
+
+    static dispatch_once_t firstFire;
+    dispatch_once(&firstFire, ^{
+        NSLog(@"[ViroObjDet] _detectorTick firing — ARSession ready");
+    });
+
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:kVROARFrameNotification
+                      object:nil
+                    userInfo:@{@"session": nativeSession}];
 }
 
 - (void)startVideoRecording:(NSString *)fileName
            saveToCameraRoll:(BOOL)saveToCameraRoll
                     onError:(RCTResponseSenderBlock)onError {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR startVideoRecording:fileName saveToCameraRoll:saveToCameraRoll errorBlock:^(NSInteger errorCode) {
+    void (^errorBlock)(NSInteger) = ^(NSInteger errorCode) {
         onError(@[@(errorCode)]);
+    };
+
+    // The UIView overlay isn't captured by the GL recorder, so bake the mark
+    // into the encoded video.
+    if ([RVStudioWatermarkState sharedState].freeTier) {
+        CGSize viewSize = self.bounds.size;
+        UIImage *mark = [self watermarkBarOfWidth:viewSize.width fontSize:12.0];
+        // Frame is in view points, full-width just above the bottom.
+        CGRect frame = CGRectMake(0,
+                                  viewSize.height - mark.size.height - 24.0,
+                                  mark.size.width, mark.size.height);
+        [viewAR startVideoRecording:fileName
+                      withWatermark:mark
+                          withFrame:frame
+                   saveToCameraRoll:saveToCameraRoll
+                         errorBlock:errorBlock];
+    } else {
+        [viewAR startVideoRecording:fileName
+                   saveToCameraRoll:saveToCameraRoll
+                         errorBlock:errorBlock];
+    }
+}
+
+// Full-width watermark bar of the given width with centred text. Larger fonts
+// (for screenshots) stay legible; vertical padding scales off the 12pt baseline.
+- (UIImage *)watermarkBarOfWidth:(CGFloat)width fontSize:(CGFloat)fontSize {
+    NSString *text = @"Powered by ReactVision Studio";
+    UIFont *font = [UIFont systemFontOfSize:fontSize weight:UIFontWeightMedium];
+    NSMutableParagraphStyle *para = [NSMutableParagraphStyle new];
+    para.alignment = NSTextAlignmentCenter;
+    NSDictionary *attrs = @{ NSFontAttributeName: font,
+                             NSForegroundColorAttributeName: [UIColor whiteColor],
+                             NSParagraphStyleAttributeName: para };
+    CGFloat padY = 6.0 * (fontSize / 12.0);
+    CGFloat labelH = ceil([text sizeWithAttributes:attrs].height);
+    CGSize size = CGSizeMake(width, labelH + padY * 2);
+
+    UIGraphicsImageRenderer *renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [[UIColor colorWithWhite:0.0 alpha:0.6] setFill];
+        UIRectFill(CGRectMake(0, 0, size.width, size.height));
+        [text drawInRect:CGRectMake(0, padY, size.width, labelH) withAttributes:attrs];
+    }];
+}
+
+- (UIImage *)imageByWatermarking:(UIImage *)source {
+    CGSize imgSize = source.size;
+    CGFloat fontSize = MAX(14.0, imgSize.width * 0.030);
+    UIImage *bar = [self watermarkBarOfWidth:imgSize.width fontSize:fontSize];
+
+    UIGraphicsImageRendererFormat *fmt = [UIGraphicsImageRendererFormat defaultFormat];
+    fmt.scale = source.scale;
+    fmt.opaque = YES;
+    UIGraphicsImageRenderer *renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:imgSize format:fmt];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [source drawInRect:CGRectMake(0, 0, imgSize.width, imgSize.height)];
+        CGFloat margin = imgSize.width * 0.04;
+        CGRect barRect = CGRectMake(0,
+                                    imgSize.height - bar.size.height - margin,
+                                    bar.size.width, bar.size.height);
+        [bar drawInRect:barRect];
     }];
 }
 
@@ -290,8 +493,30 @@
       saveToCameraRoll:(BOOL)saveToCameraRoll
      completionHandler:(VROViewWriteMediaFinishBlock)completionHandler {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
-    [viewAR takeScreenshot:fileName saveToCameraRoll:saveToCameraRoll withCompletionHandler:completionHandler];
-    
+
+    if (![RVStudioWatermarkState sharedState].freeTier) {
+        [viewAR takeScreenshot:fileName saveToCameraRoll:saveToCameraRoll withCompletionHandler:completionHandler];
+        return;
+    }
+
+    // The core screenshot has no withWatermark: path, so capture to a file only
+    // (saveToCameraRoll:NO), burn the mark in, then save that to the camera roll
+    // ourselves. Otherwise the core writes an unmarked copy.
+    [viewAR takeScreenshot:fileName saveToCameraRoll:NO withCompletionHandler:
+        ^(BOOL success, NSURL *filePath, NSURL *gifPath, NSInteger errorCode) {
+            UIImage *shot = (success && filePath) ? [UIImage imageWithContentsOfFile:filePath.path] : nil;
+            if (shot == nil) {
+                completionHandler(success, filePath, gifPath, errorCode);
+                return;
+            }
+            UIImage *marked = [self imageByWatermarking:shot];
+            NSData *jpeg = UIImageJPEGRepresentation(marked, 1.0);
+            [jpeg writeToURL:filePath atomically:YES];
+            if (saveToCameraRoll) {
+                UIImageWriteToSavedPhotosAlbum(marked, nil, nil, nil);
+            }
+            completionHandler(YES, filePath, gifPath, errorCode);
+        }];
 }
 
 - (void)setSceneView:(VRTScene *)sceneView {
@@ -340,6 +565,16 @@
     }
     _hasCleanedUp = YES;
 
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:RVStudioWatermarkDidChangeNotification
+                                                  object:nil];
+    _watermarkView = nil;
+    _watermarkLabel = nil;
+
+    // Verification log: if this does NOT appear when leaving the AR screen, the navigator
+    // (and the VROViewAR it owns) is being retained and deleteGL never runs → GPU stays.
+    NSLog(@"[Viro] cleanupViroResources ran (releasing AR view + GPU resources)");
+
     // CRITICAL: Clear currentViews to break retain cycle
     if (_currentViews) {
         [_currentViews removeAllObjects];
@@ -357,6 +592,11 @@
     if (_bridge) {
         VRTMaterialManager *materialManager = [_bridge materialManager];
         [materialManager clearAllMaterials];
+        // RCTPerfMonitor (dev) holds a STRONG ref to the AR view (set in initWithBridge via
+        // [_bridge.perfMonitor setView:_vroView]). If left set, it keeps VROViewAR alive
+        // after unmount, so the view's dealloc/deleteGL never runs and the renderer's
+        // Metal/GPU resources stay resident. Release it before dropping _bridge.
+        [_bridge.perfMonitor setView:nil];
         _bridge = nil;
     }
 
@@ -404,6 +644,7 @@
         // Clear the view reference to prevent dangling pointer
         _vroView = nil;
     }
+    [self _stopDetectorLink];
 
     // Destroy the EAGLContext to release GPU resources
     // This must happen after deleteGL since GL operations require a valid context
@@ -593,6 +834,17 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     }
 }
 
+// WS-C: mirrors rvMatrixToCsv() (virocore, VROARSessioniOS.cpp) so a resolved
+// anchor's transform can be threaded into loadWorldMeshFromFile().
+static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
+    const float *a = m.getArray();
+    NSMutableString *csv = [NSMutableString stringWithCapacity:16 * 12];
+    for (int i = 0; i < 16; i++) {
+        [csv appendFormat:i == 0 ? @"%g" : @",%g", a[i]];
+    }
+    return csv;
+}
+
 #pragma mark - Cloud Anchor Methods
 
 - (void)setCloudAnchorProvider:(NSString *)cloudAnchorProvider {
@@ -704,6 +956,71 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     );
 }
 
+- (void)startRecording:(NSString *)outputDir
+      completionHandler:(RecordingStartCompletionHandler)completionHandler {
+    if (!_vroView) {
+        if (completionHandler) {
+            completionHandler(NO, @"AR view not initialized");
+        }
+        return;
+    }
+
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        if (completionHandler) {
+            completionHandler(NO, @"AR session not available");
+        }
+        return;
+    }
+
+    VROARRecordingConfig config;
+    config.outputDir = std::string([outputDir UTF8String]);
+
+    arSession->startRecording(config,
+        [completionHandler] {
+            if (completionHandler) {
+                completionHandler(YES, nil);
+            }
+        },
+        [completionHandler](std::string error) {
+            if (completionHandler) {
+                NSString *errorStr = [NSString stringWithUTF8String:error.c_str()];
+                completionHandler(NO, errorStr);
+            }
+        }
+    );
+}
+
+- (void)stopRecording {
+    if (!_vroView) {
+        return;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (arSession) {
+        arSession->stopRecording();
+    }
+}
+
+- (NSString *)getRecordingStatus {
+    if (!_vroView) {
+        return @"Unsupported";
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        return @"Unsupported";
+    }
+    switch (arSession->getRecordingStatus()) {
+        case VROARRecordingStatus::Recording: return @"Recording";
+        case VROARRecordingStatus::IOError: return @"IOError";
+        case VROARRecordingStatus::Unsupported: return @"Unsupported";
+        case VROARRecordingStatus::None:
+        default: return @"None";
+    }
+}
+
 - (void)resolveCloudAnchor:(NSString *)cloudAnchorId
          completionHandler:(CloudAnchorResolveCompletionHandler)completionHandler {
     if (!_vroView) {
@@ -740,7 +1057,9 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
                     @"state": @"Success",
                     @"position": @[@(position.x), @(position.y), @(position.z)],
                     @"rotation": @[@(toDegrees(rotation.x)), @(toDegrees(rotation.y)), @(toDegrees(rotation.z))],
-                    @"scale": @[@(scale.x), @(scale.y), @(scale.z)]
+                    @"scale": @[@(scale.x), @(scale.y), @(scale.z)],
+                    // WS-C: lets the caller thread this straight into loadWorldMeshFromFile().
+                    @"resolvedTransform": rvMatrixToCsv(transform)
                 };
                 completionHandler(YES, anchorData, nil, @"Success");
             }
@@ -821,6 +1140,20 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
     return arSession->isGeospatialModeSupported();
 }
 
+- (BOOL)isLocationAccuracyReduced {
+    if (!_vroView) {
+        return NO;
+    }
+
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        return NO;
+    }
+
+    return arSession->isLocationAccuracyReduced();
+}
+
 - (void)setGeospatialModeEnabled:(BOOL)enabled {
     _pendingGeospatialModeEnabled = enabled;
 
@@ -874,6 +1207,8 @@ static void splitErrorState(NSString *raw, NSString * __autoreleasing *outMsg, N
             return @"Enabled";
         case VROEarthTrackingState::Paused:
             return @"Paused";
+        case VROEarthTrackingState::Localizing:
+            return @"Localizing";
         case VROEarthTrackingState::Stopped:
         default:
             return @"Stopped";
@@ -1417,6 +1752,32 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 
 // ── Cloud anchor management ───────────────────────────────────────────────────
 
+- (void)rvStartScan {
+    if (!_vroView) return;
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) return;
+    arSession->rvStartScan();
+}
+
+- (void)rvFinishScan:(NSInteger)ttlDays
+   completionHandler:(void (^)(BOOL, NSString *, NSString *, NSString *))completionHandler {
+    if (!_vroView) { if (completionHandler) completionHandler(NO, nil, nil, @"AR view not initialized"); return; }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) { if (completionHandler) completionHandler(NO, nil, nil, @"AR session not available"); return; }
+    arSession->rvFinishScan((int)ttlDays,
+        [completionHandler](bool success, std::string cloudAnchorId,
+                             std::string locationTransformCsv, std::string error) {
+            if (completionHandler) {
+                completionHandler(success,
+                    success ? [NSString stringWithUTF8String:cloudAnchorId.c_str()] : nil,
+                    success ? [NSString stringWithUTF8String:locationTransformCsv.c_str()] : nil,
+                    success ? nil : [NSString stringWithUTF8String:error.c_str()]);
+            }
+        });
+}
+
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
@@ -1760,6 +2121,101 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
 }
 
 #pragma mark - World Mesh API Methods
+
+// WS-C: parses the CSV produced by rvMatrixToCsv() (virocore, VROARSessioniOS.cpp)
+// back into a VROMatrix4f. Returns identity (and logs) if malformed.
+static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
+    NSArray<NSString *> *parts = [csv componentsSeparatedByString:@","];
+    if (parts.count != 16) {
+        RCTLogWarn(@"[ViroAR] rvSnapshotWorldMeshToFile: malformed locationTransformCsv (%lu values, expected 16)",
+                   (unsigned long)parts.count);
+        return VROMatrix4f();
+    }
+    float values[16];
+    for (int i = 0; i < 16; i++) {
+        values[i] = [parts[i] floatValue];
+    }
+    return VROMatrix4f(values);
+}
+
+// WS-C: serialize the current world mesh to a temp file, returning its path
+// (or nil on failure/no mesh) — ready to pass straight into rvUploadAsset().
+- (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv {
+    if (!_vroView || !_currentScene || !locationTransformCsv) {
+        return nil;
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return nil;
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return nil;
+    }
+
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (!worldMesh) {
+        return nil;
+    }
+
+    VROMatrix4f locationTransform = rvParseMatrixCsv(locationTransformCsv);
+    std::vector<uint8_t> bytes = worldMesh->serializeCurrentMesh(locationTransform);
+    if (bytes.empty()) {
+        return nil;
+    }
+
+    NSData *data = [NSData dataWithBytes:bytes.data() length:bytes.size()];
+    NSString *fileName = [NSString stringWithFormat:@"rvmesh_%@.bin", [[NSUUID UUID] UUIDString]];
+    NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+    if (![data writeToFile:filePath atomically:YES]) {
+        return nil;
+    }
+    return filePath;
+}
+
+// WS-C: reverse of rvSnapshotWorldMeshToFile — load a resolved mesh snapshot
+// and attach it for physics + visual occlusion. See VROARWorldMesh::
+// attachResolvedMesh() for the (compile-verified only, not visually tested)
+// occlusion geometry construction.
+- (BOOL)rvLoadWorldMeshFromFile:(NSString *)filePath
+              resolvedTransform:(NSString *)resolvedTransformCsv {
+    if (!_vroView || !_currentScene || !filePath || !resolvedTransformCsv) {
+        return NO;
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return NO;
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return NO;
+    }
+
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (!worldMesh) {
+        RCTLogWarn(@"[ViroAR] rvLoadWorldMeshFromFile: no world mesh — call setWorldMeshEnabled(true) first");
+        return NO;
+    }
+
+    NSData *data = [NSData dataWithContentsOfFile:filePath];
+    if (!data) {
+        return NO;
+    }
+    std::vector<uint8_t> bytes((const uint8_t *)data.bytes, (const uint8_t *)data.bytes + data.length);
+
+    VROMatrix4f resolvedTransform = rvParseMatrixCsv(resolvedTransformCsv);
+    std::shared_ptr<VROARDepthMesh> mesh = VROARWorldMesh::loadMeshSnapshot(bytes, resolvedTransform);
+    if (!mesh) {
+        return NO;
+    }
+
+    worldMesh->attachResolvedMesh(mesh, arScene);
+    return YES;
+}
 
 - (void)setWorldMeshEnabled:(BOOL)worldMeshEnabled {
     _worldMeshEnabled = worldMeshEnabled;

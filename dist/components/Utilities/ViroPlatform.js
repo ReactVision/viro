@@ -1,7 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.hasOpenXRSupport = exports.isQuest = void 0;
+exports.hasOpenXRSupport = exports.isQuest = exports.isWeb = void 0;
 const react_native_1 = require("react-native");
+/**
+ * True when running on the web platform (react-native-web). Web uses the
+ * WASM/WebGL2 renderer via @reactvision/viro-web-renderer and the .web.tsx
+ * bridge instead of the native view managers.
+ */
+exports.isWeb = react_native_1.Platform.OS === "web";
 /**
  * True only on actual Meta Quest hardware (Quest 1/2/Pro/3/3S).
  *

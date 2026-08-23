@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VRModuleOpenXR = void 0;
 exports.exitVRScene = exitVRScene;
+exports.setPassthroughStyle = setPassthroughStyle;
 exports.useVRViewTag = useVRViewTag;
 const react_1 = require("react");
 const react_native_1 = require("react-native");
@@ -14,6 +15,21 @@ function exitVRScene() {
     VRQuestNavigatorBridge_1.VRQuestNavigatorBridge.setVRActive(false);
     react_native_1.NativeModules.VRLauncher
         ?.exitVRScene?.();
+}
+/**
+ * Style the Quest passthrough layer (XR_FB_passthrough). No-op off-Quest.
+ *
+ * ```tsx
+ * const viewTag = useVRViewTag();
+ * if (viewTag != null) {
+ *   setPassthroughStyle(viewTag, { opacity: 0.8, edgeColor: [0, 1, 1, 1] });
+ * }
+ * ```
+ */
+function setPassthroughStyle(viewTag, style) {
+    const opacity = style.opacity ?? 1;
+    const [r, g, b, a] = style.edgeColor ?? [0, 0, 0, 0];
+    exports.VRModuleOpenXR?.setPassthroughStyle?.(viewTag, opacity, r, g, b, a);
 }
 /**
  * Typed reference to the VRModuleOpenXR native module.

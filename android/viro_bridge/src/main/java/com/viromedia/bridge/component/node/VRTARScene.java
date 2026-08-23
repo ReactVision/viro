@@ -24,6 +24,7 @@ package com.viromedia.bridge.component.node;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.View;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
@@ -75,6 +76,22 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
     public VRTARScene(ReactContext reactContext) {
         super(reactContext);
         mMainHandler = new Handler(Looper.getMainLooper());
+    }
+
+    @Override
+    public void onTearDown() {
+        // Cancel pending anchor retries on all descendant nodes BEFORE super
+        // disposes the native scene. Otherwise a queued 1s AnchorAttempt retry can
+        // call createAnchoredNode() on the freed native VROARSceneController and
+        // crash (SIGSEGV in nativeCreateAnchoredNode). Teardown and the retry both
+        // run on the main looper, so cancelling here is race-free.
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof VRTNode) {
+                ((VRTNode) child).cancelPendingAnchorAttempts();
+            }
+        }
+        super.onTearDown();
     }
 
     @Override
@@ -205,6 +222,11 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         returnMap.putInt("reason", reason.getId());
 
         ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_TRACKING_UPDATED, returnMap);
+    }
+
+    @Override
+    public void onDepthReady() {
+        ViroEventEmitter.emit(mReactContext, getId(), ViroEvents.ON_DEPTH_READY, Arguments.createMap());
     }
 
     @Override

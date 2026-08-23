@@ -28,6 +28,8 @@
 #include "VROEye.h"
 #include "VROMetalUtils.h"
 #include "VROLog.h"
+#include <cxxabi.h>
+#include <typeinfo>
 // Test scene
 #include "VROSceneController.h"
 #include "VROScene.h"
@@ -48,25 +50,6 @@
 #import <MetalKit/MetalKit.h>
 
 // Local mirror of VROLightUniforms / VROSceneLightingUniforms from VROSharedStructures.h.
-// Cannot include VROSharedStructures.h directly because it typedef-declares a 'VROSurface'
-// struct that conflicts with the VROSurface geometry class included above.
-struct VROLightUniformsMM {
-    int           type;
-    simd_float3   position;
-    simd_float3   direction;
-    simd_float3   color;
-    float         attenuation_start_distance;
-    float         attenuation_end_distance;
-    float         attenuation_falloff_exp;
-    float         spot_inner_angle;
-    float         spot_outer_angle;
-};
-struct VROSceneLightingUniformsMM {
-    simd_float3        ambient_light_color;
-    VROLightUniformsMM lights[8];
-    int                num_lights;
-};
-
 // ── Stub input controller ─────────────────────────────────────────────────────
 // Handles the three remaining pure-virtual methods from VROInputControllerBase.
 // Week 4 will replace this with a real hand-tracking controller.
@@ -114,13 +97,25 @@ protected:
     // ── Input controller ─────────────────────────────────────────────────────
     _inputController = std::make_shared<VROInputControllerVisionOS>(_driver);
 
-    // ── Renderer configuration — all advanced features off for visionOS POC ─
+    // ── Renderer configuration ──────────────────────────────────────────────
+    // Shadows are on: the Metal path has depth-texture render targets, silhouette
+    // rendering, and shadow sampling in the lighting shaders.
+    // HDR and bloom stay off — they need the lighting shaders to write a second colour
+    // attachment (the tone-mapping mask), which the Metal shaders do not do yet.
+    // PBR stays off until VROIBLPreprocess has a Metal implementation.
     VRORendererConfiguration config;
-    config.enableShadows        = false;
+    config.enableShadows        = true;
     config.enableBloom          = false;
     config.enableHDR            = false;
     config.enablePBR            = false;
     config.enableMultisampling  = false;
+
+    // Fallback scene lighting at buffer index 4, re-applied by the driver to every
+    // encoder it opens. bindShader() / bindLights() overwrite it per draw call for lit
+    // materials; it only has to stop an unbound-buffer read by a shader that reaches
+    // slot 4 first (Constant shaders, early-exit paths).
+    // normalize({0, -1, -0.5}) = {0, -0.894, -0.447}, matching the scene's directional light.
+    _driver->installDefaultLightingFallback(0.3f, 0.0f, -0.894427f, -0.447214f);
 
     _renderer = std::make_shared<VRORenderer>(config, _inputController);
 
@@ -144,6 +139,15 @@ protected:
     dirLight->setColor({1.0f, 1.0f, 1.0f});
     dirLight->setIntensity(1000);
     dirLight->setDirection({0.0f, -1.0f, -0.5f});
+    // Shadow casting, so the test scene exercises the shadow-map pass. The orthographic
+    // size has to cover the scene's footprint or objects fall outside the light frustum
+    // and simply stop casting.
+    dirLight->setCastsShadow(true);
+    dirLight->setShadowOrthographicSize(6.0f);
+    dirLight->setShadowNearZ(0.1f);
+    dirLight->setShadowFarZ(10.0f);
+    dirLight->setShadowOpacity(0.8f);
+    dirLight->setShadowMapSize(1024);
     scene->getRootNode()->addLight(dirLight);
 
     // ── 360° equirectangular background sphere ────────────────────────────────
@@ -310,6 +314,23 @@ protected:
         auto node = std::make_shared<VRONode>();
         node->setGeometry(quad);
         node->setPosition({0.0f, 0.1f, -2.5f});
+        scene->getRootNode()->addChildNode(node);
+    }
+
+    // ── VROSurface — floor, grey. Receives the directional light's shadow. ───
+    {
+        auto floor = VROSurface::createSurface(4.0f, 4.0f);
+        auto mat = std::make_shared<VROMaterial>();
+        mat->setLightingModel(VROLightingModel::Phong);
+        mat->getDiffuse().setColor({0.55f, 0.55f, 0.58f, 1.0f});
+        // A floor should receive shadows but not cast one onto itself.
+        mat->setCastsShadows(false);
+        floor->setMaterials({mat});
+        auto node = std::make_shared<VRONode>();
+        node->setGeometry(floor);
+        // VROSurface is built in the XY plane facing +z; rotate it flat.
+        node->setRotationEuler({-(float)M_PI_2, 0.0f, 0.0f});
+        node->setPosition({0.0f, -0.7f, -1.8f});
         scene->getRootNode()->addChildNode(node);
     }
 
@@ -529,27 +550,6 @@ protected:
 
     VROEyeType eyeType = (viewIndex == 0) ? VROEyeType::Left : VROEyeType::Right;
 
-    // Fallback scene lighting uniforms at buffer index 4.
-    // bindShader() / bindLights() overwrite this per draw call for Phong materials,
-    // but a valid fallback prevents unset-buffer reads if any shader reads index 4
-    // before bindLights() fires (e.g. Constant shaders, or early-exit paths).
-    // The driver re-applies it to every encoder it opens, because Metal buffer
-    // bindings do not survive the end of a render pass and an offscreen pass can
-    // end the display encoder mid-eye.
-    {
-        VROSceneLightingUniformsMM lightingUniforms = {};
-        // Ambient component (matches the VROLight::Ambient added to the scene).
-        lightingUniforms.ambient_light_color = { 0.3f, 0.3f, 0.3f };
-        // Directional light (matches the VROLight::Directional added to the scene).
-        lightingUniforms.num_lights = 1;
-        lightingUniforms.lights[0].type      = 1;   // VROLightType::Directional
-        lightingUniforms.lights[0].color     = { 1.0f, 1.0f, 1.0f };
-        // normalize({0, -1, -0.5}) = {0, -0.894, -0.447}
-        lightingUniforms.lights[0].direction = { 0.0f, -0.894427f, -0.447214f };
-        lightingUniforms.lights[0].attenuation_falloff_exp = 1.0f;
-        _driver->setFallbackUniformBytes(4, &lightingUniforms, sizeof(lightingUniforms));
-    }
-
     _driver->beginDisplayPass(renderPass);
 
     @try {
@@ -558,7 +558,13 @@ protected:
         } catch (const std::exception &e) {
             NSLog(@"[ViroBridge] renderEye C++ exception: %s (frame=%d)", e.what(), _frameNumber);
         } catch (...) {
-            NSLog(@"[ViroBridge] renderEye unknown C++ exception (frame=%d)", _frameNumber);
+            // ObjC exceptions reach this handler as C++ exceptions under the unified
+            // runtime, so report the type — a bare "unknown exception" hides Metal
+            // validation failures, which is how they present.
+            const std::type_info *type = __cxxabiv1::__cxa_current_exception_type();
+            NSLog(@"[ViroBridge] renderEye unknown C++ exception type=%s (frame=%d)",
+                  type ? type->name() : "?", _frameNumber);
+            throw;
         }
     } @catch (NSException *e) {
         NSLog(@"[ViroBridge] renderEye NSException: %@ — %@ (frame=%d)", e.name, e.reason, _frameNumber);

@@ -37,6 +37,9 @@
 #include "VROBox.h"
 #include "VROSphere.h"
 #include "VROSurface.h"
+#include "VROPhysicsBody.h"
+#include "VROPhysicsShape.h"
+#include "VROPhysicsWorld.h"
 #include "VROText.h"
 #include "VROTypeface.h"
 #include "VROLight.h"
@@ -74,6 +77,9 @@ protected:
     std::shared_ptr<VRORenderer>                  _renderer;
     std::shared_ptr<VROInputControllerVisionOS>   _inputController;
     std::shared_ptr<VRONode>                      _cameraNode;
+    // Dynamic body whose height is traced to confirm bullet is actually stepping.
+    std::shared_ptr<VRONode>                      _physicsProbe;
+    std::shared_ptr<VRONode>                      _floorCollider;
     // Soldier animation loop — shared_ptr keeps the std::function alive across frames.
     // _soldierAnimPending: set to 1 by the GLTF callback (main thread) to signal
     // prepareFrame (render thread) to fire the first execute() on the correct thread.
@@ -390,6 +396,30 @@ protected:
         }
     }
 
+    // ── Physics — bullet built for xros (M5) ─────────────────────────────────
+    // Before bullet was compiled for xros, VROPhysicsWorld::computePhysics was a no-op
+    // stub: bodies existed but nothing ever moved. This sphere starts above the floor and
+    // has to fall and settle on it.
+    {
+        auto sphere = VROSphere::createSphere(0.09f, 20, 20, true);
+        auto mat = std::make_shared<VROMaterial>();
+        mat->setLightingModel(VROLightingModel::Phong);
+        mat->getDiffuse().setColor({0.35f, 0.85f, 0.45f, 1.0f});
+        sphere->setMaterials({mat});
+
+        auto node = std::make_shared<VRONode>();
+        node->setGeometry(sphere);
+        node->setPosition({-1.10f, 0.10f, -1.60f});
+        scene->getRootNode()->addChildNode(node);
+
+        // The body itself is created on the first frame, not here: VRONode::initPhysicsBody
+        // only registers with the physics world when the node already has a scene, and the
+        // scene is not attached to the renderer until after it is built.
+        // Traced in prepareFrame so the simulation can be checked by number rather than by
+        // catching the fall in a screenshot.
+        _physicsProbe = node;
+    }
+
     // ── VROText — freetype + VROGlyphMetal (M5) ──────────────────────────────
     // The whole point of the M5 static-library work: before freetype was built for xros,
     // VRODriverVisionOS::newTypefaceCollection called pabort() and any ViroText took the
@@ -445,6 +475,15 @@ protected:
         node->setRotationEuler({-(float)M_PI_2, 0.0f, 0.0f});
         node->setPosition({0.0f, -0.7f, -1.8f});
         scene->getRootNode()->addChildNode(node);
+
+        // The collider rides the floor's own visual node rather than a bare node of its own.
+        // A node with no geometry never gets a world transform computed by the render
+        // traversal, so its rigid body stays at the bullet origin — measured, not guessed.
+        //
+        // That node is rotated -90 degrees about X to lie flat, and a physics shape inherits
+        // its node's rotation, so the extents are given in the node's *unrotated* frame:
+        // (4, 4, 0.1) becomes a 4x4 slab 0.1 thick once rotated.
+        _floorCollider = node;
     }
 
     // ── VROBox — upper-left, yellow ──────────────────────────────────────────
@@ -565,6 +604,30 @@ protected:
     // RGBA16Float.  Setting it here ensures any pipeline compiled during prepareFrame
     // (including the first-frame initRenderer path) uses the correct format.
     _driver->setColorPixelFormat(colorTexture.pixelFormat);
+
+    // Physics bodies are created here rather than during scene construction, because
+    // VRONode::initPhysicsBody registers with the world only if the node already belongs to
+    // a scene — and the scene is attached to the renderer after it is built.
+    // Frame 5, not frame 1: a physics body takes its initial transform from the node's
+    // *world* transform, which is only computed during the render traversal. Creating the
+    // bodies before any traversal has run places them both at the origin, where the sphere
+    // starts inside the floor slab and pops through it.
+    if (_frameNumber == 5 && _physicsProbe && _floorCollider) {
+        // Box params are FULL extents, not half extents — the header comment in
+        // VROPhysicsShape.h says "half span" but a (2, 0.05, 2) box measured an AABB of
+        // (-1, -0.025, -1)..(1, 0.025, 1).
+        _floorCollider->initPhysicsBody(VROPhysicsBody::VROPhysicsBodyType::Static, 0.0f,
+                                        std::make_shared<VROPhysicsShape>(
+                                            VROPhysicsShape::VROShapeType::Box,
+                                            std::vector<float>{ 4.0f, 4.0f, 0.1f }));
+        _physicsProbe->initPhysicsBody(VROPhysicsBody::VROPhysicsBodyType::Dynamic, 1.0f,
+                                       std::make_shared<VROPhysicsShape>(
+                                           VROPhysicsShape::VROShapeType::Sphere,
+                                           std::vector<float>{ 0.09f }));
+        NSLog(@"[ViroBridge] physics bodies created (floor=%d sphere=%d)",
+              _floorCollider->getPhysicsBody() != nullptr,
+              _physicsProbe->getPhysicsBody() != nullptr);
+    }
 
     // Register this CompositorServices thread as the VROThreadName::Renderer thread so that
     // VROAnimatable::animate() adds animations to transactions instead of immediately

@@ -98,15 +98,17 @@ protected:
     _inputController = std::make_shared<VROInputControllerVisionOS>(_driver);
 
     // ── Renderer configuration ──────────────────────────────────────────────
-    // Shadows are on: the Metal path has depth-texture render targets, silhouette
-    // rendering, and shadow sampling in the lighting shaders.
-    // HDR and bloom stay off — they need the lighting shaders to write a second colour
-    // attachment (the tone-mapping mask), which the Metal shaders do not do yet.
+    // Shadows: depth-texture render targets, silhouette rendering, and shadow sampling
+    // in the lighting shaders are all in place on Metal.
+    // HDR: the lighting fragment functions write the tone-mapping mask to a second
+    // colour attachment, specialised per target via function constants.
+    // Bloom stays off — it needs a third attachment plus the additive-blend
+    // post-process that the choreographer builds from a GLSL VROShaderProgram.
     // PBR stays off until VROIBLPreprocess has a Metal implementation.
     VRORendererConfiguration config;
     config.enableShadows        = true;
     config.enableBloom          = false;
-    config.enableHDR            = false;
+    config.enableHDR            = true;
     config.enablePBR            = false;
     config.enableMultisampling  = false;
 

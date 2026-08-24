@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.58.0",
+  "version": "3.0.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -28,6 +28,7 @@
     "prepare": "npm run build"
   },
   "peerDependencies": {
+    "@callstack/react-native-visionos": ">=0.83.0 <0.87.0",
     "@reactvision/viro-web-renderer": ">=0.0.1",
     "expo": ">=55.0.0 <58.0.0",
     "react": ">=18.0.0",
@@ -38,6 +39,9 @@
     "react-native": ">=0.83.0 <0.87.0"
   },
   "peerDependenciesMeta": {
+    "@callstack/react-native-visionos": {
+      "optional": true
+    },
     "expo": {
       "optional": true
     },

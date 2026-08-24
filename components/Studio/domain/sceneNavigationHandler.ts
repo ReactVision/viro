@@ -17,6 +17,7 @@ import {
   valueMatchesType,
 } from "./expressionEvaluator";
 import { studioRecordingStore } from "./recordingStore";
+import { studioApiError } from "./studioApiError";
 import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
@@ -996,7 +997,7 @@ async function navigateToScene(
   try {
     const result = await VRTStudioModule.rvGetScene(targetSceneId);
     if (!result?.success) {
-      throw new Error(result?.error ?? "rvGetScene failed");
+      throw studioApiError("rvGetScene", result?.error);
     }
 
     const sceneData: StudioSceneResponse = JSON.parse(result.data!);

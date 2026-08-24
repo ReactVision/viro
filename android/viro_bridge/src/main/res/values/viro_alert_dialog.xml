@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Applied onto the host activity theme at runtime (see ReactViroPackage);
+         overrides only the alert dialog theme, nothing else in the app. -->
+    <style name="ViroAlertDialogThemeOverride" parent="">
+        <item name="alertDialogTheme">@style/ViroAlertDialogTheme</item>
+        <item name="android:alertDialogTheme">@style/ViroAlertDialogTheme</item>
+    </style>
+
+    <!-- M3 shape and button treatment only; all colors stay inherited from the host
+         theme. Google's ThemeOverlay.Material3.Dialog.Alert is deliberately not the
+         parent: its whole chain supplies just buttonBarButtonStyle and windowElevation
+         (no shape, no dialogCornerRadius), so it would leave AppCompat's 2dp corners.
+         The M3 shape lives in ThemeOverlay.Material3.MaterialAlertDialog, which needs
+         both a Material3 host theme and the material library — and react_viro ships as
+         a bare AAR propagating no dependencies, so neither can be assumed. -->
+    <style name="ViroAlertDialogTheme" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+        <item name="dialogCornerRadius">28dp</item>
+        <item name="android:windowBackground">@drawable/viro_alert_dialog_background</item>
+        <!-- Buttons read colorAccent, which templates rarely set (AppCompat teal by
+             default); follow the app's brand colorPrimary instead. Day only — the
+             values-night twin keeps AppCompat's night accent, because colorPrimary
+             rarely has a night variant and dark brand colors are unreadable on the
+             dark dialog surface. -->
+        <item name="colorAccent">?attr/colorPrimary</item>
+        <item name="buttonBarButtonStyle">@style/ViroAlertDialogButton</item>
+        <item name="android:buttonBarButtonStyle">@style/ViroAlertDialogButton</item>
+    </style>
+
+    <!-- M3 label-large. textAllCaps has to be a direct attribute here: it is forced
+         true by Base.TextAppearance.AppCompat.Button, which a textAppearance-level
+         override would not beat. Text color is left alone so it follows colorAccent. -->
+    <style name="ViroAlertDialogButton" parent="Widget.AppCompat.Button.Borderless.Colored">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.007</item>
+    </style>
+
+</resources>

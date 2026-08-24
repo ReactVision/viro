@@ -9,7 +9,7 @@
  *   3. Injects ViroKit + ViroReact pods + post_install hooks into visionos/Podfile
  *   4. Ensures App.swift uses moduleName "main" (required by Expo's registerRootComponent)
  *   5. Patches App.swift with the ImmersiveSpace scene
- *   6. Copies the 3 visionOS patch files into the project's patches/ dir
+ *   6. Copies the bundled visionOS patch files into the project's patches/ dir
  *   7. Adds postinstall: patch-package to package.json scripts
  *   8. Copies BlurView + LinearGradient compat shims into components/compat/
  *

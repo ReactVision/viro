@@ -32,6 +32,9 @@
 #import "VRTSceneNavigator.h"
 #import "VRTScene.h"
 #import "VRTNotifications.h"
+#if TARGET_OS_VISION
+#import "VisionOS/VRORendererBridge+Scene.h"
+#endif
 #import <React/RCTRootView.h>
 #import <React/RCTUtils.h>
 #import "VRTPerfMonitor.h"
@@ -45,15 +48,32 @@
 @implementation VRTSceneNavigator {
     id <VROView> _vroView;
 //    VROViewControllerGVR *_gvrController;
+#if TARGET_OS_VISION
+    // Scene waiting for an ImmersiveSpace to exist. See -setSceneView:.
+    VRTScene *_pendingScene;
+#endif
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
     self = [super initWithBridge:bridge];
     if (self) {
-        
+#if TARGET_OS_VISION
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(immersiveRendererDidBecomeActive:)
+                                                     name:@"ViroImmersiveRendererDidBecomeActive"
+                                                   object:nil];
+#endif
     }
     return self;
 }
+
+#if TARGET_OS_VISION
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:@"ViroImmersiveRendererDidBecomeActive"
+                                                  object:nil];
+}
+#endif
 
 /*
  We defer creating the VR view until either the Scene is added or
@@ -179,16 +199,47 @@
     [[NSNotificationCenter defaultCenter] postNotification:[NSNotification notificationWithName:kVRTOnExitViro object:nil]];
 }
 
+#if TARGET_OS_VISION
+- (void)attachPendingSceneToBridge {
+    if (_pendingScene == nil) {
+        return;
+    }
+    VRORendererBridge *bridge = VRORendererBridge.currentBridge;
+    if (bridge == nil) {
+        return;
+    }
+    [bridge setNativeSceneController:[_pendingScene sceneController]];
+    _pendingScene = nil;
+}
+
+- (void)immersiveRendererDidBecomeActive:(NSNotification *)notification {
+    [self attachPendingSceneToBridge];
+}
+#endif
+
 - (void)setSceneView:(VRTScene *)sceneView {
     if (_currentScene == sceneView) {
         return;
     }
-    
+
+#if TARGET_OS_VISION
+    // On visionOS this view is not a render surface and _vroView is nil — the GVR view this
+    // navigator used to create was removed long ago, which is why ViroSceneNavigator carries a
+    // deprecation notice everywhere else. The ImmersiveSpace owns the display instead, so the
+    // scene goes to the bridge driving it. Nothing is lost by skipping the timed transition:
+    // VRORendererBridge swaps scenes outright.
+    // React mounts the scene as soon as the navigator renders, while opening the ImmersiveSpace
+    // is asynchronous — so on a cold start there is usually no bridge yet. Hold the scene and
+    // hand it over when the renderer announces itself.
+    _pendingScene = sceneView;
+    [self attachPendingSceneToBridge];
+#else
     if (_currentScene == nil) {
         [_vroView setSceneController:[sceneView sceneController]];
     } else {
         [_vroView setSceneController:[sceneView sceneController] duration:1 timingFunction:VROTimingFunctionType::EaseIn];
     }
+#endif
     _currentScene = sceneView;
 }
 

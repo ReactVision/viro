@@ -44,6 +44,17 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithDevice:(id <MTLDevice>)device NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
+/// The bridge currently driving the ImmersiveSpace, or nil if none is open.
+///
+/// There is exactly one at a time: ViroImmersiveRenderer creates it when the space opens and
+/// releases it when the space closes. The React Native side needs a way to reach that instance
+/// from a view manager that never sees the Swift renderer, and this is it. Set in
+/// -initWithDevice: and cleared on dealloc.
+///
+/// Declared here rather than in VRORendererBridge+Scene.h because it names no C++ type — this
+/// header is imported by Swift, which compiles it as plain Objective-C.
+@property (class, nonatomic, readonly, nullable) VRORendererBridge *currentBridge;
+
 /// Call once per frame before the per-eye loop, using left-eye data (view index 0).
 /// Drives VRORenderer::prepareFrame() — updates physics, animations, and visibility.
 /// @param viewIndex    Typically 0 (left eye).

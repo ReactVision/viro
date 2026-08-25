@@ -12,6 +12,7 @@
 #if __has_include(<CompositorServices/CompositorServices.h>)
 
 #import "VRORendererBridge.h"
+#import "VRORendererBridge+Scene.h"
 
 // ── C++ includes ─────────────────────────────────────────────────────────────
 #include "VRODefines.h"
@@ -270,11 +271,24 @@ private:
 }
 @end
 
+// Weak, deliberately: this only mirrors whichever bridge ViroImmersiveRenderer currently owns,
+// and must never be the reason one stays alive after the ImmersiveSpace closes. ARC is off in
+// ViroKitVisionOS but on here in ViroReact, so __weak behaves normally.
+static __weak VRORendererBridge *sCurrentBridge = nil;
+
 @implementation VRORendererBridge
+
++ (nullable VRORendererBridge *)currentBridge {
+    return sCurrentBridge;
+}
 
 - (instancetype)initWithDevice:(id <MTLDevice>)device {
     self = [super init];
     if (!self) return nil;
+
+    // Publish before any of the setup below: a React view can mount and look for the bridge
+    // while the ImmersiveSpace is still opening.
+    sCurrentBridge = self;
 
     _frameNumber = 0;
     _soldierAnimPending.store(false, std::memory_order_relaxed);
@@ -751,6 +765,15 @@ private:
     // ────────────────────────────────────────────────────────────────────────
 
     return self;
+}
+
+- (void)setNativeSceneController:(std::shared_ptr<VROSceneController>)sceneController {
+    if (!sceneController || !_renderer) {
+        return;
+    }
+    // No transition duration: this runs when React mounts its scene, and a cross-fade from the
+    // placeholder would read as a glitch rather than a transition.
+    _renderer->setSceneController(sceneController, _driver);
 }
 
 // ── prepareFrame ──────────────────────────────────────────────────────────────

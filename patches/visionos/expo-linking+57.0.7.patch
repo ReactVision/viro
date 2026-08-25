@@ -1,19 +1,22 @@
 diff --git a/node_modules/expo-linking/build/Schemes.js b/node_modules/expo-linking/build/Schemes.js
-index 1111111..2222222 100644
+index 21cbfb7..5af51e3 100644
 --- a/node_modules/expo-linking/build/Schemes.js
 +++ b/node_modules/expo-linking/build/Schemes.js
-@@ -82,9 +82,10 @@ export function hasConstantsManifest() {
- // @docsMissing
+@@ -82,7 +82,11 @@ export function hasConstantsManifest() {
  export function resolveScheme(options) {
      if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
          !hasConstantsManifest()) {
 -        throw new Error(`expo-linking needs access to the expo-constants manifest (app.json or app.config.js) to determine what URI scheme to use. Setup the manifest and rebuild: https://github.com/expo/expo/blob/main/packages/expo-constants/README.md`);
-+        // No expo-constants manifest available (e.g. visionOS without Expo pods).
-+        // Deep-linking is not used on this platform, return empty string to degrade gracefully.
-+        return options.scheme ?? '';
++        // No expo-constants manifest available (e.g. visionOS without Expo pods). Deep linking
++        // does not work on this platform anyway, but the scheme cannot be empty: expo-router
++        // builds its root URL with createURL('/'), and an empty scheme yields a URL it cannot
++        // parse a path out of — which lands the app on "Unmatched Route" instead of index.
++        return options.scheme ?? 'app';
      }
+     const manifestSchemes = collectManifestSchemes();
+     const nativeAppId = getNativeAppIdScheme();
 diff --git a/node_modules/expo-linking/build/createURL.js b/node_modules/expo-linking/build/createURL.js
-index 1111111..2222222 100644
+index e3d9919..985046f 100644
 --- a/node_modules/expo-linking/build/createURL.js
 +++ b/node_modules/expo-linking/build/createURL.js
 @@ -8,7 +8,7 @@ function getHostUri() {
@@ -23,3 +26,5 @@ index 1111111..2222222 100644
 -        return removeScheme(Constants.linkingUri).replace(/\/--($|\/.*$)/, '');
 +        return removeScheme(Constants.linkingUri ?? '').replace(/\/--($|\/.*$)/, '');
      }
+     else {
+         return null;

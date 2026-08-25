@@ -1,54 +1,50 @@
 diff --git a/node_modules/expo-modules-core/src/EventEmitter.ts b/node_modules/expo-modules-core/src/EventEmitter.ts
-index 1111111..2222222 100644
+index 86119d9..870edbe 100644
 --- a/node_modules/expo-modules-core/src/EventEmitter.ts
 +++ b/node_modules/expo-modules-core/src/EventEmitter.ts
 @@ -19,4 +19,4 @@ export interface EventSubscription {
-
+ 
  export type EventEmitter<TEventsMap extends EventsMap = Record<never, never>> =
    typeof ExpoGlobal.EventEmitter<TEventsMap>;
 -export const EventEmitter: typeof ExpoGlobal.EventEmitter = globalThis.expo.EventEmitter;
 +export const EventEmitter: typeof ExpoGlobal.EventEmitter = globalThis.expo?.EventEmitter;
 diff --git a/node_modules/expo-modules-core/src/NativeModule.ts b/node_modules/expo-modules-core/src/NativeModule.ts
-index 1111111..2222222 100644
+index 4a93938..cc2b477 100644
 --- a/node_modules/expo-modules-core/src/NativeModule.ts
 +++ b/node_modules/expo-modules-core/src/NativeModule.ts
-@@ -9,4 +9,4 @@ ensureNativeModulesAreInstalled();
-
+@@ -8,4 +8,4 @@ ensureNativeModulesAreInstalled();
+ 
  export type NativeModule<TEventsMap extends EventsMap = Record<never, never>> =
    typeof ExpoGlobal.NativeModule<EventsMap>;
 -export const NativeModule: typeof ExpoGlobal.NativeModule = globalThis.expo.NativeModule;
 +export const NativeModule: typeof ExpoGlobal.NativeModule = globalThis.expo?.NativeModule;
 diff --git a/node_modules/expo-modules-core/src/SharedObject.ts b/node_modules/expo-modules-core/src/SharedObject.ts
-index 1111111..2222222 100644
+index 36c1329..c5e6b17 100644
 --- a/node_modules/expo-modules-core/src/SharedObject.ts
 +++ b/node_modules/expo-modules-core/src/SharedObject.ts
 @@ -8,4 +8,4 @@ ensureNativeModulesAreInstalled();
-
+ 
  export type SharedObject<TEventsMap extends EventsMap = Record<never, never>> =
    typeof ExpoGlobal.SharedObject<TEventsMap>;
 -export const SharedObject: typeof ExpoGlobal.SharedObject = globalThis.expo.SharedObject;
 +export const SharedObject: typeof ExpoGlobal.SharedObject = globalThis.expo?.SharedObject;
 diff --git a/node_modules/expo-modules-core/src/SharedRef.ts b/node_modules/expo-modules-core/src/SharedRef.ts
-index 1111111..2222222 100644
+index 2a7e8bd..ab9ca02 100644
 --- a/node_modules/expo-modules-core/src/SharedRef.ts
 +++ b/node_modules/expo-modules-core/src/SharedRef.ts
-@@ -10,4 +10,4 @@ ensureNativeModulesAreInstalled();
-
- export type SharedRef<
+@@ -10,4 +10,4 @@ export type SharedRef<
    TNativeRefType extends string = 'unknown',
    TEventsMap extends EventsMap = Record<never, never>,
  > = typeof ExpoGlobal.SharedRef<TNativeRefType, TEventsMap>;
 -export const SharedRef: typeof ExpoGlobal.SharedRef = globalThis.expo.SharedRef;
 +export const SharedRef: typeof ExpoGlobal.SharedRef = globalThis.expo?.SharedRef;
 diff --git a/node_modules/expo-modules-core/src/requireNativeModule.ts b/node_modules/expo-modules-core/src/requireNativeModule.ts
-index 1111111..2222222 100644
+index 22fc31e..96d8cfd 100644
 --- a/node_modules/expo-modules-core/src/requireNativeModule.ts
 +++ b/node_modules/expo-modules-core/src/requireNativeModule.ts
-@@ -14,9 +14,19 @@ import { ensureNativeModulesAreInstalled } from './ensureNativeModulesAreInstall
-  */
- export function requireNativeModule<ModuleType = any>(moduleName: string): ModuleType {
+@@ -17,7 +17,25 @@ export function requireNativeModule<ModuleType = any>(moduleName: string): Modul
    const nativeModule = requireOptionalNativeModule<ModuleType>(moduleName);
-
+ 
    if (!nativeModule) {
 -    throw new Error(`Cannot find native module '${moduleName}'`);
 +    // ExpoModulesCore is not linked on this platform (e.g. visionOS without expo pods).
@@ -60,10 +56,14 @@ index 1111111..2222222 100644
 +    return new Proxy({} as ModuleType, {
 +      get(_, prop) {
 +        if (typeof prop !== 'string') return undefined;
-+        // Return null from all method calls so callers that null-check (e.g. getLinkingURL,
-+        // loadAsync) degrade gracefully instead of crashing. __DEV__ warning is already
-+        // shown once above when the stub is first created.
-+        return (..._args: unknown[]) => null;
++        // A plain function, never an arrow: callers do `new SomeNativeClass()` on these
++        // properties as well as calling them, and an arrow function is not a constructor —
++        // that surfaces as "TypeError: Object is not a constructor" at import time.
++        // Called normally it returns null, so callers that null-check (getLinkingURL,
++        // loadAsync) degrade gracefully. The __DEV__ warning above fires once per stub.
++        return function (this: unknown, ..._args: unknown[]) {
++          return null;
++        };
 +      },
 +    });
    }

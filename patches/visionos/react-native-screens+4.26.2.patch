@@ -1,0 +1,84 @@
+diff --git a/node_modules/react-native-screens/ios/bridging/RNSReactBaseView.h b/node_modules/react-native-screens/ios/bridging/RNSReactBaseView.h
+index 5fad606..318ba4c 100644
+--- a/node_modules/react-native-screens/ios/bridging/RNSReactBaseView.h
++++ b/node_modules/react-native-screens/ios/bridging/RNSReactBaseView.h
+@@ -1,5 +1,10 @@
+ #pragma once
+ 
++// This public header names UIView but never imports UIKit, and both branches below need it —
++// the C branch declares the class as a UIView subclass outright. A prefix header cannot cover
++// for it either: Swift pulls RNScreens in as a module, and module builds ignore the pch.
++#import <UIKit/UIKit.h>
++
+ // Hide C++ symbols from C compiler used when building Swift module
+ #if defined(__cplusplus)
+ 
+diff --git a/node_modules/react-native-screens/ios/conversion/RNSConversions-SplitView.mm b/node_modules/react-native-screens/ios/conversion/RNSConversions-SplitView.mm
+index faa1153..ebd892e 100644
+--- a/node_modules/react-native-screens/ios/conversion/RNSConversions-SplitView.mm
++++ b/node_modules/react-native-screens/ios/conversion/RNSConversions-SplitView.mm
+@@ -10,10 +10,18 @@ UISplitViewControllerSplitBehavior SplitViewPreferredSplitBehaviorFromHostProp(
+   using enum facebook::react::RNSSplitHostPreferredSplitBehavior;
+ 
+   switch (splitBehavior) {
++    // visionOS has no overlaying or displacing split behaviours — a window there does not slide
++    // one column over another. Tile is the only side-by-side arrangement it offers.
++#if TARGET_OS_VISION
++    case Displace:
++    case Overlay:
++      return UISplitViewControllerSplitBehaviorTile;
++#else
+     case Displace:
+       return UISplitViewControllerSplitBehaviorDisplace;
+     case Overlay:
+       return UISplitViewControllerSplitBehaviorOverlay;
++#endif // TARGET_OS_VISION
+     case Tile:
+       return UISplitViewControllerSplitBehaviorTile;
+     case Automatic:
+@@ -45,6 +53,16 @@ UISplitViewControllerDisplayMode SplitViewPreferredDisplayModeFromHostProp(
+       return UISplitViewControllerDisplayModeSecondaryOnly;
+     case OneBesideSecondary:
+       return UISplitViewControllerDisplayModeOneBesideSecondary;
++    // Same story for the display modes: the "over" and "displace" variants do not exist on
++    // visionOS, so each falls back to the "beside" mode with the same column count.
++#if TARGET_OS_VISION
++    case OneOverSecondary:
++      return UISplitViewControllerDisplayModeOneBesideSecondary;
++    case TwoBesideSecondary:
++    case TwoOverSecondary:
++    case TwoDisplaceSecondary:
++      return UISplitViewControllerDisplayModeTwoBesideSecondary;
++#else
+     case OneOverSecondary:
+       return UISplitViewControllerDisplayModeOneOverSecondary;
+     case TwoBesideSecondary:
+@@ -53,6 +71,7 @@ UISplitViewControllerDisplayMode SplitViewPreferredDisplayModeFromHostProp(
+       return UISplitViewControllerDisplayModeTwoOverSecondary;
+     case TwoDisplaceSecondary:
+       return UISplitViewControllerDisplayModeTwoDisplaceSecondary;
++#endif // TARGET_OS_VISION
+     case Automatic:
+     default:
+       return UISplitViewControllerDisplayModeAutomatic;
+@@ -101,14 +120,18 @@ UISplitViewControllerDisplayModeButtonVisibility SplitViewDisplayModeButtonVisib
+       return "secondaryOnly";
+     case UISplitViewControllerDisplayModeOneBesideSecondary:
+       return "oneBesideSecondary";
+-    case UISplitViewControllerDisplayModeOneOverSecondary:
+-      return "oneOverSecondary";
+     case UISplitViewControllerDisplayModeTwoBesideSecondary:
+       return "twoBesideSecondary";
++    // These three constants are not merely unused on visionOS, they are undeclared, so they
++    // cannot appear as case labels there at all.
++#if !TARGET_OS_VISION
++    case UISplitViewControllerDisplayModeOneOverSecondary:
++      return "oneOverSecondary";
+     case UISplitViewControllerDisplayModeTwoOverSecondary:
+       return "twoOverSecondary";
+     case UISplitViewControllerDisplayModeTwoDisplaceSecondary:
+       return "twoDisplaceSecondary";
++#endif // !TARGET_OS_VISION
+     case UISplitViewControllerDisplayModeAutomatic:
+     default:
+       return "automatic";

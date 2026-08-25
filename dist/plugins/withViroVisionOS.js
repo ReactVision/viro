@@ -45,7 +45,12 @@ const METRO_MARKER = "// viro-visionos";
 const RNVISION_PKG = "@callstack/react-native-visionos";
 const RNVISION_PLATFORMS_PKG = "@callstack/out-of-tree-platforms";
 // Path inside this package where bundled assets live (resolved at runtime).
-const PKG_ROOT = path_1.default.resolve(__dirname, "..");
+// This file is compiled to dist/plugins/, and plugins/withViroVisionOS.js is a one-line
+// forwarder to it — so at runtime __dirname is <pkg>/dist/plugins, not <pkg>/plugins.
+// Resolving one level up lands in dist/, where patches/ does not exist: they are source
+// files, not TypeScript output, so they are never copied there. Two levels up is the package
+// root under both layouts, because nothing else sits between.
+const PKG_ROOT = path_1.default.resolve(__dirname, "..", "..");
 const BUNDLED_PATCHES_DIR = path_1.default.join(PKG_ROOT, "patches", "visionos");
 const BUNDLED_SHIMS_DIR = path_1.default.join(PKG_ROOT, "shims");
 // ─── Helpers ──────────────────────────────────────────────────────────────────

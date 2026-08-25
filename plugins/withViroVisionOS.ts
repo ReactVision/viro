@@ -284,11 +284,16 @@ const withVisionOSAppSwift: ConfigPlugin = (config) =>
       }
 
       // ── 4d. Add .viroImmersiveSpaceController() + ImmersiveSpace ──
+      // viroImmersiveSpaceController() is a View modifier, not a Scene one — it reads
+      // openImmersiveSpace out of the environment, which only a View can do. RCTMainWindow is a
+      // Scene, so the modifier goes on the React Native root view instead, via the contentView
+      // initializer the fork provides for exactly this.
       if (!swift.includes("ViroImmersiveSpace")) {
         swift = swift.replace(
-          /(RCTMainWindow\(moduleName:[^\n]+\n)/,
-          "$1" +
-            "            .viroImmersiveSpaceController()\n\n" +
+          /RCTMainWindow\(moduleName:\s*"main"\)\n/,
+          'RCTMainWindow(moduleName: "main") { rootView in\n' +
+            "            rootView.viroImmersiveSpaceController()\n" +
+            "        }\n\n" +
             "        ImmersiveSpace(id: ViroImmersiveSpace.id) {\n" +
             "            ViroImmersiveSpaceView()\n" +
             "        }\n" +

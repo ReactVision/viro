@@ -420,6 +420,62 @@ const withVisionOSCompatShims: ConfigPlugin = (config) =>
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
+
+// ─── 7. visionos/{App}/Info.plist — allow more than one scene ─────────────────
+//
+// Opening an ImmersiveSpace requires UIApplicationSupportsMultipleScenes = YES. The visionOS
+// template ships it as NO, and SwiftUI then refuses at runtime with:
+//
+//   "Unable to open an immersive space when the app does not support multiple scenes."
+//
+// It is a silent failure from JavaScript's point of view: enterImmersiveSpace() resolves, no
+// exception is raised, and the scene simply never appears. Every Viro app on visionOS needs
+// this, so it is set here rather than left as a manual step.
+const withVisionOSInfoPlist: ConfigPlugin = (config) =>
+  withDangerousMod(config, [
+    "ios",
+    async (newConfig) => {
+      const projectRoot = newConfig.modRequest.projectRoot;
+      const projectName = (config.name as string).replace(/[^a-zA-Z0-9]/g, "");
+      const plistPath = path.join(
+        projectRoot,
+        "visionos",
+        projectName,
+        "Info.plist"
+      );
+
+      if (!fs.existsSync(plistPath)) {
+        WarningAggregator.addWarningIOS(
+          "withViroVisionOS",
+          `Could not find visionos/${projectName}/Info.plist. Set ` +
+            `UIApplicationSceneManifest.UIApplicationSupportsMultipleScenes to true manually, ` +
+            `or the ImmersiveSpace will refuse to open.`
+        );
+        return newConfig;
+      }
+
+      const plist = fs.readFileSync(plistPath, "utf-8");
+      // The key lives inside UIApplicationSceneManifest and is written by the template as
+      // <false/> on the line after the key. Only that occurrence is rewritten.
+      const updated = plist.replace(
+        /(<key>UIApplicationSupportsMultipleScenes<\/key>\s*)<false\/>/,
+        "$1<true/>"
+      );
+
+      if (updated !== plist) {
+        fs.writeFileSync(plistPath, updated, "utf-8");
+      } else if (!/<key>UIApplicationSupportsMultipleScenes<\/key>\s*<true\/>/.test(plist)) {
+        WarningAggregator.addWarningIOS(
+          "withViroVisionOS",
+          `Could not set UIApplicationSupportsMultipleScenes in visionos/${projectName}/Info.plist. ` +
+            `Set it to true manually, or the ImmersiveSpace will refuse to open.`
+        );
+      }
+
+      return newConfig;
+    },
+  ]);
+
 export const withViroVisionOS: ConfigPlugin = (config) =>
   withPlugins(config, [
     withVisionOSSetup,         // 1. verify visionos/ folder + deps
@@ -428,6 +484,7 @@ export const withViroVisionOS: ConfigPlugin = (config) =>
     withVisionOSAppSwift,      // 4. App.swift: moduleName "main" + ImmersiveSpace
     withVisionOSPatches,       // 5. patches/ + postinstall: patch-package
     withVisionOSCompatShims,   // 6. components/compat/ BlurView + LinearGradient
+    withVisionOSInfoPlist,     // 7. Info.plist: allow multiple scenes (ImmersiveSpace)
   ]);
 
 export default withViroVisionOS;

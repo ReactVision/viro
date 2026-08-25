@@ -78,6 +78,22 @@ NS_ASSUME_NONNULL_BEGIN
                       tangents:(simd_float4)tangents;
 
 /// Call after all eyes have been rendered.  Drives VRORenderer::endFrame().
+/*
+ Per-frame hand input. Sampled once per frame in the Swift layer so both eyes see the same
+ pointer state. A hand the tracker has lost arrives with valid = NO, which stops its ray
+ being dispatched at all rather than leaving it hovering wherever it was last seen.
+
+ Origin and forward are in world space; forward is expected normalised.
+ */
+- (void)updateHandsWithLeftValid:(BOOL)leftValid
+                      leftOrigin:(simd_float3)leftOrigin
+                     leftForward:(simd_float3)leftForward
+                    leftPinching:(BOOL)leftPinching
+                      rightValid:(BOOL)rightValid
+                     rightOrigin:(simd_float3)rightOrigin
+                    rightForward:(simd_float3)rightForward
+                   rightPinching:(BOOL)rightPinching;
+
 - (void)endFrame;
 
 /// Turn frame timing on. Off by default because it costs a counter sample buffer and a

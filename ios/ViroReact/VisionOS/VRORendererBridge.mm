@@ -22,6 +22,7 @@
 #include "VROMetalFrameTimer.h"
 #include "VRORendererConfiguration.h"
 #include "VROInputControllerBase.h"
+#include "VROInputType.h"
 #include "VROInputPresenter.h"
 #include "VROMatrix4f.h"
 #include "VROFieldOfView.h"
@@ -56,9 +57,53 @@
 #import <MetalKit/MetalKit.h>
 
 // Local mirror of VROLightUniforms / VROSceneLightingUniforms from VROSharedStructures.h.
-// ── Stub input controller ─────────────────────────────────────────────────────
-// Handles the three remaining pure-virtual methods from VROInputControllerBase.
-// Week 4 will replace this with a real hand-tracking controller.
+// ── Visible feedback for input bring-up ───────────────────────────────────────
+//
+// Without this nothing in the test scene reacts, so hand tracking looks broken even when
+// every event is firing correctly — which is exactly how it looked on the first device run.
+// The events were reaching the scene; the scene simply had no listeners.
+//
+// White at rest, amber on hover, green while pinched. Colour rather than motion so the state
+// is readable from any angle and does not disturb the physics scene beside it.
+
+class VROHighlightOnInput : public VROEventDelegate {
+public:
+    VROHighlightOnInput(std::shared_ptr<VROMaterial> material) : _material(material) {}
+
+    void onHover(int source, std::shared_ptr<VRONode> node, bool isHovering,
+                 std::vector<float> position) override {
+        _hovering = isHovering;
+        apply();
+    }
+
+    void onClick(int source, std::shared_ptr<VRONode> node, ClickState clickState,
+                 std::vector<float> position) override {
+        if (clickState == ClickState::ClickDown)      { _pressed = true;  }
+        else if (clickState == ClickState::ClickUp)   { _pressed = false; }
+        apply();
+    }
+
+private:
+    void apply() {
+        VROVector4f colour = _pressed  ? VROVector4f(0.2f, 0.9f, 0.3f, 1.0f)   // pinched
+                           : _hovering ? VROVector4f(1.0f, 0.7f, 0.1f, 1.0f)   // pointed at
+                                       : VROVector4f(1.0f, 1.0f, 1.0f, 1.0f);  // at rest
+        _material->getDiffuse().setColor(colour);
+    }
+
+    std::shared_ptr<VROMaterial> _material;
+    bool _hovering = false;
+    bool _pressed  = false;
+};
+
+// ── Hand-tracking input controller ────────────────────────────────────────────
+//
+// Two hands, two independent sources, following the same shape as
+// VROInputControllerOpenXR: capture both poses first, then dispatch each side with its own
+// source id so hover, click and drag stay separate per hand. VROInputControllerBase already
+// keeps a hit result per source, so nothing here has to reimplement hit testing.
+//
+// The ray is the index finger, not gaze: see the note on ViroVisionOS::InputSource.
 
 class VROInputControllerVisionOS : public VROInputControllerBase {
 public:
@@ -68,8 +113,72 @@ public:
     std::string getHeadset()    override { return "visionos"; }
     std::string getController() override { return "hand"; }
 
+    struct HandState {
+        bool        valid    = false;
+        bool        pinching = false;
+        VROVector3f origin;
+        VROVector3f forward;
+    };
+
+    /*
+     Called once per frame from the bridge, before either eye renders. Only stores state —
+     dispatch happens in onProcess, which the renderer drives with a camera we do not have
+     here.
+     */
+    void setHandState(const HandState &left, const HandState &right) {
+        _left  = left;
+        _right = right;
+    }
+
+    void onProcess(const VROCamera &camera) override {
+        dispatchHand(camera, ViroVisionOS::LeftHand,  _left,  _leftWasPinching);
+        dispatchHand(camera, ViroVisionOS::RightHand, _right, _rightWasPinching);
+    }
+
 protected:
     VROVector3f getDragForwardOffset() override { return { 0, 0, -1 }; }
+
+    /*
+     A minimal presenter. visionOS draws the system pointer itself and VROReticle is a no-op
+     in this target, so there is nothing for a presenter to render — but the base class
+     registers it as an event delegate and complains on every frame without one.
+     */
+    std::shared_ptr<VROInputPresenter> createPresenter(std::shared_ptr<VRODriver> driver) override {
+        return std::make_shared<VROInputPresenter>();
+    }
+
+private:
+    void dispatchHand(const VROCamera &camera, int source,
+                      const HandState &hand, bool &wasPinching) {
+        if (!hand.valid) {
+            // A hand that just went out of view while pinching would otherwise leave a click
+            // latched down forever.
+            if (wasPinching) {
+                VROInputControllerBase::onButtonEvent(source, VROEventDelegate::ClickState::ClickUp);
+                wasPinching = false;
+            }
+            return;
+        }
+
+        VROQuaternion rotation = VROQuaternion::rotationFromTo({ 0, 0, -1 }, hand.forward);
+        VROInputControllerBase::updateHitNode(source, camera, hand.origin, hand.forward);
+        // processGazeEvent is what turns a hit result into onHover — without it the hit is
+        // computed, click still works through onButtonEvent, and hover silently never fires.
+        VROInputControllerBase::processGazeEvent(source);
+        VROInputControllerBase::onMove(source, hand.origin, rotation, hand.forward);
+
+        // Edges only: the base class treats every ClickDown as a new press.
+        if (hand.pinching != wasPinching) {
+            VROInputControllerBase::onButtonEvent(
+                source, hand.pinching ? VROEventDelegate::ClickState::ClickDown
+                                      : VROEventDelegate::ClickState::ClickUp);
+            wasPinching = hand.pinching;
+        }
+    }
+
+    HandState _left, _right;
+    bool _leftWasPinching  = false;
+    bool _rightWasPinching = false;
 };
 
 // ── Private implementation ────────────────────────────────────────────────────
@@ -78,6 +187,10 @@ protected:
     std::shared_ptr<VRORenderer>                  _renderer;
     std::shared_ptr<VROInputControllerVisionOS>   _inputController;
     std::shared_ptr<VRONode>                      _cameraNode;
+    // VRONode::setEventDelegate stores a weak_ptr, so the scene does not keep the delegate
+    // alive. Held here for the lifetime of the bridge; a local would be destroyed as soon as
+    // the scene finished building and every event would silently find no listener.
+    std::vector<std::shared_ptr<VROEventDelegate>>  _eventDelegates;
     // Dynamic body whose height is traced to confirm bullet is actually stepping.
     std::shared_ptr<VRONode>                      _physicsProbe;
     std::shared_ptr<VRONode>                      _floorCollider;
@@ -554,8 +667,19 @@ protected:
         auto node = std::make_shared<VRONode>();
         node->setGeometry(box);
         node->setPosition({0.0f, 0.0f, -0.5f});
+        node->setName("white-box");
+
+        // Hover and click have to be enabled per node — the delegate alone is not enough,
+        // the controller checks the node's enabled-event map before dispatching.
+        auto highlight = std::make_shared<VROHighlightOnInput>(mat);
+        highlight->setEnabledEvent(VROEventDelegate::EventAction::OnHover, true);
+        highlight->setEnabledEvent(VROEventDelegate::EventAction::OnClick, true);
+        node->setEventDelegate(highlight);
+        _eventDelegates.push_back(highlight);
+
         scene->getRootNode()->addChildNode(node);
     }
+
 
     _renderer->setSceneController(sceneController, _driver);
     // ────────────────────────────────────────────────────────────────────────
@@ -753,6 +877,35 @@ protected:
 }
 
 // ── endFrame ─────────────────────────────────────────────────────────────────
+
+- (void)updateHandsWithLeftValid:(BOOL)leftValid
+                      leftOrigin:(simd_float3)leftOrigin
+                     leftForward:(simd_float3)leftForward
+                    leftPinching:(BOOL)leftPinching
+                      rightValid:(BOOL)rightValid
+                     rightOrigin:(simd_float3)rightOrigin
+                    rightForward:(simd_float3)rightForward
+                   rightPinching:(BOOL)rightPinching {
+    if (!_inputController) {
+        return;
+    }
+    VROInputControllerVisionOS::HandState left;
+    left.valid    = leftValid;
+    left.pinching = leftPinching;
+    left.origin   = { leftOrigin.x,  leftOrigin.y,  leftOrigin.z  };
+    left.forward  = { leftForward.x, leftForward.y, leftForward.z };
+
+    VROInputControllerVisionOS::HandState right;
+    right.valid    = rightValid;
+    right.pinching = rightPinching;
+    right.origin   = { rightOrigin.x,  rightOrigin.y,  rightOrigin.z  };
+    right.forward  = { rightForward.x, rightForward.y, rightForward.z };
+
+    // Only stored here. The dispatch needs a camera, which the renderer supplies when it
+    // calls onProcess during the frame.
+    _inputController->setHandState(left, right);
+
+}
 
 - (void)endFrame {
     _renderer->endFrame(_driver);

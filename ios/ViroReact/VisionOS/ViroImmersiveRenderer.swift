@@ -40,6 +40,20 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     private let arSession = ARKitSession()
     private let worldTracking = WorldTrackingProvider()
 
+    // Hand tracking is the only input a fully immersive app receives: gaze-and-pinch is
+    // delivered as a SwiftUI SpatialEventGesture, which needs a view, and CompositorServices
+    // hands out a Metal layer with no input API at all. So the pointing ray comes from the
+    // index finger and the click from a pinch.
+    private let handTracking = HandTrackingProvider()
+
+    // Pinch is latched with hysteresis. A single threshold chatters around the boundary and
+    // turns one deliberate pinch into a burst of clicks; closing at 2 cm and only releasing
+    // at 3.2 cm costs nothing and makes the gesture read as one event.
+    private static let pinchCloseDistance: Float = 0.020
+    private static let pinchOpenDistance:  Float = 0.032
+    private var leftPinching  = false
+    private var rightPinching = false
+
     // MARK: - Init
 
     public init(layerRenderer: LayerRenderer) {
@@ -66,9 +80,16 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
 
     public func startRenderLoop() {
         renderTask = Task(priority: .high) {
-            if WorldTrackingProvider.isSupported {
+            // Both providers go into a single run() — a second ARKitSession would be
+            // refused, and running them together is what keeps their timestamps comparable.
+            var providers: [any DataProvider] = []
+            if WorldTrackingProvider.isSupported { providers.append(self.worldTracking) }
+            if HandTrackingProvider.isSupported  { providers.append(self.handTracking) }
+            else { NSLog("[Viro] hand tracking unsupported on this device — input will be inert") }
+
+            if !providers.isEmpty {
                 do {
-                    try await self.arSession.run([self.worldTracking])
+                    try await self.arSession.run(providers)
                 } catch {
                     NSLog("[Viro] ARKitSession.run() FAILED: %@", error.localizedDescription)
                 }
@@ -162,6 +183,11 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 tangents: Self.tangentsFromDrawable(primary, viewIndex: 0))
         }
 
+        // Hands are sampled once per frame, before any eye is rendered, so both eyes see the
+        // same input state. Doing it per drawable would let the two eyes disagree about where
+        // the pointer is, which reads as jitter.
+        updateHandInput()
+
         // Each drawable (built-in display, capture target, etc.) needs its own
         // command buffer and an encodePresent call — cp_frame_end_submission asserts
         // that every drawable returned by queryDrawables() was presented.
@@ -248,6 +274,69 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     /// The x/y components of the projection matrix are depth-convention-independent;
     /// we extract (left, right, up, down) signed tangents that VRORendererBridge
     /// feeds into its asymmetric-frustum projection helper.
+    // MARK: - Hand input
+
+    /// Samples both hands and hands the bridge a ray plus a pinch state for each.
+    ///
+    /// The ray starts at the index knuckle and points through the fingertip: taking the
+    /// fingertip alone gives a position but no direction, and the wrist is too far back to
+    /// aim with. A hand the tracker has lost is reported as invalid rather than left at its
+    /// last pose — a stale ray that keeps hovering things is worse than no ray.
+    private func updateHandInput() {
+        let anchors = handTracking.latestAnchors
+
+        func sample(_ anchor: HandAnchor?) -> (valid: Bool, origin: simd_float3,
+                                               forward: simd_float3, pinching: Bool) {
+            guard let anchor, anchor.isTracked,
+                  let skeleton = anchor.handSkeleton else {
+                return (false, .zero, .zero, false)
+            }
+
+            let originFromAnchor = anchor.originFromAnchorTransform
+            func jointPosition(_ name: HandSkeleton.JointName) -> simd_float3? {
+                let joint = skeleton.joint(name)
+                guard joint.isTracked else { return nil }
+                let m = originFromAnchor * joint.anchorFromJointTransform
+                return simd_float3(m.columns.3.x, m.columns.3.y, m.columns.3.z)
+            }
+
+            guard let tip  = jointPosition(.indexFingerTip),
+                  let base = jointPosition(.indexFingerKnuckle) else {
+                return (false, .zero, .zero, false)
+            }
+
+            let direction = tip - base
+            let length = simd_length(direction)
+            // A degenerate direction means the joints resolved to the same point; aiming with
+            // it would produce a random ray.
+            guard length > 1e-5 else { return (false, .zero, .zero, false) }
+
+            var pinching = false
+            if let thumb = jointPosition(.thumbTip) {
+                let gap = simd_distance(tip, thumb)
+                let wasPinching = (anchor.chirality == .left) ? leftPinching : rightPinching
+                pinching = wasPinching ? (gap < Self.pinchOpenDistance)
+                                       : (gap < Self.pinchCloseDistance)
+            }
+
+            return (true, base, direction / length, pinching)
+        }
+
+        let left  = sample(anchors.leftHand)
+        let right = sample(anchors.rightHand)
+        leftPinching  = left.pinching
+        rightPinching = right.pinching
+
+        bridge.updateHands(withLeftValid: left.valid,
+                           leftOrigin: left.origin,
+                           leftForward: left.forward,
+                           leftPinching: left.pinching,
+                           rightValid: right.valid,
+                           rightOrigin: right.origin,
+                           rightForward: right.forward,
+                           rightPinching: right.pinching)
+    }
+
     private static func tangentsFromDrawable(
         _ drawable: LayerRenderer.Drawable,
         viewIndex: Int

@@ -47,6 +47,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
 var ViroSceneNavigatorModule = react_native_1.NativeModules.VRTSceneNavigatorModule;
 var mathRandomOffset = 0;
 /**
@@ -373,7 +374,14 @@ class ViroSceneNavigator extends React.Component {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroSceneNavigator", this.props);
-        console.warn("<ViroSceneNavigator> has been DEPRECATED. Please use <ViroVRSceneNavigator> instead.");
+        // Not on visionOS: there the replacement does not exist. ViroVRSceneNavigator renders
+        // VRTVRSceneNavigator, which is the Android/OpenXR host and is excluded from the xros
+        // build, while VRTSceneNavigator — this component — is the one that is registered. Sending
+        // visionOS users to a component that cannot mount would be worse than saying nothing, and
+        // the warning would fire on every render of a supported configuration.
+        if (!ViroPlatform_1.isVisionOS) {
+            console.warn("<ViroSceneNavigator> has been DEPRECATED. Please use <ViroVRSceneNavigator> instead.");
+        }
         var items = this._renderSceneStackItems();
         // update the sceneNavigator with the latest given props on every render
         this.sceneNavigator.viroAppProps = this.props.viroAppProps;

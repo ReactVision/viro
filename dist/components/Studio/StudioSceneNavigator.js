@@ -277,8 +277,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         // On Quest, pre-register animations and materials before VRActivity
         // launches so the native registrations land before any Viro component
         // mounts; otherwise registerAnimations/createMaterials races the Fabric
-        // commit that creates those components.
-        if (ViroPlatform_1.isQuest) {
+        // commit that creates those components. visionOS is the same shape of
+        // problem: the ImmersiveSpace renderer starts outside this commit.
+        if (ViroPlatform_1.isQuest || ViroPlatform_1.isVisionOS) {
             (0, animationRegistry_1.registerSceneAnimations)(sceneData.animations);
             (0, studioMaterials_1.registerStudioMaterialsForAssets)(sceneData.assets);
         }
@@ -296,9 +297,11 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
                 placementApiRef,
             },
         };
-        if (ViroPlatform_1.isQuest) {
+        if (ViroPlatform_1.isQuest || ViroPlatform_1.isVisionOS) {
             // Setting vrSceneEntry mounts ViroXRSceneNavigator with StudioARScene as
-            // vrInitialScene, so VRActivity launches straight into content.
+            // vrInitialScene, so VRActivity launches straight into content. visionOS reads the
+            // same prop — its ImmersiveSpace cannot host a ViroARScene either — so it takes this
+            // path rather than pushing onto a navigator that starts on the loading scene.
             setVrSceneEntry(entry);
         }
         else {
@@ -324,8 +327,10 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     }, [sceneId, loadScene]);
     // Quest has no camera passthrough, so during load it always needs something
     // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
-    // live camera, so its overlay stays opt-in.)
-    if (ViroPlatform_1.isQuest && !vrSceneEntry) {
+    // live camera, so its overlay stays opt-in.) visionOS needs it for a different
+    // reason with the same effect — its passthrough is in the ImmersiveSpace, not in
+    // this window, so the window would otherwise be blank while the scene loads.
+    if ((ViroPlatform_1.isQuest || ViroPlatform_1.isVisionOS) && !vrSceneEntry) {
         return (<react_native_1.View style={styles.loader}>
         {loadingView ?? <react_native_1.ActivityIndicator size="large" color="#ffffff"/>}
       </react_native_1.View>);

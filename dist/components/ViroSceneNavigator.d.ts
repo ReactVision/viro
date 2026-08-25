@@ -25,9 +25,13 @@ type Props = ViewProps & {
      */
     initialScene: {
         /**
-         * The React Class to render for this scene.
+         * The React component to render for this scene.
+         *
+         * Typed as a component, not as a `ViroScene` instance: at runtime this is mounted as
+         * `<Component />` (see `sceneClass.scene` below), exactly as ViroARSceneNavigator does.
+         * The old `ViroScene` annotation described a value this navigator never receives.
          */
-        scene: ViroScene;
+        scene: () => React.JSX.Element;
     };
     viroAppProps?: any;
     /**

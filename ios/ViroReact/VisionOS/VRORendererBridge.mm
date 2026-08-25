@@ -579,10 +579,6 @@ protected:
     // VRODriverMetal defaults to BGRA8Unorm_sRGB; CompositorServices provides
     // RGBA16Float.  Setting it here ensures any pipeline compiled during prepareFrame
     // (including the first-frame initRenderer path) uses the correct format.
-    // TEMP diagnostic (device crash triage 2026-08-24)
-    NSLog(@"[ViroBridge] PREPARE view=%d colour=%lu %lux%lu",
-          (int)viewIndex, (unsigned long)colorTexture.pixelFormat,
-          (unsigned long)colorTexture.width, (unsigned long)colorTexture.height);
     _driver->setColorPixelFormat(colorTexture.pixelFormat);
 
     VROMetalFrameTimer *timer = _driver->getFrameTimerForBridge();
@@ -712,9 +708,6 @@ protected:
     // formats at compile time.  VRODriverMetal defaults to BGRA8Unorm_sRGB which
     // differs from the CompositorServices drawable format and causes silent draw
     // rejection when the pipeline state format doesn't match the render pass.
-    // TEMP diagnostic (device crash triage 2026-08-24)
-    NSLog(@"[ViroBridge] RENDER-EYE begin view=%d colour=%lu",
-          (int)viewIndex, (unsigned long)colorTexture.pixelFormat);
     _driver->setColorPixelFormat(colorTexture.pixelFormat);
     _driver->setDepthPixelFormat(depthTexture.pixelFormat);
 

@@ -160,12 +160,35 @@ private:
             return;
         }
 
-        VROQuaternion rotation = VROQuaternion::rotationFromTo({ 0, 0, -1 }, hand.forward);
-        VROInputControllerBase::updateHitNode(source, camera, hand.origin, hand.forward);
+        // ── Which ray to act on ──────────────────────────────────────────────
+        //
+        // Not the live one, while pinching. Closing the index against the thumb curls the
+        // finger, and the ray is the finger: measured on device, the forward vector's Y
+        // component swung from -0.11 to -0.81 during a single pinch. Acting on the live ray
+        // means the click lands wherever the finger ended up pointing — the floor — instead
+        // of on what the wearer was aiming at.
+        //
+        // The frozen ray is also deliberately not the one from the frame the threshold
+        // tripped on. By then the fingers are already 2 cm apart and most of the curl has
+        // happened. `_aimHistory` keeps a short delay line so the pinch acts on the aim from
+        // before the gesture started, which is the aim the wearer chose.
+        Ray &aim = _aim[slotFor(source)];
+        if (!wasPinching) {
+            aim.pushLive(hand.origin, hand.forward);
+        }
+        const bool pinchStarting = hand.pinching && !wasPinching;
+        if (pinchStarting) {
+            aim.freeze();
+        }
+        const VROVector3f origin  = aim.frozen ? aim.frozenOrigin  : hand.origin;
+        const VROVector3f forward = aim.frozen ? aim.frozenForward : hand.forward;
+
+        VROQuaternion rotation = VROQuaternion::rotationFromTo({ 0, 0, -1 }, forward);
+        VROInputControllerBase::updateHitNode(source, camera, origin, forward);
         // processGazeEvent is what turns a hit result into onHover — without it the hit is
         // computed, click still works through onButtonEvent, and hover silently never fires.
         VROInputControllerBase::processGazeEvent(source);
-        VROInputControllerBase::onMove(source, hand.origin, rotation, hand.forward);
+        VROInputControllerBase::onMove(source, origin, rotation, forward);
 
         // Edges only: the base class treats every ClickDown as a new press.
         if (hand.pinching != wasPinching) {
@@ -173,8 +196,51 @@ private:
                 source, hand.pinching ? VROEventDelegate::ClickState::ClickDown
                                       : VROEventDelegate::ClickState::ClickUp);
             wasPinching = hand.pinching;
+            if (!hand.pinching) {
+                aim.thaw();
+            }
         }
     }
+
+    static int slotFor(int source) { return source == ViroVisionOS::LeftHand ? 0 : 1; }
+
+    /*
+     A short delay line of recent aim, plus the frozen aim held for the duration of a pinch.
+
+     kAimDelayFrames is ~150 ms at 90 Hz — long enough to predate the finger curl that
+     triggers the pinch, short enough that the frozen aim still corresponds to where the
+     wearer was looking a moment ago rather than to somewhere they have already left.
+     */
+    struct Ray {
+        static const int kAimDelayFrames = 14;
+
+        void pushLive(const VROVector3f &o, const VROVector3f &f) {
+            origins[cursor]  = o;
+            forwards[cursor] = f;
+            cursor = (cursor + 1) % kAimDelayFrames;
+            if (filled < kAimDelayFrames) { filled++; }
+        }
+
+        void freeze() {
+            // The oldest entry still in the buffer: the aim from before the gesture began.
+            const int oldest = (filled < kAimDelayFrames) ? 0 : cursor;
+            frozenOrigin  = origins[oldest];
+            frozenForward = forwards[oldest];
+            frozen = true;
+        }
+
+        void thaw() { frozen = false; }
+
+        VROVector3f origins[kAimDelayFrames];
+        VROVector3f forwards[kAimDelayFrames];
+        int  cursor = 0;
+        int  filled = 0;
+        bool frozen = false;
+        VROVector3f frozenOrigin;
+        VROVector3f frozenForward;
+    };
+
+    Ray _aim[2];
 
     HandState _left, _right;
     bool _leftWasPinching  = false;

@@ -121,6 +121,21 @@ const VIRO_PODS = `
 // These lines are injected INSIDE the existing post_install block (before the closing `end`).
 // If no post_install block exists they are injected as a new one.
 const POST_INSTALL_CONTENT = `
+    # ${PODFILE_MARKER}: UIKit back into every pod's prefix header
+    # CocoaPods writes each pod's -prefix.pch from a case on the platform name that knows
+    # :ios, :tvos and :osx but not visionOS, so on xros the pch falls through with nothing but
+    # Foundation. Pods that reach for a UIKit type without importing UIKit compile on iOS purely
+    # because the pch handed it over, and fail here. The __OBJC__ guard is CocoaPods' own, so the
+    # C and C++ sources in those same pods are untouched.
+    Dir.glob("#{installer.sandbox.root}/Target Support Files/*/*-prefix.pch").each do |pch|
+      content = File.read(pch)
+      next if content.include?('UIKit/UIKit.h')
+      patched = content.sub("#import <Foundation/Foundation.h>",
+                            "#import <Foundation/Foundation.h>\\n#import <UIKit/UIKit.h>")
+      next if patched == content
+      FileUtils.chmod('u+w', pch)
+      File.write(pch, patched)
+    end
     # ${PODFILE_MARKER}: fmt consteval fix for Apple Clang 16
     fmt_base_h = "#{installer.sandbox.root}/fmt/include/fmt/base.h"
     if File.exist?(fmt_base_h)

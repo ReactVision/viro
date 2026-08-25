@@ -166,6 +166,23 @@ const withVisionOSPodfile = (config) => (0, config_plugins_1.withDangerousMod)(c
         }
         let podfile = fs_1.default.readFileSync(podfilePath, "utf-8");
         const alreadyPatched = podfile.includes(PODFILE_MARKER);
+        // ── 3a0. Both React Native source flags, set in the Podfile itself ──
+        //
+        // Neither default works on visionOS, and forgetting either fails in a way that does not
+        // name the cause:
+        //
+        //   RCT_USE_PREBUILT_RNCORE=0 — React core ships as a prebuilt xcframework with ios,
+        //     ios-simulator and maccatalyst slices and no xros slice, so `import React` fails
+        //     inside React Native's own RCTRootViewRepresentable.swift.
+        //   RCT_USE_RN_DEP=0 — same story for folly, glog and fmt.
+        //
+        // Set here rather than documented as a shell prefix, because a Podfile that only builds
+        // when invoked a particular way is a trap. `||=` leaves an explicit override alone.
+        if (!podfile.includes("RCT_USE_PREBUILT_RNCORE")) {
+            podfile = podfile.replace(/^(platform :visionos[^\n]*\n)/m, `$1\n# ${PODFILE_MARKER}: build React Native from source — no xros slice is published\n` +
+                `ENV['RCT_USE_PREBUILT_RNCORE'] ||= '0'\n` +
+                `ENV['RCT_USE_RN_DEP'] ||= '0'\n`);
+        }
         // ── 3a. Inject Viro pods inside the main target block ──
         if (!alreadyPatched) {
             podfile = podfile.replace(/^(target '[^']+' do)([\s\S]*?)^end/m, (_, header, body) => `${header}${body}${VIRO_PODS}\nend`);
@@ -259,14 +276,28 @@ const withVisionOSPatches = (config) => (0, config_plugins_1.withDangerousMod)(c
         // ── 5b. Ensure patch-package is wired as postinstall ──
         const pkgPath = path_1.default.join(projectRoot, "package.json");
         const pkg = JSON.parse(fs_1.default.readFileSync(pkgPath, "utf-8"));
+        let pkgChanged = false;
         const current = pkg.scripts?.postinstall ?? "";
         if (!current.includes("patch-package")) {
             pkg.scripts = pkg.scripts ?? {};
             pkg.scripts.postinstall = current
                 ? `${current} && patch-package`
                 : "patch-package";
-            fs_1.default.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+            pkgChanged = true;
             console.log("[withViroVisionOS] Added postinstall: patch-package");
+        }
+        // The postinstall above invokes patch-package, so it has to be installed — otherwise the
+        // very next `npm install` fails on a command that is not there, and the patches this step
+        // just copied are never applied.
+        const hasPatchPackage = pkg.devDependencies?.["patch-package"] ?? pkg.dependencies?.["patch-package"];
+        if (!hasPatchPackage) {
+            pkg.devDependencies = pkg.devDependencies ?? {};
+            pkg.devDependencies["patch-package"] = "^8.0.0";
+            pkgChanged = true;
+            console.log("[withViroVisionOS] Added devDependency: patch-package — run your package manager's install");
+        }
+        if (pkgChanged) {
+            fs_1.default.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
         }
         return newConfig;
     },
@@ -343,6 +374,41 @@ const withVisionOSInfoPlist = (config) => (0, config_plugins_1.withDangerousMod)
         return newConfig;
     },
 ]);
+// ─── 8. visionos/{App}/AppDelegate.swift — Expo's entry point and imports ─────
+//
+// The Callstack visionOS template is a bare React Native template: it asks Metro for
+// `index`, and it does not import ReactAppDependencyProvider. An Expo app serves its entry
+// through a virtual module instead, which `expo prebuild` writes into the iOS AppDelegate as
+// `.expo/.virtual-metro-entry` — but prebuild does not manage the visionos/ folder's copy.
+//
+// Left alone, the app launches, connects to Metro, and sits on its loading spinner forever:
+// Metro answers "Unable to resolve module ./index" and nothing surfaces in the UI.
+const withVisionOSAppDelegate = (config) => (0, config_plugins_1.withDangerousMod)(config, [
+    "ios",
+    async (newConfig) => {
+        const projectRoot = newConfig.modRequest.projectRoot;
+        const projectName = config.name.replace(/[^a-zA-Z0-9]/g, "");
+        const appDelegatePath = path_1.default.join(projectRoot, "visionos", projectName, "AppDelegate.swift");
+        if (!fs_1.default.existsSync(appDelegatePath)) {
+            config_plugins_1.WarningAggregator.addWarningIOS("withViroVisionOS", `Could not find visionos/${projectName}/AppDelegate.swift. If the app hangs on its ` +
+                `loading screen, point jsBundleURL(forBundleRoot:) at ".expo/.virtual-metro-entry".`);
+            return newConfig;
+        }
+        let swift = fs_1.default.readFileSync(appDelegatePath, "utf-8");
+        const before = swift;
+        swift = swift.replace(/jsBundleURL\(forBundleRoot:\s*"index"\)/, 'jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")');
+        // RCTAppDependencyProvider lives in its own module, and the bare template never imports it.
+        if (swift.includes("RCTAppDependencyProvider") &&
+            !swift.includes("import ReactAppDependencyProvider")) {
+            swift = swift.replace(/^(import React_RCTAppDelegate\n)/m, "$1import ReactAppDependencyProvider\n");
+        }
+        if (swift !== before) {
+            fs_1.default.writeFileSync(appDelegatePath, swift, "utf-8");
+            console.log("[withViroVisionOS] Pointed AppDelegate at the Expo entry point");
+        }
+        return newConfig;
+    },
+]);
 const withViroVisionOS = (config) => (0, config_plugins_1.withPlugins)(config, [
     withVisionOSSetup, // 1. verify visionos/ folder + deps
     withVisionOSMetroConfig, // 2. metro.config.js visionOS resolver
@@ -351,6 +417,7 @@ const withViroVisionOS = (config) => (0, config_plugins_1.withPlugins)(config, [
     withVisionOSPatches, // 5. patches/ + postinstall: patch-package
     withVisionOSCompatShims, // 6. components/compat/ BlurView + LinearGradient
     withVisionOSInfoPlist, // 7. Info.plist: allow multiple scenes (ImmersiveSpace)
+    withVisionOSAppDelegate, // 8. AppDelegate.swift: Expo entry point + imports
 ]);
 exports.withViroVisionOS = withViroVisionOS;
 exports.default = exports.withViroVisionOS;

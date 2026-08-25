@@ -104,6 +104,13 @@ Pod::Spec.new do |s|
   end
 
   # React Native dependencies
+  # 32 files in ViroReact import <ViroKit/ViroKit.h>, so this dependency was always real —
+  # it simply went undeclared. On iOS that is survivable: ViroKit is a plain framework and its
+  # headers land in Pods/Headers/Public early enough that the compile finds them anyway. On
+  # visionOS it ships as an xcframework, whose headers are staged by a build phase on the
+  # ViroKit target, and without a declared dependency Xcode has no reason to run that phase
+  # first — so every ViroKit import fails while the headers sit in the package, unextracted.
+  s.dependency 'ViroKit'
   s.dependency 'React-Core'
 
   # ONNX Runtime is distributed as a vendored dynamic xcframework (onnxruntime.xcframework).
@@ -137,7 +144,12 @@ Pod::Spec.new do |s|
       '"$(PODS_ROOT)/Headers/Public"',
       '"$(PODS_ROOT)/Headers/Public/ViroKit"',
       '"$(PODS_ROOT)/ViroKit/dist/include"',
-      '"$(PODS_ROOT)/ViroKit/Headers"'
+      '"$(PODS_ROOT)/ViroKit/Headers"',
+      # visionOS ships ViroKit as an xcframework rather than a plain framework, and CocoaPods
+      # stages the selected slice's headers here. The paths above assume the older layout and
+      # resolve to nothing on xros, so without this every `#import <ViroKit/...>` in the VRT
+      # layer fails — the headers exist, they are just somewhere these paths never look.
+      '"${PODS_XCFRAMEWORKS_BUILD_DIR}/ViroKit/Headers"'
     ].join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1',
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'

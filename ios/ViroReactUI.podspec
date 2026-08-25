@@ -27,8 +27,11 @@ Pod::Spec.new do |s|
   s.author              = 'ReactVision'
   s.requires_arc        = true
 
-  s.platform                       = :visionos, '1.0'
-  s.visionos.deployment_target     = '1.0'
+  # visionOS 26.0, not 1.0: the render loop calls LayerRenderer.Frame.queryDrawables(), which
+  # arrived in 26.0, and Drawable.computeProjection(viewIndex:), which arrived in 2.0. Neither is
+  # behind an availability check, so this is the version the code actually requires today.
+  s.platform                       = :visionos, '26.0'
+  s.visionos.deployment_target     = '26.0'
 
   # Only the Swift SwiftUI files — no ObjC, so the module is importable
   # by the host app without use_frameworks!.

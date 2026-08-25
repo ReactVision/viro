@@ -30,6 +30,15 @@
 #import "VRTFlexView.h"
 #import "VRTScene.h"
 #import "VRTVideoSurface.h"
+
+#if TARGET_OS_VISION
+// VRTVideoSurface is not compiled for visionOS, so referencing its class object directly would leave an
+// undefined class symbol at link time. Looking the class up by name instead yields nil on
+// visionOS — the branch simply never matches — and resolves normally everywhere else.
+#define VRT_CLASS_VIDEO_SURFACE NSClassFromString(@"VRTVideoSurface")
+#else
+#define VRT_CLASS_VIDEO_SURFACE [VRTVideoSurface class]
+#endif
 #import "VRTAnimatedComponent.h"
 #import "VRTMaterialManager.h"
 #import "VRTImage.h"
@@ -152,7 +161,7 @@
     if ([vrtView isKindOfClass:[VRTImage class]] ||
         [vrtView isKindOfClass:[VRTText class]] ||
         [vrtView isKindOfClass:[VRTFlexView class]] ||
-        [vrtView isKindOfClass:[VRTVideoSurface class]] ||
+        [vrtView isKindOfClass:VRT_CLASS_VIDEO_SURFACE] ||
         [vrtView isKindOfClass:[VRTQuad class]]) {
         [super insertReactSubview:view atIndex:index];
     } else {

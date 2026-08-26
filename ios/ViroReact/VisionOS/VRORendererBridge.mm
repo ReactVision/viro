@@ -774,6 +774,13 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     // No transition duration: this runs when React mounts its scene, and a cross-fade from the
     // placeholder would read as a glitch rather than a transition.
     _renderer->setSceneController(sceneController, _driver);
+
+    // Worth a line: "my ImmersiveSpace is empty" has several possible causes, and this
+    // distinguishes "React never handed a scene over" from "it did, and the scene is empty or
+    // the geometry is not where you think". A child count of zero is the interesting case.
+    auto scene = sceneController->getScene();
+    NSLog(@"[Viro] React scene attached to the ImmersiveSpace renderer (%lu root children)",
+          scene ? (unsigned long)scene->getRootNode()->getChildNodes().size() : 0UL);
 }
 
 // ── prepareFrame ──────────────────────────────────────────────────────────────

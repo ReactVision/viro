@@ -115,6 +115,12 @@ ${METRO_MARKER} — visionOS platform resolver
 // Without this, \`<ViroLightingEnvironment source={require('./env.hdr')} />\` fails the bundle with
 // "Unable to resolve ./env.hdr" before a single frame is drawn — which is a confusing first
 // experience for a file that is plainly an asset.
+// Without visionos in resolver.platforms, Metro never tries a module's \`.native.js\` variant on
+// this platform, so any package shipping one silently resolves to its **web** build. expo-asset is
+// how this surfaces: its web AssetSourceResolver returns an empty uri, and every require()'d image
+// reaches the native side with no URL at all.
+config.resolver.platforms = [...new Set([...(config.resolver.platforms ?? []), 'visionos'])];
+
 const VIRO_ASSET_EXTS = ['glb', 'gltf', 'hdr', 'obj', 'mtl', 'vrx'];
 for (const ext of VIRO_ASSET_EXTS) {
   if (!config.resolver.assetExts.includes(ext)) {

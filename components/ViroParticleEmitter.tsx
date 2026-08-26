@@ -19,9 +19,13 @@ import {
   NativeSyntheticEvent,
   processColor,
   requireNativeComponent,
+  Image,
 } from "react-native";
 // @ts-ignore
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
+// Image.resolveAssetSource, not the deep "react-native/Libraries/Image/resolveAssetSource" path.
+// The deep path is an internal module specifier, and on an out-of-tree platform it does not
+// necessarily resolve to the same module the platform resolver picks — Viro3DObject has always
+// used the public accessor, and its assets load where the emitter's did not.
 import { ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroNativeTransformUpdateEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
@@ -249,7 +253,7 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
     checkMisnamedProps("ViroParticleEmitter", this.props);
     let image = { ...this.props.image };
     if (image.source != undefined) {
-      image.source = resolveAssetSource(image.source);
+      image.source = Image.resolveAssetSource(image.source);
     }
     let transformBehaviors =
       typeof this.props.transformBehaviors === "string"

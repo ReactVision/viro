@@ -55,6 +55,17 @@ NS_ASSUME_NONNULL_BEGIN
 /// header is imported by Swift, which compiles it as plain Objective-C.
 @property (class, nonatomic, readonly, nullable) VRORendererBridge *currentBridge;
 
+/*
+ Run a block on the CompositorServices render thread, at the start of the next frame.
+
+ VROAnimatable::animate() only queues an animation when it is called on the renderer thread —
+ anywhere else it calls onTermination() and the property jumps straight to its final value, which
+ is why a JS `animation` prop rendered but never moved. Relaxing that check would not be enough on
+ its own: VROTransaction keeps its state in thread_local storage, so a transaction opened on the
+ main thread would never be advanced by the render thread's update(). The work has to happen there.
+ */
++ (void)runOnRenderThread:(nonnull dispatch_block_t)block;
+
 /// Closes any render command encoder the renderer still has open, and reports whether there
 /// was one.
 ///

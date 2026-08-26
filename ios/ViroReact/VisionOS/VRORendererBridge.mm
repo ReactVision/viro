@@ -29,6 +29,7 @@
 #include "VROInputType.h"
 #include "VROInputPresenter.h"
 #include "VROReticle.h"
+#include <mutex>
 #include "VROHitTestResult.h"
 #include <limits>
 #include "VROTexture.h"
@@ -577,6 +578,9 @@ private:
 // ViroKitVisionOS but on here in ViroReact, so __weak behaves normally.
 static __weak VRORendererBridge *sCurrentBridge = nil;
 
+static std::mutex sRenderThreadQueueMutex;
+static std::vector<dispatch_block_t> sRenderThreadQueue;
+
 @implementation VRORendererBridge
 
 + (nullable VRORendererBridge *)currentBridge {
@@ -1120,6 +1124,12 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
 // Drives VRORenderer::prepareFrame which computes physics, animations, and
 // visibility.
 
++ (void)runOnRenderThread:(dispatch_block_t)block {
+    if (!block) { return; }
+    std::lock_guard<std::mutex> lock(sRenderThreadQueueMutex);
+    sRenderThreadQueue.push_back([block copy]);
+}
+
 - (void)prepareFrameWithViewIndex:(NSUInteger)viewIndex
                      colorTexture:(id <MTLTexture>)colorTexture
                     viewTransform:(simd_float4x4)viewTransform
@@ -1215,6 +1225,18 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
         _soldierAnimPending.store(false, std::memory_order_relaxed);
         if (_soldierAnimLoop) {
             (*_soldierAnimLoop)();
+        }
+    }
+
+    // Drained here, on the render thread, before prepareFrame opens the frame's transaction.
+    {
+        std::vector<dispatch_block_t> pending;
+        {
+            std::lock_guard<std::mutex> lock(sRenderThreadQueueMutex);
+            pending.swap(sRenderThreadQueue);
+        }
+        for (dispatch_block_t block : pending) {
+            block();
         }
     }
 

@@ -12,7 +12,7 @@ import {
   useStudioRecording,
   useStudioPlacement,
 } from "./components/Studio";
-import { ViroVisionOSModule, isVisionOS, enterImmersiveSpace, exitImmersiveSpace } from "./components/VisionOS/ViroVisionOSModule";
+import { ViroVisionOSModule, isVisionOS, enterImmersiveSpace, exitImmersiveSpace, setInputTuning } from "./components/VisionOS/ViroVisionOSModule";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";
 import { Viro360Video } from "./components/Viro360Video";
@@ -401,10 +401,11 @@ export {
   isVisionOS,
   enterImmersiveSpace,
   exitImmersiveSpace,
+  setInputTuning,
 };
 
 export type { VRModuleOpenXRType, ViroPassthroughStyle };
-export type { ImmersiveSpaceStyle } from "./components/VisionOS/ViroVisionOSModule";
+export type { ImmersiveSpaceStyle, ViroInputTuning } from "./components/VisionOS/ViroVisionOSModule";
 
 export type {
   StudioSceneResponse,

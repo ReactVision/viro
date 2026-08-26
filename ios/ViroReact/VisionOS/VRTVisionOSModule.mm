@@ -6,6 +6,8 @@
 // (ViroImmersiveSpace.swift → .viroImmersiveSpaceController() modifier).
 
 #import "VRTVisionOSModule.h"
+#import "VRORendererBridge.h"
+#import <React/RCTLog.h>
 
 // Notification names — must match those in ViroImmersiveSpace.swift.
 static NSString *const kVRTEnterImmersiveSpace = @"VRTEnterImmersiveSpace";
@@ -45,6 +47,18 @@ RCT_EXPORT_METHOD(enterImmersiveSpace:(NSString *)style
 // ─── exitImmersiveSpace ──────────────────────────────────────────────────────
 
 /// Dismisses the Viro ImmersiveSpace.
+// Live input tuning. Exists so the aim can be tuned with a headset on: a native rebuild is ten
+// minutes and finding these numbers takes dozens of tries.
+RCT_EXPORT_METHOD(setInputTuning:(NSDictionary *)tuning)
+{
+    VRORendererBridge *bridge = VRORendererBridge.currentBridge;
+    if (bridge == nil) {
+        RCTLogWarn(@"[Viro] setInputTuning called with no ImmersiveSpace open — ignored.");
+        return;
+    }
+    [bridge setInputTuning:tuning];
+}
+
 RCT_EXPORT_METHOD(exitImmersiveSpace:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {

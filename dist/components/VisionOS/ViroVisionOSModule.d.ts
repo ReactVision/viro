@@ -67,6 +67,27 @@ export declare function enterImmersiveSpace(style?: ImmersiveSpaceStyle): Promis
  */
 export declare function exitImmersiveSpace(): Promise<boolean>;
 /** Convenience object matching the typical NativeModules pattern. */
+/** Live input tuning for the visionOS ray. All fields optional; omitted ones keep their value. */
+export type ViroInputTuning = {
+    /**
+     * `"head"` (default) aims from between the eyes through the hand; `"finger"` aims along the
+     * index finger. The finger ray inherits articulation noise — the joints move whenever the hand
+     * does anything, and hardest as a pinch begins — so `"head"` is steadier and matches how people
+     * physically point.
+     */
+    rayOrigin?: "head" | "finger";
+    /** 0 disables filtering, 1 is heavy. Applies to the live ray only, never to the frozen aim. */
+    smoothing?: number;
+    /** Radians the ray must move off a hovered target before hover is dropped. */
+    hoverHysteresis?: number;
+};
+/**
+ * Adjusts how the visionOS ray behaves, while the ImmersiveSpace is open.
+ *
+ * Exists to be called from JavaScript during a session: these numbers can only be judged with a
+ * headset on, and a native rebuild is ten minutes. No-op on every other platform.
+ */
+export declare function setInputTuning(tuning: ViroInputTuning): void;
 export declare const ViroVisionOSModule: {
     readonly isVisionOS: typeof isVisionOS;
     readonly enterImmersiveSpace: typeof enterImmersiveSpace;

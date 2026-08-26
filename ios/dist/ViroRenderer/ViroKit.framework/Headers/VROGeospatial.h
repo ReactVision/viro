@@ -35,8 +35,16 @@
 enum class VROEarthTrackingState {
     Enabled,    // Earth is being tracked with VPS/GPS fusion
     Paused,     // Tracking is paused (e.g., app backgrounded)
-    Stopped     // No tracking available
+    Stopped,    // No tracking available
+    // WS-D: appended, not inserted — Android's JNI bridge maps this enum to Java
+    // by raw ordinal (ARScene.java), so existing positions must not shift.
+    Localizing  // GPS fix acquired but not yet within the accuracy threshold
 };
+
+// WS-D: horizontal accuracy (meters) below which a GPS-only geospatial pose is
+// considered localized rather than still converging. Placeholder default —
+// will become app-configurable via the JS bridge (WS-D follow-up task).
+constexpr double kVROGeospatialAccuracyThresholdMeters = 15.0;
 
 /*
  * Represents the availability of Visual Positioning System (VPS) at a location.
@@ -159,6 +167,7 @@ inline std::string VROEarthTrackingStateToString(VROEarthTrackingState state) {
         case VROEarthTrackingState::Enabled: return "ENABLED";
         case VROEarthTrackingState::Paused: return "PAUSED";
         case VROEarthTrackingState::Stopped: return "STOPPED";
+        case VROEarthTrackingState::Localizing: return "LOCALIZING";
     }
     return "UNKNOWN";
 }

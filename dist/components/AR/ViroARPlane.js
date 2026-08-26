@@ -47,7 +47,6 @@ exports.ViroARPlane = void 0;
 const ViroBase_1 = require("../ViroBase");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
-const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 /**
  * Container for Viro Components anchored to a detected plane.
  */
@@ -68,10 +67,7 @@ class ViroARPlane extends ViroBase_1.ViroBase {
         }
     };
     render() {
-        if (ViroPlatform_1.isQuest) {
-            console.warn("[Viro] ViroARPlane is not supported on Quest and will not render.");
-            return null;
-        }
+        // Supported on Quest via XR_FB_scene plane anchors (room model). No longer gated.
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroARPlane", this.props);
         let timeToFuse = undefined;
@@ -81,7 +77,7 @@ class ViroARPlane extends ViroBase_1.ViroBase {
         }
         return (<VRTARPlane {...this.props} ref={(component) => {
                 this._component = component;
-            }} canHover={this.props.onHover != undefined} canClick={this.props.onClick != undefined ||
+            }} canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)} canClick={this.props.onClick != undefined ||
                 this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canFuse={this.props.onFuse != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onFuseViro={this._onFuse} timeToFuse={timeToFuse} canCollide={this.props.onCollision != undefined} onCollisionViro={this._onCollision} onAnchorFoundViro={this._onAnchorFound} onAnchorUpdatedViro={this._onAnchorUpdated} onAnchorRemovedViro={this._onAnchorRemoved}/>);
     }
 }

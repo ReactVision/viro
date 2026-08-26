@@ -29,6 +29,7 @@
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
 #include "VROARSession.h"
+#include "VROARSessionRecorderIOS.h"
 #include "VROViewport.h"
 #include <ARKit/ARKit.h>
 #include <map>
@@ -126,8 +127,19 @@ public:
     void setPreferMonocularDepth(bool prefer);
     bool isPreferMonocularDepth() const;
 
-    // Use the front (TrueDepth) camera via ARFaceTrackingConfiguration.
-    // When true, world tracking, planes, and LiDAR are unavailable.
+    // Front-camera AR is supplied by an optional external module so that ViroKit
+    // itself never references the ARKit face-tracking / TrueDepth API. Apps that
+    // need it install @reactvision/react-viro-face-tracking, which registers a
+    // provider here. The provider returns a ready-to-run front-camera
+    // ARConfiguration (or nil if the device is unsupported). When no provider is
+    // registered, setFrontCameraEnabled(true) has no effect and AR falls through
+    // to world tracking.
+    typedef ARConfiguration * _Nullable (^VROARFrontCameraConfigProvider)(void);
+    static void setFrontCameraConfigProvider(VROARFrontCameraConfigProvider provider);
+
+    // Enable/disable front-camera AR. Requires a registered config provider
+    // (see setFrontCameraConfigProvider); otherwise it is a no-op. When active,
+    // world tracking, planes, and LiDAR are unavailable.
     void setFrontCameraEnabled(bool enabled);
     bool isFrontCameraEnabled() const { return _frontCameraEnabled; }
 
@@ -150,6 +162,7 @@ public:
     void setGeospatialModeEnabled(bool enabled) override;
     VROEarthTrackingState getEarthTrackingState() const override;
     VROGeospatialPose getCameraGeospatialPose() const override;
+    bool isLocationAccuracyReduced() const override;
     void checkVPSAvailability(double latitude, double longitude,
                               std::function<void(VROVPSAvailability)> callback) override;
     void createGeospatialAnchor(double latitude, double longitude, double altitude,
@@ -189,6 +202,9 @@ public:
         std::function<void(bool, std::string, std::string)> callback) override;
 
     // Cloud anchor management
+    void rvStartScan() override;
+    void rvFinishScan(int ttlDays,
+        std::function<void(bool, std::string, std::string, std::string)> callback) override;
     void rvGetCloudAnchor(const std::string& anchorId,
         std::function<void(bool, std::string, std::string)> callback) override;
     void rvListCloudAnchors(int limit, int offset,
@@ -222,6 +238,14 @@ public:
     void setSemanticModeEnabled(bool enabled) override;
     float getSemanticLabelFraction(VROSemanticLabel label) const;
 
+    // AR Session Recording API (see VROARSessionRecorderIOS)
+    bool isRecordingSupported() const override;
+    void startRecording(const VROARRecordingConfig &config,
+                         std::function<void()> onSuccess,
+                         std::function<void(std::string error)> onFailure) override;
+    void stopRecording() override;
+    VROARRecordingStatus getRecordingStatus() const override;
+
     /*
      Internal methods.
      */
@@ -248,6 +272,7 @@ private:
     ARSession *_session;
     ARConfiguration *_sessionConfiguration;
     VROARKitSessionDelegate *_delegateAR;
+    std::unique_ptr<VROARSessionRecorderIOS> _recorder;
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300
     NSMutableSet<ARReferenceImage *> *_arKitImageDetectionSet;
@@ -371,7 +396,7 @@ private:
     std::shared_ptr<VROMonocularDepthEstimator> _monocularDepthEstimator;
     bool _monocularDepthEnabled;
     bool _preferMonocularDepth;  // When true, use monocular even on LiDAR devices
-    bool _frontCameraEnabled;    // When true, use ARFaceTrackingConfiguration (front camera)
+    bool _frontCameraEnabled;    // When true and a config provider is registered, use front-camera AR
     bool _monocularDepthLoading;
     float _monocularDepthScale;  // Multiplied into depth values (1.0 = no change)
     int   _monocularDepthTargetFPS;  // 0 = use estimator default

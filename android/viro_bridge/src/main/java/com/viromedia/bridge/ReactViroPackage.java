@@ -21,9 +21,11 @@
 
 package com.viromedia.bridge;
 
-import android.util.Log;
+import android.app.Activity;
+import android.content.res.TypedArray;
 
 import com.facebook.react.ReactPackage;
+import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ViewManager;
@@ -73,6 +75,7 @@ import com.viromedia.bridge.component.node.VRTPortalManager;
 import com.viromedia.bridge.component.VRTVirtualJoystickViewManager;
 import com.viromedia.bridge.component.VRTVirtualButtonViewManager;
 import com.viromedia.bridge.component.VRTGameLoopViewManager;
+import com.viromedia.bridge.component.VRTObjectDetectorViewManager;
 
 
 import com.viromedia.bridge.module.ARSceneModule;
@@ -105,7 +108,16 @@ public class ReactViroPackage implements ReactPackage {
     public static final String ON_EXIT_VIRO_BROADCAST ="com.viromedia.bridge.broadcast.OnExitViro";
 
     public enum ViroPlatform {
-        GVR, OVR_MOBILE, AR, QUEST
+        GVR,
+        /**
+         * @deprecated Deprecated in 2.57.3 — the Oculus Mobile SDK (VrApi) path targets EOL
+         * hardware (GearVR / Oculus Go) and its {@code libvrapi.so} is not 16 KB page-size
+         * compliant (viro#491). Use {@link #QUEST} (OpenXR) for all current Meta headsets.
+         */
+        @Deprecated
+        OVR_MOBILE,
+        AR,
+        QUEST
     }
 
     private final ViroPlatform mViroPlatform;
@@ -116,7 +128,7 @@ public class ReactViroPackage implements ReactPackage {
 
     @Override
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
-        Log.e("Manish", "createNativeModules");
+        installMaterial3AlertTheme(reactContext);
         List<NativeModule> modules = new java.util.ArrayList<>(Arrays.<NativeModule>asList(
                 new MaterialManager(reactContext),
                 new AnimationManager(reactContext),
@@ -141,6 +153,46 @@ public class ReactViroPackage implements ReactPackage {
             modules.add(new VRLauncherModule(reactContext));
         }
         return modules;
+    }
+
+    // RN's Alert builds an AppCompat dialog styled by the host activity theme,
+    // where the RN/Expo template parent (Theme.AppCompat) means Material 2. Overlay
+    // just alertDialogTheme with viro's Material 3-styled dialog theme. Runs on
+    // every host resume: addLifecycleEventListener dispatches immediately when the
+    // host is already resumed, and re-applying covers activity recreation.
+    private void installMaterial3AlertTheme(final ReactApplicationContext reactContext) {
+        reactContext.addLifecycleEventListener(new LifecycleEventListener() {
+            @Override
+            public void onHostResume() {
+                Activity activity = reactContext.getCurrentActivity();
+                if (activity != null && isAppCompatTheme(activity)) {
+                    activity.getTheme().applyStyle(R.style.ViroAlertDialogThemeOverride, true);
+                }
+            }
+
+            @Override
+            public void onHostPause() {
+            }
+
+            @Override
+            public void onHostDestroy() {
+            }
+        });
+    }
+
+    // The probe RN's AlertFragment uses to pick the AppCompat dialog path. In a
+    // brownfield host whose activity theme is not AppCompat-derived, RN shows a
+    // framework dialog instead, and the override must not reach it: the dialog
+    // background resolves ?attr/colorBackgroundFloating, which only AppCompat
+    // themes define — inflating it there crashes at alert-show time.
+    private static boolean isAppCompatTheme(Activity activity) {
+        TypedArray attributes =
+                activity.obtainStyledAttributes(androidx.appcompat.R.styleable.AppCompatTheme);
+        try {
+            return attributes.hasValue(androidx.appcompat.R.styleable.AppCompatTheme_windowActionBar);
+        } finally {
+            attributes.recycle();
+        }
     }
 
     @Override
@@ -193,7 +245,8 @@ public class ReactViroPackage implements ReactPackage {
                 new VRTARObjectMarkerManager(reactContext),
                 new VRTVirtualJoystickViewManager(reactContext),
                 new VRTVirtualButtonViewManager(reactContext),
-                new VRTGameLoopViewManager(reactContext)
+                new VRTGameLoopViewManager(reactContext),
+                new VRTObjectDetectorViewManager(reactContext)
         );
     }
 }

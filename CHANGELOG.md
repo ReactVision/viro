@@ -1,5 +1,142 @@
 # CHANGELOG
 
+## v2.58.1 — 17 August 2026
+
+### Fixed
+
+- **AR session recordings played sideways (iOS and Android).** `video.mp4` carried no rotation on either platform, so players showed the camera sensor's landscape frame however the phone was held — ARKit and ARCore both deliver the captured image in sensor orientation. Both recorders now tag the file for a quarter turn clockwise on playback. Fixed in `@reactvision/virocore` 2.58.1, which this release bundles.
+- **AR session recordings were unusable for analysis on iOS: the IMU was in the wrong units.** `session.jsonl` uses one schema for both platforms, but iOS wrote `imu.accel` and `pose.gravity` in G while Android wrote m/s² — the same field meaning two things, off by 9.81×. Anything integrating acceleration was wrong by exactly that factor. iOS now writes m/s². Measured against tinyvio on a real recording, this took tracking from **0% of frames to 96%**.
+- **iOS recordings held one more pose line than the video had frames.** ARKit can deliver the same frame twice; the duplicate added a pose line while the muxer dropped its video frame, and since the format pairs the two by array position, every pose after that point described the wrong frame. Duplicates are now dropped whole, and a pose line is only written once its frame has actually reached the encoder, so the pairing survives a dropped frame too. A recording that loses video entirely still keeps its full IMU/pose sidecar.
+- **AR session recordings had scrambled colour (Android).** Luma was intact — the video looked sharp and correctly framed — while chroma landed in the wrong bytes, painting large green/magenta blocks over it. The encoder was configured with an *abstract* pixel format (`COLOR_FormatYUV420Flexible`) and fed a tightly-packed planar I420 buffer, but most devices lay that memory out as NV12 semi-planar with a padded row stride. Frames now go through `MediaCodec.getInputImage()` and honour the encoder's real per-plane strides.
+
+  Note this affects `startRecording()` (the offline-analysis session capture), **not** `startVideoRecording()`, which records the rendered screen with audio and was never affected.
+
+### Migration
+
+- **No breaking changes.** Both items are bug fixes.
+- iOS `imu.accel`/`pose.gravity` are now m/s² rather than G, matching Android. The recording format only shipped in 2.58.0, so there is effectively no earlier iOS data to reconcile.
+- If you have tooling that decodes a recording's `video.mp4` for tracking or measurement, pass ffmpeg `-noautorotate`. The new rotation is container metadata only — the frames stay sensor-native so they keep matching the intrinsics in `session.jsonl` — but ffmpeg applies a display matrix by default, which would rotate the pixels while `ffprobe` still reports the unrotated size those intrinsics assume. Nothing errors; the geometry just comes out wrong. Recordings made before this release carry no matrix, so the flag is a no-op on them. Playback and preview paths want the rotation and need no change.
+- Pairs with `@reactvision/virocore` 2.58.1.
+
+## v2.58.0 — 16 August 2026
+
+### Added
+
+- **AR Session Recording** (`ViroARSceneNavigator`). `startRecording(outputDir)`/`stopRecording()`/`getRecordingStatus()` capture a session to local storage — `video.mp4` (the camera passthrough feed) + `session.jsonl` (raw IMU + the platform's own tracked pose as ground truth) — for **offline** analysis/replay via `tinyvio`, not in-app playback. A different feature from `ViroCameraTexture.startRecording()` (camera-feed-only MP4). iOS + Android.
+
+### Fixed
+
+- **The package could crash on first import when bundled with `react-native-web`.** Ten native-only components (`ViroARImageMarker`, `ViroARObjectMarker`, `ViroAnimatedImage`, `ViroCameraTexture`, `ViroController`, `ViroObjectDetector`, `ViroSceneNavigator`, `ViroVRSceneNavigator`, `ViroVirtualButton`, `ViroVirtualJoystick`) called `requireNativeComponent()` at module scope with no `.web.tsx` variant to substitute — and since `dist/index.js` is a single CommonJS barrel that `require()`s every component eagerly, importing *anything* from the package under a web bundle crashed immediately via whichever of the ten loaded first, regardless of which components an app actually used. All ten now have a minimal `.web.tsx` stub (renders `null`, dev-only warning).
+- **GLB/glTF models with sparse accessors or non-indexed (draw-arrays) primitives failed to load.** Both are legal per the glTF spec — a sparse-only accessor can leave its buffer view unset, and a primitive can omit `indices` entirely — but the loader rejected both. Fixed in `@reactvision/virocore` 2.58.0 (VIRO-3664).
+
+### Changed
+
+- **Android alert dialogs now follow Material 3** (#508). React Native's `Alert` builds an AppCompat dialog styled by the host activity's theme, and the RN/Expo template parent (`Theme.AppCompat`) renders it as Material 2. `ReactViroPackage` now overlays just `alertDialogTheme` with a Material 3-styled dialog theme (rounded corners, day/night colour sets), re-applied on every host resume so activity recreation keeps it. Only the alert dialog theme attribute is overlaid, so the rest of a host app's theme is untouched. *(Shipped in 2.58.0; documented retroactively.)*
+- **`docs/` moved out of the repository.** The package's markdown docs (`AR_SESSION_RECORDING.md`, `ViroObjectDetector.md`, `PLATFORM_EXTENSIONS.md`, `QUEST_SETUP.md`, `ViroCameraTexture.md`) are no longer tracked in this repo or shipped in the npm package — they're maintained privately alongside the workspace for internal/MCP tooling use. Older CHANGELOG entries that reference a `docs/*.md` path describe the state at that release; those files are no longer present in a fresh checkout or install.
+
+### Migration
+
+- **No breaking changes.** Everything in this release is additive or a bug fix.
+
+## v2.57.5 — 26 July 2026
+
+### Added
+
+- **`onGaze` prop for eye-gaze hover on Meta Quest Pro.** New optional event on all Viro nodes (`onGaze?: (isHovering, position, source) => void`) that fires when the node is hovered by the eye-gaze ray specifically, backed by `@reactvision/virocore` 2.57.5's `XR_EXT_eye_gaze_interaction` support. `onHover` still fires for every input source (controllers, hands, eye gaze); `onGaze` is limited to the eye-gaze source, and setting it alone is enough to enable hover on the node. No-op on devices without eye tracking (Quest 2 / 3 / 3S).
+
+### Fixed
+
+- **AR anchor retry no longer crashes when leaving a scene (Android, SIGSEGV).** `VRTNode`'s delayed anchor-retry (a 1s main-thread handler, up to 3×) could fire after its parent AR scene had been torn down, calling `createAnchoredNode()` on a freed native `VROARSceneController` and crashing (`SEGV_MAPERR` in `nativeCreateAnchoredNode`). The retry now bails if the parent scene is gone — checking the scene's teardown flag and zeroed native ref (which covers the dispose-before-flag window) — and `VRTARScene` cancels pending child anchor retries on teardown. `@reactvision/virocore` 2.57.5 adds a matching native null-ref guard as defense-in-depth.
+- **Screenshots and video recordings are now reliably written on Android (API 29+).** Media was written with a raw `File` into the public `Pictures/` directory, which fails with `EACCES` under scoped storage — so files silently weren't created, or (with `saveToCameraRoll` off) landed in app-private storage invisible to the gallery while still reporting success. Media now writes to app-specific external storage (always succeeds, no runtime storage permission) and, when `saveToCameraRoll` is set, is published to the device gallery via `MediaStore`. The recording permission gate was corrected to request only what's needed (`RECORD_AUDIO`; `WRITE_EXTERNAL_STORAGE` only on API ≤ 28) and to stop ignoring the grant result.
+- **Free-tier watermark is now burned into recorded video on Android.** Screenshots were already watermarked, but video — rendered directly into the encoder's surface — had no per-frame hook, so recordings went out unmarked. The bridge now hands the recorder a watermark bitmap, composited natively per frame by `@reactvision/virocore` 2.57.5, matching iOS and the Android photo path. Gated on free tier like the other paths.
+- **`getTransformAsync` / `getBoundingBoxAsync` / `getMorphTargets` no longer redbox or hang when a node isn't ready.** On iOS (`VRTNodeModule`) and Android (`NodeModule`) these logged an error and returned without settling the promise when the view tag wasn't a registered node yet — a normal mount / unmount / hot-reload race (hit, e.g., by `onProximity`) that redboxed in dev and left the awaited promise unsettled (leaked). They now reject with `view_not_ready` so callers can retry or ignore the transient quietly; the Android path also tests the view type before casting (was risking a `ClassCastException`).
+
+## v2.57.4 — 9 July 2026
+
+- Stability improvements
+
+## v2.57.3 — 2 July 2026
+
+### Added
+
+- **Expo SDK 57 / React Native 0.86 support (viro#492).** Widened `peerDependencies` (`expo` to `<58.0.0`, `react-native` to `<0.87.0`) and `engines`, and bumped the build/test toolchain (`expo` 57, `react-native` 0.86, `@react-native/*` 0.86, `@expo/config-plugins` 57). RN 0.86 ships no breaking changes and the Android bridge resolves the host app's RN version dynamically, so no native changes were required.
+
+### Changed
+
+- **`frontCameraEnabled` on iOS now requires the optional [`@reactvision/react-viro-face-tracking`](https://www.npmjs.com/package/@reactvision/react-viro-face-tracking) package.** ARKit exposes the front camera only through `ARFaceTrackingConfiguration` (the TrueDepth API), and Apple's App Store review (Guideline 2.5.1) statically scans the binary for it — so bundling it in core caused *every* app, including rear-camera-only ones (image markers, world tracking), to be flagged for unused TrueDepth code. That path has been extracted from core (companion to `@reactvision/virocore` 2.57.3's provider seam) into a plug-and-play package whose Expo config plugin adds the pod and injects `NSCameraUsageDescription`. Apps that need front-camera face tracking install it and declare TrueDepth to Apple; everyone else ships a TrueDepth-free binary that passes 2.5.1 with no configuration. Without the package, `frontCameraEnabled` is a no-op on iOS (falls through to world tracking). **Android is unchanged** — front-camera AR (ARCore) stays in core, as there's no Play Store TrueDepth restriction. For a selfie *feed* without face tracking, use `ViroCameraTexture` with `cameraPosition="front"` (AVFoundation, no TrueDepth). See `docs/PLATFORM_EXTENSIONS.md`.
+
+### Fixed
+
+- **ViroVideo no longer crashes or freezes around Android lifecycle transitions (viro#478).** With a `ViroVideo` in the scene, a background/foreground transition could crash the app (ExoPlayer listener callbacks reaching freed native memory after the video was torn down) and leaving the screen could freeze/ANR (the GL render thread blocked calling ExoPlayer on the main thread while the main thread waited for the GL thread in `GLSurfaceView.surfaceDestroyed()`). Fixed in `@reactvision/virocore` 2.57.3 via a post-destroy callback guard, a main-thread-refreshed cache for per-frame position/duration, and fire-and-forget play/pause.
+- **`ViroARImageMarker` no longer crashes the app when its `target` is registered after the marker mounts.** Registering targets from a React `useEffect` (the common pattern) runs *after* the marker's native view is committed, so `VRTARImageMarker` looked up a target that did not exist yet and threw an `IllegalArgumentException` from inside a Fabric prop update — which is fatal under the New Architecture (bridgeless) and tore down the entire `ReactHost`, terminating the app. The marker no longer throws (matching iOS, which only `RCTLogError`s); instead it registers interest by target name with `ARTrackingTargetsModule`, which now queues waiters for not-yet-registered targets and flushes them when `createTargets(...)` runs. The marker therefore attaches automatically regardless of whether `createTargets` runs before or after it mounts.
+- **Removed the non-compliant `libvrapi.so` (viro#491).** v2.57.2 aligned every `PT_LOAD` segment to ≥ 16 KB, but the prebuilt `libvrapi.so` (Meta VrApi / Oculus Mobile SDK) still had a `PT_GNU_RELRO` segment ending on a 4 KB boundary, which the Android 15+ linker rejects (`dlopen … "libvrapi.so" program alignment (4096) cannot be smaller than system page size (16384)`). Because `libviro_renderer.so` listed `libvrapi.so` as a `NEEDED` dependency, it was force-loaded on **every** launch — so the crash affected all Android apps, not just VR. A prebuilt binary's RELRO padding cannot be re-aligned by a field patch, so the fix removes the dependency entirely.
+
+### Removed
+
+- **Deprecated the Oculus Mobile SDK (VrApi) path — `ViroPlatform.OVR_MOBILE` / `ViroViewOVR`.** VrApi targets EOL hardware (GearVR / Oculus Go) and was superseded by the OpenXR path (`ViroPlatform.QUEST` / `ViroViewOpenXR`), which covers all current Meta headsets (Quest 1/2/3/Pro). `OVR_MOBILE` and `ViroViewOVR` are now `@Deprecated` and no longer create a native renderer; selecting `OVR_MOBILE` logs a warning. Companion to `@reactvision/virocore` 2.57.3, which drops `libvrapi.so` and the VrApi renderer from the native build.
+
+---
+
+## v2.57.2 — 29 June 2026
+
+### Fixed
+
+- **16 KB page-size alignment completed for all bundled native libraries (Android).** Companion to the renderer fix in `@reactvision/virocore` 2.57.2. v2.57.0 aligned `libopenxr_loader.so`, but the prebuilt `libc++_shared.so` inside the renderer AAR was still 4 KB-aligned (`2**12`) and failed the 16 KB memory-page requirement for Android 15+ / Google Play. The renderer's Android NDK was bumped from r25 to r27 — whose `libc++_shared.so` is 16 KB-aligned — and the prebuilt AARs (`viro_renderer-release.aar`, `react_viro-release.aar`) were regenerated. Every 64-bit (`arm64-v8a`) library now reports ≥ 16 KB segment alignment (16 KB / `2**14` for most libs, 64 KB / `2**16` for `libvrapi` / `libgvr`), verified with Google's `check_elf_alignment.sh` (0 unaligned). This unblocks Google Play / Meta Quest Store submission for 16 KB devices.
+
+---
+
+## v2.57.1 — 27 June 2026
+
+### Added
+
+- **Mixed Reality on Meta Quest 3 / 3S.** AR scenes now run through the OpenXR renderer with passthrough, lighting up the standard Viro AR component API on Quest with **no separate API**: pass a `ViroARScene` to `ViroXRSceneNavigator` and the same scene runs on phones (ARCore) and Quest (OpenXR). `onAnchorFound` / `onAnchorUpdated` / `onAnchorRemoved`, `ViroARPlane`, and `ViroARPlaneSelector` all fire from the room's detected floors, walls, ceilings, and tables; passthrough is enabled automatically when an AR scene is mounted. Plane data comes from the Quest **room model** (the spatial-entity scene captured in Space Setup), so it requires `horizonos.permission.USE_ANCHOR_API` and a completed Space Setup on the headset. See `docs/QUEST_SETUP.md` §7b.
+
+- **Object detection on Meta Quest.** `ViroObjectDetector` now runs on Quest 3 / 3S. Because there's no ARCore camera and the passthrough layer isn't app-readable, frames come from the **Meta Passthrough Camera API** (Camera2, Horizon OS v74+). The entire YOLOE/ONNX preprocess → inference → `onDetection` pipeline is reused unchanged; v1 emits `label` + normalized `boundingBox` (no `worldPosition` / `screenBoundingBox` yet — those need camera extrinsics + raycast). Requires `horizonos.permission.HEADSET_CAMERA` (runtime-granted). See `docs/ViroObjectDetector.md`.
+
+- **Passthrough styling API.** `setPassthroughStyle(viewTag, { opacity, edgeColor })` styles the Quest passthrough layer (texture opacity + edge-highlight colour) via `XR_FB_passthrough`'s `xrPassthroughLayerSetStyleFB`. Exported alongside `useVRViewTag()` and the new `ViroPassthroughStyle` type. No-op off-Quest.
+
+### Fixed
+
+- **Passthrough showed a black background on Quest.** Mixed-reality scenes have no skybox or camera quad to fill the view, so the projection layer stayed opaque and hid the passthrough layer beneath it. The OpenXR display now clears transparent (alpha 0) when passthrough is enabled and the projection composition layer is submitted with the source-alpha blend flag, so empty regions reveal the room.
+
+- **`passthroughEnabled` / `handTrackingEnabled` dropped when set before the renderer existed.** On Quest the native renderer is created lazily (deferred to the host Activity's first resume), so an initial `passthroughEnabled` prop set during mount was silently ignored. These values are now cached and re-applied once the renderer initializes — passthrough engages reliably from the first frame.
+
+- **`ViroARPlaneSelector` content rendered in only one eye on Quest.** The selector's plane overlays use a translucent material with `writesToDepthBuffer: false`. On Quest's tiled GPU, rendering many non-depth-writing transparent objects breaks the second (right) eye's entire render — the whole eye goes black/garbage (taking any other scene content, e.g. a model on the selected plane, with it), while the left eye is correct. The overlay material now writes depth **on Quest only** (`writesToDepthBuffer: isQuest`), which renders correctly in both eyes; phone AR keeps `false` for clean coplanar overlay blending and is unchanged. (The underlying engine bug — a non-depth-writing transparent pass breaking stereo at quantity — needs on-device GPU capture and is tracked as a follow-up; see `docs/QUEST_SETUP.md` §7b.)
+
+---
+
+## v2.57.0 — 19 June 2026
+
+### Added
+
+- **`ViroObjectDetector` — on-device object detection.** A new component that runs open-vocabulary [YOLOE](https://docs.ultralytics.com/models/yoloe/) detection through ONNX Runtime, on-device and offline. It runs inside an AR session — sharing the enclosing `ViroARSceneNavigator`'s camera feed — and fires `onDetection` with labels, confidences, and bounding boxes. Each detection also carries a `screenBoundingBox` in density-independent points (dp), aligned to the on-screen camera preview, so boxes drop straight into an absolutely-positioned overlay. iOS and Android reach parity for detection and the 2D overlay (`worldPosition` 3D raycast remains iOS-only for now). Inference is delegated to the companion package **`@reactvision/react-viro-onnx`** (Android uses the NNAPI execution provider with FP16); without the provider the detector emits no detections and fires `onError`. See `docs/ViroObjectDetector.md`.
+
+- **`onDepthReady` event on `ViroARScene`.** Fires once, when AR depth first becomes available, on both iOS and Android. Use it to gate depth-dependent features (occlusion, hit-testing) until the depth subsystem is actually producing data.
+
+- **Expo SDK 56 support.** The config plugin and prebuilt artifacts now build against Expo 56 / React Native's new architecture.
+
+### Improved
+
+- **iOS depth precision.** Depth points are now derived directly from the AR depth map rather than approximated, and the monocular depth model is warmed up ahead of first use — eliminating inaccurate/late depth on the first frames and tightening occlusion and hit-test accuracy on non-LiDAR devices.
+
+### Fixed
+
+- **Layered / stacked GLB animations freezing instead of playing (VIRO-5741).** glTF skeletal clips whose channels mixed STEP and LINEAR interpolation or sat on multiple independent time-grids (common in Blender exports with layered animations) were being dropped or flattened, causing the animation to freeze. Channels are now resampled onto a single common time-grid and merged per joint into one index-aligned keyframe animation, with a per-frame density cap to bound skinning cost on pathological assets. Affected clips now play through fully.
+
+- **16 KB page-size alignment for `libopenxr_loader.so` (Android).** The bundled OpenXR loader library, `libopenxr_loader.so`, previously used 4 KB alignment and failed the 16 KB memory-page requirement for Android 15+ devices, blocking Google Play / Meta Quest Store submission. The loader was updated from 1.1.38 to 1.1.49, which is 16 KB-page aligned. Apps that don't use XR are unaffected.
+
+- **VR controller input** — upgraded the VR event listener path to the new architecture, restoring controller controls in VR.
+
+- **`onDrag` in `StudioSceneNavigator`** — drag events now fire correctly.
+
+- **iOS pod build** — visionOS-only sources are now excluded from the iOS CocoaPods build, fixing compile errors in iOS-only targets.
+
+### Experimental / Preview
+
+- **visionOS renderer.** Initial visionOS support landed: a Metal-based renderer/driver, the React Native bindings, and the renderer bridge. This is a work-in-progress foundation and not yet production-ready.
+
+---
+
 ## v2.56.0 — 04 June 2026
 
 ### Added

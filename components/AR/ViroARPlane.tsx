@@ -59,10 +59,7 @@ export class ViroARPlane extends ViroBase<Props> {
   };
 
   render() {
-    if (isQuest) {
-      console.warn("[Viro] ViroARPlane is not supported on Quest and will not render.");
-      return null;
-    }
+    // Supported on Quest via XR_FB_scene plane anchors (room model). No longer gated.
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroARPlane", this.props);
 
@@ -80,7 +77,7 @@ export class ViroARPlane extends ViroBase<Props> {
         ref={(component) => {
           this._component = component;
         }}
-        canHover={this.props.onHover != undefined}
+        canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
         canClick={
           this.props.onClick != undefined ||
           this.props.onClickState != undefined

@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroGeospatialSupportResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -149,9 +149,17 @@ type Props = ViewProps & {
     monocularDepthTargetFPS?: number;
     /**
      * Use the front (selfie) camera as the AR session background.
-     * On iOS uses ARFaceTrackingConfiguration (requires TrueDepth camera, iPhone X+).
-     * On Android uses ARCore Augmented Faces mode (front camera).
-     * World tracking, plane detection, and LiDAR are unavailable in this mode.
+     *
+     * Requires the optional `@reactvision/react-viro-face-tracking` package to be
+     * installed — it provides the native front-camera AR configuration and, on
+     * iOS, declares TrueDepth usage. Without it, this prop has no effect.
+     *
+     * On iOS the package uses the front TrueDepth camera; on Android it uses
+     * ARCore Augmented Faces mode. World tracking, plane detection, and LiDAR are
+     * unavailable in this mode.
+     *
+     * For a plain selfie feed without face tracking (no TrueDepth), use
+     * `ViroCameraTexture` with `cameraPosition="front"` instead.
      *
      * @default false
      * @platform ios, android
@@ -397,6 +405,25 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      *                  Note: TTL > 1 requires keyless authorization on Google Cloud.
      * @returns Promise resolving to the hosting result with cloudAnchorId
      */
+    /**
+     * Records this AR session (video + IMU + tracked pose) to local storage — see
+     * ViroWorkspace/plans/viro-ar-recording-playback-plan.md for the format. This is for
+     * offline analysis/replay; there is no in-app playback of a recording. Not to be confused
+     * with startVideoRecording, which captures the rendered screen only.
+     *
+     * @param outputDir - A directory that will contain video.mp4 + session.jsonl. Created if
+     *                    it doesn't exist.
+     * @returns Promise resolving to { success: boolean, error?: string }.
+     */
+    _startRecording: (outputDir: string) => Promise<any>;
+    /**
+     * Stops the recording started by startRecording and finalizes video.mp4 + session.jsonl.
+     */
+    _stopRecording: () => Promise<any>;
+    /**
+     * The current recording state: "None" | "Recording" | "IOError" | "Unsupported".
+     */
+    _getRecordingStatus: () => Promise<any>;
     _hostCloudAnchor: (anchorId: string, ttlDays?: number) => Promise<ViroHostCloudAnchorResult>;
     /**
      * Resolve a cloud anchor by its ID.
@@ -415,11 +442,63 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _cancelCloudAnchorOperations: () => void;
     /**
+     * Begin a room/building-scale scan that defines its own location frame,
+     * independent of any placed anchor (WS-A). Call this before walking the
+     * space, then call finishScan() when done. Unlike hostCloudAnchor(), this
+     * does not require tapping/placing an anchor first.
+     */
+    _startScan: () => void;
+    /**
+     * Finish a scan started with startScan() and host it to the cloud. Same
+     * pipeline as hostCloudAnchor(), but positions content in the scan's own
+     * location frame instead of relative to a placed anchor.
+     *
+     * @param ttlDays - Time-to-live in days (1-365)
+     * @returns Promise resolving to the hosting result with cloudAnchorId
+     */
+    _finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+    /**
+     * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
+     * local cache file (WS-C). Pass the returned filePath straight into
+     * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
+     * cloud anchor hosted via finishScan().
+     *
+     * @param locationTransform - The `locationTransform` returned by finishScan()'s
+     *        success result. Required — there is no placed anchor to derive a
+     *        transform from for a finishScan()-hosted mesh.
+     * @returns Promise resolving to the snapshot result with filePath
+     */
+    _snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;
+    /**
+     * Load a mesh snapshot downloaded from a resolved cloud anchor's mesh
+     * asset and attach it for physics collision + visual occlusion (WS-C).
+     * Requires `worldMeshEnabled` to be true on this navigator's AR scene.
+     *
+     * The app is responsible for downloading the asset's `fileUrl` (from
+     * `rvGetCloudAnchor()`'s `assets`) to a local file itself — pass that
+     * local path here, not the remote URL.
+     *
+     * @param filePath - Local path to the downloaded mesh snapshot bytes.
+     * @param resolvedTransform - `result.anchor.resolvedTransform` from
+     *        `resolveCloudAnchor()`'s success result.
+     * @returns Promise resolving to the load result
+     */
+    _loadWorldMeshFromFile: (filePath: string, resolvedTransform: string) => Promise<ViroWorldMeshLoadResult>;
+    /**
      * Check if geospatial mode is supported on this device.
      *
      * @returns Promise resolving to support status
      */
     _isGeospatialModeSupported: () => Promise<ViroGeospatialSupportResult>;
+    /**
+     * Check if only approximate location is granted (iOS 14+ "Precise
+     * Location" off, or Android's ACCESS_COARSE_LOCATION without
+     * ACCESS_FINE_LOCATION). When true, geospatial tracking will never
+     * converge — show the user an explicit error instead of waiting (WS-D).
+     *
+     * @returns Promise resolving to the reduced-accuracy status
+     */
+    _isLocationAccuracyReduced: () => Promise<ViroLocationAccuracyResult>;
     /**
      * Enable or disable geospatial mode.
      * When enabled, the session will track the device's position relative to the Earth.
@@ -625,6 +704,9 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
         stopVideoRecording: () => Promise<any>;
+        startRecording: (outputDir: string) => Promise<any>;
+        stopRecording: () => Promise<any>;
+        getRecordingStatus: () => Promise<any>;
         takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
         resetARSession: (resetTracking: any, removeAnchors: any) => void;
         setWorldOrigin: (worldOrigin: ViroWorldOrigin) => void;
@@ -633,7 +715,12 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         hostCloudAnchor: (anchorId: string, ttlDays?: number) => Promise<ViroHostCloudAnchorResult>;
         resolveCloudAnchor: (cloudAnchorId: string) => Promise<ViroResolveCloudAnchorResult>;
         cancelCloudAnchorOperations: () => void;
+        startScan: () => void;
+        finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+        snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;
+        loadWorldMeshFromFile: (filePath: string, resolvedTransform: string) => Promise<ViroWorldMeshLoadResult>;
         isGeospatialModeSupported: () => Promise<ViroGeospatialSupportResult>;
+        isLocationAccuracyReduced: () => Promise<ViroLocationAccuracyResult>;
         setGeospatialModeEnabled: (enabled: boolean) => void;
         getEarthTrackingState: () => Promise<ViroEarthTrackingStateResult>;
         getCameraGeospatialPose: () => Promise<ViroGeospatialPoseResult>;
@@ -679,6 +766,9 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         replace: (param1?: ViroScene | string, param2?: ViroScene) => void;
         startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
         stopVideoRecording: () => Promise<any>;
+        startRecording: (outputDir: string) => Promise<any>;
+        stopRecording: () => Promise<any>;
+        getRecordingStatus: () => Promise<any>;
         takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<any>;
         resetARSession: (resetTracking: any, removeAnchors: any) => void;
         setWorldOrigin: (worldOrigin: ViroWorldOrigin) => void;
@@ -687,7 +777,12 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         hostCloudAnchor: (anchorId: string, ttlDays?: number) => Promise<ViroHostCloudAnchorResult>;
         resolveCloudAnchor: (cloudAnchorId: string) => Promise<ViroResolveCloudAnchorResult>;
         cancelCloudAnchorOperations: () => void;
+        startScan: () => void;
+        finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+        snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;
+        loadWorldMeshFromFile: (filePath: string, resolvedTransform: string) => Promise<ViroWorldMeshLoadResult>;
         isGeospatialModeSupported: () => Promise<ViroGeospatialSupportResult>;
+        isLocationAccuracyReduced: () => Promise<ViroLocationAccuracyResult>;
         setGeospatialModeEnabled: (enabled: boolean) => void;
         getEarthTrackingState: () => Promise<ViroEarthTrackingStateResult>;
         getCameraGeospatialPose: () => Promise<ViroGeospatialPoseResult>;

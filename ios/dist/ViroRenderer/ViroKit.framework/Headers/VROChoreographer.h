@@ -90,6 +90,13 @@ public:
      */
     bool setPBREnabled(bool enablePBR);
     bool isPBREnabled() const { return _hdrEnabled && _pbrEnabled; }
+
+    /*
+     Whether bloom is currently enabled at the pipeline level. When true, the HDR
+     render target has an additional (bloom) color attachment, so every shader
+     drawn into it must write that output — see VROShaderFactory's bloom modifier.
+     */
+    bool isBloomEnabled() const { return _bloomEnabled; }
     
     /*
      Enable or disable rendering shadows. If shadows are disabled here, shadow

@@ -4,11 +4,30 @@ import { Viro3DObject } from "../../Viro3DObject";
 import { ViroImage } from "../../ViroImage";
 import { ViroText } from "../../ViroText";
 import { ViroVideo } from "../../ViroVideo";
-import { StudioAnimation, StudioAsset, StudioSceneMeta, ViroAnimationProp } from "../types";
-import { executeFunctionWithRelations } from "./sceneNavigationHandler";
+import {
+  StudioAnimation,
+  StudioAsset,
+  StudioSceneMeta,
+  ViroAnimationProp,
+} from "../types";
+import {
+  executeFunctionWithRelations,
+  SequenceRuntimeContext,
+} from "./sceneNavigationHandler";
+import {
+  extractPlaceholders,
+  interpolateDisplayTemplate,
+} from "./apiRequestHelpers";
 import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
 import { DragConfiguration } from "./dragConfiguration";
-import { buildViroPhysicsBody, parsePhysicsBodyConfig } from "./physicsConfig";
+import {
+  buildViroPhysicsBody,
+  parsePhysicsBodyConfig,
+  shouldUseKinematicPhysicsDrag,
+} from "./physicsConfig";
+import { StudioVariableStore } from "./variableStore";
+import { StudioVisibilityStore } from "./visibilityStore";
+import { StudioPlacementStore } from "./placementStore";
 
 type SceneNavigator = any;
 
@@ -16,18 +35,29 @@ export type NodeConfig = {
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
-  dragType?: "FixedDistance" | "FixedDistanceOrigin" | "FixedToWorld" | "FixedToPlane";
-  dragPlane?: { planePoint: [number, number, number]; planeNormal: [number, number, number]; maxDistance: number };
+  dragType?:
+    | "FixedDistance"
+    | "FixedDistanceOrigin"
+    | "FixedToWorld"
+    | "FixedToPlane";
+  dragPlane?: {
+    planePoint: [number, number, number];
+    planeNormal: [number, number, number];
+    maxDistance: number;
+  };
   physicsBody?: Record<string, unknown>;
   viroTag?: string;
   onClick?: () => void;
+  // On Gaze (headset eye-gaze). Setting it enables the node's native canHover.
+  onGaze?: (
+    isHovering: boolean,
+    position: [number, number, number],
+    source: number
+  ) => void;
   animation?: ViroAnimationProp;
 };
 
-/**
- * Derives the transform config for an asset.
- * Clamps Z to -2 for non-trigger assets to guarantee visibility.
- */
+/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 export function createNodeConfig(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
@@ -35,12 +65,25 @@ export function createNodeConfig(
   scene: StudioSceneMeta | null,
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   animationStates?: Record<string, ViroAnimationProp>,
-  onSceneChange?: (sceneId: string, sceneName: string) => void
+  isDragActive?: (assetId: string) => boolean,
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext
 ): NodeConfig {
   const hasTriggerImage = !!asset.trigger_image_url;
+  // Tap-to-place stores the author position as an OFFSET from the runtime tap
+  // point (PlaceableNode adds it), so the camera-relative -2 default and the
+  // "too close" clamp — both meant for camera/plane assets — must not apply.
+  const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
 
-  let posZ = asset.position_z ?? -2;
-  if (!hasTriggerImage && posZ > -0.5) {
+  // `world_placement` means the coordinates are a point in the world, not a
+  // camera-relative offset an author typed. The clamp below exists to stop an
+  // author putting an object inside the user's face, and it cannot tell the two
+  // apart: applied to a world coordinate it silently rewrites it to -2, which
+  // pins the object in front of the view. That reads as "the anchor does not
+  // stay fixed", and the only notice is the warning below.
+  const isWorldPlacement = !!(asset as { world_placement?: boolean }).world_placement;
+  let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
+  if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
     console.warn(
       `[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`
     );
@@ -82,12 +125,18 @@ export function createNodeConfig(
   if (dragType === "FixedToPlane") {
     dragPlane = DragConfiguration.getDragPlane(
       scene?.plane_direction ?? "Horizontal",
-      position,
+      position
     );
   }
 
   const parsedPhysics = parsePhysicsBodyConfig(asset.physics_config);
-  const physicsBody = parsedPhysics ? buildViroPhysicsBody(parsedPhysics) : undefined;
+  const dragActive = isDragActive?.(asset.id) ?? false;
+  const physicsBody = parsedPhysics
+    ? buildViroPhysicsBody(parsedPhysics, {
+        kinematicDragOverride:
+          dragActive && shouldUseKinematicPhysicsDrag(asset, parsedPhysics),
+      })
+    : undefined;
   const viroTag = parsedPhysics ? asset.id : undefined;
 
   const onClick = createOnClickHandler(
@@ -95,12 +144,23 @@ export function createNodeConfig(
     sceneNavigator,
     animations,
     onAnimationTrigger,
-    onSceneChange
+    onSceneChange,
+    runtimeCtx
   );
 
   const animation = animationStates?.[asset.id];
 
-  return { position, rotation, scale, dragType, dragPlane, physicsBody, viroTag, onClick, animation };
+  return {
+    position,
+    rotation,
+    scale,
+    dragType,
+    dragPlane,
+    physicsBody,
+    viroTag,
+    onClick,
+    animation,
+  };
 }
 
 function createOnClickHandler(
@@ -108,13 +168,16 @@ function createOnClickHandler(
   sceneNavigator: SceneNavigator | undefined,
   animations: StudioAnimation[],
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
-  onSceneChange?: (sceneId: string, sceneName: string) => void
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext
 ): (() => void) | undefined {
   const fn = asset.scene_function;
   if (!fn) return undefined;
 
   if (fn.function_type === "NAVIGATION" && !fn.scene_navigation?.navigate_to) {
-    console.warn(`[Studio] Asset "${asset.name}" has NAVIGATION but no target scene`);
+    console.warn(
+      `[Studio] Asset "${asset.name}" has NAVIGATION but no target scene`
+    );
     return undefined;
   }
   if (fn.function_type === "ALERT" && !fn.scene_alert) {
@@ -122,22 +185,30 @@ function createOnClickHandler(
     return undefined;
   }
   if (fn.function_type === "ANIMATION" && !fn.scene_animation) {
-    console.warn(`[Studio] Asset "${asset.name}" has ANIMATION but no animation data`);
+    console.warn(
+      `[Studio] Asset "${asset.name}" has ANIMATION but no animation data`
+    );
     return undefined;
   }
 
   return () =>
-    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
+    executeFunctionWithRelations(
+      fn,
+      sceneNavigator,
+      animations,
+      onAnimationTrigger,
+      0,
+      onSceneChange,
+      runtimeCtx
+    );
 }
 
-/** Resolves asset type from asset_type_name. */
 function resolveType(
   asset: StudioAsset
 ): "3D-MODEL" | "TEXT" | "IMAGE" | "VIDEO" | null {
   return asset.asset_type_name ?? null;
 }
 
-/** Infers 3D model format from file extension. */
 function inferModelType(url: string): "GLB" | "GLTF" | "OBJ" | "VRX" {
   const ext = url.toLowerCase().split(".").pop();
   if (ext === "gltf") return "GLTF";
@@ -150,7 +221,13 @@ function create3DObject(
   asset: StudioAsset,
   config: NodeConfig,
   onAssetLoaded?: (id: string) => void,
-  onCollision?: (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void
+  notifyPhysicsDrag?: (assetId: string) => void,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
     console.warn(`[Studio] 3D model "${asset.name}" has no file_url`);
@@ -170,11 +247,14 @@ function create3DObject(
       : config.scale;
 
   const hasMaterialConfig = parseMaterialConfig(asset.material_config) !== null;
-  const shaderOverrides = hasMaterialConfig ? [studioMaterialName(asset.id)] : undefined;
+  const shaderOverrides = hasMaterialConfig
+    ? [studioMaterialName(asset.id)]
+    : undefined;
 
   return (
     <Viro3DObject
       key={asset.id}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
@@ -191,10 +271,15 @@ function create3DObject(
       }
       // Viro derives native canDrag from `onDrag != undefined`; without this prop
       // the drag recognizer is never attached, even when dragType is set.
-      {...(config.dragType ? { onDrag: () => {} } : {})}
+      {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}
       {...(shaderOverrides ? { shaderOverrides } : {})}
-      {...(config.physicsBody ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag } : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
       {...(onCollision ? { onCollision: onCollision as any } : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 }
@@ -202,7 +287,14 @@ function create3DObject(
 function createImage(
   asset: StudioAsset,
   config: NodeConfig,
-  onAssetLoaded?: (id: string) => void
+  onAssetLoaded?: (id: string) => void,
+  notifyPhysicsDrag?: (assetId: string) => void,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
     console.warn(`[Studio] Image "${asset.name}" has no file_url`);
@@ -212,6 +304,7 @@ function createImage(
   return (
     <ViroImage
       key={asset.id}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
@@ -220,42 +313,202 @@ function createImage(
       animation={config.animation as any}
       onClick={config.onClick}
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
-      onError={(e) =>
-        console.error(`[Studio] Image "${asset.name}" error:`, e)
-      }
-      {...(config.dragType ? { onDrag: () => {} } : {})}
+      onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)}
+      {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
+      {...(onCollision ? { onCollision: onCollision as any } : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 }
 
-function createText(
-  asset: StudioAsset,
-  config: NodeConfig
-): React.ReactElement {
+/**
+ * TEXT node whose content is a {{variable}} template (the asset name). It
+ * re-interpolates and repaints whenever a referenced variable changes (and only
+ * subscribes when the template actually has placeholders). Resolution is
+ * fail-soft: unknown names stay literal.
+ */
+const VariableText: React.FC<{
+  asset: StudioAsset;
+  config: NodeConfig;
+  store?: StudioVariableStore;
+  notifyPhysicsDrag?: (assetId: string) => void;
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void;
+  nodeRef?: (ref: unknown) => void;
+  // Injected via cloneElement; TEXT is the only node type that is a component
+  // wrapper, so it must forward these to its ViroText: `visible` from
+  // VisibleNode, `position`/`rotation` from PlaceableNode (tap-relative placement).
+  visible?: boolean;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}> = ({
+  asset,
+  config,
+  store,
+  notifyPhysicsDrag,
+  onCollision,
+  nodeRef,
+  visible,
+  position,
+  rotation,
+}) => {
+  const template = asset.name ?? "";
+  const compute = () =>
+    store
+      ? interpolateDisplayTemplate(template, (n) => store.get(n))
+      : template;
+  const [text, setText] = React.useState(compute);
+
+  React.useEffect(() => {
+    if (!store || extractPlaceholders(template).length === 0) return;
+    // Resync any write that landed between first render and subscribe.
+    setText(compute());
+    return store.subscribe(() => setText(compute()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, template]);
+
   return (
     <ViroText
-      key={asset.id}
-      text={asset.name ?? ""}
-      position={config.position}
-      rotation={config.rotation}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
+      text={text}
+      position={position ?? config.position}
+      rotation={rotation ?? config.rotation}
       scale={config.scale}
       dragType={config.dragType}
       animation={config.animation as any}
       onClick={config.onClick}
+      {...(visible === undefined ? {} : { visible })}
       style={{
         fontFamily: "Arial",
         fontSize: 20,
         color: "#FFFFFF",
         textAlign: "center",
       }}
-      {...(config.dragType ? { onDrag: () => {} } : {})}
+      {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
+      {...(onCollision ? { onCollision: onCollision as any } : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
+    />
+  );
+};
+
+/**
+ * Wraps a created node and drives its `visible` prop from the per-scene
+ * visibility store, subscribing to its own asset so a Set Visibility action
+ * repaints only this node. Without a store, the node stays visible.
+ */
+const VisibleNode: React.FC<{
+  assetId: string;
+  store?: StudioVisibilityStore;
+  // Props typed loosely so cloneElement can inject `visible` (all Viro node
+  // types accept it via ViroCommonProps).
+  children: React.ReactElement<any>;
+}> = ({ assetId, store, children }) => {
+  const [visible, setVisible] = React.useState(
+    () => store?.isVisible(assetId) ?? true
+  );
+
+  React.useEffect(() => {
+    if (!store) return;
+    // Resync any write that landed between first render and subscribe.
+    setVisible(store.isVisible(assetId));
+    return store.subscribe(assetId, () => setVisible(store.isVisible(assetId)));
+  }, [store, assetId]);
+
+  return React.cloneElement(children, { visible });
+};
+
+/**
+ * Gates a tap-to-place node: renders nothing until the end user places the
+ * asset, then mounts it at the tap point with the author position AND rotation
+ * applied relative to where the user was facing when they tapped (see
+ * StudioPlacementStore.resolvePlacedPosition / resolvePlacedRotation), and hands
+ * off to VisibleNode so Set Visibility still applies. Rendered at scene root
+ * (world space), never inside a plane wrapper.
+ */
+const PlaceableNode: React.FC<{
+  assetId: string;
+  store: StudioPlacementStore;
+  authorPosition: [number, number, number];
+  authorRotation: [number, number, number];
+  visibilityStore?: StudioVisibilityStore;
+  children: React.ReactElement<any>;
+}> = ({
+  assetId,
+  store,
+  authorPosition,
+  authorRotation,
+  visibilityStore,
+  children,
+}) => {
+  const [placed, setPlaced] = React.useState(() => store.isPlaced(assetId));
+
+  React.useEffect(() => {
+    setPlaced(store.isPlaced(assetId));
+    return store.subscribe(assetId, () => setPlaced(store.isPlaced(assetId)));
+  }, [store, assetId]);
+
+  if (!placed) return null;
+
+  const position =
+    store.resolvePlacedPosition(assetId, authorPosition) ?? authorPosition;
+  const rotation =
+    store.resolvePlacedRotation(assetId, authorRotation) ?? authorRotation;
+
+  return (
+    <VisibleNode assetId={assetId} store={visibilityStore}>
+      {React.cloneElement(children, { position, rotation })}
+    </VisibleNode>
+  );
+};
+
+function createText(
+  asset: StudioAsset,
+  config: NodeConfig,
+  notifyPhysicsDrag?: (assetId: string) => void,
+  store?: StudioVariableStore,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
+  nodeRef?: (ref: unknown) => void
+): React.ReactElement {
+  return (
+    <VariableText
+      key={asset.id}
+      asset={asset}
+      config={config}
+      store={store}
+      notifyPhysicsDrag={notifyPhysicsDrag}
+      onCollision={onCollision}
+      nodeRef={nodeRef}
     />
   );
 }
 
 function createVideo(
   asset: StudioAsset,
-  config: NodeConfig
+  config: NodeConfig,
+  notifyPhysicsDrag?: (assetId: string) => void,
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
+  nodeRef?: (ref: unknown) => void
 ): React.ReactElement | null {
   if (!asset.file_url) {
     console.warn(`[Studio] Video "${asset.name}" has no file_url`);
@@ -265,6 +518,7 @@ function createVideo(
   return (
     <ViroVideo
       key={asset.id}
+      {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
@@ -274,17 +528,19 @@ function createVideo(
       onClick={config.onClick}
       loop={true}
       muted={false}
-      onError={(e) =>
-        console.error(`[Studio] Video "${asset.name}" error:`, e)
-      }
-      {...(config.dragType ? { onDrag: () => {} } : {})}
+      onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)}
+      {...(config.dragType
+        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        : {})}
+      {...(config.physicsBody
+        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
+        : {})}
+      {...(onCollision ? { onCollision: onCollision as any } : {})}
+      {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
   );
 }
 
-/**
- * Creates the appropriate Viro component for a StudioAsset.
- */
 export function createNode(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
@@ -293,8 +549,24 @@ export function createNode(
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   animationStates?: Record<string, ViroAnimationProp>,
   onAssetLoaded?: (id: string) => void,
-  onCollision?: (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void,
-  onSceneChange?: (sceneId: string, sceneName: string) => void
+  onCollision?: (
+    viroTag: string,
+    collidedPoint: [number, number, number],
+    collidedNormal: [number, number, number]
+  ) => void,
+  isDragActive?: (assetId: string) => boolean,
+  notifyPhysicsDrag?: (assetId: string) => void,
+  onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext,
+  // When set (proximity-target assets), captures the live Viro node so the host
+  // can read its world transform for the distance check.
+  registerProximityTarget?: (assetId: string, ref: unknown) => void,
+  // When set (gaze-target assets on a headset), the node's native onGaze handler.
+  onGaze?: (
+    isHovering: boolean,
+    position: [number, number, number],
+    source: number
+  ) => void
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -304,20 +576,93 @@ export function createNode(
     scene,
     onAnimationTrigger,
     animationStates,
-    onSceneChange
+    isDragActive,
+    onSceneChange,
+    runtimeCtx
   );
+  config.onGaze = onGaze;
 
+  const proximityRef = registerProximityTarget
+    ? (ref: unknown) => registerProximityTarget(asset.id, ref)
+    : undefined;
+
+  let node: React.ReactElement | null;
   switch (type) {
     case "3D-MODEL":
-      return create3DObject(asset, config, onAssetLoaded, onCollision);
+      // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep both;
+      // a drag-only merge here once silently killed collisions.
+      node = create3DObject(
+        asset,
+        config,
+        onAssetLoaded,
+        notifyPhysicsDrag,
+        onCollision,
+        proximityRef
+      );
+      break;
     case "IMAGE":
-      return createImage(asset, config, onAssetLoaded);
+      node = createImage(
+        asset,
+        config,
+        onAssetLoaded,
+        notifyPhysicsDrag,
+        onCollision,
+        proximityRef
+      );
+      break;
     case "TEXT":
-      return createText(asset, config);
+      node = createText(
+        asset,
+        config,
+        notifyPhysicsDrag,
+        runtimeCtx?.variableStore,
+        onCollision,
+        proximityRef
+      );
+      break;
     case "VIDEO":
-      return createVideo(asset, config);
+      node = createVideo(
+        asset,
+        config,
+        notifyPhysicsDrag,
+        onCollision,
+        proximityRef
+      );
+      break;
     default:
       console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);
       return null;
   }
+
+  if (!node) return null;
+
+  // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
+  // node at the tap point with the author position and rotation applied relative
+  // to the user's facing, and wraps it in VisibleNode itself.
+  if (asset.tap_to_place && runtimeCtx?.placementStore) {
+    return (
+      <PlaceableNode
+        key={asset.id}
+        assetId={asset.id}
+        store={runtimeCtx.placementStore}
+        authorPosition={config.position}
+        authorRotation={config.rotation}
+        visibilityStore={runtimeCtx?.visibilityStore}
+      >
+        {node}
+      </PlaceableNode>
+    );
+  }
+
+  // Drive show/hide/toggle from the visibility store (Set Visibility actions);
+  // seeded from the asset's author-time hidden_on_load default.
+  return (
+    <VisibleNode
+      key={asset.id}
+      assetId={asset.id}
+      store={runtimeCtx?.visibilityStore}
+    >
+      {node}
+    </VisibleNode>
+  );
 }

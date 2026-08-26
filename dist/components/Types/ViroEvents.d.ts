@@ -363,6 +363,15 @@ export type ViroProvider = "none" | "arcore" | "reactvision";
 export type ViroCloudAnchorProvider = ViroProvider;
 /**
  * Represents a cloud-hosted AR anchor.
+ *
+ * `position`/`rotation` are always in world coordinates at resolve time — how
+ * that world pose was originally anchored depends on how the anchor was
+ * hosted: `hostCloudAnchor()` ties it to a hand-placed physical anchor;
+ * `finishScan()` (room/building-scale scans, no placed anchor) ties it to a
+ * self-defined location frame instead (origin at the scan's camera-position
+ * centroid, oriented by the first keyframe's heading). Callers do not need to
+ * know which one produced a given `cloudAnchorId` — both resolve to the same
+ * world-space shape.
  */
 export type ViroCloudAnchor = {
     /** The local anchor ID */
@@ -377,6 +386,13 @@ export type ViroCloudAnchor = {
     rotation: [number, number, number];
     /** Scale */
     scale: [number, number, number];
+    /**
+     * Opaque CSV-encoded transform for this resolved anchor (WS-C). Pass it
+     * straight into `loadWorldMeshFromFile()` as `resolvedTransform` to attach
+     * a mesh snapshot hosted alongside this anchor. Treat as opaque; do not
+     * parse or construct this value.
+     */
+    resolvedTransform?: string;
 };
 /**
  * Result of a host cloud anchor operation.
@@ -388,7 +404,43 @@ export type ViroHostCloudAnchorResult = {
     state: ViroCloudAnchorState;
 };
 /**
- * Result of a resolve cloud anchor operation.
+ * Result of a finishScan() operation (WS-A room/building-scale scan, the
+ * counterpart to ViroHostCloudAnchorResult for scans with no placed anchor).
+ */
+export type ViroFinishScanResult = {
+    success: boolean;
+    cloudAnchorId?: string;
+    /**
+     * Opaque token identifying the location frame this scan was hosted in.
+     * Pass it straight into snapshotWorldMeshToFile() if attaching a mesh —
+     * there is no placed anchor to derive one from otherwise. Treat as opaque;
+     * do not parse or construct this value.
+     */
+    locationTransform?: string;
+    error?: string;
+};
+/**
+ * Result of snapshotWorldMeshToFile() (WS-C). filePath points at a local
+ * cache file — pass it straight into rvUploadAsset() to persist it as a
+ * cloud anchor asset.
+ */
+export type ViroWorldMeshSnapshotResult = {
+    success: boolean;
+    filePath?: string;
+    error?: string;
+};
+/**
+ * Result of loadWorldMeshFromFile() (WS-C). success is false if there was no
+ * AR scene, world mesh was not enabled (see setWorldMeshEnabled), or the
+ * file was malformed.
+ */
+export type ViroWorldMeshLoadResult = {
+    success: boolean;
+    error?: string;
+};
+/**
+ * Result of a resolve cloud anchor operation. See {@link ViroCloudAnchor} for
+ * how `anchor`'s pose relates to the original hosting method.
  */
 export type ViroResolveCloudAnchorResult = {
     success: boolean;
@@ -414,7 +466,7 @@ export type ViroGeospatialAnchorProvider = ViroProvider;
  * Earth tracking state.
  * Maps to GARSessionEarthState (iOS) and Earth.EarthState (Android)
  */
-export type ViroEarthTrackingState = "Enabled" | "Paused" | "Stopped";
+export type ViroEarthTrackingState = "Enabled" | "Paused" | "Stopped" | "Localizing";
 /**
  * VPS (Visual Positioning System) availability at a location.
  */
@@ -474,6 +526,16 @@ export type ViroGeospatialAnchor = {
  */
 export type ViroGeospatialSupportResult = {
     supported: boolean;
+    error?: string;
+};
+/**
+ * Result of checking whether only approximate location is granted (WS-D).
+ * When true, horizontalAccuracy will stay coarse and geospatial tracking
+ * will never leave "Localizing" — surface an explicit error instead of
+ * waiting on it to resolve on its own.
+ */
+export type ViroLocationAccuracyResult = {
+    reduced: boolean;
     error?: string;
 };
 /**

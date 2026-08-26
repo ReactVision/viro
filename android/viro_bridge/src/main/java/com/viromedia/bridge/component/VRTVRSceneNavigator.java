@@ -150,6 +150,12 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
     protected ViroView createViroView(ReactContext reactContext) {
         switch (mPlatform) {
             case OVR_MOBILE:
+                // Deprecated in 2.57.3: the Oculus Mobile SDK (VrApi) path targets EOL hardware
+                // (GearVR / Oculus Go) and its libvrapi.so is not 16 KB page-size compliant
+                // (viro#491). Use the QUEST (OpenXR) platform instead. ViroViewOVR no longer
+                // creates a native renderer.
+                ViroLog.warn(TAG, "ViroPlatform.OVR_MOBILE is deprecated and no longer supported; "
+                        + "use ViroPlatform.QUEST (OpenXR) for Meta headsets.");
                 return new ViroViewOVR(reactContext.getCurrentActivity(),
                         new StartupListenerOVR(this));
             case QUEST:
@@ -175,6 +181,17 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
     public void setPassthroughEnabled(boolean enabled) {
         if (mViroView instanceof ViroViewOpenXR) {
             ((ViroViewOpenXR) mViroView).setPassthroughEnabled(enabled);
+        }
+    }
+
+    /**
+     * Style the passthrough layer (opacity + edge-highlight colour).
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setPassthroughStyle(float opacity, float edgeR, float edgeG,
+                                    float edgeB, float edgeA) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setPassthroughStyle(opacity, edgeR, edgeG, edgeB, edgeA);
         }
     }
 

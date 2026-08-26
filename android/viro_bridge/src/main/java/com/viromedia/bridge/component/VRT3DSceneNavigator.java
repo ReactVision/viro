@@ -22,11 +22,16 @@
 package com.viromedia.bridge.component;
 
 import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.TypedValue;
+import android.view.Gravity;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactContext;
@@ -40,6 +45,7 @@ import com.viro.core.ViroViewScene;
 import com.viromedia.bridge.ReactViroPackage;
 import com.viromedia.bridge.component.node.VRTScene;
 import com.viromedia.bridge.module.MaterialManager;
+import com.viromedia.bridge.module.RVStudioWatermarkState;
 import com.viromedia.bridge.utility.ViroEvents;
 import com.viromedia.bridge.module.PerfMonitor;
 import com.viromedia.bridge.utility.ViroLog;
@@ -167,6 +173,10 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
     private boolean mHasOnExitViroCallback = false;
 
+    // Free-tier watermark overlay; visibility driven by RVStudioWatermarkState.
+    private TextView mWatermarkView;
+    private RVStudioWatermarkState.Listener mWatermarkListener;
+
     /*
      * Renderer configuration parameters.
      */
@@ -184,6 +194,9 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
         // Add the ViroView as a child so it's rendered.
         addView((View) mViroView);
+
+        // Added after the ViroView so it layers above the render surface.
+        setupWatermarkOverlay();
 
         mViroContext = mViroView.getViroContext();
 
@@ -216,6 +229,63 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
         return new ViroViewScene(reactContext.getCurrentActivity(),
                 new StartupListener3DScene(this));
+    }
+
+    // -----------------------------------------------------------------------
+    // Free-tier watermark
+    // -----------------------------------------------------------------------
+
+    private void setupWatermarkOverlay() {
+        final float density = getResources().getDisplayMetrics().density;
+
+        TextView bar = new TextView(getContext());
+        bar.setText("Powered by ReactVision Studio");
+        bar.setTextColor(Color.WHITE);
+        bar.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        bar.setGravity(Gravity.CENTER_HORIZONTAL);
+        int padV = (int) (6 * density);
+        bar.setPadding(0, padV, 0, padV);
+        bar.setBackgroundColor(Color.argb(153, 0, 0, 0)); // ~60% black
+
+        bar.setOnClickListener(v -> {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://www.reactvision.xyz/studio/?utm_source=scenenavigator-banner"));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+            } catch (Exception ignored) {
+                // No browser / activity available.
+            }
+        });
+
+        bar.setVisibility(View.GONE);
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM);
+        lp.bottomMargin = (int) (24 * density);
+
+        // Bypass the addView(View,int) override (which only accepts ViroView /
+        // VRTScene children) by calling ViewGroup's 3-arg addView directly.
+        super.addView(bar, -1, lp);
+        mWatermarkView = bar;
+
+        mWatermarkListener = freeTier -> updateWatermarkVisibility(freeTier);
+        RVStudioWatermarkState.getInstance().addListener(mWatermarkListener);
+        updateWatermarkVisibility(RVStudioWatermarkState.getInstance().isFreeTier());
+    }
+
+    // Listener fires on the rvGetScene background thread; hop to the UI thread.
+    private void updateWatermarkVisibility(final boolean freeTier) {
+        (new Handler(Looper.getMainLooper())).post(() -> {
+            if (mWatermarkView != null) {
+                mWatermarkView.setVisibility(freeTier ? View.VISIBLE : View.GONE);
+                if (freeTier) {
+                    mWatermarkView.bringToFront();
+                }
+            }
+        });
     }
 
     @Override
@@ -329,6 +399,12 @@ public class VRT3DSceneNavigator extends FrameLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+
+        if (mWatermarkListener != null) {
+            RVStudioWatermarkState.getInstance().removeListener(mWatermarkListener);
+            mWatermarkListener = null;
+        }
+        mWatermarkView = null;
 
         for (VRTScene scene : mSceneArray) {
             scene.forceCascadeTearDown();

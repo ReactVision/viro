@@ -45,6 +45,10 @@ type Props = {
    * | `"Both"` (default) | All orientations                       |
    *
    * Default: `"Both"` (accept every plane ARKit/ARCore detects).
+   *
+   * ARKit does not classify horizontal facing (its anchors report plain
+   * "Horizontal"), so on iOS `"HorizontalUpward"` and `"HorizontalDownward"`
+   * accept any horizontal plane, matching the native behavior of ViroARPlane.
    */
   alignment?:
     | "Horizontal"
@@ -409,7 +413,13 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
     if (alignment === "Horizontal")
       return anchor.alignment.includes("Horizontal");
     if (alignment === "Vertical") return anchor.alignment.includes("Vertical");
-    return anchor.alignment === alignment;
+    // ARKit does not classify horizontal facing; its anchors report plain
+    // "Horizontal". Accept those for the facing-specific alignments so they
+    // degrade to "any horizontal plane" (as the native declarative matcher
+    // does) instead of rejecting every plane.
+    return (
+      anchor.alignment === alignment || anchor.alignment === "Horizontal"
+    );
   };
 
   // ---------------------------------------------------------------------------
@@ -417,10 +427,7 @@ export class ViroARPlaneSelector extends React.Component<Props, State> {
   // ---------------------------------------------------------------------------
 
   render() {
-    if (isQuest) {
-      console.warn("[Viro] ViroARPlaneSelector is not supported on Quest and will not render.");
-      return null;
-    }
+    // Supported on Quest via XR_FB_scene plane anchors (room model). No longer gated.
     return <ViroNode>{this._renderPlanes()}</ViroNode>;
   }
 
@@ -541,6 +548,14 @@ ViroMaterials.createMaterials({
     diffuseColor: "rgba(0, 122, 255, 0.5)",
     blendMode: "Alpha",
     cullMode: "None",
-    writesToDepthBuffer: false,
+    // Phone: don't write depth, so overlapping/coplanar overlays blend cleanly.
+    // Quest: WRITE depth. On Quest's tiled GPU, many non-depth-writing transparent
+    // draws break the second (right) eye's render entirely — the whole eye goes
+    // black/garbage. Writing depth avoids that path and renders correctly in both
+    // eyes (device-confirmed). The plane overlays don't overlap, so depth-writing
+    // has no visible downside here. (Engine-level bug — non-depth-writing
+    // transparency at quantity breaking stereo — tracked in virocore
+    // VROGeometry::updateSubstrate notes / QUEST_SETUP.md.)
+    writesToDepthBuffer: isQuest,
   },
 });

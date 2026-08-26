@@ -44,6 +44,12 @@ public:
     virtual void onTrackingUpdated(VROARTrackingState state, VROARTrackingStateReason reason) = 0;
     virtual void onAmbientLightUpdate(float ambientLightIntensity, VROVector3f ambientLightColor) = 0;
     virtual void onWorldMeshUpdated(const VROWorldMeshStats& stats) {}
+
+    /*
+     Called once when depth data (LiDAR or monocular) first becomes available for the
+     session, i.e. hit tests can now return DepthPoints. Optional.
+     */
+    virtual void onDepthReady() {}
 };
 
 class VROARScene : public VROScene {
@@ -114,6 +120,12 @@ public:
     void setTrackingState(VROARTrackingState state, VROARTrackingStateReason reason, bool force);
 
     /*
+     Notify the delegate that depth data is now available. Fires the delegate's
+     onDepthReady() exactly once per scene; subsequent calls are no-ops.
+     */
+    void notifyDepthReady();
+
+    /*
      Get the ambient light estimate of the scene.
      */
     float getAmbientLightIntensity() const {
@@ -180,7 +192,8 @@ private:
     std::shared_ptr<VRONode> _pointCloudNode;
     std::shared_ptr<VROFixedParticleEmitter> _pointCloudEmitter;
     std::weak_ptr<VROARSceneDelegate> _delegate;
-    
+    bool _depthReadyNotified = false;
+
     /*
      Ambient light estimation. The intensity is in lumens and the color is in linear space.
      */

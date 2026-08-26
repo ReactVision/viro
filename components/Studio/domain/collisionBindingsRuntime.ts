@@ -1,7 +1,10 @@
 import { MutableRefObject } from "react";
 import { StudioAnimation, StudioCollisionBinding } from "../types";
 import { canonicalizeCollisionAssetIds, collisionPairKey } from "./collisionPairKey";
-import { executeFunctionWithRelations } from "./sceneNavigationHandler";
+import {
+  executeFunctionWithRelations,
+  SequenceRuntimeContext,
+} from "./sceneNavigationHandler";
 
 const DEFAULT_COOLDOWN_MS = 750;
 
@@ -23,6 +26,7 @@ export function dispatchCollisionBindingActions(params: {
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void;
   cooldownMs?: number;
   lastFiredRef: MutableRefObject<Map<string, number>>;
+  runtimeCtx?: SequenceRuntimeContext;
 }): void {
   const {
     selfPlacementId,
@@ -34,6 +38,7 @@ export function dispatchCollisionBindingActions(params: {
     onAnimationTrigger,
     cooldownMs = DEFAULT_COOLDOWN_MS,
     lastFiredRef,
+    runtimeCtx,
   } = params;
 
   if (!otherTag) return;
@@ -58,7 +63,15 @@ export function dispatchCollisionBindingActions(params: {
     if (now - last < cooldownMs) continue;
     map.set(ck, now);
 
-    executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimationTrigger, 0, onSceneChange);
+    executeFunctionWithRelations(
+      fn,
+      sceneNavigator,
+      animations,
+      onAnimationTrigger,
+      0,
+      onSceneChange,
+      runtimeCtx
+    );
   }
 }
 
@@ -73,6 +86,7 @@ export function createPlacementCollisionHandler(
   lastFiredRef: MutableRefObject<Map<string, number>>,
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
+  runtimeCtx?: SequenceRuntimeContext,
 ): (
   viroTag: string,
   collidedPoint: [number, number, number],
@@ -88,6 +102,7 @@ export function createPlacementCollisionHandler(
       onSceneChange,
       onAnimationTrigger,
       lastFiredRef,
+      runtimeCtx,
     });
   };
 }

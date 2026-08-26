@@ -69,6 +69,16 @@
 // RCTLegacyViewManagerInteropComponentView, which tears it out of the hierarchy on unmount —
 // registering in -init and unregistering only in -dealloc left exactly that window open, and the
 // app died in -[UIView removeFromSuperview] with an objc_msgSend on a released object.
+- (void)willMoveToWindow:(UIWindow *)newWindow {
+    [super willMoveToWindow:newWindow];
+    if (newWindow == nil) {
+        // Leaving the hierarchy: hand the renderer back an empty scene before React starts
+        // destroying the views these nodes are built on.
+        [VRORendererBridge.currentBridge detachNativeSceneController];
+        _pendingScene = nil;
+    }
+}
+
 - (void)didMoveToWindow {
     [super didMoveToWindow];
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];

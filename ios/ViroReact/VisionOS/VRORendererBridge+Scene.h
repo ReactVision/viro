@@ -33,6 +33,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// Passing nullptr is not a way to clear the scene; the renderer always needs one.
 - (void)setNativeSceneController:(std::shared_ptr<VROSceneController>)sceneController;
 
+/// Drops the React-owned scene and puts an empty one in its place.
+///
+/// Must be called before React tears the scene's views down. The renderer keeps the scene
+/// controller alive and walks its nodes every frame; those nodes are backed by the very
+/// Objective-C views React is destroying, so a scene that outlives its owner is a use-after-free
+/// waiting for the next frame.
+- (void)detachNativeSceneController;
+
 @end
 
 NS_ASSUME_NONNULL_END

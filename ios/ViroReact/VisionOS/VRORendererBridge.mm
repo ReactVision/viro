@@ -783,6 +783,16 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     return self;
 }
 
+- (void)detachNativeSceneController {
+    if (!_renderer) {
+        return;
+    }
+    // An empty scene rather than none: VRORenderer always needs something to render, and the
+    // point here is only to stop it holding React's nodes.
+    _renderer->setSceneController(std::make_shared<VROSceneController>(), _driver);
+    NSLog(@"[Viro] React scene detached from the ImmersiveSpace renderer");
+}
+
 - (void)setNativeSceneController:(std::shared_ptr<VROSceneController>)sceneController {
     if (!sceneController || !_renderer) {
         return;

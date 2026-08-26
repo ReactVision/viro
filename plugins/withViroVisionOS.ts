@@ -526,8 +526,37 @@ const withVisionOSInfoPlist: ConfigPlugin = (config) =>
         "$1<true/>"
       );
 
-      if (updated !== plist) {
-        fs.writeFileSync(plistPath, updated, "utf-8");
+      // ARKit authorisation strings. The renderer starts a WorldTrackingProvider and, where the
+      // hardware has it, a HandTrackingProvider. On a device, starting a provider without the
+      // matching usage description does not degrade — it raises
+      // NSInternalInconsistencyException and terminates the app the moment the immersive space
+      // opens. The Simulator never surfaces this, because it has no hand tracking and the
+      // provider is never started, so the whole class of failure is invisible until hardware.
+      let withUsage = updated;
+      const usageKeys: [string, string][] = [
+        [
+          "NSWorldSensingUsageDescription",
+          "Places your scene relative to the room around you.",
+        ],
+        [
+          "NSHandsTrackingUsageDescription",
+          "Lets you point at and select objects in your scene with your hands.",
+        ],
+      ];
+      for (const [key, description] of usageKeys) {
+        if (withUsage.includes(`<key>${key}</key>`)) continue;
+        withUsage = withUsage.replace(
+          /<dict>/,
+          `<dict>\n\t<key>${key}</key>\n\t<string>${description}</string>`
+        );
+      }
+      if (withUsage !== updated) {
+        console.log("[withViroVisionOS] Added the ARKit usage descriptions to Info.plist");
+      }
+      const finalPlist = withUsage;
+
+      if (finalPlist !== plist) {
+        fs.writeFileSync(plistPath, finalPlist, "utf-8");
       } else if (!/<key>UIApplicationSupportsMultipleScenes<\/key>\s*<true\/>/.test(plist)) {
         WarningAggregator.addWarningIOS(
           "withViroVisionOS",

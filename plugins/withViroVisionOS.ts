@@ -110,6 +110,18 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
 
 const METRO_PATCH = `
 ${METRO_MARKER} — visionOS platform resolver
+
+// Viro loads these through \`require()\`, and Metro treats anything not in assetExts as source.
+// Without this, \`<ViroLightingEnvironment source={require('./env.hdr')} />\` fails the bundle with
+// "Unable to resolve ./env.hdr" before a single frame is drawn — which is a confusing first
+// experience for a file that is plainly an asset.
+const VIRO_ASSET_EXTS = ['glb', 'gltf', 'hdr', 'obj', 'mtl', 'vrx'];
+for (const ext of VIRO_ASSET_EXTS) {
+  if (!config.resolver.assetExts.includes(ext)) {
+    config.resolver.assetExts.push(ext);
+  }
+}
+
 const path = require('path');
 const { getPlatformResolver } = require('${RNVISION_PLATFORMS_PKG}');
 const viroPlatformResolver = getPlatformResolver({

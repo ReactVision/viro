@@ -463,13 +463,18 @@ const withVisionOSBundlePhase = (config) => (0, config_plugins_1.withDangerousMo
         const pbx = fs_1.default.readFileSync(pbxPath, "utf-8");
         if (pbx.includes("resolveAppEntry"))
             return newConfig; // idempotent
-        const anchor = String.raw `export PROJECT_ROOT=\"$PROJECT_DIR\"/..\n`;
+        // Anchor on the template's own first line. An earlier draft anchored on
+        // `export PROJECT_ROOT=...`, which the template does not contain at all — it came
+        // from the hand-edit this step replaces, so it would never have matched.
+        const anchor = String.raw `set -e\n`;
         if (!pbx.includes(anchor)) {
             config_plugins_1.WarningAggregator.addWarningIOS("withViroVisionOS", "The visionOS bundling phase does not look like the Callstack template's. Set " +
                 "ENTRY_FILE via expo/scripts/resolveAppEntry and SKIP_BUNDLING=1 in Debug by hand.");
             return newConfig;
         }
         const injected = anchor +
+            String.raw `\n` +
+            String.raw `export PROJECT_ROOT=\"$PROJECT_DIR\"/..\n` +
             String.raw `\n` +
             String.raw `if [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\n` +
             String.raw `\n` +

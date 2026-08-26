@@ -643,7 +643,10 @@ const withVisionOSBundlePhase: ConfigPlugin = (config) =>
       const pbx = fs.readFileSync(pbxPath, "utf-8");
       if (pbx.includes("resolveAppEntry")) return newConfig; // idempotent
 
-      const anchor = String.raw`export PROJECT_ROOT=\"$PROJECT_DIR\"/..\n`;
+      // Anchor on the template's own first line. An earlier draft anchored on
+      // `export PROJECT_ROOT=...`, which the template does not contain at all — it came
+      // from the hand-edit this step replaces, so it would never have matched.
+      const anchor = String.raw`set -e\n`;
       if (!pbx.includes(anchor)) {
         WarningAggregator.addWarningIOS(
           "withViroVisionOS",
@@ -655,6 +658,8 @@ const withVisionOSBundlePhase: ConfigPlugin = (config) =>
 
       const injected =
         anchor +
+        String.raw`\n` +
+        String.raw`export PROJECT_ROOT=\"$PROJECT_DIR\"/..\n` +
         String.raw`\n` +
         String.raw`if [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\n` +
         String.raw`\n` +

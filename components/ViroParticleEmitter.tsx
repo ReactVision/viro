@@ -21,6 +21,7 @@ import {
   requireNativeComponent,
   Image,
 } from "react-native";
+import { resolveViroAssetSource } from "./Utilities/ViroAssetSource";
 // @ts-ignore
 // Image.resolveAssetSource, not the deep "react-native/Libraries/Image/resolveAssetSource" path.
 // The deep path is an internal module specifier, and on an out-of-tree platform it does not
@@ -253,7 +254,7 @@ export class ViroParticleEmitter extends React.Component<Props, State> {
     checkMisnamedProps("ViroParticleEmitter", this.props);
     let image = { ...this.props.image };
     if (image.source != undefined) {
-      image.source = Image.resolveAssetSource(image.source);
+      image.source = resolveViroAssetSource(image.source);
     }
     let transformBehaviors =
       typeof this.props.transformBehaviors === "string"

@@ -47,6 +47,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroParticleEmitter = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroParticleEmitter extends React.Component {
     state = {
@@ -87,7 +88,7 @@ class ViroParticleEmitter extends React.Component {
         (0, ViroProps_1.checkMisnamedProps)("ViroParticleEmitter", this.props);
         let image = { ...this.props.image };
         if (image.source != undefined) {
-            image.source = react_native_1.Image.resolveAssetSource(image.source);
+            image.source = (0, ViroAssetSource_1.resolveViroAssetSource)(image.source);
         }
         let transformBehaviors = typeof this.props.transformBehaviors === "string"
             ? new Array(this.props.transformBehaviors)

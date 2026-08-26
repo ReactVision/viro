@@ -43,6 +43,7 @@ import {
   ViroDirectionalLight,
   ViroFlexView,
   ViroLightingEnvironment,
+  ViroAnimations,
   ViroMaterials,
   ViroNode,
   ViroOmniLight,
@@ -73,6 +74,18 @@ ViroMaterials.createMaterials({
   // makes a broken IBL obvious. Anything between them looks plausible when it is wrong.
   pbrMetal: { lightingModel: "PBR", diffuseColor: "#C0C0C0", metalness: 1.0, roughness: 0.15 },
   pbrRough: { lightingModel: "PBR", diffuseColor: "#B04030", metalness: 0.0, roughness: 0.85 },
+});
+
+// ── Animations ───────────────────────────────────────────────────────────────
+// The animated box on page 3 referenced "spin" without this, so the name resolved to nothing and
+// the page could not test animation at all. Found by running the sweep for the first time.
+
+ViroAnimations.registerAnimations({
+  spin: {
+    properties: { rotateY: "+=90" },
+    duration: 1000,
+    easing: "Linear",
+  },
 });
 
 const LABEL = { fontFamily: "Arial", fontSize: 12, color: "#FFFFFF" } as const;
@@ -242,22 +255,30 @@ function PageLighting() {
   );
 }
 
-// ── Page 5 — input, expected inert ───────────────────────────────────────────
+// ── Page 5 — input, expected to work ─────────────────────────────────────────
+//
+// This page used to read "expected INERT": it was written before input reached JavaScript, when a
+// tap here would have been the surprise. That landed on 2026-08-26 and was confirmed on device, so
+// the expectation is inverted — a tap that does *not* register is now the finding.
+//
+// Note this is the Simulator's one blind spot in the whole sweep: it has no hand tracking and says
+// so on startup, so page 5 can only be judged on hardware.
 
 function PageInput() {
   const [tapped, setTapped] = useState(0);
   return (
     <ViroNode position={[0, 0, Z]}>
-      <ViroText text="5 · input — expected INERT" position={[0, 0.75, 0]} scale={[0.4, 0.4, 0.4]} style={LABEL} />
+      <ViroText text="5 · input — expected to RESPOND" position={[0, 0.75, 0]} scale={[0.4, 0.4, 0.4]} style={LABEL} />
       <ViroText
-        text={`taps registered: ${tapped}\nexpected: 0 until hand tracking lands`}
+        text={`taps registered: ${tapped}\nexpected: rises on device, stays 0 in the Simulator`}
         position={[0, 0.4, 0]}
         scale={[0.35, 0.35, 0.35]}
         style={LABEL}
       />
 
-      {/* These render. They do not respond. If a tap ever registers here, hand tracking has
-          started working and the M4 input ticket needs revisiting — that is a finding too. */}
+      {/* Both should respond to a pinch on hardware, and both should show the system hover
+          highlight: the renderer registers a tracking area for any node with onHover, onClick or
+          onDrag. A component that takes the click but never highlights is a finding on its own. */}
       <ViroButton
         position={[-0.35, -0.1, 0]}
         height={0.3}

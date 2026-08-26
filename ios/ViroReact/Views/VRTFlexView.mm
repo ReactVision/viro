@@ -116,9 +116,9 @@
 }
 
 - (BOOL)isRootFlexboxView {
-    VRTView *superview = [self superview];
+    VRTView *superview = [self viroSuperview];
     if([superview isKindOfClass:[VRTAnimatedComponent class]]) {
-        superview = [[super superview] superview];
+        superview = [[super viroSuperview] viroSuperview];
     }
     
     if([superview isKindOfClass:[VRTScene class]] || [superview isKindOfClass:[VRTNodeContainer class]]) {

@@ -1225,11 +1225,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     VRTNode *realSuperview;
     
     // Find superview, skipping over animated components.
-    if (self.superview && [self.superview isKindOfClass:[VRTNode class]]) {
-        realSuperview = (VRTNode *)self.superview;
-    } else if(self.superview && [self.superview isKindOfClass:[VRTAnimatedComponent class]]) {
-        if([self.superview.superview isKindOfClass:[VRTNode class]]) {
-            realSuperview = (VRTNode *) self.superview.superview;
+    if (self.viroSuperview && [self.viroSuperview isKindOfClass:[VRTNode class]]) {
+        realSuperview = (VRTNode *)self.viroSuperview;
+    } else if(self.viroSuperview && [self.viroSuperview isKindOfClass:[VRTAnimatedComponent class]]) {
+        if([self.viroSuperview.viroSuperview isKindOfClass:[VRTNode class]]) {
+            realSuperview = (VRTNode *) self.viroSuperview.viroSuperview;
         }
     }
     
@@ -1314,7 +1314,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         return YES;
     }
     
-    VRTNode *superview = ([self.superview isKindOfClass:[VRTAnimatedComponent class]]) ? self.superview.superview : (VRTNode *)self.superview;
+    VRTNode *superview = ([self.viroSuperview isKindOfClass:[VRTAnimatedComponent class]]) ? self.viroSuperview.viroSuperview : (VRTNode *)self.viroSuperview;
     while(superview) {
         
         if([superview isKindOfClass:[VRTNode class]]) {
@@ -1322,10 +1322,10 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 return YES;
             }
         }
-        superview = superview.superview;
+        superview = superview.viroSuperview;
         //skip checking animated component superview, ignore it when it comes to flexbox
         if([superview isKindOfClass:[VRTAnimatedComponent class]]){
-            superview = superview.superview;
+            superview = superview.viroSuperview;
         }
     }
     return NO;

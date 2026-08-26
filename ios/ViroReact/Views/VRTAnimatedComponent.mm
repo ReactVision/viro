@@ -135,9 +135,9 @@
     self.managedAnimation.node = self.vroSubview.node;
     
     BOOL childFound = false;
-    if (self.superview != nil) {
+    if (self.viroSuperview != nil) {
         // The supernode of a VRTAnimatedComponent is always a VRTNode
-        VRTNode *supernodeView = (VRTNode *) self.superview;
+        VRTNode *supernodeView = (VRTNode *) self.viroSuperview;
         
         std::vector<std::shared_ptr<VRONode>> subnodeArray = supernodeView.node->getChildNodes();
         for (std::shared_ptr<VRONode> node: subnodeArray){

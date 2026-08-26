@@ -36,6 +36,7 @@
 #import "VRTView.h"
 #import "VRTShadowView.h"
 #import "VRTNode.h"
+#import "VRTFabricCrashFix.h"
 
 // Inline Fabric crash fix implementation
 @interface ViroCrashFix : NSObject
@@ -73,17 +74,22 @@
         if (!self) {
             return;
         }
-        
-        // Clear pointer interactions that cause the crash
-        if ([self respondsToSelector:@selector(interactions)]) {
-            @try {
-                self.interactions = @[];
-            } @catch (NSException *exception) {
-                // Only log errors for debugging
-                NSLog(@"VRT: Error clearing interactions: %@", exception.reason);
+
+        // Same reasoning as VRTFabricCrashFix: this swizzles UIView itself, so it must leave
+        // Apple's own views untouched.
+        if (!VRTIsAppleOwnedClass([self class])) {
+            // Clear pointer interactions that cause the crash
+            if ([self respondsToSelector:@selector(interactions)]) {
+                @try {
+                    self.interactions = @[];
+                } @catch (NSException *exception) {
+                    // Only log errors for debugging
+                    NSLog(@"VRT: Error clearing interactions: %@", exception.reason);
+                }
             }
         }
-        
+
+        // Load-bearing, as in VRTFabricCrashFix: see issue #324.
         if (!self.superview) {
             return; // Already removed
         }

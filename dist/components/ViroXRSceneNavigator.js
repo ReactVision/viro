@@ -213,7 +213,16 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
                 "rooted in a ViroScene (not a ViroARScene).");
             return null;
         }
-        return (<ViroSceneNavigator_1.ViroSceneNavigator ref={visionRef} initialScene={visionScene} {...rest}/>);
+        // Zero-sized and hidden on purpose. This view is not a render surface on visionOS — the
+        // ImmersiveSpace is — so anything it occupies in the window is space the app cannot use,
+        // showing nothing. Left at its natural size it fills the window and the result reads as a
+        // black panel floating in front of the immersive content, because an empty React Native
+        // window is black. The scene tree still mounts, which is what matters: that is how the
+        // native VRTScene reaches the renderer.
+        const { style: _ignoredStyle, ...visionRest } = rest;
+        return (<react_native_1.View style={styles.visionOSHost} pointerEvents="none">
+          <ViroSceneNavigator_1.ViroSceneNavigator ref={visionRef} initialScene={visionScene} {...visionRest}/>
+        </react_native_1.View>);
     }
     const scene = arInitialScene ?? initialScene;
     if (!scene) {
@@ -221,4 +230,13 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
         return null;
     }
     return (<ViroARSceneNavigator_1.ViroARSceneNavigator ref={arRef} initialScene={scene} {...rest}/>);
+});
+const styles = react_native_1.StyleSheet.create({
+    /** See the visionOS branch above: present in the tree, absent from the layout. */
+    visionOSHost: {
+        position: "absolute",
+        width: 0,
+        height: 0,
+        opacity: 0,
+    },
 });

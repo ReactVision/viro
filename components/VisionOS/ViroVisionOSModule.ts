@@ -108,6 +108,11 @@ export type ViroInputTuning = {
   smoothing?: number;
   /** Radians the ray must move off a hovered target before hover is dropped. */
   hoverHysteresis?: number;
+  /** Angular radius, in radians, of the cone used when the ray itself misses.
+   *  A zero-width ray demands more precision than hand tracking can give; this
+   *  gives small targets a tolerance without changing a precise aim, which is
+   *  always tried first. 0 disables it. Default 0.03 (~1.7°). */
+  coneAngle?: number;
 };
 
 /**

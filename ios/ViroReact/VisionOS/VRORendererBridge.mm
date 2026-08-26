@@ -29,6 +29,8 @@
 #include "VROInputType.h"
 #include "VROInputPresenter.h"
 #include "VROReticle.h"
+#include "VROHitTestResult.h"
+#include <limits>
 #include "VROTexture.h"
 #include "VROData.h"
 #include "VROMatrix4f.h"
@@ -315,6 +317,11 @@ private:
             }
         }
 
+        // Applied to the ray the events use, not to the reticle: the mark stays where the wearer
+        // is actually pointing, while the selection is the forgiving one. A reticle that jumped to
+        // the assisted direction would be telling them their aim was somewhere it was not.
+        forward = widenAim(camera, origin, forward);
+
         VROQuaternion rotation = VROQuaternion::rotationFromTo({ 0, 0, -1 }, forward);
         VROInputControllerBase::updateHitNode(source, camera, origin, forward);
         // Take only the *depth* from the hit and lay it along the live ray. That keeps the
@@ -354,6 +361,51 @@ private:
         }
     }
 
+    /*
+     Widen the aim to a cone when the ray itself misses.
+
+     A ray of zero width asks for more precision than hand tracking can deliver: the target has to
+     be hit exactly, and a target that is nearly hit behaves identically to one that is not aimed at
+     at all. Sampling a ring around the ray gives small targets a tolerance without taking anything
+     away from a precise aim — the centre ray is tried first and wins whenever it hits, so nothing
+     that already worked starts behaving differently.
+
+     Cost is bounded and only paid on a miss: nine tests, and none at all while the wearer is
+     actually pointing at something.
+     */
+    VROVector3f widenAim(const VROCamera &camera, const VROVector3f &origin,
+                         const VROVector3f &forward) {
+        if (_tuning.coneAngle <= 0.0f) { return forward; }
+
+        VROHitTestResult centre = VROInputControllerBase::hitTest(camera, origin, forward, true);
+        if (!centre.isBackgroundHit()) { return forward; }
+
+        // A basis perpendicular to the ray, to lay the ring on.
+        VROVector3f up = std::fabs(forward.y) > 0.9f ? VROVector3f(1, 0, 0) : VROVector3f(0, 1, 0);
+        VROVector3f right = forward.cross(up).normalize();
+        up = right.cross(forward).normalize();
+
+        const int kSamples = 8;
+        const float tan = std::tan(_tuning.coneAngle);
+        VROVector3f best = forward;
+        float bestDistance = std::numeric_limits<float>::max();
+
+        for (int i = 0; i < kSamples; i++) {
+            const float a = (2.0f * M_PI * i) / kSamples;
+            VROVector3f candidate =
+                (forward + right * (std::cos(a) * tan) + up * (std::sin(a) * tan)).normalize();
+            VROHitTestResult hit = VROInputControllerBase::hitTest(camera, origin, candidate, true);
+            if (hit.isBackgroundHit()) { continue; }
+            // Nearest wins: with two targets inside the cone, the closer one is the one the wearer
+            // is most likely reaching for, and it is also the one that occludes the other.
+            if (hit.getDistance() < bestDistance) {
+                bestDistance = hit.getDistance();
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
     static int slotFor(int source) { return source == ViroVisionOS::LeftHand ? 0 : 1; }
 
     // ── Live-tunable input parameters ────────────────────────────────────────
@@ -366,6 +418,7 @@ private:
         Origin origin = Origin::Head;   // head-through-hand: see setInputTuning
         float  smoothing = 0.6f;        // 0 = raw, 1 = heavy
         float  hoverHysteresis = 0.035f; // radians
+        float  coneAngle = 0.030f;       // radians (~1.7°); 0 disables the cone cast
     };
     Tuning _tuning;
     VROVector3f _headPosition;
@@ -398,6 +451,9 @@ public:
         }
         if (NSNumber *n = t[@"hoverHysteresis"]) {
             _tuning.hoverHysteresis = std::max(0.0f, n.floatValue);
+        }
+        if (NSNumber *n = t[@"coneAngle"]) {
+            _tuning.coneAngle = std::max(0.0f, n.floatValue);
         }
     }
 

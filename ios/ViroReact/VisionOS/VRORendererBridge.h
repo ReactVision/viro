@@ -55,6 +55,15 @@ NS_ASSUME_NONNULL_BEGIN
 /// header is imported by Swift, which compiles it as plain Objective-C.
 @property (class, nonatomic, readonly, nullable) VRORendererBridge *currentBridge;
 
+/// Closes any render command encoder the renderer still has open, and reports whether there
+/// was one.
+///
+/// CompositorServices aborts the process from cp_drawable_encode_present if the command buffer
+/// handed to it still has an encoder open — as __BUG_IN_CLIENT__, with no message naming the
+/// cause. The render loop calls this immediately before presenting so that a pass which returns
+/// without closing its encoder costs a log line instead of a crash.
+- (BOOL)endAnyOpenEncoder;
+
 /// Call once per frame before the per-eye loop, using left-eye data (view index 0).
 /// Drives VRORenderer::prepareFrame() — updates physics, animations, and visibility.
 /// @param viewIndex    Typically 0 (left eye).

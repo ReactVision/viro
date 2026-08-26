@@ -310,11 +310,23 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     // Image-based lighting is not implemented, so the ambient term stands in for the
     // environment contribution — a PBR material needs an analytic light to be lit.
     VRORendererConfiguration config;
-    config.enableShadows        = true;
-    config.enableBloom          = true;
-    config.enableHDR            = true;
-    config.enablePBR            = true;
+    // VIRO_MINIMAL_RENDER=1 disables every post-processing pass, so the renderer draws straight
+    // into the drawable with no offscreen targets in between.
+    //
+    // This is how the CompositorServices abort was localised (2026-08-25): with the passes on,
+    // cp_drawable_encode_present kills the process as __BUG_IN_CLIENT__ a second or two after the
+    // ImmersiveSpace opens; with them off the app runs. Keep it — the same switch separates "the
+    // renderer is wrong" from "a post-processing pass is wrong" in one run, and that distinction
+    // took four refuted hypotheses to reach the first time.
+    const bool minimal = (getenv("VIRO_MINIMAL_RENDER") != NULL);
+    config.enableShadows        = !minimal;
+    config.enableBloom          = !minimal;
+    config.enableHDR            = !minimal;
+    config.enablePBR            = !minimal;
     config.enableMultisampling  = false;
+    if (minimal) {
+        NSLog(@"[Viro] VIRO_MINIMAL_RENDER set — shadows, bloom, HDR and PBR disabled");
+    }
 
     // Fallback scene lighting at buffer index 4, re-applied by the driver to every
     // encoder it opens. bindShader() / bindLights() overwrite it per draw call for lit
@@ -914,6 +926,14 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
             timer->endFrame();
         }
     }
+}
+
+- (BOOL)endAnyOpenEncoder {
+    if (!_driver || !_driver->hasOpenEncoder()) {
+        return NO;
+    }
+    _driver->endActiveEncoder();
+    return YES;
 }
 
 - (void)renderEyeWithViewIndex:(NSUInteger)viewIndex

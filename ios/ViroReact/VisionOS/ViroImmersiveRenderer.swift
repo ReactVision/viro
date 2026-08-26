@@ -146,11 +146,23 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
 
     private func renderFrame() {
         guard let frame = layerRenderer.queryNextFrame() else { return }
-        frame.startSubmission()
+
+        // CompositorServices frames have two phases and they are not optional. The update phase
+        // comes first and is where app state changes belong; only then is predictTiming valid,
+        // and the submission phase must not open until the wait for optimalInputTime is over.
+        //
+        // Starting submission first — which this did — is a contract violation, and
+        // CompositorServices reports it by aborting the process from inside
+        // cp_drawable_encode_present as __BUG_IN_CLIENT__, naming neither the phase nor the
+        // cause. Two seconds of a black immersive space, then SIGABRT.
+        frame.startUpdate()
+        frame.endUpdate()
 
         if let timing = frame.predictTiming() {
             LayerRenderer.Clock().wait(until: timing.optimalInputTime)
         }
+
+        frame.startSubmission()
 
         // queryDrawable() is deprecated + API_UNAVAILABLE(macosx) — crashes in simulator.
         // queryDrawables() returns an array. Empty = frame cancelled; invalid to access further.
@@ -248,6 +260,13 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                     depthTexture: depthTexture,
                     viewTransform: eyeFromWorld,
                     tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
+            }
+
+            // A pass that returns without closing its encoder would abort the process inside
+            // encodePresent below, as __BUG_IN_CLIENT__ with no message. Close it here and say
+            // so, so the failure is a log line naming the frame instead of a crash report.
+            if bridge.endAnyOpenEncoder() {
+                NSLog("[Viro] a render pass left its command encoder open; closed it before present")
             }
 
             // Required: set device anchor before encodePresent so CompositorServices

@@ -19,7 +19,9 @@ import {
   requireNativeComponent,
 } from "react-native";
 // @ts-ignore
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+import { resolveViroAssetSource as resolveAssetSource } from "./Utilities/ViroAssetSource";
 import { ViroStyle } from "./Styles/ViroStyle";
 import { ViroLoadEndEvent, ViroLoadStartEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";

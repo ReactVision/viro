@@ -43,15 +43,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSpatialSound = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
-const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 class ViroSpatialSound extends React.Component {
     _component = null;
@@ -68,7 +67,7 @@ class ViroSpatialSound extends React.Component {
         (0, ViroProps_1.checkMisnamedProps)("ViroSpatialSound", this.props);
         var soundSrc = this.props.source;
         if (typeof soundSrc === "number") {
-            soundSrc = (0, resolveAssetSource_1.default)(soundSrc);
+            soundSrc = (0, ViroAssetSource_1.resolveViroAssetSource)(soundSrc);
         }
         else if (typeof soundSrc === "string") {
             /**

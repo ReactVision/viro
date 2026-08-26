@@ -110,10 +110,26 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
 
 const METRO_PATCH = `
 ${METRO_MARKER} — visionOS platform resolver
+const path = require('path');
 const { getPlatformResolver } = require('${RNVISION_PLATFORMS_PKG}');
-config.resolver.resolveRequest = getPlatformResolver({
+const viroPlatformResolver = getPlatformResolver({
   platformNameMap: { visionos: '${RNVISION_PKG}' },
 });
+
+// Device builds run their own Metro from the Xcode build phase, which reads this file and
+// nothing else — tsconfig \`paths\` are applied by the Expo dev server, not by that instance.
+// A project using the \`@/\` alias therefore builds in the Simulator and fails on device with
+// "Unable to resolve module @/...". Resolving it here covers both.
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.startsWith('@/')) {
+    return viroPlatformResolver(
+      context,
+      path.resolve(__dirname, moduleName.slice(2)),
+      platform
+    );
+  }
+  return viroPlatformResolver(context, moduleName, platform);
+};
 `;
 
 const withVisionOSMetroConfig: ConfigPlugin = (config) =>
@@ -584,6 +600,73 @@ const withVisionOSAppDelegate: ConfigPlugin = (config) =>
     },
   ]);
 
+
+// ─── 9. visionos/*.xcodeproj — the React Native bundling phase, for Expo ──────
+//
+// The Callstack template's phase is a bare React Native one: it runs react-native-xcode.sh with
+// no ENTRY_FILE, which defaults to index.js, and it bundles in every configuration.
+//
+// Neither suits an Expo app, and both only bite on device — the Simulator loads from the dev
+// server and never runs this phase in anger:
+//
+//   * ENTRY_FILE  — an Expo project has no index.js. The build fails with
+//     "ResourceNotFoundError: The resource `.../index.js` was not found."
+//   * SKIP_BUNDLING — embedding a Debug bundle also trips Metro's
+//     "Unexpected module with full source map found", and expo prebuild's own iOS phase skips
+//     bundling in Debug for the same reason.
+//
+// The entry is resolved the Expo way but the bundling is left to the React Native CLI: the fork's
+// script passes --resolver-option for the visionos platform extension, which @expo/cli rejects.
+const withVisionOSBundlePhase: ConfigPlugin = (config) =>
+  withDangerousMod(config, [
+    "ios",
+    async (newConfig) => {
+      const projectRoot = newConfig.modRequest.projectRoot;
+      const projectName = (config.name as string).replace(/[^a-zA-Z0-9]/g, "");
+      const pbxPath = path.join(
+        projectRoot,
+        "visionos",
+        `${projectName}.xcodeproj`,
+        "project.pbxproj"
+      );
+
+      if (!fs.existsSync(pbxPath)) {
+        WarningAggregator.addWarningIOS(
+          "withViroVisionOS",
+          `Could not find visionos/${projectName}.xcodeproj/project.pbxproj — the React Native ` +
+            `bundling phase was left as the template wrote it. Device builds will fail on ` +
+            `index.js not being found.`
+        );
+        return newConfig;
+      }
+
+      const pbx = fs.readFileSync(pbxPath, "utf-8");
+      if (pbx.includes("resolveAppEntry")) return newConfig; // idempotent
+
+      const anchor = String.raw`export PROJECT_ROOT=\"$PROJECT_DIR\"/..\n`;
+      if (!pbx.includes(anchor)) {
+        WarningAggregator.addWarningIOS(
+          "withViroVisionOS",
+          "The visionOS bundling phase does not look like the Callstack template's. Set " +
+            "ENTRY_FILE via expo/scripts/resolveAppEntry and SKIP_BUNDLING=1 in Debug by hand."
+        );
+        return newConfig;
+      }
+
+      const injected =
+        anchor +
+        String.raw`\n` +
+        String.raw`if [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\n` +
+        String.raw`\n` +
+        String.raw`if [[ -z \"$ENTRY_FILE\" ]]; then\n` +
+        String.raw`  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n`;
+
+      fs.writeFileSync(pbxPath, pbx.replace(anchor, injected), "utf-8");
+      console.log("[withViroVisionOS] Pointed the bundling phase at Expo's entry point");
+      return newConfig;
+    },
+  ]);
+
 export const withViroVisionOS: ConfigPlugin = (config) =>
   withPlugins(config, [
     withVisionOSSetup,         // 1. verify visionos/ folder + deps
@@ -594,6 +677,7 @@ export const withViroVisionOS: ConfigPlugin = (config) =>
     withVisionOSCompatShims,   // 6. components/compat/ BlurView + LinearGradient
     withVisionOSInfoPlist,     // 7. Info.plist: allow multiple scenes (ImmersiveSpace)
     withVisionOSAppDelegate,   // 8. AppDelegate.swift: Expo entry point + imports
+    withVisionOSBundlePhase,   // 9. Xcode bundling phase: Expo entry + skip bundling in Debug
   ]);
 
 export default withViroVisionOS;

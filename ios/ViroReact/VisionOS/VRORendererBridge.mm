@@ -318,15 +318,19 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     // ImmersiveSpace opens; with them off the app runs. Keep it — the same switch separates "the
     // renderer is wrong" from "a post-processing pass is wrong" in one run, and that distinction
     // took four refuted hypotheses to reach the first time.
+    // Each pass can also be turned off on its own (VIRO_DISABLE_HDR, _BLOOM, _SHADOWS, _PBR),
+    // which is what narrows "somewhere in post-processing" down to a single pass.
     const bool minimal = (getenv("VIRO_MINIMAL_RENDER") != NULL);
-    config.enableShadows        = !minimal;
-    config.enableBloom          = !minimal;
-    config.enableHDR            = !minimal;
-    config.enablePBR            = !minimal;
+    auto disabled = [minimal](const char *name) {
+        return minimal || getenv(name) != NULL;
+    };
+    config.enableShadows        = !disabled("VIRO_DISABLE_SHADOWS");
+    config.enableBloom          = !disabled("VIRO_DISABLE_BLOOM");
+    config.enableHDR            = !disabled("VIRO_DISABLE_HDR");
+    config.enablePBR            = !disabled("VIRO_DISABLE_PBR");
     config.enableMultisampling  = false;
-    if (minimal) {
-        NSLog(@"[Viro] VIRO_MINIMAL_RENDER set — shadows, bloom, HDR and PBR disabled");
-    }
+    NSLog(@"[Viro] render config: shadows=%d bloom=%d hdr=%d pbr=%d",
+          config.enableShadows, config.enableBloom, config.enableHDR, config.enablePBR);
 
     // Fallback scene lighting at buffer index 4, re-applied by the driver to every
     // encoder it opens. bindShader() / bindLights() overwrite it per draw call for lit

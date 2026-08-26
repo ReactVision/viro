@@ -246,7 +246,14 @@ const withVisionOSAppSwift = (config) => (0, config_plugins_1.withDangerousMod)(
                 "        ImmersiveSpace(id: ViroImmersiveSpace.id) {\n" +
                 "            ViroImmersiveSpaceView()\n" +
                 "        }\n" +
-                "        .immersionStyle(selection: $immersionStyle, in: .mixed, .full, .progressive)\n");
+                // .progressive is deliberately absent. Declaring support for it changes the contract:
+                // CompositorServices then requires presenting through the drawable's render
+                // context, and rejects encodePresent with "BUG IN CLIENT: cannot present
+                // drawable: need to use drawable render context when supporting progressive
+                // style" — killing the process seconds after the space opens. Viro's renderer
+                // uses encodePresent, so the styles it offers are the ones it can actually
+                // present. Re-add this only together with the render-context path.
+                "        .immersionStyle(selection: $immersionStyle, in: .mixed, .full)\n");
         }
         fs_1.default.writeFileSync(appSwiftPath, swift, "utf-8");
         return newConfig;

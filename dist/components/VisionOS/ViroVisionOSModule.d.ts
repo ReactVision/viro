@@ -24,7 +24,7 @@
  *        ImmersiveSpace(id: "ViroImmersive") {
  *          ViroImmersiveSpaceView()
  *        }
- *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full, .progressive)
+ *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full)
  *        #endif
  *      }
  *    }
@@ -38,7 +38,17 @@
  *    await ViroVisionOSModule.exitImmersiveSpace();
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export type ImmersiveSpaceStyle = "mixed" | "full" | "progressive";
+/**
+ * Immersion styles Viro can present.
+ *
+ * "progressive" is absent on purpose. Declaring it on the ImmersiveSpace changes what
+ * CompositorServices requires: presentation must then go through the drawable's render context,
+ * and encodePresent — which this renderer uses — is rejected outright with "BUG IN CLIENT:
+ * cannot present drawable: need to use drawable render context when supporting progressive
+ * style", aborting the process seconds after the space opens. Supporting it means implementing
+ * the render-context path first.
+ */
+export type ImmersiveSpaceStyle = "mixed" | "full";
 /**
  * Returns true if the app is running on Apple Vision Pro (visionOS).
  * Uses the native module constant; falls back to Platform.isVision when
@@ -50,7 +60,6 @@ export declare function isVisionOS(): boolean;
  *
  * @param style  "mixed" (default) — virtual content blended over passthrough
  *               "full"  — fully virtual, passthrough hidden
- *               "progressive" — graduated immersion with crown dial
  */
 export declare function enterImmersiveSpace(style?: ImmersiveSpaceStyle): Promise<boolean>;
 /**

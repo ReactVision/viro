@@ -25,7 +25,7 @@
  *        ImmersiveSpace(id: "ViroImmersive") {
  *          ViroImmersiveSpaceView()
  *        }
- *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full, .progressive)
+ *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full)
  *        #endif
  *      }
  *    }
@@ -64,7 +64,6 @@ function isVisionOS() {
  *
  * @param style  "mixed" (default) — virtual content blended over passthrough
  *               "full"  — fully virtual, passthrough hidden
- *               "progressive" — graduated immersion with crown dial
  */
 async function enterImmersiveSpace(style = "mixed") {
     if (!VRTVisionOSModule) {

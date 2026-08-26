@@ -24,7 +24,7 @@
  *        ImmersiveSpace(id: "ViroImmersive") {
  *          ViroImmersiveSpaceView()
  *        }
- *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full, .progressive)
+ *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full)
  *        #endif
  *      }
  *    }
@@ -41,7 +41,17 @@
 
 import { NativeModules, Platform } from "react-native";
 
-export type ImmersiveSpaceStyle = "mixed" | "full" | "progressive";
+/**
+ * Immersion styles Viro can present.
+ *
+ * "progressive" is absent on purpose. Declaring it on the ImmersiveSpace changes what
+ * CompositorServices requires: presentation must then go through the drawable's render context,
+ * and encodePresent — which this renderer uses — is rejected outright with "BUG IN CLIENT:
+ * cannot present drawable: need to use drawable render context when supporting progressive
+ * style", aborting the process seconds after the space opens. Supporting it means implementing
+ * the render-context path first.
+ */
+export type ImmersiveSpaceStyle = "mixed" | "full";
 
 /** @internal — raw NativeModule reference */
 const { VRTVisionOSModule } = NativeModules;
@@ -63,7 +73,6 @@ export function isVisionOS(): boolean {
  *
  * @param style  "mixed" (default) — virtual content blended over passthrough
  *               "full"  — fully virtual, passthrough hidden
- *               "progressive" — graduated immersion with crown dial
  */
 export async function enterImmersiveSpace(
   style: ImmersiveSpaceStyle = "mixed"

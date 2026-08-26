@@ -15,6 +15,9 @@
 #import "VRORendererBridge+Scene.h"
 
 // ── C++ includes ─────────────────────────────────────────────────────────────
+#include <algorithm>
+#include <unordered_map>
+#include <functional>
 #include "VRODefines.h"
 #if VRO_METAL
 
@@ -25,6 +28,9 @@
 #include "VROInputControllerBase.h"
 #include "VROInputType.h"
 #include "VROInputPresenter.h"
+#include "VROReticle.h"
+#include "VROTexture.h"
+#include "VROData.h"
 #include "VROMatrix4f.h"
 #include "VROFieldOfView.h"
 #include "VROViewport.h"
@@ -132,20 +138,95 @@ public:
     }
 
     void onProcess(const VROCamera &camera) override {
+        _reticleHit = false;
+        // Right hand last so that, when both hands are pointing at something, the right one wins
+        // the reticle rather than the two fighting over it frame by frame.
         dispatchHand(camera, ViroVisionOS::LeftHand,  _left,  _leftWasPinching);
         dispatchHand(camera, ViroVisionOS::RightHand, _right, _rightWasPinching);
+        applyReticle(camera);
     }
+
+    std::shared_ptr<VROReticle> getReticle() const { return _reticle; }
 
 protected:
     VROVector3f getDragForwardOffset() override { return { 0, 0, -1 }; }
 
     /*
-     A minimal presenter. visionOS draws the system pointer itself and VROReticle is a no-op
-     in this target, so there is nothing for a presenter to render — but the base class
-     registers it as an event delegate and complains on every frame without one.
+     The presenter carries the reticle. There is no system pointer to rely on in a Metal
+     immersive space — the compositor only highlights registered tracking areas — so without
+     this the wearer has no indication of where the ray points, which is what made the
+     head-through-hand mode unusable: correct aim, invisible.
      */
+    /*
+     A ring, drawn into an RGBA texture rather than left to VROReticle's default polyline.
+
+     The polyline path strokes the circle with a shader modifier written in GLSL — vec3, mat3,
+     highp — and the Metal substrate drops the lines it cannot translate while keeping the
+     assignments, so the generated MSL failed to compile with "use of undeclared identifier
+     'world_vertex_offset'" and the pipeline assertion aborted the process. The texture path
+     goes through a plain VROSurface with no modifiers at all.
+
+     Generated in code so the reticle needs no bundled asset, which matters because ViroKit
+     ships to visionOS as a static library with no resource bundle of its own.
+     */
+    static std::shared_ptr<VROTexture> createReticleTexture() {
+        const int size = 64;
+        const float centre = (size - 1) * 0.5f;
+        const float outer = size * 0.45f;
+        const float inner = size * 0.30f;
+        const float feather = 1.5f;   // pixels of alpha ramp, so the edge is not a staircase
+
+        std::vector<uint8_t> pixels((size_t)size * size * 4, 0);
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                const float dx = x - centre, dy = y - centre;
+                const float d = std::sqrt(dx * dx + dy * dy);
+                const float ramp = [&](float t) {
+                    return std::clamp(t / feather, 0.0f, 1.0f);
+                }(std::min(outer - d, d - inner));
+                uint8_t *p = &pixels[((size_t)y * size + x) * 4];
+                p[0] = 84;    // the same cyan VROReticle uses for its polyline
+                p[1] = 249;
+                p[2] = 247;
+                p[3] = (uint8_t)std::lround(ramp * 255.0f);
+            }
+        }
+
+        std::vector<std::shared_ptr<VROData>> data = {
+            std::make_shared<VROData>(pixels.data(), (int)pixels.size())
+        };
+        return std::make_shared<VROTexture>(VROTextureType::Texture2D,
+                                            VROTextureFormat::RGBA8,
+                                            VROTextureInternalFormat::RGBA8,
+                                            true, VROMipmapMode::None,
+                                            data, size, size, std::vector<uint32_t>());
+    }
+
     std::shared_ptr<VROInputPresenter> createPresenter(std::shared_ptr<VRODriver> driver) override {
-        return std::make_shared<VROInputPresenter>();
+        std::shared_ptr<VROInputPresenter> presenter = std::make_shared<VROInputPresenter>();
+        _reticle = std::make_shared<VROReticle>(createReticleTexture());
+        // Not headlocked: the reticle belongs at the point the hand ray hits, not pinned to the
+        // centre of view. Headlocked is for platforms that aim with the head.
+        _reticle->setPointerFixed(false);
+        _reticle->setEnabled(false);
+        presenter->setReticle(_reticle);
+        return presenter;
+    }
+
+    /*
+     Place the reticle on whatever the ray hit this frame, and size it by distance so it keeps a
+     constant angular size — a fixed-radius reticle is a dot far away and a hoop up close.
+     */
+    void applyReticle(const VROCamera &camera) {
+        if (!_reticle) { return; }
+        if (!_reticleHit) {
+            _reticle->setEnabled(false);
+            return;
+        }
+        _reticle->setEnabled(true);
+        _reticle->setPosition(_reticlePosition);
+        const float distance = (_reticlePosition - camera.getPosition()).magnitude();
+        _reticle->setRadius(std::max(0.008f, distance * kReticleAngularSize));
     }
 
 private:
@@ -158,6 +239,9 @@ private:
                 VROInputControllerBase::onButtonEvent(source, VROEventDelegate::ClickState::ClickUp);
                 wasPinching = false;
             }
+            _filter[slotFor(source)].reset();
+            _hoverHeld[slotFor(source)] = false;
+            _reticleDistance[slotFor(source)] = -1.0f;
             return;
         }
 
@@ -173,19 +257,86 @@ private:
         // tripped on. By then the fingers are already 2 cm apart and most of the curl has
         // happened. `_aimHistory` keeps a short delay line so the pinch acts on the aim from
         // before the gesture started, which is the aim the wearer chose.
+        // ── The live ray ─────────────────────────────────────────────────────
+        //
+        // Origin::Head aims from between the eyes through the hand rather than along the finger.
+        // The finger ray inherits every bit of articulation noise — the joints move whenever the
+        // hand does anything, and hardest exactly as a pinch begins — whereas a head-through-hand
+        // ray does not depend on finger pose at all. It is also how people physically point.
+        VROVector3f liveOrigin  = hand.origin;
+        VROVector3f liveForward = hand.forward;
+        if (_tuning.origin == Tuning::Origin::Head && _hasHead) {
+            const VROVector3f toHand = hand.origin - _headPosition;
+            const float reach = toHand.magnitude();
+            // Too close to the head and the direction is meaningless; keep the finger ray.
+            if (reach > 0.05f) {
+                liveOrigin  = _headPosition;
+                liveForward = toHand / reach;
+            }
+        }
+        liveForward = _filter[slotFor(source)].apply(liveForward, _tuning.smoothing);
+
+        // The reticle rides the live filtered ray, deliberately not the one the events use. The
+        // hysteresis below holds the aim still until it drifts past a threshold, which is right
+        // for hover — it stops the target flickering — and wrong for a drawn indicator, which
+        // then advances in steps and reads as lag. Freezing on pinch is the same story: correct
+        // for where the click lands, wrong for where the dot is drawn.
+        _liveOrigin[slotFor(source)]  = liveOrigin;
+        _liveForward[slotFor(source)] = liveForward;
+
         Ray &aim = _aim[slotFor(source)];
         if (!wasPinching) {
-            aim.pushLive(hand.origin, hand.forward);
+            aim.pushLive(liveOrigin, liveForward);
         }
         const bool pinchStarting = hand.pinching && !wasPinching;
         if (pinchStarting) {
             aim.freeze();
         }
-        const VROVector3f origin  = aim.frozen ? aim.frozenOrigin  : hand.origin;
-        const VROVector3f forward = aim.frozen ? aim.frozenForward : hand.forward;
+        const VROVector3f origin  = aim.frozen ? aim.frozenOrigin  : liveOrigin;
+        VROVector3f forward = aim.frozen ? aim.frozenForward : liveForward;
+
+        // ── Hover hysteresis ────────────────────────────────────────────────
+        //
+        // Without this, a target at the edge of the ray flickers in and out of hover as the hand
+        // breathes, and selection stops feeling like something the user controls. Once a target is
+        // acquired, hold the aim that acquired it until the ray has moved off by a real margin.
+        const int slot = slotFor(source);
+        if (!aim.frozen && _tuning.hoverHysteresis > 0.0f) {
+            if (_hoverHeld[slot]) {
+                const float drift = std::acos(std::clamp(forward.dot(_hoverForward[slot]), -1.0f, 1.0f));
+                if (drift < _tuning.hoverHysteresis) {
+                    forward = _hoverForward[slot];
+                } else {
+                    _hoverForward[slot] = forward;
+                }
+            } else {
+                _hoverForward[slot] = forward;
+                _hoverHeld[slot] = true;
+            }
+        }
 
         VROQuaternion rotation = VROQuaternion::rotationFromTo({ 0, 0, -1 }, forward);
         VROInputControllerBase::updateHitNode(source, camera, origin, forward);
+        // Take only the *depth* from the hit and lay it along the live ray. That keeps the
+        // reticle on the surface it is pointing at while still moving smoothly, and it means a
+        // miss is not a disappearance — it falls back to a fixed reach, so the wearer can always
+        // see where they are aiming, which is the whole point of having one.
+        const int rslot = slotFor(source);
+        float target = kReticleFallbackDistance;
+        if (std::shared_ptr<VROHitTestResult> hit = getHitResultForSource(source)) {
+            if (!hit->isBackgroundHit()) {
+                target = (hit->getLocation() - _liveOrigin[rslot]).magnitude();
+            }
+        }
+        // Ease the depth rather than snapping it, or crossing an edge pops the reticle between
+        // the object and the fallback distance.
+        if (_reticleDistance[rslot] <= 0.0f) {
+            _reticleDistance[rslot] = target;
+        } else {
+            _reticleDistance[rslot] += (target - _reticleDistance[rslot]) * kReticleDepthEasing;
+        }
+        _reticleHit = true;
+        _reticlePosition = _liveOrigin[rslot] + _liveForward[rslot] * _reticleDistance[rslot];
         // processGazeEvent is what turns a hit result into onHover — without it the hit is
         // computed, click still works through onButtonEvent, and hover silently never fires.
         VROInputControllerBase::processGazeEvent(source);
@@ -204,6 +355,96 @@ private:
     }
 
     static int slotFor(int source) { return source == ViroVisionOS::LeftHand ? 0 : 1; }
+
+    // ── Live-tunable input parameters ────────────────────────────────────────
+    //
+    // Defaults are the starting point for tuning on device, not settled values. They are
+    // deliberately reachable from JavaScript: input tuning takes dozens of iterations with a
+    // headset on, and a rebuild cycle is ten minutes.
+    struct Tuning {
+        enum class Origin { Finger, Head };
+        Origin origin = Origin::Head;   // head-through-hand: see setInputTuning
+        float  smoothing = 0.6f;        // 0 = raw, 1 = heavy
+        float  hoverHysteresis = 0.035f; // radians
+    };
+    Tuning _tuning;
+    VROVector3f _headPosition;
+    bool _hasHead = false;
+
+    static constexpr float kReticleAngularSize = 0.012f;
+    // Where the reticle sits when the ray hits nothing: far enough to read as "out there",
+    // near enough to stay comfortable to focus on.
+    static constexpr float kReticleFallbackDistance = 2.5f;
+    static constexpr float kReticleDepthEasing = 0.25f;
+    std::shared_ptr<VROReticle> _reticle;
+    VROVector3f _reticlePosition;
+    bool _reticleHit = false;
+    VROVector3f _liveOrigin[2];
+    VROVector3f _liveForward[2];
+    float _reticleDistance[2] = { -1.0f, -1.0f };
+
+public:
+    void setHeadPosition(const VROVector3f &p) { _headPosition = p; _hasHead = true; }
+
+    void applyTuning(NSDictionary *t) {
+        if (NSString *o = t[@"rayOrigin"]) {
+            _tuning.origin = [o isEqualToString:@"finger"] ? Tuning::Origin::Finger
+                                                           : Tuning::Origin::Head;
+            _filter[0].reset();
+            _filter[1].reset();
+        }
+        if (NSNumber *n = t[@"smoothing"]) {
+            _tuning.smoothing = std::clamp(n.floatValue, 0.0f, 1.0f);
+        }
+        if (NSNumber *n = t[@"hoverHysteresis"]) {
+            _tuning.hoverHysteresis = std::max(0.0f, n.floatValue);
+        }
+    }
+
+private:
+
+    /*
+     One-euro filter on the aim direction.
+
+     The live ray was previously raw joint data with no filtering at all, taken from a finger that
+     moves whenever the hand does anything — which is the jitter, and it is not latency: the delay
+     line below never fed the live ray.
+
+     A fixed low-pass would trade jitter for lag uniformly. This adapts: heavy smoothing when the
+     hand is nearly still, light when it is moving deliberately, so a slow careful aim is steady
+     and a fast sweep still keeps up.
+     */
+    struct DirectionFilter {
+        void reset() { initialised = false; }
+
+        VROVector3f apply(const VROVector3f &raw, float smoothing) {
+            if (smoothing <= 0.0f) { return raw; }
+            if (!initialised) {
+                value = raw; velocity = 0.0f; initialised = true;
+                return value;
+            }
+            // Angular speed stands in for the "speed" term of a one-euro filter.
+            const float speed = (raw - value).magnitude();
+            velocity = 0.7f * velocity + 0.3f * speed;
+
+            // More movement → less smoothing. The constants set how quickly that trade happens
+            // and are the part most worth tuning on device.
+            const float responsiveness = velocity / (velocity + 0.02f);
+            const float alpha = (1.0f - smoothing) + smoothing * responsiveness;
+
+            value = value * (1.0f - alpha) + raw * alpha;
+            const float len = value.magnitude();
+            if (len > 1e-5f) { value = value / len; }
+            return value;
+        }
+
+        VROVector3f value;
+        float velocity = 0.0f;
+        bool  initialised = false;
+    };
+    DirectionFilter _filter[2];
+    VROVector3f _hoverForward[2];
+    bool        _hoverHeld[2] = { false, false };
 
     /*
      A short delay line of recent aim, plus the frozen aim held for the duration of a pinch.
@@ -253,6 +494,10 @@ private:
     std::shared_ptr<VRODriverVisionOS>            _driver;
     std::shared_ptr<VRORenderer>                  _renderer;
     std::shared_ptr<VROInputControllerVisionOS>   _inputController;
+    std::unordered_map<int, uint16_t>            _trackingAreaValues;
+    // VRORenderer keeps its scene controller private, and the bridge is the only thing that ever
+    // sets one — so holding our own reference is cheaper than widening the renderer's API.
+    std::shared_ptr<VROSceneController>          _activeSceneController;
     std::shared_ptr<VRONode>                      _cameraNode;
     // VRONode::setEventDelegate stores a weak_ptr, so the scene does not keep the delegate
     // alive. Held here for the lifetime of the bridge; a local would be destroyed as soon as
@@ -778,6 +1023,7 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
 
 
     _renderer->setSceneController(sceneController, _driver);
+    _activeSceneController = sceneController;
     // ────────────────────────────────────────────────────────────────────────
 
     return self;
@@ -789,7 +1035,9 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     }
     // An empty scene rather than none: VRORenderer always needs something to render, and the
     // point here is only to stop it holding React's nodes.
-    _renderer->setSceneController(std::make_shared<VROSceneController>(), _driver);
+    auto empty = std::make_shared<VROSceneController>();
+    _renderer->setSceneController(empty, _driver);
+    _activeSceneController = empty;
     NSLog(@"[Viro] React scene detached from the ImmersiveSpace renderer");
 }
 
@@ -800,6 +1048,7 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     // No transition duration: this runs when React mounts its scene, and a cross-fade from the
     // placeholder would read as a glitch rather than a transition.
     _renderer->setSceneController(sceneController, _driver);
+    _activeSceneController = sceneController;
 
     // Worth a line: "my ImmersiveSpace is empty" has several possible causes, and this
     // distinguishes "React never handed a scene over" from "it did, and the scene is empty or
@@ -984,6 +1233,18 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
     @try {
         try {
             _renderer->renderEye(eyeType, vroView, vroProj, viewport, _driver);
+
+            // Drawn after the scene, inside the same display pass, so it composites over what it
+            // is pointing at. Its material neither reads nor writes depth, so it stays visible
+            // against geometry it overlaps.
+            if (_inputController) {
+                if (std::shared_ptr<VROReticle> reticle = _inputController->getReticle()) {
+                    if (_renderer->hasRenderContext()) {
+                        std::shared_ptr<VRODriver> driver = std::static_pointer_cast<VRODriver>(_driver);
+                        reticle->renderEye(eyeType, *_renderer->getRenderContext(), driver);
+                    }
+                }
+            }
         } catch (const std::exception &e) {
             NSLog(@"[ViroBridge] renderEye C++ exception: %s (frame=%d)", e.what(), _frameNumber);
         } catch (...) {
@@ -1007,6 +1268,112 @@ static __weak VRORendererBridge *sCurrentBridge = nil;
 }
 
 // ── endFrame ─────────────────────────────────────────────────────────────────
+
+- (NSArray<NSNumber *> *)hoverableNodeIdentifiers {
+    NSMutableArray<NSNumber *> *ids = [NSMutableArray array];
+    if (!_renderer) { return ids; }
+    if (!_activeSceneController) { return ids; }
+    auto scene = _activeSceneController->getScene();
+    if (!scene) { return ids; }
+
+    // Walk the tree once per frame. A node gets a tracking area if it responds to the pointer at
+    // all — not only OnHover. The system effect exists to say "this reacts to you", and a box
+    // that takes a click but never lights up reads as dead, which is the opposite of the point.
+    std::function<void(const std::shared_ptr<VRONode> &)> walk =
+        [&](const std::shared_ptr<VRONode> &node) {
+            if (!node) { return; }
+            auto delegate = node->getEventDelegate();
+            if (delegate &&
+                (delegate->isEventEnabled(VROEventDelegate::EventAction::OnHover) ||
+                 delegate->isEventEnabled(VROEventDelegate::EventAction::OnClick) ||
+                 delegate->isEventEnabled(VROEventDelegate::EventAction::OnDrag))) {
+                [ids addObject:@((uint64_t)node->getUniqueID())];
+            }
+            for (const auto &child : node->getChildNodes()) { walk(child); }
+        };
+    walk(scene->getRootNode());
+    return ids;
+}
+
+- (void)renderTrackingAreasWithViewIndex:(NSUInteger)viewIndex
+                    renderPassDescriptor:(MTLRenderPassDescriptor *)renderPass
+                           viewTransform:(simd_float4x4)viewTransform
+                                tangents:(simd_float4)tangents {
+    if (!_renderer || !_activeSceneController) {
+        return;
+    }
+    auto scene = _activeSceneController->getScene();
+    if (!scene) { return; }
+
+    if (!_renderer->hasRenderContext()) { return; }
+    VRORenderContext &context = *_renderer->getRenderContext();
+
+    // The context is left holding the *last* eye drawn, so reusing it as-is would write both
+    // eyes' ids from the right eye's viewpoint — a highlight offset from its object on the left.
+    // Point it at this view instead; the next frame's renderEye overwrites these again.
+    VROMatrix4f vroView = toMatrix4f(viewTransform);
+    VROMatrix4f vroProj = [VRORendererBridge projectionFromTangents:tangents
+                                                               near:kZNear
+                                                                far:kZFar];
+    context.setViewMatrix(vroView);
+    context.setProjectionMatrix(vroProj);
+
+    _driver->beginDisplayPass(renderPass);
+
+    // beginDisplayPass only hands the descriptor to the display target; the encoder is not
+    // created until something binds it. The eye pass gets that for free inside renderEye, but
+    // this pass has no renderer call to do it, so bind here — without this every draw below
+    // returns early on a nil encoder and the descriptor's clear never runs, which leaves the
+    // tracking texture holding whatever was in that memory.
+    if (std::shared_ptr<VRORenderTarget> display = _driver->getDisplay()) {
+        display->bind();
+    }
+
+    // Deliberately after the bind, not before it: a scene with nothing hoverable still has to
+    // clear this texture. Returning early would present whatever was in that memory, and the
+    // compositor reads it to decide the hover effect.
+    if (_trackingAreaValues.empty()) {
+        _driver->endDisplayPass();
+        return;
+    }
+
+    std::shared_ptr<VRODriver> driver = std::static_pointer_cast<VRODriver>(_driver);
+
+    std::function<void(const std::shared_ptr<VRONode> &)> walk =
+        [&](const std::shared_ptr<VRONode> &node) {
+            if (!node) { return; }
+            auto it = _trackingAreaValues.find(node->getUniqueID());
+            if (it != _trackingAreaValues.end()) {
+                if (auto geometry = node->getGeometry()) {
+                    geometry->renderTrackingArea(node->getWorldTransform(), it->second,
+                                                 context, driver);
+                }
+            }
+            for (const auto &child : node->getChildNodes()) { walk(child); }
+        };
+    walk(scene->getRootNode());
+
+    _driver->endDisplayPass();
+}
+
+- (void)resetTrackingAreas {
+    _trackingAreaValues.clear();
+}
+
+- (void)registerTrackingAreaForIdentifier:(uint64_t)identifier renderValue:(uint16_t)renderValue {
+    _trackingAreaValues[(int)identifier] = renderValue;
+}
+
+- (void)setHeadPosition:(simd_float3)headPosition {
+    if (!_inputController) { return; }
+    _inputController->setHeadPosition({ headPosition.x, headPosition.y, headPosition.z });
+}
+
+- (void)setInputTuning:(NSDictionary *)tuning {
+    if (!_inputController || tuning == nil) { return; }
+    _inputController->applyTuning(tuning);
+    NSLog(@"[Viro] input tuning: %@", tuning);
+}
 
 - (void)updateHandsWithLeftValid:(BOOL)leftValid
                       leftOrigin:(simd_float3)leftOrigin

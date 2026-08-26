@@ -49,6 +49,12 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     // Pinch is latched with hysteresis. A single threshold chatters around the boundary and
     // turns one deliberate pinch into a burst of clicks; closing at 2 cm and only releasing
     // at 3.2 cm costs nothing and makes the gesture read as one event.
+    // Logged only on change: this is recomputed every frame and a per-frame line would bury
+    // everything else in the console.
+    private static var lastTrackingAreaCount = -1
+
+    static let trackingAreasEnabled = ProcessInfo.processInfo.environment["VIRO_TRACKING_AREAS"] != "0"
+
     private static let pinchCloseDistance: Float = 0.020
     private static let pinchOpenDistance:  Float = 0.032
     private var leftPinching  = false
@@ -195,6 +201,13 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 tangents: Self.tangentsFromDrawable(primary, viewIndex: 0))
         }
 
+        // The head position feeds the head-through-hand ray. Set before the hands so the ray is
+        // built from this frame's pose rather than the previous one's.
+        if let anchor = deviceAnchor {
+            let m = anchor.originFromAnchorTransform
+            bridge.setHeadPosition(simd_float3(m.columns.3.x, m.columns.3.y, m.columns.3.z))
+        }
+
         // Hands are sampled once per frame, before any eye is rendered, so both eyes see the
         // same input state. Doing it per drawable would let the two eyes disagree about where
         // the pointer is, which reads as jitter.
@@ -260,6 +273,75 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                     depthTexture: depthTexture,
                     viewTransform: eyeFromWorld,
                     tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
+            }
+
+            // ── Tracking areas for this drawable ─────────────────────────────
+            //
+            // Registered per frame, before the render pass, because the render value a tracking
+            // area gets is only valid for this frame — the identifier is what stays stable across
+            // frames for the same object.
+            //
+            // The compositor reads the tracking-areas texture to decide what to highlight, so a
+            // registration only takes effect once the pass below writes that area's render value
+            // into the pixels its object covers.
+            if #available(visionOS 26.0, *), !drawable.trackingAreasTextures.isEmpty {
+                bridge.resetTrackingAreas()
+                let identifiers = bridge.hoverableNodeIdentifiers()
+                if identifiers.count != Self.lastTrackingAreaCount {
+                    Self.lastTrackingAreaCount = identifiers.count
+                    NSLog("[Viro] tracking areas registered: %d", identifiers.count)
+                }
+                for boxed in identifiers {
+                    let raw = boxed.uint64Value
+                    let area = drawable.addTrackingArea(
+                        identifier: LayerRenderer.Drawable.TrackingArea.Identifier(rawValue: raw))
+                    area.addHoverEffect(.automatic)
+                    bridge.registerTrackingArea(forIdentifier: raw,
+                                                renderValue: UInt16(area.renderValue.rawValue))
+                }
+            }
+
+            // ── Tracking-areas pass ──────────────────────────────────────────
+            //
+            // A second, cheap pass per eye that writes one integer id per pixel. It is separate
+            // from the picture on purpose: sharing the main pass would mean every Viro fragment
+            // shader had to grow a second output, and those shaders are shared with every other
+            // platform.
+            //
+            // Depth is loaded, not cleared, and never written: the ids must be occluded by the
+            // same geometry that occludes the picture, or the compositor would highlight an
+            // object hidden behind a wall.
+            // VIRO_TRACKING_AREAS=0 disables this. It was suspected of the termination that
+            // turned out to be the -[UIView superview] shadowing in VRTView, and it is kept
+            // switchable because it is the newest pass in the frame.
+            if Self.trackingAreasEnabled,
+               #available(visionOS 26.0, *), !drawable.trackingAreasTextures.isEmpty {
+                for i in 0..<viewCount {
+                    let view = drawable.views[i]
+                    let index = view.textureMap.textureIndex
+                    guard index < drawable.trackingAreasTextures.count else { continue }
+                    let trackingTexture = drawable.trackingAreasTextures[index]
+                    let depthTexture = drawable.depthTextures[index]
+                    let slice = trackingTexture.textureType == .type2DArray ? i : 0
+
+                    let pass = MTLRenderPassDescriptor()
+                    pass.colorAttachments[0].texture     = trackingTexture
+                    pass.colorAttachments[0].slice       = slice
+                    // Clear to zero: TrackingArea.RenderValue.invalid, "nothing here".
+                    pass.colorAttachments[0].loadAction  = .clear
+                    pass.colorAttachments[0].clearColor  = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+                    pass.colorAttachments[0].storeAction = .store
+                    pass.depthAttachment.texture     = depthTexture
+                    pass.depthAttachment.slice       = depthTexture.textureType == .type2DArray ? i : 0
+                    pass.depthAttachment.loadAction  = .load
+                    pass.depthAttachment.storeAction = .store
+
+                    bridge.renderTrackingAreas(
+                        withViewIndex: UInt(i),
+                        renderPassDescriptor: pass,
+                        viewTransform: view.transform * deviceFromWorld,
+                        tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
+                }
             }
 
             // A pass that returns without closing its encoder would abort the process inside

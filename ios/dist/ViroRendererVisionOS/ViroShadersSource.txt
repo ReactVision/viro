@@ -1817,6 +1817,48 @@ fragment void silhouette_fragment_textured(VROSilhouetteVertexOut in [[ stage_in
     }
 }
 
+// ── Tracking areas (visionOS hover) ───────────────────────────────────────────
+//
+// visionOS applies its own gaze-driven hover effect to a Metal immersive app, but it needs to
+// know which pixels belong to which object. The app renders an id per pixel into a separate
+// texture and the compositor does the rest — it never tells us where the wearer is looking, it
+// just draws the highlight over the right shape.
+//
+// The output type is an integer, not a colour: the tracking-areas texture is r8Uint (or r16Uint),
+// so a float fragment would not even bind. That is why this cannot reuse the silhouette pipeline,
+// which has either no fragment stage or a void one.
+//
+// The value written is the tracking area's *render value* for this frame, supplied per draw.
+
+vertex VROSilhouetteVertexOut tracking_area_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                   constant VROViewUniforms &view [[ buffer(1) ]]) {
+    VROSilhouetteVertexOut out;
+    out.position = view.modelview_projection_matrix * float4(attributes.position, 1.0);
+    out.texcoord = attributes.texcoord;
+    return out;
+}
+
+vertex VROSilhouetteVertexOut tracking_area_skinned_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                           constant VROViewUniforms &view [[ buffer(1) ]],
+                                                           constant float4x4 *bone_matrices [[ buffer(5) ]]) {
+    const float4 pos_h = float4(attributes.position, 1.0);
+    const float4 blended =
+        (bone_matrices[attributes.bone_indices.x] * pos_h) * attributes.bone_weights.x +
+        (bone_matrices[attributes.bone_indices.y] * pos_h) * attributes.bone_weights.y +
+        (bone_matrices[attributes.bone_indices.z] * pos_h) * attributes.bone_weights.z +
+        (bone_matrices[attributes.bone_indices.w] * pos_h) * attributes.bone_weights.w;
+
+    VROSilhouetteVertexOut out;
+    out.position = view.modelview_projection_matrix * float4(blended.xyz, 1.0);
+    out.texcoord = attributes.texcoord;
+    return out;
+}
+
+fragment uint tracking_area_fragment(VROSilhouetteVertexOut in [[ stage_in ]],
+                                     constant uint &render_value [[ buffer(2) ]]) {
+    return render_value;
+}
+
 // ── Post-processing ───────────────────────────────────────────────────────────
 //
 // The OpenGL path assembles a GLSL fragment shader at runtime from string fragments

@@ -114,6 +114,44 @@ NS_ASSUME_NONNULL_BEGIN
                     rightForward:(simd_float3)rightForward
                    rightPinching:(BOOL)rightPinching;
 
+/// Live input tuning, settable from JavaScript so the numbers can be found with a headset on
+/// rather than through ten-minute rebuild cycles.
+///
+/// Keys, all optional; anything absent keeps its current value:
+///   `rayOrigin`      — `"finger"` (knuckle through fingertip) or `"head"` (eyes through hand).
+///   `smoothing`      — 0 disables the filter; 1 is heavy. Applies to the live ray only.
+///   `hoverHysteresis`— radians the ray must move off a hovered target before it is dropped.
+- (void)setInputTuning:(NSDictionary *)tuning;
+
+/// Stable identifiers for every node in the current scene that wants hover.
+///
+/// One per tracking area. The identifier must be the same across frames for the same object, so
+/// the compositor can follow it; VRONode's unique id already satisfies that.
+- (NSArray<NSNumber *> *)hoverableNodeIdentifiers;
+
+/// Records the render value the compositor assigned to a node's tracking area this frame.
+///
+/// Render values are per frame; identifiers are not. The renderer writes this value into the
+/// tracking-areas texture for the pixels the node covers.
+- (void)registerTrackingAreaForIdentifier:(uint64_t)identifier renderValue:(uint16_t)renderValue;
+
+/// Draws every hoverable node into the tracking-areas texture as a flat id.
+///
+/// Run after the scene has been rendered for this view, with the tracking-areas texture bound as
+/// the colour attachment and the drawable's depth attached read-only, so the ids are occluded by
+/// the same geometry that occludes the picture. Until this runs the texture is all zeroes, which
+/// the compositor reads as "no tracking area here" and nothing is highlighted.
+- (void)renderTrackingAreasWithViewIndex:(NSUInteger)viewIndex
+                    renderPassDescriptor:(MTLRenderPassDescriptor *)renderPass
+                           viewTransform:(simd_float4x4)viewTransform
+                                tangents:(simd_float4)tangents;
+
+/// Clears the per-frame tracking area table before it is refilled.
+- (void)resetTrackingAreas;
+
+/// The head pose, needed for the head-through-hand ray. Set once per frame before -updateHands…
+- (void)setHeadPosition:(simd_float3)headPosition;
+
 - (void)endFrame;
 
 /// Turn frame timing on. Off by default because it costs a counter sample buffer and a

@@ -94,6 +94,33 @@ struct ViroLayerConfiguration: CompositorLayerConfiguration {
         // TODO: implement single-pass layered rendering to re-enable .layered.
         configuration.layout = .dedicated
 
+        // ── Tracking areas ───────────────────────────────────────────────────
+        //
+        // This is how a Metal immersive app gets the system's own gaze-driven hover. The app
+        // registers a tracking area per hoverable object, writes that area's render value into
+        // an extra texture during its render pass, and the compositor applies the highlight
+        // afterwards using that texture and the wearer's gaze.
+        //
+        // The gaze itself is never handed to the app — the system draws the effect. Which means
+        // the hover looks exactly like every other visionOS control, rather than like something
+        // we approximated.
+        //
+        // visionOS 26.0 and later. Older systems simply skip this and fall back to the ray.
+        if #available(visionOS 26.0, *) {
+            let formats = capabilities.supportedTrackingAreasFormats
+            NSLog("[Viro] LayerCfg supportedTrackingAreasFormats=%@",
+                  formats.map { $0.rawValue } as NSArray)
+            if let format = formats.first {
+                configuration.trackingAreasFormat = format
+                // renderTarget so our pass can write ids into it; shaderRead because the
+                // compositor samples it after we are done.
+                configuration.trackingAreasUsage = [.renderTarget, .shaderRead]
+                NSLog("[Viro] tracking areas enabled, format=%lu", format.rawValue)
+            } else {
+                NSLog("[Viro] tracking areas unsupported on this layer — hover falls back to the ray")
+            }
+        }
+
         // Foveation also requires rasterizationRateMap on the render pass.
         // Keep disabled until that support is added.
         configuration.isFoveationEnabled = false

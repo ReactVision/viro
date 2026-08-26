@@ -57,21 +57,34 @@
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
     self = [super initWithBridge:bridge];
     if (self) {
-#if TARGET_OS_VISION
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(immersiveRendererDidBecomeActive:)
-                                                     name:@"ViroImmersiveRendererDidBecomeActive"
-                                                   object:nil];
-#endif
     }
     return self;
 }
 
 #if TARGET_OS_VISION
+// The observer is bound to the window, not to the object's lifetime.
+//
+// NSNotificationCenter keeps an unretained reference, so a registration that outlives the view
+// by even a moment is a message to freed memory. React Native recycles this view through
+// RCTLegacyViewManagerInteropComponentView, which tears it out of the hierarchy on unmount —
+// registering in -init and unregistering only in -dealloc left exactly that window open, and the
+// app died in -[UIView removeFromSuperview] with an objc_msgSend on a released object.
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    [center removeObserver:self name:@"ViroImmersiveRendererDidBecomeActive" object:nil];
+    if (self.window != nil) {
+        [center addObserver:self
+                   selector:@selector(immersiveRendererDidBecomeActive:)
+                       name:@"ViroImmersiveRendererDidBecomeActive"
+                     object:nil];
+        // The renderer may already be up by the time this view lands in a window.
+        [self attachPendingSceneToBridge];
+    }
+}
+
 - (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:@"ViroImmersiveRendererDidBecomeActive"
-                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 #endif
 

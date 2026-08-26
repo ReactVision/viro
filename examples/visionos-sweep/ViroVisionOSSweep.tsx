@@ -8,30 +8,35 @@
  * in the visionOS target appear here — putting an unsupported component on screen would produce
  * a link error, not a red box, and would take the whole sweep down with it.
  *
+ * ── Corrected 2026-08-25 (Session 26). Three assumptions in the original header were wrong: ──
+ *
+ *   ViroSkyBox now WORKS. The portal background family was implemented, and a stub constructor
+ *   that never set VRONodeType::Portal — which made VRONode::getParentPortal() return nullptr and
+ *   crashed VRTSkybox on a null dereference — was fixed. A solid-colour skybox needs no cube map.
+ *
+ *   Input is NOT inert. Two-handed tracking, ray, pinch, hover and click are implemented and were
+ *   validated on device. What is still unproven is the last hop into JavaScript — see
+ *   InputTestScene in the testbed, and note the Simulator has no hand tracking at all.
+ *
+ *   The scene host is NOT Viro3DSceneNavigator. That component is the OpenGL presentation path
+ *   (it builds an EAGLContext and hosts a VROViewScene) and is excluded from the visionOS build
+ *   outright. Use ViroXRSceneNavigator, which routes to ViroSceneNavigator and hands the scene to
+ *   the ImmersiveSpace renderer. Its scene must be rooted in ViroScene, never ViroARScene.
+ *
  * Deliberately NOT in this scene, and why:
- *   ViroSkyBox / Viro360Image / Viro360Video   VROPortal::setBackground* is undefined in the
- *                                             visionOS target — link failure, see the doc
+ *   Viro360Image / Viro360Video               no video texture backend on xros
  *   ViroVideo / ViroMaterialVideo              VROVideoTextureiOS is not in the target
  *   ViroSound / ViroSoundField / SpatialSound  no audio backend
  *   ViroPortal / ViroPortalScene               traversePortals has no recursion
  *   ViroCameraTexture / ViroObjectDetector     no passthrough camera access
  *   everything under components/AR/            ~30 VROAR* classes excluded from the target
- *
- * Page 5 exists to record that input is inert rather than to have someone rediscover it: the
- * bridge's VROInputControllerVisionOS satisfies its pure virtuals but nothing feeds it a hit
- * test until hand tracking lands, so onClick never fires anywhere in this scene.
- *
- * Assumption worth checking on first run: the non-AR Viro3DSceneNavigator is the scene host on
- * visionOS. That is the documented non-AR path, but it has not been exercised inside an
- * ImmersiveSpace — if the scene does not attach, that is the first thing to look at, not the
- * components.
  */
 
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   Viro3DObject,
-  Viro3DSceneNavigator,
+  ViroXRSceneNavigator,
   ViroAmbientLight,
   ViroBox,
   ViroButton,
@@ -291,7 +296,7 @@ export function ViroVisionOSSweepScene(props: SweepSceneProps) {
 
 // ── 2D control panel ─────────────────────────────────────────────────────────
 
-/** The renderer feature flags Viro3DSceneNavigator requires. They double as the cost-attribution
+/** The renderer feature flags the navigator forwards. They double as the cost-attribution
  *  control the frame timer falls back to when per-pass GPU counters are unavailable: toggle one,
  *  read the GPU total, take the difference. Defaults are everything on except MSAA, which the M6
  *  ticket gates behind a confirmed budget. */
@@ -355,8 +360,8 @@ export default function ViroVisionOSSweep() {
       </View>
 
       {immersive && (
-        <Viro3DSceneNavigator
-          initialScene={{ scene: ViroVisionOSSweepScene as any }}
+        <ViroXRSceneNavigator
+          vrInitialScene={{ scene: ViroVisionOSSweepScene as any }}
           viroAppProps={{ page }}
           debug={false}
           onExitViro={() => setImmersive(false)}

@@ -25,7 +25,9 @@
     "clean": "rm -rf ./dist/ *.tgz node_modules/",
     "release": "release-it",
     "after:release": "./prepare_release.sh",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "harness:assets": "bash scripts/sync-harness-assets.sh",
+    "preharness": "npm run harness:assets"
   },
   "peerDependencies": {
     "@callstack/react-native-visionos": ">=0.83.0 <0.87.0",

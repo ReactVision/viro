@@ -234,7 +234,18 @@ function ViroARSceneNavigator(props) {
             },
         });
         sessionRef.current = session;
-        await session.start();
+        // start() rejects when it cannot start, having already called onError with
+        // the reason. Swallow the rejection here rather than letting it escape an
+        // onClick handler, and above all do not fall through to setStarted(true):
+        // that used to run even on a denied camera, undoing the state onError had
+        // just set and leaving the UI claiming a session that does not exist.
+        try {
+            await session.start();
+        }
+        catch {
+            sessionRef.current = null;
+            return;
+        }
         setStarted(true);
         setStarting(false);
         props.onSessionReady?.(session);

@@ -45,6 +45,7 @@ type ArOptions = Partial<
     | "captureHeight"
     | "facingMode"
     | "intrinsics"
+    | "intrinsicsSize"
     | "tuning"
     | "showCameraBackground"
     | "detectPlanes"

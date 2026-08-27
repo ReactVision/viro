@@ -20,7 +20,7 @@
 import * as React from "react";
 import { ViroArSession, type ViroWebRendererOptions, type ViroArSessionOptions } from "@reactvision/viro-web-renderer";
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
-type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "facingMode" | "intrinsics" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
+type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "facingMode" | "intrinsics" | "intrinsicsSize" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
 type Props = {
     initialScene: {
         scene: React.ComponentType<any>;

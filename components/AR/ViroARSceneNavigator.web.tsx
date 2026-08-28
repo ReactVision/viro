@@ -61,11 +61,14 @@ type Props = {
   /** WASM renderer asset-loading options (bundler/ESM). See Viro3DSceneNavigator.web. */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
   /**
-   * URL to the tracking engine's glue (tinyvio-slam.js). Injected as a <script>; the build
-   * exposes a global `SlamModule` factory. Ignored if `loadSlam` is provided.
+   * URL to the tracking engine's glue (tinyvio-slam.js), injected as a <script>.
+   *
+   * Optional. `@reactvision/viro-web-renderer` ships the engine, and that copy
+   * is used when neither this nor `loadSlam` is given. Set this only to serve a
+   * different build, or one hosted somewhere your bundler put it.
    */
   slamScriptUrl?: string;
-  /** Override how the slam-wasm factory is obtained (e.g. an ESM import()). */
+  /** Override how the tracking-engine factory is obtained (e.g. an ESM import()). */
   loadSlam?: ViroArSessionOptions["loadSlam"];
   /** Capture/tuning options for tracking. */
   arOptions?: ArOptions;
@@ -222,16 +225,12 @@ export function ViroARSceneNavigator(props: Props) {
     if (props.loadSlam) return props.loadSlam;
     const url = props.slamScriptUrl;
     if (url) return () => loadSlamViaScript(url);
-    // Fall back to a pre-loaded global (host injected the <script> itself).
-    return () => {
-      const factory = (globalThis as any).SlamModule as SlamWasmFactory | undefined;
-      if (!factory) {
-        throw new Error(
-          "slam-wasm not found: pass slamScriptUrl or loadSlam, or preload global SlamModule.",
-        );
-      }
-      return factory;
-    };
+    // Neither given: let the renderer load the engine it ships with. Returning
+    // undefined is what selects that path -- it is the default, not a failure.
+    // A host that injected the <script> itself is still served, because the
+    // bundled loader reuses an existing `SlamModule` global rather than
+    // fetching a second copy of a 265 KB module to arrive at the same object.
+    return undefined;
   }, [props.loadSlam, props.slamScriptUrl]);
 
   const startAR = useCallback(async () => {

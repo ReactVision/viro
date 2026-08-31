@@ -30,7 +30,7 @@
     "preharness": "npm run harness:assets"
   },
   "peerDependencies": {
-    "@callstack/react-native-visionos": ">=0.83.0 <0.87.0",
+    "@reactvision/react-native-visionos": ">=0.83.0 <0.87.0",
     "@reactvision/viro-web-renderer": ">=0.0.1",
     "expo": ">=55.0.0 <58.0.0",
     "react": ">=18.0.0",
@@ -41,16 +41,16 @@
     "react-native": ">=0.83.0 <0.87.0"
   },
   "peerDependenciesMeta": {
-    "@callstack/react-native-visionos": {
+    "@reactvision/react-native-visionos": {
+      "optional": true
+    },
+    "@reactvision/viro-web-renderer": {
       "optional": true
     },
     "expo": {
       "optional": true
     },
     "react-native-web": {
-      "optional": true
-    },
-    "@reactvision/viro-web-renderer": {
       "optional": true
     }
   },

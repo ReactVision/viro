@@ -44,7 +44,7 @@ import path from "path";
 
 const PODFILE_MARKER = "# viro-visionos";
 const METRO_MARKER = "// viro-visionos";
-const RNVISION_PKG = "@callstack/react-native-visionos";
+const RNVISION_PKG = "@reactvision/react-native-visionos";
 const RNVISION_PLATFORMS_PKG = "@callstack/out-of-tree-platforms";
 
 // Path inside this package where bundled assets live (resolved at runtime).
@@ -270,6 +270,18 @@ const withVisionOSPodfile: ConfigPlugin = (config) =>
           (_, header, body) => `${header}${body}${VIRO_PODS}\nend`
         );
       }
+
+      // ── 3a-bis. Repoint the react_native_pods.rb require ──
+      //
+      // The generated Podfile resolves this script through whatever package the template was
+      // built against. That name is not ours, so after installing this fork `pod install` dies
+      // with "Cannot find module '<other-scope>/react-native-visionos/scripts/react_native_pods.rb'"
+      // before a single pod is written — a confusing first failure, and one no amount of
+      // reactNativePath configuration fixes, because it happens while the Podfile is being read.
+      podfile = podfile.replace(
+        /"@[a-z0-9-]+\/react-native-visionos\/scripts\/react_native_pods\.rb"/g,
+        `"${RNVISION_PKG}/scripts/react_native_pods.rb"`
+      );
 
       // ── 3b. Ensure config[:reactNativePath] is set correctly ──
       if (!podfile.includes("config[:reactNativePath]")) {
@@ -687,7 +699,24 @@ const withVisionOSBundlePhase: ConfigPlugin = (config) =>
         return newConfig;
       }
 
-      const pbx = fs.readFileSync(pbxPath, "utf-8");
+      let pbx = fs.readFileSync(pbxPath, "utf-8");
+
+      // The template's phase runs react-native-xcode.sh out of whatever package it was generated
+      // against, and that script sources with-environment.sh beside it. Neither path is ours, so
+      // the phase dies with "with-environment.sh: No such file or directory" — and only on device,
+      // because the Simulator loads from the dev server and never runs this phase in anger.
+      const staleScriptPath =
+        /@[a-z0-9-]+\/react-native-visionos\/scripts\/react-native-xcode\.sh/g;
+      const repointed = pbx.replace(
+        staleScriptPath,
+        `${RNVISION_PKG}/scripts/react-native-xcode.sh`
+      );
+      if (repointed !== pbx) {
+        pbx = repointed;
+        fs.writeFileSync(pbxPath, pbx, "utf-8");
+        console.log("[withViroVisionOS] Repointed the bundling phase at this fork's scripts");
+      }
+
       if (pbx.includes("resolveAppEntry")) return newConfig; // idempotent
 
       // Anchor on the template's own first line. An earlier draft anchored on

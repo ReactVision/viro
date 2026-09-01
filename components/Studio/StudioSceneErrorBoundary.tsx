@@ -3,7 +3,7 @@ import { Component, ErrorInfo, ReactNode } from "react";
 interface Props {
   children: ReactNode;
   onError?: (error: Error) => void;
-  renderError?: (error: Error) => ReactNode;
+  renderError?: (error: Error, retry: () => void) => ReactNode;
   sceneId?: string;
 }
 
@@ -15,12 +15,13 @@ interface State {
 /**
  * Catches render/lifecycle errors in the Studio scene tree so a bad asset or a
  * node-factory throw can't take down the host app. Always reports via onError;
- * renders renderError(error) if provided, else nothing (no built-in UI).
+ * renders renderError(error, retry) if provided, else nothing (no built-in UI).
  *
  * AR-only in effect: on Quest, ViroXRSceneNavigator forwards to a separate
  * React root (VRActivity), so scene errors there are outside this boundary.
- * Native and async errors are also out of a React boundary's reach; async
- * scene-load failures route through onError in StudioSceneNavigator instead.
+ * Native and async errors are also out of a React boundary's reach; a failed
+ * scene load is caught in StudioSceneNavigator, which renders the same
+ * renderError itself with a retry that refetches.
  */
 export class StudioSceneErrorBoundary extends Component<Props, State> {
   public state: State = { hasError: false, error: null };
@@ -39,9 +40,17 @@ export class StudioSceneErrorBoundary extends Component<Props, State> {
     );
   }
 
+  /**
+   * Retry for the render path: re-mounting the children is the whole recovery,
+   * because the scene data is already loaded. Nothing refetches.
+   */
+  private retry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   public render() {
     if (this.state.hasError && this.state.error) {
-      return this.props.renderError?.(this.state.error) ?? null;
+      return this.props.renderError?.(this.state.error, this.retry) ?? null;
     }
     return this.props.children;
   }

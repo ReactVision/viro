@@ -28,6 +28,7 @@ import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore } from "./domain/placementStore";
+import { studioApiError } from "./domain/studioApiError";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
@@ -201,10 +202,15 @@ export interface StudioSceneNavigatorProps {
    */
   loadingView?: React.ReactNode;
   /**
-   * Opt-in UI for a caught render error. The boundary always catches and calls
-   * `onError`; when this is omitted it renders nothing.
+   * Opt-in UI for a failed scene load or a caught render error. `onError` is
+   * always called either way; when this is omitted it renders nothing, and a
+   * load failure leaves the loading overlay in place.
+   *
+   * `retry` refetches the scene on the load path, or re-mounts the scene tree
+   * on the render path. Errors from a load are StudioApiError, so branch on
+   * `code` rather than matching the message.
    */
-  renderError?: (error: Error) => React.ReactNode;
+  renderError?: (error: Error, retry: () => void) => React.ReactNode;
   /**
    * Show the built-in "recording" indicator (a REC pill) while a RECORD_VIDEO
    * action is recording. Default true, positioned top-centre with an approximate
@@ -264,6 +270,22 @@ export const StudioSceneNavigator = forwardRef<
   const loadedSceneIdRef = useRef<string | null>(null);
 
   const [isSceneReady, setIsSceneReady] = useState(false);
+
+  // A failed load has to be state, not just an onError callback: the loading
+  // overlay is gated on isSceneReady, which never flips when the load throws,
+  // so without this the host is left showing its loadingView forever.
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // Deliberately does not clear loadedSceneIdRef: it is only assigned after a
+  // successful parse, so it is already null on the path that can fail. Leaving
+  // it means a retry after a scene did load is a no-op rather than a second
+  // push of the same scene onto the navigator.
+  const retryLoad = useCallback(() => {
+    setLoadError(null);
+    setIsSceneReady(false);
+    setLoadAttempt((attempt) => attempt + 1);
+  }, []);
 
   // Session-scoped variable store: outlives every scene push, resets when the
   // navigator (= the AR/VR session) unmounts.
@@ -351,7 +373,7 @@ export const StudioSceneNavigator = forwardRef<
 
     const projectResult = await VRTStudioModule.rvGetProject();
     if (!projectResult.success) {
-      throw new Error(projectResult.error ?? "rvGetProject failed");
+      throw studioApiError("rvGetProject", projectResult.error);
     }
     if (typeof projectResult.data !== "string") {
       throw new Error("rvGetProject returned no data");
@@ -367,7 +389,11 @@ export const StudioSceneNavigator = forwardRef<
     if (project.scenes.length > 0) {
       return project.scenes[0].id;
     }
-    throw new Error(`Project ${project.id} has no scenes`);
+    // Id on a field, not in the message: interpolated it would open a new
+    // group per project in the host's error reporter.
+    throw Object.assign(new Error("Project has no scenes"), {
+      projectId: project.id,
+    });
   }, [sceneId]);
 
   const loadScene = useCallback(
@@ -385,7 +411,7 @@ export const StudioSceneNavigator = forwardRef<
       const result = await VRTStudioModule.rvGetScene(resolvedSceneId);
       if (isCancelled()) return;
       if (!result.success) {
-        throw new Error(result.error ?? "rvGetScene failed");
+        throw studioApiError("rvGetScene", result.error);
       }
       if (typeof result.data !== "string") {
         throw new Error("rvGetScene returned no data");
@@ -455,6 +481,7 @@ export const StudioSceneNavigator = forwardRef<
     loadScene(isCancelled).catch((e: unknown) => {
       if (cancelled) return;
       const err = e instanceof Error ? e : new Error(String(e));
+      setLoadError(err);
       const handler = onErrorRef.current;
       if (handler) handler(err);
       else console.error("[Studio] Failed to load scene:", err);
@@ -463,15 +490,23 @@ export const StudioSceneNavigator = forwardRef<
     return () => {
       cancelled = true;
     };
-  }, [sceneId, loadScene]);
+    // loadAttempt is the retry trigger: loadScene is stable within a mount, so
+    // bumping it is what re-runs the fetch without remounting the AR session.
+  }, [sceneId, loadScene, loadAttempt]);
+
+  // Falls back to loadingView when the host passes no renderError, so callers
+  // that never opted in keep exactly their previous behaviour.
+  const loadErrorView = loadError ? renderError?.(loadError, retryLoad) : null;
+  const overlay = isSceneReady ? null : (loadErrorView ?? loadingView ?? null);
 
   // Quest has no camera passthrough, so during load it always needs something
   // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
-  // live camera, so its overlay stays opt-in.)
+  // live camera, so its overlay stays opt-in.) This branch sits above the error
+  // boundary, which is why it has to handle loadError itself.
   if (isQuest && !vrSceneEntry) {
     return (
       <View style={styles.loader}>
-        {loadingView ?? <ActivityIndicator size="large" color="#ffffff" />}
+        {overlay ?? <ActivityIndicator size="large" color="#ffffff" />}
       </View>
     );
   }
@@ -495,10 +530,10 @@ export const StudioSceneNavigator = forwardRef<
           style={StyleSheet.absoluteFill}
         />
         {/* Absolutely filled so the overlay covers the navigator instead of
-            taking flow space beneath it. */}
-        {!isSceneReady && loadingView && (
-          <View style={StyleSheet.absoluteFill}>{loadingView}</View>
-        )}
+            taking flow space beneath it. Swapping the overlay's content, rather
+            than replacing this subtree, keeps the AR session and its camera
+            alive while the error shows, so a retry costs no session restart. */}
+        {overlay && <View style={StyleSheet.absoluteFill}>{overlay}</View>}
         {recordingIndicator && (
           <View
             pointerEvents="box-none"

@@ -8,6 +8,11 @@ export type {
   StudioSceneNavigatorHandle,
   StudioSceneNavigatorProps,
 } from "./StudioSceneNavigator";
+export { isStudioApiError } from "./domain/studioApiError";
+export type {
+  StudioApiError,
+  StudioApiErrorFields,
+} from "./domain/studioApiError";
 export type {
   StudioAnimation,
   StudioAsset,

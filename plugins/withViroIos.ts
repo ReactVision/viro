@@ -8,14 +8,42 @@ import {
 } from "@expo/config-plugins";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
+import path from "path";
 import { insertLinesHelper } from "./util/insertLinesHelper";
 import { DEFAULTS, ViroConfigurationOptions } from "./withViro";
+
+/**
+ * Resolve the on-disk `@reactvision/react-viro/ios` directory as a path
+ * relative to the iOS project root (where the Podfile lives).
+ *
+ * Hardcoding `../node_modules/...` assumes react-viro is installed in the app's
+ * own `node_modules`. That is false under pnpm/yarn workspaces (and npm
+ * workspaces), where the package is hoisted to the monorepo root or nested
+ * under `.pnpm`, so `pod install` fails with "No podspec found for ViroKit".
+ * Resolving via Node follows symlinks/hoisting and works in both flat and
+ * workspace layouts.
+ */
+export function resolveViroIosRelativePath(projectRoot: string, iosRoot: string): string {
+  const fallback = "../node_modules/@reactvision/react-viro/ios";
+  try {
+    const pkgJson = require.resolve("@reactvision/react-viro/package.json", {
+      paths: [projectRoot],
+    });
+    // CocoaPods resolves :path relative to the directory of the Podfile (iosRoot).
+    // Always emit POSIX separators (split on the current platform's sep and
+    // re-join with "/") so the generated paths are valid on Windows too.
+    return path.relative(iosRoot, path.join(path.dirname(pkgJson), "ios")).split(path.sep).join("/");
+  } catch {
+    return fallback;
+  }
+}
 
 const withViroPods = (config: ExpoConfig) => {
   config = withDangerousMod(config, [
     "ios",
     async (newConfig) => {
       const root = newConfig.modRequest.platformProjectRoot;
+      const projectRoot = newConfig.modRequest.projectRoot;
 
       // Check plugin configuration options
       let cloudAnchorProvider: string | undefined;
@@ -44,11 +72,12 @@ const withViroPods = (config: ExpoConfig) => {
 
       fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
         // ViroReact with integrated Fabric support
+        const viroIosRoot = resolveViroIosRelativePath(projectRoot, root);
         let viroPods =
           `  # ViroReact with integrated New Architecture (Fabric) support\n` +
           `  # Automatically includes Fabric components when RCT_NEW_ARCH_ENABLED=1\n` +
-          `  pod 'ViroReact', :path => '../node_modules/@reactvision/react-viro/ios'\n` +
-          `  pod 'ViroKit', :path => '../node_modules/@reactvision/react-viro/ios/dist/ViroRenderer/'`;
+          `  pod 'ViroReact', :path => '${viroIosRoot}'\n` +
+          `  pod 'ViroKit', :path => '${viroIosRoot}/dist/ViroRenderer/'`;
 
         // Add ARCore pods if enabled (explicitly via includeARCore/includeSemantics or implicitly via providers)
         // ViroKit.podspec declares these as weak_frameworks, making ARCore optional at runtime

@@ -30,15 +30,15 @@
     "preharness": "npm run harness:assets"
   },
   "peerDependencies": {
-    "@reactvision/react-native-visionos": ">=0.83.0 <0.87.0",
+    "@reactvision/react-native-visionos": ">=0.86.0 <0.87.0",
     "@reactvision/viro-web-renderer": ">=0.0.1",
-    "expo": ">=55.0.0 <58.0.0",
-    "react": ">=18.0.0",
-    "react-native": ">=0.83.0 <0.87.0",
+    "expo": ">=57.0.0 <58.0.0",
+    "react": ">=19.0.0",
+    "react-native": ">=0.86.0 <0.87.0",
     "react-native-web": ">=0.19.0"
   },
   "engines": {
-    "react-native": ">=0.83.0 <0.87.0"
+    "react-native": ">=0.86.0 <0.87.0"
   },
   "peerDependenciesMeta": {
     "@reactvision/react-native-visionos": {

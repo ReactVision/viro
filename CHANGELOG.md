@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Quest builds failed Meta Horizon Store validation on Expo projects.** Two checks the plugin meant to handle never did. The `targetSdkVersion` cap rewrote `app/build.gradle`, but Expo's template resolves targetSdk from `gradle.properties` through `rootProject.ext`, so nothing matched and the APK shipped with targetSdk 36. The GLES `uses-feature` was declared `required="false"`, which the store validator does not count as a graphics API. When `xRMode` includes `"QUEST"`, the plugin now writes `android.targetSdkVersion=34` to `gradle.properties` (only ever lowering it; `android.questTargetSdkVersion` overrides the ceiling) and declares GLES 3.0 as required. Phone-only builds are unchanged.
+
+### Added
+
+- **Quest Store packaging defaults** when `xRMode` includes `"QUEST"`: `reactNativeArchitectures=arm64-v8a` (Quest hardware is 64-bit, the store warns on 32-bit libraries, and dropping the other ABIs roughly halves the APK; opt out with `android.questArm64Only: false`) and a `com.oculus.supportedDevices` manifest entry defaulting to `quest2|questpro|quest3|quest3s` (clears the "Quest 1 is no longer supported" warning; override with `android.questSupportedDevices`).
+
+### Migration
+
+- No breaking changes for phone builds. If an app also sets `android.targetSdkVersion` or `buildArchs` through `expo-build-properties`, the plugin listed earlier in `plugins` wins on the same `gradle.properties` key, because config-plugin mods run in reverse registration order.
+
 ## v2.58.1 — 17 August 2026
 
 ### Fixed

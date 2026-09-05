@@ -9,7 +9,7 @@
  * ViroSpotLight-adjacent AR helpers don't have a web port yet.
  */
 import { createElement, useEffect } from "react";
-import { pushWarning } from "./renderState";
+import { markError, pushWarning } from "./renderState";
 import { webRendererOptions } from "./wasmOptions";
 
 // tinyvio, built through platforms/slam's drop-in C API and served from
@@ -72,6 +72,7 @@ import { ViroARSceneNavigator as _ViroARSceneNavigatorRaw } from "../components/
 import { ViroScene as _SceneForVR } from "../components/ViroScene";
 
 export function Viro3DSceneNavigator(props: any) {
+  if (usePlaybackRefusal("Viro3DSceneNavigator")) return null;
   return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
 }
 
@@ -88,6 +89,23 @@ export function setPlaybackSource(
 ): void {
   playbackSource = source;
   onSessionReady = onReady;
+}
+
+// The recording only ever reaches the AR wrapper below. Any other navigator
+// mounted over one is a working free-running scene that never publishes the
+// frame stepper, so the driver would sit out its whole timeout; the error is
+// what lets it stop at once (playback.ts resolves its wait on it).
+function usePlaybackRefusal(navigator: string): boolean {
+  const refused = playbackSource !== null;
+  useEffect(() => {
+    if (!refused) return;
+    markError(
+      new Error(
+        `A render over a recording is driven through ViroARSceneNavigator; this scene mounts ${navigator}, which cannot play the recording back.`,
+      ),
+    );
+  }, [refused, navigator]);
+  return refused;
 }
 
 // One render produces one output frame, so two navigators mounted at once are
@@ -137,11 +155,14 @@ export function ViroARSceneNavigator(props: any) {
 // say so via a warning, rather than failing a VR-flavored generated scaffold
 // outright. Both aliases keep the same prop surface as their 3D originals.
 export function ViroVRSceneNavigator(props: any) {
+  const refused = usePlaybackRefusal("ViroVRSceneNavigator");
   useEffect(() => {
+    if (refused) return;
     pushWarning(
       '"ViroVRSceneNavigator" has no web implementation yet — rendered via Viro3DSceneNavigator.',
     );
-  }, []);
+  }, [refused]);
+  if (refused) return null;
   return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
 }
 

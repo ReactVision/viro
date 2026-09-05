@@ -117,5 +117,8 @@
     "url": "https://github.com/ReactVision/viro/issues"
   },
   "homepage": "https://reactvision.xyz/viro-react",
-  "author": "ReactVision, Inc"
+  "author": "ReactVision, Inc",
+  "dependencies": {
+    "react": "~19.2.3"
+  }
 }

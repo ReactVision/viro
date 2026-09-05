@@ -1,5 +1,15 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **Quest builds failed Meta Horizon Store validation on Expo projects.** The plugin's targetSdk cap never applied on Expo's template and the GLES declaration was optional, which the store reads as missing. With `"QUEST"` in `xRMode` the plugin now sets `android.targetSdkVersion=34` in `gradle.properties` and requires GLES 3.0.
+
+### Added
+
+- **Quest Store packaging defaults**: arm64-only builds (`android.questArm64Only`, default true) and a `com.oculus.supportedDevices` manifest entry (`android.questSupportedDevices`, default `quest2|questpro|quest3|quest3s`).
+
 ## v2.58.1
 
 ### Fixed

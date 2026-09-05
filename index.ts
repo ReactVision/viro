@@ -417,4 +417,8 @@ export type {
   StudioProjectMeta,
   StudioSceneNavigatorHandle,
   StudioSceneNavigatorProps,
+  StudioApiError,
+  StudioApiErrorFields,
 } from "./components/Studio";
+
+export { isStudioApiError } from "./components/Studio";

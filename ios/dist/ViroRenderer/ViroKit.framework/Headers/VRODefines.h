@@ -83,8 +83,17 @@
 // Default to 0.  The ViroKitVisionOS (and ViroKit iOS Metal) Xcode targets pass
 // -DVRO_METAL=1 via GCC_PREPROCESSOR_DEFINITIONS.  Using #ifndef lets that
 // build-system flag take effect instead of being clobbered by this header.
+// The default is platform-aware, and has to be: consumers of these headers (the ViroReact pod,
+// for one) never pass -DVRO_METAL=1, so on visionOS they would otherwise see the OpenGL halves of
+// VROUniform.h and VROShaderProgram.h — which cannot compile there, since VROOpenGL.h has no
+// visionOS branch and glUniform* is simply undeclared. There is no OpenGL on xros at all, so
+// Metal is not a choice to be configured on that platform; it is the only answer.
 #ifndef VRO_METAL
-  #define VRO_METAL 0
+  #if VRO_PLATFORM_VISION
+    #define VRO_METAL 1
+  #else
+    #define VRO_METAL 0
+  #endif
 #endif
 
 // ── VRO_POSEMOJI ─────────────────────────────────────────────────────────────

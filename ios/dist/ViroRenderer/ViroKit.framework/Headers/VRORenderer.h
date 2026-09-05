@@ -292,6 +292,17 @@ public:
     }
 
     /*
+     The render context from the frame just drawn.
+
+     Exposed for the visionOS tracking-areas pass, which draws the same geometry a second time
+     into an id texture and must use the very matrices the picture was drawn with — an id written
+     from a different viewpoint is a highlight that does not line up with its object.
+     */
+    const std::shared_ptr<VRORenderContext> &getRenderContext() const {
+        return _context;
+    }
+
+    /*
      Get the camera used in the last frame.
      */
     const VROCamera &getCamera() const {

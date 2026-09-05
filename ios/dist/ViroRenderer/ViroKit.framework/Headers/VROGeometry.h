@@ -140,6 +140,11 @@ public:
      texturing and lighting. Typically this is used for rendering to a stencil
      buffer or shadow map.
      */
+    void renderTrackingArea(VROMatrix4f transform,
+                            uint32_t renderValue,
+                            const VRORenderContext &context,
+                            std::shared_ptr<VRODriver> &driver);
+
     void renderSilhouette(VROMatrix4f transform,
                           std::shared_ptr<VROMaterial> &material,
                           const VRORenderContext &context,

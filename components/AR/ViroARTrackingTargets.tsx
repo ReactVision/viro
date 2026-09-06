@@ -12,7 +12,9 @@
 
 import { NativeModules } from "react-native";
 // @ts-ignore
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+import { resolveViroAssetSource as resolveAssetSource } from "../Utilities/ViroAssetSource";
 const ARTrackingTargetsModule = NativeModules.VRTARTrackingTargetsModule;
 
 // // Currently only used for reference purposes (we manually validate)
@@ -49,7 +51,9 @@ export class ViroARTrackingTargets {
     }
 
     // call the createTargets function in the native module
-    ARTrackingTargetsModule.createTargets(targets);
+    if (ARTrackingTargetsModule) {
+      ARTrackingTargetsModule.createTargets(targets);
+    }
   }
 
   static checkForRequiredProps(_key: string, target: ViroARTrackingTarget) {
@@ -73,6 +77,8 @@ export class ViroARTrackingTargets {
   }
 
   static deleteTarget(targetName: string) {
-    ARTrackingTargetsModule.deleteTarget(targetName);
+    if (ARTrackingTargetsModule) {
+      ARTrackingTargetsModule.deleteTarget(targetName);
+    }
   }
 }

@@ -26,6 +26,9 @@
 //
 
 #import "VRTManagedAnimation.h"
+#if TARGET_OS_VISION
+#import "VRORendererBridge.h"
+#endif
 
 enum class VRTAnimationState {
     Scheduled,
@@ -192,10 +195,29 @@ enum class VRTAnimationState {
     if (self.durationOverride > -1) {
         animation->setDuration(self.durationOverride / 1000.0f);
     }
-    animation->execute(node, [weakSelf, animation] {
-                             if (weakSelf) {
-                                 [weakSelf onAnimationFinish:animation];
-                             }});
+    // The completion hop back to the main queue is not incidental: onAnimationFinish fires the
+    // onFinish React event and may restart a looping animation, and neither belongs on the
+    // render thread.
+    auto onFinish = [weakSelf, animation] {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (weakSelf) {
+                [weakSelf onAnimationFinish:animation];
+            }
+        });
+    };
+
+#if TARGET_OS_VISION
+    // VROAnimatable::animate() drops any animation started off the renderer thread — it calls
+    // onTermination() and the property snaps to its final value. React starts animations from the
+    // main thread, so on visionOS every `animation` prop rendered its node correctly and then sat
+    // there without moving. Hand the execute to the render thread, where the transaction it opens
+    // lives in the same thread_local storage that update() advances.
+    [VRORendererBridge runOnRenderThread:^{
+        animation->execute(node, onFinish);
+    }];
+#else
+    animation->execute(node, onFinish);
+#endif
     self.state = VRTAnimationState::Running;
 }
 

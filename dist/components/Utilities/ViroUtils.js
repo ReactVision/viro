@@ -128,9 +128,13 @@ const ALL_PERMISSIONS = [
  */
 function requestRequiredPermissions(permissions = ALL_PERMISSIONS) {
     if (react_native_1.Platform.OS === "ios") {
+        if (!react_native_1.NativeModules.VRTARUtils)
+            return Promise.resolve({});
         return react_native_1.NativeModules.VRTARUtils.requestRequiredPermissions(permissions);
     }
     else {
+        if (!react_native_1.NativeModules.VRTARSceneNavigatorModule)
+            return Promise.resolve({});
         return react_native_1.NativeModules.VRTARSceneNavigatorModule.requestRequiredPermissions(permissions);
     }
 }
@@ -141,15 +145,23 @@ function requestRequiredPermissions(permissions = ALL_PERMISSIONS) {
  */
 function checkPermissions(permissions = ALL_PERMISSIONS) {
     if (react_native_1.Platform.OS === "ios") {
+        if (!react_native_1.NativeModules.VRTARUtils)
+            return Promise.resolve({});
         return react_native_1.NativeModules.VRTARUtils.checkPermissions(permissions);
     }
     else {
+        if (!react_native_1.NativeModules.VRTARSceneNavigatorModule)
+            return Promise.resolve({});
         return react_native_1.NativeModules.VRTARSceneNavigatorModule.checkPermissions(permissions);
     }
 }
 function isARSupportedOnDevice() {
     return new Promise((resolve, reject) => {
         if (react_native_1.Platform.OS == "ios") {
+            if (!react_native_1.NativeModules.VRTARUtils) {
+                resolve({ isARSupported: false });
+                return;
+            }
             react_native_1.NativeModules.VRTARUtils.isARSupported((error, result) => {
                 if (error)
                     reject(error);
@@ -159,6 +171,10 @@ function isARSupportedOnDevice() {
             });
         }
         else {
+            if (!react_native_1.NativeModules.VRTARSceneNavigatorModule) {
+                resolve({ isARSupported: false });
+                return;
+            }
             react_native_1.NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice((result) => {
                 if (result == "SUPPORTED")
                     resolve({ isARSupported: true });

@@ -24,7 +24,7 @@
  *        ImmersiveSpace(id: "ViroImmersive") {
  *          ViroImmersiveSpaceView()
  *        }
- *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full, .progressive)
+ *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full)
  *        #endif
  *      }
  *    }
@@ -38,7 +38,17 @@
  *    await ViroVisionOSModule.exitImmersiveSpace();
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export type ImmersiveSpaceStyle = "mixed" | "full" | "progressive";
+/**
+ * Immersion styles Viro can present.
+ *
+ * "progressive" is absent on purpose. Declaring it on the ImmersiveSpace changes what
+ * CompositorServices requires: presentation must then go through the drawable's render context,
+ * and encodePresent — which this renderer uses — is rejected outright with "BUG IN CLIENT:
+ * cannot present drawable: need to use drawable render context when supporting progressive
+ * style", aborting the process seconds after the space opens. Supporting it means implementing
+ * the render-context path first.
+ */
+export type ImmersiveSpaceStyle = "mixed" | "full";
 /**
  * Returns true if the app is running on Apple Vision Pro (visionOS).
  * Uses the native module constant; falls back to Platform.isVision when
@@ -50,7 +60,6 @@ export declare function isVisionOS(): boolean;
  *
  * @param style  "mixed" (default) — virtual content blended over passthrough
  *               "full"  — fully virtual, passthrough hidden
- *               "progressive" — graduated immersion with crown dial
  */
 export declare function enterImmersiveSpace(style?: ImmersiveSpaceStyle): Promise<boolean>;
 /**
@@ -58,6 +67,32 @@ export declare function enterImmersiveSpace(style?: ImmersiveSpaceStyle): Promis
  */
 export declare function exitImmersiveSpace(): Promise<boolean>;
 /** Convenience object matching the typical NativeModules pattern. */
+/** Live input tuning for the visionOS ray. All fields optional; omitted ones keep their value. */
+export type ViroInputTuning = {
+    /**
+     * `"head"` (default) aims from between the eyes through the hand; `"finger"` aims along the
+     * index finger. The finger ray inherits articulation noise — the joints move whenever the hand
+     * does anything, and hardest as a pinch begins — so `"head"` is steadier and matches how people
+     * physically point.
+     */
+    rayOrigin?: "head" | "finger";
+    /** 0 disables filtering, 1 is heavy. Applies to the live ray only, never to the frozen aim. */
+    smoothing?: number;
+    /** Radians the ray must move off a hovered target before hover is dropped. */
+    hoverHysteresis?: number;
+    /** Angular radius, in radians, of the cone used when the ray itself misses.
+     *  A zero-width ray demands more precision than hand tracking can give; this
+     *  gives small targets a tolerance without changing a precise aim, which is
+     *  always tried first. 0 disables it. Default 0.03 (~1.7°). */
+    coneAngle?: number;
+};
+/**
+ * Adjusts how the visionOS ray behaves, while the ImmersiveSpace is open.
+ *
+ * Exists to be called from JavaScript during a session: these numbers can only be judged with a
+ * headset on, and a native rebuild is ten minutes. No-op on every other platform.
+ */
+export declare function setInputTuning(tuning: ViroInputTuning): void;
 export declare const ViroVisionOSModule: {
     readonly isVisionOS: typeof isVisionOS;
     readonly enterImmersiveSpace: typeof enterImmersiveSpace;

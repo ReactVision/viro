@@ -28,6 +28,15 @@
 #import "VRTPortalScene.h"
 #import "VRTPortal.h"
 
+#if TARGET_OS_VISION
+// VRTPortal is not compiled for visionOS, so referencing its class object directly would leave an
+// undefined class symbol at link time. Looking the class up by name yields nil there — the branch
+// simply never matches — and resolves normally everywhere else.
+#define VRT_CLASS_PORTAL NSClassFromString(@"VRTPortal")
+#else
+#define VRT_CLASS_PORTAL [VRTPortal class]
+#endif
+
 @interface VRTPortalScene ()
 
 @end
@@ -56,7 +65,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex {
-    if ([view isKindOfClass:[VRTPortal class]]) {
+    if ([view isKindOfClass:VRT_CLASS_PORTAL]) {
         VRTPortal *frameView = (VRTPortal *)view;
         [self portal]->setPortalEntrance([frameView portalFrame]);
     }
@@ -64,7 +73,7 @@
 }
 
 - (void)removeReactSubview:(UIView *)subview {
-    if ([subview isKindOfClass:[VRTPortal class]]) {
+    if ([subview isKindOfClass:VRT_CLASS_PORTAL]) {
         VRTPortal *frameView = (VRTPortal *)subview;
         [frameView clearPhysicsBody];
         

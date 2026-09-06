@@ -54,8 +54,8 @@ public final class ViroImmersiveCoordinator {
             isImmersiveActive = true
         case .userCancelled:
             print("[Viro] VisionOS: ImmersiveSpace open was cancelled by the user")
-        case .error(let error):
-            print("[Viro] VisionOS: ImmersiveSpace open error: \(error)")
+        case .error:
+            print("[Viro] VisionOS: ImmersiveSpace open error")
         @unknown default:
             break
         }
@@ -65,10 +65,13 @@ public final class ViroImmersiveCoordinator {
     func exit() async {
         guard let dismiss = dismissAction else { return }
         guard isImmersiveActive else { return }
-        await dismiss()
-        isImmersiveActive = false
+        // Stop drawing before tearing the space down, not after. Dismissing invalidates the
+        // LayerRenderer, and a loop still inside queryNextFrame/encodePresent when that happens is
+        // working against a layer that is going away.
         activeRenderer?.stopRenderLoop()
         activeRenderer = nil
+        await dismiss()
+        isImmersiveActive = false
     }
 }
 #endif  // os(visionOS)

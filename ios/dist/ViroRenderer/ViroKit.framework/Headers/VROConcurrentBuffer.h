@@ -28,7 +28,7 @@
 #define VROConcurrentBuffer_h
 
 #include "VRODefines.h"
-#if VRO_METAL
+#if VRO_METAL && defined(__OBJC__)
 
 #include <stdio.h>
 #include "VROEye.h"

@@ -61,7 +61,7 @@
     VRTView *view = (VRTView *)subview;
     
     [_childViews insertObject:subview atIndex:atIndex];
-    view.superview = self;
+    view.viroSuperview = self;
     
     /*
      If the scene has appeared, meaning the renderer is ready, then invoke
@@ -91,7 +91,7 @@
     [view parentDidDisappear];
     
     [_childViews removeObject:subview];
-    view.superview = NULL;
+    view.viroSuperview = NULL;
 }
 
 - (NSArray *)reactSubviews {
@@ -182,14 +182,14 @@
     // Safely clear references before recycling
     @try {
         _scene = nullptr;
-        // Don't clear _childViews or _superview here as they might be needed
+        // Don't clear _childViews or _viroSuperview here as they might be needed
     } @catch (NSException *exception) {
         NSLog(@"VRTView: Error preparing for recycle: %@", exception.reason);
     }
 }
 
 -(void)dealloc {
-    _superview = nil;
+    _viroSuperview = nil;
     _childViews = nil;
     _scene = nullptr;
 }

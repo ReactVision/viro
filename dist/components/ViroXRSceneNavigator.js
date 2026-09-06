@@ -37,7 +37,9 @@ exports.ViroXRSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroARSceneNavigator_1 = require("./AR/ViroARSceneNavigator");
+const ViroSceneNavigator_1 = require("./ViroSceneNavigator");
 const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroVisionOSModule_1 = require("./VisionOS/ViroVisionOSModule");
 const VRQuestNavigatorBridge_1 = require("./Utilities/VRQuestNavigatorBridge");
 const VRLauncher = react_native_1.NativeModules.VRLauncher;
 // Quest VR requires a lifecycle-correct VRActivity that drives
@@ -72,6 +74,9 @@ function checkRNVersionForVR() {
  * Cross-reality scene navigator. Picks the right underlying navigator at runtime:
  *
  *  - **iOS / non-Quest Android** → `ViroARSceneNavigator` (rendered inline)
+ *  - **Apple Vision Pro** → opens the visionOS ImmersiveSpace and renders the scene
+ *    through `ViroSceneNavigator`. Unlike Quest, the ImmersiveSpace shares this
+ *    React runtime, so the scene tree stays mounted here rather than being forwarded.
  *  - **Meta Quest** → launches VRActivity via `VRLauncher.launchVRScene()` and
  *    forwards all navigator operations (push/pop/etc.) to the
  *    `ViroVRSceneNavigator` running there via `VRQuestNavigatorBridge`.
@@ -87,9 +92,11 @@ function checkRNVersionForVR() {
 exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(props, ref) {
     const { initialScene, arInitialScene, vrInitialScene, 
     // VR-only renderer config — forwarded via bridge on Quest
-    hdrEnabled, pbrEnabled, bloomEnabled, shadowsEnabled, multisamplingEnabled, vrModeEnabled, passthroughEnabled, handTrackingEnabled, onExitViro, debug, ...rest } = props;
+    hdrEnabled, pbrEnabled, bloomEnabled, shadowsEnabled, multisamplingEnabled, vrModeEnabled, passthroughEnabled, handTrackingEnabled, onExitViro, debug, visionOSImmersionStyle = "mixed", ...rest } = props;
     // Inner ref used on the AR path to capture the ViroARSceneNavigator instance.
     const arRef = React.useRef(null);
+    // Same idea on visionOS, where the host is a ViroSceneNavigator instead.
+    const visionRef = React.useRef(null);
     // Expose navigator interface on the ref.
     // Quest: proxy push/pop/etc. through VRQuestNavigatorBridge to VRActivity.
     // AR:    expose the underlying ViroARSceneNavigator instance directly.
@@ -104,6 +111,13 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
             };
             return { sceneNavigator: bridgeNav, arSceneNavigator: bridgeNav };
         }
+        if (ViroPlatform_1.isVisionOS) {
+            // Expose the instance under both names, as the Quest branch does. Callers written for
+            // the AR path reach for `arSceneNavigator` (Studio does), and there is no reason for
+            // them to learn a third spelling just because the host underneath changed.
+            const nav = visionRef.current;
+            return { sceneNavigator: nav, arSceneNavigator: nav };
+        }
         return arRef.current;
     }, []);
     // Track AppState so we can detect background → active transitions.
@@ -115,6 +129,29 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
     // re-launch VR; the latter would trigger a no-op startActivity that can
     // contribute to the lifecycle storm in some configurations.
     const leftActiveAtRef = React.useRef(0);
+    // On visionOS: open the ImmersiveSpace on mount and close it on unmount.
+    //
+    // This mirrors what the Quest branch does with VRActivity — in both cases something other
+    // than the React view hierarchy owns the display. The difference is that VRActivity runs its
+    // own React host, so Quest forwards the scene across a bridge and renders null here, whereas
+    // the visionOS ImmersiveSpace shares this runtime: the scene tree below stays mounted, and
+    // the native side hands its VRTScene to the CompositorServices render loop.
+    React.useEffect(() => {
+        if (!ViroPlatform_1.isVisionOS)
+            return;
+        let cancelled = false;
+        (0, ViroVisionOSModule_1.enterImmersiveSpace)(visionOSImmersionStyle).then((opened) => {
+            if (!opened && !cancelled) {
+                console.warn("[Viro] Could not open the visionOS ImmersiveSpace. Check that the host app's " +
+                    "SwiftUI App declares `ImmersiveSpace(id: ViroImmersiveSpace.id)` and applies " +
+                    "`.viroImmersiveSpaceController()` to the React Native root view.");
+            }
+        });
+        return () => {
+            cancelled = true;
+            (0, ViroVisionOSModule_1.exitImmersiveSpace)();
+        };
+    }, []);
     // On Quest: register the intent (scene + renderer config) then launch VRActivity.
     // Also re-launch when the app returns from background (e.g. Quest system menu),
     // because VRActivity auto-finishes when MainActivity resumes.
@@ -164,10 +201,42 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
     // Quest renders nothing here — VRActivity owns the display.
     if (ViroPlatform_1.isQuest)
         return null;
+    if (ViroPlatform_1.isVisionOS) {
+        // The visionOS renderer has no AR subsystem — every VROAR* class is excluded from the
+        // xros build, so a ViroARScene root has no view manager and fails at mount with
+        // "View config not found for component `VRTARScene`". The scene root has to be a plain
+        // ViroScene, which is what the Quest VR scene already is, so `vrInitialScene` is the
+        // right source and `arInitialScene` is deliberately not consulted.
+        const visionScene = vrInitialScene ?? initialScene;
+        if (!visionScene) {
+            console.warn("[Viro] ViroXRSceneNavigator on visionOS requires `vrInitialScene` or `initialScene`, " +
+                "rooted in a ViroScene (not a ViroARScene).");
+            return null;
+        }
+        // Zero-sized and hidden on purpose. This view is not a render surface on visionOS — the
+        // ImmersiveSpace is — so anything it occupies in the window is space the app cannot use,
+        // showing nothing. Left at its natural size it fills the window and the result reads as a
+        // black panel floating in front of the immersive content, because an empty React Native
+        // window is black. The scene tree still mounts, which is what matters: that is how the
+        // native VRTScene reaches the renderer.
+        const { style: _ignoredStyle, ...visionRest } = rest;
+        return (<react_native_1.View style={styles.visionOSHost} pointerEvents="none">
+          <ViroSceneNavigator_1.ViroSceneNavigator ref={visionRef} initialScene={visionScene} {...visionRest}/>
+        </react_native_1.View>);
+    }
     const scene = arInitialScene ?? initialScene;
     if (!scene) {
         console.warn("[Viro] ViroXRSceneNavigator requires `arInitialScene` or `initialScene`.");
         return null;
     }
     return (<ViroARSceneNavigator_1.ViroARSceneNavigator ref={arRef} initialScene={scene} {...rest}/>);
+});
+const styles = react_native_1.StyleSheet.create({
+    /** See the visionOS branch above: present in the tree, absent from the layout. */
+    visionOSHost: {
+        position: "absolute",
+        width: 0,
+        height: 0,
+        opacity: 0,
+    },
 });

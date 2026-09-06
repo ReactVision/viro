@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ViewProps } from "react-native";
+import { ImmersiveSpaceStyle } from "./VisionOS/ViroVisionOSModule";
 type SceneFactory = {
     scene: () => React.JSX.Element;
 };
@@ -7,6 +8,9 @@ type SceneFactory = {
  * Cross-reality scene navigator. Picks the right underlying navigator at runtime:
  *
  *  - **iOS / non-Quest Android** → `ViroARSceneNavigator` (rendered inline)
+ *  - **Apple Vision Pro** → opens the visionOS ImmersiveSpace and renders the scene
+ *    through `ViroSceneNavigator`. Unlike Quest, the ImmersiveSpace shares this
+ *    React runtime, so the scene tree stays mounted here rather than being forwarded.
  *  - **Meta Quest** → launches VRActivity via `VRLauncher.launchVRScene()` and
  *    forwards all navigator operations (push/pop/etc.) to the
  *    `ViroVRSceneNavigator` running there via `VRQuestNavigatorBridge`.
@@ -53,6 +57,18 @@ export declare const ViroXRSceneNavigator: React.ForwardRefExoticComponent<ViewP
     passthroughEnabled?: boolean;
     handTrackingEnabled?: boolean;
     onExitViro?: () => void;
+    /**
+     * Immersion style used when the ImmersiveSpace is opened on visionOS.
+     *
+     *  - `"mixed"` (default) — virtual content blended over passthrough. This is the
+     *    closest analogue to phone AR, and the right default for a scene that expects
+     *    to sit in the user's room.
+     *  - `"full"` — fully virtual, passthrough hidden.
+     *  - `"progressive"` — graduated immersion, dialled by the Digital Crown.
+     *
+     * Ignored on every other platform.
+     */
+    visionOSImmersionStyle?: ImmersiveSpaceStyle;
     viroAppProps?: any;
     hdrEnabled?: boolean;
     pbrEnabled?: boolean;

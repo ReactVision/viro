@@ -37,6 +37,24 @@
 #import "VRTUtils.h"
 #import "VRTCamera.h"
 #import "VRTPortal.h"
+
+#if TARGET_OS_VISION
+// VRTPortal is not compiled for visionOS, so referencing its class object directly would leave an
+// undefined class symbol at link time. Looking the class up by name instead yields nil on
+// visionOS — the branch simply never matches — and resolves normally everywhere else.
+#define VRT_CLASS_PORTAL NSClassFromString(@"VRTPortal")
+#else
+#define VRT_CLASS_PORTAL [VRTPortal class]
+#endif
+
+#if TARGET_OS_VISION
+// VRTVideoSurface is not compiled for visionOS, so referencing its class object directly would
+// leave an undefined class symbol at link time. Looking the class up by name yields nil there —
+// the branch simply never matches — and resolves normally everywhere else.
+#define VRT_CLASS_VIDEO_SURFACE NSClassFromString(@"VRTVideoSurface")
+#else
+#define VRT_CLASS_VIDEO_SURFACE [VRTVideoSurface class]
+#endif
 #import "VRT360Image.h"
 #import "VRT3DObject.h"
 #import "VRTAnimatedComponent.h"
@@ -186,7 +204,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         if (cameraView.nodeRootTransformCamera) {
             self.node->addChildNode(cameraView.nodeRootTransformCamera);
         }
-    } else if ([child isKindOfClass:[VRTPortal class]]) {
+    } else if ([child isKindOfClass:VRT_CLASS_PORTAL]) {
         // Ignore, this is only handled by VRTPortal
     } else if ([child isKindOfClass:[VRTNode class]]) {
         VRTNode *nodeView = (VRTNode *)child;
@@ -235,7 +253,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         VRTCamera *cameraView = (VRTCamera *)vroView;
         cameraView.nodeRootTransformCamera->removeFromParentNode();
     }
-    else if ([vroView isKindOfClass:[VRTPortal class]]) {
+    else if ([vroView isKindOfClass:VRT_CLASS_PORTAL]) {
         // Ignore, this is only handled by VRTPortal
     }
     else if([vroView isKindOfClass:[VRT360Image class]]) {
@@ -1207,11 +1225,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     VRTNode *realSuperview;
     
     // Find superview, skipping over animated components.
-    if (self.superview && [self.superview isKindOfClass:[VRTNode class]]) {
-        realSuperview = (VRTNode *)self.superview;
-    } else if(self.superview && [self.superview isKindOfClass:[VRTAnimatedComponent class]]) {
-        if([self.superview.superview isKindOfClass:[VRTNode class]]) {
-            realSuperview = (VRTNode *) self.superview.superview;
+    if (self.viroSuperview && [self.viroSuperview isKindOfClass:[VRTNode class]]) {
+        realSuperview = (VRTNode *)self.viroSuperview;
+    } else if(self.viroSuperview && [self.viroSuperview isKindOfClass:[VRTAnimatedComponent class]]) {
+        if([self.viroSuperview.viroSuperview isKindOfClass:[VRTNode class]]) {
+            realSuperview = (VRTNode *) self.viroSuperview.viroSuperview;
         }
     }
     
@@ -1270,7 +1288,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         [surface setHeight:self.bounds2DFlex.size.height/ k2DPointsPerSpatialUnit];
         [surface didSetProps:nil];
     }
-    else if([self isKindOfClass:[VRTVideoSurface class]]) {
+    else if([self isKindOfClass:VRT_CLASS_VIDEO_SURFACE]) {
         VRTVideoSurface *surface = (VRTVideoSurface *)self;
         //NSLog(@"Video surface position(%f, %f), size:(%f, %f)", transformedX, transformedY,node.bounds2DFlex.size.width/ k2DPointsPerSpatialUnit, node.bounds2DFlex.size.height/ k2DPointsPerSpatialUnit );
         [surface setWidth:self.bounds2DFlex.size.width/ k2DPointsPerSpatialUnit];
@@ -1296,7 +1314,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         return YES;
     }
     
-    VRTNode *superview = ([self.superview isKindOfClass:[VRTAnimatedComponent class]]) ? self.superview.superview : (VRTNode *)self.superview;
+    VRTNode *superview = ([self.viroSuperview isKindOfClass:[VRTAnimatedComponent class]]) ? self.viroSuperview.viroSuperview : (VRTNode *)self.viroSuperview;
     while(superview) {
         
         if([superview isKindOfClass:[VRTNode class]]) {
@@ -1304,10 +1322,10 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 return YES;
             }
         }
-        superview = superview.superview;
+        superview = superview.viroSuperview;
         //skip checking animated component superview, ignore it when it comes to flexbox
         if([superview isKindOfClass:[VRTAnimatedComponent class]]){
-            superview = superview.superview;
+            superview = superview.viroSuperview;
         }
     }
     return NO;

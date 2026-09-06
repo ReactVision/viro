@@ -25,7 +25,7 @@
  *        ImmersiveSpace(id: "ViroImmersive") {
  *          ViroImmersiveSpaceView()
  *        }
- *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full, .progressive)
+ *        .immersionStyle(selection: .constant(.mixed), in: .mixed, .full)
  *        #endif
  *      }
  *    }
@@ -44,6 +44,7 @@ exports.ViroVisionOSModule = void 0;
 exports.isVisionOS = isVisionOS;
 exports.enterImmersiveSpace = enterImmersiveSpace;
 exports.exitImmersiveSpace = exitImmersiveSpace;
+exports.setInputTuning = setInputTuning;
 const react_native_1 = require("react-native");
 /** @internal — raw NativeModule reference */
 const { VRTVisionOSModule } = react_native_1.NativeModules;
@@ -64,7 +65,6 @@ function isVisionOS() {
  *
  * @param style  "mixed" (default) — virtual content blended over passthrough
  *               "full"  — fully virtual, passthrough hidden
- *               "progressive" — graduated immersion with crown dial
  */
 async function enterImmersiveSpace(style = "mixed") {
     if (!VRTVisionOSModule) {
@@ -83,7 +83,15 @@ async function exitImmersiveSpace() {
         return false;
     return VRTVisionOSModule.exitImmersiveSpace();
 }
-/** Convenience object matching the typical NativeModules pattern. */
+/**
+ * Adjusts how the visionOS ray behaves, while the ImmersiveSpace is open.
+ *
+ * Exists to be called from JavaScript during a session: these numbers can only be judged with a
+ * headset on, and a native rebuild is ten minutes. No-op on every other platform.
+ */
+function setInputTuning(tuning) {
+    VRTVisionOSModule?.setInputTuning?.(tuning);
+}
 exports.ViroVisionOSModule = {
     isVisionOS,
     enterImmersiveSpace,

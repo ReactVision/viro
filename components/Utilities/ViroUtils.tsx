@@ -161,8 +161,10 @@ export function requestRequiredPermissions(
   permissions: ViroPermission[] = ALL_PERMISSIONS
 ): Promise<ViroPermissionsResult> {
   if (Platform.OS === "ios") {
+    if (!NativeModules.VRTARUtils) return Promise.resolve({});
     return NativeModules.VRTARUtils.requestRequiredPermissions(permissions);
   } else {
+    if (!NativeModules.VRTARSceneNavigatorModule) return Promise.resolve({});
     return NativeModules.VRTARSceneNavigatorModule.requestRequiredPermissions(
       permissions
     );
@@ -178,8 +180,10 @@ export function checkPermissions(
   permissions: ViroPermission[] = ALL_PERMISSIONS
 ): Promise<ViroPermissionsResult> {
   if (Platform.OS === "ios") {
+    if (!NativeModules.VRTARUtils) return Promise.resolve({});
     return NativeModules.VRTARUtils.checkPermissions(permissions);
   } else {
+    if (!NativeModules.VRTARSceneNavigatorModule) return Promise.resolve({});
     return NativeModules.VRTARSceneNavigatorModule.checkPermissions(permissions);
   }
 }
@@ -214,6 +218,7 @@ export interface ViroARSupportResponse {
 export function isARSupportedOnDevice() {
   return new Promise<ViroARSupportResponse>((resolve, reject) => {
     if (Platform.OS == "ios") {
+      if (!NativeModules.VRTARUtils) { resolve({ isARSupported: false }); return; }
       NativeModules.VRTARUtils.isARSupported(
         (error: Error, result: ViroiOSArSupportResponse) => {
           if (error) reject(error);
@@ -222,6 +227,7 @@ export function isARSupportedOnDevice() {
         }
       );
     } else {
+      if (!NativeModules.VRTARSceneNavigatorModule) { resolve({ isARSupported: false }); return; }
       NativeModules.VRTARSceneNavigatorModule.isARSupportedOnDevice(
         (result: ViroAndroidArSupportResponse) => {
           if (result == "SUPPORTED") resolve({ isARSupported: true });

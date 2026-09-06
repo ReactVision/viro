@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.hasOpenXRSupport = exports.isQuest = exports.isWeb = void 0;
+exports.isVisionOS = exports.hasOpenXRSupport = exports.isQuest = exports.isWeb = void 0;
 const react_native_1 = require("react-native");
 /**
  * True when running on the web platform (react-native-web). Web uses the
@@ -47,3 +47,20 @@ exports.isQuest = detectQuest();
  * if you forced VR mode (e.g., for in-app build diagnostics).
  */
 exports.hasOpenXRSupport = react_native_1.NativeModules.VRModuleOpenXR !== undefined;
+/**
+ * True on Apple Vision Pro (visionOS).
+ *
+ * Sits here next to `isQuest` and `isWeb` so platform branching reads the same way everywhere.
+ * `Platform.OS` is `"ios"` on visionOS — react-native-visionos is an out-of-tree platform that
+ * keeps the iOS identity — so it cannot be used to tell the two apart. React Native 0.83+ sets
+ * `Platform.isVision`; the native module constant covers builds where it is absent.
+ *
+ * `ViroVisionOSModule.isVisionOS()` computes the same thing and remains the public API; this is
+ * the constant form, evaluated once at import, matching `isQuest`.
+ */
+function detectVisionOS() {
+    if (react_native_1.Platform.isVision === true)
+        return true;
+    return react_native_1.NativeModules.VRTVisionOSModule?.isVisionOS === true;
+}
+exports.isVisionOS = detectVisionOS();

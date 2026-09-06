@@ -10,14 +10,13 @@
  * @providesModule VRTARTrackingTargets
  * @flow
  */
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARTrackingTargets = void 0;
 const react_native_1 = require("react-native");
 // @ts-ignore
-const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("../Utilities/ViroAssetSource");
 const ARTrackingTargetsModule = react_native_1.NativeModules.VRTARTrackingTargetsModule;
 class ViroARTrackingTargets {
     static createTargets(targets) {
@@ -26,11 +25,13 @@ class ViroARTrackingTargets {
             // Check for required props
             ViroARTrackingTargets.checkForRequiredProps(key, target);
             // resolve asset source if applicable and update the object
-            var resultSource = (0, resolveAssetSource_1.default)(target.source);
+            var resultSource = (0, ViroAssetSource_1.resolveViroAssetSource)(target.source);
             target.source = resultSource;
         }
         // call the createTargets function in the native module
-        ARTrackingTargetsModule.createTargets(targets);
+        if (ARTrackingTargetsModule) {
+            ARTrackingTargetsModule.createTargets(targets);
+        }
     }
     static checkForRequiredProps(_key, target) {
         // source is required
@@ -47,7 +48,9 @@ class ViroARTrackingTargets {
         }
     }
     static deleteTarget(targetName) {
-        ARTrackingTargetsModule.deleteTarget(targetName);
+        if (ARTrackingTargetsModule) {
+            ARTrackingTargetsModule.deleteTarget(targetName);
+        }
     }
 }
 exports.ViroARTrackingTargets = ViroARTrackingTargets;

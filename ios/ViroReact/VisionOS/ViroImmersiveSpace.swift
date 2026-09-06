@@ -52,11 +52,11 @@ public enum ViroImmersiveSpace {
 /// The content view placed inside the ImmersiveSpace scene.
 /// Contains a CompositorLayer that drives the Viro Metal render loop.
 @available(visionOS 1.0, *)
-public struct ViroImmersiveSpaceView: View {
+public struct ViroImmersiveSpaceView: ImmersiveSpaceContent {
 
     public init() {}
 
-    public var body: some View {
+    public var body: some ImmersiveSpaceContent {
         CompositorLayer(configuration: ViroLayerConfiguration()) { layerRenderer in
             let renderer = ViroImmersiveRenderer(layerRenderer: layerRenderer)
             // Keep a reference so ARC doesn't collect the renderer.
@@ -75,22 +75,55 @@ struct ViroLayerConfiguration: CompositorLayerConfiguration {
         capabilities: LayerRenderer.Capabilities,
         configuration: inout LayerRenderer.Configuration
     ) {
-        // 32-bit depth for accurate occlusion
+        NSLog("[Viro] LayerCfg supportedColorFormats=%@",
+              capabilities.supportedColorFormats.map { $0.rawValue } as NSArray)
+        NSLog("[Viro] LayerCfg supportedDepthFormats=%@",
+              capabilities.supportedDepthFormats.map { $0.rawValue } as NSArray)
+
+        // rgba16Float is Apple's recommended format for visionOS immersive rendering.
+        // bgra8Unorm_sRGB may be silently composited to black on device (visionOS 26).
         configuration.depthFormat = .depth32Float
-        // sRGB BGRA colour
-        configuration.colorFormat = .bgra8Unorm_srgb
+        configuration.colorFormat = .rgba16Float
 
-        // Enable foveation where supported (Quest Pro / Vision Pro gaze-based)
-        let foveationEnabled = capabilities.supportsFoveation
-        configuration.isFoveationEnabled = foveationEnabled
+        // .layered delivers ONE MTLTextureType2DArray for both eyes and requires
+        // a SINGLE render pass with renderTargetArrayLength=2 + viewport arrays.
+        // Our current per-eye loop uses two separate slice passes which the
+        // compositor silently ignores for .layered → black screen on device.
+        // Force .dedicated so each eye gets its own MTLTexture2D, matching the
+        // simulator path that already works.
+        // TODO: implement single-pass layered rendering to re-enable .layered.
+        configuration.layout = .dedicated
 
-        let layoutOptions: LayerRenderer.Capabilities.SupportedLayoutsOptions =
-            foveationEnabled ? [.foveationEnabled] : []
-        let supportedLayouts = capabilities.supportedLayouts(options: layoutOptions)
+        // ── Tracking areas ───────────────────────────────────────────────────
+        //
+        // This is how a Metal immersive app gets the system's own gaze-driven hover. The app
+        // registers a tracking area per hoverable object, writes that area's render value into
+        // an extra texture during its render pass, and the compositor applies the highlight
+        // afterwards using that texture and the wearer's gaze.
+        //
+        // The gaze itself is never handed to the app — the system draws the effect. Which means
+        // the hover looks exactly like every other visionOS control, rather than like something
+        // we approximated.
+        //
+        // visionOS 26.0 and later. Older systems simply skip this and fall back to the ray.
+        if #available(visionOS 26.0, *) {
+            let formats = capabilities.supportedTrackingAreasFormats
+            NSLog("[Viro] LayerCfg supportedTrackingAreasFormats=%@",
+                  formats.map { $0.rawValue } as NSArray)
+            if let format = formats.first {
+                configuration.trackingAreasFormat = format
+                // renderTarget so our pass can write ids into it; shaderRead because the
+                // compositor samples it after we are done.
+                configuration.trackingAreasUsage = [.renderTarget, .shaderRead]
+                NSLog("[Viro] tracking areas enabled, format=%lu", format.rawValue)
+            } else {
+                NSLog("[Viro] tracking areas unsupported on this layer — hover falls back to the ray")
+            }
+        }
 
-        // Layered: both eyes in a single texture array — preferred.
-        // Dedicated: separate textures per eye — fallback.
-        configuration.layout = supportedLayouts.contains(.layered) ? .layered : .dedicated
+        // Foveation also requires rasterizationRateMap on the render pass.
+        // Keep disabled until that support is added.
+        configuration.isFoveationEnabled = false
     }
 }
 

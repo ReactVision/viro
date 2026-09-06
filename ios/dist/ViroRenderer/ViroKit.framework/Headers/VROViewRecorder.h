@@ -25,7 +25,13 @@
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #import <Foundation/Foundation.h>
+// GLKit does not exist on visionOS, and neither does the OpenGL view this recorder was
+// built around. The rest of the class — AVFoundation capture, Photos saving, the watermark
+// and screenshot paths — is platform-agnostic, and the VROView protocol needs the typedefs
+// declared here, so the header has to parse on xros.
+#if !TARGET_OS_VISION
 #import <GLKit/GLKit.h>
+#endif
 #import <AVFoundation/AVFoundation.h>
 #import <Photos/Photos.h>
 #import <memory>
@@ -81,9 +87,11 @@ private:
  */
 @interface VROViewRecorder : NSObject
 
+#if !TARGET_OS_VISION
 - (id)initWithView:(GLKView *)view
           renderer:(std::shared_ptr<VRORenderer>)renderer
             driver:(std::shared_ptr<VRODriver>)driver;
+#endif
 - (void)deleteGL;
 
 - (void)startVideoRecording:(NSString *)fileName

@@ -20,7 +20,7 @@
 import * as React from "react";
 import { ViroArSession, type ViroWebRendererOptions, type ViroArSessionOptions } from "@reactvision/viro-web-renderer";
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
-type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "facingMode" | "intrinsics" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
+type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "facingMode" | "intrinsics" | "intrinsicsSize" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
 type Props = {
     initialScene: {
         scene: React.ComponentType<any>;
@@ -29,11 +29,14 @@ type Props = {
     /** WASM renderer asset-loading options (bundler/ESM). See Viro3DSceneNavigator.web. */
     webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
     /**
-     * URL to the tracking engine's glue (tinyvio-slam.js). Injected as a <script>; the build
-     * exposes a global `SlamModule` factory. Ignored if `loadSlam` is provided.
+     * URL to the tracking engine's glue (tinyvio-slam.js), injected as a <script>.
+     *
+     * Optional. `@reactvision/viro-web-renderer` ships the engine, and that copy
+     * is used when neither this nor `loadSlam` is given. Set this only to serve a
+     * different build, or one hosted somewhere your bundler put it.
      */
     slamScriptUrl?: string;
-    /** Override how the slam-wasm factory is obtained (e.g. an ESM import()). */
+    /** Override how the tracking-engine factory is obtained (e.g. an ESM import()). */
     loadSlam?: ViroArSessionOptions["loadSlam"];
     /** Capture/tuning options for tracking. */
     arOptions?: ArOptions;

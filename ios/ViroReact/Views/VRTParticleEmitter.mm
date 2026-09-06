@@ -176,8 +176,22 @@ const int kDefaultMaxParticles = 500;
         return;
     }
     
+    // The whole source object goes to RCTConvert, not just its `uri` string. Pulling the string
+    // out and converting that discards everything else the asset carries — scale, and the
+    // `__packager_asset` marker — and when the string is empty or not an absolute URL RCTConvert
+    // resolves it against the bundle and hands back the bundle *directory*. That is what the
+    // loader was being asked to download: a folder, failing with NSURLErrorFileIsDirectory, which
+    // the emitter then reported through perror() as an unrelated errno.
+    id source = [self.image objectForKey:@"source"];
+
+    NSString *nsStringImageSource = [source isKindOfClass:[NSDictionary class]]
+        ? [source objectForKey:@"uri"]
+        : ([source isKindOfClass:[NSString class]] ? source : nil);
+    if (![nsStringImageSource isKindOfClass:[NSString class]]) {
+        nsStringImageSource = nil;
+    }
+
     // Return if the image for this Image emitter has not changed.
-    NSString *nsStringImageSource = [self.image objectForKey:@"source"][@"uri"];
     if ((_currentImageSource && nsStringImageSource && [_currentImageSource isEqualToString:nsStringImageSource])
         || (!_currentImageSource && !nsStringImageSource)) {
         return;
@@ -186,9 +200,11 @@ const int kDefaultMaxParticles = 500;
 
     // Else, start the download with the newly provided image.
     _particleTexture = nullptr;
-    if (nsStringImageSource != nil) {
-        [_loader loadImage:[RCTConvert RCTImageSource:nsStringImageSource]];
+    RCTImageSource *converted = [RCTConvert RCTImageSource:source];
+    if (converted != nil) {
+        [_loader loadImage:converted];
     } else {
+        NSLog(@"Viro: particle image source could not be converted: %@", source);
         [_loader cancel];
         _particleTexture = nullptr;
     }
@@ -710,7 +726,7 @@ const int kDefaultMaxParticles = 500;
             _needsImageUpdate = true;
             [self updateEmitter];
         } else {
-            perror("Viro: Error loading particle image resource");
+            NSLog(@"Viro: particle image failed to load — see VRTImageAsyncLoader for the reason");
         }
     });
 }

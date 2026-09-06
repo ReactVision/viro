@@ -199,14 +199,12 @@ function ViroARSceneNavigator(props) {
         const url = props.slamScriptUrl;
         if (url)
             return () => loadSlamViaScript(url);
-        // Fall back to a pre-loaded global (host injected the <script> itself).
-        return () => {
-            const factory = globalThis.SlamModule;
-            if (!factory) {
-                throw new Error("slam-wasm not found: pass slamScriptUrl or loadSlam, or preload global SlamModule.");
-            }
-            return factory;
-        };
+        // Neither given: let the renderer load the engine it ships with. Returning
+        // undefined is what selects that path -- it is the default, not a failure.
+        // A host that injected the <script> itself is still served, because the
+        // bundled loader reuses an existing `SlamModule` global rather than
+        // fetching a second copy of a 265 KB module to arrive at the same object.
+        return undefined;
     }, [props.loadSlam, props.slamScriptUrl]);
     const startAR = (0, react_1.useCallback)(async () => {
         if (!renderer || starting || started)
@@ -234,7 +232,18 @@ function ViroARSceneNavigator(props) {
             },
         });
         sessionRef.current = session;
-        await session.start();
+        // start() rejects when it cannot start, having already called onError with
+        // the reason. Swallow the rejection here rather than letting it escape an
+        // onClick handler, and above all do not fall through to setStarted(true):
+        // that used to run even on a denied camera, undoing the state onError had
+        // just set and leaving the UI claiming a session that does not exist.
+        try {
+            await session.start();
+        }
+        catch {
+            sessionRef.current = null;
+            return;
+        }
         setStarted(true);
         setStarting(false);
         props.onSessionReady?.(session);

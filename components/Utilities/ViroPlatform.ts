@@ -57,3 +57,21 @@ export const isQuest: boolean = detectQuest();
  */
 export const hasOpenXRSupport: boolean =
   NativeModules.VRModuleOpenXR !== undefined;
+
+/**
+ * True on Apple Vision Pro (visionOS).
+ *
+ * Sits here next to `isQuest` and `isWeb` so platform branching reads the same way everywhere.
+ * `Platform.OS` is `"ios"` on visionOS — react-native-visionos is an out-of-tree platform that
+ * keeps the iOS identity — so it cannot be used to tell the two apart. React Native 0.83+ sets
+ * `Platform.isVision`; the native module constant covers builds where it is absent.
+ *
+ * `ViroVisionOSModule.isVisionOS()` computes the same thing and remains the public API; this is
+ * the constant form, evaluated once at import, matching `isQuest`.
+ */
+function detectVisionOS(): boolean {
+  if ((Platform as any).isVision === true) return true;
+  return NativeModules.VRTVisionOSModule?.isVisionOS === true;
+}
+
+export const isVisionOS: boolean = detectVisionOS();

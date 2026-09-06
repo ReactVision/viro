@@ -79,6 +79,9 @@ test/android/fastlane/README.md
 test/android/fastlane/report.xml
 /android/viro_bridge/.cxx/Debug
 /ios/dist/ViroRenderer/armv7_arm64
+# visionOS: ignore the built xcframework, keep ViroKit.podspec tracked (the
+# withViroVisionOS plugin points Podfile at that directory and does not generate it).
+/ios/dist/ViroRendererVisionOS/ViroKit.xcframework/
 
 # Web bridge harness — local WASM assets (copied from viro-web-renderer) and build output
 web-harness/wasm/

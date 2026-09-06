@@ -20,7 +20,7 @@ import {
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
@@ -442,8 +442,9 @@ export const StudioSceneNavigator = forwardRef<
       // On Quest, pre-register animations and materials before VRActivity
       // launches so the native registrations land before any Viro component
       // mounts; otherwise registerAnimations/createMaterials races the Fabric
-      // commit that creates those components.
-      if (isQuest) {
+      // commit that creates those components. visionOS is the same shape of
+      // problem: the ImmersiveSpace renderer starts outside this commit.
+      if (isQuest || isVisionOS) {
         registerSceneAnimations(sceneData.animations);
         registerStudioMaterialsForAssets(sceneData.assets);
       }
@@ -463,9 +464,11 @@ export const StudioSceneNavigator = forwardRef<
         },
       };
 
-      if (isQuest) {
+      if (isQuest || isVisionOS) {
         // Setting vrSceneEntry mounts ViroXRSceneNavigator with StudioARScene as
-        // vrInitialScene, so VRActivity launches straight into content.
+        // vrInitialScene, so VRActivity launches straight into content. visionOS reads the
+        // same prop — its ImmersiveSpace cannot host a ViroARScene either — so it takes this
+        // path rather than pushing onto a navigator that starts on the loading scene.
         setVrSceneEntry(entry);
       } else {
         navigatorRef.current?.arSceneNavigator?.push(entry);
@@ -503,7 +506,11 @@ export const StudioSceneNavigator = forwardRef<
   // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
   // live camera, so its overlay stays opt-in.) This branch sits above the error
   // boundary, which is why it has to handle loadError itself.
-  if (isQuest && !vrSceneEntry) {
+  //
+  // visionOS needs the same treatment for a different reason: its passthrough lives in
+  // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
+  // while the scene loads.
+  if ((isQuest || isVisionOS) && !vrSceneEntry) {
     return (
       <View style={styles.loader}>
         {overlay ?? <ActivityIndicator size="large" color="#ffffff" />}

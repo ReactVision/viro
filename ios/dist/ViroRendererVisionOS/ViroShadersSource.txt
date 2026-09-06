@@ -1,0 +1,2223 @@
+//
+//  Shaders.metal
+//  ViroRenderer
+//
+//  Created by Raj Advani on 10/13/15.
+//  Copyright © 2015 Raj Advani. All rights reserved.
+//
+//  Permission is hereby granted, free of charge, to any person obtaining
+//  a copy of this software and associated documentation files (the
+//  "Software"), to deal in the Software without restriction, including
+//  without limitation the rights to use, copy, modify, merge, publish,
+//  distribute, sublicense, and/or sell copies of the Software, and to
+//  permit persons to whom the Software is furnished to do so, subject to
+//  the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included
+//  in all copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+//  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+//  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+//  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+//  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+#include <simd/simd.h>
+typedef struct {
+    int type;
+    vector_float3 position;
+    vector_float3 direction;
+    vector_float3 color;
+    
+    float attenuation_start_distance;
+    float attenuation_end_distance;
+    float attenuation_falloff_exp;
+    
+    float spot_inner_angle;
+    float spot_outer_angle;
+
+    // Photometric intensity, used by the physically based model to turn a colour into
+    // radiance. The Lambert/Phong/Blinn models ignore it.
+    float intensity;
+
+    // Shadowing. shadow_map_index is the slice of the shadow map texture array this
+    // light rendered into, or -1 when the light casts no shadow.
+    int   shadow_map_index;
+    float shadow_bias;
+    float shadow_opacity;
+} VROLightUniforms;
+
+typedef struct {
+    matrix_float4x4 modelview_projection_matrix;
+    matrix_float4x4 modelview_matrix;
+    matrix_float4x4 model_matrix;
+    matrix_float4x4 normal_matrix;
+    matrix_float4x4 view_matrix;
+    matrix_float4x4 projection_matrix;
+    vector_float3   camera_position;
+} VROViewUniforms;
+
+typedef struct {
+    simd_float4    diffuse_surface_color;
+    float            diffuse_intensity;
+    float            shininess;
+    float            alpha;
+    float            roughness;
+    float            metalness;
+    float            ao;
+
+    // Written to the HDR target's extra colour attachments when the choreographer runs
+    // the HDR path. tone_mapping_mask is 1 for a material that should be tone-mapped and
+    // 0 otherwise; bloom_threshold is negative when the material contributes no bloom.
+    float            tone_mapping_mask;
+    float            bloom_threshold;
+} VROMaterialUniforms;
+
+typedef struct {
+    simd_float3 position;
+    simd_float3 normal;
+    simd_float2 texcoord;
+    simd_float4 color;
+    simd_float3 tangent;
+    simd_float4 bone_weights;
+    simd_uint4  bone_indices;
+} VROShaderGeometry;
+
+typedef struct {
+    simd_float4 position;
+} VROShaderVertex;
+
+typedef struct {
+    simd_float4 diffuse_color;
+    simd_float4 specular_color;
+    float shininess;
+    float roughness;
+    float metalness;
+    float ao;
+    simd_float3 normal;
+    simd_float3 view;
+    simd_float2 diffuse_texcoord;
+    simd_float2 specular_texcoord;
+    float alpha;
+    simd_float3 position;
+} VROSurface;
+
+typedef struct {
+    simd_float4x4 model_matrix;
+    simd_float4x4 view_matrix;
+    simd_float4x4 projection_matrix;
+    simd_float4x4 normal_matrix;
+    simd_float4x4 modelview_matrix;
+} VROTransforms;
+
+typedef struct {
+    vector_float3    ambient_light_color;
+    VROLightUniforms lights[8];
+    int              num_lights;
+
+    // Per-light shadow transforms, indexed the same way as lights[]. The vertex stage
+    // uses them to project each vertex into every shadow-casting light's clip space.
+    matrix_float4x4  shadow_view_matrices[8];
+    matrix_float4x4  shadow_projection_matrices[8];
+
+    // Non-zero once VROIBLPreprocess has produced the irradiance, prefiltered and BRDF
+    // maps. Until then the physically based model falls back to a flat ambient term,
+    // because the bound IBL textures are 1x1 placeholders.
+    int              has_ibl;
+} VROSceneLightingUniforms;
+
+typedef struct {
+    float texcoord_scale;
+} VRODistortionUniforms;
+#include <metal_stdlib>
+using namespace metal;
+
+struct VROCustomUniforms {
+#pragma custom_uniforms
+};
+
+constexpr sampler s(coord::normalized,
+                    address::repeat,
+                    filter::linear,
+                    mip_filter::linear);
+
+/* ---------------------------------------
+   GEOMETRY ATTRIBUTES
+ --------------------------------------- */
+
+typedef struct {
+    float3 position       [[ attribute(0) ]];
+    float3 normal         [[ attribute(1) ]];
+    float4 color          [[ attribute(2) ]];
+    float2 texcoord       [[ attribute(3) ]];
+    float4 bone_weights   [[ attribute(7) ]];
+    uint4  bone_indices   [[ attribute(8) ]];
+} VRORendererAttributes;
+
+/* ---------------------------------------
+   MODIFIER STRUCTURES
+   (defined in VROSharedStructures.h)
+   --------------------------------------- */
+
+/* ---------------------------------------
+   SHARED LIGHTING FUNCTIONS
+ --------------------------------------- */
+
+float compute_attenuation(constant VROLightUniforms &light,
+                          float3 surface_pos,
+                          thread float3 *surface_to_light);
+
+float compute_attenuation(constant VROLightUniforms &light,
+                          float3 surface_pos,
+                          thread float3 *surface_to_light) {
+    
+    float attenuation = 1.0;
+    
+    // Directional light
+    if (light.type == 1) {
+        *surface_to_light = normalize(light.direction);
+        attenuation = 1.0;
+    }
+    
+    // Omni + Spot lights
+    else {
+        *surface_to_light = -normalize(light.position.xyz - surface_pos);
+        float distance_to_light = length(light.position.xyz - surface_pos);
+        float d = clamp((distance_to_light - light.attenuation_start_distance) /
+                        (light.attenuation_end_distance - light.attenuation_start_distance),
+                        0.0, 1.0);
+        
+        attenuation = 1.0 - pow(d, 1.0 / light.attenuation_falloff_exp);
+        
+        // Spot light
+        if (light.type == 3) {
+            float light_surface_angle = acos(dot(*surface_to_light, normalize(light.direction)));
+            if (light_surface_angle > light.spot_inner_angle) {
+                float t = (light_surface_angle - light.spot_inner_angle) / light.spot_outer_angle;
+                attenuation = clamp(mix(attenuation, 0.0, t), 0.0, 1.0);
+            }
+        }
+    }
+    
+    return attenuation;
+}
+
+float4 compute_reflection(float3 surface_position, float3 camera_position, float3 normal,
+                          texturecube<float> reflect_texture);
+float4 compute_reflection(float3 surface_position, float3 camera_position, float3 normal,
+                          texturecube<float> reflect_texture) {
+    
+    float3 surface_to_camera = normalize(surface_position - camera_position);
+    float3 reflect_ray = reflect(surface_to_camera, -normal);
+    
+    return reflect_texture.sample(s, float3(reflect_ray.xy, -reflect_ray.z));
+}
+
+// ── Multiple render targets ───────────────────────────────────────────────────
+//
+// With HDR on, VROChoreographer renders the scene into a target with more than one
+// colour attachment: the HDR colour, a tone-mapping mask, and (with bloom) a bloom
+// buffer. Metal requires a pipeline to declare exactly the attachments its pass has and
+// a fragment function to write exactly what the pipeline declares, so a single float4
+// return cannot serve both the display pass and the HDR pass.
+//
+// Rather than duplicating all fifteen lighting fragment functions per attachment count,
+// the extra members are gated by function constants. VROMaterialSubstrateMetal
+// specialises the function at pipeline-creation time with the attachment count of the
+// target being rendered into, so one entry point covers every configuration.
+
+constant bool kVROHasToneMappingMask [[ function_constant(0) ]];
+constant bool kVROHasBloom           [[ function_constant(1) ]];
+constant bool kVROHasPostProcessMask [[ function_constant(2) ]];
+
+struct VROLightingFragmentOut {
+    float4 color     [[ color(0) ]];
+    float4 tone_mask [[ color(1), function_constant(kVROHasToneMappingMask) ]];
+    float4 bloom     [[ color(2), function_constant(kVROHasBloom) ]];
+    float4 post_mask [[ color(3), function_constant(kVROHasPostProcessMask) ]];
+};
+
+// Builds the fragment output from the shaded colour. The mask attachments are alpha
+// blended along with the colour, which is what lets a tone-mapped transparent surface
+// over a non-tone-mapped background fade smoothly between the two.
+static VROLightingFragmentOut VROMakeLightingOut(float4 color,
+                                                constant VROMaterialUniforms &material) {
+    VROLightingFragmentOut out;
+    out.color = color;
+    if (kVROHasToneMappingMask) {
+        out.tone_mask = float4(material.tone_mapping_mask);
+    }
+    if (kVROHasBloom) {
+        // A negative threshold means the material contributes no bloom. The bloom buffer
+        // is premultiplied, matching what VROGaussianBlurRenderPass expects.
+        const float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+        const bool contributes = material.bloom_threshold >= 0.0 && luminance > material.bloom_threshold;
+        out.bloom = contributes ? float4(color.rgb * color.a, color.a) : float4(0.0);
+    }
+    if (kVROHasPostProcessMask) {
+        // Per-material post-process masking is not plumbed through on Metal yet; an empty
+        // mask means every fragment is treated as unmasked.
+        out.post_mask = float4(0.0);
+    }
+    return out;
+}
+
+// ── Shadow mapping ────────────────────────────────────────────────────────────
+//
+// Shadow maps are rendered by VROShadowMapRenderPass into one slice of a depth texture
+// array, one slice per shadow-casting light. compute_shadow returns the fraction of
+// light reaching the fragment: 1.0 in full light, (1 - shadow_opacity) in full shadow.
+//
+// The OpenGL path interpolates a shadow_coords[8] varying from the vertex stage. MSL
+// forbids array members in a stage_in struct, and eight extra float4 interpolants would
+// be expensive anyway, so the coordinate is derived per fragment from the world-space
+// surface position instead. Same result, no interpolants.
+//
+// The clip-to-texture mapping is Metal's, not OpenGL's: clip z already lands in [0, 1]
+// so it needs no remapping, and the texture origin is top-left so v is flipped. The
+// shadow projection is built to match — see VROMathComputeOrthographicProjectionZeroToOne.
+
+constexpr sampler kVROShadowSampler(coord::normalized, filter::linear,
+                                    address::clamp_to_edge, compare_func::less);
+
+float compute_shadow(constant VROSceneLightingUniforms &lighting, int index,
+                     float3 surface_position, depth2d_array<float> shadow_map);
+float compute_shadow(constant VROSceneLightingUniforms &lighting, int index,
+                     float3 surface_position, depth2d_array<float> shadow_map) {
+    constant VROLightUniforms &light = lighting.lights[index];
+    if (light.shadow_map_index < 0) {
+        return 1.0;
+    }
+    const float4 coord = lighting.shadow_projection_matrices[index]
+                       * lighting.shadow_view_matrices[index]
+                       * float4(surface_position, 1.0);
+    if (coord.w <= 0.0) {
+        return 1.0;
+    }
+    const float inv_w = 1.0 / coord.w;
+    const float2 uv = float2((coord.x + coord.w) * 0.5 * inv_w,
+                             (coord.w - coord.y) * 0.5 * inv_w);
+    const float depth = coord.z * inv_w;
+
+    // Outside the light's shadow frustum nothing is occluded.
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0 || depth > 1.0) {
+        return 1.0;
+    }
+    // sample_compare returns the fraction of taps passing compare_func::less, i.e. the
+    // fraction of the neighbourhood that is lit.
+    const float lit = shadow_map.sample_compare(kVROShadowSampler, uv,
+                                                light.shadow_map_index,
+                                                depth - light.shadow_bias);
+    return mix(1.0, lit, light.shadow_opacity);
+}
+
+/* ---------------------------------------
+   CONSTANT LIGHTING MODEL
+   --------------------------------------- */
+
+typedef struct {
+    float4 position [[ position ]];
+    float4 color;
+    float2 texcoord;
+
+    float3 surface_position;
+    float3 camera_position;
+
+    float3 ambient_color;
+    float4 material_color;
+    float  diffuse_intensity;
+    float  material_alpha;
+    // Particle instancing: which instance this vertex belongs to, so the fragment
+    // stage can index particle_colors. Flat — an instance index must not interpolate.
+    uint   instance_id [[ flat ]];
+} VROConstantLightingVertexOut;
+
+vertex VROConstantLightingVertexOut constant_lighting_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                             constant VROViewUniforms &view [[ buffer(1) ]],
+                                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                             constant float4x4 *bone_matrices [[ buffer(5) ]],
+                                constant float4x4 *particle_transforms [[ buffer(7) ]],
+                                uint v_instance_id [[ instance_id ]]) {
+
+#pragma geometry_modifier_uniforms
+#pragma vertex_modifier_uniforms
+
+    VROConstantLightingVertexOut out;
+
+    VROShaderGeometry _geometry;
+    _geometry.position = attributes.position;
+    _geometry.normal = attributes.normal;
+    _geometry.texcoord = attributes.texcoord;
+    _geometry.bone_weights = attributes.bone_weights;
+    _geometry.bone_indices = attributes.bone_indices;
+
+    VROTransforms _transforms;
+    _transforms.model_matrix = view.model_matrix;
+    _transforms.view_matrix = view.view_matrix;
+    _transforms.projection_matrix = view.projection_matrix;
+
+#pragma geometry_modifier_body
+
+    float3 v_position = (_transforms.model_matrix * float4(_geometry.position, 1.0)).xyz;
+    float4 in_position = float4(_geometry.position, 1.0);
+    
+    VROShaderVertex _vertex;
+    _vertex.position = view.modelview_projection_matrix * in_position;
+
+#pragma vertex_modifier_body
+
+    out.position = _vertex.position;
+    out.instance_id = v_instance_id;
+    out.texcoord = _geometry.texcoord;
+    out.ambient_color = lighting.ambient_light_color;
+    out.material_color = material.diffuse_surface_color;
+    out.diffuse_intensity = material.diffuse_intensity;
+    out.material_alpha = material.alpha;
+    out.surface_position = v_position;
+    out.camera_position = view.camera_position;
+
+    return out;
+}
+
+fragment VROLightingFragmentOut constant_lighting_fragment_c(VROConstantLightingVertexOut in [[ stage_in ]],
+                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                             constant float4 *particle_colors [[ buffer(7) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = material.shininess;
+    _surface.roughness = material.roughness;
+    _surface.metalness = material.metalness;
+    _surface.ao = material.ao;
+    _surface.normal = float3(0, 0, 1);
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.diffuse_texcoord = float2(0, 0);
+    _surface.specular_texcoord = float2(0, 0);
+    _surface.alpha = in.material_alpha;
+    
+#pragma surface_modifier_body
+
+    float4 _output_color = float4(_surface.diffuse_color.xyz * lighting.ambient_light_color + _surface.diffuse_color.xyz * in.diffuse_intensity,
+                                  _surface.alpha * _surface.diffuse_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut constant_lighting_fragment_t(VROConstantLightingVertexOut in [[ stage_in ]],
+                                             texture2d<float> texture [[ texture(0) ]],
+                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                             constant float4 *particle_colors [[ buffer(7) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = material.shininess;
+    _surface.normal = float3(0, 0, 1);
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha;
+
+#pragma surface_modifier_body
+
+    float4 _output_color = float4(_surface.diffuse_color.xyz * lighting.ambient_light_color + _surface.diffuse_color.xyz * in.diffuse_intensity,
+                                  _surface.alpha * _surface.diffuse_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut constant_lighting_fragment_q(VROConstantLightingVertexOut in [[ stage_in ]],
+                                             texturecube<float> texture [[ texture(0) ]],
+                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                             constant float4 *particle_colors [[ buffer(7) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float3 texcoord = float3(in.surface_position.x, in.surface_position.y, -in.surface_position.z);
+    float4 texture_color = texture.sample(s, texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color * texture_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = material.shininess;
+    _surface.normal = float3(0, 0, 1);
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha;
+
+#pragma surface_modifier_body
+
+    float4 _output_color = float4(_surface.diffuse_color.xyz * lighting.ambient_light_color + _surface.diffuse_color.xyz * in.diffuse_intensity, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+/* ---------------------------------------
+ LAMBERT LIGHTING MODEL
+ --------------------------------------- */
+
+typedef struct {
+    float4 position [[ position ]];
+    float3 normal;
+    float4 color;
+    float2 texcoord;
+    
+    float3 surface_position;
+    float3 camera_position;
+    
+    float3 ambient_color;
+    float4 material_color;
+    float  diffuse_intensity;
+    float  material_alpha;
+    // Particle instancing: which instance this vertex belongs to, so the fragment
+    // stage can index particle_colors. Flat — an instance index must not interpolate.
+    uint   instance_id [[ flat ]];
+} VROLambertLightingVertexOut;
+
+vertex VROLambertLightingVertexOut lambert_lighting_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                           constant VROViewUniforms &view [[ buffer(1) ]],
+                                                           constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                           constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                           constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                           constant float4x4 *bone_matrices [[ buffer(5) ]],
+                               constant float4x4 *particle_transforms [[ buffer(7) ]],
+                               uint v_instance_id [[ instance_id ]]) {
+
+#pragma geometry_modifier_uniforms
+#pragma vertex_modifier_uniforms
+
+    VROLambertLightingVertexOut out;
+
+    VROShaderGeometry _geometry;
+    _geometry.position = attributes.position;
+    _geometry.normal = attributes.normal;
+    _geometry.texcoord = attributes.texcoord;
+    _geometry.color = attributes.color;
+    _geometry.bone_weights = attributes.bone_weights;
+    _geometry.bone_indices = attributes.bone_indices;
+
+    VROTransforms _transforms;
+    _transforms.model_matrix = view.model_matrix;
+    _transforms.view_matrix = view.view_matrix;
+    _transforms.projection_matrix = view.projection_matrix;
+    _transforms.normal_matrix = view.normal_matrix;
+    _transforms.modelview_matrix = view.modelview_matrix;
+
+#pragma geometry_modifier_body
+
+    float3 v_position = (_transforms.model_matrix * float4(_geometry.position, 1.0)).xyz;
+    float4 in_position = float4(_geometry.position, 1.0);
+    
+    VROShaderVertex _vertex;
+    _vertex.position = view.modelview_projection_matrix * in_position;
+
+#pragma vertex_modifier_body
+    
+    out.position = _vertex.position;
+    out.instance_id = v_instance_id;
+    out.texcoord = _geometry.texcoord;
+    out.color = _geometry.color;
+    
+    out.surface_position = v_position;
+    out.camera_position  = view.camera_position;
+    out.normal = normalize((_transforms.normal_matrix * float4(_geometry.normal, 0.0)).xyz);
+    
+    out.ambient_color = lighting.ambient_light_color;
+    out.material_color = material.diffuse_surface_color;
+    out.diffuse_intensity = material.diffuse_intensity;
+    out.material_alpha = material.alpha;
+    
+    return out;
+}
+
+float3 apply_light_lambert(constant VROLightUniforms &light,
+                           float3 surface_pos,
+                           float3 surface_normal,
+                           float4 material_color);
+float3 apply_light_lambert(constant VROLightUniforms &light,
+                           float3 surface_pos,
+                           float3 surface_normal,
+                           float4 material_color) {
+
+    thread float3 surface_to_light;
+    float attenuation = compute_attenuation(light, surface_pos, &surface_to_light);
+
+    float diffuse_coeff = fmax(0.0, dot(-surface_normal, surface_to_light));
+    return attenuation * diffuse_coeff * material_color.rgb * light.color;
+}
+
+float3 apply_light_lambert(constant VROLightUniforms &light,
+                           float3 surface_pos,
+                           float3 surface_normal,
+                           float3 material_color,
+                           float  diffuse_intensity);
+float3 apply_light_lambert(constant VROLightUniforms &light,
+                           float3 surface_pos,
+                           float3 surface_normal,
+                           float3 material_color,
+                           float  diffuse_intensity) {
+    thread float3 surface_to_light;
+    float attenuation = compute_attenuation(light, surface_pos, &surface_to_light);
+    float diffuse_coeff = fmax(0.0, dot(-surface_normal, surface_to_light));
+    return attenuation * diffuse_coeff * material_color * diffuse_intensity * light.color;
+}
+
+fragment VROLightingFragmentOut lambert_lighting_fragment_c(VROLambertLightingVertexOut in [[ stage_in ]],
+                                            constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                            constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                            constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                            constant float4 *particle_colors [[ buffer(7) ]],
+                                            depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = 0;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float3 ambient_light_color = in.ambient_color * _surface.diffuse_color.xyz;
+    float4 material_diffuse_color = _surface.diffuse_color * in.diffuse_intensity;
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_lambert(lighting.lights[i],
+                                                      in.surface_position,
+                                                      _surface.normal,
+                                                      material_diffuse_color);
+    }
+    
+    float4 _output_color = float4(ambient_light_color + diffuse_light_color, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut lambert_lighting_fragment_c_reflect(VROLambertLightingVertexOut in [[ stage_in ]],
+                                                    texturecube<float> reflect_texture [[ texture(0) ]],
+                                                    constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                    constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                    constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                    constant float4 *particle_colors [[ buffer(7) ]],
+                                                    depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float4 reflective_color = compute_reflection(in.surface_position, in.camera_position, _surface.normal, reflect_texture);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_lambert(lighting.lights[i],
+                                                      in.surface_position,
+                                                      _surface.normal,
+                                                      _surface.diffuse_color.xyz,
+                                                      in.diffuse_intensity);
+    }
+    float4 lighting_color = float4(in.ambient_color * _surface.diffuse_color.xyz + diffuse_light_color, _surface.alpha);
+    
+    float4 _output_color = float4(lighting_color.xyz + reflective_color.xyz, lighting_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut lambert_lighting_fragment_t(VROLambertLightingVertexOut in [[ stage_in ]],
+                                            texture2d<float> texture [[ texture(0) ]],
+                                            constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                            constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                            constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                            constant float4 *particle_colors [[ buffer(7) ]],
+                                            depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color * in.material_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = 0;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * diffuse_texture_color.a * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float3 ambient_light_color = in.ambient_color * _surface.diffuse_color.xyz;
+    float4 material_diffuse_color = _surface.diffuse_color * in.diffuse_intensity;
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_lambert(lighting.lights[i],
+                                                      in.surface_position,
+                                                      _surface.normal,
+                                                      material_diffuse_color);
+    }
+    
+    float4 _output_color = float4(ambient_light_color + diffuse_light_color, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut lambert_lighting_fragment_t_reflect(VROLambertLightingVertexOut in [[ stage_in ]],
+                                                    texture2d<float> texture [[ texture(0) ]],
+                                                    texturecube<float> reflect_texture [[ texture(1) ]],
+                                                    constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                    constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                    constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                    constant float4 *particle_colors [[ buffer(7) ]],
+                                                    depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color * in.material_color;
+    _surface.specular_color = float4(0, 0, 0, 0);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * diffuse_texture_color.a * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float4 reflective_color = compute_reflection(in.surface_position, in.camera_position, _surface.normal, reflect_texture);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_lambert(lighting.lights[i],
+                                                      in.surface_position,
+                                                      _surface.normal,
+                                                      _surface.diffuse_color.xyz,
+                                                      in.diffuse_intensity);
+    }
+    float4 lighting_color = float4(in.ambient_color * _surface.diffuse_color.xyz + diffuse_light_color, _surface.alpha);
+    
+    float4 _output_color = float4(lighting_color.xyz + reflective_color.xyz, lighting_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+/* ---------------------------------------
+   PHONG LIGHTING MODEL
+   --------------------------------------- */
+
+typedef struct {
+    float4 position [[ position ]];
+    float3 normal;
+    float4 color;
+    float2 texcoord;
+    
+    float3 surface_position;
+    float3 camera_position;
+    
+    float3 ambient_color;
+    float4 material_color;
+    float  material_shininess;
+    float  diffuse_intensity;
+    float  material_alpha;
+    // Particle instancing: which instance this vertex belongs to, so the fragment
+    // stage can index particle_colors. Flat — an instance index must not interpolate.
+    uint   instance_id [[ flat ]];
+} VROPhongLightingVertexOut;
+
+vertex VROPhongLightingVertexOut phong_lighting_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                       constant VROViewUniforms &view [[ buffer(1) ]],
+                                                       constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                       constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                       constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                       constant float4x4 *bone_matrices [[ buffer(5) ]],
+                             constant float4x4 *particle_transforms [[ buffer(7) ]],
+                             uint v_instance_id [[ instance_id ]]) {
+
+#pragma geometry_modifier_uniforms
+#pragma vertex_modifier_uniforms
+
+    VROPhongLightingVertexOut out;
+
+    VROShaderGeometry _geometry;
+    _geometry.position = attributes.position;
+    _geometry.normal = attributes.normal;
+    _geometry.texcoord = attributes.texcoord;
+    _geometry.color = attributes.color;
+    _geometry.bone_weights = attributes.bone_weights;
+    _geometry.bone_indices = attributes.bone_indices;
+
+    VROTransforms _transforms;
+    _transforms.model_matrix = view.model_matrix;
+    _transforms.view_matrix = view.view_matrix;
+    _transforms.projection_matrix = view.projection_matrix;
+    _transforms.normal_matrix = view.normal_matrix;
+    _transforms.modelview_matrix = view.modelview_matrix;
+
+#pragma geometry_modifier_body
+
+    float3 v_position = (_transforms.model_matrix * float4(_geometry.position, 1.0)).xyz;
+    float4 in_position = float4(_geometry.position, 1.0);
+    
+    VROShaderVertex _vertex;
+    _vertex.position = view.modelview_projection_matrix * in_position;
+
+#pragma vertex_modifier_body
+    
+    out.position = _vertex.position;
+    out.instance_id = v_instance_id;
+    out.texcoord = _geometry.texcoord;
+    out.color = _geometry.color;
+    
+    out.surface_position = v_position;
+    out.camera_position  = view.camera_position;
+    out.normal = normalize((_transforms.normal_matrix * float4(_geometry.normal, 0.0)).xyz);
+    
+    out.ambient_color = lighting.ambient_light_color;
+    out.material_color = material.diffuse_surface_color;
+    out.material_shininess = material.shininess;
+    out.diffuse_intensity = material.diffuse_intensity;
+    out.material_alpha = material.alpha;
+    
+    return out;
+}
+
+float3 apply_light_phong(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float4 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess);
+float3 apply_light_phong(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float4 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess) {
+
+    thread float3 surface_to_light;
+    float attenuation = compute_attenuation(light, surface_pos, &surface_to_light);
+
+    float diffuse_coeff = fmax(0.0, dot(-surface_normal, surface_to_light));
+    float3 diffuse = diffuse_coeff * material_diffuse_color.rgb * light.color;
+
+    float specular_coeff = 0.0;
+    if (diffuse_coeff > 0.0) {
+        specular_coeff = pow(max(0.0, dot(surface_to_camera,
+                                          reflect(surface_to_light, -surface_normal))),
+                             material_shininess);
+    }
+
+    float3 specular = specular_coeff * material_specular_color.rgb * light.color;
+    return attenuation * (diffuse + specular);
+}
+
+float3 apply_light_phong(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float3 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess);
+float3 apply_light_phong(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float3 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess) {
+    thread float3 surface_to_light;
+    float attenuation = compute_attenuation(light, surface_pos, &surface_to_light);
+    float diffuse_coeff = fmax(0.0, dot(-surface_normal, surface_to_light));
+    float3 diffuse = diffuse_coeff * material_diffuse_color * light.color;
+    float specular_coeff = 0.0;
+    if (diffuse_coeff > 0.0) {
+        specular_coeff = pow(max(0.0, dot(surface_to_camera,
+                                          reflect(surface_to_light, -surface_normal))),
+                             material_shininess);
+    }
+    float3 specular = specular_coeff * material_specular_color.rgb * light.color;
+    return attenuation * (diffuse + specular);
+}
+
+fragment VROLightingFragmentOut phong_lighting_fragment_c(VROPhongLightingVertexOut in [[ stage_in ]],
+                                          texture2d<float> specular_texture [[ texture(0) ]],
+                                          constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                          constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                          constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                          constant float4 *particle_colors [[ buffer(7) ]],
+                                          depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float3 ambient_light_color = in.ambient_color * _surface.diffuse_color.xyz;
+    float4 material_diffuse_color = _surface.diffuse_color * in.diffuse_intensity;
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_phong(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    material_diffuse_color,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    
+    float4 _output_color = float4(ambient_light_color + diffuse_light_color, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut phong_lighting_fragment_c_reflect(VROPhongLightingVertexOut in [[ stage_in ]],
+                                                  texture2d<float> specular_texture [[ texture(0) ]],
+                                                  texturecube<float> reflect_texture [[ texture(1) ]],
+                                                  constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                  constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                  constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                  constant float4 *particle_colors [[ buffer(7) ]],
+                                                  depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float4 reflective_color = compute_reflection(in.surface_position, in.camera_position, _surface.normal, reflect_texture);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_phong(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    _surface.diffuse_color.xyz,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    float4 lighting_color = float4(in.ambient_color * _surface.diffuse_color.xyz + diffuse_light_color, _surface.alpha);
+    
+    float4 _output_color = float4(lighting_color.xyz + reflective_color.xyz, lighting_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut phong_lighting_fragment_t(VROPhongLightingVertexOut in [[ stage_in ]],
+                                          texture2d<float> diffuse_texture [[ texture(0) ]],
+                                          texture2d<float> specular_texture [[ texture(1) ]],
+                                          constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                          constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                          constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                          constant float4 *particle_colors [[ buffer(7) ]],
+                                          depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = diffuse_texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color * in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * diffuse_texture_color.a * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float3 ambient_light_color = in.ambient_color * _surface.diffuse_color.xyz;
+    float4 material_diffuse_color = _surface.diffuse_color * in.diffuse_intensity;
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_phong(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    material_diffuse_color,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    
+    float4 _output_color = float4(ambient_light_color + diffuse_light_color, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut phong_lighting_fragment_t_reflect(VROPhongLightingVertexOut in [[ stage_in ]],
+                                          texture2d<float> diffuse_texture [[ texture(0) ]],
+                                          texture2d<float> specular_texture [[ texture(1) ]],
+                                          texturecube<float> reflect_texture [[ texture(2) ]],
+                                                  constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                  constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                  constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                  constant float4 *particle_colors [[ buffer(7) ]],
+                                                  depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = diffuse_texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color * in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * diffuse_texture_color.a * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float4 reflective_color = compute_reflection(in.surface_position, in.camera_position, _surface.normal, reflect_texture);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_phong(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    _surface.diffuse_color.xyz,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    float4 lighting_color = float4(in.ambient_color * _surface.diffuse_color.xyz + diffuse_light_color, _surface.alpha);
+    
+    float4 _output_color = float4(lighting_color.xyz + reflective_color.xyz, lighting_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+/* ---------------------------------------
+   BLINN LIGHTING MODEL
+   --------------------------------------- */
+
+typedef struct {
+    float4 position [[ position ]];
+    float3 normal;
+    float4 color;
+    float2 texcoord;
+
+    float3 surface_position;
+    float3 camera_position;
+
+    float3 ambient_color;
+    float4 material_color;
+    float  material_shininess;
+    float  diffuse_intensity;
+    float  material_alpha;
+    // Particle instancing: which instance this vertex belongs to, so the fragment
+    // stage can index particle_colors. Flat — an instance index must not interpolate.
+    uint   instance_id [[ flat ]];
+} VROBlinnLightingVertexOut;
+
+vertex VROBlinnLightingVertexOut blinn_lighting_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                       constant VROViewUniforms &view [[ buffer(1) ]],
+                                                       constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                       constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                       constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                       constant float4x4 *bone_matrices [[ buffer(5) ]],
+                             constant float4x4 *particle_transforms [[ buffer(7) ]],
+                             uint v_instance_id [[ instance_id ]]) {
+
+#pragma geometry_modifier_uniforms
+#pragma vertex_modifier_uniforms
+
+    VROBlinnLightingVertexOut out;
+
+    VROShaderGeometry _geometry;
+    _geometry.position = attributes.position;
+    _geometry.normal = attributes.normal;
+    _geometry.texcoord = attributes.texcoord;
+    _geometry.color = attributes.color;
+    _geometry.bone_weights = attributes.bone_weights;
+    _geometry.bone_indices = attributes.bone_indices;
+
+    VROTransforms _transforms;
+    _transforms.model_matrix = view.model_matrix;
+    _transforms.view_matrix = view.view_matrix;
+    _transforms.projection_matrix = view.projection_matrix;
+    _transforms.normal_matrix = view.normal_matrix;
+    _transforms.modelview_matrix = view.modelview_matrix;
+
+#pragma geometry_modifier_body
+
+    float3 v_position = (_transforms.model_matrix * float4(_geometry.position, 1.0)).xyz;
+    float4 in_position = float4(_geometry.position, 1.0);
+    
+    VROShaderVertex _vertex;
+    _vertex.position = view.modelview_projection_matrix * in_position;
+
+#pragma vertex_modifier_body
+    
+    out.position = _vertex.position;
+    out.instance_id = v_instance_id;
+    out.texcoord = _geometry.texcoord;
+    out.color = _geometry.color;
+    
+    out.surface_position = v_position;
+    out.camera_position  = view.camera_position;
+    out.normal = normalize((_transforms.normal_matrix * float4(_geometry.normal, 0.0)).xyz);
+    
+    out.ambient_color = lighting.ambient_light_color;
+    out.material_color = material.diffuse_surface_color;
+    out.material_shininess = material.shininess;
+    out.diffuse_intensity = material.diffuse_intensity;
+    out.material_alpha = material.alpha;
+    
+    return out;
+}
+
+float3 apply_light_blinn(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float4 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess);
+float3 apply_light_blinn(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float4 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess) {
+
+    thread float3 surface_to_light;
+    float attenuation = compute_attenuation(light, surface_pos, &surface_to_light);
+
+    float diffuse_coeff = fmax(0.0, dot(-surface_normal, surface_to_light));
+    float3 diffuse = diffuse_coeff * material_diffuse_color.rgb * light.color;
+
+    float specular_coeff = 0.0;
+    if (diffuse_coeff > 0.0) {
+        specular_coeff = pow(max(0.0, dot(normalize(-surface_to_camera + surface_to_light),
+                                          -surface_normal)),
+                             material_shininess);
+    }
+
+    float3 specular = specular_coeff * material_specular_color.rgb * light.color;
+    return attenuation * (diffuse + specular);
+}
+
+float3 apply_light_blinn(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float3 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess);
+float3 apply_light_blinn(constant VROLightUniforms &light,
+                         float3 surface_pos,
+                         float3 surface_normal,
+                         float3 surface_to_camera,
+                         float3 material_diffuse_color,
+                         float4 material_specular_color,
+                         float  material_shininess) {
+    thread float3 surface_to_light;
+    float attenuation = compute_attenuation(light, surface_pos, &surface_to_light);
+    float diffuse_coeff = fmax(0.0, dot(-surface_normal, surface_to_light));
+    float3 diffuse = diffuse_coeff * material_diffuse_color * light.color;
+    float specular_coeff = 0.0;
+    if (diffuse_coeff > 0.0) {
+        specular_coeff = pow(max(0.0, dot(normalize(-surface_to_camera + surface_to_light),
+                                          -surface_normal)),
+                             material_shininess);
+    }
+    float3 specular = specular_coeff * material_specular_color.rgb * light.color;
+    return attenuation * (diffuse + specular);
+}
+
+fragment VROLightingFragmentOut blinn_lighting_fragment_c(VROBlinnLightingVertexOut in [[ stage_in ]],
+                                          texture2d<float> specular_texture [[ texture(0) ]],
+                                          constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                          constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                          constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                          constant float4 *particle_colors [[ buffer(7) ]],
+                                          depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float3 ambient_light_color = in.ambient_color * _surface.diffuse_color.xyz;
+    float4 material_diffuse_color = _surface.diffuse_color * in.diffuse_intensity;
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_blinn(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    material_diffuse_color,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    
+    float4 _output_color = float4(ambient_light_color + diffuse_light_color, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut blinn_lighting_fragment_c_reflect(VROBlinnLightingVertexOut in [[ stage_in ]],
+                                                  texture2d<float> specular_texture [[ texture(0) ]],
+                                                  texturecube<float> reflect_texture [[ texture(1) ]],
+                                                  constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                  constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                  constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                  constant float4 *particle_colors [[ buffer(7) ]],
+                                                  depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    VROSurface _surface;
+    _surface.diffuse_color = in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float4 reflective_color = compute_reflection(in.surface_position, in.camera_position, _surface.normal, reflect_texture);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_blinn(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    _surface.diffuse_color.xyz,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    float4 lighting_color = float4(in.ambient_color * _surface.diffuse_color.xyz + diffuse_light_color, _surface.alpha);
+    
+    float4 _output_color = float4(lighting_color.xyz + reflective_color.xyz, lighting_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut blinn_lighting_fragment_t(VROBlinnLightingVertexOut in [[ stage_in ]],
+                                          texture2d<float> diffuse_texture [[ texture(0) ]],
+                                          texture2d<float> specular_texture [[ texture(1) ]],
+                                          constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                          constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                          constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                          constant float4 *particle_colors [[ buffer(7) ]],
+                                          depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = diffuse_texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color * in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * diffuse_texture_color.a * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float3 ambient_light_color = in.ambient_color * _surface.diffuse_color.xyz;
+    float4 material_diffuse_color = _surface.diffuse_color * in.diffuse_intensity;
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_blinn(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    material_diffuse_color,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    
+    float4 _output_color = float4(ambient_light_color + diffuse_light_color, _surface.alpha);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+fragment VROLightingFragmentOut blinn_lighting_fragment_t_reflect(VROBlinnLightingVertexOut in [[ stage_in ]],
+                                                  texture2d<float> diffuse_texture [[ texture(0) ]],
+                                                  texture2d<float> specular_texture [[ texture(1) ]],
+                                                  texturecube<float> reflect_texture [[ texture(2) ]],
+                                                  constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                  constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                  constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                  constant float4 *particle_colors [[ buffer(7) ]],
+                                                  depth2d_array<float> shadow_map [[ texture(4) ]]) {
+    
+#pragma surface_modifier_uniforms
+#pragma fragment_modifier_uniforms
+
+    float4 diffuse_texture_color = diffuse_texture.sample(s, in.texcoord);
+
+    VROSurface _surface;
+    _surface.diffuse_color = diffuse_texture_color * in.material_color;
+    _surface.specular_color = specular_texture.sample(s, in.texcoord);
+    _surface.shininess = material.shininess;
+    _surface.normal = in.normal;
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+    _surface.alpha = in.material_alpha * diffuse_texture_color.a * in.material_color.a;
+
+#pragma surface_modifier_body
+
+    float4 reflective_color = compute_reflection(in.surface_position, in.camera_position, _surface.normal, reflect_texture);
+    
+    float3 diffuse_light_color = float3(0, 0, 0);
+    float3 surface_to_camera = normalize(in.camera_position - in.surface_position);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        const float shadow = compute_shadow(lighting, i, in.surface_position, shadow_map);
+        diffuse_light_color += shadow * apply_light_blinn(lighting.lights[i],
+                                                    in.surface_position,
+                                                    _surface.normal,
+                                                    surface_to_camera,
+                                                    _surface.diffuse_color.xyz,
+                                                    _surface.specular_color,
+                                                    _surface.shininess);
+    }
+    float4 lighting_color = float4(in.ambient_color * _surface.diffuse_color.xyz + diffuse_light_color, _surface.alpha);
+    
+    float4 _output_color = float4(lighting_color.xyz + reflective_color.xyz, lighting_color.a);
+
+#pragma fragment_modifier_body
+
+    return VROMakeLightingOut(_output_color, material);
+}
+
+/* ---------------------------------------
+   DISTORTION SHADERS
+   --------------------------------------- */
+
+typedef struct {
+    float2 position       [[ attribute(0) ]];
+    float  vignette       [[ attribute(1) ]];
+    float2 red_texcoord   [[ attribute(2) ]];
+    float2 green_texcoord [[ attribute(3) ]];
+    float2 blue_texcoord  [[ attribute(4) ]];
+} VRODistortionAttributes;
+
+typedef struct {
+    float4 position [[ position ]];
+    float2 texcoord;
+    float  vignette;
+} VRODistortionVertexOut;
+
+/* ---------------------------------------
+   PHYSICALLY BASED LIGHTING MODEL
+   --------------------------------------- */
+//
+// Cook-Torrance specular BRDF with a Lambertian diffuse term — the same construction the
+// OpenGL path assembles from pbr_fsh.glsl, written out directly here because Metal has no
+// runtime shader assembly.
+//
+// Image-based lighting is not wired up yet: with no irradiance or prefiltered environment
+// map the ambient term falls back to the scene's ambient colour, which is why a PBR
+// material still needs an analytic light to be visible. That is the remaining gap versus
+// the OpenGL path, not a difference in the direct-lighting maths.
+
+constant float kVROPi = 3.14159265359;
+
+static float3 vro_fresnel_schlick(float cos_theta, float3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
+// Roughness-aware variant, used for the IBL specular term so that rough surfaces do not
+// pick up a hard rim.
+static float3 vro_fresnel_schlick_roughness(float cos_theta, float3 F0, float roughness) {
+    return F0 + (max(float3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
+// Mip count of the prefiltered environment chain minus one; must match
+// kVROIBLPrefilterMips in the IBL preprocess.
+constant float kVROPrefilterMipCount = 4.0;
+
+constexpr sampler kVROIBLSampler(coord::normalized, filter::linear, mip_filter::linear,
+                                 address::clamp_to_edge);
+
+// Trowbridge-Reitz GGX: how much of the surface's microfacets align with the halfway
+// vector, driven by roughness.
+static float vro_distribution_ggx(float3 N, float3 H, float roughness) {
+    const float a  = roughness * roughness;
+    const float a2 = a * a;
+    const float NdotH  = max(dot(N, H), 0.0);
+    const float NdotH2 = NdotH * NdotH;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = kVROPi * denom * denom;
+    return a2 / max(denom, 1e-7);
+}
+
+// Schlick-GGX: microfacet self-shadowing for one direction.
+static float vro_geometry_schlick_ggx(float NdotX, float roughness) {
+    const float r = roughness + 1.0;
+    const float k = (r * r) / 8.0;
+    return NdotX / max(NdotX * (1.0 - k) + k, 1e-7);
+}
+
+// Smith: combines view obstruction with light shadowing.
+static float vro_geometry_smith(float3 N, float3 V, float3 L, float roughness) {
+    return vro_geometry_schlick_ggx(max(dot(N, V), 0.0), roughness)
+         * vro_geometry_schlick_ggx(max(dot(N, L), 0.0), roughness);
+}
+
+static float vro_smooth_distance_attenuation(float squared_distance,
+                                             float inv_squared_attenuation_radius) {
+    const float factor = squared_distance * inv_squared_attenuation_radius;
+    const float smooth_factor = clamp(1.0 - factor * factor, 0.0, 1.0);
+    return smooth_factor * smooth_factor;
+}
+
+// Physically based attenuation: inverse-square falloff with a smooth cutoff at the
+// light's end distance, scaled by luminous intensity.
+static float vro_attenuation_pbr(constant VROLightUniforms &light, float3 surface_pos,
+                                 thread float3 *L) {
+    // Directional
+    if (light.type == 1) {
+        *L = -normalize(light.direction);
+        return light.intensity / 1000.0;
+    }
+
+    const float3 unnormalized = light.position - surface_pos;
+    *L = normalize(unnormalized);
+
+    const float end = max(light.attenuation_end_distance, 1e-3);
+    const float inv_radius_sq = 1.0 / (end * end);
+    const float squared_distance = dot(unnormalized, unnormalized);
+
+    float attenuation = 1.0 / max(squared_distance, 0.0001);
+    attenuation *= vro_smooth_distance_attenuation(squared_distance, inv_radius_sq);
+    attenuation *= light.intensity / kVROPi;
+
+    // Spot cone
+    if (light.type == 3) {
+        const float angle = acos(clamp(dot(-*L, normalize(light.direction)), -1.0, 1.0));
+        if (angle > light.spot_inner_angle) {
+            const float t = (angle - light.spot_inner_angle) / max(light.spot_outer_angle, 1e-3);
+            attenuation = mix(attenuation, 0.0, clamp(t, 0.0, 1.0));
+        }
+    }
+    return attenuation;
+}
+
+typedef struct {
+    float4 position [[ position ]];
+    float2 texcoord;
+    float4 color;
+
+    float3 surface_position;
+    float3 camera_position;
+    float3 normal;
+
+    float3 ambient_color;
+    // Particle instancing: which instance this vertex belongs to, so the fragment
+    // stage can index particle_colors. Flat — an instance index must not interpolate.
+    uint   instance_id [[ flat ]];
+} VROPBRLightingVertexOut;
+
+vertex VROPBRLightingVertexOut pbr_lighting_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                  constant VROViewUniforms &view [[ buffer(1) ]],
+                                                  constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                                  constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                                  constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                                  constant float4x4 *bone_matrices [[ buffer(5) ]],
+                                                  constant float4x4 *particle_transforms [[ buffer(7) ]],
+                                                  uint v_instance_id [[ instance_id ]]) {
+
+#pragma geometry_modifier_uniforms
+#pragma vertex_modifier_uniforms
+
+    VROPBRLightingVertexOut out;
+
+    VROShaderGeometry _geometry;
+    _geometry.position = attributes.position;
+    _geometry.normal = attributes.normal;
+    _geometry.texcoord = attributes.texcoord;
+    _geometry.color = attributes.color;
+    _geometry.bone_weights = attributes.bone_weights;
+    _geometry.bone_indices = attributes.bone_indices;
+
+    VROTransforms _transforms;
+    _transforms.model_matrix = view.model_matrix;
+    _transforms.view_matrix = view.view_matrix;
+    _transforms.projection_matrix = view.projection_matrix;
+    _transforms.normal_matrix = view.normal_matrix;
+    _transforms.modelview_matrix = view.modelview_matrix;
+
+#pragma geometry_modifier_body
+
+    const float3 v_position = (_transforms.model_matrix * float4(_geometry.position, 1.0)).xyz;
+
+    VROShaderVertex _vertex;
+    _vertex.position = view.modelview_projection_matrix * float4(_geometry.position, 1.0);
+
+#pragma vertex_modifier_body
+
+    out.position = _vertex.position;
+    out.instance_id = v_instance_id;
+    out.texcoord = _geometry.texcoord;
+    out.color = _geometry.color;
+    out.surface_position = v_position;
+    out.camera_position = view.camera_position;
+    out.normal = normalize((_transforms.normal_matrix * float4(_geometry.normal, 0.0)).xyz);
+    out.ambient_color = lighting.ambient_light_color;
+
+    return out;
+}
+
+// Shared body: `albedo` already carries the material colour (from a uniform or a texture).
+static float4 vro_pbr_shade(VROPBRLightingVertexOut in,
+                            float4 albedo,
+                            constant VROMaterialUniforms &material,
+                            constant VROSceneLightingUniforms &lighting,
+                            depth2d_array<float> shadow_map,
+                            texturecube<float> irradiance_map,
+                            texturecube<float> prefiltered_map,
+                            texture2d<float> brdf_map) {
+    VROSurface _surface;
+    _surface.diffuse_color = albedo;
+    _surface.diffuse_texcoord = in.texcoord;
+    _surface.specular_color = float4(0.0);
+    _surface.specular_texcoord = in.texcoord;
+    _surface.shininess = material.shininess;
+    // Clamped: a roughness of zero makes the GGX denominator collapse.
+    _surface.roughness = max(material.roughness, 0.06);
+    _surface.metalness = material.metalness;
+    _surface.ao = material.ao;
+    _surface.alpha = material.alpha;
+    _surface.normal = normalize(in.normal);
+    _surface.position = in.surface_position;
+    _surface.view = normalize(in.camera_position - in.surface_position);
+
+    // Shader modifiers are not injected on the PBR path yet. The surface/fragment
+    // modifier directives cannot live in this helper — it has no access to the injected
+    // uniforms or to _custom — and putting them here made every material that carries a
+    // modifier fail the runtime library compile, which takes the whole scene down with it.
+    // Supporting them means inlining this shading into each entry point.
+
+    const float3 N = normalize(_surface.normal);
+    const float3 V = _surface.view;
+    const float3 base_color = _surface.diffuse_color.rgb;
+
+    // Dielectrics reflect ~4% at normal incidence; metals reflect their own colour.
+    const float3 F0 = mix(float3(0.04), base_color, _surface.metalness);
+
+    float3 radiance_out = float3(0.0);
+    for (int i = 0; i < lighting.num_lights; i++) {
+        thread float3 L;
+        const float attenuation = vro_attenuation_pbr(lighting.lights[i], _surface.position, &L);
+        const float shadow = compute_shadow(lighting, i, _surface.position, shadow_map);
+        const float NdotL = max(dot(N, L), 0.0);
+        if (NdotL <= 0.0 || attenuation <= 0.0) {
+            continue;
+        }
+        const float3 H = normalize(V + L);
+        const float3 radiance = lighting.lights[i].color * attenuation * shadow;
+
+        const float  NDF = vro_distribution_ggx(N, H, _surface.roughness);
+        const float  G   = vro_geometry_smith(N, V, L, _surface.roughness);
+        const float3 F   = vro_fresnel_schlick(max(dot(H, V), 0.0), F0);
+
+        const float3 numerator = NDF * G * F;
+        const float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 1e-4;
+        const float3 specular = numerator / denominator;
+
+        // Metals have no diffuse response, and energy taken by the specular lobe is not
+        // available to the diffuse one.
+        const float3 kD = (float3(1.0) - F) * (1.0 - _surface.metalness);
+
+        radiance_out += (kD * base_color / kVROPi + specular) * radiance * NdotL;
+    }
+
+    // Ambient: the environment contribution when IBL is available, a flat term otherwise.
+    float3 ambient;
+    if (lighting.has_ibl != 0) {
+        // Split-sum approximation: a prefiltered environment mip chosen by roughness,
+        // scaled by the precomputed BRDF terms.
+        const float NdotV = max(dot(N, V), 0.0);
+        const float3 F = vro_fresnel_schlick_roughness(NdotV, F0, _surface.roughness);
+        const float3 kD = (float3(1.0) - F) * (1.0 - _surface.metalness);
+
+        const float3 irradiance = irradiance_map.sample(kVROIBLSampler, N).rgb;
+        const float3 diffuse_ibl = irradiance * base_color;
+
+        const float3 R = reflect(-V, N);
+        const float mip = _surface.roughness * kVROPrefilterMipCount;
+        const float3 prefiltered = prefiltered_map.sample(kVROIBLSampler, R, level(mip)).rgb;
+        const float2 brdf = brdf_map.sample(kVROIBLSampler, float2(NdotV, _surface.roughness)).rg;
+        const float3 specular_ibl = prefiltered * (F * brdf.x + brdf.y);
+
+        ambient = (kD * diffuse_ibl + specular_ibl) * _surface.ao;
+    } else {
+        ambient = in.ambient_color * base_color * _surface.ao;
+    }
+
+    return float4(ambient + radiance_out, _surface.alpha * _surface.diffuse_color.a);
+}
+
+fragment VROLightingFragmentOut pbr_lighting_fragment_c(VROPBRLightingVertexOut in [[ stage_in ]],
+                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                             constant float4 *particle_colors [[ buffer(7) ]],
+                                             depth2d_array<float> shadow_map [[ texture(4) ]],
+                                             texturecube<float> irradiance_map [[ texture(5) ]],
+                                             texturecube<float> prefiltered_map [[ texture(6) ]],
+                                             texture2d<float> brdf_map [[ texture(7) ]]) {
+    const float4 color = vro_pbr_shade(in, material.diffuse_surface_color, material, lighting, shadow_map,
+                                      irradiance_map, prefiltered_map, brdf_map);
+    return VROMakeLightingOut(color, material);
+}
+
+fragment VROLightingFragmentOut pbr_lighting_fragment_t(VROPBRLightingVertexOut in [[ stage_in ]],
+                                             texture2d<float> diffuse_texture [[ texture(0) ]],
+                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                             constant float4 *particle_colors [[ buffer(7) ]],
+                                             depth2d_array<float> shadow_map [[ texture(4) ]],
+                                             texturecube<float> irradiance_map [[ texture(5) ]],
+                                             texturecube<float> prefiltered_map [[ texture(6) ]],
+                                             texture2d<float> brdf_map [[ texture(7) ]]) {
+    const float4 albedo = diffuse_texture.sample(s, in.texcoord) * material.diffuse_surface_color;
+    const float4 color = vro_pbr_shade(in, albedo, material, lighting, shadow_map,
+                                      irradiance_map, prefiltered_map, brdf_map);
+    return VROMakeLightingOut(color, material);
+}
+
+vertex VRODistortionVertexOut distortion_vertex(VRODistortionAttributes attributes [[ stage_in ]],
+                                                constant VRODistortionUniforms &uniforms [[ buffer(1) ]]) {
+    
+    VRODistortionVertexOut out;
+    out.position = float4(attributes.position, 0.0, 1.0);
+    out.texcoord = attributes.blue_texcoord.xy * uniforms.texcoord_scale;
+    out.vignette = attributes.vignette;
+    
+    return out;
+}
+
+fragment float4 distortion_fragment(VRODistortionVertexOut in [[ stage_in ]],
+                                    texture2d<float> texture [[ texture(0) ]]) {
+    
+    return in.vignette * texture.sample(s, in.texcoord);
+}
+
+typedef struct {
+    float4 position [[ position ]];
+    float2 red_texcoord;
+    float2 blue_texcoord;
+    float2 green_texcoord;
+    float  vignette;
+} VRODistortionAberrationVertexOut;
+
+vertex VRODistortionAberrationVertexOut distortion_aberration_vertex(VRODistortionAttributes attributes [[ stage_in ]],
+                                                                     constant VRODistortionUniforms &uniforms [[ buffer(1) ]]) {
+    
+    VRODistortionAberrationVertexOut out;
+    out.position = float4(attributes.position, 0.0, 1.0);
+    out.red_texcoord = attributes.red_texcoord.xy * uniforms.texcoord_scale;
+    out.green_texcoord = attributes.green_texcoord.xy * uniforms.texcoord_scale;
+    out.blue_texcoord = attributes.blue_texcoord.xy * uniforms.texcoord_scale;
+    out.vignette = attributes.vignette;
+    
+    return out;
+}
+
+fragment float4 distortion_aberration_fragment(VRODistortionAberrationVertexOut in [[ stage_in ]],
+                                               texture2d<float> texture [[ texture(0) ]]) {
+
+    return in.vignette * float4(texture.sample(s, in.red_texcoord).r,
+                                texture.sample(s, in.green_texcoord).g,
+                                texture.sample(s, in.blue_texcoord).b,
+                                1.0);
+}
+
+// ── Silhouette rendering ──────────────────────────────────────────────────────
+//
+// Depth-only draws used by the shadow-map pass and by the portal stencil passes.
+// The colour write mask is disabled by the pipeline state, so the fragment output is
+// discarded; only depth (and, for portals, stencil) matters. The textured variant
+// still needs a real fragment stage so an alpha-masked surface can discard, which is
+// what keeps cut-out foliage from casting a solid rectangular shadow.
+//
+// Skinning is inlined here rather than injected as a shader modifier: the silhouette
+// materials are built by shared code that knows nothing about MSL, so the two vertex
+// entry points are selected by VROGeometrySubstrateMetal instead.
+
+constexpr sampler kVROSilhouetteSampler(coord::normalized, filter::linear, address::clamp_to_edge);
+
+struct VROSilhouetteVertexOut {
+    float4 position [[ position ]];
+    float2 texcoord;
+};
+
+vertex VROSilhouetteVertexOut silhouette_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                constant VROViewUniforms &view [[ buffer(1) ]]) {
+    VROSilhouetteVertexOut out;
+    out.position = view.modelview_projection_matrix * float4(attributes.position, 1.0);
+    out.texcoord = attributes.texcoord;
+    return out;
+}
+
+vertex VROSilhouetteVertexOut silhouette_skinned_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                        constant VROViewUniforms &view [[ buffer(1) ]],
+                                                        constant float4x4 *bone_matrices [[ buffer(5) ]]) {
+    const float4 pos_h = float4(attributes.position, 1.0);
+    const float4 blended =
+        (bone_matrices[attributes.bone_indices.x] * pos_h) * attributes.bone_weights.x +
+        (bone_matrices[attributes.bone_indices.y] * pos_h) * attributes.bone_weights.y +
+        (bone_matrices[attributes.bone_indices.z] * pos_h) * attributes.bone_weights.z +
+        (bone_matrices[attributes.bone_indices.w] * pos_h) * attributes.bone_weights.w;
+
+    VROSilhouetteVertexOut out;
+    out.position = view.modelview_projection_matrix * float4(blended.xyz, 1.0);
+    out.texcoord = attributes.texcoord;
+    return out;
+}
+
+// A plain silhouette needs no fragment stage at all — VROGeometrySubstrateMetal builds
+// that pipeline with a nil fragment function, which is both legal and the fast path for
+// a depth-only target. Only the textured variant needs one, and it writes nothing: a
+// void fragment stage is valid whether or not the pass has a colour attachment, so the
+// same function serves the depth-only shadow target and the colour-masked portal pass.
+fragment void silhouette_fragment_textured(VROSilhouetteVertexOut in [[ stage_in ]],
+                                           texture2d<float> diffuse_texture [[ texture(0) ]]) {
+    const float alpha = diffuse_texture.sample(kVROSilhouetteSampler, in.texcoord).a;
+    // Cut-outs must not cast a solid shadow.
+    if (alpha < 0.5) {
+        discard_fragment();
+    }
+}
+
+// ── Tracking areas (visionOS hover) ───────────────────────────────────────────
+//
+// visionOS applies its own gaze-driven hover effect to a Metal immersive app, but it needs to
+// know which pixels belong to which object. The app renders an id per pixel into a separate
+// texture and the compositor does the rest — it never tells us where the wearer is looking, it
+// just draws the highlight over the right shape.
+//
+// The output type is an integer, not a colour: the tracking-areas texture is r8Uint (or r16Uint),
+// so a float fragment would not even bind. That is why this cannot reuse the silhouette pipeline,
+// which has either no fragment stage or a void one.
+//
+// The value written is the tracking area's *render value* for this frame, supplied per draw.
+
+vertex VROSilhouetteVertexOut tracking_area_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                   constant VROViewUniforms &view [[ buffer(1) ]]) {
+    VROSilhouetteVertexOut out;
+    out.position = view.modelview_projection_matrix * float4(attributes.position, 1.0);
+    out.texcoord = attributes.texcoord;
+    return out;
+}
+
+vertex VROSilhouetteVertexOut tracking_area_skinned_vertex(VRORendererAttributes attributes [[ stage_in ]],
+                                                           constant VROViewUniforms &view [[ buffer(1) ]],
+                                                           constant float4x4 *bone_matrices [[ buffer(5) ]]) {
+    const float4 pos_h = float4(attributes.position, 1.0);
+    const float4 blended =
+        (bone_matrices[attributes.bone_indices.x] * pos_h) * attributes.bone_weights.x +
+        (bone_matrices[attributes.bone_indices.y] * pos_h) * attributes.bone_weights.y +
+        (bone_matrices[attributes.bone_indices.z] * pos_h) * attributes.bone_weights.z +
+        (bone_matrices[attributes.bone_indices.w] * pos_h) * attributes.bone_weights.w;
+
+    VROSilhouetteVertexOut out;
+    out.position = view.modelview_projection_matrix * float4(blended.xyz, 1.0);
+    out.texcoord = attributes.texcoord;
+    return out;
+}
+
+fragment uint tracking_area_fragment(VROSilhouetteVertexOut in [[ stage_in ]],
+                                     constant uint &render_value [[ buffer(2) ]]) {
+    return render_value;
+}
+
+// ── Post-processing ───────────────────────────────────────────────────────────
+//
+// The OpenGL path assembles a GLSL fragment shader at runtime from string fragments
+// supplied by each render pass. MSL is compiled ahead of time, so each effect lives
+// here as a named fragment function and VROMetalPostProcess selects one by name.
+//
+// Every function samples its inputs on texture slots 0..N (matching the order the
+// pass hands them to blit) and reads its parameters from one uniform block at
+// fragment buffer index 0.
+
+struct VROPostProcessVertexOut {
+    float4 position [[ position ]];
+    float2 texcoord;
+};
+
+constexpr sampler kVROPostSampler(coord::normalized, filter::linear, address::clamp_to_edge);
+
+// Full-screen quad from vertex_id alone; no vertex buffer is bound.
+//
+// Metal's texture origin is top-left while NDC is centre-origin with +y up, so a
+// naive uv = ndc * 0.5 + 0.5 samples upside down. The default therefore flips v, and
+// flip_y > 0.5 restores the unflipped mapping — which is what setVerticalFlip(true)
+// asks for.
+vertex VROPostProcessVertexOut post_process_vertex(uint vid [[ vertex_id ]],
+                                                  constant float &flip_y [[ buffer(0) ]]) {
+    const float2 ndc = float2((vid == 1 || vid == 3) ?  1.0 : -1.0,
+                              (vid == 2 || vid == 3) ?  1.0 : -1.0);
+    VROPostProcessVertexOut out;
+    out.position = float4(ndc, 0.0, 1.0);
+    const float2 uv = ndc * 0.5 + 0.5;
+    out.texcoord = float2(uv.x, (flip_y > 0.5) ? uv.y : (1.0 - uv.y));
+    return out;
+}
+
+// Straight copy — the equivalent of VROChoreographer's blit-to-display post-process.
+fragment float4 post_blit(VROPostProcessVertexOut in [[ stage_in ]],
+                          texture2d<float> source [[ texture(0) ]]) {
+    return source.sample(kVROPostSampler, in.texcoord);
+}
+
+// ── Tone mapping ──────────────────────────────────────────────────────────────
+//
+// Mirrors VROToneMappingRenderPass::createPostProcess. The mask texture holds, per
+// fragment, how much tone mapping the material asked for (1 = full, 0 = none), already
+// alpha-blended across fragments; the result is mixed by that value so a tone-mapped
+// transparent surface over a non-tone-mapped background blends smoothly.
+
+struct VROToneMappingUniforms {
+    float exposure;
+    float white_point;
+    float gamma_correct;   // > 0.5 applies the 1/2.2 gamma curve in-shader
+};
+
+static float3 VROToneMapFinish(float3 hdr_color, float3 mapped, float tone_mapped,
+                               float gamma_correct) {
+    float3 result = mix(hdr_color, mapped, clamp(tone_mapped, 0.0, 1.0));
+    if (gamma_correct > 0.5) {
+        result = pow(result, float3(1.0 / 2.2));
+    }
+    return result;
+}
+
+static float3 VROHableCurve(float3 x) {
+    const float A = 0.15, B = 0.50, C = 0.10, D = 0.20, E = 0.02, F = 0.30;
+    return max(((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F, float3(0.0));
+}
+
+static float VROHableCurveScalar(float x) {
+    const float A = 0.15, B = 0.50, C = 0.10, D = 0.20, E = 0.02, F = 0.30;
+    return max(((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F, 0.0);
+}
+
+fragment float4 post_tone_map_disabled(VROPostProcessVertexOut in [[ stage_in ]],
+                                       constant VROToneMappingUniforms &uniforms [[ buffer(0) ]],
+                                       texture2d<float> hdr_texture [[ texture(0) ]],
+                                       texture2d<float> tone_mapping_mask [[ texture(1) ]]) {
+    const float4 hdr = hdr_texture.sample(kVROPostSampler, in.texcoord);
+    const float mask = tone_mapping_mask.sample(kVROPostSampler, in.texcoord).r;
+    return float4(VROToneMapFinish(hdr.rgb, hdr.rgb, mask, uniforms.gamma_correct), hdr.a);
+}
+
+fragment float4 post_tone_map_reinhard(VROPostProcessVertexOut in [[ stage_in ]],
+                                       constant VROToneMappingUniforms &uniforms [[ buffer(0) ]],
+                                       texture2d<float> hdr_texture [[ texture(0) ]],
+                                       texture2d<float> tone_mapping_mask [[ texture(1) ]]) {
+    const float4 hdr = hdr_texture.sample(kVROPostSampler, in.texcoord);
+    const float mask = tone_mapping_mask.sample(kVROPostSampler, in.texcoord).r;
+    const float3 H = hdr.rgb * pow(2.0, uniforms.exposure);
+    const float3 mapped = clamp(H / (H + float3(1.0)), 0.0, 1.0);
+    return float4(VROToneMapFinish(hdr.rgb, mapped, mask, uniforms.gamma_correct), hdr.a);
+}
+
+fragment float4 post_tone_map_hable(VROPostProcessVertexOut in [[ stage_in ]],
+                                    constant VROToneMappingUniforms &uniforms [[ buffer(0) ]],
+                                    texture2d<float> hdr_texture [[ texture(0) ]],
+                                    texture2d<float> tone_mapping_mask [[ texture(1) ]]) {
+    const float4 hdr = hdr_texture.sample(kVROPostSampler, in.texcoord);
+    const float mask = tone_mapping_mask.sample(kVROPostSampler, in.texcoord).r;
+    const float3 H = hdr.rgb * pow(2.0, uniforms.exposure);
+    const float3 W = float3(uniforms.white_point);
+    const float3 mapped = clamp(VROHableCurve(H) / VROHableCurve(W), 0.0, 1.0);
+    return float4(VROToneMapFinish(hdr.rgb, mapped, mask, uniforms.gamma_correct), hdr.a);
+}
+
+fragment float4 post_tone_map_hable_luminance(VROPostProcessVertexOut in [[ stage_in ]],
+                                              constant VROToneMappingUniforms &uniforms [[ buffer(0) ]],
+                                              texture2d<float> hdr_texture [[ texture(0) ]],
+                                              texture2d<float> tone_mapping_mask [[ texture(1) ]]) {
+    const float4 hdr = hdr_texture.sample(kVROPostSampler, in.texcoord);
+    const float mask = tone_mapping_mask.sample(kVROPostSampler, in.texcoord).r;
+    const float3 H = hdr.rgb * pow(2.0, uniforms.exposure);
+    const float3 W = float3(uniforms.white_point);
+    const float3 kLuma = float3(0.2126, 0.7152, 0.0722);
+    const float luminance_H = dot(H, kLuma);
+    const float luminance_W = dot(W, kLuma);
+    // Guard the divides: a fully black fragment has zero luminance.
+    const float3 hdr_mapped   = (luminance_H > 0.0) ? (VROHableCurveScalar(luminance_H) / luminance_H) * H : float3(0.0);
+    const float3 white_mapped = (luminance_W > 0.0) ? (VROHableCurveScalar(luminance_W) / luminance_W) * W : float3(1.0);
+    const float3 mapped = clamp(hdr_mapped / max(white_mapped, float3(1e-5)), 0.0, 1.0);
+    return float4(VROToneMapFinish(hdr.rgb, mapped, mask, uniforms.gamma_correct), hdr.a);
+}
+
+fragment float4 post_tone_map_exposure(VROPostProcessVertexOut in [[ stage_in ]],
+                                       constant VROToneMappingUniforms &uniforms [[ buffer(0) ]],
+                                       texture2d<float> hdr_texture [[ texture(0) ]],
+                                       texture2d<float> tone_mapping_mask [[ texture(1) ]]) {
+    const float4 hdr = hdr_texture.sample(kVROPostSampler, in.texcoord);
+    const float mask = tone_mapping_mask.sample(kVROPostSampler, in.texcoord).r;
+    const float3 mapped = float3(1.0) - exp(-hdr.rgb * uniforms.exposure);
+    return float4(VROToneMapFinish(hdr.rgb, mapped, mask, uniforms.gamma_correct), hdr.a);
+}
+
+// ── Gaussian blur ─────────────────────────────────────────────────────────────
+//
+// Separable two-pass blur. The pass sets direction to (1/width, 0) horizontally and
+// (0, 1/height) vertically, and supplies the half-kernel with its centre weight in
+// weights[0]. Bilinear offsets are precomputed by the pass, so the shader only walks
+// the taps.
+
+struct VROGaussianBlurUniforms {
+    float2 direction;
+    int    tap_count;      // number of entries in weights/offsets, centre included
+    float  intensity;
+    float4 weights[8];     // packed 4 per float4 → up to 32 taps
+    float4 offsets[8];
+};
+
+fragment float4 post_gaussian_blur(VROPostProcessVertexOut in [[ stage_in ]],
+                                   constant VROGaussianBlurUniforms &uniforms [[ buffer(0) ]],
+                                   texture2d<float> source [[ texture(0) ]]) {
+    const int taps = min(uniforms.tap_count, 32);
+    float4 result = source.sample(kVROPostSampler, in.texcoord) * uniforms.weights[0][0];
+    for (int i = 1; i < taps; i++) {
+        const float weight = uniforms.weights[i >> 2][i & 3];
+        const float offset = uniforms.offsets[i >> 2][i & 3];
+        const float2 delta = uniforms.direction * offset;
+        result += source.sample(kVROPostSampler, in.texcoord + delta) * weight;
+        result += source.sample(kVROPostSampler, in.texcoord - delta) * weight;
+    }
+    return result * uniforms.intensity;
+}
+
+// Additive blend of a bloom texture back over the scene. The bloom input is
+// premultiplied, matching the OpenGL path's PremultiplyAlpha blend mode.
+fragment float4 post_additive_blend(VROPostProcessVertexOut in [[ stage_in ]],
+                                    texture2d<float> scene [[ texture(0) ]],
+                                    texture2d<float> bloom [[ texture(1) ]]) {
+    const float4 base  = scene.sample(kVROPostSampler, in.texcoord);
+    const float4 added = bloom.sample(kVROPostSampler, in.texcoord);
+    return float4(base.rgb + added.rgb, base.a);
+}
+
+// ── Image-based lighting ──────────────────────────────────────────────────────
+//
+// The four passes VROIBLPreprocess runs, in order: convert the scene's equirectangular
+// lighting environment into a cubemap, convolve it into a diffuse irradiance cubemap,
+// prefilter it into a roughness mip chain for specular, and integrate the split-sum BRDF
+// into a 2D lookup table.
+//
+// The OpenGL path draws a cube and rasterises each face. Here every pass is a full-screen
+// quad rendered into one face at a time, with the sampling direction reconstructed from
+// the face index and the quad's uv. Same result, no cube geometry and no per-face view
+// matrices.
+
+struct VROIBLUniforms {
+    int   face;        // 0..5, matching MTLTextureType Cube slice order (+X -X +Y -Y +Z -Z)
+    float roughness;   // prefilter pass only
+    float sample_delta;// irradiance pass step; larger is faster and coarser
+    float padding;
+};
+
+// Direction for a texel of one cube face. uv is in [0,1] with v already flipped by the
+// post-process vertex stage, so it matches Metal's top-left texture origin.
+static float3 VROCubeDirection(int face, float2 uv) {
+    const float2 st = uv * 2.0 - 1.0;
+    switch (face) {
+        case 0: return normalize(float3(  1.0, -st.y, -st.x));  // +X
+        case 1: return normalize(float3( -1.0, -st.y,  st.x));  // -X
+        case 2: return normalize(float3( st.x,   1.0,  st.y));  // +Y
+        case 3: return normalize(float3( st.x,  -1.0, -st.y));  // -Y
+        case 4: return normalize(float3( st.x, -st.y,   1.0));  // +Z
+        default:return normalize(float3(-st.x, -st.y,  -1.0));  // -Z
+    }
+}
+
+// Equirectangular lookup for a direction.
+static float2 VROEquirectUV(float3 direction) {
+    const float u = atan2(direction.z, direction.x) / (2.0 * kVROPi) + 0.5;
+    const float v = asin(clamp(direction.y, -1.0, 1.0)) / kVROPi + 0.5;
+    // Metal's texture origin is top-left, so the vertical axis is inverted.
+    return float2(u, 1.0 - v);
+}
+
+fragment float4 post_equirect_to_cube(VROPostProcessVertexOut in [[ stage_in ]],
+                                      constant VROIBLUniforms &uniforms [[ buffer(0) ]],
+                                      texture2d<float> equirect [[ texture(0) ]]) {
+    const float3 direction = VROCubeDirection(uniforms.face, in.texcoord);
+    return float4(equirect.sample(kVROPostSampler, VROEquirectUV(direction)).rgb, 1.0);
+}
+
+// Diffuse irradiance: the cosine-weighted integral of incoming radiance over the
+// hemisphere around the texel's normal.
+fragment float4 post_irradiance_convolution(VROPostProcessVertexOut in [[ stage_in ]],
+                                            constant VROIBLUniforms &uniforms [[ buffer(0) ]],
+                                            texturecube<float> environment [[ texture(0) ]]) {
+    const float3 N = VROCubeDirection(uniforms.face, in.texcoord);
+
+    // Tangent basis around N.
+    float3 up = float3(0.0, 1.0, 0.0);
+    if (abs(N.y) > 0.999) {
+        up = float3(0.0, 0.0, 1.0);
+    }
+    const float3 right = normalize(cross(up, N));
+    up = normalize(cross(N, right));
+
+    const float delta = max(uniforms.sample_delta, 0.005);
+    float3 irradiance = float3(0.0);
+    float samples = 0.0;
+
+    for (float phi = 0.0; phi < 2.0 * kVROPi; phi += delta) {
+        for (float theta = 0.0; theta < 0.5 * kVROPi; theta += delta) {
+            // Spherical to world, in N's tangent frame.
+            const float3 tangent = float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+            const float3 sample_dir = tangent.x * right + tangent.y * up + tangent.z * N;
+            irradiance += environment.sample(kVROPostSampler, sample_dir).rgb
+                        * cos(theta) * sin(theta);
+            samples += 1.0;
+        }
+    }
+    irradiance = kVROPi * irradiance / max(samples, 1.0);
+    return float4(irradiance, 1.0);
+}
+
+// Van der Corput radical inverse, for the Hammersley sequence.
+static float VRORadicalInverseVdC(uint bits) {
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+    return float(bits) * 2.3283064365386963e-10;
+}
+
+static float2 VROHammersley(uint i, uint n) {
+    return float2(float(i) / float(n), VRORadicalInverseVdC(i));
+}
+
+// GGX importance sample around N for a given roughness.
+static float3 VROImportanceSampleGGX(float2 Xi, float3 N, float roughness) {
+    const float a = roughness * roughness;
+    const float phi = 2.0 * kVROPi * Xi.x;
+    const float cos_theta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+    const float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    const float3 H = float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+
+    float3 up = float3(0.0, 1.0, 0.0);
+    if (abs(N.z) > 0.999) {
+        up = float3(1.0, 0.0, 0.0);
+    }
+    const float3 tangent_x = normalize(cross(up, N));
+    const float3 tangent_y = cross(N, tangent_x);
+    return normalize(tangent_x * H.x + tangent_y * H.y + N * H.z);
+}
+
+// Specular prefilter: one mip per roughness level of the split-sum approximation.
+fragment float4 post_prefilter_convolution(VROPostProcessVertexOut in [[ stage_in ]],
+                                           constant VROIBLUniforms &uniforms [[ buffer(0) ]],
+                                           texturecube<float> environment [[ texture(0) ]]) {
+    const float3 N = VROCubeDirection(uniforms.face, in.texcoord);
+    const float3 V = N;
+    const uint kSamples = 64u;
+
+    float3 prefiltered = float3(0.0);
+    float total_weight = 0.0;
+
+    for (uint i = 0u; i < kSamples; i++) {
+        const float2 Xi = VROHammersley(i, kSamples);
+        const float3 H = VROImportanceSampleGGX(Xi, N, uniforms.roughness);
+        const float3 L = normalize(2.0 * dot(V, H) * H - V);
+        const float NdotL = dot(N, L);
+        if (NdotL > 0.0) {
+            prefiltered += environment.sample(kVROPostSampler, L).rgb * NdotL;
+            total_weight += NdotL;
+        }
+    }
+    return float4(prefiltered / max(total_weight, 1e-4), 1.0);
+}
+
+// Split-sum BRDF integration into a 2D LUT indexed by (NdotV, roughness).
+fragment float4 post_brdf_integration(VROPostProcessVertexOut in [[ stage_in ]]) {
+    const float NdotV = max(in.texcoord.x, 1e-3);
+    const float roughness = in.texcoord.y;
+
+    const float3 V = float3(sqrt(1.0 - NdotV * NdotV), 0.0, NdotV);
+    const float3 N = float3(0.0, 0.0, 1.0);
+    const uint kSamples = 256u;
+
+    float A = 0.0;
+    float B = 0.0;
+    for (uint i = 0u; i < kSamples; i++) {
+        const float2 Xi = VROHammersley(i, kSamples);
+        const float3 H = VROImportanceSampleGGX(Xi, N, roughness);
+        const float3 L = normalize(2.0 * dot(V, H) * H - V);
+
+        const float NdotL = max(L.z, 0.0);
+        const float NdotH = max(H.z, 0.0);
+        const float VdotH = max(dot(V, H), 0.0);
+        if (NdotL > 0.0) {
+            // Geometry term for IBL uses k = a^2 / 2 rather than the direct-lighting form.
+            const float a = roughness * roughness;
+            const float k = a / 2.0;
+            const float ggx_v = NdotV / (NdotV * (1.0 - k) + k);
+            const float ggx_l = NdotL / (NdotL * (1.0 - k) + k);
+            const float G = ggx_v * ggx_l;
+
+            const float G_Vis = (G * VdotH) / max(NdotH * NdotV, 1e-4);
+            const float Fc = pow(1.0 - VdotH, 5.0);
+            A += (1.0 - Fc) * G_Vis;
+            B += Fc * G_Vis;
+        }
+    }
+    return float4(A / float(kSamples), B / float(kSamples), 0.0, 1.0);
+}
+
+// ── Diagnostic test shaders ───────────────────────────────────────────────────
+// Hardcoded screen-space triangle covering the upper-right quadrant.
+// Used by VRORendererBridge raw-draw test to verify the encoder produces output.
+vertex float4 viro_test_vertex(uint vid [[ vertex_id ]]) {
+    // Small triangle in top-left corner so it doesn't cover the Viro scene.
+    const float2 positions[3] = {
+        float2(-0.95,  0.95),  // top-left
+        float2(-0.50,  0.95),  // top-right
+        float2(-0.95,  0.50)   // bottom-left
+    };
+    return float4(positions[vid], 0.5, 1.0);
+}
+
+fragment half4 viro_test_fragment() {
+    return half4(1.0, 0.0, 0.0, 1.0);   // solid red
+}
+

@@ -35,10 +35,15 @@ export interface StudioSceneNavigatorProps {
      */
     loadingView?: React.ReactNode;
     /**
-     * Opt-in UI for a caught render error. The boundary always catches and calls
-     * `onError`; when this is omitted it renders nothing.
+     * Opt-in UI for a failed scene load or a caught render error. `onError` is
+     * always called either way; when this is omitted it renders nothing, and a
+     * load failure leaves the loading overlay in place.
+     *
+     * `retry` refetches the scene on the load path, or re-mounts the scene tree
+     * on the render path. Errors from a load are StudioApiError, so branch on
+     * `code` rather than matching the message.
      */
-    renderError?: (error: Error) => React.ReactNode;
+    renderError?: (error: Error, retry: () => void) => React.ReactNode;
     /**
      * Show the built-in "recording" indicator (a REC pill) while a RECORD_VIDEO
      * action is recording. Default true, positioned top-centre with an approximate

@@ -10,6 +10,7 @@ const VRTStudioModule_1 = require("../VRTStudioModule");
 const apiRequestHelpers_1 = require("./apiRequestHelpers");
 const expressionEvaluator_1 = require("./expressionEvaluator");
 const recordingStore_1 = require("./recordingStore");
+const studioApiError_1 = require("./studioApiError");
 const ANIMATION_CHAIN_MAX_DEPTH = 10;
 // The proxy enforces the authored timeout server-side; the client backstop
 // only covers an unreachable/unresponsive proxy.
@@ -710,7 +711,7 @@ async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations,
     try {
         const result = await VRTStudioModule_1.VRTStudioModule.rvGetScene(targetSceneId);
         if (!result?.success) {
-            throw new Error(result?.error ?? "rvGetScene failed");
+            throw (0, studioApiError_1.studioApiError)("rvGetScene", result?.error);
         }
         const sceneData = JSON.parse(result.data);
         // Lazy import to avoid circular dependency

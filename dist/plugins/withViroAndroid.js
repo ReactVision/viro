@@ -276,13 +276,13 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
             "tools:replace": "required",
         },
     });
-    // Keep GLES 3.0 declared (required=false) so the Quest Store validator
-    // sees a graphics API. Previously tools:node="remove" silently stripped
-    // this entry from the merged manifest entirely.
+    // The Quest Store validator only counts a *required* GLES/Vulkan
+    // declaration; required=false is reported as "no graphics API". Every
+    // Quest has GLES 3, so require it there and keep it optional on phones.
     contents.manifest["uses-feature"].push({
         $: {
             "android:glEsVersion": "0x00030000",
-            "android:required": "false",
+            "android:required": activeXrModes.includes("QUEST") ? "true" : "false",
             "tools:replace": "required",
         },
     });
@@ -577,9 +577,22 @@ class VRActivity : ReactActivity() {
             return config;
         },
     ]);
-    // 2. Cap targetSdkVersion to 34 — Meta Quest Store rejects targetSdk > 34.
-    config = (0, config_plugins_1.withAppBuildGradle)(config, (config) => {
-        config.modResults.contents = config.modResults.contents.replace(/targetSdk(?:Version)?\s*[=\s]\s*(\d+)/g, (match, ver) => parseInt(ver, 10) > 34 ? match.replace(ver, "34") : match);
+    // 2. Quest Store packaging. Expo's template resolves targetSdk through
+    // rootProject.ext from gradle.properties (`android.targetSdkVersion`), so a
+    // rewrite of app/build.gradle never matched anything. Only ever lower it.
+    // Quest hardware is arm64-only; the other ABIs roughly double the APK and the
+    // store warns on 32-bit libraries.
+    const questTargetSdk = props?.android?.questTargetSdkVersion ?? 34;
+    const questArm64Only = props?.android?.questArm64Only ?? true;
+    config = (0, config_plugins_1.withGradleProperties)(config, (config) => {
+        const current = config.modResults.find((item) => item.type === "property" && item.key === "android.targetSdkVersion");
+        const currentSdk = current?.type === "property" ? parseInt(current.value, 10) : NaN;
+        if (Number.isNaN(currentSdk) || currentSdk > questTargetSdk) {
+            config_plugins_1.AndroidConfig.BuildProperties.updateAndroidBuildProperty(config.modResults, "android.targetSdkVersion", String(questTargetSdk));
+        }
+        if (questArm64Only) {
+            config_plugins_1.AndroidConfig.BuildProperties.updateAndroidBuildProperty(config.modResults, "reactNativeArchitectures", "arm64-v8a");
+        }
         return config;
     });
     // 3. Add VRActivity to AndroidManifest
@@ -637,6 +650,20 @@ class VRActivity : ReactActivity() {
                     },
                 });
             }
+        }
+        // Without this the store assumes every headset, including the retired
+        // Quest 1, and warns on upload.
+        const supportedDevices = props?.android?.questSupportedDevices ?? "quest2|questpro|quest3|quest3s";
+        if (!app["meta-data"])
+            app["meta-data"] = [];
+        const alreadyHasDevices = app["meta-data"].some((m) => m.$?.["android:name"] === "com.oculus.supportedDevices");
+        if (!alreadyHasDevices) {
+            app["meta-data"].push({
+                $: {
+                    "android:name": "com.oculus.supportedDevices",
+                    "android:value": supportedDevices,
+                },
+            });
         }
         return config;
     });

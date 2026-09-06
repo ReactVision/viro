@@ -3,8 +3,14 @@
  * ViroGameLoopUtils — direct node manipulation that bypasses the React reconciler.
  *
  * Call these from inside useGameLoop / onUpdate callbacks for zero-setState
- * positional updates. The native NodeModule methods dispatch directly to the
- * render thread via the existing VRONode::setPositionAtomic() infrastructure.
+ * positional updates. Each dispatches a view-manager command that writes to the
+ * VRONode through the same setter the corresponding prop uses — no setState, no
+ * diffing, no re-render.
+ *
+ * The commands are declared on the shared base of every node manager:
+ * ViroViewManager on iOS, VRTNodeManager on Android. They must stay in step with
+ * the names below — a command a manager does not declare is a runtime error, not
+ * a silent no-op.
  *
  * Copyright © 2026 ReactVision. All rights reserved.
  */

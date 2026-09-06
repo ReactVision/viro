@@ -44,6 +44,7 @@ import com.viromedia.bridge.module.MaterialManager;
 import com.viromedia.bridge.module.MaterialManager.MaterialWrapper;
 import com.viromedia.bridge.utility.DynamicUtil;
 import com.viromedia.bridge.utility.Helper;
+import com.viromedia.bridge.utility.ViroCommands;
 import com.viromedia.bridge.utility.ViroEvents;
 import com.viromedia.bridge.utility.ViroLog;
 
@@ -411,6 +412,64 @@ public abstract class VRTNodeManager<T extends VRTNode> extends VRTViroViewGroup
     @ReactProp(name = "hasTransformDelegate", defaultBoolean = false)
     public void setHasTransformDelegate(T view, boolean hasDelegate) {
         safelyApplyProp(view, "hasTransformDelegate", v -> v.setOnNativeTransformDelegate(hasDelegate));
+    }
+
+    /*
+     Reconciler-free transform writes, backing ViroGameLoopUtils. These let a
+     per-frame update skip setState and the reconciler and write straight to the
+     node, using the same setters the props above use.
+
+     A subclass that overrides getCommandsMap or receiveCommand must merge with
+     super, or its nodes lose these.
+     */
+
+    @Override
+    public Map<String, Integer> getCommandsMap() {
+        return MapBuilder.of(
+                ViroCommands.SET_POSITION_NAME, ViroCommands.SET_POSITION_INDEX,
+                ViroCommands.SET_ROTATION_EULER_NAME, ViroCommands.SET_ROTATION_EULER_INDEX,
+                ViroCommands.SET_SCALE_NAME, ViroCommands.SET_SCALE_INDEX);
+    }
+
+    @Override
+    public void receiveCommand(T view, String commandId, @Nullable ReadableArray args) {
+        if (!applyTransformCommand(view, commandId, args)) {
+            super.receiveCommand(view, commandId, args);
+        }
+    }
+
+    @Override
+    public void receiveCommand(T view, int commandType, @Nullable ReadableArray args) {
+        switch (commandType) {
+            case ViroCommands.SET_POSITION_INDEX:
+                applyTransformCommand(view, ViroCommands.SET_POSITION_NAME, args);
+                break;
+            case ViroCommands.SET_ROTATION_EULER_INDEX:
+                applyTransformCommand(view, ViroCommands.SET_ROTATION_EULER_NAME, args);
+                break;
+            case ViroCommands.SET_SCALE_INDEX:
+                applyTransformCommand(view, ViroCommands.SET_SCALE_NAME, args);
+                break;
+            default:
+                super.receiveCommand(view, commandType, args);
+        }
+    }
+
+    /** Returns false when commandId is not one of ours, so the caller can defer to super. */
+    private boolean applyTransformCommand(T view, String commandId, @Nullable ReadableArray args) {
+        if (view == null || view.isTornDown() || args == null) {
+            return false;
+        }
+        if (ViroCommands.SET_POSITION_NAME.equals(commandId)) {
+            view.setPosition(Helper.toFloatArray(args, DEFAULT_ZERO_VEC));
+        } else if (ViroCommands.SET_ROTATION_EULER_NAME.equals(commandId)) {
+            view.setRotation(Helper.toFloatArray(args, DEFAULT_ZERO_VEC));
+        } else if (ViroCommands.SET_SCALE_NAME.equals(commandId)) {
+            view.setScale(Helper.toFloatArray(args, new float[]{1, 1, 1}));
+        } else {
+            return false;
+        }
+        return true;
     }
 
 }

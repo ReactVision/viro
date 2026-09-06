@@ -35,12 +35,17 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro3DObject = Viro3DObject;
 /**
- * Web implementation of Viro3DObject — loads a GLB/glTF/VRX model into a node.
- * Fetches the model bytes, writes them to the WASM virtual FS, and invokes the
- * native loader. Transform props apply to the containing node.
+ * Web implementation of Viro3DObject — loads a GLB/glTF/VRX/OBJ model into a
+ * node. Fetches the model bytes, writes them to the WASM virtual FS, and invokes
+ * the native loader. Transform props apply to the containing node.
  *
  * Model animations become available after load; drive them via ViroAnimations
- * (follow-up). OBJ and external-resource glTF are not supported yet.
+ * (follow-up).
+ *
+ * OBJ is not self-contained: pass its .mtl through `resources`, along with every
+ * texture that .mtl names. They are matched by basename, exactly as on native,
+ * so the URLs may live anywhere as long as the final path segments match the
+ * names inside the files.
  */
 const React = __importStar(require("react"));
 const react_1 = require("react");

@@ -6,7 +6,8 @@ exports.resourceName = resourceName;
 exports.fetchModelBytes = fetchModelBytes;
 /**
  * Fetch model bytes and determine container format for the model C API.
- * Self-contained formats (GLB, VRX) need only the single file.
+ * Self-contained formats (GLB, VRX) need only the single file; OBJ needs its
+ * .mtl and that .mtl's textures passed through Viro3DObject's `resources`.
  */
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 /** Resolve a Viro model source to a URL. Web supports a string URL or { uri }. */
@@ -29,11 +30,15 @@ function modelFormatFor(url, typeHint) {
         return viro_web_renderer_1.ViroModelFormat.GLB;
     if (t === "GLTF")
         return viro_web_renderer_1.ViroModelFormat.GLTF;
+    if (t === "OBJ")
+        return viro_web_renderer_1.ViroModelFormat.OBJ;
     const path = url.split("?")[0].toLowerCase();
     if (path.endsWith(".vrx"))
         return viro_web_renderer_1.ViroModelFormat.VRX;
     if (path.endsWith(".gltf"))
         return viro_web_renderer_1.ViroModelFormat.GLTF;
+    if (path.endsWith(".obj"))
+        return viro_web_renderer_1.ViroModelFormat.OBJ;
     return viro_web_renderer_1.ViroModelFormat.GLB; // default: GLB (self-contained binary)
 }
 /** Filename the model references a resource by (basename of the URL, no query). */

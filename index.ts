@@ -39,6 +39,7 @@ import { ViroVirtualJoystick } from "./components/ViroVirtualJoystick";
 import { ViroVirtualButton } from "./components/ViroVirtualButton";
 import { ViroGameLoop } from "./components/ViroGameLoop";
 import { ViroGameLoopUtils } from "./components/ViroGameLoopUtils";
+import { useViroMapCamera, viroMapCameraTransform } from "./components/useViroMapCamera";
 import { useGameLoop, useLateUpdate, useFixedUpdate } from "./components/hooks/useGameLoop";
 import { ViroDirectionalLight } from "./components/ViroDirectionalLight";
 import { ViroFlexView } from "./components/ViroFlexView";
@@ -55,6 +56,7 @@ import {
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroCameraTexture } from "./components/ViroCameraTexture";
 export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
+export type { ViroMapCameraState, ViroMapCameraOptions } from "./components/useViroMapCamera";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
 export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
@@ -220,6 +222,8 @@ export {
   ViroVirtualButton,
   ViroGameLoop,
   ViroGameLoopUtils,
+  useViroMapCamera,
+  viroMapCameraTransform,
   useGameLoop,
   useLateUpdate,
   useFixedUpdate,

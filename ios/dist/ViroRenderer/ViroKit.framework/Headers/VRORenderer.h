@@ -145,6 +145,22 @@ public:
     VROFieldOfView computeUserFieldOfView(float viewportWidth, float viewportHeight) const;
 
     /*
+     The projection matrix for the active point of view, honouring its projection type.
+
+     Perspective is the default and what every path used before this existed. Orthographic is
+     driven by VRONodeCamera, which has carried a projection type and orthographic extents since
+     glTF 2.0 camera support was added — the glTF loader writes them, and until now nothing read
+     them, so a glTF orthographic camera silently rendered in perspective.
+
+     The orthographic height comes from the camera's orthographic height in world units; the width
+     is derived from the viewport's aspect ratio, so a scene keeps its proportions when the view
+     is resized. A camera that reports a height of zero falls back to perspective rather than
+     collapsing the frustum to nothing.
+     */
+    VROMatrix4f computeProjection(float viewportWidth, float viewportHeight,
+                                  float near, float far) const;
+
+    /*
      Get the field of view that was used to render the last frame. On AR and VR platforms this
      is typically set by the device. On other platforms it can be set by the user through the
      VRONodeCamera. This returns the FOV across the major (larger) axis.

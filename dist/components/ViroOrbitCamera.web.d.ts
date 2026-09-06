@@ -12,6 +12,8 @@ type Vec3 = [number, number, number];
 type Props = ViroWebNodeProps & {
     active?: boolean;
     focalPoint?: Vec3;
+    projection?: "perspective" | "orthographic";
+    orthographicScale?: number;
     children?: React.ReactNode;
     [key: string]: any;
 };

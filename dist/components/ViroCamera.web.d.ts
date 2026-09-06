@@ -7,6 +7,8 @@ import * as React from "react";
 import { type ViroWebNodeProps } from "./Web/useViroNode";
 type Props = ViroWebNodeProps & {
     active?: boolean;
+    projection?: "perspective" | "orthographic";
+    orthographicScale?: number;
     children?: React.ReactNode;
     [key: string]: any;
 };

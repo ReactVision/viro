@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D1A0010000000000000000B2 /* RVStudioWatermarkState.mm in Sources */ = {isa = PBXBuildFile; fileRef = D1A0010000000000000000A2 /* RVStudioWatermarkState.mm */; };
 		0BE6354440D5435F9D252A94 /* VRTStreamingAudioModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = C702A11D127A4B21B0BD482E /* VRTStreamingAudioModule.mm */; };
 		0CC0B5D4555D4AD9BB9C6A84 /* VRTCameraTexture.mm in Sources */ = {isa = PBXBuildFile; fileRef = A0549ED8CB564EB0A6BFC513 /* VRTCameraTexture.mm */; };
 		133FE28B206EE35300FB6F34 /* VRTVRSceneNavigatorManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 133FE28A206EE35300FB6F34 /* VRTVRSceneNavigatorManager.mm */; };
@@ -906,6 +907,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D1A0010000000000000000A1 /* RVStudioWatermarkState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RVStudioWatermarkState.h; path = ViroReact/Modules/RVStudioWatermarkState.h; sourceTree = "<group>"; };
+		D1A0010000000000000000A2 /* RVStudioWatermarkState.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = RVStudioWatermarkState.mm; path = ViroReact/Modules/RVStudioWatermarkState.mm; sourceTree = "<group>"; };
 		08AC1A55DE3440AA88215308 /* VRTStreamingAudioModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTStreamingAudioModule.h; path = ViroReact/Modules/VRTStreamingAudioModule.h; sourceTree = "<group>"; };
 		133FE284206EE2FC00FB6F34 /* VRTVRSceneNavigatorManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VRTVRSceneNavigatorManager.h; sourceTree = "<group>"; };
 		133FE28A206EE35300FB6F34 /* VRTVRSceneNavigatorManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = VRTVRSceneNavigatorManager.mm; sourceTree = "<group>"; };
@@ -2259,6 +2262,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1A0010000000000000000B2 /* RVStudioWatermarkState.mm in Sources */,
 				8FEF00661F37ACCC006AE4B1 /* VRTPortalScene.mm in Sources */,
 				8BDD9DD71E2EDC5200A42870 /* VRTCameraManager.h in Sources */,
 				A5E8F0AC1ED6B64E00729916 /* VRTSceneModule.mm in Sources */,
@@ -2450,7 +2454,10 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ViroReact/**",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2466,6 +2473,7 @@
 					"$(inherited)",
 					" ",
 				);
+				PODFILE_DIR = "$(SRCROOT)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -2518,7 +2526,10 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				HEADER_SEARCH_PATHS = "";
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ViroReact/**",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				OTHER_CFLAGS = (
@@ -2533,6 +2544,7 @@
 					"$(inherited)",
 					" ",
 				);
+				PODFILE_DIR = "$(SRCROOT)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;

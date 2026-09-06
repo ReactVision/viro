@@ -1317,15 +1317,23 @@ namespace tinyobj {
                                                       });
                 });
             });
+            return true;
         }
-        return true;
+
+        // Plain local file: read it here. Without this the MTL named by an OBJ
+        // loaded through loadOBJFromResource (no resource map, not a URL) was
+        // never opened at all, and the model came back with zero materials.
+        return readMaterialFile(filepath, matId, materials, matMap, err);
     }
     
     bool MaterialFileReader::readMaterialFile(std::string filepath, const std::string &matId,
                                               std::shared_ptr<std::vector<material_t>> materials,
                                               std::shared_ptr<std::map<std::string, int>> matMap, std::string *err) {
         std::shared_ptr<std::ifstream> matIStream = std::make_shared<std::ifstream>(filepath.c_str());
-        if (!matIStream) {
+        // Test the stream, not the shared_ptr: make_shared never returns null, so
+        // this check used to pass for a file that does not exist and the caller
+        // was told the material loaded.
+        if (!matIStream->is_open()) {
             std::stringstream ss;
             ss << "WARN: path to material [" << matId + "] not found" << std::endl;
             if (err) {

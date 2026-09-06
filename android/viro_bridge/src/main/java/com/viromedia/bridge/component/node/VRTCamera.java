@@ -32,6 +32,8 @@ import com.viromedia.bridge.utility.Helper;
 public class VRTCamera extends VRTNode {
     protected static final float DEFAULT_FOV = 0;
     private float mFieldOfView = DEFAULT_FOV;
+    private boolean mOrthographic = false;
+    private float mOrthographicScale = 0;
     protected Camera mNativeCamera;
     protected VRTNode mNodeRootTransformCamera;
 
@@ -78,6 +80,20 @@ public class VRTCamera extends VRTNode {
         return mPosition;
     }
 
+    public void setOrthographic(boolean orthographic) {
+        mOrthographic = orthographic;
+        if (mNativeCamera != null) {
+            mNativeCamera.setOrthographic(orthographic);
+        }
+    }
+
+    public void setOrthographicScale(float scale) {
+        mOrthographicScale = scale;
+        if (mNativeCamera != null) {
+            mNativeCamera.setOrthographicScale(scale);
+        }
+    }
+
     public void setFieldOfView(float fov){
         mFieldOfView = fov;
     }
@@ -97,6 +113,8 @@ public class VRTCamera extends VRTNode {
         mNativeCamera.setPosition(new Vector(mPosition));
         mNativeCamera.setRotationType(getRotationType());
         mNativeCamera.setFieldOfView(mFieldOfView);
+        mNativeCamera.setOrthographic(mOrthographic);
+        mNativeCamera.setOrthographicScale(mOrthographicScale);
         mNativeCamera.setRotation(Helper.toRadiansVector(mRotation));
 
     }

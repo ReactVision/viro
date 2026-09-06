@@ -16,6 +16,8 @@ type Vec3 = [number, number, number];
 type Props = ViroWebNodeProps & {
   active?: boolean;
   focalPoint?: Vec3;
+  projection?: "perspective" | "orthographic";
+  orthographicScale?: number;
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -52,6 +54,16 @@ export function ViroOrbitCamera(props: Props) {
   useEffect(() => {
     if (active) scene.setActiveCameraNode(node);
   }, [scene, node, active]);
+
+  useEffect(() => {
+    scene.setCameraProjection(node, props.projection ?? "perspective");
+  }, [scene, node, props.projection]);
+
+  useEffect(() => {
+    if (props.orthographicScale !== undefined) {
+      scene.setCameraOrthographicScale(node, props.orthographicScale);
+    }
+  }, [scene, node, props.orthographicScale]);
 
   return (
     <ViroParentNodeContext.Provider value={node}>

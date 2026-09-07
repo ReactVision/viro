@@ -86,11 +86,17 @@ function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationT
         asset.rotation_y ?? 0,
         rotationZ,
     ];
+    // Zero, negative and non-finite scales are degenerate transforms rather than
+    // small ones, so they fall back to 1. Everything else passes through, large
+    // values included: scale doubles as compensation for a model's own units, so a
+    // mesh authored in centimetres legitimately needs about 100. This replaced a
+    // pair of rules that substituted 0.1 below 0.01 and 2 above 10, which rendered
+    // an asset authored at 13 more than six times too small with no way to tell.
+    // Editors that author these scenes apply the same rule, and hold their own
+    // copy of it since this package does not depend on them.
     let scaleValue = asset.scale ?? 1;
-    if (scaleValue < 0.01)
-        scaleValue = 0.1;
-    if (scaleValue > 10)
-        scaleValue = 2;
+    if (!Number.isFinite(scaleValue) || scaleValue <= 0)
+        scaleValue = 1;
     const scale = [scaleValue, scaleValue, scaleValue];
     const dragType = dragConfiguration_1.DragConfiguration.getDragType(asset, scene);
     let dragPlane;
@@ -156,19 +162,11 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
         return null;
     }
     const modelType = inferModelType(asset.file_url);
-    // Android: slightly reduce scale for stability
-    const scale = react_native_1.Platform.OS === "android"
-        ? [
-            config.scale[0] * 0.8,
-            config.scale[1] * 0.8,
-            config.scale[2] * 0.8,
-        ]
-        : config.scale;
     const hasMaterialConfig = (0, materialConfig_1.parseMaterialConfig)(asset.material_config) !== null;
     const shaderOverrides = hasMaterialConfig
         ? [(0, materialConfig_1.studioMaterialName)(asset.id)]
         : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
     // Viro derives native canDrag from `onDrag != undefined`; without this prop
     // the drag recognizer is never attached, even when dragType is set.
     {...(config.dragType

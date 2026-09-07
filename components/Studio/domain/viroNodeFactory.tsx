@@ -243,16 +243,6 @@ function create3DObject(
 
   const modelType = inferModelType(asset.file_url);
 
-  // Android: slightly reduce scale for stability
-  const scale =
-    Platform.OS === "android"
-      ? ([
-          config.scale[0] * 0.8,
-          config.scale[1] * 0.8,
-          config.scale[2] * 0.8,
-        ] as [number, number, number])
-      : config.scale;
-
   const hasMaterialConfig = parseMaterialConfig(asset.material_config) !== null;
   const shaderOverrides = hasMaterialConfig
     ? [studioMaterialName(asset.id)]
@@ -265,7 +255,7 @@ function create3DObject(
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
-      scale={scale}
+      scale={config.scale}
       type={modelType}
       dragType={config.dragType}
       dragPlane={config.dragPlane}

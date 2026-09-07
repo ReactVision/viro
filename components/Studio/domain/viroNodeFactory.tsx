@@ -114,9 +114,16 @@ export function createNodeConfig(
     rotationZ,
   ];
 
+  // Zero, negative and non-finite scales are degenerate transforms rather than
+  // small ones, so they fall back to 1. Everything else passes through, large
+  // values included: scale doubles as compensation for a model's own units, so a
+  // mesh authored in centimetres legitimately needs about 100. This replaced a
+  // pair of rules that substituted 0.1 below 0.01 and 2 above 10, which rendered
+  // an asset authored at 13 more than six times too small with no way to tell.
+  // Editors that author these scenes apply the same rule, and hold their own
+  // copy of it since this package does not depend on them.
   let scaleValue = asset.scale ?? 1;
-  if (scaleValue < 0.01) scaleValue = 0.1;
-  if (scaleValue > 10) scaleValue = 2;
+  if (!Number.isFinite(scaleValue) || scaleValue <= 0) scaleValue = 1;
   const scale: [number, number, number] = [scaleValue, scaleValue, scaleValue];
 
   const dragType = DragConfiguration.getDragType(asset, scene);

@@ -388,6 +388,9 @@ const VariableText: React.FC<{
         fontSize: 20,
         color: "#FFFFFF",
         textAlign: "center",
+        // Centred on the node rather than hung from the top of its box, so the
+        // authored position is where the text is at any scale.
+        textAlignVertical: "center",
       }}
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }

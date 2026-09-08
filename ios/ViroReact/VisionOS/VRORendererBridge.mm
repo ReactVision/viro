@@ -646,6 +646,20 @@ static std::vector<dispatch_block_t> sRenderThreadQueue;
 
     _renderer = std::make_shared<VRORenderer>(config, _inputController);
 
+    // Clear transparent, or mixed immersion shows a black void instead of the room.
+    //
+    // CompositorServices composites what we draw over passthrough, so anything the scene does not
+    // cover has to carry alpha 0. VROChoreographer's default is opaque black ({0,0,0,1}), which
+    // fills the whole frame and hides passthrough entirely — the app then looks like it opened in
+    // full immersion no matter what style was requested.
+    //
+    // Quest hit this and fixed it the same way: see the "CRITICAL for passthrough to show through"
+    // comment in VROSceneRendererOpenXR.cpp. visionOS never got the equivalent.
+    //
+    // Unconditional on purpose. Under `.full` immersion there is no passthrough to reveal, so an
+    // alpha-0 clear resolves to the same black the opaque clear produced.
+    _renderer->setClearColor({ 0, 0, 0, 0 }, _driver);
+
     // ── Camera node ──────────────────────────────────────────────────────────
     // Root node, no VRONodeCamera attached — updateCamera() uses getWorldPosition()
     // directly and leaves baseRotation as identity, so headRotation (worldFromEye

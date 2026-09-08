@@ -245,6 +245,10 @@ private:
             _filter[slotFor(source)].reset();
             _hoverHeld[slotFor(source)] = false;
             _reticleDistance[slotFor(source)] = -1.0f;
+            // Thaw too, or the aim stays frozen for the rest of the session: this path resets
+            // wasPinching without the pinching->not transition below that normally thaws, so a
+            // pinch ended by the hand leaving view left every later ray pinned to that moment.
+            _aim[slotFor(source)].thaw();
             return;
         }
 
@@ -330,10 +334,24 @@ private:
         // miss is not a disappearance — it falls back to a fixed reach, so the wearer can always
         // see where they are aiming, which is the whole point of having one.
         const int rslot = slotFor(source);
+
+        // While the aim is frozen the reticle shows the frozen aim, not the live one.
+        //
+        // The click already uses the aim from before the pinch began — that is what the delay
+        // line is for — but the reticle used to keep tracking the live ray, so a wearer saw the
+        // mark bolt away exactly as they pinched and read it as the gesture ruining their aim.
+        // It was not: the selection was correct and only the feedback lied. This is most of why
+        // the finger ray felt unusable, since that is where the curl moves the ray most.
+        //
+        // Not the same as showing the widened aim, which is deliberately not drawn: this is the
+        // direction the click actually uses, so drawing it is the honest thing.
+        const VROVector3f reticleOrigin  = aim.frozen ? aim.frozenOrigin  : _liveOrigin[rslot];
+        const VROVector3f reticleForward = aim.frozen ? aim.frozenForward : _liveForward[rslot];
+
         float target = kReticleFallbackDistance;
         if (std::shared_ptr<VROHitTestResult> hit = getHitResultForSource(source)) {
             if (!hit->isBackgroundHit()) {
-                target = (hit->getLocation() - _liveOrigin[rslot]).magnitude();
+                target = (hit->getLocation() - reticleOrigin).magnitude();
             }
         }
         // Ease the depth rather than snapping it, or crossing an edge pops the reticle between
@@ -344,7 +362,7 @@ private:
             _reticleDistance[rslot] += (target - _reticleDistance[rslot]) * kReticleDepthEasing;
         }
         _reticleHit = true;
-        _reticlePosition = _liveOrigin[rslot] + _liveForward[rslot] * _reticleDistance[rslot];
+        _reticlePosition = reticleOrigin + reticleForward * _reticleDistance[rslot];
         // processGazeEvent is what turns a hit result into onHover — without it the hit is
         // computed, click still works through onButtonEvent, and hover silently never fires.
         VROInputControllerBase::processGazeEvent(source);

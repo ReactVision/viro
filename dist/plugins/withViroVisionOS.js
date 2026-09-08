@@ -540,12 +540,16 @@ const withVisionOSBundlePhase = (config) => (0, config_plugins_1.withDangerousMo
             return newConfig;
         }
         let pbx = fs_1.default.readFileSync(pbxPath, "utf-8");
-        // The template's phase runs react-native-xcode.sh out of whatever package it was generated
-        // against, and that script sources with-environment.sh beside it. Neither path is ours, so
-        // the phase dies with "with-environment.sh: No such file or directory" — and only on device,
-        // because the Simulator loads from the dev server and never runs this phase in anger.
-        const staleScriptPath = /@[a-z0-9-]+\/react-native-visionos\/scripts\/react-native-xcode\.sh/g;
-        const repointed = pbx.replace(staleScriptPath, `${RNVISION_PKG}/scripts/react-native-xcode.sh`);
+        // The template's phase runs scripts out of whatever visionOS package it was generated
+        // against, which is not this fork. Every such path is repointed, not just
+        // react-native-xcode.sh: the phase also references with-environment.sh directly, and an
+        // earlier version of this rule rewrote only the first on the assumption that the second was
+        // sourced relative to it. It is not, so the build died with "with-environment.sh: No such
+        // file or directory" after compiling everything.
+        //
+        // The pattern matches this package's own scope too, where the replacement is a no-op.
+        const stalePackagePath = /@[a-z0-9-]+\/react-native-visionos\//g;
+        const repointed = pbx.replace(stalePackagePath, `${RNVISION_PKG}/`);
         if (repointed !== pbx) {
             pbx = repointed;
             fs_1.default.writeFileSync(pbxPath, pbx, "utf-8");

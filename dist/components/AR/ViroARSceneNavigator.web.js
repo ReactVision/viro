@@ -281,7 +281,7 @@ function ViroARSceneNavigator(props) {
 
       {started ? (<div style={statusStyle}>{trackingLabel(tracking)}</div>) : (<div style={overlayStyle}>
           {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
-          <div>{props.startLabel ?? "AR on the web · camera + tracking"}</div>
+          <div>{props.startLabel ?? "AR needs access to your camera."}</div>
           <button type="button" style={buttonStyle} disabled={!renderer || starting} onClick={startAR}>
             {starting ? "Starting…" : "Start AR"}
           </button>

@@ -47,6 +47,8 @@ export type NodeConfig = {
     maxDistance: number;
   };
   physicsBody?: Record<string, unknown>;
+  /** Authored velocity, sent once on mount rather than on the body. */
+  launchVelocity?: [number, number, number];
   viroTag?: string;
   onClick?: () => void;
   // On Gaze (headset eye-gaze). Setting it enables the node's native canHover.
@@ -146,9 +148,13 @@ export function createNodeConfig(
     ? buildViroPhysicsBody(parsedPhysics, {
         kinematicDragOverride:
           dragActive && shouldUseKinematicPhysicsDrag(asset, parsedPhysics),
+        scale: scaleValue,
       })
     : undefined;
   const viroTag = parsedPhysics ? asset.id : undefined;
+  const launchVelocity = parsedPhysics?.velocity
+    ? ([...parsedPhysics.velocity] as [number, number, number])
+    : undefined;
 
   const onClick = createOnClickHandler(
     asset,
@@ -168,6 +174,7 @@ export function createNodeConfig(
     dragType,
     dragPlane,
     physicsBody,
+    launchVelocity,
     viroTag,
     onClick,
     animation,
@@ -478,6 +485,52 @@ const PlaceableNode: React.FC<{
   );
 };
 
+/**
+ * Sends an authored velocity once, as a launch.
+ *
+ * `physicsBody.velocity` is a CONSTANT velocity on the device: both bridges pass
+ * `isConstant` true and `VROPhysicsBody::applyPresetVelocity` reasserts it on the
+ * rigid body every frame, so gravity never gets a turn and the node runs in a
+ * straight line for as long as the scene lives. virocore's other slot,
+ * `_instantVelocity`, is applied once and then cleared, which is what an author
+ * means by a velocity and what the editors preview. Only
+ * `VRTNodeModule.setVelocity` reaches it, so the value is sent through the node's
+ * own ref here instead of being declared on the body.
+ *
+ * The node is built by `render` rather than cloned, so the ref arrives through
+ * the `nodeRef` prop each creator already forwards: TEXT renders a function
+ * component, which a cloned `ref` would miss. That ref is the node's only one,
+ * hence `forwardRef` for the proximity registration that would otherwise own it.
+ */
+const LaunchNode: React.FC<{
+  velocity: [number, number, number];
+  forwardRef?: (ref: unknown) => void;
+  render: (nodeRef: (ref: unknown) => void) => React.ReactElement | null;
+}> = ({ velocity, forwardRef, render }) => {
+  const nodeRef = React.useRef<{
+    setVelocity?: (v: number[]) => void;
+  } | null>(null);
+
+  const setRef = React.useCallback(
+    (ref: unknown) => {
+      nodeRef.current = ref as { setVelocity?: (v: number[]) => void } | null;
+      forwardRef?.(ref);
+    },
+    [forwardRef]
+  );
+
+  // Keyed on the numbers, since `config` hands back a new array every render.
+  const signature = velocity.join(",");
+  React.useEffect(() => {
+    // Both platforms resolve the view inside a UI block, which runs after this
+    // mount's own view operations, so the physics body exists by then.
+    nodeRef.current?.setVelocity?.([...velocity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  return render(setRef);
+};
+
 function createText(
   asset: StudioAsset,
   config: NodeConfig,
@@ -590,53 +643,64 @@ export function createNode(
     ? (ref: unknown) => registerProximityTarget(asset.id, ref)
     : undefined;
 
-  let node: React.ReactElement | null;
-  switch (type) {
-    case "3D-MODEL":
-      // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep both;
-      // a drag-only merge here once silently killed collisions.
-      node = create3DObject(
-        asset,
-        config,
-        onAssetLoaded,
-        notifyPhysicsDrag,
-        onCollision,
-        proximityRef
-      );
-      break;
-    case "IMAGE":
-      node = createImage(
-        asset,
-        config,
-        onAssetLoaded,
-        notifyPhysicsDrag,
-        onCollision,
-        proximityRef
-      );
-      break;
-    case "TEXT":
-      node = createText(
-        asset,
-        config,
-        notifyPhysicsDrag,
-        runtimeCtx?.variableStore,
-        onCollision,
-        proximityRef
-      );
-      break;
-    case "VIDEO":
-      node = createVideo(
-        asset,
-        config,
-        notifyPhysicsDrag,
-        onCollision,
-        proximityRef
-      );
-      break;
-    default:
-      console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);
-      return null;
-  }
+  const buildNode = (
+    nodeRef?: (ref: unknown) => void
+  ): React.ReactElement | null => {
+    switch (type) {
+      case "3D-MODEL":
+        // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep
+        // both; a drag-only merge here once silently killed collisions.
+        return create3DObject(
+          asset,
+          config,
+          onAssetLoaded,
+          notifyPhysicsDrag,
+          onCollision,
+          nodeRef
+        );
+      case "IMAGE":
+        return createImage(
+          asset,
+          config,
+          onAssetLoaded,
+          notifyPhysicsDrag,
+          onCollision,
+          nodeRef
+        );
+      case "TEXT":
+        return createText(
+          asset,
+          config,
+          notifyPhysicsDrag,
+          runtimeCtx?.variableStore,
+          onCollision,
+          nodeRef
+        );
+      case "VIDEO":
+        return createVideo(
+          asset,
+          config,
+          notifyPhysicsDrag,
+          onCollision,
+          nodeRef
+        );
+      default:
+        console.warn(
+          `[Studio] Unknown asset type "${type}" for "${asset.name}"`
+        );
+        return null;
+    }
+  };
+
+  const node = config.launchVelocity ? (
+    <LaunchNode
+      velocity={config.launchVelocity}
+      forwardRef={proximityRef}
+      render={buildNode}
+    />
+  ) : (
+    buildNode(proximityRef)
+  );
 
   if (!node) return null;
 

@@ -44,6 +44,15 @@ export type PhysicsWorldConfig = {
 export type BuildViroPhysicsBodyOptions = {
   /** Forces Dynamic body to Kinematic with mass 0 while dragging. */
   kinematicDragOverride?: boolean;
+  /**
+   * The node's uniform scale, applied to an explicit Box or Sphere shape.
+   * virocore does not scale one: `generateBasicBulletShape(type, params)` builds
+   * the bullet shape from the params as given and only the geometry-inferred
+   * branch calls `setLocalScaling`, so a 1 m collider stayed 1 m around a node
+   * scaled to 2 and the node sank halfway through whatever it landed on. The
+   * editors multiply when they build their own collider; this is the same rule.
+   */
+  scale?: number;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,10 +97,20 @@ function parseShape(raw: unknown): PhysicsShape | undefined {
   return undefined;
 }
 
-function mapShapeToViro(shape: PhysicsShape): Record<string, unknown> {
-  if (shape.type === "Box") return { type: "Box", params: [...shape.params] };
-  if (shape.type === "Sphere")
-    return { type: "Sphere", params: [...shape.params] };
+function mapShapeToViro(
+  shape: PhysicsShape,
+  scale: number
+): Record<string, unknown> {
+  if (shape.type === "Box") {
+    return { type: "Box", params: shape.params.map((p) => p * scale) };
+  }
+  if (shape.type === "Sphere") {
+    return { type: "Sphere", params: [shape.params[0] * scale] };
+  }
+  // Compound children are passed as authored, unscaled: virocore ignores them
+  // and builds a compound of the NODE's own children instead, applying the
+  // node's scale to that itself (`generateCompoundBulletShape`), so nothing
+  // here reaches bullet and scaling it would only look right in a diff.
   return {
     type: "Compound",
     params: [],
@@ -228,22 +247,31 @@ export function buildViroPhysicsBody(
 
   const type = kinematicDrag ? "Kinematic" : config.type;
   const mass = kinematicDrag ? 0 : config.mass;
-  const shape = mapShapeToViro(
-    config.shape ?? { type: "Box", params: [1, 1, 1] }
-  );
 
   const body: Record<string, unknown> = {
     type,
     mass,
-    shape,
     enabled: config.enabled,
   };
+
+  // No configured shape means "fit the geometry", so the key is left out
+  // entirely: virocore then infers a box or sphere from the node's own bounding
+  // box and applies the node's world scale to it (`VROPhysicsShape(node, false)`
+  // followed by `setLocalScaling`), which is what the editors measure. This used
+  // to send a 1x1x1 box instead, which gave a 0.4 m model a 1 m collider and
+  // stood it 0.3 m off the ground.
+  if (config.shape) {
+    body.shape = mapShapeToViro(config.shape, options?.scale ?? 1);
+  }
 
   if (config.restitution !== undefined) body.restitution = config.restitution;
   if (config.friction !== undefined) body.friction = config.friction;
   if (config.useGravity !== undefined)
     body.useGravity = kinematicDrag ? false : config.useGravity;
-  if (config.velocity !== undefined) body.velocity = [...config.velocity];
+  // `velocity` is deliberately NOT sent: the bridges pass it to virocore as a
+  // CONSTANT velocity, reasserted on the rigid body every frame, so gravity
+  // never gets a turn. The node factory launches the authored value once
+  // instead (`LaunchNode`).
   if (config.torque !== undefined) body.torque = normalizeTorque(config.torque);
   if (config.force !== undefined) body.force = normalizeForce(config.force);
 

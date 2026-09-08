@@ -1953,6 +1953,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     std::shared_ptr<VROPhysicsBody> body = [self node]->getPhysicsBody();
     if (!body) {
         RCTLogError(@"Attempted to set a velocity on a non-physics node");
+        return;
     }
     VROVector3f velocity3f = VROVector3f([[velocity objectAtIndex:0] floatValue],
                                          [[velocity objectAtIndex:1] floatValue],

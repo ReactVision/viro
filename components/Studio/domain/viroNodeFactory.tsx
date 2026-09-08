@@ -27,7 +27,7 @@ import {
 } from "./physicsConfig";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
-import { StudioPlacementStore } from "./placementStore";
+import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
 
 type SceneNavigator = any;
 
@@ -73,7 +73,7 @@ export function createNodeConfig(
   // Tap-to-place stores the author position as an OFFSET from the runtime tap
   // point (PlaceableNode adds it), so the camera-relative -2 default and the
   // "too close" clamp — both meant for camera/plane assets — must not apply.
-  const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
+  const isTapToPlace = isTapToPlaceAsset(asset);
 
   // `world_placement` means the coordinates are a point in the world, not a
   // camera-relative offset an author typed. The clamp below exists to stop an
@@ -636,8 +636,9 @@ export function createNode(
 
   // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
   // node at the tap point with the author position and rotation applied relative
-  // to the user's facing, and wraps it in VisibleNode itself.
-  if (asset.tap_to_place && runtimeCtx?.placementStore) {
+  // to the user's facing, and wraps it in VisibleNode itself. A marker asset is
+  // never gated this way, whatever the flag says (isTapToPlaceAsset).
+  if (isTapToPlaceAsset(asset) && runtimeCtx?.placementStore) {
     return (
       <PlaceableNode
         key={asset.id}

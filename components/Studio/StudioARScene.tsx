@@ -38,7 +38,7 @@ import {
 } from "./domain/sceneNavigationHandler";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioVisibilityStore } from "./domain/visibilityStore";
-import { StudioPlacementStore } from "./domain/placementStore";
+import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
@@ -771,9 +771,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // tap-to-place since a marker already dictates the anchor.
   const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = useMemo(() => {
     const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
-    const tapToPlace = assets.filter(
-      (a) => !a.trigger_image_url && a.tap_to_place
-    );
+    const tapToPlace = assets.filter((a) => isTapToPlaceAsset(a));
     const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
     return {
       planeAssets: plane,

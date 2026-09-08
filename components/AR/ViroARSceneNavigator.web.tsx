@@ -163,9 +163,9 @@ function trackingLabel(state: ViroTrackingState): string {
     case ViroTrackingState.Normal:
       return "Tracking";
     case ViroTrackingState.Limited:
-      return "Inicializando…";
+      return "Initializing…";
     default:
-      return "Buscando tracking…";
+      return "Looking for tracking…";
   }
 }
 
@@ -199,7 +199,7 @@ export function ViroARSceneNavigator(props: Props) {
         setRenderer(created);
       } catch (err) {
         console.error("[Viro web AR] failed to initialize renderer:", err);
-        setError("No se pudo inicializar el renderer.");
+        setError("Could not initialize the renderer.");
       }
     })();
     return () => {
@@ -318,14 +318,14 @@ export function ViroARSceneNavigator(props: Props) {
       ) : (
         <div style={overlayStyle}>
           {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
-          <div>{props.startLabel ?? "AR en la web · cámara + tracking"}</div>
+          <div>{props.startLabel ?? "AR on the web · camera + tracking"}</div>
           <button
             type="button"
             style={buttonStyle}
             disabled={!renderer || starting}
             onClick={startAR}
           >
-            {starting ? "Iniciando…" : "Iniciar AR"}
+            {starting ? "Starting…" : "Start AR"}
           </button>
         </div>
       )}

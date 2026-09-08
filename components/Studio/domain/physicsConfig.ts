@@ -149,6 +149,26 @@ export function parsePhysicsWorldConfig(
 }
 
 /**
+ * The scene-level switch, and the gate on every body: no world, no bodies.
+ *
+ * Without it a placement carrying `physics_config` simulated on the device in a
+ * scene whose author had physics switched off, because virocore adds a body to a
+ * `VROPhysicsWorld` it creates on demand at its own -9.81 gravity
+ * (`VROScene::getPhysicsWorld`) whether or not the scene sent a `physicsWorld`
+ * prop. Nothing landed, since AR has no floor, so the content fell out of sight
+ * while the Studio editor drew it standing still. `StudioARScene` reads the same
+ * flag for the `physicsWorld` prop, where it also carries the gravity.
+ */
+export function isPhysicsWorldEnabled(
+  scene: { physics_world_config?: Record<string, unknown> | null } | null
+): boolean {
+  return (
+    parsePhysicsWorldConfig(scene?.physics_world_config ?? null)?.enabled ===
+    true
+  );
+}
+
+/**
  * Parses `asset.physics_config` JSON. Returns null if missing or invalid.
  */
 export function parsePhysicsBodyConfig(raw: unknown): PhysicsBodyConfig | null {

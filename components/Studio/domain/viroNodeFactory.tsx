@@ -22,6 +22,7 @@ import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
 import { DragConfiguration } from "./dragConfiguration";
 import {
   buildViroPhysicsBody,
+  isPhysicsWorldEnabled,
   parsePhysicsBodyConfig,
   shouldUseKinematicPhysicsDrag,
 } from "./physicsConfig";
@@ -134,7 +135,12 @@ export function createNodeConfig(
     );
   }
 
-  const parsedPhysics = parsePhysicsBodyConfig(asset.physics_config);
+  // Both the body and its collision tag hang off the scene's physics switch
+  // (isPhysicsWorldEnabled), which is what the Studio UI, its editor preview and
+  // the apply_physics tool all treat as the switch.
+  const parsedPhysics = isPhysicsWorldEnabled(scene)
+    ? parsePhysicsBodyConfig(asset.physics_config)
+    : null;
   const dragActive = isDragActive?.(asset.id) ?? false;
   const physicsBody = parsedPhysics
     ? buildViroPhysicsBody(parsedPhysics, {

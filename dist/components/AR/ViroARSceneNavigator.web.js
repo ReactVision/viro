@@ -132,14 +132,20 @@ function loadSlamViaScript(url) {
     });
     return slamScriptPromise;
 }
+/*
+ * A status readout, so it reports the state rather than guessing at a cause.
+ * Limited is not only a startup condition — ARKit and ARCore also report it for
+ * poor light or fast motion — so calling it "initializing" would be wrong every
+ * time it happens mid-session.
+ */
 function trackingLabel(state) {
     switch (state) {
         case viro_web_renderer_1.ViroTrackingState.Normal:
             return "Tracking";
         case viro_web_renderer_1.ViroTrackingState.Limited:
-            return "Initializing…";
+            return "Tracking limited";
         default:
-            return "Looking for tracking…";
+            return "No tracking";
     }
 }
 function ViroARSceneNavigator(props) {

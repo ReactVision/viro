@@ -179,9 +179,18 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
         }
 
         // Resolve device anchor → world-to-device transform.
-        // view.transform is eye-from-device (fixed IPD offset).
-        // To get eye-from-world (view matrix) we compose:
-        //   eyeFromWorld = view.transform × inverse(deviceAnchor.originFromAnchorTransform)
+        //
+        // `view.transform` is **device-from-eye**, not eye-from-device: it places the eye inside
+        // the device, carrying half the IPD. The view matrix is therefore
+        //
+        //   eyeFromWorld = inverse(originFromAnchor × view.transform)
+        //                = inverse(view.transform) × inverse(originFromAnchor)
+        //
+        // which is what Apple's own sample composes. Leaving out that inner inverse — as this did
+        // — negates the eye offset, so the left eye is rendered from the right eye's position and
+        // vice versa. Reversed stereo does not look broken so much as *wrong*: depth reads far too
+        // strong, close geometry is hard to fuse and blurs, and small head movements make the
+        // scene tremble.
         //
         // The anchor MUST also be set on each drawable via setDeviceAnchor() before
         // encodePresent() — CompositorServices silently discards every frame that lacks it.
@@ -193,7 +202,7 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
         // Drive prepareFrame once using the first drawable's left-eye data.
         let primary = drawables[0]
         if !primary.views.isEmpty {
-            let eyeFromWorld0 = primary.views[0].transform * deviceFromWorld
+            let eyeFromWorld0 = primary.views[0].transform.inverse * deviceFromWorld
             bridge.prepareFrame(
                 withViewIndex: 0,
                 colorTexture: primary.colorTextures[0],
@@ -265,7 +274,7 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                 // offscreen pass (bloom, shadows, tone mapping) can interleave —
                 // Metal permits one render command encoder per command buffer at a
                 // time, so a detour has to end the display encoder and reopen it.
-                let eyeFromWorld = view.transform * deviceFromWorld
+                let eyeFromWorld = view.transform.inverse * deviceFromWorld
                 bridge.renderEye(
                     withViewIndex: UInt(i),
                     renderPassDescriptor: renderPass,
@@ -339,7 +348,7 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
                     bridge.renderTrackingAreas(
                         withViewIndex: UInt(i),
                         renderPassDescriptor: pass,
-                        viewTransform: view.transform * deviceFromWorld,
+                        viewTransform: view.transform.inverse * deviceFromWorld,
                         tangents: Self.tangentsFromDrawable(drawable, viewIndex: i))
                 }
             }

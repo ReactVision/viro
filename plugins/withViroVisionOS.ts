@@ -27,7 +27,7 @@
  *
  * Manual step (one-time, before prebuild):
  *   npx @react-native-community/cli@latest init MyApp \
- *     --template @callstack/visionos-template@latest \
+ *     --template github:ReactVision/visionos-template \
  *     --directory visionos --skip-install
  */
 
@@ -46,6 +46,10 @@ const PODFILE_MARKER = "# viro-visionos";
 const METRO_MARKER = "// viro-visionos";
 const RNVISION_PKG = "@reactvision/react-native-visionos";
 const RNVISION_PLATFORMS_PKG = "@callstack/out-of-tree-platforms";
+// The visionOS Podfile autolinks through this. Expo apps do not have it — Expo ships its own
+// CLI — and without it `pod install` fails inside CocoaPods with a wall of text that names the
+// package only in passing.
+const RN_COMMUNITY_CLI_PKG = "@react-native-community/cli";
 
 // Path inside this package where bundled assets live (resolved at runtime).
 // This file is compiled to dist/plugins/, and plugins/withViroVisionOS.js is a one-line
@@ -80,7 +84,7 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
       const visionosDir = path.join(projectRoot, "visionos");
 
       // Warn if missing deps
-      for (const pkg of [RNVISION_PKG, RNVISION_PLATFORMS_PKG]) {
+      for (const pkg of [RNVISION_PKG, RNVISION_PLATFORMS_PKG, RN_COMMUNITY_CLI_PKG]) {
         if (!isPkgInstalled(projectRoot, pkg)) {
           WarningAggregator.addWarningIOS(
             "withViroVisionOS",
@@ -96,7 +100,7 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
           "withViroVisionOS",
           `visionos/ folder not found. Create it once before running expo prebuild:\n\n` +
             `  npx @react-native-community/cli@latest init "${appName}" \\\n` +
-            `    --template @callstack/visionos-template@latest \\\n` +
+            `    --template github:ReactVision/visionos-template \\\n` +
             `    --directory visionos --skip-install\n\n` +
             `Then re-run: expo prebuild`
         );
@@ -240,7 +244,27 @@ const withVisionOSPodfile: ConfigPlugin = (config) =>
       }
 
       let podfile = fs.readFileSync(podfilePath, "utf-8");
+
+      // Read before touching anything: the deployment-target fix below writes PODFILE_MARKER, and
+      // computing this afterwards would report an unpatched Podfile as already patched and skip
+      // injecting the Viro pods entirely.
       const alreadyPatched = podfile.includes(PODFILE_MARKER);
+
+      // Raise the deployment target if the folder predates the template pinning it.
+      //
+      // ViroReactUI.podspec requires visionos 26.0 — ViroKit calls queryDrawables() and
+      // computeProjection(viewIndex:) with no availability fallback — and CocoaPods refuses the
+      // pod below it with "required a higher minimum deployment target". The template pins 26.0
+      // now, but nobody regenerates a visionos/ folder they already have, so it is fixed here too.
+      if (/^platform :visionos, min_visionos_version_supported/m.test(podfile)) {
+        podfile = podfile.replace(
+          /^platform :visionos, min_visionos_version_supported/m,
+          `platform :visionos, '26.0' ${PODFILE_MARKER}: ViroReactUI requires 26.0`
+        );
+        console.log(
+          "[withViroVisionOS] Raised the visionOS deployment target to 26.0 (ViroReactUI requires it)"
+        );
+      }
 
       // ── 3a0. Both React Native source flags, set in the Podfile itself ──
       //
@@ -463,7 +487,13 @@ const withVisionOSPatches: ConfigPlugin = (config) =>
 
 // ─── 6. components/compat/ — copy BlurView + LinearGradient shims ─────────────
 
-const SHIM_FILES = ["BlurView.tsx", "LinearGradient.tsx"];
+// Each shim replaces one Expo package that does not work on visionOS. Copying a shim into an app
+// that does not depend on that package leaves a file importing something absent — two TypeScript
+// errors in code the app never imports — so each is gated on the dependency it stands in for.
+const SHIM_FILES: { file: string; requires: string }[] = [
+  { file: "BlurView.tsx", requires: "expo-blur" },
+  { file: "LinearGradient.tsx", requires: "expo-linear-gradient" },
+];
 
 const withVisionOSCompatShims: ConfigPlugin = (config) =>
   withDangerousMod(config, [
@@ -480,19 +510,20 @@ const withVisionOSCompatShims: ConfigPlugin = (config) =>
         return newConfig;
       }
 
-      if (!fs.existsSync(compatDir)) {
-        fs.mkdirSync(compatDir, { recursive: true });
-      }
-
+      // Created lazily: an app depending on neither package should not be left with an empty
+      // components/compat/ directory it never asked for.
       const copied: string[] = [];
-      for (const file of SHIM_FILES) {
+      for (const { file, requires } of SHIM_FILES) {
+        if (!isPkgInstalled(projectRoot, requires)) continue;
         const src = path.join(BUNDLED_SHIMS_DIR, file);
-        const dest = path.join(compatDir, file);
         if (!fs.existsSync(src)) continue;
-        if (!fs.existsSync(dest)) {
-          fs.copyFileSync(src, dest);
-          copied.push(file);
+        const dest = path.join(compatDir, file);
+        if (fs.existsSync(dest)) continue;
+        if (!fs.existsSync(compatDir)) {
+          fs.mkdirSync(compatDir, { recursive: true });
         }
+        fs.copyFileSync(src, dest);
+        copied.push(file);
       }
 
       if (copied.length > 0) {

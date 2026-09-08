@@ -81,7 +81,8 @@ export function createNodeConfig(
   // apart: applied to a world coordinate it silently rewrites it to -2, which
   // pins the object in front of the view. That reads as "the anchor does not
   // stay fixed", and the only notice is the warning below.
-  const isWorldPlacement = !!(asset as { world_placement?: boolean }).world_placement;
+  const isWorldPlacement = !!(asset as { world_placement?: boolean })
+    .world_placement;
   let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
   if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
     console.warn(
@@ -96,22 +97,19 @@ export function createNodeConfig(
     posZ,
   ];
 
-  // Apply trigger image orientation offset to rotation Z
-  let rotationZ = asset.rotation_z ?? 0;
-  if (hasTriggerImage && asset.trigger_image_orientation) {
-    const offsets: Record<string, number> = {
-      Left: -90,
-      Right: 90,
-      Down: 180,
-      Up: 0,
-    };
-    rotationZ += offsets[asset.trigger_image_orientation] ?? 0;
-  }
-
+  // A trigger image's orientation describes the uploaded FILE, not the surface
+  // it is printed on and not a rotation for the content: it says where the top
+  // of that file is, so a sideways or upside-down file is still recognised.
+  // virocore acts on it by correcting the pixels before the tracker sees them
+  // (VROARSessionARCore rotates the grayscale buffer, VROARImageTargetiOS passes
+  // a CGImagePropertyOrientation to ARReferenceImage), so the anchor frame comes
+  // back the same whatever it is set to. This used to add Left -90, Right 90 and
+  // Down 180 to rotation Z, which nothing cancelled: content on any non-Up
+  // marker was drawn turned, upside down in the Down case.
   const rotation: [number, number, number] = [
     asset.rotation_x ?? 0,
     asset.rotation_y ?? 0,
-    rotationZ,
+    asset.rotation_z ?? 0,
   ];
 
   // Zero, negative and non-finite scales are degenerate transforms rather than

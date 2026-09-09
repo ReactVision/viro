@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Quest: `onDrag` followed the idle hand and objects jumped on grab / release when both hands were tracked.** Fixed in `@reactvision/virocore` (drag ownership per aim ray; grip / A / X / Y / thumbstick sources resolve against their own hand's ray), which this release bundles in `viro_renderer-release.aar`.
+- **Quest: clicks on a highlighted button were dropped, and `onClick` (state `Clicked`) rarely fired.** Fixed in `@reactvision/virocore` (aim lasers no longer hit-testable, click grace and press capture, `Clicked` compared on handler nodes, button edges resolved against the current frame's hit), bundled in the same AAR.
+- **`ViroController` crashed the app on the first button event (`TypeError: Cannot read property 'props' of undefined`).** Its event handlers were prototype methods handed to the native view unbound; React Native dispatches them detached, so `this` was undefined once a click-type prop was set. They are now arrow class fields like `ViroBase`'s.
+
 ## v2.58.1 — 17 August 2026
 
 ### Fixed

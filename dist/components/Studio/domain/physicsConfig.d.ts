@@ -42,11 +42,34 @@ export type PhysicsWorldConfig = {
 export type BuildViroPhysicsBodyOptions = {
     /** Forces Dynamic body to Kinematic with mass 0 while dragging. */
     kinematicDragOverride?: boolean;
+    /**
+     * The node's uniform scale, applied to an explicit Box or Sphere shape.
+     * virocore does not scale one: `generateBasicBulletShape(type, params)` builds
+     * the bullet shape from the params as given and only the geometry-inferred
+     * branch calls `setLocalScaling`, so a 1 m collider stayed 1 m around a node
+     * scaled to 2 and the node sank halfway through whatever it landed on. The
+     * editors multiply when they build their own collider; this is the same rule.
+     */
+    scale?: number;
 };
 /**
  * Parses `scene.physics_world_config` JSON. Returns null if missing or invalid.
  */
 export declare function parsePhysicsWorldConfig(raw: unknown): PhysicsWorldConfig | null;
+/**
+ * The scene-level switch, and the gate on every body: no world, no bodies.
+ *
+ * Without it a placement carrying `physics_config` simulated on the device in a
+ * scene whose author had physics switched off, because virocore adds a body to a
+ * `VROPhysicsWorld` it creates on demand at its own -9.81 gravity
+ * (`VROScene::getPhysicsWorld`) whether or not the scene sent a `physicsWorld`
+ * prop. Nothing landed, since AR has no floor, so the content fell out of sight
+ * while the Studio editor drew it standing still. `StudioARScene` reads the same
+ * flag for the `physicsWorld` prop, where it also carries the gravity.
+ */
+export declare function isPhysicsWorldEnabled(scene: {
+    physics_world_config?: Record<string, unknown> | null;
+} | null): boolean;
 /**
  * Parses `asset.physics_config` JSON. Returns null if missing or invalid.
  */

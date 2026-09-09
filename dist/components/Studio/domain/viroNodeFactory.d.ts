@@ -13,6 +13,8 @@ export type NodeConfig = {
         maxDistance: number;
     };
     physicsBody?: Record<string, unknown>;
+    /** Authored velocity, sent once on mount rather than on the body. */
+    launchVelocity?: [number, number, number];
     viroTag?: string;
     onClick?: () => void;
     onGaze?: (isHovering: boolean, position: [number, number, number], source: number) => void;

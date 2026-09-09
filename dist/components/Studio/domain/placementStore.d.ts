@@ -1,6 +1,16 @@
 import { StudioAsset } from "../types";
 type Vec3 = [number, number, number];
 /**
+ * Image triggering wins over tap-to-place: a marker both triggers its content and
+ * anchors it, since the node is a child of `ViroARImageMarker` and follows the
+ * marker, so there is nothing left for a tap to decide. `StudioARScene` splits the
+ * scene on that rule already; this is the same rule for the two places that gate a
+ * single asset, the placement queue below and the node factory's `PlaceableNode`
+ * wrap, which used to withhold such an asset until a tap and then hand it world
+ * coordinates inside the marker's frame.
+ */
+export declare function isTapToPlaceAsset(asset: StudioAsset | null | undefined): boolean;
+/**
  * Per-scene store for tap-to-place assets, keyed by asset placement id. A
  * tap-to-place asset is withheld from the scene until the end user places it,
  * then rendered at the placed world position. Placement is ephemeral runtime

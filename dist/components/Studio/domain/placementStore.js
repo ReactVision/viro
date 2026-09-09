@@ -1,7 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioPlacementStore = void 0;
+exports.isTapToPlaceAsset = isTapToPlaceAsset;
 const utils_1 = require("./utils");
+/**
+ * Image triggering wins over tap-to-place: a marker both triggers its content and
+ * anchors it, since the node is a child of `ViroARImageMarker` and follows the
+ * marker, so there is nothing left for a tap to decide. `StudioARScene` splits the
+ * scene on that rule already; this is the same rule for the two places that gate a
+ * single asset, the placement queue below and the node factory's `PlaceableNode`
+ * wrap, which used to withhold such an asset until a tap and then hand it world
+ * coordinates inside the marker's frame.
+ */
+function isTapToPlaceAsset(asset) {
+    return !!asset?.tap_to_place && !asset.trigger_image_url;
+}
 /**
  * Tap-to-place assets in author-defined queue order: ascending tap_to_place_order,
  * nulls last (an older backend that omits the field keeps its incoming load order
@@ -119,7 +132,7 @@ class StudioPlacementStore {
     /** Initialise-if-absent from the tap_to_place flag (idempotent, strict-mode safe). */
     seed(assets) {
         for (const asset of byPlacementOrder(assets)) {
-            if (!asset?.id || !asset.tap_to_place)
+            if (!asset?.id || !isTapToPlaceAsset(asset))
                 continue;
             if (this.status.has(asset.id))
                 continue;
@@ -134,7 +147,7 @@ class StudioPlacementStore {
         this.bases.clear();
         this.order = [];
         for (const asset of byPlacementOrder(assets)) {
-            if (!asset?.id || !asset.tap_to_place)
+            if (!asset?.id || !isTapToPlaceAsset(asset))
                 continue;
             this.status.set(asset.id, "unplaced");
             this.order.push(asset.id);

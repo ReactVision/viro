@@ -592,7 +592,7 @@ const StudioARSceneInner = (props) => {
     // tap-to-place since a marker already dictates the anchor.
     const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = (0, react_1.useMemo)(() => {
         const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
-        const tapToPlace = assets.filter((a) => !a.trigger_image_url && a.tap_to_place);
+        const tapToPlace = assets.filter((a) => (0, placementStore_1.isTapToPlaceAsset)(a));
         const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
         return {
             planeAssets: plane,

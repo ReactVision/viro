@@ -314,6 +314,12 @@ function createImage(
       key={asset.id}
       {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
+      // No width or height props, so the bridges derive the height from the
+      // image's own aspect on load, but only build the quad from it under
+      // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
+      // the picture. The crop this mode also selects needs explicit size props,
+      // so the UVs stay 0 to 1.
+      resizeMode="ScaleToFill"
       position={config.position}
       rotation={config.rotation}
       scale={config.scale}

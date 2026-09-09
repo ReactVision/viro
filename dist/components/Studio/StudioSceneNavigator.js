@@ -287,7 +287,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         loadedSceneIdRef.current = resolvedSceneId;
         // Names for the tap-to-place prompt (overlay reads this on placement).
         placementNamesRef.current = new Map(sceneData.assets
-            .filter((a) => a.tap_to_place)
+            .filter((a) => (0, placementStore_1.isTapToPlaceAsset)(a))
             .map((a) => [a.id, a.name ?? ""]));
         const triggerImageCount = sceneData.assets.filter((a) => !!a.trigger_image_url).length;
         setNumberOfTrackedImages(triggerImageCount > 0 ? Math.min(triggerImageCount, 5) : undefined);

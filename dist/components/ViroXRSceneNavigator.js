@@ -86,12 +86,17 @@ function checkRNVersionForVR() {
  * When only `initialScene` is provided it is used for both modes.
  *
  * Renderer flags (`hdrEnabled`, `pbrEnabled`, `bloomEnabled`, `shadowsEnabled`,
- * `passthroughEnabled`, etc.) are forwarded to ViroVRSceneNavigator on Quest
- * via the intent bridge.
+ * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
+ * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
+ * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`
+ * and `handTrackingEnabled` are Quest-only and go over the bridge alone.
  */
 exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(props, ref) {
     const { initialScene, arInitialScene, vrInitialScene, 
-    // VR-only renderer config — forwarded via bridge on Quest
+    // Renderer config. Destructured because Quest forwards it over the intent
+    // bridge rather than as props; the AR branch passes it on by hand below,
+    // and leaving it out of that list is how the AR path silently lost every
+    // one of these.
     hdrEnabled, pbrEnabled, bloomEnabled, shadowsEnabled, multisamplingEnabled, vrModeEnabled, passthroughEnabled, handTrackingEnabled, onExitViro, debug, visionOSImmersionStyle = "mixed", ...rest } = props;
     // Inner ref used on the AR path to capture the ViroARSceneNavigator instance.
     const arRef = React.useRef(null);
@@ -229,7 +234,7 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
         console.warn("[Viro] ViroXRSceneNavigator requires `arInitialScene` or `initialScene`.");
         return null;
     }
-    return (<ViroARSceneNavigator_1.ViroARSceneNavigator ref={arRef} initialScene={scene} {...rest}/>);
+    return (<ViroARSceneNavigator_1.ViroARSceneNavigator ref={arRef} initialScene={scene} hdrEnabled={hdrEnabled} pbrEnabled={pbrEnabled} bloomEnabled={bloomEnabled} shadowsEnabled={shadowsEnabled} multisamplingEnabled={multisamplingEnabled} {...rest}/>);
 });
 const styles = react_native_1.StyleSheet.create({
     /** See the visionOS branch above: present in the tree, absent from the layout. */

@@ -130,8 +130,10 @@ type Props = ViewProps & {
  * When only `initialScene` is provided it is used for both modes.
  *
  * Renderer flags (`hdrEnabled`, `pbrEnabled`, `bloomEnabled`, `shadowsEnabled`,
- * `passthroughEnabled`, etc.) are forwarded to ViroVRSceneNavigator on Quest
- * via the intent bridge.
+ * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
+ * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
+ * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`
+ * and `handTrackingEnabled` are Quest-only and go over the bridge alone.
  */
 export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
   function ViroXRSceneNavigator(props, ref) {
@@ -139,7 +141,10 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       initialScene,
       arInitialScene,
       vrInitialScene,
-      // VR-only renderer config — forwarded via bridge on Quest
+      // Renderer config. Destructured because Quest forwards it over the intent
+      // bridge rather than as props; the AR branch passes it on by hand below,
+      // and leaving it out of that list is how the AR path silently lost every
+      // one of these.
       hdrEnabled,
       pbrEnabled,
       bloomEnabled,
@@ -310,6 +315,11 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       <ViroARSceneNavigator
         ref={arRef}
         initialScene={scene}
+        hdrEnabled={hdrEnabled}
+        pbrEnabled={pbrEnabled}
+        bloomEnabled={bloomEnabled}
+        shadowsEnabled={shadowsEnabled}
+        multisamplingEnabled={multisamplingEnabled}
         {...rest}
       />
     );

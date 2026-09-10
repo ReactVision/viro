@@ -533,6 +533,12 @@ export const StudioSceneNavigator = forwardRef<
           autofocus={autofocus}
           numberOfTrackedImages={numberOfTrackedImages}
           occlusionMode={occlusionMode}
+          // Both default on natively, where Hable luminance-only tone mapping
+          // renders pure white at about 0.77 and bright materials glow. The
+          // editor previews neither, and Studio content is white-heavy text and
+          // images, so the tone curve is what an author notices.
+          hdrEnabled={false}
+          bloomEnabled={false}
           onExitViro={onExitViro}
           style={StyleSheet.absoluteFill}
         />

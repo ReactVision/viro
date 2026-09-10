@@ -52,6 +52,7 @@ exports.StudioARScene = void 0;
 const React = __importStar(require("react"));
 const react_1 = require("react");
 const ViroAmbientLight_web_1 = require("../ViroAmbientLight.web");
+const ViroDirectionalLight_web_1 = require("../ViroDirectionalLight.web");
 const ViroARPlane_web_1 = require("../AR/ViroARPlane.web");
 const ViroARScene_web_1 = require("../AR/ViroARScene.web");
 const ViroScene_web_1 = require("../ViroScene.web");
@@ -64,6 +65,7 @@ const visibilityStore_1 = require("./domain/visibilityStore");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
+const studioLighting_1 = require("./domain/studioLighting");
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
@@ -246,7 +248,8 @@ const StudioARSceneInner = (props) => {
       {renderedAssets}
     </ViroARPlane_web_1.ViroARPlane>) : (<>{renderedAssets}</>);
     const children = (<>
-      <ViroAmbientLight_web_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
+      <ViroAmbientLight_web_1.ViroAmbientLight color="#ffffff" intensity={studioLighting_1.STUDIO_AMBIENT_INTENSITY}/>
+      <ViroDirectionalLight_web_1.ViroDirectionalLight color="#ffffff" intensity={studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY} direction={studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION}/>
       {body}
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_web_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{ fontFamily: "Arial", fontSize: 16, color: "#CCCCCC", textAlign: "center" }}/>)}

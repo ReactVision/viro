@@ -16,6 +16,7 @@
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ViroAmbientLight } from "../ViroAmbientLight.web";
+import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
 import { ViroARScene } from "../AR/ViroARScene.web";
 import { ViroScene } from "../ViroScene.web";
@@ -32,6 +33,11 @@ import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import {
+  STUDIO_AMBIENT_INTENSITY,
+  STUDIO_DIRECTIONAL_DIRECTION,
+  STUDIO_DIRECTIONAL_INTENSITY,
+} from "./domain/studioLighting";
 import type {
   StudioAnimation,
   StudioSceneResponse,
@@ -317,7 +323,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
 
   const children = (
     <>
-      <ViroAmbientLight color="#ffffff" intensity={1000} />
+      <ViroAmbientLight color="#ffffff" intensity={STUDIO_AMBIENT_INTENSITY} />
+      <ViroDirectionalLight
+        color="#ffffff"
+        intensity={STUDIO_DIRECTIONAL_INTENSITY}
+        direction={STUDIO_DIRECTIONAL_DIRECTION}
+      />
       {body}
       <StudioSounds manager={soundManagerRef.current!} />
       {assets.length === 0 && (

@@ -1,7 +1,15 @@
 import * as React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Platform } from "react-native";
 import { ViroAmbientLight } from "../ViroAmbientLight";
+import { ViroDirectionalLight } from "../ViroDirectionalLight";
 import { ViroARImageMarker } from "../AR/ViroARImageMarker";
 import { ViroARPlane } from "../AR/ViroARPlane";
 import { ViroARPlaneSelector } from "../AR/ViroARPlaneSelector";
@@ -11,7 +19,11 @@ import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
 import { ViroTrackingStateConstants } from "../ViroConstants";
-import type { ViroAnchor, ViroTrackingState } from "../Types/ViroEvents";
+import type {
+  ViroAmbientLightInfo,
+  ViroAnchor,
+  ViroTrackingState,
+} from "../Types/ViroEvents";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
@@ -48,6 +60,13 @@ import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import {
+  STUDIO_AMBIENT_INTENSITY,
+  STUDIO_DIRECTIONAL_DIRECTION,
+  STUDIO_DIRECTIONAL_INTENSITY,
+  STUDIO_LIGHT_SCALE_STEP,
+  studioLightScale,
+} from "./domain/studioLighting";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
 import {
@@ -178,6 +197,29 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
 interface StudioARSceneInnerProps extends StudioARSceneProps {
   sceneData: StudioSceneResponse; // guaranteed non-null by outer gate
 }
+
+type StudioLightRigHandle = { setScale: (scale: number) => void };
+
+/** Owns the rig's estimate scale so a light change re-renders these two alone. */
+const StudioLightRig = React.forwardRef<StudioLightRigHandle>(
+  function StudioLightRig(_props, ref) {
+    const [scale, setScale] = useState(1);
+    useImperativeHandle(ref, () => ({ setScale }), []);
+    return (
+      <>
+        <ViroAmbientLight
+          color="#ffffff"
+          intensity={STUDIO_AMBIENT_INTENSITY * scale}
+        />
+        <ViroDirectionalLight
+          color="#ffffff"
+          intensity={STUDIO_DIRECTIONAL_INTENSITY * scale}
+          direction={STUDIO_DIRECTIONAL_DIRECTION}
+        />
+      </>
+    );
+  }
+);
 
 const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const {
@@ -941,6 +983,23 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     }
   }, []);
 
+  // ─── Rig scale from the room ──────────────────────────────────────────────
+  // The estimate arrives on every rendered frame, so it goes to the rig's own
+  // component rather than into state here, where a render rebuilds every asset
+  // node, and only once it has moved enough to see. Quest and web never call
+  // this and render the rig as authored.
+  const lightRigRef = useRef<StudioLightRigHandle | null>(null);
+  const lightScaleRef = useRef(1);
+
+  const handleAmbientLightUpdate = useCallback((info: ViroAmbientLightInfo) => {
+    const scale = studioLightScale(info?.intensity);
+    if (Math.abs(scale - lightScaleRef.current) < STUDIO_LIGHT_SCALE_STEP) {
+      return;
+    }
+    lightScaleRef.current = scale;
+    lightRigRef.current?.setScale(scale);
+  }, []);
+
   useEffect(() => {
     if (trackingReady) return;
     const timer = setTimeout(
@@ -1308,7 +1367,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
             : {})}
         />
       )}
-      <ViroAmbientLight color="#ffffff" intensity={1000} />
+      <StudioLightRig ref={lightRigRef} />
       {trackingReady && renderAssets()}
       {renderedTapToPlaceAssets}
       {renderedImageTriggeredAssets}
@@ -1366,6 +1425,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       {...cameraTransformProp}
       anchorDetectionTypes={anchorDetectionTypes}
       onTrackingUpdated={handleTrackingUpdated}
+      onAmbientLightUpdate={handleAmbientLightUpdate}
       onAnchorFound={handleAnchorFound}
       onAnchorUpdated={handleAnchorUpdated}
       onAnchorRemoved={handleAnchorRemoved}

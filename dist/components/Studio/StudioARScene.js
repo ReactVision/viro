@@ -38,6 +38,7 @@ const React = __importStar(require("react"));
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const ViroAmbientLight_1 = require("../ViroAmbientLight");
+const ViroDirectionalLight_1 = require("../ViroDirectionalLight");
 const ViroARImageMarker_1 = require("../AR/ViroARImageMarker");
 const ViroARPlane_1 = require("../AR/ViroARPlane");
 const ViroARPlaneSelector_1 = require("../AR/ViroARPlaneSelector");
@@ -63,6 +64,7 @@ const placementStore_1 = require("./domain/placementStore");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
+const studioLighting_1 = require("./domain/studioLighting");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
 const physicsConfig_1 = require("./domain/physicsConfig");
@@ -126,6 +128,15 @@ const StudioARScene = (props) => {
     return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
 };
 exports.StudioARScene = StudioARScene;
+/** Owns the rig's estimate scale so a light change re-renders these two alone. */
+const StudioLightRig = React.forwardRef(function StudioLightRig(_props, ref) {
+    const [scale, setScale] = (0, react_1.useState)(1);
+    (0, react_1.useImperativeHandle)(ref, () => ({ setScale }), []);
+    return (<>
+        <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={studioLighting_1.STUDIO_AMBIENT_INTENSITY * scale}/>
+        <ViroDirectionalLight_1.ViroDirectionalLight color="#ffffff" intensity={studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY * scale} direction={studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION}/>
+      </>);
+});
 const StudioARSceneInner = (props) => {
     const { sceneNavigator, sceneData, onReady, onSceneChange, onPlaneDetected, onPlaneSelected, noAssetsMessage, variableStore, placementStore, placementApiRef, } = props;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
@@ -726,6 +737,21 @@ const StudioARSceneInner = (props) => {
             setTrackingReady(true);
         }
     }, []);
+    // ─── Rig scale from the room ──────────────────────────────────────────────
+    // The estimate arrives on every rendered frame, so it goes to the rig's own
+    // component rather than into state here, where a render rebuilds every asset
+    // node, and only once it has moved enough to see. Quest and web never call
+    // this and render the rig as authored.
+    const lightRigRef = (0, react_1.useRef)(null);
+    const lightScaleRef = (0, react_1.useRef)(1);
+    const handleAmbientLightUpdate = (0, react_1.useCallback)((info) => {
+        const scale = (0, studioLighting_1.studioLightScale)(info?.intensity);
+        if (Math.abs(scale - lightScaleRef.current) < studioLighting_1.STUDIO_LIGHT_SCALE_STEP) {
+            return;
+        }
+        lightScaleRef.current = scale;
+        lightRigRef.current?.setScale(scale);
+    }, []);
     (0, react_1.useEffect)(() => {
         if (trackingReady)
             return;
@@ -973,7 +999,7 @@ const StudioARSceneInner = (props) => {
                 onClick: (position) => handleHeadsetPlaceTrigger(position),
             }
             : {})}/>)}
-      <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
+      <StudioLightRig ref={lightRigRef}/>
       {trackingReady && renderAssets()}
       {renderedTapToPlaceAssets}
       {renderedImageTriggeredAssets}
@@ -1002,7 +1028,7 @@ const StudioARSceneInner = (props) => {
         {children}
       </ViroScene_1.ViroScene>);
     }
-    return (<ViroARScene_1.ViroARScene ref={arSceneRef} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+    return (<ViroARScene_1.ViroARScene ref={arSceneRef} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAmbientLightUpdate={handleAmbientLightUpdate} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
       {children}
     </ViroARScene_1.ViroARScene>);
 };

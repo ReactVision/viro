@@ -30,6 +30,8 @@ import {
   getColocationPeers,
 } from "./components/AR/ViroColocation";
 import { useViroColocation } from "./components/hooks/useViroColocation";
+import { ViroReplicationClient } from "./components/AR/ViroReplication";
+import { useViroReplicatedState } from "./components/hooks/useViroReplicatedState";
 import {
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
@@ -91,6 +93,18 @@ export type {
   UseViroColocationResult,
   UseViroColocationOptions,
 } from "./components/hooks/useViroColocation";
+export type {
+  ViroReplicatedEntity,
+  ViroReplicationState,
+  ViroReplicationConfig,
+  ViroReplicationRejection,
+  ViroReplicationRejectReason,
+  ViroWriteOptions,
+} from "./components/AR/ViroReplication";
+export type {
+  UseViroReplicatedStateResult,
+  UseViroReplicatedStateOptions,
+} from "./components/hooks/useViroReplicatedState";
 export type {
   ViroFrameSource,
   ViroFrameSupport,
@@ -261,6 +275,8 @@ export {
   getColocationState,
   getColocationPeers,
   useViroColocation,
+  ViroReplicationClient,
+  useViroReplicatedState,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

@@ -63,6 +63,11 @@ function coerce(value: number | string | undefined, fallback: number): number {
 /**
  * Run a declarative animation on a node, starting from its current transform.
  * Returns true if `name` was a registered animation.
+ *
+ * `delayMs` is the `animation` prop's own delay. It wins over the registered
+ * one, which is how a caller that carries the delay per trigger rather than per
+ * registry entry still gets it, and matches the native side, where the prop
+ * delay gates the start and the registered one is a second wait on top.
  */
 export function runDeclarativeAnimation(
   scene: ViroSceneApi,
@@ -70,12 +75,14 @@ export function runDeclarativeAnimation(
   name: string,
   base: ViroBaseTransform,
   loop: boolean,
+  delayMs?: number,
 ): boolean {
   const def = registry.get(name);
   if (!def) return false;
 
   const p = def.properties;
-  scene.beginAnimation(node, def.duration / 1000, (def.delay ?? 0) / 1000, loop, easingValue(def.easing));
+  const delay = delayMs ?? def.delay ?? 0;
+  scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
 
   if (p.positionX !== undefined || p.positionY !== undefined || p.positionZ !== undefined) {
     scene.setNodePosition(

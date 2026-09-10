@@ -127,7 +127,20 @@ function projectAlongCameraForward(
 // indefinitely. Tunable; most sessions reach NORMAL within ~1-3s.
 const TRACKING_GATE_FALLBACK_MS = 6000;
 
-type AnimOverride = { key: string; run: boolean };
+type AnimOverride = {
+  key: string;
+  run: boolean;
+  /**
+   * Set on the single update that replaces a still-running animation. The
+   * runtime only terminates a running one when the prop carrying the new name
+   * says it is interruptible, so the flag rides here rather than coming from
+   * the animation row.
+   */
+  interrupting?: boolean;
+};
+
+/** What is playing on an asset right now, as `triggerAnimation` needs to read it. */
+type LiveAnimation = { key: string; loop: boolean; interruptible: boolean };
 
 interface StudioARSceneProps {
   sceneNavigator?: any;
@@ -315,6 +328,19 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const [loadedAssetIds, setLoadedAssetIds] = useState<Record<string, true>>(
     {}
   );
+  // A node has one animation slot, so two animations on one asset cannot
+  // overlap the way they do in the editor. These track what is playing, what is
+  // waiting behind it, and whether this play has already run its on_start.
+  const liveAnimRef = useRef<Map<string, LiveAnimation>>(new Map());
+  const queuedAnimRef = useRef<Map<string, string[]>>(new Map());
+  const startedPlayRef = useRef<Set<string>>(new Set());
+  const loadedAssetIdsRef = useRef(loadedAssetIds);
+  loadedAssetIdsRef.current = loadedAssetIds;
+  useEffect(() => {
+    liveAnimRef.current.clear();
+    queuedAnimRef.current.clear();
+    startedPlayRef.current.clear();
+  }, [scene.id]);
 
   // ─── Drag-active state (debounced) ────────────────────────────────────────
   // Viro's onDrag fires per-frame. Track a Record<assetId, true> cleared 220ms
@@ -373,8 +399,62 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     };
   }, []);
 
+  const markAnimationLive = useCallback(
+    (assetId: string, anim: StudioAnimation) => {
+      startedPlayRef.current.delete(assetId);
+      // An asset that has not loaded yet never starts, so it never reports a
+      // finish either. Leaving it out keeps a later trigger from waiting behind
+      // an animation that is not going to run.
+      if (!loadedAssetIdsRef.current[assetId]) {
+        liveAnimRef.current.delete(assetId);
+        return;
+      }
+      liveAnimRef.current.set(assetId, {
+        key: anim.animation_key,
+        loop: anim.loop,
+        interruptible: anim.interruptible,
+      });
+    },
+    []
+  );
+
   const triggerAnimation = useCallback(
     (targetAssetId: string, animationKey: string) => {
+      const requested = animations.find(
+        (a) =>
+          a.target_asset_id === targetAssetId &&
+          a.animation_key === animationKey
+      );
+      if (!requested) return;
+
+      const live = liveAnimRef.current.get(targetAssetId);
+      if (live && live.key !== animationKey) {
+        if (!live.loop && !live.interruptible) {
+          // Let the running one finish and play this next. The editor runs both
+          // at once and the runtime cannot, but in sequence the asset at least
+          // ends up where running both would have left it, and nothing is lost.
+          const queue = queuedAnimRef.current.get(targetAssetId) ?? [];
+          if (queue[queue.length - 1] !== animationKey) {
+            queue.push(animationKey);
+            queuedAnimRef.current.set(targetAssetId, queue);
+          }
+          return;
+        }
+        // A loop never finishes and an interruptible animation is one the author
+        // said may be cut short, so this one takes the slot now. Sent as a single
+        // update with `run` still true: the runtime only terminates a running
+        // animation inside `playAnimation`, which a false→true pair never reaches
+        // because the false half pauses it first, and a paused animation resumes
+        // whatever it already holds however the name changed.
+        markAnimationLive(targetAssetId, requested);
+        setAnimOverrides((prev) => ({
+          ...prev,
+          [targetAssetId]: { key: animationKey, run: true, interrupting: true },
+        }));
+        return;
+      }
+
+      markAnimationLive(targetAssetId, requested);
       // Viro's animation prop is edge-triggered on false→true. Force false first,
       // then flip to true on the next frame so a re-trigger of the same key fires.
       setAnimOverrides((prev) => ({
@@ -392,11 +472,39 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       });
       triggerHandlesRef.current.add(handle);
     },
-    []
+    [animations, markAnimationLive]
   );
 
   const triggerAnimationRef = useRef(triggerAnimation);
   triggerAnimationRef.current = triggerAnimation;
+
+  const handleAnimationFinished = useCallback(
+    (assetId: string, anim: StudioAnimation) => {
+      // The runtime loops by replaying the whole animation, so it reports a
+      // finish at every cycle boundary. A loop has not finished: firing
+      // on_finish there repeats a chained function for as long as the loop runs,
+      // and the editor fires it only when an animation ends.
+      if (anim.loop) return;
+      liveAnimRef.current.delete(assetId);
+      startedPlayRef.current.delete(assetId);
+      if (anim.on_finish_function) {
+        executeOnLoadFunction(
+          anim.on_finish_function,
+          functions,
+          sceneNavigator,
+          animations,
+          (id, key) => triggerAnimationRef.current(id, key),
+          handleSceneChange,
+          runtimeCtx
+        );
+      }
+      // on_finish runs first, so an animation it chains holds the slot and this
+      // one waits behind it rather than cutting it off.
+      const next = queuedAnimRef.current.get(assetId)?.shift();
+      if (next) triggerAnimationRef.current(assetId, next);
+    },
+    [functions, sceneNavigator, animations, handleSceneChange, runtimeCtx]
+  );
 
   // ─── Computed animation props per asset ──────────────────────────────────
   const animationStates = useMemo<Record<string, ViroAnimationProp>>(() => {
@@ -429,10 +537,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
             : activeAnim.animation_key,
         run,
         loop: activeAnim.loop,
-        interruptible: activeAnim.interruptible,
+        interruptible: activeAnim.interruptible || !!override?.interrupting,
         delay: activeAnim.delay_ms ?? 0,
         onStart: activeAnim.on_start_function
-          ? () =>
+          ? () => {
+              // Once per play, not once per loop cycle: the runtime reports a
+              // start on every replay, and the editor fires it once.
+              if (startedPlayRef.current.has(assetId)) return;
+              startedPlayRef.current.add(assetId);
               executeOnLoadFunction(
                 activeAnim.on_start_function!,
                 functions,
@@ -441,20 +553,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
                 (id, key) => triggerAnimationRef.current(id, key),
                 handleSceneChange,
                 runtimeCtx
-              )
+              );
+            }
           : undefined,
-        onFinish: activeAnim.on_finish_function
-          ? () =>
-              executeOnLoadFunction(
-                activeAnim.on_finish_function!,
-                functions,
-                sceneNavigator,
-                animations,
-                (id, key) => triggerAnimationRef.current(id, key),
-                handleSceneChange,
-                runtimeCtx
-              )
-          : undefined,
+        // Always wired: it carries the author's on_finish and it is also what
+        // releases an animation waiting for this one.
+        onFinish: () => handleAnimationFinished(assetId, activeAnim),
       };
     }
     return states;
@@ -465,6 +569,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     functions,
     sceneNavigator,
     handleSceneChange,
+    handleAnimationFinished,
     runtimeCtx,
   ]);
 

@@ -4,6 +4,8 @@ export interface ViroAnimationProp {
     name?: string;
     run?: boolean;
     loop?: boolean;
+    /** Milliseconds to wait before the first value, per trigger. */
+    delay?: number;
     onStart?: () => void;
     onFinish?: () => void;
 }

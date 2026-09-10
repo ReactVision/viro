@@ -20,10 +20,14 @@ function buildViroAnimationRegistry(animations) {
         if (anim.animation_source === "MODEL_CLIP")
             continue;
         warnAnimationPerformance(anim);
+        // No `delay` here on purpose. Both surfaces honour a delay twice if it is
+        // registered as well as passed per trigger: the runtime waits it out before
+        // `startAnimation`, then `VROAnimationGroup` waits it again inside the
+        // transaction. The per-trigger prop is the one that keeps it, because
+        // `on_start` fires between the two and the editor fires it after the delay.
         registry[anim.animation_key] = {
             properties: anim.properties,
             duration: anim.duration_ms ?? 1000,
-            delay: anim.delay_ms ?? 0,
             ...(anim.easing ? { easing: anim.easing } : {}),
         };
     }

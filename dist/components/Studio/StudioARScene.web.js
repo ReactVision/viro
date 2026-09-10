@@ -59,6 +59,7 @@ const ViroScene_web_1 = require("../ViroScene.web");
 const ViroText_web_1 = require("../ViroText.web");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
+const assetPosition_1 = require("./domain/assetPosition");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const visibilityStore_1 = require("./domain/visibilityStore");
@@ -111,7 +112,7 @@ const StudioARSceneInner = (props) => {
     }, [scene.id]);
     const getAssetPosition = (0, react_1.useCallback)((assetId) => {
         const a = assets.find((x) => x.id === assetId);
-        return a ? [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2] : undefined;
+        return a ? (0, assetPosition_1.studioAssetPosition)(a) : undefined;
     }, [assets]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,

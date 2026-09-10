@@ -23,6 +23,7 @@ import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { createNode } from "./domain/viroNodeFactory";
+import { studioAssetPosition } from "./domain/assetPosition";
 import {
   executeOnLoadFunction,
   SequenceScheduler,
@@ -130,7 +131,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const getAssetPosition = useCallback(
     (assetId: string): [number, number, number] | undefined => {
       const a = assets.find((x) => x.id === assetId);
-      return a ? [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2] : undefined;
+      return a ? studioAssetPosition(a) : undefined;
     },
     [assets],
   );

@@ -56,11 +56,13 @@ const gazeBindingsRuntime_1 = require("./domain/gazeBindingsRuntime");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
 const dragConfiguration_1 = require("./domain/dragConfiguration");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
+const assetPosition_1 = require("./domain/assetPosition");
 const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const visibilityStore_1 = require("./domain/visibilityStore");
 const placementStore_1 = require("./domain/placementStore");
+const utils_1 = require("./domain/utils");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
@@ -210,13 +212,11 @@ const StudioARSceneInner = (props) => {
         soundManagerRef.current?.reset();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
-    // Position for a spatial PLAY: look up the placed target asset (matches the
-    // node factory's position derivation, position_z defaulting to -2).
+    // Position for a spatial PLAY: the target asset's mounted position, through
+    // the node factory's own rule so the sound and the object agree.
     const getAssetPosition = (0, react_1.useCallback)((assetId) => {
         const a = assets.find((x) => x.id === assetId);
-        if (!a)
-            return undefined;
-        return [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2];
+        return a ? (0, assetPosition_1.studioAssetPosition)(a) : undefined;
     }, [assets]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
@@ -697,7 +697,7 @@ const StudioARSceneInner = (props) => {
             tapToPlaceAssets: tapToPlace,
         };
     }, [assets]);
-    const [urlToTargetName, setUrlToTargetName] = (0, react_1.useState)(() => new Map());
+    const [targetNameByAssetId, setTargetNameByAssetId] = (0, react_1.useState)(() => new Map());
     const prevTargetNamesRef = (0, react_1.useRef)([]);
     (0, react_1.useEffect)(() => {
         if (ViroPlatform_1.isQuest) {
@@ -709,13 +709,17 @@ const StudioARSceneInner = (props) => {
         if (imageTriggeredAssets.length === 0) {
             (0, triggerImageRegistry_1.cleanupTriggerImageTargets)(prevTargetNamesRef.current);
             prevTargetNamesRef.current = [];
-            setUrlToTargetName(new Map());
+            setTargetNameByAssetId(new Map());
             return;
         }
         const map = (0, triggerImageRegistry_1.registerTriggerImageTargets)(imageTriggeredAssets);
-        const targetNames = [...map.values()];
+        // Assets sharing a picture share a target name, so delete each one once.
+        const targetNames = [...new Set(map.values())];
+        if ((0, utils_1.isDev)()) {
+            console.log(`[Studio] Registered ${targetNames.length} trigger target(s) for ${imageTriggeredAssets.length} placement(s): ${targetNames.join(", ")}`);
+        }
         prevTargetNamesRef.current = targetNames;
-        setUrlToTargetName(map);
+        setTargetNameByAssetId(map);
         return () => {
             (0, triggerImageRegistry_1.cleanupTriggerImageTargets)(targetNames);
             prevTargetNamesRef.current = [];
@@ -855,26 +859,37 @@ const StudioARSceneInner = (props) => {
         registerProximityTarget,
         getGazeHandler,
     ]);
+    // One marker per target, carrying every asset on that image. The renderer
+    // attaches a detected anchor to a single marker node, so a second marker on
+    // the same target stays detached and its assets never appear.
     const renderedImageTriggeredAssets = (0, react_1.useMemo)(() => {
         if (ViroPlatform_1.isQuest)
             return [];
-        return imageTriggeredAssets
-            .map((asset) => {
-            const targetName = urlToTargetName.get(asset.trigger_image_url);
+        const nodesByTarget = new Map();
+        for (const asset of imageTriggeredAssets) {
+            const targetName = targetNameByAssetId.get(asset.id);
             if (!targetName)
-                return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
-                ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id));
+                continue;
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined, getGazeHandler(asset.id));
             if (!node)
-                return null;
-            return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
-            {node}
-          </ViroARImageMarker_1.ViroARImageMarker>);
-        })
-            .filter(Boolean);
+                continue;
+            const nodes = nodesByTarget.get(targetName);
+            if (nodes)
+                nodes.push(node);
+            else
+                nodesByTarget.set(targetName, [node]);
+        }
+        return [...nodesByTarget].map(([targetName, nodes]) => (<ViroARImageMarker_1.ViroARImageMarker key={targetName} target={targetName} 
+        // Whether the tracker ever recognised the picture is otherwise
+        // invisible, and it is the first thing to establish when content does
+        // not appear on a marker. The native side emits this event either way.
+        onAnchorFound={(0, utils_1.isDev)()
+                ? () => console.log(`[Studio] Trigger image "${targetName}" found, ${nodes.length} placement(s) on it`)
+                : undefined}>
+        {nodes}
+      </ViroARImageMarker_1.ViroARImageMarker>));
     }, [
-        urlToTargetName,
+        targetNameByAssetId,
         imageTriggeredAssets,
         sceneNavigator,
         animations,

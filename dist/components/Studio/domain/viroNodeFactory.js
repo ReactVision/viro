@@ -47,34 +47,12 @@ const materialConfig_1 = require("./materialConfig");
 const dragConfiguration_1 = require("./dragConfiguration");
 const physicsConfig_1 = require("./physicsConfig");
 const placementStore_1 = require("./placementStore");
-/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
+const assetPosition_1 = require("./assetPosition");
 function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, 
 // The detected plane this asset is anchored to, once the session has found
 // one. Only the assets under the plane wrapper have it.
 dragSurface) {
-    const hasTriggerImage = !!asset.trigger_image_url;
-    // Tap-to-place stores the author position as an OFFSET from the runtime tap
-    // point (PlaceableNode adds it), so the camera-relative -2 default and the
-    // "too close" clamp — both meant for camera/plane assets — must not apply.
-    const isTapToPlace = (0, placementStore_1.isTapToPlaceAsset)(asset);
-    // `world_placement` means the coordinates are a point in the world, not a
-    // camera-relative offset an author typed. The clamp below exists to stop an
-    // author putting an object inside the user's face, and it cannot tell the two
-    // apart: applied to a world coordinate it silently rewrites it to -2, which
-    // pins the object in front of the view. That reads as "the anchor does not
-    // stay fixed", and the only notice is the warning below.
-    const isWorldPlacement = !!asset
-        .world_placement;
-    let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
-    if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
-        console.warn(`[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`);
-        posZ = -2;
-    }
-    const position = [
-        asset.position_x ?? 0,
-        asset.position_y ?? 0,
-        posZ,
-    ];
+    const position = (0, assetPosition_1.studioAssetPosition)(asset);
     // A trigger image's orientation describes the uploaded FILE, not the surface
     // it is printed on and not a rotation for the content: it says where the top
     // of that file is, so a sideways or upside-down file is still recognised.

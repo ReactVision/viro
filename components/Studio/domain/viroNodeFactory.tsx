@@ -29,6 +29,7 @@ import {
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
+import { studioAssetPosition } from "./assetPosition";
 
 type SceneNavigator = any;
 
@@ -60,7 +61,6 @@ export type NodeConfig = {
   animation?: ViroAnimationProp;
 };
 
-/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 export function createNodeConfig(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
@@ -75,33 +75,7 @@ export function createNodeConfig(
   // one. Only the assets under the plane wrapper have it.
   dragSurface?: DragSurface | null
 ): NodeConfig {
-  const hasTriggerImage = !!asset.trigger_image_url;
-  // Tap-to-place stores the author position as an OFFSET from the runtime tap
-  // point (PlaceableNode adds it), so the camera-relative -2 default and the
-  // "too close" clamp — both meant for camera/plane assets — must not apply.
-  const isTapToPlace = isTapToPlaceAsset(asset);
-
-  // `world_placement` means the coordinates are a point in the world, not a
-  // camera-relative offset an author typed. The clamp below exists to stop an
-  // author putting an object inside the user's face, and it cannot tell the two
-  // apart: applied to a world coordinate it silently rewrites it to -2, which
-  // pins the object in front of the view. That reads as "the anchor does not
-  // stay fixed", and the only notice is the warning below.
-  const isWorldPlacement = !!(asset as { world_placement?: boolean })
-    .world_placement;
-  let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
-  if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
-    console.warn(
-      `[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`
-    );
-    posZ = -2;
-  }
-
-  const position: [number, number, number] = [
-    asset.position_x ?? 0,
-    asset.position_y ?? 0,
-    posZ,
-  ];
+  const position = studioAssetPosition(asset);
 
   // A trigger image's orientation describes the uploaded FILE, not the surface
   // it is printed on and not a rotation for the content: it says where the top

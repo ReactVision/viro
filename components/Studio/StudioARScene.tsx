@@ -47,6 +47,7 @@ import {
   isSameDragSurface,
 } from "./domain/dragConfiguration";
 import { createNode } from "./domain/viroNodeFactory";
+import { studioAssetPosition } from "./domain/assetPosition";
 import { defaultApiRequestExecutor } from "./domain/defaultApiRequestExecutor";
 import {
   executeOnLoadFunction,
@@ -56,6 +57,7 @@ import {
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
+import { isDev } from "./domain/utils";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
@@ -312,13 +314,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Position for a spatial PLAY: look up the placed target asset (matches the
-  // node factory's position derivation, position_z defaulting to -2).
+  // Position for a spatial PLAY: the target asset's mounted position, through
+  // the node factory's own rule so the sound and the object agree.
   const getAssetPosition = useCallback(
     (assetId: string): [number, number, number] | undefined => {
       const a = assets.find((x) => x.id === assetId);
-      if (!a) return undefined;
-      return [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2];
+      return a ? studioAssetPosition(a) : undefined;
     },
     [assets]
   );
@@ -932,9 +933,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     };
   }, [assets]);
 
-  const [urlToTargetName, setUrlToTargetName] = useState<Map<string, string>>(
-    () => new Map()
-  );
+  const [targetNameByAssetId, setTargetNameByAssetId] = useState<
+    Map<string, string>
+  >(() => new Map());
   const prevTargetNamesRef = useRef<string[]>([]);
 
   useEffect(() => {
@@ -949,13 +950,19 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     if (imageTriggeredAssets.length === 0) {
       cleanupTriggerImageTargets(prevTargetNamesRef.current);
       prevTargetNamesRef.current = [];
-      setUrlToTargetName(new Map());
+      setTargetNameByAssetId(new Map());
       return;
     }
     const map = registerTriggerImageTargets(imageTriggeredAssets);
-    const targetNames = [...map.values()];
+    // Assets sharing a picture share a target name, so delete each one once.
+    const targetNames = [...new Set(map.values())];
+    if (isDev()) {
+      console.log(
+        `[Studio] Registered ${targetNames.length} trigger target(s) for ${imageTriggeredAssets.length} placement(s): ${targetNames.join(", ")}`
+      );
+    }
     prevTargetNamesRef.current = targetNames;
-    setUrlToTargetName(map);
+    setTargetNameByAssetId(map);
     return () => {
       cleanupTriggerImageTargets(targetNames);
       prevTargetNamesRef.current = [];
@@ -1156,40 +1163,57 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     getGazeHandler,
   ]);
 
+  // One marker per target, carrying every asset on that image. The renderer
+  // attaches a detected anchor to a single marker node, so a second marker on
+  // the same target stays detached and its assets never appear.
   const renderedImageTriggeredAssets = useMemo(() => {
     if (isQuest) return [];
-    return imageTriggeredAssets
-      .map((asset) => {
-        const targetName = urlToTargetName.get(asset.trigger_image_url!);
-        if (!targetName) return null;
-        const node = createNode(
-          asset,
-          sceneNavigator,
-          animations,
-          scene,
-          (id, key) => triggerAnimationRef.current(id, key),
-          animationStates,
-          handleAssetLoaded,
-          getCollisionHandler(asset.id),
-          isDragActive,
-          notifyPhysicsDrag,
-          handleSceneChange,
-          runtimeCtx,
-          proximityTargetIds.has(asset.id)
-            ? registerProximityTarget
-            : undefined,
-          getGazeHandler(asset.id)
-        );
-        if (!node) return null;
-        return (
-          <ViroARImageMarker key={asset.id} target={targetName}>
-            {node}
-          </ViroARImageMarker>
-        );
-      })
-      .filter(Boolean) as React.ReactElement[];
+    const nodesByTarget = new Map<string, React.ReactElement[]>();
+    for (const asset of imageTriggeredAssets) {
+      const targetName = targetNameByAssetId.get(asset.id);
+      if (!targetName) continue;
+      const node = createNode(
+        asset,
+        sceneNavigator,
+        animations,
+        scene,
+        (id, key) => triggerAnimationRef.current(id, key),
+        animationStates,
+        handleAssetLoaded,
+        getCollisionHandler(asset.id),
+        isDragActive,
+        notifyPhysicsDrag,
+        handleSceneChange,
+        runtimeCtx,
+        proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined,
+        getGazeHandler(asset.id)
+      );
+      if (!node) continue;
+      const nodes = nodesByTarget.get(targetName);
+      if (nodes) nodes.push(node);
+      else nodesByTarget.set(targetName, [node]);
+    }
+    return [...nodesByTarget].map(([targetName, nodes]) => (
+      <ViroARImageMarker
+        key={targetName}
+        target={targetName}
+        // Whether the tracker ever recognised the picture is otherwise
+        // invisible, and it is the first thing to establish when content does
+        // not appear on a marker. The native side emits this event either way.
+        onAnchorFound={
+          isDev()
+            ? () =>
+                console.log(
+                  `[Studio] Trigger image "${targetName}" found, ${nodes.length} placement(s) on it`
+                )
+            : undefined
+        }
+      >
+        {nodes}
+      </ViroARImageMarker>
+    ));
   }, [
-    urlToTargetName,
+    targetNameByAssetId,
     imageTriggeredAssets,
     sceneNavigator,
     animations,

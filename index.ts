@@ -20,6 +20,8 @@ import { ViroAnimatedImage } from "./components/ViroAnimatedImage";
 import { ViroAmbientLight } from "./components/ViroAmbientLight";
 import { ViroAnimatedComponent } from "./components/ViroAnimatedComponent";
 import { ViroARCloudAnchor } from "./components/AR/ViroARCloudAnchor";
+import { ViroSharedFrame } from "./components/AR/ViroSharedFrame";
+import { cloudAnchorFrameSource } from "./components/AR/ViroFrameSource";
 import {
   parseLocationTransform,
   locationToWorld,
@@ -65,6 +67,14 @@ import { ViroCameraTexture } from "./components/ViroCameraTexture";
 export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
 export type { ViroMapCameraState, ViroMapCameraOptions } from "./components/useViroMapCamera";
 export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
+export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
+export type {
+  ViroFrameSource,
+  ViroFrameSupport,
+  ViroFrameOutcome,
+  ViroFrameSourceContext,
+  ViroSharedFrameValue,
+} from "./components/AR/ViroFrameSource";
 export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
 export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
@@ -217,6 +227,8 @@ AppRegistry.registerComponent("VRQuestScene", () => ViroQuestEntryPoint);
 
 export {
   ViroARCloudAnchor,
+  ViroSharedFrame,
+  cloudAnchorFrameSource,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

@@ -40,38 +40,16 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARCloudAnchor = void 0;
 const React = __importStar(require("react"));
-const ViroNode_1 = require("../ViroNode");
-const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+const ViroFrameSource_1 = require("./ViroFrameSource");
+const ViroSharedFrame_1 = require("./ViroSharedFrame");
 /**
- * Neither headset can localise a cloud anchor, for different reasons.
+ * Renders its children in a resolved cloud anchor's location frame.
  *
- * Quest: `VROARSessionOpenXR` stubs `hostCloudAnchor`/`resolveCloudAnchor` with
- * "Cloud anchors not supported on OpenXR", and more fundamentally it produces
- * no camera frame at all — SIFT has nothing to run on.
- *
- * visionOS: the whole AR subsystem is excluded from that renderer target (the
- * shipped `libViroKitVisionOS.a` contains zero `VROAR*` objects), and passthrough
- * camera access needs an enterprise entitlement Apple does not grant by default.
- *
- * Both are structural, not missing wiring, so this warns once and renders
- * nothing rather than leaving a resolve to fail confusingly a few seconds later.
- */
-const UNSUPPORTED_REASON = ViroPlatform_1.isQuest
-    ? "Meta Quest has no camera frames for the SIFT localiser and OpenXR stubs cloud anchors."
-    : ViroPlatform_1.isVisionOS
-        ? "visionOS builds exclude the AR subsystem, and passthrough camera access needs an enterprise entitlement."
-        : null;
-/**
- * Renders its children in a resolved cloud anchor's **location frame**.
- *
- * This is the co-location primitive. Two devices that mount this with the same
- * `cloudAnchorId` in the same physical space put their children in the same
- * real-world place, because both frames are recovered from the same hosted map.
- *
- * Children are positioned by the scene graph, so a child at `[0, 0, -1]` is one
- * metre in front of the frame origin on every device — no per-app coordinate
- * maths, and nothing that depends on where a given session happened to start
- * tracking.
+ * Two devices that mount this with the same `cloudAnchorId` in the same
+ * physical space put their children in the same real-world place, because both
+ * frames are recovered from the same hosted map. A child at `[0, 0, -1]` is one
+ * metre in front of the frame origin on every device — no coordinate maths in
+ * app code.
  *
  * ```tsx
  * <ViroARCloudAnchor
@@ -82,77 +60,28 @@ const UNSUPPORTED_REASON = ViroPlatform_1.isQuest
  *   <ViroBox position={[0, 0, -1]} scale={[0.2, 0.2, 0.2]} />
  * </ViroARCloudAnchor>
  * ```
+ *
+ * This is `<ViroSharedFrame>` with the cloud-anchor source pre-selected. On a
+ * headset, use the platform's own source instead — cloud anchors are
+ * unsupported there and this reports `ErrorNotSupported` rather than failing
+ * slowly. See `ViroFrameSource`.
  */
 class ViroARCloudAnchor extends React.Component {
-    state = { anchor: null };
-    // Resolve is async and the component can unmount mid-flight — a resolve keeps
-    // retrying every AR frame until it localises or the window expires, so this is
-    // a real window, not a theoretical one.
-    _mounted = false;
-    static _unsupportedWarningLogged = false;
-    componentDidMount() {
-        if (UNSUPPORTED_REASON) {
-            if (!ViroARCloudAnchor._unsupportedWarningLogged) {
-                console.warn(`[Viro] ViroARCloudAnchor is not supported on this platform. ${UNSUPPORTED_REASON}`);
-                ViroARCloudAnchor._unsupportedWarningLogged = true;
-            }
-            this.props.onLocalizeError?.(UNSUPPORTED_REASON, "ErrorNotSupported");
-            return;
+    // Rebuilt only when the id changes: the source is compared by `key`, so a new
+    // object every render would restart acquisition on each parent update.
+    _source = (0, ViroFrameSource_1.cloudAnchorFrameSource)(this.props.cloudAnchorId);
+    _sourceId = this.props.cloudAnchorId;
+    get source() {
+        if (this._sourceId !== this.props.cloudAnchorId) {
+            this._sourceId = this.props.cloudAnchorId;
+            this._source = (0, ViroFrameSource_1.cloudAnchorFrameSource)(this.props.cloudAnchorId);
         }
-        this._mounted = true;
-        this._resolve();
+        return this._source;
     }
-    componentDidUpdate(prev) {
-        if (prev.cloudAnchorId !== this.props.cloudAnchorId) {
-            this.setState({ anchor: null });
-            this._resolve();
-        }
-    }
-    componentWillUnmount() {
-        this._mounted = false;
-    }
-    _resolve = async () => {
-        const { cloudAnchorId, arSceneNavigator } = this.props;
-        if (!cloudAnchorId || !arSceneNavigator)
-            return;
-        const requested = cloudAnchorId;
-        let result;
-        try {
-            result = await arSceneNavigator.resolveCloudAnchor(cloudAnchorId);
-        }
-        catch (e) {
-            if (this._mounted && requested === this.props.cloudAnchorId) {
-                this.props.onLocalizeError?.(e?.message ?? String(e), "ErrorInternal");
-            }
-            return;
-        }
-        // Ignore a resolve that landed after unmount, or after cloudAnchorId moved on.
-        if (!this._mounted || requested !== this.props.cloudAnchorId)
-            return;
-        if (!result?.success || !result.anchor) {
-            this.props.onLocalizeError?.(result?.error ?? "Resolve failed", result?.state);
-            return;
-        }
-        const anchor = result.anchor;
-        this.setState({ anchor });
-        this.props.onLocalized?.({
-            cloudAnchorId: anchor.cloudAnchorId ?? requested,
-            position: anchor.position,
-            rotation: anchor.rotation,
-            scale: anchor.scale,
-            transform: anchor.resolvedTransform ?? "",
-        });
-    };
     render() {
-        if (UNSUPPORTED_REASON)
-            return null;
-        const { anchor } = this.state;
-        if (!anchor) {
-            return this.props.placeholder ? <ViroNode_1.ViroNode>{this.props.placeholder}</ViroNode_1.ViroNode> : null;
-        }
-        return (<ViroNode_1.ViroNode position={anchor.position} rotation={anchor.rotation} scale={anchor.scale}>
+        return (<ViroSharedFrame_1.ViroSharedFrame source={this.source} arSceneNavigator={this.props.arSceneNavigator} onLocalized={this.props.onLocalized} onLocalizeError={this.props.onLocalizeError} placeholder={this.props.placeholder}>
         {this.props.children}
-      </ViroNode_1.ViroNode>);
+      </ViroSharedFrame_1.ViroSharedFrame>);
     }
 }
 exports.ViroARCloudAnchor = ViroARCloudAnchor;

@@ -60,7 +60,13 @@ Pod::Spec.new do |s|
   # alone pulls in <vector>), which cannot parse that way. VRORendererBridge.h is the one header
   # Swift actually needs and the one that is pure Objective-C. Everything else stays reachable as
   # a private header, which is how the pod's own .mm files consume it anyway.
-  s.visionos.public_header_files = ['ViroReact/VisionOS/VRORendererBridge.h']
+  # VROSharedSpaceBridge joins it: the Swift shared-space provider lives in
+  # ViroReactUI and has to reach back into this pod, so its header must be
+  # public too. Like VRORendererBridge.h it is deliberately pure Objective-C.
+  s.visionos.public_header_files = [
+    'ViroReact/VisionOS/VRORendererBridge.h',
+    'ViroReact/VisionOS/VROSharedSpaceBridge.h',
+  ]
 
   # iOS: exclude all VisionOS-only files (CompositorServices, Metal render loop, SwiftUI types).
   ios_exclude_files = ['ViroReact/VisionOS/**/*']

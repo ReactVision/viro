@@ -31,6 +31,7 @@
 
 import ARKit
 import Foundation
+import ViroReact
 
 @available(visionOS 2.0, *)
 @objc(ViroSharedSpace)
@@ -65,6 +66,13 @@ public final class ViroSharedSpace: NSObject {
     @objc public func start() {
         guard SharedCoordinateSpaceProvider.isSupported, eventTask == nil else { return }
 
+        // Publish downwards: ViroReact cannot see into this pod, so the module
+        // that JS talks to reads state and handlers from the ObjC side.
+        let bridge = VROSharedSpaceBridge.shared
+        bridge.supported = true
+        bridge.nextOutgoingHandler = { [weak self] in self?.nextOutgoingData() }
+        bridge.pushIncomingHandler = { [weak self] data in self?.pushIncoming(data) }
+
         eventTask = Task { [weak self] in
             guard let self else { return }
             for await event in self.provider.eventUpdates {
@@ -88,6 +96,7 @@ public final class ViroSharedSpace: NSObject {
         eventTask = nil
         isSharing = false
         participantCount = 0
+        VROSharedSpaceBridge.shared.reset()
     }
 
     /// Alignment data to deliver to the other participants, or nil when there is
@@ -109,6 +118,8 @@ public final class ViroSharedSpace: NSObject {
     private func update(sharing: Bool, participants: Int) {
         isSharing = sharing
         participantCount = participants
+        VROSharedSpaceBridge.shared.sharing = sharing
+        VROSharedSpaceBridge.shared.participantCount = participants
         onStateChange?(sharing, participants)
     }
 }

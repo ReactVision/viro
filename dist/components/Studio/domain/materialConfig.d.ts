@@ -35,6 +35,7 @@ export type MaterialConfig = {
     }>;
     transparencyMode?: string;
     cullMode?: string;
+    writesToDepthBuffer?: boolean;
 };
 export type ViroMaterialDefinition = Record<string, unknown>;
 export declare function materialConfigNeedsTimeUniform(config: MaterialConfig): boolean;

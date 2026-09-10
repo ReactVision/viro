@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- **`<ViroARCloudAnchor>` — co-located AR.** Renders its children in a resolved cloud anchor's *location frame*, which is the shared coordinate frame two devices in the same space can agree on. Mount it with the same `cloudAnchorId` on both devices and a child at `[0, 0, -1]` is the same physical metre on each, with no coordinate maths in app code — previously `resolveCloudAnchor()` returned position/rotation/scale and no scene node, leaving every app to redo the frame arithmetic itself. Fires `onLocalized` once the frame exists, and `onLocalizeError` when localisation fails or times out.
+- **Location-frame conversion helpers**: `parseLocationTransform`, `locationToWorld`, `worldToLocation`, `invertTransform`. World coordinates are per-session — each AR session picks its origin wherever tracking started — so anything two devices exchange has to travel as location-frame coordinates and be converted on arrival. **Send frame coordinates, never world coordinates.**
+
 ### Fixed
 
 - **Quest builds failed Meta Horizon Store validation on Expo projects.** Two checks the plugin meant to handle never did. The `targetSdkVersion` cap rewrote `app/build.gradle`, but Expo's template resolves targetSdk from `gradle.properties` through `rootProject.ext`, so nothing matched and the APK shipped with targetSdk 36. The GLES `uses-feature` was declared `required="false"`, which the store validator does not count as a graphics API. When `xRMode` includes `"QUEST"`, the plugin now writes `android.targetSdkVersion=34` to `gradle.properties` (only ever lowering it; `android.questTargetSdkVersion` overrides the ceiling) and declares GLES 3.0 as required. Phone-only builds are unchanged.

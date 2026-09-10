@@ -19,6 +19,13 @@ import { Viro360Video } from "./components/Viro360Video";
 import { ViroAnimatedImage } from "./components/ViroAnimatedImage";
 import { ViroAmbientLight } from "./components/ViroAmbientLight";
 import { ViroAnimatedComponent } from "./components/ViroAnimatedComponent";
+import { ViroARCloudAnchor } from "./components/AR/ViroARCloudAnchor";
+import {
+  parseLocationTransform,
+  locationToWorld,
+  worldToLocation,
+  invertTransform,
+} from "./components/AR/ViroLocationFrame";
 import { ViroARImageMarker } from "./components/AR/ViroARImageMarker";
 import { ViroARObjectMarker } from "./components/AR/ViroARObjectMarker";
 import { ViroARTrackingTargets } from "./components/AR/ViroARTrackingTargets";
@@ -57,6 +64,8 @@ import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroCameraTexture } from "./components/ViroCameraTexture";
 export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
 export type { ViroMapCameraState, ViroMapCameraOptions } from "./components/useViroMapCamera";
+export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
+export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
 export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
@@ -207,6 +216,7 @@ import { AppRegistry } from "react-native";
 AppRegistry.registerComponent("VRQuestScene", () => ViroQuestEntryPoint);
 
 export {
+  ViroARCloudAnchor,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,
@@ -222,6 +232,10 @@ export {
   ViroVirtualButton,
   ViroGameLoop,
   ViroGameLoopUtils,
+  parseLocationTransform,
+  locationToWorld,
+  worldToLocation,
+  invertTransform,
   useViroMapCamera,
   viroMapCameraTransform,
   useGameLoop,

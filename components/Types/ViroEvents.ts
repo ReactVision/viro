@@ -573,6 +573,24 @@ export type ViroResolveCloudAnchorResult = {
 };
 
 /**
+ * Fired by `<ViroARCloudAnchor>` once a cloud anchor has localised and its
+ * location frame is established.
+ *
+ * `transform` is the same opaque token as `ViroCloudAnchor.resolvedTransform`.
+ * Feed it to `parseLocationTransform()` when converting coordinates for another
+ * device, or pass it straight into `loadWorldMeshFromFile()` for a mesh.
+ */
+export type ViroLocalizedEvent = {
+  cloudAnchorId: string;
+  /** Frame origin in this session's world coordinates. */
+  position: [number, number, number];
+  /** Frame orientation, Euler degrees. */
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  transform: string;
+};
+
+/**
  * Event fired when a cloud anchor state changes.
  */
 export type ViroCloudAnchorStateChangeEvent = {

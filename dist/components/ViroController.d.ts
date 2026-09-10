@@ -11,18 +11,18 @@ type Props = ViroCommonProps & ViroObjectProps & {
 };
 export declare class ViroController extends React.Component<Props> {
     _component: ViroNativeRef;
-    _onClick(event: NativeSyntheticEvent<ViroClickEvent>): void;
-    _onClickState(event: NativeSyntheticEvent<ViroClickStateEvent>): void;
-    _onTouch(event: NativeSyntheticEvent<ViroTouchEvent>): void;
-    _onScroll(event: NativeSyntheticEvent<ViroScrollEvent>): void;
-    _onSwipe(event: NativeSyntheticEvent<ViroSwipeEvent>): void;
-    _onControllerStatus(event: NativeSyntheticEvent<ViroControllerStatusEvent>): void;
+    _onClick: (event: NativeSyntheticEvent<ViroClickEvent>) => void;
+    _onClickState: (event: NativeSyntheticEvent<ViroClickStateEvent>) => void;
+    _onTouch: (event: NativeSyntheticEvent<ViroTouchEvent>) => void;
+    _onScroll: (event: NativeSyntheticEvent<ViroScrollEvent>) => void;
+    _onSwipe: (event: NativeSyntheticEvent<ViroSwipeEvent>) => void;
+    _onControllerStatus: (event: NativeSyntheticEvent<ViroControllerStatusEvent>) => void;
     _onFuse: (event: NativeSyntheticEvent<ViroFuseEvent>) => void;
-    _onPinch(event: NativeSyntheticEvent<ViroPinchEvent>): void;
-    _onRotate(event: NativeSyntheticEvent<ViroRotateEvent>): void;
+    _onPinch: (event: NativeSyntheticEvent<ViroPinchEvent>) => void;
+    _onRotate: (event: NativeSyntheticEvent<ViroRotateEvent>) => void;
     getControllerForwardAsync(): Promise<any>;
     setNativeProps(nativeProps: Props): void;
-    _onDrag(event: NativeSyntheticEvent<ViroDragEvent>): void;
+    _onDrag: (event: NativeSyntheticEvent<ViroDragEvent>) => void;
     render(): React.JSX.Element;
 }
 export {};

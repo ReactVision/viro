@@ -22,6 +22,15 @@ import { ViroAnimatedComponent } from "./components/ViroAnimatedComponent";
 import { ViroARCloudAnchor } from "./components/AR/ViroARCloudAnchor";
 import { ViroSharedFrame } from "./components/AR/ViroSharedFrame";
 import {
+  isColocationAvailable,
+  joinColocation,
+  leaveColocation,
+  setColocationLocalPose,
+  getColocationState,
+  getColocationPeers,
+} from "./components/AR/ViroColocation";
+import { useViroColocation } from "./components/hooks/useViroColocation";
+import {
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
   visionOSSharedSpaceFrameSource,
@@ -72,6 +81,16 @@ export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/Viro
 export type { ViroMapCameraState, ViroMapCameraOptions } from "./components/useViroMapCamera";
 export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
 export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
+export type {
+  ViroColocationState,
+  ViroColocationPeer,
+  ViroColocationConfig,
+  ViroColocationJoinResult,
+} from "./components/AR/ViroColocation";
+export type {
+  UseViroColocationResult,
+  UseViroColocationOptions,
+} from "./components/hooks/useViroColocation";
 export type {
   ViroFrameSource,
   ViroFrameSupport,
@@ -235,6 +254,13 @@ export {
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
   visionOSSharedSpaceFrameSource,
+  isColocationAvailable,
+  joinColocation,
+  leaveColocation,
+  setColocationLocalPose,
+  getColocationState,
+  getColocationPeers,
+  useViroColocation,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

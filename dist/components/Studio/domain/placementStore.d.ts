@@ -46,9 +46,9 @@ export declare class StudioPlacementStore {
     /**
      * Author rotation (Euler degrees) composed with the full tap-time camera
      * orientation, so the asset is oriented exactly as authored relative to how the
-     * user was looking (R = camera · author, decomposed back to Viro's X-Y-Z Euler).
-     * Falls back to the author rotation when no basis was captured. Undefined until
-     * placed.
+     * user was looking (R = camera · author, decomposed back to the euler triple
+     * the renderer reads). Falls back to the author rotation when no basis was
+     * captured. Undefined until placed.
      */
     resolvePlacedRotation(assetId: string, rotation: Vec3): Vec3 | undefined;
     /** First still-unplaced asset in seed order, or null once all are placed. */

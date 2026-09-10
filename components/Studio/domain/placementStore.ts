@@ -35,8 +35,13 @@ function byPlacementOrder(assets: StudioAsset[]): StudioAsset[] {
 // ─── Tap-time orientation math ──────────────────────────────────────────────
 // A placed asset's author position/rotation are expressed in the FULL camera
 // basis at the moment of the tap (pitch and roll included), so the placement
-// lands exactly as authored relative to where the user was looking. Rotations
-// use Viro's Euler convention: R = Rx·Ry·Rz, X-Y-Z order (VROMatrix4f).
+// lands exactly as authored relative to where the user was looking.
+//
+// Rotations compose the way the renderer applies a node's euler triple, R =
+// Rz·Ry·Rx: X first, then Y, then Z, about the fixed world axes. Composing them
+// in the opposite order and handing the result to a renderer that reads it this
+// way turns the same numbers into a different orientation, and only agrees when
+// two of the three angles are zero, which is why a level camera looked right.
 
 type Mat3 = [Vec3, Vec3, Vec3]; // row-major
 const DEG = 180 / Math.PI;
@@ -77,36 +82,37 @@ function multiplyMat(a: Mat3, b: Mat3): Mat3 {
   return r;
 }
 
-/** Rotation matrix for an Euler triple (degrees), R = Rx·Ry·Rz. */
+/** Rotation matrix for an Euler triple (degrees), R = Rz·Ry·Rx. */
 function eulerToMat(deg: Vec3): Mat3 {
-  const ca = Math.cos(deg[0] * RAD),
-    sa = Math.sin(deg[0] * RAD);
-  const cb = Math.cos(deg[1] * RAD),
-    sb = Math.sin(deg[1] * RAD);
-  const cc = Math.cos(deg[2] * RAD),
-    sc = Math.sin(deg[2] * RAD);
+  const cx = Math.cos(deg[0] * RAD),
+    sx = Math.sin(deg[0] * RAD);
+  const cy = Math.cos(deg[1] * RAD),
+    sy = Math.sin(deg[1] * RAD);
+  const cz = Math.cos(deg[2] * RAD),
+    sz = Math.sin(deg[2] * RAD);
   return [
-    [cb * cc, -cb * sc, sb],
-    [ca * sc + sa * sb * cc, ca * cc - sa * sb * sc, -sa * cb],
-    [sa * sc - ca * sb * cc, sa * cc + ca * sb * sc, ca * cb],
+    [cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx],
+    [sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx],
+    [-sy, cy * sx, cy * cx],
   ];
 }
 
-/** Inverse of eulerToMat: recover the Euler triple (degrees) from R = Rx·Ry·Rz. */
+/** Inverse of eulerToMat: recover the Euler triple (degrees) from R = Rz·Ry·Rx. */
 function matToEuler(m: Mat3): Vec3 {
-  const sb = Math.max(-1, Math.min(1, m[0][2]));
-  const b = Math.asin(sb);
-  let a: number;
-  let c: number;
-  if (Math.abs(m[0][2]) < 1 - 1e-6) {
-    a = Math.atan2(-m[1][2], m[2][2]);
-    c = Math.atan2(-m[0][1], m[0][0]);
+  const cy = Math.hypot(m[0][0], m[1][0]);
+  const y = Math.atan2(-m[2][0], cy);
+  let x: number;
+  let z: number;
+  if (cy > 1e-6) {
+    x = Math.atan2(m[2][1], m[2][2]);
+    z = Math.atan2(m[1][0], m[0][0]);
   } else {
-    // Gimbal lock (ry = ±90°): fold the roll into c = 0.
-    c = 0;
-    a = m[0][2] > 0 ? Math.atan2(m[1][0], m[1][1]) : Math.atan2(-m[1][0], m[1][1]);
+    // Gimbal lock (ry = ±90°): X and Z turn about the same axis, so fold them
+    // into Z, which is where VROQuaternion::toEuler puts them too.
+    x = 0;
+    z = Math.atan2(-m[0][1], m[1][1]);
   }
-  return [a * DEG, b * DEG, c * DEG];
+  return [x * DEG, y * DEG, z * DEG];
 }
 
 /**
@@ -205,9 +211,9 @@ export class StudioPlacementStore {
   /**
    * Author rotation (Euler degrees) composed with the full tap-time camera
    * orientation, so the asset is oriented exactly as authored relative to how the
-   * user was looking (R = camera · author, decomposed back to Viro's X-Y-Z Euler).
-   * Falls back to the author rotation when no basis was captured. Undefined until
-   * placed.
+   * user was looking (R = camera · author, decomposed back to the euler triple
+   * the renderer reads). Falls back to the author rotation when no basis was
+   * captured. Undefined until placed.
    */
   resolvePlacedRotation(assetId: string, rotation: Vec3): Vec3 | undefined {
     if (!this.positions.has(assetId)) return undefined;

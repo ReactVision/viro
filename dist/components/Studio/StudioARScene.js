@@ -53,6 +53,7 @@ const collisionPairKey_1 = require("./domain/collisionPairKey");
 const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const gazeBindingsRuntime_1 = require("./domain/gazeBindingsRuntime");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
+const dragConfiguration_1 = require("./domain/dragConfiguration");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
 const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
@@ -652,6 +653,28 @@ const StudioARSceneInner = (props) => {
     (0, react_1.useEffect)(() => {
         onReady?.();
     }, []);
+    // ─── Drag surface ─────────────────────────────────────────────────────────
+    // A FixedToPlane drag is confined to a world plane, so a draggable asset
+    // needs the plane its anchor actually found: guessing an axis from
+    // plane_direction drags content off any wall not facing world Z. Only the
+    // plane-wrapped assets are anchored to it, and only their own anchor will do,
+    // since a scene can detect several walls at once.
+    const hasPlaneDrag = (0, react_1.useMemo)(() => planeAssets.some((asset) => asset.is_draggable), [planeAssets]);
+    const [dragSurface, setDragSurface] = (0, react_1.useState)(null);
+    const selectedAnchorIdRef = (0, react_1.useRef)(null);
+    const trackDragSurface = (0, react_1.useCallback)((anchor) => {
+        if (!hasPlaneDrag || !anchor?.position || !anchor?.rotation)
+            return;
+        const next = (0, dragConfiguration_1.dragSurfaceFromAnchor)(anchor.position, anchor.rotation);
+        // The session refines a plane continuously, mostly by sliding the anchor
+        // around inside the surface, which does not move the plane at all. Keep
+        // the previous object in that case or every update re-renders the scene.
+        setDragSurface((prev) => prev && (0, dragConfiguration_1.isSameDragSurface)(prev, next) ? prev : next);
+    }, [hasPlaneDrag]);
+    (0, react_1.useEffect)(() => {
+        setDragSurface(null);
+        selectedAnchorIdRef.current = null;
+    }, [scene.id]);
     // ─── Render helpers ───────────────────────────────────────────────────────
     const maxModels = react_native_1.Platform.OS === "android" ? ANDROID_MAX_3D_MODELS : IOS_MAX_3D_MODELS;
     const renderedPlaneAssets = (0, react_1.useMemo)(() => {
@@ -667,11 +690,12 @@ const StudioARSceneInner = (props) => {
             }
             return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
                 ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id));
+                : undefined, getGazeHandler(asset.id), dragSurface);
         })
             .filter(Boolean);
     }, [
         planeAssets,
+        dragSurface,
         sceneNavigator,
         animations,
         animationStates,
@@ -800,13 +824,16 @@ const StudioARSceneInner = (props) => {
         try {
             if (planeDetectionMode === "MANUAL") {
                 planeSelectorRef.current?.handleAnchorUpdated(anchor);
+                if (anchor?.anchorId === selectedAnchorIdRef.current) {
+                    trackDragSurface(anchor);
+                }
             }
             refreshAllTargetTransforms();
         }
         catch (error) {
             console.error("[Studio] handleAnchorUpdated failed:", error);
         }
-    }, [planeDetectionMode, refreshAllTargetTransforms]);
+    }, [planeDetectionMode, refreshAllTargetTransforms, trackDragSurface]);
     const handleAnchorRemoved = (0, react_1.useCallback)((anchor) => {
         try {
             if (planeDetectionMode === "MANUAL" && anchor) {
@@ -817,9 +844,11 @@ const StudioARSceneInner = (props) => {
             console.error("[Studio] handleAnchorRemoved failed:", error);
         }
     }, [planeDetectionMode]);
-    const handlePlaneSelected = (0, react_1.useCallback)(() => {
+    const handlePlaneSelected = (0, react_1.useCallback)((plane) => {
+        selectedAnchorIdRef.current = plane?.anchorId ?? null;
+        trackDragSurface(plane);
         onPlaneSelected?.();
-    }, [onPlaneSelected]);
+    }, [onPlaneSelected, trackDragSurface]);
     // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
     const handlePlaneDetectedForSelector = (0, react_1.useCallback)(() => {
         onPlaneDetected?.();
@@ -833,7 +862,7 @@ const StudioARSceneInner = (props) => {
             return <>{renderedPlaneAssets}</>;
         }
         if (planeDetectionMode === "AUTOMATIC") {
-            return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment}>
+            return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={trackDragSurface} onAnchorUpdated={trackDragSurface}>
           {renderedPlaneAssets}
         </ViroARPlane_1.ViroARPlane>);
         }

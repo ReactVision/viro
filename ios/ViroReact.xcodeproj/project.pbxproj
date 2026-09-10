@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D1A0010000000000000000B2 /* RVStudioWatermarkState.mm in Sources */ = {isa = PBXBuildFile; fileRef = D1A0010000000000000000A2 /* RVStudioWatermarkState.mm */; };
 		0BE6354440D5435F9D252A94 /* VRTStreamingAudioModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = C702A11D127A4B21B0BD482E /* VRTStreamingAudioModule.mm */; };
 		0CC0B5D4555D4AD9BB9C6A84 /* VRTCameraTexture.mm in Sources */ = {isa = PBXBuildFile; fileRef = A0549ED8CB564EB0A6BFC513 /* VRTCameraTexture.mm */; };
 		133FE28B206EE35300FB6F34 /* VRTVRSceneNavigatorManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 133FE28A206EE35300FB6F34 /* VRTVRSceneNavigatorManager.mm */; };
@@ -226,6 +225,7 @@
 		A5E8F0AC1ED6B64E00729916 /* VRTSceneModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5E8F0A81ED6B64D00729916 /* VRTSceneModule.mm */; };
 		A5F6D4011E4B0DFF00655F60 /* VRTController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5F6D4001E4B0DFF00655F60 /* VRTController.mm */; };
 		A5F6D4051E4B179700655F60 /* VRTControllerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = A5F6D4041E4B179700655F60 /* VRTControllerManager.mm */; };
+		D1A0010000000000000000B2 /* RVStudioWatermarkState.mm in Sources */ = {isa = PBXBuildFile; fileRef = D1A0010000000000000000A2 /* RVStudioWatermarkState.mm */; };
 		D4AB408111BB4BD180017D7A /* VRTCameraTextureManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 59F2ABC13A6A45E0A96EA94E /* VRTCameraTextureManager.h */; };
 		E139A8EB2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
 		E139A8EC2E0B9C6A0050EC9A /* BuildFile in Sources */ = {isa = PBXBuildFile; };
@@ -907,8 +907,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		D1A0010000000000000000A1 /* RVStudioWatermarkState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RVStudioWatermarkState.h; path = ViroReact/Modules/RVStudioWatermarkState.h; sourceTree = "<group>"; };
-		D1A0010000000000000000A2 /* RVStudioWatermarkState.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = RVStudioWatermarkState.mm; path = ViroReact/Modules/RVStudioWatermarkState.mm; sourceTree = "<group>"; };
 		08AC1A55DE3440AA88215308 /* VRTStreamingAudioModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTStreamingAudioModule.h; path = ViroReact/Modules/VRTStreamingAudioModule.h; sourceTree = "<group>"; };
 		133FE284206EE2FC00FB6F34 /* VRTVRSceneNavigatorManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VRTVRSceneNavigatorManager.h; sourceTree = "<group>"; };
 		133FE28A206EE35300FB6F34 /* VRTVRSceneNavigatorManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = VRTVRSceneNavigatorManager.mm; sourceTree = "<group>"; };
@@ -1159,6 +1157,7 @@
 		B23F778D18583A1428591854 /* Pods-ViroReact.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ViroReact.release.xcconfig"; path = "Pods/Target Support Files/Pods-ViroReact/Pods-ViroReact.release.xcconfig"; sourceTree = "<group>"; };
 		C702A11D127A4B21B0BD482E /* VRTStreamingAudioModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTStreamingAudioModule.mm; path = ViroReact/Modules/VRTStreamingAudioModule.mm; sourceTree = "<group>"; };
 		CAB21D4BF1444EEDB020B69C /* VRTCameraTextureModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTCameraTextureModule.mm; path = ViroReact/VRTCameraTextureModule.mm; sourceTree = "<group>"; };
+		D1A0010000000000000000A2 /* RVStudioWatermarkState.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = RVStudioWatermarkState.mm; path = ViroReact/Modules/RVStudioWatermarkState.mm; sourceTree = "<group>"; };
 		E1BD618B2FBBEC56008FDF74 /* VRTVirtualJoystickView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTVirtualJoystickView.h; path = ViroReact/Views/VRTVirtualJoystickView.h; sourceTree = "<group>"; };
 		E1BD618C2FBBEC56008FDF74 /* VRTVirtualJoystickView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTVirtualJoystickView.mm; path = ViroReact/Views/VRTVirtualJoystickView.mm; sourceTree = "<group>"; };
 		E1BD618D2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTVirtualJoystickViewManager.h; path = ViroReact/Views/VRTVirtualJoystickViewManager.h; sourceTree = "<group>"; };

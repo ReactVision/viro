@@ -29,6 +29,11 @@ import {
   cleanupTriggerImageTargets,
   registerTriggerImageTargets,
 } from "./domain/triggerImageRegistry";
+import {
+  type DragSurface,
+  dragSurfaceFromAnchor,
+  isSameDragSurface,
+} from "./domain/dragConfiguration";
 import { createNode } from "./domain/viroNodeFactory";
 import { defaultApiRequestExecutor } from "./domain/defaultApiRequestExecutor";
 import {
@@ -847,6 +852,38 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     onReady?.();
   }, []);
 
+  // ─── Drag surface ─────────────────────────────────────────────────────────
+  // A FixedToPlane drag is confined to a world plane, so a draggable asset
+  // needs the plane its anchor actually found: guessing an axis from
+  // plane_direction drags content off any wall not facing world Z. Only the
+  // plane-wrapped assets are anchored to it, and only their own anchor will do,
+  // since a scene can detect several walls at once.
+  const hasPlaneDrag = useMemo(
+    () => planeAssets.some((asset) => asset.is_draggable),
+    [planeAssets]
+  );
+  const [dragSurface, setDragSurface] = useState<DragSurface | null>(null);
+  const selectedAnchorIdRef = useRef<string | null>(null);
+
+  const trackDragSurface = useCallback(
+    (anchor: ViroAnchor) => {
+      if (!hasPlaneDrag || !anchor?.position || !anchor?.rotation) return;
+      const next = dragSurfaceFromAnchor(anchor.position, anchor.rotation);
+      // The session refines a plane continuously, mostly by sliding the anchor
+      // around inside the surface, which does not move the plane at all. Keep
+      // the previous object in that case or every update re-renders the scene.
+      setDragSurface((prev) =>
+        prev && isSameDragSurface(prev, next) ? prev : next
+      );
+    },
+    [hasPlaneDrag]
+  );
+
+  useEffect(() => {
+    setDragSurface(null);
+    selectedAnchorIdRef.current = null;
+  }, [scene.id]);
+
   // ─── Render helpers ───────────────────────────────────────────────────────
   const maxModels =
     Platform.OS === "android" ? ANDROID_MAX_3D_MODELS : IOS_MAX_3D_MODELS;
@@ -880,12 +917,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           proximityTargetIds.has(asset.id)
             ? registerProximityTarget
             : undefined,
-          getGazeHandler(asset.id)
+          getGazeHandler(asset.id),
+          dragSurface
         );
       })
       .filter(Boolean) as React.ReactElement[];
   }, [
     planeAssets,
+    dragSurface,
     sceneNavigator,
     animations,
     animationStates,
@@ -1057,13 +1096,16 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       try {
         if (planeDetectionMode === "MANUAL") {
           planeSelectorRef.current?.handleAnchorUpdated(anchor);
+          if (anchor?.anchorId === selectedAnchorIdRef.current) {
+            trackDragSurface(anchor);
+          }
         }
         refreshAllTargetTransforms();
       } catch (error) {
         console.error("[Studio] handleAnchorUpdated failed:", error);
       }
     },
-    [planeDetectionMode, refreshAllTargetTransforms]
+    [planeDetectionMode, refreshAllTargetTransforms, trackDragSurface]
   );
 
   const handleAnchorRemoved = useCallback(
@@ -1079,9 +1121,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     [planeDetectionMode]
   );
 
-  const handlePlaneSelected = useCallback(() => {
-    onPlaneSelected?.();
-  }, [onPlaneSelected]);
+  const handlePlaneSelected = useCallback(
+    (plane: ViroAnchor) => {
+      selectedAnchorIdRef.current = plane?.anchorId ?? null;
+      trackDragSurface(plane);
+      onPlaneSelected?.();
+    },
+    [onPlaneSelected, trackDragSurface]
+  );
 
   // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
   const handlePlaneDetectedForSelector = useCallback(() => {
@@ -1101,7 +1148,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
 
     if (planeDetectionMode === "AUTOMATIC") {
       return (
-        <ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment}>
+        <ViroARPlane
+          minHeight={0.1}
+          minWidth={0.1}
+          alignment={planeAlignment}
+          onAnchorFound={trackDragSurface}
+          onAnchorUpdated={trackDragSurface}
+        >
           {renderedPlaneAssets}
         </ViroARPlane>
       );

@@ -48,7 +48,10 @@ const dragConfiguration_1 = require("./dragConfiguration");
 const physicsConfig_1 = require("./physicsConfig");
 const placementStore_1 = require("./placementStore");
 /** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
-function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx) {
+function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, 
+// The detected plane this asset is anchored to, once the session has found
+// one. Only the assets under the plane wrapper have it.
+dragSurface) {
     const hasTriggerImage = !!asset.trigger_image_url;
     // Tap-to-place stores the author position as an OFFSET from the runtime tap
     // point (PlaceableNode adds it), so the camera-relative -2 default and the
@@ -101,7 +104,7 @@ function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationT
     const dragType = dragConfiguration_1.DragConfiguration.getDragType(asset, scene);
     let dragPlane;
     if (dragType === "FixedToPlane") {
-        dragPlane = dragConfiguration_1.DragConfiguration.getDragPlane(scene?.plane_direction ?? "Horizontal", position);
+        dragPlane = dragConfiguration_1.DragConfiguration.getDragPlane(scene?.plane_direction ?? "Horizontal", position, dragSurface);
     }
     // Both the body and its collision tag hang off the scene's physics switch
     // (isPhysicsWorldEnabled), which is what the Studio UI, its editor preview and
@@ -326,9 +329,11 @@ function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger
 // can read its world transform for the distance check.
 registerProximityTarget, 
 // When set (gaze-target assets on a headset), the node's native onGaze handler.
-onGaze) {
+onGaze, 
+// See createNodeConfig.
+dragSurface) {
     const type = resolveType(asset);
-    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx);
+    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, dragSurface);
     config.onGaze = onGaze;
     const proximityRef = registerProximityTarget
         ? (ref) => registerProximityTarget(asset.id, ref)

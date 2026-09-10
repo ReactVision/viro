@@ -49,6 +49,8 @@ public:
     VROInputPresenter() : VROThreadRestricted(VROThreadName::Renderer) {
         _reticle = nullptr;
         _rootNode = std::make_shared<VRONode>();
+        // Presenter geometry (lasers, controller models) is never a hit target.
+        _rootNode->setSelectable(false);
     }
 
     ~VROInputPresenter() {}

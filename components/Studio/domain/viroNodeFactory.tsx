@@ -19,7 +19,7 @@ import {
   interpolateDisplayTemplate,
 } from "./apiRequestHelpers";
 import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
-import { DragConfiguration } from "./dragConfiguration";
+import { DragConfiguration, type DragSurface } from "./dragConfiguration";
 import {
   buildViroPhysicsBody,
   isPhysicsWorldEnabled,
@@ -70,7 +70,10 @@ export function createNodeConfig(
   animationStates?: Record<string, ViroAnimationProp>,
   isDragActive?: (assetId: string) => boolean,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  runtimeCtx?: SequenceRuntimeContext
+  runtimeCtx?: SequenceRuntimeContext,
+  // The detected plane this asset is anchored to, once the session has found
+  // one. Only the assets under the plane wrapper have it.
+  dragSurface?: DragSurface | null
 ): NodeConfig {
   const hasTriggerImage = !!asset.trigger_image_url;
   // Tap-to-place stores the author position as an OFFSET from the runtime tap
@@ -133,7 +136,8 @@ export function createNodeConfig(
   if (dragType === "FixedToPlane") {
     dragPlane = DragConfiguration.getDragPlane(
       scene?.plane_direction ?? "Horizontal",
-      position
+      position,
+      dragSurface
     );
   }
 
@@ -629,7 +633,9 @@ export function createNode(
     isHovering: boolean,
     position: [number, number, number],
     source: number
-  ) => void
+  ) => void,
+  // See createNodeConfig.
+  dragSurface?: DragSurface | null
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -641,7 +647,8 @@ export function createNode(
     animationStates,
     isDragActive,
     onSceneChange,
-    runtimeCtx
+    runtimeCtx,
+    dragSurface
   );
   config.onGaze = onGaze;
 

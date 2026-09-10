@@ -44,6 +44,14 @@
 static const float ON_DRAG_DISTANCE_THRESHOLD = 0.01;
 static const float ON_PINCH_SCALE_THRESHOLD = 0.02;
 static const float ON_ROTATE_THRESHOLD = 0.01; // in radians (~.5729 degrees)
+
+// Distance from a FixedToPlane drag plane within which a node counts as already
+// on it, so starting a drag does not snap it to the aim point.
+static const float ON_PLANE_DISTANCE_THRESHOLD = 0.01;
+
+// Shortest in-plane component of the aim direction that still names a direction
+// to travel along a drag plane. Below it the aim is square to the plane.
+static const float MIN_DRAG_AIM_IN_PLANE = 0.0001;
 static float kSceneBackgroundDistance = 8;
 
 /*
@@ -183,7 +191,7 @@ protected:
 
     /*
      Source-aware hit-node update. Stores the result both in the legacy
-     `_hitResult` (so single-pointer subsystems — drag, fuse, pinch, rotate —
+     `_hitResult` (so single-pointer subsystems — fuse, pinch, rotate —
      keep working unchanged) and in `_hitResultsBySource[source]` so that
      gaze/click events can resolve against the specific input source that
      produced them. Used by backends with multiple simultaneous pointers
@@ -193,10 +201,17 @@ protected:
                        VROVector3f origin, VROVector3f ray);
 
     /*
-     Returns the per-source hit result if one was recorded for this source,
-     otherwise falls back to the legacy single-source `_hitResult`.
+     Returns the per-source hit result recorded for this source's ray (see
+     rayForSource), otherwise falls back to the legacy single-source `_hitResult`.
      */
     std::shared_ptr<VROHitTestResult> getHitResultForSource(int source) const;
+
+    /*
+     Maps a button source onto the source whose aim ray hit-tests for it, so a
+     grip or face button resolves against its own hand's hit, hover and drag
+     state. Identity by default (single-pointer backends).
+     */
+    virtual int rayForSource(int source) const { return source; }
 
     /*
      VRODraggedObject encapsulates all the information that needs to be tracked
@@ -210,7 +225,22 @@ protected:
         VROVector3f _forwardOffset;
         float _draggedDistanceFromController;
         VROEventDelegate::DragState _dragState;
+
+        /*
+         Ray (see rayForSource) that started the drag and alone may move or end
+         it. kUnownedSource on single-pointer backends, whose button and ray
+         report under different source ids.
+         */
+        int _source;
+
+        /*
+         Owning ray's latest pose. Drag math reads these rather than the shared
+         _lastKnown*, which the other hand overwrites every frame.
+         */
+        VROVector3f _position;
+        VROVector3f _forward;
     };
+    static constexpr int kUnownedSource = -1;
     
     /*
      Last hit result that we are performing a drag event on.
@@ -235,8 +265,8 @@ protected:
 
     /*
      Returns the position of the intersection point on the given node's configured fixed
-     plane, based on a rayIntersectPlane test performed from the _lastKnownPosition in
-     the direction of _lastKnownForward.
+     plane, based on a rayIntersectPlane test performed from the owning ray's pose stored
+     on _lastDraggedNode.
      */
     VROVector3f getPlaneIntersect(std::shared_ptr<VRONode> node);
 
@@ -374,6 +404,21 @@ private:
     };
     std::map<int, HoverPending> _hoverPendingBySource;
     HoverPending _hoverPending;  // legacy single-source fallback
+
+    /*
+     Clicks get a longer grace than hover exits: the press motion tilts the
+     aim by 1–3°, about the height of a small button at arm's length. While
+     a hover exit is pending the click follows the highlight; once the exit
+     is confirmed, a click that hits nothing clickable still goes to the node
+     the ray left less than kClickGraceMillis ago.
+     */
+    static constexpr double kClickGraceMillis = 150.0;
+    struct HoverExit {
+        std::shared_ptr<VRONode> node;   // last node whose hover exit was confirmed
+        double leftMillis = -1.0;        // when the ray first left it
+    };
+    std::map<int, HoverExit> _hoverExitBySource;
+    HoverExit _hoverExit;  // legacy single-source fallback
 
     /*
      Returns the first node that is able to handle the event action by bubbling it up.

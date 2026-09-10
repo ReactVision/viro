@@ -174,6 +174,13 @@ public class NodeModule extends ReactContextBaseJavaModule {
                  VRTNode nodeView = (VRTNode) viroView;
 
                  Node nodeJNI = nodeView.getNodeJni();
+                 if (nodeJNI == null) {
+                     // Torn down but still registered: forceCascadeTearDown() nulls every
+                     // node in the tree when the scene navigator is destroyed, while the
+                     // views stay resolvable until React drops them.
+                     promise.reject("view_not_ready", "Node has been torn down");
+                     return;
+                 }
                  Matrix matrix = nodeJNI.getWorldTransformRealTime();
                  Vector scale = matrix.extractScale();
                  Vector position = matrix.extractTranslation();
@@ -224,6 +231,11 @@ public class NodeModule extends ReactContextBaseJavaModule {
                 VRTNode nodeView = (VRTNode) viroView;
 
                 Node nodeJNI = nodeView.getNodeJni();
+                if (nodeJNI == null) {
+                    // Torn down but still registered (see getNodeTransform).
+                    promise.reject("view_not_ready", "Node has been torn down");
+                    return;
+                }
                 BoundingBox box = nodeJNI.getBoundingBox();
 
                 WritableMap returnMap = Arguments.createMap();
@@ -258,6 +270,11 @@ public class NodeModule extends ReactContextBaseJavaModule {
                 }
                 VRT3DObject nodeView = (VRT3DObject) viroView;
                 Object3D node = (Object3D)nodeView.getNodeJni();
+                if (node == null) {
+                    // Torn down but still registered (see getNodeTransform).
+                    promise.reject("view_not_ready", "Node has been torn down");
+                    return;
+                }
                 Set<String> keys = node.getMorphTargetKeys();
                 WritableMap returnMap = Arguments.createMap();
                 WritableArray targets = Arguments.createArray();

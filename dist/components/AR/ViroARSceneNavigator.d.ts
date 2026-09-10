@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -458,6 +458,17 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
     /**
+     * CL-H: establish a platform-native shared coordinate frame and publish it to
+     * `groupId` for other devices in the room to join. Quest only.
+     *
+     * Distinct from a cloud anchor: nothing is uploaded, nothing is relocalised
+     * from camera imagery, and no API key is involved. `groupId` is a UUID the
+     * app picks, and it doubles as the co-location room key.
+     */
+    _rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
+    /** CL-H: recover a shared frame another device published to `groupId`. */
+    _rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
+    /**
      * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
      * local cache file (WS-C). Pass the returned filePath straight into
      * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
@@ -717,6 +728,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         cancelCloudAnchorOperations: () => void;
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+        rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
+        rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;
         loadWorldMeshFromFile: (filePath: string, resolvedTransform: string) => Promise<ViroWorldMeshLoadResult>;
         isGeospatialModeSupported: () => Promise<ViroGeospatialSupportResult>;
@@ -779,6 +792,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         cancelCloudAnchorOperations: () => void;
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+        rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
+        rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;
         loadWorldMeshFromFile: (filePath: string, resolvedTransform: string) => Promise<ViroWorldMeshLoadResult>;
         isGeospatialModeSupported: () => Promise<ViroGeospatialSupportResult>;

@@ -26,6 +26,7 @@
 
 import { ViroCloudAnchorState } from "../Types/ViroEvents";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { parseLocationTransform } from "./ViroLocationFrame";
 
 /** Whether a source can run at all on the device it finds itself on. */
 export type ViroFrameSupport = { ok: true } | { ok: false; reason: string };
@@ -125,6 +126,127 @@ export function cloudAnchorFrameSource(cloudAnchorId: string): ViroFrameSource {
         };
       }
     },
+  };
+}
+
+/**
+ * Frame from a Meta shared spatial anchor — the Quest path (CL-H).
+ *
+ * Nothing is uploaded and nothing is relocalised from camera imagery, which is
+ * the point: Quest gives no camera frames to the SIFT localiser, but its own
+ * spatial anchors already solve co-location. One device calls this with
+ * `create`, the rest with `join`, and `groupId` — a UUID the app picks — names
+ * the space, the frame and the co-location room all at once.
+ *
+ * @param groupId  UUID shared out-of-band, exactly like a cloud anchor id.
+ * @param mode     `"create"` publishes a new frame; `"join"` recovers one.
+ */
+export function metaSpatialAnchorFrameSource(
+  groupId: string,
+  mode: "create" | "join" = "join"
+): ViroFrameSource {
+  return {
+    key: groupId,
+    name: "Meta spatial anchor",
+    // Platform-level only. Whether the runtime actually exposes group sharing
+    // cannot be answered synchronously from JS, so that surfaces as an acquire
+    // error rather than a support flag — see the `acquire` failure below.
+    support: isQuest
+      ? { ok: true }
+      : {
+          ok: false,
+          reason:
+            "Meta shared spatial anchors exist only on Quest. Use a cloud anchor on phones, or the visionOS shared space.",
+        },
+
+    async acquire(ctx: ViroFrameSourceContext): Promise<ViroFrameOutcome> {
+      const nav = ctx.arSceneNavigator;
+      const fn = mode === "create" ? nav?.rvCreateSharedFrame : nav?.rvJoinSharedFrame;
+      if (!fn) {
+        return {
+          success: false,
+          error: "This navigator does not expose shared frames",
+          state: "ErrorInternal",
+        };
+      }
+
+      try {
+        const result = await fn(groupId);
+        if (!result?.success) {
+          return {
+            success: false,
+            error: result?.error ?? "Shared frame failed",
+            state: "ErrorInternal",
+          };
+        }
+        return {
+          success: true,
+          frame: {
+            // The anchor sits at the reference-space origin, so the pose the
+            // native side returns is the frame; position and rotation are read
+            // back out of it rather than reported separately.
+            ...decomposeCsv(result.transform ?? ""),
+            transform: result.transform ?? "",
+          },
+        };
+      } catch (e: any) {
+        return {
+          success: false,
+          error: e?.message ?? String(e),
+          state: "ErrorInternal",
+        };
+      }
+    },
+  };
+}
+
+/**
+ * Position and Euler rotation from a column-major transform CSV.
+ *
+ * Cloud anchors get these from native, which already decomposed them; a shared
+ * frame arrives as the matrix alone, so the same numbers are recovered here
+ * rather than adding a second native shape for one platform.
+ */
+function decomposeCsv(csv: string): {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+} {
+  const t = parseLocationTransform(csv);
+  if (!t) {
+    return { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+  }
+
+  const len = (a: number, b: number, c: number) => Math.hypot(t[a], t[b], t[c]);
+  const sx = len(0, 1, 2) || 1;
+  const sy = len(4, 5, 6) || 1;
+  const sz = len(8, 9, 10) || 1;
+
+  // Rotation matrix with scale divided out, then ZYX Euler in degrees to match
+  // ViroNode's `rotation` prop.
+  const m00 = t[0] / sx, m01 = t[4] / sy, m02 = t[8] / sz;
+  const m10 = t[1] / sx, m11 = t[5] / sy, m12 = t[9] / sz;
+  const m20 = t[2] / sx, m21 = t[6] / sy, m22 = t[10] / sz;
+
+  const deg = 180 / Math.PI;
+  let rx: number, ry: number, rz: number;
+
+  // |m20| ~ 1 is gimbal lock: m00/m11 stop carrying yaw and roll separately, so
+  // roll is pinned to 0 and the whole rotation is folded into yaw.
+  if (Math.abs(m20) < 0.999999) {
+    ry = Math.asin(-m20);
+    rx = Math.atan2(m21, m22);
+    rz = Math.atan2(m10, m00);
+  } else {
+    ry = m20 > 0 ? -Math.PI / 2 : Math.PI / 2;
+    rx = Math.atan2(-m01, m11);
+    rz = 0;
+  }
+
+  return {
+    position: [t[12], t[13], t[14]],
+    rotation: [rx * deg, ry * deg, rz * deg],
+    scale: [sx, sy, sz],
   };
 }
 

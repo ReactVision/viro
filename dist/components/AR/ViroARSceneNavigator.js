@@ -558,6 +558,21 @@ class ViroARSceneNavigator extends React.Component {
         );
     };
     /**
+     * CL-H: establish a platform-native shared coordinate frame and publish it to
+     * `groupId` for other devices in the room to join. Quest only.
+     *
+     * Distinct from a cloud anchor: nothing is uploaded, nothing is relocalised
+     * from camera imagery, and no API key is involved. `groupId` is a UUID the
+     * app picks, and it doubles as the co-location room key.
+     */
+    _rvCreateSharedFrame = async (groupId) => {
+        return await ViroARSceneNavigatorModule.rvCreateSharedFrame((0, react_native_1.findNodeHandle)(this), groupId);
+    };
+    /** CL-H: recover a shared frame another device published to `groupId`. */
+    _rvJoinSharedFrame = async (groupId) => {
+        return await ViroARSceneNavigatorModule.rvJoinSharedFrame((0, react_native_1.findNodeHandle)(this), groupId);
+    };
+    /**
      * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
      * local cache file (WS-C). Pass the returned filePath straight into
      * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
@@ -978,6 +993,8 @@ class ViroARSceneNavigator extends React.Component {
         cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
         startScan: this._startScan,
         finishScan: this._finishScan,
+        rvCreateSharedFrame: this._rvCreateSharedFrame,
+        rvJoinSharedFrame: this._rvJoinSharedFrame,
         snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
         loadWorldMeshFromFile: this._loadWorldMeshFromFile,
         // Geospatial API
@@ -1047,6 +1064,8 @@ class ViroARSceneNavigator extends React.Component {
         cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
         startScan: this._startScan,
         finishScan: this._finishScan,
+        rvCreateSharedFrame: this._rvCreateSharedFrame,
+        rvJoinSharedFrame: this._rvJoinSharedFrame,
         snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
         loadWorldMeshFromFile: this._loadWorldMeshFromFile,
         // Geospatial API

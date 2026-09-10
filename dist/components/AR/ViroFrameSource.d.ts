@@ -80,3 +80,16 @@ export interface ViroFrameSource {
  * Use `metaSpatialAnchorFrameSource` / `visionOSSharedSpaceFrameSource` there.
  */
 export declare function cloudAnchorFrameSource(cloudAnchorId: string): ViroFrameSource;
+/**
+ * Frame from a Meta shared spatial anchor — the Quest path (CL-H).
+ *
+ * Nothing is uploaded and nothing is relocalised from camera imagery, which is
+ * the point: Quest gives no camera frames to the SIFT localiser, but its own
+ * spatial anchors already solve co-location. One device calls this with
+ * `create`, the rest with `join`, and `groupId` — a UUID the app picks — names
+ * the space, the frame and the co-location room all at once.
+ *
+ * @param groupId  UUID shared out-of-band, exactly like a cloud anchor id.
+ * @param mode     `"create"` publishes a new frame; `"join"` recovers one.
+ */
+export declare function metaSpatialAnchorFrameSource(groupId: string, mode?: "create" | "join"): ViroFrameSource;

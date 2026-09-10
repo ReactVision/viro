@@ -21,7 +21,10 @@ import { ViroAmbientLight } from "./components/ViroAmbientLight";
 import { ViroAnimatedComponent } from "./components/ViroAnimatedComponent";
 import { ViroARCloudAnchor } from "./components/AR/ViroARCloudAnchor";
 import { ViroSharedFrame } from "./components/AR/ViroSharedFrame";
-import { cloudAnchorFrameSource } from "./components/AR/ViroFrameSource";
+import {
+  cloudAnchorFrameSource,
+  metaSpatialAnchorFrameSource,
+} from "./components/AR/ViroFrameSource";
 import {
   parseLocationTransform,
   locationToWorld,
@@ -229,6 +232,7 @@ export {
   ViroARCloudAnchor,
   ViroSharedFrame,
   cloudAnchorFrameSource,
+  metaSpatialAnchorFrameSource,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

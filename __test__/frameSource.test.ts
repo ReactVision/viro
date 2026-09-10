@@ -116,3 +116,82 @@ describe("cloudAnchorFrameSource on headsets", () => {
     if (!src.support.ok) expect(src.support.reason).toMatch(/visionOS/);
   });
 });
+
+describe("metaSpatialAnchorFrameSource", () => {
+  const GROUP = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
+  const onQuest = async () => {
+    jest.resetModules();
+    jest.doMock("../components/Utilities/ViroPlatform", () => ({
+      isQuest: true,
+      isVisionOS: false,
+      isWeb: false,
+    }));
+    return await import("../components/AR/ViroFrameSource");
+  };
+
+  it("keys on the group id — one id names space, frame and room", async () => {
+    const { metaSpatialAnchorFrameSource } = await onQuest();
+    const src = metaSpatialAnchorFrameSource(GROUP);
+    expect(src.key).toBe(GROUP);
+    expect(src.support.ok).toBe(true);
+  });
+
+  it("is unsupported off Quest", async () => {
+    jest.resetModules();
+    jest.doMock("../components/Utilities/ViroPlatform", () => ({
+      isQuest: false, isVisionOS: false, isWeb: false,
+    }));
+    const { metaSpatialAnchorFrameSource } = await import("../components/AR/ViroFrameSource");
+    expect(metaSpatialAnchorFrameSource(GROUP).support.ok).toBe(false);
+  });
+
+  it("routes create and join to different native calls", async () => {
+    const { metaSpatialAnchorFrameSource } = await onQuest();
+    const nav = {
+      rvCreateSharedFrame: jest.fn().mockResolvedValue({ success: true, transform: IDENTITY_CSV }),
+      rvJoinSharedFrame: jest.fn().mockResolvedValue({ success: true, transform: IDENTITY_CSV }),
+    };
+
+    await metaSpatialAnchorFrameSource(GROUP, "create").acquire({ arSceneNavigator: nav });
+    expect(nav.rvCreateSharedFrame).toHaveBeenCalledWith(GROUP);
+    expect(nav.rvJoinSharedFrame).not.toHaveBeenCalled();
+
+    await metaSpatialAnchorFrameSource(GROUP, "join").acquire({ arSceneNavigator: nav });
+    expect(nav.rvJoinSharedFrame).toHaveBeenCalledWith(GROUP);
+  });
+
+  it("decomposes the transform, since native returns only the matrix", async () => {
+    const { metaSpatialAnchorFrameSource } = await onQuest();
+    // 90° yaw about +Y, translated to (2, 0, 3).
+    const csv = "0,0,-1,0,0,1,0,0,1,0,0,0,2,0,3,1";
+    const nav = { rvJoinSharedFrame: jest.fn().mockResolvedValue({ success: true, transform: csv }) };
+
+    const outcome = await metaSpatialAnchorFrameSource(GROUP).acquire({ arSceneNavigator: nav });
+    expect(outcome.success).toBe(true);
+    if (!outcome.success) return;
+
+    expect(outcome.frame.position).toEqual([2, 0, 3]);
+    expect(outcome.frame.rotation[1]).toBeCloseTo(90, 4);
+    outcome.frame.scale.forEach((s) => expect(s).toBeCloseTo(1, 5));
+    // The opaque token survives for the mesh APIs.
+    expect(outcome.frame.transform).toBe(csv);
+  });
+
+  it("carries a native failure through", async () => {
+    const { metaSpatialAnchorFrameSource } = await onQuest();
+    const nav = {
+      rvJoinSharedFrame: jest.fn().mockResolvedValue({
+        success: false,
+        error: "no shared frame published to this group yet",
+      }),
+    };
+    const outcome = await metaSpatialAnchorFrameSource(GROUP).acquire({ arSceneNavigator: nav });
+    expect(outcome).toMatchObject({
+      success: false,
+      error: "no shared frame published to this group yet",
+    });
+  });
+});
+
+const IDENTITY_CSV = "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1";

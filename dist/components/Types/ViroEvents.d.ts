@@ -455,6 +455,19 @@ export type ViroResolveCloudAnchorResult = {
     state: ViroCloudAnchorState;
 };
 /**
+ * Result of `rvCreateSharedFrame()` / `rvJoinSharedFrame()` (CL-H).
+ *
+ * `transform` is the same opaque, column-major CSV a resolved cloud anchor
+ * returns, so a shared frame and a cloud anchor are interchangeable downstream.
+ */
+export type ViroSharedFrameResult = {
+    success: boolean;
+    /** UUID of the underlying platform anchor. */
+    frameId?: string;
+    transform?: string;
+    error?: string;
+};
+/**
  * Fired by `<ViroARCloudAnchor>` once a cloud anchor has localised and its
  * location frame is established.
  *

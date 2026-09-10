@@ -354,7 +354,13 @@ export type ViroSoundFinishEvent = any;
  * State of a cloud anchor operation.
  * Maps to GARCloudAnchorState (iOS) and Anchor.CloudAnchorState (Android)
  */
-export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable";
+export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable"
+/**
+ * Emitted by JS platform guards, never by native: the running platform has no
+ * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there
+ * was nothing to attempt.
+ */
+ | "ErrorNotSupported";
 /**
  * Unified AR provider — controls both cloud anchors and geospatial anchors.
  */

@@ -12,6 +12,7 @@ import {
   ViroCloudAnchorState,
   ViroLocalizedEvent,
 } from "../Types/ViroEvents";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 
 type ResolveResult = {
   success: boolean;
@@ -60,6 +61,26 @@ type State = {
 };
 
 /**
+ * Neither headset can localise a cloud anchor, for different reasons.
+ *
+ * Quest: `VROARSessionOpenXR` stubs `hostCloudAnchor`/`resolveCloudAnchor` with
+ * "Cloud anchors not supported on OpenXR", and more fundamentally it produces
+ * no camera frame at all — SIFT has nothing to run on.
+ *
+ * visionOS: the whole AR subsystem is excluded from that renderer target (the
+ * shipped `libViroKitVisionOS.a` contains zero `VROAR*` objects), and passthrough
+ * camera access needs an enterprise entitlement Apple does not grant by default.
+ *
+ * Both are structural, not missing wiring, so this warns once and renders
+ * nothing rather than leaving a resolve to fail confusingly a few seconds later.
+ */
+const UNSUPPORTED_REASON = isQuest
+  ? "Meta Quest has no camera frames for the SIFT localiser and OpenXR stubs cloud anchors."
+  : isVisionOS
+  ? "visionOS builds exclude the AR subsystem, and passthrough camera access needs an enterprise entitlement."
+  : null;
+
+/**
  * Renders its children in a resolved cloud anchor's **location frame**.
  *
  * This is the co-location primitive. Two devices that mount this with the same
@@ -92,7 +113,22 @@ export class ViroARCloudAnchor extends React.Component<
   // a real window, not a theoretical one.
   private _mounted = false;
 
+  private static _unsupportedWarningLogged = false;
+
   componentDidMount() {
+    if (UNSUPPORTED_REASON) {
+      if (!ViroARCloudAnchor._unsupportedWarningLogged) {
+        console.warn(
+          `[Viro] ViroARCloudAnchor is not supported on this platform. ${UNSUPPORTED_REASON}`
+        );
+        ViroARCloudAnchor._unsupportedWarningLogged = true;
+      }
+      this.props.onLocalizeError?.(
+        UNSUPPORTED_REASON,
+        "ErrorNotSupported"
+      );
+      return;
+    }
     this._mounted = true;
     this._resolve();
   }
@@ -120,7 +156,7 @@ export class ViroARCloudAnchor extends React.Component<
       if (this._mounted && requested === this.props.cloudAnchorId) {
         this.props.onLocalizeError?.(
           e?.message ?? String(e),
-          "ErrorInternal" as ViroCloudAnchorState
+          "ErrorInternal"
         );
       }
       return;
@@ -150,6 +186,8 @@ export class ViroARCloudAnchor extends React.Component<
   };
 
   render() {
+    if (UNSUPPORTED_REASON) return null;
+
     const { anchor } = this.state;
 
     if (!anchor) {

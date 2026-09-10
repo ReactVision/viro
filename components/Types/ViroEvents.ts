@@ -469,7 +469,13 @@ export type ViroCloudAnchorState =
   | "ErrorCloudIdNotFound"
   | "ErrorResolvingSdkVersionTooOld"
   | "ErrorResolvingSdkVersionTooNew"
-  | "ErrorHostingServiceUnavailable";
+  | "ErrorHostingServiceUnavailable"
+  /**
+   * Emitted by JS platform guards, never by native: the running platform has no
+   * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there
+   * was nothing to attempt.
+   */
+  | "ErrorNotSupported";
 
 /**
  * Unified AR provider — controls both cloud anchors and geospatial anchors.

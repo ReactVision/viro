@@ -41,6 +41,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARCloudAnchor = void 0;
 const React = __importStar(require("react"));
 const ViroNode_1 = require("../ViroNode");
+const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+/**
+ * Neither headset can localise a cloud anchor, for different reasons.
+ *
+ * Quest: `VROARSessionOpenXR` stubs `hostCloudAnchor`/`resolveCloudAnchor` with
+ * "Cloud anchors not supported on OpenXR", and more fundamentally it produces
+ * no camera frame at all — SIFT has nothing to run on.
+ *
+ * visionOS: the whole AR subsystem is excluded from that renderer target (the
+ * shipped `libViroKitVisionOS.a` contains zero `VROAR*` objects), and passthrough
+ * camera access needs an enterprise entitlement Apple does not grant by default.
+ *
+ * Both are structural, not missing wiring, so this warns once and renders
+ * nothing rather than leaving a resolve to fail confusingly a few seconds later.
+ */
+const UNSUPPORTED_REASON = ViroPlatform_1.isQuest
+    ? "Meta Quest has no camera frames for the SIFT localiser and OpenXR stubs cloud anchors."
+    : ViroPlatform_1.isVisionOS
+        ? "visionOS builds exclude the AR subsystem, and passthrough camera access needs an enterprise entitlement."
+        : null;
 /**
  * Renders its children in a resolved cloud anchor's **location frame**.
  *
@@ -69,7 +89,16 @@ class ViroARCloudAnchor extends React.Component {
     // retrying every AR frame until it localises or the window expires, so this is
     // a real window, not a theoretical one.
     _mounted = false;
+    static _unsupportedWarningLogged = false;
     componentDidMount() {
+        if (UNSUPPORTED_REASON) {
+            if (!ViroARCloudAnchor._unsupportedWarningLogged) {
+                console.warn(`[Viro] ViroARCloudAnchor is not supported on this platform. ${UNSUPPORTED_REASON}`);
+                ViroARCloudAnchor._unsupportedWarningLogged = true;
+            }
+            this.props.onLocalizeError?.(UNSUPPORTED_REASON, "ErrorNotSupported");
+            return;
+        }
         this._mounted = true;
         this._resolve();
     }
@@ -115,6 +144,8 @@ class ViroARCloudAnchor extends React.Component {
         });
     };
     render() {
+        if (UNSUPPORTED_REASON)
+            return null;
         const { anchor } = this.state;
         if (!anchor) {
             return this.props.placeholder ? <ViroNode_1.ViroNode>{this.props.placeholder}</ViroNode_1.ViroNode> : null;

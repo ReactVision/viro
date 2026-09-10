@@ -67,6 +67,7 @@ type State = {
 export declare class ViroARCloudAnchor extends React.Component<ViroARCloudAnchorProps, State> {
     state: State;
     private _mounted;
+    private static _unsupportedWarningLogged;
     componentDidMount(): void;
     componentDidUpdate(prev: ViroARCloudAnchorProps): void;
     componentWillUnmount(): void;

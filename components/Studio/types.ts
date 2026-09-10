@@ -233,7 +233,8 @@ export interface StudioAsset {
   position_x: number | null;
   position_y: number | null;
   position_z: number | null;
-  rotation_x: number | null; // radians
+  // Degrees: passed to a Viro `rotation` prop verbatim, never converted.
+  rotation_x: number | null;
   rotation_y: number | null;
   rotation_z: number | null;
   scale: number | null;

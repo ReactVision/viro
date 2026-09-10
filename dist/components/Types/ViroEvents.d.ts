@@ -354,7 +354,13 @@ export type ViroSoundFinishEvent = any;
  * State of a cloud anchor operation.
  * Maps to GARCloudAnchorState (iOS) and Anchor.CloudAnchorState (Android)
  */
-export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable";
+export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable"
+/**
+ * Emitted by JS platform guards, never by native: the running platform has no
+ * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there
+ * was nothing to attempt.
+ */
+ | "ErrorNotSupported";
 /**
  * Unified AR provider — controls both cloud anchors and geospatial anchors.
  */
@@ -447,6 +453,36 @@ export type ViroResolveCloudAnchorResult = {
     anchor?: ViroCloudAnchor;
     error?: string;
     state: ViroCloudAnchorState;
+};
+/**
+ * Result of `rvCreateSharedFrame()` / `rvJoinSharedFrame()` (CL-H).
+ *
+ * `transform` is the same opaque, column-major CSV a resolved cloud anchor
+ * returns, so a shared frame and a cloud anchor are interchangeable downstream.
+ */
+export type ViroSharedFrameResult = {
+    success: boolean;
+    /** UUID of the underlying platform anchor. */
+    frameId?: string;
+    transform?: string;
+    error?: string;
+};
+/**
+ * Fired by `<ViroARCloudAnchor>` once a cloud anchor has localised and its
+ * location frame is established.
+ *
+ * `transform` is the same opaque token as `ViroCloudAnchor.resolvedTransform`.
+ * Feed it to `parseLocationTransform()` when converting coordinates for another
+ * device, or pass it straight into `loadWorldMeshFromFile()` for a mesh.
+ */
+export type ViroLocalizedEvent = {
+    cloudAnchorId: string;
+    /** Frame origin in this session's world coordinates. */
+    position: [number, number, number];
+    /** Frame orientation, Euler degrees. */
+    rotation: [number, number, number];
+    scale: [number, number, number];
+    transform: string;
 };
 /**
  * Event fired when a cloud anchor state changes.

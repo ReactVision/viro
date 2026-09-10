@@ -98,3 +98,32 @@ export declare const ViroVisionOSModule: {
     readonly enterImmersiveSpace: typeof enterImmersiveSpace;
     readonly exitImmersiveSpace: typeof exitImmersiveSpace;
 };
+/** State of the visionOS shared coordinate space. */
+export type ViroSharedSpaceState = {
+    /** False when this device cannot join a shared coordinate space at all. */
+    supported: boolean;
+    /** True once ARKit has aligned this device with at least one other. */
+    sharing: boolean;
+    /** Participants aligned to the space, excluding this device. */
+    participants: number;
+};
+/**
+ * Current shared-space state.
+ *
+ * Unlike a cloud anchor or a Meta spatial anchor, there is no frame to locate
+ * here: ARKit aligns the **world origin itself**, so once `sharing` is true,
+ * world coordinates already mean the same thing on every participant.
+ */
+export declare function sharedSpaceState(): Promise<ViroSharedSpaceState>;
+/**
+ * Alignment data to deliver to the other participants, base64-encoded, or null
+ * when there is nothing new to send.
+ *
+ * ARKit does not move this data itself — it emits blobs and expects them
+ * delivered, by any transport. Poll this and ship whatever it returns; the
+ * receiving device passes it to {@link sharedSpacePushIncoming}. Until both
+ * sides do that, `sharing` never becomes true.
+ */
+export declare function sharedSpaceNextOutgoing(): Promise<string | null>;
+/** Hand ARKit base64 alignment data received from another participant. */
+export declare function sharedSpacePushIncoming(base64: string): Promise<boolean>;

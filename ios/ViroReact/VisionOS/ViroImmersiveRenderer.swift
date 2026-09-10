@@ -46,6 +46,11 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     // index finger and the click from a pinch.
     private let handTracking = HandTrackingProvider()
 
+    // Co-location (CL-I). Joins this session rather than opening its own: a
+    // second ARKitSession is refused while one is live. Inert until an app
+    // starts exchanging alignment data — see ViroSharedSpace.
+    public let sharedSpace = ViroSharedSpace()
+
     // Pinch is latched with hysteresis. A single threshold chatters around the boundary and
     // turns one deliberate pinch into a burst of clicks; closing at 2 cm and only releasing
     // at 3.2 cm costs nothing and makes the gesture read as one event.
@@ -93,9 +98,14 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
             if HandTrackingProvider.isSupported  { providers.append(self.handTracking) }
             else { NSLog("[Viro] hand tracking unsupported on this device — input will be inert") }
 
+            // Guarded the same way as the others: an unsupported device keeps
+            // rendering and simply cannot co-locate.
+            if let shared = self.sharedSpace.dataProvider { providers.append(shared) }
+
             if !providers.isEmpty {
                 do {
                     try await self.arSession.run(providers)
+                    self.sharedSpace.start()
                 } catch {
                     NSLog("[Viro] ARKitSession.run() FAILED: %@", error.localizedDescription)
                 }
@@ -105,6 +115,7 @@ public final class ViroImmersiveRenderer: @unchecked Sendable {
     }
 
     public func stopRenderLoop() {
+        sharedSpace.stop()
         renderTask?.cancel()
         renderTask = nil
     }

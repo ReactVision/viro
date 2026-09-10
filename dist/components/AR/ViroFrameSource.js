@@ -22,9 +22,43 @@
  * @providesModule ViroFrameSource
  */
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cloudAnchorFrameSource = cloudAnchorFrameSource;
 exports.metaSpatialAnchorFrameSource = metaSpatialAnchorFrameSource;
+exports.visionOSSharedSpaceFrameSource = visionOSSharedSpaceFrameSource;
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const ViroLocationFrame_1 = require("./ViroLocationFrame");
 /**
@@ -144,6 +178,73 @@ function metaSpatialAnchorFrameSource(groupId, mode = "join") {
                     state: "ErrorInternal",
                 };
             }
+        },
+    };
+}
+/** Identity, column-major — visionOS's frame, once the space converges. */
+const IDENTITY_CSV = "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1";
+/**
+ * Frame from ARKit's shared coordinate space — the visionOS path (CL-I).
+ *
+ * Shaped differently from the other two, and the difference is the whole point:
+ * phone and Quest hand back an anchor to locate, whereas visionOS aligns the
+ * **world origin itself** across participants. So there is no transform to
+ * apply — once the space converges the frame is identity, and content placed at
+ * a world position is already in the same physical spot everywhere.
+ *
+ * ARKit does not move the alignment data. Poll
+ * `ViroVisionOSModule.sharedSpaceNextOutgoing()` and deliver whatever it
+ * returns to the other participants, over whatever transport the app already
+ * has; they call `sharedSpacePushIncoming()`. Until both sides pump, the space
+ * never converges and this never resolves.
+ *
+ * @param sessionId  Names the co-location room. Not used by ARKit, which
+ *                   discovers participants itself — it exists so the channel
+ *                   has a room key, like the other sources.
+ * @param timeoutMs  How long to wait for convergence before giving up.
+ */
+function visionOSSharedSpaceFrameSource(sessionId, timeoutMs = 30000) {
+    return {
+        key: sessionId,
+        name: "visionOS shared space",
+        support: ViroPlatform_1.isVisionOS
+            ? { ok: true }
+            : {
+                ok: false,
+                reason: "ARKit shared coordinate spaces exist only on visionOS. Use a cloud anchor on phones, or a Meta spatial anchor on Quest.",
+            },
+        async acquire() {
+            // Imported lazily: this module is loaded on every platform, and the
+            // visionOS module pulls in native lookups that are pointless elsewhere.
+            const { sharedSpaceState } = await Promise.resolve().then(() => __importStar(require("../VisionOS/ViroVisionOSModule")));
+            const deadline = Date.now() + timeoutMs;
+            while (Date.now() < deadline) {
+                const state = await sharedSpaceState();
+                if (!state.supported) {
+                    return {
+                        success: false,
+                        error: "This device cannot join a shared coordinate space",
+                        state: "ErrorNotSupported",
+                    };
+                }
+                if (state.sharing) {
+                    return {
+                        success: true,
+                        frame: {
+                            position: [0, 0, 0],
+                            rotation: [0, 0, 0],
+                            scale: [1, 1, 1],
+                            transform: IDENTITY_CSV,
+                        },
+                    };
+                }
+                await new Promise((r) => setTimeout(r, 250));
+            }
+            return {
+                success: false,
+                error: "Timed out waiting for the shared coordinate space. Are both devices exchanging alignment data?",
+                state: "ErrorInternal",
+            };
         },
     };
 }

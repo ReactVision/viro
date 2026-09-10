@@ -24,6 +24,7 @@ import { ViroSharedFrame } from "./components/AR/ViroSharedFrame";
 import {
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
+  visionOSSharedSpaceFrameSource,
 } from "./components/AR/ViroFrameSource";
 import {
   parseLocationTransform,
@@ -233,6 +234,7 @@ export {
   ViroSharedFrame,
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
+  visionOSSharedSpaceFrameSource,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

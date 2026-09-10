@@ -93,3 +93,24 @@ export declare function cloudAnchorFrameSource(cloudAnchorId: string): ViroFrame
  * @param mode     `"create"` publishes a new frame; `"join"` recovers one.
  */
 export declare function metaSpatialAnchorFrameSource(groupId: string, mode?: "create" | "join"): ViroFrameSource;
+/**
+ * Frame from ARKit's shared coordinate space — the visionOS path (CL-I).
+ *
+ * Shaped differently from the other two, and the difference is the whole point:
+ * phone and Quest hand back an anchor to locate, whereas visionOS aligns the
+ * **world origin itself** across participants. So there is no transform to
+ * apply — once the space converges the frame is identity, and content placed at
+ * a world position is already in the same physical spot everywhere.
+ *
+ * ARKit does not move the alignment data. Poll
+ * `ViroVisionOSModule.sharedSpaceNextOutgoing()` and deliver whatever it
+ * returns to the other participants, over whatever transport the app already
+ * has; they call `sharedSpacePushIncoming()`. Until both sides pump, the space
+ * never converges and this never resolves.
+ *
+ * @param sessionId  Names the co-location room. Not used by ARKit, which
+ *                   discovers participants itself — it exists so the channel
+ *                   has a room key, like the other sources.
+ * @param timeoutMs  How long to wait for convergence before giving up.
+ */
+export declare function visionOSSharedSpaceFrameSource(sessionId: string, timeoutMs?: number): ViroFrameSource;

@@ -200,6 +200,84 @@ export function metaSpatialAnchorFrameSource(
   };
 }
 
+/** Identity, column-major — visionOS's frame, once the space converges. */
+const IDENTITY_CSV = "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1";
+
+/**
+ * Frame from ARKit's shared coordinate space — the visionOS path (CL-I).
+ *
+ * Shaped differently from the other two, and the difference is the whole point:
+ * phone and Quest hand back an anchor to locate, whereas visionOS aligns the
+ * **world origin itself** across participants. So there is no transform to
+ * apply — once the space converges the frame is identity, and content placed at
+ * a world position is already in the same physical spot everywhere.
+ *
+ * ARKit does not move the alignment data. Poll
+ * `ViroVisionOSModule.sharedSpaceNextOutgoing()` and deliver whatever it
+ * returns to the other participants, over whatever transport the app already
+ * has; they call `sharedSpacePushIncoming()`. Until both sides pump, the space
+ * never converges and this never resolves.
+ *
+ * @param sessionId  Names the co-location room. Not used by ARKit, which
+ *                   discovers participants itself — it exists so the channel
+ *                   has a room key, like the other sources.
+ * @param timeoutMs  How long to wait for convergence before giving up.
+ */
+export function visionOSSharedSpaceFrameSource(
+  sessionId: string,
+  timeoutMs: number = 30000
+): ViroFrameSource {
+  return {
+    key: sessionId,
+    name: "visionOS shared space",
+    support: isVisionOS
+      ? { ok: true }
+      : {
+          ok: false,
+          reason:
+            "ARKit shared coordinate spaces exist only on visionOS. Use a cloud anchor on phones, or a Meta spatial anchor on Quest.",
+        },
+
+    async acquire(): Promise<ViroFrameOutcome> {
+      // Imported lazily: this module is loaded on every platform, and the
+      // visionOS module pulls in native lookups that are pointless elsewhere.
+      const { sharedSpaceState } = await import("../VisionOS/ViroVisionOSModule");
+
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const state = await sharedSpaceState();
+
+        if (!state.supported) {
+          return {
+            success: false,
+            error: "This device cannot join a shared coordinate space",
+            state: "ErrorNotSupported",
+          };
+        }
+        if (state.sharing) {
+          return {
+            success: true,
+            frame: {
+              position: [0, 0, 0],
+              rotation: [0, 0, 0],
+              scale: [1, 1, 1],
+              transform: IDENTITY_CSV,
+            },
+          };
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+
+      return {
+        success: false,
+        error:
+          "Timed out waiting for the shared coordinate space. Are both devices exchanging alignment data?",
+        state: "ErrorInternal",
+      };
+    },
+  };
+}
+
 /**
  * Position and Euler rotation from a column-major transform CSV.
  *

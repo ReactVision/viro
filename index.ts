@@ -12,13 +12,35 @@ import {
   useStudioRecording,
   useStudioPlacement,
 } from "./components/Studio";
-import { ViroVisionOSModule, isVisionOS, enterImmersiveSpace, exitImmersiveSpace, setInputTuning } from "./components/VisionOS/ViroVisionOSModule";
+import { ViroVisionOSModule, isVisionOS, enterImmersiveSpace, exitImmersiveSpace, setInputTuning, sharedSpaceState, sharedSpaceNextOutgoing, sharedSpacePushIncoming } from "./components/VisionOS/ViroVisionOSModule";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";
 import { Viro360Video } from "./components/Viro360Video";
 import { ViroAnimatedImage } from "./components/ViroAnimatedImage";
 import { ViroAmbientLight } from "./components/ViroAmbientLight";
 import { ViroAnimatedComponent } from "./components/ViroAnimatedComponent";
+import { ViroARCloudAnchor } from "./components/AR/ViroARCloudAnchor";
+import { ViroSharedFrame } from "./components/AR/ViroSharedFrame";
+import {
+  isColocationAvailable,
+  joinColocation,
+  leaveColocation,
+  setColocationLocalPose,
+  getColocationState,
+  getColocationPeers,
+} from "./components/AR/ViroColocation";
+import { useViroColocation } from "./components/hooks/useViroColocation";
+import {
+  cloudAnchorFrameSource,
+  metaSpatialAnchorFrameSource,
+  visionOSSharedSpaceFrameSource,
+} from "./components/AR/ViroFrameSource";
+import {
+  parseLocationTransform,
+  locationToWorld,
+  worldToLocation,
+  invertTransform,
+} from "./components/AR/ViroLocationFrame";
 import { ViroARImageMarker } from "./components/AR/ViroARImageMarker";
 import { ViroARObjectMarker } from "./components/AR/ViroARObjectMarker";
 import { ViroARTrackingTargets } from "./components/AR/ViroARTrackingTargets";
@@ -57,6 +79,26 @@ import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroCameraTexture } from "./components/ViroCameraTexture";
 export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
 export type { ViroMapCameraState, ViroMapCameraOptions } from "./components/useViroMapCamera";
+export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
+export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
+export type {
+  ViroColocationState,
+  ViroColocationPeer,
+  ViroColocationConfig,
+  ViroColocationJoinResult,
+} from "./components/AR/ViroColocation";
+export type {
+  UseViroColocationResult,
+  UseViroColocationOptions,
+} from "./components/hooks/useViroColocation";
+export type {
+  ViroFrameSource,
+  ViroFrameSupport,
+  ViroFrameOutcome,
+  ViroFrameSourceContext,
+  ViroSharedFrameValue,
+} from "./components/AR/ViroFrameSource";
+export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
 export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
@@ -207,6 +249,18 @@ import { AppRegistry } from "react-native";
 AppRegistry.registerComponent("VRQuestScene", () => ViroQuestEntryPoint);
 
 export {
+  ViroARCloudAnchor,
+  ViroSharedFrame,
+  cloudAnchorFrameSource,
+  metaSpatialAnchorFrameSource,
+  visionOSSharedSpaceFrameSource,
+  isColocationAvailable,
+  joinColocation,
+  leaveColocation,
+  setColocationLocalPose,
+  getColocationState,
+  getColocationPeers,
+  useViroColocation,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,
@@ -222,6 +276,10 @@ export {
   ViroVirtualButton,
   ViroGameLoop,
   ViroGameLoopUtils,
+  parseLocationTransform,
+  locationToWorld,
+  worldToLocation,
+  invertTransform,
   useViroMapCamera,
   viroMapCameraTransform,
   useGameLoop,
@@ -404,12 +462,15 @@ export {
   ViroVisionOSModule,
   isVisionOS,
   enterImmersiveSpace,
+  sharedSpaceState,
+  sharedSpaceNextOutgoing,
+  sharedSpacePushIncoming,
   exitImmersiveSpace,
   setInputTuning,
 };
 
 export type { VRModuleOpenXRType, ViroPassthroughStyle };
-export type { ImmersiveSpaceStyle, ViroInputTuning } from "./components/VisionOS/ViroVisionOSModule";
+export type { ImmersiveSpaceStyle, ViroInputTuning, ViroSharedSpaceState } from "./components/VisionOS/ViroVisionOSModule";
 
 export type {
   StudioSceneResponse,

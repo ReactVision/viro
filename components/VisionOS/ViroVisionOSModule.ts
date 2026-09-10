@@ -130,3 +130,53 @@ export const ViroVisionOSModule = {
   enterImmersiveSpace,
   exitImmersiveSpace,
 } as const;
+
+// ─── Shared coordinate space (CL-I) ──────────────────────────────────────────
+
+/** State of the visionOS shared coordinate space. */
+export type ViroSharedSpaceState = {
+  /** False when this device cannot join a shared coordinate space at all. */
+  supported: boolean;
+  /** True once ARKit has aligned this device with at least one other. */
+  sharing: boolean;
+  /** Participants aligned to the space, excluding this device. */
+  participants: number;
+};
+
+const NOT_SUPPORTED: ViroSharedSpaceState = {
+  supported: false,
+  sharing: false,
+  participants: 0,
+};
+
+/**
+ * Current shared-space state.
+ *
+ * Unlike a cloud anchor or a Meta spatial anchor, there is no frame to locate
+ * here: ARKit aligns the **world origin itself**, so once `sharing` is true,
+ * world coordinates already mean the same thing on every participant.
+ */
+export async function sharedSpaceState(): Promise<ViroSharedSpaceState> {
+  if (!VRTVisionOSModule?.sharedSpaceState) return NOT_SUPPORTED;
+  return VRTVisionOSModule.sharedSpaceState();
+}
+
+/**
+ * Alignment data to deliver to the other participants, base64-encoded, or null
+ * when there is nothing new to send.
+ *
+ * ARKit does not move this data itself — it emits blobs and expects them
+ * delivered, by any transport. Poll this and ship whatever it returns; the
+ * receiving device passes it to {@link sharedSpacePushIncoming}. Until both
+ * sides do that, `sharing` never becomes true.
+ */
+export async function sharedSpaceNextOutgoing(): Promise<string | null> {
+  if (!VRTVisionOSModule?.sharedSpaceNextOutgoing) return null;
+  return VRTVisionOSModule.sharedSpaceNextOutgoing();
+}
+
+/** Hand ARKit base64 alignment data received from another participant. */
+export async function sharedSpacePushIncoming(base64: string): Promise<boolean> {
+  if (!VRTVisionOSModule?.sharedSpacePushIncoming) return false;
+  return VRTVisionOSModule.sharedSpacePushIncoming(base64);
+}

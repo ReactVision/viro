@@ -27,7 +27,7 @@
  *
  * Manual step (one-time, before prebuild):
  *   npx @react-native-community/cli@latest init MyApp \
- *     --template @callstack/visionos-template@latest \
+ *     --template github:ReactVision/visionos-template \
  *     --directory visionos --skip-install
  */
 import { ConfigPlugin } from "@expo/config-plugins";

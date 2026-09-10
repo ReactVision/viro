@@ -1208,6 +1208,21 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.rvFinishScan(ttlDays, callback);
     }
 
+    // CL-H: platform-native shared frames (Quest). No ensureRvConfigApplied —
+    // these never reach the ReactVision backend, so the API key and project id
+    // that cloud anchors need are irrelevant here.
+    public void rvCreateSharedFrame(String groupId, ARScene.RvSharedFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
+        arScene.rvCreateSharedFrame(groupId, callback);
+    }
+
+    public void rvJoinSharedFrame(String groupId, ARScene.RvSharedFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
+        arScene.rvJoinSharedFrame(groupId, callback);
+    }
+
     /**
      * WS-C: serialize the current world mesh to a cache file, returning its
      * path (or null on failure/no mesh) — ready to pass straight into

@@ -49,34 +49,34 @@ const ViroEvents_1 = require("./Types/ViroEvents");
 const ViroControllerModule = react_native_2.NativeModules.VRTControllerModule;
 class ViroController extends React.Component {
     _component = null;
-    _onClick(event) {
+    _onClick = (event) => {
         this.props.onClick &&
             this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
-    }
-    _onClickState(event) {
+    };
+    _onClickState = (event) => {
         this.props.onClickState &&
             this.props.onClickState(event.nativeEvent.clickState, event.nativeEvent.position, event.nativeEvent.source);
         let CLICKED = ViroEvents_1.ViroClickStateTypes.CLICKED; // Value representation of Clicked ClickState within EventDelegateJni.
         if (event.nativeEvent.clickState == CLICKED) {
             this._onClick(event);
         }
-    }
-    _onTouch(event) {
+    };
+    _onTouch = (event) => {
         this.props.onTouch &&
             this.props.onTouch(event.nativeEvent.touchState, event.nativeEvent.touchPos, event.nativeEvent.source);
-    }
-    _onScroll(event) {
+    };
+    _onScroll = (event) => {
         this.props.onScroll &&
             this.props.onScroll(event.nativeEvent.scrollPos, event.nativeEvent.source);
-    }
-    _onSwipe(event) {
+    };
+    _onSwipe = (event) => {
         this.props.onSwipe &&
             this.props.onSwipe(event.nativeEvent.swipeState, event.nativeEvent.source);
-    }
-    _onControllerStatus(event) {
+    };
+    _onControllerStatus = (event) => {
         this.props.onControllerStatus &&
             this.props.onControllerStatus(event.nativeEvent.controllerStatus, event.nativeEvent.source);
-    }
+    };
     _onFuse = (event) => {
         if (this.props.onFuse) {
             if (typeof this.props.onFuse === "function") {
@@ -87,24 +87,24 @@ class ViroController extends React.Component {
             }
         }
     };
-    _onPinch(event) {
+    _onPinch = (event) => {
         this.props.onPinch &&
             this.props.onPinch(event.nativeEvent.pinchState, event.nativeEvent.scaleFactor, event.nativeEvent.source);
-    }
-    _onRotate(event) {
+    };
+    _onRotate = (event) => {
         this.props.onRotate &&
             this.props.onRotate(event.nativeEvent.rotateState, event.nativeEvent.rotationFactor, event.nativeEvent.source);
-    }
+    };
     async getControllerForwardAsync() {
         return await ViroControllerModule.getForwardVectorAsync((0, react_native_1.findNodeHandle)(this));
     }
     setNativeProps(nativeProps) {
         this._component?.setNativeProps(nativeProps);
     }
-    _onDrag(event) {
+    _onDrag = (event) => {
         this.props.onDrag &&
             this.props.onDrag(event.nativeEvent.dragToPos, event.nativeEvent.source);
-    }
+    };
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroController", this.props);

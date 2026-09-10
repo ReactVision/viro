@@ -28,6 +28,7 @@ import {
   ViroProvider,
   ViroCloudAnchorStateChangeEvent,
   ViroHostCloudAnchorResult,
+  ViroSharedFrameResult,
   ViroResolveCloudAnchorResult,
   ViroFinishScanResult,
   ViroWorldMeshSnapshotResult,
@@ -920,6 +921,29 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * CL-H: establish a platform-native shared coordinate frame and publish it to
+   * `groupId` for other devices in the room to join. Quest only.
+   *
+   * Distinct from a cloud anchor: nothing is uploaded, nothing is relocalised
+   * from camera imagery, and no API key is involved. `groupId` is a UUID the
+   * app picks, and it doubles as the co-location room key.
+   */
+  _rvCreateSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    return await ViroARSceneNavigatorModule.rvCreateSharedFrame(
+      findNodeHandle(this),
+      groupId
+    );
+  };
+
+  /** CL-H: recover a shared frame another device published to `groupId`. */
+  _rvJoinSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    return await ViroARSceneNavigatorModule.rvJoinSharedFrame(
+      findNodeHandle(this),
+      groupId
+    );
+  };
+
+  /**
    * Serialize the current world mesh (from ARWorldMesh / depth sensing) to a
    * local cache file (WS-C). Pass the returned filePath straight into
    * rvUploadAsset(), then rvAttachAssetToCloudAnchor() to persist it on a
@@ -1586,6 +1610,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    rvCreateSharedFrame: this._rvCreateSharedFrame,
+    rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
     loadWorldMeshFromFile: this._loadWorldMeshFromFile,
     // Geospatial API
@@ -1655,6 +1681,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    rvCreateSharedFrame: this._rvCreateSharedFrame,
+    rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
     loadWorldMeshFromFile: this._loadWorldMeshFromFile,
     // Geospatial API

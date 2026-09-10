@@ -1849,6 +1849,45 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void rvCreateSharedFrame(final int sceneNavTag, final String groupId, final Promise promise) {
+        sharedFrameOp(sceneNavTag, groupId, false, promise);
+    }
+
+    @ReactMethod
+    public void rvJoinSharedFrame(final int sceneNavTag, final String groupId, final Promise promise) {
+        sharedFrameOp(sceneNavTag, groupId, true, promise);
+    }
+
+    // create and join differ only in which navigator method runs; everything
+    // around it — the UI block, the view check, the result map — is identical.
+    private void sharedFrameOp(final int sceneNavTag, final String groupId,
+                               final boolean joining, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
+                    com.viro.core.ARScene.RvSharedFrameCallback cb = (success, frameId, transformCsv, error) -> {
+                        WritableMap r = Arguments.createMap();
+                        r.putBoolean("success", success);
+                        if (success) {
+                            r.putString("frameId", frameId);
+                            r.putString("transform", transformCsv);
+                        } else {
+                            r.putString("error", error);
+                        }
+                        promise.resolve(r);
+                    };
+                    if (joining) ((VRTARSceneNavigator) view).rvJoinSharedFrame(groupId, cb);
+                    else         ((VRTARSceneNavigator) view).rvCreateSharedFrame(groupId, cb);
+                } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }
+            }
+        });
+    }
+
+    @ReactMethod
     public void rvFinishScan(final int sceneNavTag, final int ttlDays, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }

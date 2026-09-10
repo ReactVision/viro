@@ -2,17 +2,25 @@
 
 ## Unreleased
 
+### Added
+
+- **`<ViroARCloudAnchor>` — co-located AR.** Renders its children in a resolved cloud anchor's *location frame*, which is the shared coordinate frame two devices in the same space can agree on. Mount it with the same `cloudAnchorId` on both devices and a child at `[0, 0, -1]` is the same physical metre on each, with no coordinate maths in app code — previously `resolveCloudAnchor()` returned position/rotation/scale and no scene node, leaving every app to redo the frame arithmetic itself. Fires `onLocalized` once the frame exists, and `onLocalizeError` when localisation fails or times out.
+- **Location-frame conversion helpers**: `parseLocationTransform`, `locationToWorld`, `worldToLocation`, `invertTransform`. World coordinates are per-session — each AR session picks its origin wherever tracking started — so anything two devices exchange has to travel as location-frame coordinates and be converted on arrival. **Send frame coordinates, never world coordinates.**
+- **Quest Store packaging defaults** when `xRMode` includes `"QUEST"`: `reactNativeArchitectures=arm64-v8a` (Quest hardware is 64-bit, the store warns on 32-bit libraries, and dropping the other ABIs roughly halves the APK; opt out with `android.questArm64Only: false`) and a `com.oculus.supportedDevices` manifest entry defaulting to `quest2|questpro|quest3|quest3s` (clears the "Quest 1 is no longer supported" warning; override with `android.questSupportedDevices`).
+
 ### Fixed
 
 - **Quest builds failed Meta Horizon Store validation on Expo projects.** Two checks the plugin meant to handle never did. The `targetSdkVersion` cap rewrote `app/build.gradle`, but Expo's template resolves targetSdk from `gradle.properties` through `rootProject.ext`, so nothing matched and the APK shipped with targetSdk 36. The GLES `uses-feature` was declared `required="false"`, which the store validator does not count as a graphics API. When `xRMode` includes `"QUEST"`, the plugin now writes `android.targetSdkVersion=34` to `gradle.properties` (only ever lowering it; `android.questTargetSdkVersion` overrides the ceiling) and declares GLES 3.0 as required. Phone-only builds are unchanged.
+- **`ViroController` crashed the app on the first button event (`TypeError: Cannot read property 'props' of undefined`).** Its event handlers were prototype methods handed to the native view unbound; React Native dispatches them detached, so `this` was undefined once a click-type prop was set. They are now arrow class fields like `ViroBase`'s.
+- **Quest: `onDrag` followed the idle hand and objects jumped on grab / release when both hands were tracked.** Fixed in `@reactvision/virocore` (drag ownership per aim ray; grip / A / X / Y / thumbstick sources resolve against their own hand's ray).
+- **Quest: clicks on a highlighted button were dropped, and `onClick` (state `Clicked`) rarely fired.** Fixed in `@reactvision/virocore` (aim lasers no longer hit-testable, click grace and press capture, `Clicked` compared on handler nodes, button edges resolved against the current frame's hit).
 
-### Added
-
-- **Quest Store packaging defaults** when `xRMode` includes `"QUEST"`: `reactNativeArchitectures=arm64-v8a` (Quest hardware is 64-bit, the store warns on 32-bit libraries, and dropping the other ABIs roughly halves the APK; opt out with `android.questArm64Only: false`) and a `com.oculus.supportedDevices` manifest entry defaulting to `quest2|questpro|quest3|quest3s` (clears the "Quest 1 is no longer supported" warning; override with `android.questSupportedDevices`).
+  > **The two Quest input fixes above are JS-side only in this branch.** Their native half is still on `virocore`'s `fix/quest-dual-pointer-drag` and is *not* in `virocore/develop`, so `viro_renderer-release.aar` here does not carry it — see the Migration note.
 
 ### Migration
 
 - No breaking changes for phone builds. If an app also sets `android.targetSdkVersion` or `buildArchs` through `expo-build-properties`, the plugin listed earlier in `plugins` wins on the same `gradle.properties` key, because config-plugin mods run in reverse registration order.
+- **The bundled `viro_renderer-release.aar` needs a rebuild before release.** The 2.58.2 back-merge hit a genuine conflict on it: `release/2.58.2`'s AAR carries the Quest input fixes but predates the OBJ material fix, while develop's carries the OBJ fix and not the Quest ones — neither is a superset. Develop's was kept, because taking the other would regress OBJ materials. Rebuild from a `virocore/develop` that has `fix/quest-dual-pointer-drag` merged, and the Quest input fixes stop being inert.
 
 ## v2.58.1 — 17 August 2026
 

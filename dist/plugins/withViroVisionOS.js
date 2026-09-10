@@ -28,7 +28,7 @@
  *
  * Manual step (one-time, before prebuild):
  *   npx @react-native-community/cli@latest init MyApp \
- *     --template @callstack/visionos-template@latest \
+ *     --template github:ReactVision/visionos-template \
  *     --directory visionos --skip-install
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
@@ -44,6 +44,10 @@ const PODFILE_MARKER = "# viro-visionos";
 const METRO_MARKER = "// viro-visionos";
 const RNVISION_PKG = "@reactvision/react-native-visionos";
 const RNVISION_PLATFORMS_PKG = "@callstack/out-of-tree-platforms";
+// The visionOS Podfile autolinks through this. Expo apps do not have it — Expo ships its own
+// CLI — and without it `pod install` fails inside CocoaPods with a wall of text that names the
+// package only in passing.
+const RN_COMMUNITY_CLI_PKG = "@react-native-community/cli";
 // Path inside this package where bundled assets live (resolved at runtime).
 // This file is compiled to dist/plugins/, and plugins/withViroVisionOS.js is a one-line
 // forwarder to it — so at runtime __dirname is <pkg>/dist/plugins, not <pkg>/plugins.
@@ -70,7 +74,7 @@ const withVisionOSSetup = (config) => (0, config_plugins_1.withDangerousMod)(con
         const projectRoot = newConfig.modRequest.projectRoot;
         const visionosDir = path_1.default.join(projectRoot, "visionos");
         // Warn if missing deps
-        for (const pkg of [RNVISION_PKG, RNVISION_PLATFORMS_PKG]) {
+        for (const pkg of [RNVISION_PKG, RNVISION_PLATFORMS_PKG, RN_COMMUNITY_CLI_PKG]) {
             if (!isPkgInstalled(projectRoot, pkg)) {
                 config_plugins_1.WarningAggregator.addWarningIOS("withViroVisionOS", `${pkg} is not installed. Add it to devDependencies:\n` +
                     `  npm install --save-dev ${pkg}`);
@@ -80,7 +84,7 @@ const withVisionOSSetup = (config) => (0, config_plugins_1.withDangerousMod)(con
             const appName = config.name.replace(/[^a-zA-Z0-9]/g, "");
             config_plugins_1.WarningAggregator.addWarningIOS("withViroVisionOS", `visionos/ folder not found. Create it once before running expo prebuild:\n\n` +
                 `  npx @react-native-community/cli@latest init "${appName}" \\\n` +
-                `    --template @callstack/visionos-template@latest \\\n` +
+                `    --template github:ReactVision/visionos-template \\\n` +
                 `    --directory visionos --skip-install\n\n` +
                 `Then re-run: expo prebuild`);
         }
@@ -199,7 +203,20 @@ const withVisionOSPodfile = (config) => (0, config_plugins_1.withDangerousMod)(c
             return newConfig;
         }
         let podfile = fs_1.default.readFileSync(podfilePath, "utf-8");
+        // Read before touching anything: the deployment-target fix below writes PODFILE_MARKER, and
+        // computing this afterwards would report an unpatched Podfile as already patched and skip
+        // injecting the Viro pods entirely.
         const alreadyPatched = podfile.includes(PODFILE_MARKER);
+        // Raise the deployment target if the folder predates the template pinning it.
+        //
+        // ViroReactUI.podspec requires visionos 26.0 — ViroKit calls queryDrawables() and
+        // computeProjection(viewIndex:) with no availability fallback — and CocoaPods refuses the
+        // pod below it with "required a higher minimum deployment target". The template pins 26.0
+        // now, but nobody regenerates a visionos/ folder they already have, so it is fixed here too.
+        if (/^platform :visionos, min_visionos_version_supported/m.test(podfile)) {
+            podfile = podfile.replace(/^platform :visionos, min_visionos_version_supported/m, `platform :visionos, '26.0' ${PODFILE_MARKER}: ViroReactUI requires 26.0`);
+            console.log("[withViroVisionOS] Raised the visionOS deployment target to 26.0 (ViroReactUI requires it)");
+        }
         // ── 3a0. Both React Native source flags, set in the Podfile itself ──
         //
         // Neither default works on visionOS, and forgetting either fails in a way that does not
@@ -352,7 +369,13 @@ const withVisionOSPatches = (config) => (0, config_plugins_1.withDangerousMod)(c
     },
 ]);
 // ─── 6. components/compat/ — copy BlurView + LinearGradient shims ─────────────
-const SHIM_FILES = ["BlurView.tsx", "LinearGradient.tsx"];
+// Each shim replaces one Expo package that does not work on visionOS. Copying a shim into an app
+// that does not depend on that package leaves a file importing something absent — two TypeScript
+// errors in code the app never imports — so each is gated on the dependency it stands in for.
+const SHIM_FILES = [
+    { file: "BlurView.tsx", requires: "expo-blur" },
+    { file: "LinearGradient.tsx", requires: "expo-linear-gradient" },
+];
 const withVisionOSCompatShims = (config) => (0, config_plugins_1.withDangerousMod)(config, [
     "ios",
     async (newConfig) => {
@@ -362,19 +385,23 @@ const withVisionOSCompatShims = (config) => (0, config_plugins_1.withDangerousMo
             config_plugins_1.WarningAggregator.addWarningIOS("withViroVisionOS", "Bundled shims not found in the @reactvision/react-viro package.");
             return newConfig;
         }
-        if (!fs_1.default.existsSync(compatDir)) {
-            fs_1.default.mkdirSync(compatDir, { recursive: true });
-        }
+        // Created lazily: an app depending on neither package should not be left with an empty
+        // components/compat/ directory it never asked for.
         const copied = [];
-        for (const file of SHIM_FILES) {
+        for (const { file, requires } of SHIM_FILES) {
+            if (!isPkgInstalled(projectRoot, requires))
+                continue;
             const src = path_1.default.join(BUNDLED_SHIMS_DIR, file);
-            const dest = path_1.default.join(compatDir, file);
             if (!fs_1.default.existsSync(src))
                 continue;
-            if (!fs_1.default.existsSync(dest)) {
-                fs_1.default.copyFileSync(src, dest);
-                copied.push(file);
+            const dest = path_1.default.join(compatDir, file);
+            if (fs_1.default.existsSync(dest))
+                continue;
+            if (!fs_1.default.existsSync(compatDir)) {
+                fs_1.default.mkdirSync(compatDir, { recursive: true });
             }
+            fs_1.default.copyFileSync(src, dest);
+            copied.push(file);
         }
         if (copied.length > 0) {
             console.log(`[withViroVisionOS] Copied compat shims: ${copied.join(", ")}`);
@@ -513,12 +540,16 @@ const withVisionOSBundlePhase = (config) => (0, config_plugins_1.withDangerousMo
             return newConfig;
         }
         let pbx = fs_1.default.readFileSync(pbxPath, "utf-8");
-        // The template's phase runs react-native-xcode.sh out of whatever package it was generated
-        // against, and that script sources with-environment.sh beside it. Neither path is ours, so
-        // the phase dies with "with-environment.sh: No such file or directory" — and only on device,
-        // because the Simulator loads from the dev server and never runs this phase in anger.
-        const staleScriptPath = /@[a-z0-9-]+\/react-native-visionos\/scripts\/react-native-xcode\.sh/g;
-        const repointed = pbx.replace(staleScriptPath, `${RNVISION_PKG}/scripts/react-native-xcode.sh`);
+        // The template's phase runs scripts out of whatever visionOS package it was generated
+        // against, which is not this fork. Every such path is repointed, not just
+        // react-native-xcode.sh: the phase also references with-environment.sh directly, and an
+        // earlier version of this rule rewrote only the first on the assumption that the second was
+        // sourced relative to it. It is not, so the build died with "with-environment.sh: No such
+        // file or directory" after compiling everything.
+        //
+        // The pattern matches this package's own scope too, where the replacement is a no-op.
+        const stalePackagePath = /@[a-z0-9-]+\/react-native-visionos\//g;
+        const repointed = pbx.replace(stalePackagePath, `${RNVISION_PKG}/`);
         if (repointed !== pbx) {
             pbx = repointed;
             fs_1.default.writeFileSync(pbxPath, pbx, "utf-8");

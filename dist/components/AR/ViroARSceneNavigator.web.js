@@ -132,14 +132,20 @@ function loadSlamViaScript(url) {
     });
     return slamScriptPromise;
 }
+/*
+ * A status readout, so it reports the state rather than guessing at a cause.
+ * Limited is not only a startup condition — ARKit and ARCore also report it for
+ * poor light or fast motion — so calling it "initializing" would be wrong every
+ * time it happens mid-session.
+ */
 function trackingLabel(state) {
     switch (state) {
         case viro_web_renderer_1.ViroTrackingState.Normal:
             return "Tracking";
         case viro_web_renderer_1.ViroTrackingState.Limited:
-            return "Inicializando…";
+            return "Tracking limited";
         default:
-            return "Buscando tracking…";
+            return "No tracking";
     }
 }
 function ViroARSceneNavigator(props) {
@@ -172,7 +178,7 @@ function ViroARSceneNavigator(props) {
             }
             catch (err) {
                 console.error("[Viro web AR] failed to initialize renderer:", err);
-                setError("No se pudo inicializar el renderer.");
+                setError("Could not initialize the renderer.");
             }
         })();
         return () => {
@@ -281,9 +287,9 @@ function ViroARSceneNavigator(props) {
 
       {started ? (<div style={statusStyle}>{trackingLabel(tracking)}</div>) : (<div style={overlayStyle}>
           {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
-          <div>{props.startLabel ?? "AR en la web · cámara + tracking"}</div>
+          <div>{props.startLabel ?? "AR needs access to your camera."}</div>
           <button type="button" style={buttonStyle} disabled={!renderer || starting} onClick={startAR}>
-            {starting ? "Iniciando…" : "Iniciar AR"}
+            {starting ? "Starting…" : "Start AR"}
           </button>
         </div>)}
     </div>);

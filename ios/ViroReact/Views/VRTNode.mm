@@ -190,12 +190,41 @@ static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial
         if (![key isKindOfClass:[NSString class]]) {
             continue;
         }
+        if ([key caseInsensitiveCompare:@"shininess"] == NSOrderedSame) {
+            dest->setShininess(source->getShininess());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"blendMode"] == NSOrderedSame) {
+            dest->setBlendMode(source->getBlendMode());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"transparencyMode"] == NSOrderedSame) {
+            dest->setTransparencyMode(source->getTransparencyMode());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"cullMode"] == NSOrderedSame) {
+            dest->setCullMode(source->getCullMode());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"writesToDepthBuffer"] == NSOrderedSame) {
+            dest->setWritesToDepthBuffer(source->getWritesToDepthBuffer());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"readsFromDepthBuffer"] == NSOrderedSame) {
+            dest->setReadsFromDepthBuffer(source->getReadsFromDepthBuffer());
+            continue;
+        }
         if ([key caseInsensitiveCompare:@"bloomThreshold"] == NSOrderedSame) {
             dest->setBloomThreshold(source->getBloomThreshold());
             continue;
         }
         if ([key caseInsensitiveCompare:@"alpha"] == NSOrderedSame) {
             dest->setTransparency(source->getTransparency());
+            if (source->getTransparency() < 1) {
+                // VRTMaterialManager turns depth writing off for a translucent material,
+                // and with no writesToDepthBuffer key nothing else would carry that.
+                dest->setWritesToDepthBuffer(source->getWritesToDepthBuffer());
+            }
             continue;
         }
         if ([key caseInsensitiveCompare:@"chromaKeyFilteringColor"] == NSOrderedSame) {
@@ -838,15 +867,10 @@ static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial
                                 // Copy embedded material — preserves textures and skinning modifiers
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Rendering properties unconditionally, colours and textures below
+                                // Only the lighting model comes across unconditionally, an
+                                // override being asked for its model above all else. Everything
+                                // else is copied below and only where the author named it.
                                 mergedMat->setLightingModel(overrideMaterial->getLightingModel());
-                                mergedMat->setBloomThreshold(overrideMaterial->getBloomThreshold());
-                                mergedMat->setShininess(overrideMaterial->getShininess());
-                                mergedMat->setBlendMode(overrideMaterial->getBlendMode());
-                                mergedMat->setTransparencyMode(overrideMaterial->getTransparencyMode());
-                                mergedMat->setCullMode(overrideMaterial->getCullMode());
-                                mergedMat->setWritesToDepthBuffer(overrideMaterial->getWritesToDepthBuffer());
-                                mergedMat->setReadsFromDepthBuffer(overrideMaterial->getReadsFromDepthBuffer());
 
                                 mergedMat->setThreadRestrictionEnabled(false);
                                 VRTMergeAuthoredMaterialProperties(mergedMat, overrideMaterial,
@@ -1070,16 +1094,11 @@ static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                // Rendering properties come across whatever the override material says,
-                // since every one of them has a meaningful value. Colours, textures and PBR
-                // values are copied below, and only where the author named them.
+                // Only the lighting model comes across unconditionally, an override being
+                // asked for its model above all else. Everything else is copied below and
+                // only where the author named it, which is what keeps a glTF material's own
+                // cull mode and its MASK cutout when nobody asked for either.
                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
-                mergedMat->setShininess(shaderMaterial->getShininess());
-                mergedMat->setBlendMode(shaderMaterial->getBlendMode());
-                mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
-                mergedMat->setCullMode(shaderMaterial->getCullMode());
-                mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
-                mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
 
                 // NOTE: We DON'T clear existing shader modifiers because:
@@ -1187,14 +1206,10 @@ static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Rendering properties unconditionally, colours and textures below
+                                // Only the lighting model comes across unconditionally, an
+                                // override being asked for its model above all else. Everything
+                                // else is copied below and only where the author named it.
                                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
-                                mergedMat->setShininess(shaderMaterial->getShininess());
-                                mergedMat->setBlendMode(shaderMaterial->getBlendMode());
-                                mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
-                                mergedMat->setCullMode(shaderMaterial->getCullMode());
-                                mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
-                                mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
                                 // NOTE: We DON'T clear existing shader modifiers because:
                                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)

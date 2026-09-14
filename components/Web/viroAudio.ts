@@ -6,6 +6,8 @@
  * catch play() rejections).
  */
 
+import { cameraBasis, type Quat, type Vec3 } from "./viroMath";
+
 let ctx: AudioContext | null = null;
 
 export function getAudioContext(): AudioContext {
@@ -16,38 +18,17 @@ export function getAudioContext(): AudioContext {
   return ctx;
 }
 
-type Vec3 = [number, number, number];
-type Quat = [number, number, number, number];
-
 /** Anything that can say where the camera is. The AR session is the implementor. */
 export interface ViroAudioListenerSource {
   readonly cameraPose: { position: Vec3; quaternion: Quat };
 }
 
-/**
- * Rotate a vector by a quaternion: v + 2w(q × v) + 2(q × (q × v)).
- *
- * Exported for its own test — a sign error here points every sound at the wrong
- * side of the listener, which is hard to hear and easy to write.
- */
-export function rotateByQuaternion(q: Quat, v: Vec3): Vec3 {
-  const [x, y, z, w] = q;
-  const [vx, vy, vz] = v;
-  const tx = 2 * (y * vz - z * vy);
-  const ty = 2 * (z * vx - x * vz);
-  const tz = 2 * (x * vy - y * vx);
-  return [
-    vx + w * tx + (y * tz - z * ty),
-    vy + w * ty + (z * tx - x * tz),
-    vz + w * tz + (x * ty - y * tx),
-  ];
-}
-
 function setListenerPose(listener: AudioListener, position: Vec3, quaternion: Quat): void {
-  // virocore's camera looks down local -Z with +Y up, the same convention Web
-  // Audio's forward/up vectors use, so the basis vectors carry over rotated.
-  const [fx, fy, fz] = rotateByQuaternion(quaternion, [0, 0, -1]);
-  const [ux, uy, uz] = rotateByQuaternion(quaternion, [0, 1, 0]);
+  // virocore's camera convention is the one Web Audio's forward/up vectors use,
+  // so the basis carries over rotated with no axis swap.
+  const { forward, up } = cameraBasis(quaternion);
+  const [fx, fy, fz] = forward;
+  const [ux, uy, uz] = up;
   const [px, py, pz] = position;
 
   if (listener.positionX) {

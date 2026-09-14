@@ -8,8 +8,8 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAudioContext = getAudioContext;
-exports.rotateByQuaternion = rotateByQuaternion;
 exports.trackAudioListener = trackAudioListener;
+const viroMath_1 = require("./viroMath");
 let ctx = null;
 function getAudioContext() {
     if (!ctx) {
@@ -18,29 +18,12 @@ function getAudioContext() {
     }
     return ctx;
 }
-/**
- * Rotate a vector by a quaternion: v + 2w(q × v) + 2(q × (q × v)).
- *
- * Exported for its own test — a sign error here points every sound at the wrong
- * side of the listener, which is hard to hear and easy to write.
- */
-function rotateByQuaternion(q, v) {
-    const [x, y, z, w] = q;
-    const [vx, vy, vz] = v;
-    const tx = 2 * (y * vz - z * vy);
-    const ty = 2 * (z * vx - x * vz);
-    const tz = 2 * (x * vy - y * vx);
-    return [
-        vx + w * tx + (y * tz - z * ty),
-        vy + w * ty + (z * tx - x * tz),
-        vz + w * tz + (x * ty - y * tx),
-    ];
-}
 function setListenerPose(listener, position, quaternion) {
-    // virocore's camera looks down local -Z with +Y up, the same convention Web
-    // Audio's forward/up vectors use, so the basis vectors carry over rotated.
-    const [fx, fy, fz] = rotateByQuaternion(quaternion, [0, 0, -1]);
-    const [ux, uy, uz] = rotateByQuaternion(quaternion, [0, 1, 0]);
+    // virocore's camera convention is the one Web Audio's forward/up vectors use,
+    // so the basis carries over rotated with no axis swap.
+    const { forward, up } = (0, viroMath_1.cameraBasis)(quaternion);
+    const [fx, fy, fz] = forward;
+    const [ux, uy, uz] = up;
     const [px, py, pz] = position;
     if (listener.positionX) {
         listener.positionX.value = px;

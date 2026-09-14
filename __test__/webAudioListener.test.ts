@@ -5,7 +5,7 @@
  * hear deliberately and easy to write. virocore's camera looks down local -Z
  * with +Y up, so an unrotated pose must come back as exactly that.
  */
-import { rotateByQuaternion } from "../components/Web/viroAudio";
+import { rotateByQuaternion } from "../components/Web/viroMath";
 
 type Quat = [number, number, number, number];
 

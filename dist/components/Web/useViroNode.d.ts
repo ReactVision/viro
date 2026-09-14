@@ -8,10 +8,11 @@ export interface ViroWebNodeProps {
     opacity?: number;
     visible?: boolean;
     materials?: string | string[];
+    shaderOverrides?: string | string[];
     onClick?: (position: ViroPosition, source: number) => void;
     onClickState?: (clickState: number, position: ViroPosition, source: number) => void;
     onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;
     animation?: ViroAnimationProp;
 }
-export declare function useViroNode(props: ViroWebNodeProps, createGeometry?: (scene: ViroSceneApi) => ViroHandle, animationReady?: boolean, geometryKey?: string | number, createNodeFn?: (scene: ViroSceneApi) => ViroHandle): ViroHandle;
+export declare function useViroNode(props: ViroWebNodeProps, createGeometry?: (scene: ViroSceneApi) => ViroHandle, contentReady?: boolean, geometryKey?: string | number, createNodeFn?: (scene: ViroSceneApi) => ViroHandle): ViroHandle;
 export {};

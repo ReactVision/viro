@@ -29,6 +29,10 @@ export interface ViroWebNodeProps {
   opacity?: number;
   visible?: boolean;
   materials?: string | string[];
+  // Registered material names merged onto whatever this node draws, subtree
+  // included. The path a Studio `material_config` takes, and the only one that
+  // reaches a loaded model — see the effect below.
+  shaderOverrides?: string | string[];
   // Events (world-space position, input source id).
   onClick?: (position: ViroPosition, source: number) => void;
   onClickState?: (
@@ -43,9 +47,10 @@ export interface ViroWebNodeProps {
 export function useViroNode(
   props: ViroWebNodeProps,
   createGeometry?: (scene: ViroSceneApi) => ViroHandle,
-  // Gates model animations, which only become available after a model loads.
-  // Declarative animations don't need it (default true).
-  animationReady: boolean = true,
+  // False until a loaded model's subtree exists. Gates the two things that need
+  // it: its embedded animations, and the shader-override merge. A node whose
+  // geometry this hook builds is ready on mount, hence the default.
+  contentReady: boolean = true,
   // When provided, the geometry is rebuilt whenever this key changes (e.g. text
   // re-shapes). Omit for static geometry (box/sphere/surface) — built once.
   geometryKey?: string | number,
@@ -142,12 +147,36 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, materialsKey]);
 
+  // Shader overrides. Separate from `materials` above because that one needs the
+  // geometry handle this hook created, and a loaded model has none: its geometry
+  // belongs to the loader and hangs off child nodes. So a Studio material_config,
+  // which viroNodeFactory sends as `shaderOverrides`, only ever reaches a model
+  // through here.
+  //
+  // Gated on `contentReady` so a model is merged after it loads rather than
+  // against an empty subtree.
+  const overrideKey = Array.isArray(props.shaderOverrides)
+    ? props.shaderOverrides.join(",")
+    : props.shaderOverrides ?? "";
+  useEffect(() => {
+    if (!overrideKey || !contentReady) return;
+    // Each name re-merges from the materials the node drew before any override
+    // and replaces them, so with several the last one wins. That is what the
+    // native bridges do too, which is the point: the merge keeps the model's own
+    // colours and textures on both surfaces.
+    for (const name of overrideKey.split(",")) {
+      const material = createMaterialFromRegistry(scene, name);
+      if (material) scene.applyShaderOverride(node, material);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, overrideKey, contentReady]);
+
   // Animation (declarative ViroAnimation or model animation).
   useViroAnimation(
     node,
     props.animation,
     { position: [px, py, pz], rotation: [rx, ry, rz], scale: [sx, sy, sz], opacity },
-    animationReady,
+    contentReady,
   );
 
   return node;

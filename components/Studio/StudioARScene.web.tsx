@@ -40,7 +40,11 @@ import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
-import { webUnsupportedFeatures } from "./domain/webCapabilities";
+import { webUnsupportedFeatures, usesPlaneWrapper } from "./domain/webCapabilities";
+import {
+  evaluateProximityBindings,
+  type ProximityRuntimeState,
+} from "./domain/proximityBindingsRuntime";
 import {
   STUDIO_AMBIENT_INTENSITY,
   STUDIO_DIRECTIONAL_DIRECTION,
@@ -53,6 +57,9 @@ import type {
 } from "./types";
 
 type AnimOverride = { key: string; run: boolean };
+
+/** Native's throttle: the pose updates every frame, the distances need not. */
+const PROXIMITY_EVAL_INTERVAL_MS = 100;
 
 type Vec3 = [number, number, number];
 
@@ -373,6 +380,56 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       }
     };
   }, [placementApiRef, placeAtScreenPoint]);
+
+  // ─── Proximity bindings ───────────────────────────────────────────────────
+  // Fires a function when the user comes within `distance` of an asset. The
+  // camera side is the tracked pose; the asset side is its authored position,
+  // which is its world position only outside a plane wrapper — hence the gate,
+  // and hence webCapabilities reporting the wrapped case as unsupported.
+  const proximityBindings = useMemo(
+    () => sceneData.proximity_bindings ?? [],
+    [sceneData],
+  );
+  const proximityStateRef = useRef<Map<string, ProximityRuntimeState>>(new Map());
+  useEffect(() => {
+    proximityStateRef.current.clear();
+  }, [scene.id]);
+
+  const proximityLive =
+    proximityBindings.length > 0 &&
+    !usesPlaneWrapper(scene.plane_detection as string, mode);
+
+  useEffect(() => {
+    if (!proximityLive || !session) return;
+    let handle = 0;
+    let last = 0;
+    const step = () => {
+      handle = requestAnimationFrame(step);
+      const now = Date.now();
+      if (now - last < PROXIMITY_EVAL_INTERVAL_MS) return;
+      last = now;
+      evaluateProximityBindings({
+        cameraPosition: session.cameraPose.position,
+        bindings: proximityBindings,
+        getTargetWorldPosition: getAssetPosition,
+        stateRef: proximityStateRef,
+        animations,
+        onSceneChange: handleSceneChange,
+        onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+        runtimeCtx,
+      });
+    };
+    handle = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(handle);
+  }, [
+    proximityLive,
+    session,
+    proximityBindings,
+    getAssetPosition,
+    animations,
+    handleSceneChange,
+    runtimeCtx,
+  ]);
 
   // ─── Node mapping (image-triggered assets are skipped on web) ─────────────
   // Tap-to-place assets are held out of the plane wrapper: once placed they live

@@ -73,7 +73,10 @@ const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const webCapabilities_1 = require("./domain/webCapabilities");
+const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const studioLighting_1 = require("./domain/studioLighting");
+/** Native's throttle: the pose updates every frame, the distances need not. */
+const PROXIMITY_EVAL_INTERVAL_MS = 100;
 /**
  * The surface a tap lands on, or null when it lands on nothing usable.
  *
@@ -301,6 +304,51 @@ const StudioARSceneInner = (props) => {
             }
         };
     }, [placementApiRef, placeAtScreenPoint]);
+    // ─── Proximity bindings ───────────────────────────────────────────────────
+    // Fires a function when the user comes within `distance` of an asset. The
+    // camera side is the tracked pose; the asset side is its authored position,
+    // which is its world position only outside a plane wrapper — hence the gate,
+    // and hence webCapabilities reporting the wrapped case as unsupported.
+    const proximityBindings = (0, react_1.useMemo)(() => sceneData.proximity_bindings ?? [], [sceneData]);
+    const proximityStateRef = (0, react_1.useRef)(new Map());
+    (0, react_1.useEffect)(() => {
+        proximityStateRef.current.clear();
+    }, [scene.id]);
+    const proximityLive = proximityBindings.length > 0 &&
+        !(0, webCapabilities_1.usesPlaneWrapper)(scene.plane_detection, mode);
+    (0, react_1.useEffect)(() => {
+        if (!proximityLive || !session)
+            return;
+        let handle = 0;
+        let last = 0;
+        const step = () => {
+            handle = requestAnimationFrame(step);
+            const now = Date.now();
+            if (now - last < PROXIMITY_EVAL_INTERVAL_MS)
+                return;
+            last = now;
+            (0, proximityBindingsRuntime_1.evaluateProximityBindings)({
+                cameraPosition: session.cameraPose.position,
+                bindings: proximityBindings,
+                getTargetWorldPosition: getAssetPosition,
+                stateRef: proximityStateRef,
+                animations,
+                onSceneChange: handleSceneChange,
+                onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+                runtimeCtx,
+            });
+        };
+        handle = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(handle);
+    }, [
+        proximityLive,
+        session,
+        proximityBindings,
+        getAssetPosition,
+        animations,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
     // ─── Node mapping (image-triggered assets are skipped on web) ─────────────
     // Tap-to-place assets are held out of the plane wrapper: once placed they live
     // in world space, and a plane wrapper would re-parent them to the plane.

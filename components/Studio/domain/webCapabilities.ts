@@ -13,6 +13,22 @@
 import type { StudioAsset, StudioSceneResponse } from "../types";
 import { isTapToPlaceAsset } from "./placementStore";
 
+/**
+ * Whether the host wraps the scene's assets in a ViroARPlane.
+ *
+ * It decides more than anchoring: inside a wrapper an asset's authored position
+ * is plane-local, and the web C API cannot read a node's world transform, so
+ * anything measuring real distances only works outside one.
+ */
+export function usesPlaneWrapper(
+  planeDetection: string | null | undefined,
+  mode: "ar" | "3d",
+): boolean {
+  if (mode !== "ar") return false;
+  const detection = (planeDetection ?? "NONE").toUpperCase();
+  return detection === "AUTOMATIC" || detection === "MANUAL";
+}
+
 /** True for a config object that exists and is not explicitly switched off. */
 function isEnabled(config: unknown): boolean {
   if (typeof config !== "object" || config === null) return false;
@@ -46,10 +62,23 @@ export function webUnsupportedFeatures(
 
   if (hasPhysics(scene.physics_world_config, assets)) features.push("physics");
 
-  // Only on-load and on-click reach a node on web: this host wires none of the
-  // three bindings runtimes the native one does.
+  // Gaze is a headset affordance: the native host wires it on Quest only, and a
+  // browser has no gaze ray either. Standing a mouse hover in for it would give
+  // web a behaviour no phone has, which is the opposite of parity.
   if (sceneData.gaze_bindings?.length) features.push("gaze triggers");
-  if (sceneData.proximity_bindings?.length) features.push("proximity triggers");
+
+  // Proximity measures the distance from the camera to an asset, so it needs the
+  // asset's world position. Inside a plane wrapper the authored position is
+  // plane-local and the web C API cannot read a world transform, so the metres
+  // would be wrong — better declared than quietly off.
+  if (
+    sceneData.proximity_bindings?.length &&
+    usesPlaneWrapper(scene.plane_detection as string, mode)
+  ) {
+    features.push("proximity triggers");
+  }
+
+  // Collisions need a physics world, which web has none of.
   if (sceneData.collision_bindings?.length) features.push("collision triggers");
 
   // Guided placement needs a tracked camera to hit-test a tap against, so it

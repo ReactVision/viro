@@ -29,16 +29,37 @@ describe("webUnsupportedFeatures", () => {
     expect(webUnsupportedFeatures(sceneData({ assets: [asset()] }))).toEqual([]);
   });
 
-  test("reports the three trigger kinds this host never wires", () => {
+  test("reports gaze and collision, which this host cannot run at all", () => {
+    // Gaze is a headset affordance the native host only wires on Quest;
+    // collisions need a physics world web has none of.
+    expect(
+      webUnsupportedFeatures(
+        sceneData({ gaze_bindings: [{}], collision_bindings: [{}] }),
+      ),
+    ).toEqual(["gaze triggers", "collision triggers"]);
+  });
+
+  test("reports proximity only where the distances would be wrong", () => {
+    const bindings = { proximity_bindings: [{}] };
+
+    // Assets at scene root: their authored position is their world position, so
+    // the distance the runtime measures is the real one.
+    expect(
+      webUnsupportedFeatures(
+        sceneData({ scene: { id: "s1", plane_detection: "NONE" }, ...bindings }),
+      ),
+    ).toEqual([]);
+
+    // Inside a plane wrapper the position is plane-local and web cannot read a
+    // world transform, so the metres would be off with no sign of it.
     expect(
       webUnsupportedFeatures(
         sceneData({
-          gaze_bindings: [{}],
-          proximity_bindings: [{}],
-          collision_bindings: [{}],
+          scene: { id: "s1", plane_detection: "AUTOMATIC" },
+          ...bindings,
         }),
       ),
-    ).toEqual(["gaze triggers", "proximity triggers", "collision triggers"]);
+    ).toEqual(["proximity triggers"]);
   });
 
   test("reports tap to place only where there is no camera to tap against", () => {

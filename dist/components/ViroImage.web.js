@@ -1,25 +1,85 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveSurface = resolveSurface;
 exports.ViroImage = ViroImage;
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const useViroNode_1 = require("./Web/useViroNode");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroImageLoader_1 = require("./Web/viroImageLoader");
+/** VRTImage.mm's kDefaultWidth / kDefaultHeight. */
+const DEFAULT_SIZE = 1;
+/**
+ * The quad's dimensions, following VRTImage's rules.
+ *
+ * `aspect` is null until the picture has been decoded, because every branch but
+ * the first needs to know its shape.
+ */
+function resolveSurface(width, height, sizeAuthored, resizeMode, resizeModeAuthored, aspect) {
+    // Nothing to measure against yet, so the quad is the authored box — the same
+    // 1x1 default a device starts with before its own download finishes.
+    if (aspect === null)
+        return [width, height];
+    // No authored size: the picture sets the height and the width stays 1. This is
+    // the case every Studio placement takes, since the node factory sends the
+    // source and a resize mode but never a size.
+    if (!sizeAuthored)
+        return [width, width / aspect];
+    // A size but no resize mode. Native leaves its _scaledWidth/_scaledHeight at
+    // the 1x1 default here and draws a unit quad, ignoring the size that was
+    // authored; that is its uninitialised state showing through rather than a
+    // decision, so this honours the box instead, which is what its own default
+    // resize mode (StretchToFill) says should happen.
+    if (!resizeModeAuthored)
+        return [width, height];
+    const target = width / height;
+    switch (resizeMode) {
+        // Fit inside the box: the whole picture shows and the quad shrinks on the
+        // axis with room to spare.
+        case "ScaleToFit":
+            return target <= aspect
+                ? [width, width / aspect]
+                : [height * aspect, height];
+        // Cover the box. Native pairs this with imageClipMode ClipToBounds, its
+        // default, and crops back to the box through the surface's UVs; web's
+        // createSurface takes no UVs, so the quad covers and overflows instead.
+        // Wrong bounds, right shape — the opposite trade would put the distortion
+        // back, which is the whole point of this function.
+        case "ScaleToFill":
+            return target <= aspect
+                ? [height * aspect, height]
+                : [width, width / aspect];
+        default:
+            return [width, height];
+    }
+}
 function ViroImage(props) {
     const scene = (0, ViroWebContext_1.useViroScene)();
-    const width = props.width ?? props.style?.width ?? 1;
-    const height = props.height ?? props.style?.height ?? 1;
+    const widthProp = props.width ?? props.style?.width;
+    const heightProp = props.height ?? props.style?.height;
+    const sizeAuthored = widthProp !== undefined || heightProp !== undefined;
+    const width = widthProp ?? DEFAULT_SIZE;
+    const height = heightProp ?? DEFAULT_SIZE;
+    const resizeModeAuthored = props.resizeMode !== undefined;
+    const resizeMode = props.resizeMode ?? "StretchToFill";
+    // The decoded picture's aspect, which only the load can supply.
+    const [aspect, setAspect] = (0, react_1.useState)(null);
+    const [surfaceWidth, surfaceHeight] = resolveSurface(width, height, sizeAuthored, resizeMode, resizeModeAuthored, aspect);
     const geometryRef = (0, react_1.useRef)(0);
-    const node = (0, useViroNode_1.useViroNode)(props, (s) => {
-        const geo = s.createSurface(width, height);
+    // Keyed on the resolved size so the surface is rebuilt once the picture lands
+    // and the height stops being a guess.
+    (0, useViroNode_1.useViroNode)(props, (s) => {
+        const geo = s.createSurface(surfaceWidth, surfaceHeight);
         geometryRef.current = geo;
         return geo;
-    });
+    }, true, `${surfaceWidth}x${surfaceHeight}`);
     const url = (0, viroImageLoader_1.resolveImageSource)(props.source);
     const materialRef = (0, react_1.useRef)(0);
     const textureRef = (0, react_1.useRef)(0);
-    // Load the image and apply it as the surface's diffuse texture.
+    // Load the image and apply it as the surface's diffuse texture. Re-runs when
+    // the surface is rebuilt, since the material belongs to the geometry that was
+    // just replaced. loadImageRGBA caches by URL, so the second pass costs a
+    // texture upload rather than a download.
     const propsRef = (0, react_1.useRef)(props);
     propsRef.current = props;
     (0, react_1.useEffect)(() => {
@@ -40,6 +100,9 @@ function ViroImage(props) {
             scene.setGeometryMaterial(geo, material);
             textureRef.current = texture;
             materialRef.current = material;
+            // Rebuilds the surface on the first pass, and is a no-op on the second.
+            if (img.height > 0)
+                setAspect(img.width / img.height);
             propsRef.current.onLoadEnd?.();
         })
             .catch((err) => {
@@ -58,6 +121,6 @@ function ViroImage(props) {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [url]);
+    }, [url, surfaceWidth, surfaceHeight]);
     return null;
 }

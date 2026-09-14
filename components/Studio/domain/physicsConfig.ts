@@ -45,7 +45,7 @@ export type BuildViroPhysicsBodyOptions = {
   /** Forces Dynamic body to Kinematic with mass 0 while dragging. */
   kinematicDragOverride?: boolean;
   /**
-   * The node's uniform scale, applied to an explicit Box or Sphere shape.
+   * The node's uniform scale, applied to an explicit shape of any type.
    * virocore does not scale one: `generateBasicBulletShape(type, params)` builds
    * the bullet shape from the params as given and only the geometry-inferred
    * branch calls `setLocalScaling`, so a 1 m collider stayed 1 m around a node
@@ -107,18 +107,18 @@ function mapShapeToViro(
   if (shape.type === "Sphere") {
     return { type: "Sphere", params: [shape.params[0] * scale] };
   }
-  // Compound children are passed as authored, unscaled: virocore ignores them
-  // and builds a compound of the NODE's own children instead, applying the
-  // node's scale to that itself (`generateCompoundBulletShape`), so nothing
-  // here reaches bullet and scaling it would only look right in a diff.
+  // A part's position scales with its dimensions, so the compound keeps its
+  // shape rather than spreading as the node grows. Scaled here for the same
+  // reason an explicit Box or Sphere is: the renderer builds the parts from
+  // these numbers as given.
   return {
     type: "Compound",
     params: [],
     children: shape.children.map((c) => {
       const base: Record<string, unknown> = {
         type: c.type,
-        params: [...c.params],
-        position: [...c.position],
+        params: c.params.map((p) => p * scale),
+        position: c.position.map((p) => p * scale),
       };
       if (c.rotation) base.rotation = [...c.rotation];
       return base;
@@ -268,10 +268,14 @@ export function buildViroPhysicsBody(
   if (config.friction !== undefined) body.friction = config.friction;
   if (config.useGravity !== undefined)
     body.useGravity = kinematicDrag ? false : config.useGravity;
-  // `velocity` is deliberately NOT sent: the bridges pass it to virocore as a
-  // CONSTANT velocity, reasserted on the rigid body every frame, so gravity
-  // never gets a turn. The node factory launches the authored value once
-  // instead (`LaunchNode`).
+  // Sent as `instantVelocity`, never as `velocity`: the bridges pass the latter
+  // to virocore as a CONSTANT velocity, reasserted on the rigid body every
+  // frame, so gravity never gets a turn. The instant one is a latch the next
+  // physics step consumes once, and it rides the node's own props, where a
+  // module call at mount cannot see the view yet under the New Architecture.
+  if (config.velocity !== undefined) {
+    body.instantVelocity = [...config.velocity];
+  }
   if (config.torque !== undefined) body.torque = normalizeTorque(config.torque);
   if (config.force !== undefined) body.force = normalizeForce(config.force);
 

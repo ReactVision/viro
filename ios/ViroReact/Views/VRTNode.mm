@@ -1750,7 +1750,8 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         if (nsShapeDictionaryProp){
             NSString *stringShapeName = [nsShapeDictionaryProp objectForKey:@"type"];
             NSArray *shapeParams = [nsShapeDictionaryProp objectForKey:@"params"];
-            propPhysicsShape = [VRTNode getPhysicsShape:stringShapeName params:shapeParams];
+            NSArray *shapeChildren = [nsShapeDictionaryProp objectForKey:@"children"];
+            propPhysicsShape = [VRTNode getPhysicsShape:stringShapeName params:shapeParams children:shapeChildren];
             if (propPhysicsShape == nullptr){
                 return false;
             }
@@ -1828,6 +1829,20 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         }
     }
     
+    // A launch, applied once by the next physics step and then cleared, where
+    // the constant velocity below is reasserted every frame. Sent only when it
+    // changes, since this runs on every physics prop write.
+    NSArray *instantVelocity = [dictionary objectForKey:@"instantVelocity"];
+    if (instantVelocity != nil) {
+        if ([instantVelocity count] != 3) {
+            RCTLogError(@"Incorrect parameters provided for instantVelocity, expected: [x, y, z]!");
+            return false;
+        }
+        if (![instantVelocity isEqualToArray:[self.physicsDictionary objectForKey:@"instantVelocity"]]) {
+            [self setVelocity:instantVelocity isConstant:NO];
+        }
+    }
+
     NSArray *velocity = [dictionary objectForKey:@"velocity"];
     if (velocity != nil){
         if ([velocity count] != 3) {
@@ -1961,15 +1976,48 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     body->setVelocity(velocity3f, constant);
 }
 
-+(std::shared_ptr<VROPhysicsShape>)getPhysicsShape:(NSString *)stringShapeName params:(NSArray *)shapeParams {
+/*
+ Flattens a compound shape's parts into the float list the renderer takes for a
+ shape, laid out as VROPhysicsShape::kCompoundChildStride describes. A part's
+ rotation is not carried, which is also what the editor simulates.
+ */
+static std::vector<float> VRTFlattenCompoundShapeChildren(NSArray *children) {
+    std::vector<float> params = {};
+    for (NSDictionary *child in children) {
+        NSString *childType = [child objectForKey:@"type"];
+        NSArray *childParams = [child objectForKey:@"params"];
+        NSArray *childPosition = [child objectForKey:@"position"];
+
+        bool isSphere = [childType isKindOfClass:[NSString class]]
+                        && [childType caseInsensitiveCompare:@"Sphere"] == NSOrderedSame;
+        if ([childParams count] < (isSphere ? 1 : 3) || [childPosition count] < 3) {
+            RCTLogError(@"Ignoring a compound physics shape part with missing dimensions or position");
+            continue;
+        }
+
+        params.push_back(isSphere ? 1 : 0);
+        params.push_back([[childParams objectAtIndex:0] floatValue]);
+        params.push_back(isSphere ? 0 : [[childParams objectAtIndex:1] floatValue]);
+        params.push_back(isSphere ? 0 : [[childParams objectAtIndex:2] floatValue]);
+        for (int i = 0; i < 3; i ++) {
+            params.push_back([[childPosition objectAtIndex:i] floatValue]);
+        }
+    }
+    return params;
+}
+
++(std::shared_ptr<VROPhysicsShape>)getPhysicsShape:(NSString *)stringShapeName params:(NSArray *)shapeParams children:(NSArray *)shapeChildren {
     if (!stringShapeName) {
         RCTLogError(@"Provided an invalid physics shape name to the physics body!");
         return nullptr;
     }
     
-    // Grab the current shapeParams
+    // Grab the current shapeParams. A compound carries its parts instead, and
+    // keeps meaning the one inferred from the node's children when given none.
     std::vector<float> params = {};
-    if (shapeParams) {
+    if ([stringShapeName caseInsensitiveCompare:@"Compound"] == NSOrderedSame) {
+        params = VRTFlattenCompoundShapeChildren(shapeChildren);
+    } else if (shapeParams) {
         for (int i = 0; i < [shapeParams count]; i ++) {
             float value = [[shapeParams objectAtIndex:i] floatValue];
             params.push_back(value);

@@ -1662,7 +1662,12 @@ public class VRTNode extends VRTComponent {
             // the current shapeType (required in JS if providing a physics shape)
             if (shapeTypeProp != null) {
                 propShapeType = shapeTypeProp.getString("type");
-                if (shapeTypeProp.hasKey("params")) {
+                if (propShapeType.equalsIgnoreCase("compound")) {
+                    // A compound's parts are what reaches the renderer, so they
+                    // are what is checked; its params key means nothing.
+                    params = flattenCompoundShapeChildren(
+                            shapeTypeProp.hasKey("children") ? shapeTypeProp.getArray("children") : null);
+                } else if (shapeTypeProp.hasKey("params")) {
                     ReadableArray readableParams = shapeTypeProp.getArray("params");
                     params = new float[readableParams.size()];
                     for (int i = 0; i < readableParams.size(); i++) {
@@ -1682,7 +1687,8 @@ public class VRTNode extends VRTComponent {
                     shape = new PhysicsShapeBox(params[0], params[1], params[2]);
                 }
                 else if (propShapeType.equalsIgnoreCase("compound")) {
-                    shape = new PhysicsShapeAutoCompound();
+                    shape = params.length > 0 ? new CompoundPhysicsShape(params)
+                                              : new PhysicsShapeAutoCompound();
                 }
                 else {
                     throw new JSApplicationCausedNativeException("Invalid shape type [" + propShapeType + "]");
@@ -1695,6 +1701,87 @@ public class VRTNode extends VRTComponent {
             } else {
                 mNodeJni.getPhysicsBody().setShape(shape);
             }
+        }
+    }
+
+    /*
+     Flattens a compound shape's parts into the float list the renderer takes for
+     a shape, laid out as VROPhysicsShape::kCompoundChildStride describes. A
+     part's rotation is not carried, which is also what the editor simulates.
+     */
+    private float[] flattenCompoundShapeChildren(ReadableArray children) {
+        if (children == null) {
+            return new float[0];
+        }
+
+        List<Float> params = new ArrayList<>();
+        for (int i = 0; i < children.size(); i++) {
+            ReadableMap child = children.getMap(i);
+            String childType = child.hasKey("type") ? child.getString("type") : null;
+            ReadableArray childParams = child.hasKey("params") ? child.getArray("params") : null;
+            ReadableArray childPosition = child.hasKey("position") ? child.getArray("position") : null;
+
+            boolean isSphere = "sphere".equalsIgnoreCase(childType);
+            if (childParams == null || childParams.size() < (isSphere ? 1 : 3)
+                    || childPosition == null || childPosition.size() < 3) {
+                ViroLog.warn(TAG, "Ignoring a compound physics shape part with missing dimensions or position");
+                continue;
+            }
+
+            params.add(isSphere ? 1f : 0f);
+            params.add((float) childParams.getDouble(0));
+            params.add(isSphere ? 0f : (float) childParams.getDouble(1));
+            params.add(isSphere ? 0f : (float) childParams.getDouble(2));
+            for (int j = 0; j < 3; j++) {
+                params.add((float) childPosition.getDouble(j));
+            }
+        }
+
+        float[] flattened = new float[params.size()];
+        for (int i = 0; i < params.size(); i++) {
+            flattened[i] = params.get(i);
+        }
+        return flattened;
+    }
+
+    /*
+     Compares two vectors by value. ReadableArray does not define equality, so
+     comparing the objects only ever answers whether it is the same instance.
+     */
+    private static boolean isSameVector(ReadableArray a, ReadableArray b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            if (a.getDouble(i) != b.getDouble(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /*
+     The parts of a compound reach the renderer through the shape params, which
+     is the only thing a PhysicsShape carries.
+     */
+    private static class CompoundPhysicsShape implements PhysicsShape {
+        private final float[] mParams;
+
+        CompoundPhysicsShape(float[] params) {
+            mParams = params;
+        }
+
+        @Override
+        public String getType() {
+            return "Compound";
+        }
+
+        @Override
+        public float[] getParams() {
+            return mParams;
         }
     }
 
@@ -1745,6 +1832,28 @@ public class VRTNode extends VRTComponent {
                 ViroLog.warn(TAG,"Attempted to set useGravity for non-dynamic phsyics bodies.");
             } else {
                 mNodeJni.getPhysicsBody().setUseGravity(map.getBoolean("useGravity"));
+            }
+        }
+
+        // A launch, applied once by the next physics step and then cleared, where
+        // the constant velocity below is reasserted every frame. Sent only when
+        // it changes, since this runs on every physics prop write.
+        if (map.hasKey("instantVelocity")) {
+            ReadableArray instantVelocity = map.getArray("instantVelocity");
+            if (instantVelocity.size() != 3) {
+                throw new JSApplicationCausedNativeException("Incorrect parameters " +
+                        "provided for instantVelocity, expected: [x, y, z]!");
+            }
+
+            ReadableArray currentInstantVelocity =
+                    (mPhysicsMap != null && mPhysicsMap.hasKey("instantVelocity"))
+                            ? mPhysicsMap.getArray("instantVelocity") : null;
+            if (!isSameVector(instantVelocity, currentInstantVelocity)) {
+                float instantArray[] = new float[instantVelocity.size()];
+                for (int i = 0; i < instantVelocity.size(); i ++){
+                    instantArray[i] = (float) instantVelocity.getDouble(i);
+                }
+                mNodeJni.getPhysicsBody().setVelocity(new Vector(instantArray), false);
             }
         }
 

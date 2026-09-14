@@ -864,6 +864,13 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             return mNativeMaterial;
         }
 
+        // The dictionary this material was registered from. A Material cannot say which
+        // of its own properties were authored, so a merge onto another material needs
+        // this to know which ones to carry across.
+        public ReadableMap getMaterialSource() {
+            return mMaterialSource;
+        }
+
         public void addVideoTexturePath(String name, Uri videoUri) {
             mVideoTextures.put(name, videoUri);
         }

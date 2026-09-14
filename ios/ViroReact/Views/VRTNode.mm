@@ -127,6 +127,104 @@ static NSHashTable *shaderOverrideNodesRegistry = nil;
 // Static registry to track all nodes with shader materials (weak references)
 static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
+// The VROMaterialVisual a JS material key writes to, or null for a key that is not
+// a visual. Mirrors VRTMaterialManager's own key handling, case-insensitive compare
+// included.
+static VROMaterialVisual *VRTVisualForMaterialKey(const std::shared_ptr<VROMaterial> &material, NSString *key) {
+    if ([key caseInsensitiveCompare:@"diffuseColor"] == NSOrderedSame ||
+        [key caseInsensitiveCompare:@"diffuseTexture"] == NSOrderedSame ||
+        [key caseInsensitiveCompare:@"diffuseIntensity"] == NSOrderedSame) {
+        return &material->getDiffuse();
+    } else if ([key caseInsensitiveCompare:@"specularColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"specularTexture"] == NSOrderedSame) {
+        return &material->getSpecular();
+    } else if ([key caseInsensitiveCompare:@"normalColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"normalTexture"] == NSOrderedSame) {
+        return &material->getNormal();
+    } else if ([key caseInsensitiveCompare:@"reflectiveColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"reflectiveTexture"] == NSOrderedSame) {
+        return &material->getReflective();
+    } else if ([key caseInsensitiveCompare:@"emissionColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"emissionTexture"] == NSOrderedSame) {
+        return &material->getEmission();
+    } else if ([key caseInsensitiveCompare:@"multiplyColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"multiplyTexture"] == NSOrderedSame) {
+        return &material->getMultiply();
+    } else if ([key caseInsensitiveCompare:@"ambientOcclusionColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"ambientOcclusionTexture"] == NSOrderedSame) {
+        return &material->getAmbientOcclusion();
+    } else if ([key caseInsensitiveCompare:@"selfIlluminationColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"selfIlluminationTexture"] == NSOrderedSame) {
+        return &material->getSelfIllumination();
+    } else if ([key caseInsensitiveCompare:@"roughness"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"roughnessTexture"] == NSOrderedSame) {
+        return &material->getRoughness();
+    } else if ([key caseInsensitiveCompare:@"metalness"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"metalnessTexture"] == NSOrderedSame) {
+        return &material->getMetalness();
+    }
+    return nullptr;
+}
+
+// Copies onto `dest` the colours, textures and PBR values that `sourceJson` names,
+// and only those. A VROMaterial cannot say which of its properties an author set:
+// one built from a dictionary carrying nothing but shader modifiers still reports a
+// white diffuse and a 0.5 roughness, so copying them all would white out a textured
+// model, which is why the merges below skipped them entirely. The dictionary the
+// material was registered from is the only record of what was asked for.
+//
+// One key moves one facet, so a config naming a colour and no texture leaves the
+// model's own texture in place. A scalar roughness or metalness is still ignored by
+// the shader when the model carries a map for it, since the map wins.
+//
+// Call with thread restrictions disabled on `dest`: setColor and setTexture both
+// call updateSubstrate, and this runs off the rendering thread.
+static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial> &dest,
+                                               const std::shared_ptr<VROMaterial> &source,
+                                               NSDictionary *sourceJson) {
+    if (!dest || !source || ![sourceJson isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+
+    for (NSString *key in sourceJson) {
+        if (![key isKindOfClass:[NSString class]]) {
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"bloomThreshold"] == NSOrderedSame) {
+            dest->setBloomThreshold(source->getBloomThreshold());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"chromaKeyFilteringColor"] == NSOrderedSame) {
+            dest->setChromaKeyFilteringColor(source->getChromaKeyFilteringColor());
+            dest->setChromaKeyFilteringEnabled(source->isChromaKeyFilteringEnabled());
+            continue;
+        }
+
+        VROMaterialVisual *destVisual = VRTVisualForMaterialKey(dest, key);
+        VROMaterialVisual *sourceVisual = VRTVisualForMaterialKey(source, key);
+        if (destVisual == nullptr || sourceVisual == nullptr) {
+            continue;
+        }
+
+        // Every other key is named for the facet the manager writes it to, but
+        // roughness and metalness take either a number or a texture source and the
+        // manager writes whichever it was handed.
+        BOOL writesTexture = [key hasSuffix:@"texture"] || [key hasSuffix:@"Texture"];
+        if ([key caseInsensitiveCompare:@"roughness"] == NSOrderedSame ||
+            [key caseInsensitiveCompare:@"metalness"] == NSOrderedSame) {
+            writesTexture = ![sourceJson[key] isKindOfClass:[NSNumber class]];
+        }
+
+        if (writesTexture) {
+            destVisual->setTexture(sourceVisual->getTexture());
+        } else if ([key caseInsensitiveCompare:@"diffuseIntensity"] == NSOrderedSame) {
+            destVisual->setIntensity(sourceVisual->getIntensity());
+        } else {
+            destVisual->setColor(sourceVisual->getColor());
+        }
+    }
+}
+
 @implementation VRTNode
 
 + (void)initialize {
@@ -705,9 +803,8 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
     [self updateVideoTextures];
 
-    // Recursively merge material rendering properties onto child node embedded materials.
-    // This preserves embedded textures and skinning modifiers while applying user-specified
-    // rendering settings (lighting model, bloom, blend mode, etc.) from the first override material.
+    // The root geometry above replaces its materials outright, but a GLB keeps its geometry
+    // on child nodes, so without this merge a `materials` prop reaches nothing a model draws.
     if (recursive && self.materials && self.materials.count > 0) {
         VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
         NSString *firstMaterialName = self.materials[0];
@@ -737,7 +834,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                                 // Copy embedded material — preserves textures and skinning modifiers
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Apply rendering properties from the user override only (NOT colors/textures)
+                                // Rendering properties unconditionally, colours and textures below
                                 mergedMat->setLightingModel(overrideMaterial->getLightingModel());
                                 mergedMat->setBloomThreshold(overrideMaterial->getBloomThreshold());
                                 mergedMat->setShininess(overrideMaterial->getShininess());
@@ -746,6 +843,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                                 mergedMat->setCullMode(overrideMaterial->getCullMode());
                                 mergedMat->setWritesToDepthBuffer(overrideMaterial->getWritesToDepthBuffer());
                                 mergedMat->setReadsFromDepthBuffer(overrideMaterial->getReadsFromDepthBuffer());
+
+                                mergedMat->setThreadRestrictionEnabled(false);
+                                VRTMergeAuthoredMaterialProperties(mergedMat, overrideMaterial,
+                                                                   materialManager.materials[firstMaterialName]);
+                                mergedMat->setThreadRestrictionEnabled(true);
 
                                 // Propagate shader modifiers (e.g. semantic mask, custom effects)
                                 for (const auto &modifier : overrideMaterial->getShaderModifiers()) {
@@ -884,8 +986,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     }
 }
 
-// Apply shader modifiers to existing materials without replacing textures.
-// Clones the geometry's current materials and merges shader modifiers from the override materials.
+// Merges the override materials onto the geometry's own materials rather than replacing
+// them, which is what keeps a GLB's embedded textures and its skinning modifier, the
+// loader having hung that modifier on the material being preserved.
 - (void)applyShaderOverridesRecursive:(BOOL)recursive {
     if (!self.node || !self.shaderOverrides) {
         return;
@@ -963,10 +1066,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                // CRITICAL: Copy properties from shader override material
-                // Similar to Android's dest.copyShaderModifiers(source) approach
-                // We only copy properties that affect rendering, NOT colors/textures
-                // (colors are set dynamically in shader modifiers)
+                // Rendering properties come across whatever the override material says,
+                // since every one of them has a meaningful value. Colours, textures and PBR
+                // values are copied below, and only where the author named them.
                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
                 mergedMat->setShininess(shaderMaterial->getShininess());
                 mergedMat->setBlendMode(shaderMaterial->getBlendMode());
@@ -985,6 +1087,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // CRITICAL: Disable thread restrictions temporarily (like Android does)
                 // This allows shader modifiers to be copied synchronously during material setup
                 mergedMat->setThreadRestrictionEnabled(false);
+
+                VRTMergeAuthoredMaterialProperties(mergedMat, shaderMaterial,
+                                                   materialManager.materials[shaderMaterialName]);
 
                 // Copy shader modifiers from shader material to merged material
                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -1078,7 +1183,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Copy rendering properties from shader override (NOT colors/textures)
+                                // Rendering properties unconditionally, colours and textures below
                                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
                                 mergedMat->setShininess(shaderMaterial->getShininess());
                                 mergedMat->setBlendMode(shaderMaterial->getBlendMode());
@@ -1095,6 +1200,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
                                 // Disable thread restrictions (like Android)
                                 mergedMat->setThreadRestrictionEnabled(false);
+
+                                VRTMergeAuthoredMaterialProperties(mergedMat, shaderMaterial,
+                                                                   materialManager.materials[shaderMaterialName]);
 
                                 // Copy shader modifiers
                                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {

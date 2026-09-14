@@ -34,6 +34,7 @@ import com.facebook.react.bridge.JSApplicationCausedNativeException;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
@@ -1125,6 +1126,9 @@ public class VRTNode extends VRTComponent {
                     // Clone original materials and merge shader modifiers
                     java.util.ArrayList<Material> mergedMaterials = new java.util.ArrayList<>();
                     Log.d(TAG, "Creating merged materials for " + originalMaterials.size() + " original materials");
+                    MaterialManager.MaterialWrapper shaderWrapper =
+                            materialManager.getMaterialWrapper(shaderMaterialName);
+
                     for (Material originalMat : originalMaterials) {
                         // Create a new material copying the original (preserves textures)
                         Log.d(TAG, "Copying material via Material(originalMat) constructor");
@@ -1134,7 +1138,8 @@ public class VRTNode extends VRTComponent {
                         // Copy shader modifiers from shader material
                         // Note: Material class doesn't expose getShaderModifiers in Java,
                         // so we rely on C++ copy constructor handling this
-                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat);
+                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat,
+                                shaderWrapper != null ? shaderWrapper.getMaterialSource() : null);
 
                         mergedMaterials.add(mergedMat);
                         clonedMaterialsList.add(mergedMat);
@@ -1206,10 +1211,14 @@ public class VRTNode extends VRTComponent {
                         mShaderOverrideMap.put(shaderMaterialName, clonedMaterialsList);
                     }
 
+                    MaterialManager.MaterialWrapper shaderWrapper =
+                            materialManager.getMaterialWrapper(shaderMaterialName);
+
                     java.util.ArrayList<Material> mergedMaterials = new java.util.ArrayList<>();
                     for (Material originalMat : originalMaterials) {
                         Material mergedMat = new Material(originalMat);
-                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat);
+                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat,
+                                shaderWrapper != null ? shaderWrapper.getMaterialSource() : null);
                         mergedMaterials.add(mergedMat);
                         clonedMaterialsList.add(mergedMat);
                     }
@@ -1245,7 +1254,7 @@ public class VRTNode extends VRTComponent {
         }
     }
 
-    private void copyShaderModifiersAndUniforms(Material source, Material dest) {
+    private void copyShaderModifiersAndUniforms(Material source, Material dest, ReadableMap authored) {
         // Copy shader modifiers and uniforms from source (shader override material)
         // to destination (cloned original material that already has textures)
         Log.d(TAG, "=== copyShaderModifiersAndUniforms START ===");
@@ -1259,6 +1268,8 @@ public class VRTNode extends VRTComponent {
             dest.setLightingModel(source.getLightingModel());
         }
 
+        copyAuthoredMaterialProperties(source, dest, authored);
+
         // NOTE: We DON'T clear existing shader modifiers because:
         // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
         // 2. Clearing would remove critical system modifiers like skinning
@@ -1268,6 +1279,53 @@ public class VRTNode extends VRTComponent {
         Log.d(TAG, "Calling copyShaderModifiers...");
         dest.copyShaderModifiers(source);
         Log.d(TAG, "=== copyShaderModifiersAndUniforms END ===");
+    }
+
+    // Copies onto `dest` the properties `authored` names, and only those. A Material
+    // reports a white diffuse and a 0.5 roughness whether or not anyone set them, so
+    // copying them all would white out a textured model; the dictionary the override
+    // was registered from is the only record of what the author asked for. That is why
+    // this merge used to carry nothing but the lighting model, and why a diffuseColor
+    // reached no model on either platform. VRTNode.mm holds the same rule for iOS.
+    //
+    // Textures are missing from this list on purpose: MaterialManager disposes the Java
+    // Texture handle as soon as it has built the material, so the source's getters hand
+    // back a Texture whose native ref is zero. Carrying those across needs the copy to
+    // happen in C++, as it does on iOS.
+    private void copyAuthoredMaterialProperties(Material source, Material dest, ReadableMap authored) {
+        if (authored == null) {
+            return;
+        }
+        ReadableMapKeySetIterator iter = authored.keySetIterator();
+        while (iter.hasNextKey()) {
+            String key = iter.nextKey();
+            if ("diffuseColor".equalsIgnoreCase(key)) {
+                dest.setDiffuseColor(source.getDiffuseColor());
+            } else if ("diffuseIntensity".equalsIgnoreCase(key)) {
+                dest.setDiffuseIntensity(source.getDiffuseIntensity());
+            } else if ("roughness".equalsIgnoreCase(key)) {
+                dest.setRoughness(source.getRoughness());
+            } else if ("metalness".equalsIgnoreCase(key)) {
+                dest.setMetalness(source.getMetalness());
+            } else if ("bloomThreshold".equalsIgnoreCase(key)) {
+                dest.setBloomThreshold(source.getBloomThreshold());
+            } else if ("chromaKeyFilteringColor".equalsIgnoreCase(key)) {
+                dest.setChromaKeyFilteringColor(source.getChromaKeyFilteringColor());
+                dest.setChromaKeyFilteringEnabled(true);
+            } else if ("shininess".equalsIgnoreCase(key)) {
+                dest.setShininess(source.getShininess());
+            } else if ("blendMode".equalsIgnoreCase(key)) {
+                dest.setBlendMode(source.getBlendMode());
+            } else if ("transparencyMode".equalsIgnoreCase(key)) {
+                dest.setTransparencyMode(source.getTransparencyMode());
+            } else if ("cullMode".equalsIgnoreCase(key)) {
+                dest.setCullMode(source.getCullMode());
+            } else if ("writesToDepthBuffer".equalsIgnoreCase(key)) {
+                dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
+            } else if ("readsFromDepthBuffer".equalsIgnoreCase(key)) {
+                dest.setReadsFromDepthBuffer(source.getReadsFromDepthBuffer());
+            }
+        }
     }
 
     public void updateShaderOverrideUniforms() {

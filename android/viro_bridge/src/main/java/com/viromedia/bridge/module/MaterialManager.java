@@ -425,6 +425,8 @@ public class MaterialManager extends ReactContextBaseJavaModule {
         // Parse stuff
         parsePBRProperties(PBRProperties.METALNESS, nativeMaterial, materialMap);
         parsePBRProperties(PBRProperties.ROUGHNESS, nativeMaterial, materialMap);
+        parsePBRProperties(PBRProperties.METALNESS_TEXTURE, nativeMaterial, materialMap);
+        parsePBRProperties(PBRProperties.ROUGHNESS_TEXTURE, nativeMaterial, materialMap);
         parsePBRProperties(PBRProperties.AMBIENT_OCCLUSION_TEXTURE, nativeMaterial, materialMap);
 
         // Parse shader modifiers

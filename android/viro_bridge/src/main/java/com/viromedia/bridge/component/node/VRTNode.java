@@ -1288,10 +1288,9 @@ public class VRTNode extends VRTComponent {
     // this merge used to carry nothing but the lighting model, and why a diffuseColor
     // reached no model on either platform. VRTNode.mm holds the same rule for iOS.
     //
-    // Textures are missing from this list on purpose: MaterialManager disposes the Java
-    // Texture handle as soon as it has built the material, so the source's getters hand
-    // back a Texture whose native ref is zero. Carrying those across needs the copy to
-    // happen in C++, as it does on iOS.
+    // A texture goes across natively: MaterialManager disposes the Java Texture handle as
+    // soon as it has built the material, so the source's getters hand back a Texture whose
+    // native ref is zero.
     private void copyAuthoredMaterialProperties(Material source, Material dest, ReadableMap authored) {
         if (authored == null) {
             return;
@@ -1299,7 +1298,9 @@ public class VRTNode extends VRTComponent {
         ReadableMapKeySetIterator iter = authored.keySetIterator();
         while (iter.hasNextKey()) {
             String key = iter.nextKey();
-            if ("diffuseColor".equalsIgnoreCase(key)) {
+            if (key.endsWith("texture") || key.endsWith("Texture")) {
+                dest.copyProperty(source, key, true);
+            } else if ("diffuseColor".equalsIgnoreCase(key)) {
                 dest.setDiffuseColor(source.getDiffuseColor());
             } else if ("diffuseIntensity".equalsIgnoreCase(key)) {
                 dest.setDiffuseIntensity(source.getDiffuseIntensity());

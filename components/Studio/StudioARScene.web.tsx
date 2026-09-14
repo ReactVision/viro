@@ -34,6 +34,7 @@ import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import { webUnsupportedFeatures } from "./domain/webCapabilities";
 import {
   STUDIO_AMBIENT_INTENSITY,
   STUDIO_DIRECTIONAL_DIRECTION,
@@ -264,12 +265,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   }, [scene.id]);
 
   // ─── Capability report (features that won't render on web) ────────────────
+  //
+  // Everything this host drops has to be listed here. The three trigger kinds
+  // and tap-to-place used to be missing, so a scene built on them opened looking
+  // fine and then did nothing, with no way to tell a web gap from a bug.
   useEffect(() => {
-    const unsupported: string[] = [];
-    if (assets.some((a) => a.trigger_image_url)) unsupported.push("image markers");
-    if (scene.physics_world_config) unsupported.push("physics");
-    if (((scene.plane_detection as string) ?? "").toUpperCase() === "MANUAL")
-      unsupported.push("manual plane selection");
+    const unsupported = webUnsupportedFeatures(sceneData);
     if (unsupported.length > 0) onUnsupported?.(unsupported);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);

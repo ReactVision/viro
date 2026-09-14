@@ -66,6 +66,7 @@ const visibilityStore_1 = require("./domain/visibilityStore");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
+const webCapabilities_1 = require("./domain/webCapabilities");
 const studioLighting_1 = require("./domain/studioLighting");
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 const StudioARScene = (props) => {
@@ -213,14 +214,12 @@ const StudioARSceneInner = (props) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
     // ─── Capability report (features that won't render on web) ────────────────
+    //
+    // Everything this host drops has to be listed here. The three trigger kinds
+    // and tap-to-place used to be missing, so a scene built on them opened looking
+    // fine and then did nothing, with no way to tell a web gap from a bug.
     (0, react_1.useEffect)(() => {
-        const unsupported = [];
-        if (assets.some((a) => a.trigger_image_url))
-            unsupported.push("image markers");
-        if (scene.physics_world_config)
-            unsupported.push("physics");
-        if ((scene.plane_detection ?? "").toUpperCase() === "MANUAL")
-            unsupported.push("manual plane selection");
+        const unsupported = (0, webCapabilities_1.webUnsupportedFeatures)(sceneData);
         if (unsupported.length > 0)
             onUnsupported?.(unsupported);
         // eslint-disable-next-line react-hooks/exhaustive-deps

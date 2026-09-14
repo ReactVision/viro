@@ -43,7 +43,7 @@ export type BuildViroPhysicsBodyOptions = {
     /** Forces Dynamic body to Kinematic with mass 0 while dragging. */
     kinematicDragOverride?: boolean;
     /**
-     * The node's uniform scale, applied to an explicit Box or Sphere shape.
+     * The node's uniform scale, applied to an explicit shape of any type.
      * virocore does not scale one: `generateBasicBulletShape(type, params)` builds
      * the bullet shape from the params as given and only the geometry-inferred
      * branch calls `setLocalScaling`, so a 1 m collider stayed 1 m around a node

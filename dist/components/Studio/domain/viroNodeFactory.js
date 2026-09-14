@@ -98,9 +98,6 @@ dragSurface) {
         })
         : undefined;
     const viroTag = parsedPhysics ? asset.id : undefined;
-    const launchVelocity = parsedPhysics?.velocity
-        ? [...parsedPhysics.velocity]
-        : undefined;
     const onClick = createOnClickHandler(asset, sceneNavigator, animations, onAnimationTrigger, onSceneChange, runtimeCtx);
     const animation = animationStates?.[asset.id];
     return {
@@ -110,7 +107,6 @@ dragSurface) {
         dragType,
         dragPlane,
         physicsBody,
-        launchVelocity,
         viroTag,
         onClick,
         animation,
@@ -255,39 +251,6 @@ const PlaceableNode = ({ assetId, store, authorPosition, authorRotation, visibil
       {React.cloneElement(children, { position, rotation })}
     </VisibleNode>);
 };
-/**
- * Sends an authored velocity once, as a launch.
- *
- * `physicsBody.velocity` is a CONSTANT velocity on the device: both bridges pass
- * `isConstant` true and `VROPhysicsBody::applyPresetVelocity` reasserts it on the
- * rigid body every frame, so gravity never gets a turn and the node runs in a
- * straight line for as long as the scene lives. virocore's other slot,
- * `_instantVelocity`, is applied once and then cleared, which is what an author
- * means by a velocity and what the editors preview. Only
- * `VRTNodeModule.setVelocity` reaches it, so the value is sent through the node's
- * own ref here instead of being declared on the body.
- *
- * The node is built by `render` rather than cloned, so the ref arrives through
- * the `nodeRef` prop each creator already forwards: TEXT renders a function
- * component, which a cloned `ref` would miss. That ref is the node's only one,
- * hence `forwardRef` for the proximity registration that would otherwise own it.
- */
-const LaunchNode = ({ velocity, forwardRef, render }) => {
-    const nodeRef = React.useRef(null);
-    const setRef = React.useCallback((ref) => {
-        nodeRef.current = ref;
-        forwardRef?.(ref);
-    }, [forwardRef]);
-    // Keyed on the numbers, since `config` hands back a new array every render.
-    const signature = velocity.join(",");
-    React.useEffect(() => {
-        // Both platforms resolve the view inside a UI block, which runs after this
-        // mount's own view operations, so the physics body exists by then.
-        nodeRef.current?.setVelocity?.([...velocity]);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [signature]);
-    return render(setRef);
-};
 function createText(asset, config, notifyPhysicsDrag, store, onCollision, nodeRef) {
     return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag} onCollision={onCollision} nodeRef={nodeRef}/>);
 }
@@ -333,7 +296,7 @@ dragSurface) {
                 return null;
         }
     };
-    const node = config.launchVelocity ? (<LaunchNode velocity={config.launchVelocity} forwardRef={proximityRef} render={buildNode}/>) : (buildNode(proximityRef));
+    const node = buildNode(proximityRef);
     if (!node)
         return null;
     // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the

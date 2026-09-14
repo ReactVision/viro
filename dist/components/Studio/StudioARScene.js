@@ -125,7 +125,7 @@ const TRACKING_GATE_FALLBACK_MS = 6000;
  */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
-        return ViroPlatform_1.isQuest ? <ViroScene_1.ViroScene /> : <ViroARScene_1.ViroARScene />;
+        return ViroPlatform_1.isQuest ? (<ViroScene_1.ViroScene toneMappingEnabled={false}/>) : (<ViroARScene_1.ViroARScene toneMappingEnabled={false}/>);
     }
     return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
 };
@@ -1039,11 +1039,15 @@ const StudioARSceneInner = (props) => {
         ? { onCameraTransformUpdate: handleCameraTransformUpdate }
         : {};
     if (ViroPlatform_1.isQuest) {
-        return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp}>
+        return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp} toneMappingEnabled={false}>
         {children}
       </ViroScene_1.ViroScene>);
     }
-    return (<ViroARScene_1.ViroARScene ref={arSceneRef} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAmbientLightUpdate={handleAmbientLightUpdate} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+    return (<ViroARScene_1.ViroARScene ref={arSceneRef} 
+    // The editor previews no tone curve, and virocore's default Hable
+    // luminance-only pass renders pure white at about 0.77. Off here rather
+    // than via the navigator's `hdrEnabled`, which would take PBR with it.
+    toneMappingEnabled={false} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAmbientLightUpdate={handleAmbientLightUpdate} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
       {children}
     </ViroARScene_1.ViroARScene>);
 };

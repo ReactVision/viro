@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioARScene = void 0;
 const React = __importStar(require("react"));
 const react_1 = require("react");
-const react_native_1 = require("react-native");
 const ViroAmbientLight_1 = require("../ViroAmbientLight");
 const ViroDirectionalLight_1 = require("../ViroDirectionalLight");
 const ViroARImageMarker_1 = require("../AR/ViroARImageMarker");
@@ -70,8 +69,6 @@ const studioLighting_1 = require("./domain/studioLighting");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
 const physicsConfig_1 = require("./domain/physicsConfig");
-const ANDROID_MAX_3D_MODELS = 3;
-const IOS_MAX_3D_MODELS = 10;
 // The native camera-transform event can fire per frame; throttle the proximity
 // distance sweep to this cadence.
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
@@ -791,22 +788,11 @@ const StudioARSceneInner = (props) => {
         selectedAnchorIdRef.current = null;
     }, [scene.id]);
     // ─── Render helpers ───────────────────────────────────────────────────────
-    const maxModels = react_native_1.Platform.OS === "android" ? ANDROID_MAX_3D_MODELS : IOS_MAX_3D_MODELS;
     const renderedPlaneAssets = (0, react_1.useMemo)(() => {
-        let modelCount = 0;
         return planeAssets
-            .map((asset) => {
-            if (asset.asset_type_name === "3D-MODEL") {
-                modelCount++;
-                if (modelCount > maxModels) {
-                    console.warn(`[Studio] Skipping 3D model "${asset.name}" — ${react_native_1.Platform.OS} limit (${maxModels}) reached`);
-                    return null;
-                }
-            }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
-                ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id), dragSurface);
-        })
+            .map((asset) => (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined, getGazeHandler(asset.id), dragSurface))
             .filter(Boolean);
     }, [
         planeAssets,
@@ -818,7 +804,6 @@ const StudioARSceneInner = (props) => {
         getCollisionHandler,
         isDragActive,
         notifyPhysicsDrag,
-        maxModels,
         handleSceneChange,
         runtimeCtx,
         proximityTargetIds,
@@ -828,20 +813,10 @@ const StudioARSceneInner = (props) => {
     // Tap-to-place nodes render at scene root (world space); each is gated by the
     // placement store (null until placed, then mounted at the placed world point).
     const renderedTapToPlaceAssets = (0, react_1.useMemo)(() => {
-        let modelCount = 0;
         return tapToPlaceAssets
-            .map((asset) => {
-            if (asset.asset_type_name === "3D-MODEL") {
-                modelCount++;
-                if (modelCount > maxModels) {
-                    console.warn(`[Studio] Skipping 3D model "${asset.name}" — ${react_native_1.Platform.OS} limit (${maxModels}) reached`);
-                    return null;
-                }
-            }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
-                ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id));
-        })
+            .map((asset) => (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined, getGazeHandler(asset.id)))
             .filter(Boolean);
     }, [
         tapToPlaceAssets,
@@ -852,7 +827,6 @@ const StudioARSceneInner = (props) => {
         getCollisionHandler,
         isDragActive,
         notifyPhysicsDrag,
-        maxModels,
         handleSceneChange,
         runtimeCtx,
         proximityTargetIds,

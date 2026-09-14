@@ -41,11 +41,12 @@ describe("webUnsupportedFeatures", () => {
     ).toEqual(["gaze triggers", "proximity triggers", "collision triggers"]);
   });
 
-  test("reports tap to place, which mounts at the camera without a placement store", () => {
-    const features = webUnsupportedFeatures(
-      sceneData({ assets: [asset({ tap_to_place: true })] }),
-    );
-    expect(features).toContain("tap to place");
+  test("reports tap to place only where there is no camera to tap against", () => {
+    const scene = sceneData({ assets: [asset({ tap_to_place: true })] });
+    // AR runs the guided queue, so there is nothing to warn about.
+    expect(webUnsupportedFeatures(scene, "ar")).toEqual([]);
+    // 3d has no tracked camera to hit-test, so the queue would never advance.
+    expect(webUnsupportedFeatures(scene, "3d")).toContain("tap to place");
   });
 
   test("an image marker wins over tap to place, and only markers are reported", () => {
@@ -55,6 +56,7 @@ describe("webUnsupportedFeatures", () => {
       sceneData({
         assets: [asset({ tap_to_place: true, trigger_image_url: "u" })],
       }),
+      "3d",
     );
     expect(features).toEqual(["image markers"]);
   });

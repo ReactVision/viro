@@ -35,6 +35,8 @@ function hasPhysics(
 
 export function webUnsupportedFeatures(
   sceneData: StudioSceneResponse,
+  /** "3d" has no camera to hit-test against, so guided placement cannot run. */
+  mode: "ar" | "3d" = "ar",
 ): string[] {
   const { scene, assets } = sceneData;
   const features: string[] = [];
@@ -50,10 +52,12 @@ export function webUnsupportedFeatures(
   if (sceneData.proximity_bindings?.length) features.push("proximity triggers");
   if (sceneData.collision_bindings?.length) features.push("collision triggers");
 
-  // With no placement store in the runtime context, the factory mounts these at
-  // once and at the raw author offset — which is an offset from a tap point that
-  // never happens, so they land on top of the camera.
-  if (assets.some(isTapToPlaceAsset)) features.push("tap to place");
+  // Guided placement needs a tracked camera to hit-test a tap against, so it
+  // runs in AR and nowhere else. In 3d the queue would never advance and the
+  // assets would stay hidden for the whole scene.
+  if (mode !== "ar" && assets.some(isTapToPlaceAsset)) {
+    features.push("tap to place");
+  }
 
   if (((scene.plane_detection as string) ?? "").toUpperCase() === "MANUAL") {
     features.push("manual plane selection");

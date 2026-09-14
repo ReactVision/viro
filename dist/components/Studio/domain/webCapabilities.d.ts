@@ -11,4 +11,6 @@
  * differently. Approximations belong in the component that makes them.
  */
 import type { StudioSceneResponse } from "../types";
-export declare function webUnsupportedFeatures(sceneData: StudioSceneResponse): string[];
+export declare function webUnsupportedFeatures(sceneData: StudioSceneResponse, 
+/** "3d" has no camera to hit-test against, so guided placement cannot run. */
+mode?: "ar" | "3d"): string[];

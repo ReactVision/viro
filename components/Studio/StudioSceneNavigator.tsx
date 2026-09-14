@@ -34,11 +34,13 @@ import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
 
+// Tone mapping off here too, or the camera feed takes the default Hable curve for
+// the moment a scene is loading and then snaps when the authored scene mounts.
 function LoadingARScene() {
-  return <ViroARScene />;
+  return <ViroARScene toneMappingEnabled={false} />;
 }
 function LoadingVRScene() {
-  return <ViroScene />;
+  return <ViroScene toneMappingEnabled={false} />;
 }
 
 type ViroOcclusionMode = "peopleOnly" | "depthBased" | undefined;
@@ -533,11 +535,19 @@ export const StudioSceneNavigator = forwardRef<
           autofocus={autofocus}
           numberOfTrackedImages={numberOfTrackedImages}
           occlusionMode={occlusionMode}
-          // Both default on natively, where Hable luminance-only tone mapping
-          // renders pure white at about 0.77 and bright materials glow. The
-          // editor previews neither, and Studio content is white-heavy text and
-          // images, so the tone curve is what an author notices.
-          hdrEnabled={false}
+          // Bloom defaults on natively and the editor does not preview it, so a
+          // bright material glows on the phone and nowhere else.
+          //
+          // HDR stays ON even though its default tone curve is the other half of
+          // that problem, because PBR rides on it: VROChoreographer::isPBREnabled
+          // is `_hdrEnabled && _pbrEnabled`, and the whole PBR branch of
+          // VROShaderFactory goes with it, so roughness, metalness and the ambient
+          // occlusion map are read by nothing and a PBR material falls back to
+          // Blinn. The tone curve is switched off per scene instead, which is what
+          // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
+          // than left to the native default, so this cannot be switched off again
+          // without meeting the reason it is on.
+          hdrEnabled
           bloomEnabled={false}
           onExitViro={onExitViro}
           style={StyleSheet.absoluteFill}

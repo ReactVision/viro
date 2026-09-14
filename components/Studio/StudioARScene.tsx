@@ -189,7 +189,11 @@ interface StudioARSceneProps {
  */
 export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
   if (!props.sceneData) {
-    return isQuest ? <ViroScene /> : <ViroARScene />;
+    return isQuest ? (
+      <ViroScene toneMappingEnabled={false} />
+    ) : (
+      <ViroARScene toneMappingEnabled={false} />
+    );
   }
   return <StudioARSceneInner {...props} sceneData={props.sceneData} />;
 };
@@ -1437,7 +1441,11 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
 
   if (isQuest) {
     return (
-      <ViroScene {...physicsProps} {...cameraTransformProp}>
+      <ViroScene
+        {...physicsProps}
+        {...cameraTransformProp}
+        toneMappingEnabled={false}
+      >
         {children}
       </ViroScene>
     );
@@ -1445,6 +1453,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   return (
     <ViroARScene
       ref={arSceneRef}
+      // The editor previews no tone curve, and virocore's default Hable
+      // luminance-only pass renders pure white at about 0.77. Off here rather
+      // than via the navigator's `hdrEnabled`, which would take PBR with it.
+      toneMappingEnabled={false}
       {...physicsProps}
       {...cameraTransformProp}
       anchorDetectionTypes={anchorDetectionTypes}

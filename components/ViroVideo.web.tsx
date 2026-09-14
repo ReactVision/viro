@@ -10,7 +10,7 @@
  * Perf note: this recreates a texture per frame (same tradeoff as the AR camera
  * feed). A `viroUpdateTexture` C API would let it reuse one GL texture.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ViroLightingModel,
   ViroTextureChannel,
@@ -45,16 +45,26 @@ function cancelVideoFrame(video: HTMLVideoElement, id: number): void {
 
 export function ViroVideo(props: Props): null {
   const scene = useViroScene();
-  const width = props.width ?? 1;
-  const height = props.height ?? 1;
   const url = resolveImageSource(props.source);
 
+  // With neither size prop given the surface takes the source's aspect ratio at one
+  // unit wide, the rule the phone bridges apply. 1 until the metadata loads.
+  const [aspect, setAspect] = useState(1);
+  const sizePropSet = props.width != null || props.height != null;
+  const width = props.width ?? 1;
+  const height = props.height ?? (sizePropSet ? 1 : width / aspect);
+
   const geometryRef = useRef<ViroHandle>(0);
-  useViroNode(props, (s) => {
-    const geo = s.createSurface(width, height);
-    geometryRef.current = geo;
-    return geo;
-  });
+  useViroNode(
+    props,
+    (s) => {
+      const geo = s.createSurface(width, height);
+      geometryRef.current = geo;
+      return geo;
+    },
+    true,
+    sizePropSet ? undefined : aspect
+  );
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const propsRef = useRef(props);
@@ -62,8 +72,7 @@ export function ViroVideo(props: Props): null {
 
   // Create the <video> + per-frame texture upload; torn down when the URL changes.
   useEffect(() => {
-    const geo = geometryRef.current;
-    if (!geo || !url) return;
+    if (!url) return;
 
     const video = document.createElement("video");
     video.src = url;
@@ -83,9 +92,12 @@ export function ViroVideo(props: Props): null {
 
     const uploadFrame = () => {
       if (cancelled || !ctx) return;
+      // Read per frame rather than capturing: the surface is rebuilt when the
+      // video's aspect ratio arrives, which replaces the handle.
+      const geo = geometryRef.current;
       const w = video.videoWidth;
       const h = video.videoHeight;
-      if (w > 0 && h > 0 && video.readyState >= video.HAVE_CURRENT_DATA) {
+      if (geo && w > 0 && h > 0 && video.readyState >= video.HAVE_CURRENT_DATA) {
         if (canvas.width !== w || canvas.height !== h) {
           canvas.width = w;
           canvas.height = h;
@@ -111,8 +123,14 @@ export function ViroVideo(props: Props): null {
 
     const onEnded = () => propsRef.current.onFinish?.();
     const onErr = () => propsRef.current.onError?.(new Error(`video failed: ${url}`));
+    const onMetadata = () => {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setAspect(video.videoWidth / video.videoHeight);
+      }
+    };
     video.addEventListener("ended", onEnded);
     video.addEventListener("error", onErr);
+    video.addEventListener("loadedmetadata", onMetadata);
 
     scheduleNext();
 
@@ -122,6 +140,7 @@ export function ViroVideo(props: Props): null {
       if (vfcId) cancelVideoFrame(video, vfcId);
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onErr);
+      video.removeEventListener("loadedmetadata", onMetadata);
       video.pause();
       video.src = "";
       videoRef.current = null;

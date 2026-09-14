@@ -37,6 +37,12 @@
 - (void)videoDidUpdateTime:(float)currentTimeInSeconds totalTimeInSeconds:(float)seconds;
 - (void)videoDidFail:(NSString *)error;
 
+@optional
+/*
+ The video's own pixel dimensions, available once the source has loaded.
+ */
+- (void)videoDidChangeSize:(float)width height:(float)height;
+
 @end
 
 #endif /* VROVideoDelegate_h */

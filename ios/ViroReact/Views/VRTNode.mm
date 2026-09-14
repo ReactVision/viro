@@ -194,6 +194,10 @@ static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial
             dest->setBloomThreshold(source->getBloomThreshold());
             continue;
         }
+        if ([key caseInsensitiveCompare:@"alpha"] == NSOrderedSame) {
+            dest->setTransparency(source->getTransparency());
+            continue;
+        }
         if ([key caseInsensitiveCompare:@"chromaKeyFilteringColor"] == NSOrderedSame) {
             dest->setChromaKeyFilteringColor(source->getChromaKeyFilteringColor());
             dest->setChromaKeyFilteringEnabled(source->isChromaKeyFilteringEnabled());

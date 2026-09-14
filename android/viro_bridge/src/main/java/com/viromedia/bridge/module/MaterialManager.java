@@ -274,8 +274,10 @@ public class MaterialManager extends ReactContextBaseJavaModule {
         Material.BlendMode blendMode = Material.BlendMode.ALPHA;
         EnumSet<Material.ColorWriteMask> colorWriteMask = EnumSet.of(Material.ColorWriteMask.ALL);
         float bloomThreshold = -1.0f;
+        float transparency = 1.0f;
         boolean writesToDepthBuffer = true;
         boolean readsFromDepthBuffer = true;
+        boolean authoredDepthWrite = false;
 
         ReadableMapKeySetIterator iter = materialMap.keySetIterator();
         while(iter.hasNextKey()) {
@@ -374,8 +376,11 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                     blendMode = Material.BlendMode.valueFromString(materialMap.getString(materialPropertyName));
                 } else if ("transparencyMode".equalsIgnoreCase(materialPropertyName)) {
                     transparencyMode = Material.TransparencyMode.valueFromString(materialMap.getString(materialPropertyName));
+                } else if ("alpha".equalsIgnoreCase(materialPropertyName)) {
+                    transparency = (float)materialMap.getDouble(materialPropertyName);
                 } else if ("writesToDepthBuffer".equalsIgnoreCase(materialPropertyName)) {
                     writesToDepthBuffer = materialMap.getBoolean(materialPropertyName);
+                    authoredDepthWrite = true;
                 } else if ("readsFromDepthBuffer".equalsIgnoreCase(materialPropertyName)) {
                     readsFromDepthBuffer = materialMap.getBoolean(materialPropertyName);
                 } else if ("colorWriteMask".equalsIgnoreCase(materialPropertyName)) {
@@ -397,10 +402,17 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             }
         }
 
+        // A translucent material that still writes depth occludes its own far faces, so
+        // setting alpha and nothing else turns depth writing off. Only the alpha key can
+        // bring transparency under 1 here, so nothing that worked before changes.
+        if (!authoredDepthWrite && transparency < 1.0f) {
+            writesToDepthBuffer = false;
+        }
+
         Material nativeMaterial = new Material(lightingModel, diffuseColor, diffuseTexture,
                 diffuseIntensity, specularTexture, shininess, fresnelExponent, normalMap,
-                cullMode, transparencyMode, blendMode, bloomThreshold, writesToDepthBuffer,
-                readsFromDepthBuffer, colorWriteMask);
+                cullMode, transparencyMode, blendMode, transparency, bloomThreshold,
+                writesToDepthBuffer, readsFromDepthBuffer, colorWriteMask);
 
                 nativeMaterial.setName(materialName);
         if (chromaFilteringEnabled) {

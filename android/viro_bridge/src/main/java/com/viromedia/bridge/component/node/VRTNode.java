@@ -1307,6 +1307,13 @@ public class VRTNode extends VRTComponent {
                 dest.setRoughness(source.getRoughness());
             } else if ("metalness".equalsIgnoreCase(key)) {
                 dest.setMetalness(source.getMetalness());
+            } else if ("alpha".equalsIgnoreCase(key)) {
+                dest.setTransparency(source.getTransparency());
+                if (source.getTransparency() < 1.0f) {
+                    // MaterialManager turns depth writing off for a translucent material,
+                    // and with no writesToDepthBuffer key nothing else would carry that.
+                    dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
+                }
             } else if ("bloomThreshold".equalsIgnoreCase(key)) {
                 dest.setBloomThreshold(source.getBloomThreshold());
             } else if ("chromaKeyFilteringColor".equalsIgnoreCase(key)) {

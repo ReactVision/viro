@@ -305,7 +305,11 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                 String type = parseAssetType(materialMap, materialPropertyName);
                 Texture.Format format = parseImageFormat(materialMap, materialPropertyName);
                 boolean mipmap = parseImageMipmap(materialMap, materialPropertyName);
-                boolean sRGB = !materialPropertyName.startsWith("normal");
+                // Only a colour map is stored gamma encoded, and this loop can reach no
+                // other one: VRTMaterialManager names the same key on iOS, and the ambient
+                // occlusion map takes its own sRGB decision in parsePBRProperties. A
+                // specular map read as sRGB here made the same PNG lighter than on iPhone.
+                boolean sRGB = materialPropertyName.equalsIgnoreCase("diffuseTexture");
 
                 Uri uri = Helper.parseUri(path, mContext);
                 if (path != null) {

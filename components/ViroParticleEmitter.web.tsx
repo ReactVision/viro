@@ -4,8 +4,9 @@
  * and a velocity range come from `spawnBehavior`/`particlePhysics`.
  *
  * MVP scope: image, spawnBehavior (rate/lifetime/maxParticles/spawnVolume),
- * particlePhysics.velocity, run. Appearance modifiers (color/scale/rotation/
- * alpha over life), bursts, acceleration and emissionRatePerMeter are follow-ups.
+ * particlePhysics.velocity and .acceleration, run. Appearance modifiers
+ * (color/scale/rotation/alpha over life), bursts, explosiveImpulse,
+ * spawnOnSurface and emissionRatePerMeter are follow-ups.
  */
 import * as React from "react";
 import { useEffect, useRef } from "react";
@@ -31,10 +32,12 @@ type Props = ViroWebNodeProps & {
   };
   particlePhysics?: {
     velocity?: VelocityRange;
+    acceleration?: VelocityRange;
   };
   [key: string]: any;
 };
 
+/** Both `velocity` and `acceleration` take this shape. */
 type VelocityRange = {
   /** ViroParticleEmitter's own shape: a [min, max] pair of vectors. */
   initialRange?: number[][];
@@ -110,6 +113,13 @@ export function ViroParticleEmitter(props: Props): null {
           velocityMin,
           velocityMax,
         });
+        // After the emitter exists: acceleration is set on a live emitter, not
+        // passed to the factory that creates it.
+        const accel = p.particlePhysics?.acceleration;
+        if (accel) {
+          const [accelMin, accelMax] = velocityRange(accel);
+          scene.setParticleAcceleration(node, accelMin, accelMax);
+        }
         scene.setParticleEmitterRun(node, p.run !== false);
       })
       .catch(() => {});

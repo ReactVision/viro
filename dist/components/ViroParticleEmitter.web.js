@@ -71,6 +71,13 @@ function ViroParticleEmitter(props) {
                 velocityMin,
                 velocityMax,
             });
+            // After the emitter exists: acceleration is set on a live emitter, not
+            // passed to the factory that creates it.
+            const accel = p.particlePhysics?.acceleration;
+            if (accel) {
+                const [accelMin, accelMax] = velocityRange(accel);
+                scene.setParticleAcceleration(node, accelMin, accelMax);
+            }
             scene.setParticleEmitterRun(node, p.run !== false);
         })
             .catch(() => { });

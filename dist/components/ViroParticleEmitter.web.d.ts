@@ -19,9 +19,11 @@ type Props = ViroWebNodeProps & {
     };
     particlePhysics?: {
         velocity?: VelocityRange;
+        acceleration?: VelocityRange;
     };
     [key: string]: any;
 };
+/** Both `velocity` and `acceleration` take this shape. */
 type VelocityRange = {
     /** ViroParticleEmitter's own shape: a [min, max] pair of vectors. */
     initialRange?: number[][];

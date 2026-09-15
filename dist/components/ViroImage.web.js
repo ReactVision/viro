@@ -9,48 +9,63 @@ const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroImageLoader_1 = require("./Web/viroImageLoader");
 /** VRTImage.mm's kDefaultWidth / kDefaultHeight. */
 const DEFAULT_SIZE = 1;
+const WHOLE_PICTURE = [0, 0, 1, 1];
 /**
- * The quad's dimensions, following VRTImage's rules.
+ * The quad's dimensions and UVs, following VRTImage's rules.
  *
  * `aspect` is null until the picture has been decoded, because every branch but
  * the first needs to know its shape.
  */
-function resolveSurface(width, height, sizeAuthored, resizeMode, resizeModeAuthored, aspect) {
+function resolveSurface(width, height, sizeAuthored, resizeMode, resizeModeAuthored, aspect, clipMode = "ClipToBounds") {
+    const whole = (w, h) => ({
+        width: w,
+        height: h,
+        uv: WHOLE_PICTURE,
+    });
     // Nothing to measure against yet, so the quad is the authored box — the same
     // 1x1 default a device starts with before its own download finishes.
     if (aspect === null)
-        return [width, height];
+        return whole(width, height);
     // No authored size: the picture sets the height and the width stays 1. This is
     // the case every Studio placement takes, since the node factory sends the
     // source and a resize mode but never a size.
     if (!sizeAuthored)
-        return [width, width / aspect];
+        return whole(width, width / aspect);
     // A size but no resize mode. Native leaves its _scaledWidth/_scaledHeight at
     // the 1x1 default here and draws a unit quad, ignoring the size that was
     // authored; that is its uninitialised state showing through rather than a
     // decision, so this honours the box instead, which is what its own default
     // resize mode (StretchToFill) says should happen.
     if (!resizeModeAuthored)
-        return [width, height];
+        return whole(width, height);
     const target = width / height;
     switch (resizeMode) {
         // Fit inside the box: the whole picture shows and the quad shrinks on the
         // axis with room to spare.
         case "ScaleToFit":
             return target <= aspect
-                ? [width, width / aspect]
-                : [height * aspect, height];
-        // Cover the box. Native pairs this with imageClipMode ClipToBounds, its
-        // default, and crops back to the box through the surface's UVs; web's
-        // createSurface takes no UVs, so the quad covers and overflows instead.
-        // Wrong bounds, right shape — the opposite trade would put the distortion
-        // back, which is the whole point of this function.
-        case "ScaleToFill":
-            return target <= aspect
-                ? [height * aspect, height]
-                : [width, width / aspect];
+                ? whole(width, width / aspect)
+                : whole(height * aspect, height);
+        case "ScaleToFill": {
+            // Cover the box, keeping the picture's shape.
+            const cover = target <= aspect
+                ? { width: height * aspect, height }
+                : { width, height: width / aspect };
+            // None lets it overflow. ClipToBounds, native's default, keeps the
+            // authored box and crops the overflow away through the UVs, centred — so
+            // the middle of the picture survives rather than a corner.
+            if (clipMode !== "ClipToBounds")
+                return whole(cover.width, cover.height);
+            const clipU = Math.abs(cover.width - width) / cover.width;
+            const clipV = Math.abs(cover.height - height) / cover.height;
+            return {
+                width,
+                height,
+                uv: [clipU / 2, clipV / 2, 1 - clipU / 2, 1 - clipV / 2],
+            };
+        }
         default:
-            return [width, height];
+            return whole(width, height);
     }
 }
 function ViroImage(props) {
@@ -64,15 +79,17 @@ function ViroImage(props) {
     const resizeMode = props.resizeMode ?? "StretchToFill";
     // The decoded picture's aspect, which only the load can supply.
     const [aspect, setAspect] = (0, react_1.useState)(null);
-    const [surfaceWidth, surfaceHeight] = resolveSurface(width, height, sizeAuthored, resizeMode, resizeModeAuthored, aspect);
+    const surface = resolveSurface(width, height, sizeAuthored, resizeMode, resizeModeAuthored, aspect, props.imageClipMode ?? "ClipToBounds");
+    const { width: surfaceWidth, height: surfaceHeight, uv } = surface;
+    const uvKey = uv.join(",");
     const geometryRef = (0, react_1.useRef)(0);
     // Keyed on the resolved size so the surface is rebuilt once the picture lands
     // and the height stops being a guess.
     (0, useViroNode_1.useViroNode)(props, (s) => {
-        const geo = s.createSurface(surfaceWidth, surfaceHeight);
+        const geo = s.createSurfaceUV(surfaceWidth, surfaceHeight, uv[0], uv[1], uv[2], uv[3]);
         geometryRef.current = geo;
         return geo;
-    }, true, `${surfaceWidth}x${surfaceHeight}`);
+    }, true, `${surfaceWidth}x${surfaceHeight}|${uvKey}`);
     const url = (0, viroImageLoader_1.resolveImageSource)(props.source);
     const materialRef = (0, react_1.useRef)(0);
     const textureRef = (0, react_1.useRef)(0);
@@ -121,6 +138,6 @@ function ViroImage(props) {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [url, surfaceWidth, surfaceHeight]);
+    }, [url, surfaceWidth, surfaceHeight, uvKey]);
     return null;
 }

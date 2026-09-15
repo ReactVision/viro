@@ -170,6 +170,19 @@ const StudioPlacementOverlay: React.FC<{
   );
 };
 
+/**
+ * The same two the native navigator switches off, and for the same reason: with
+ * HDR on, Hable luminance-only tone mapping renders pure white at about 0.77 and
+ * bright materials glow. The editor previews neither, and Studio content is
+ * white-heavy text and images, so the tone curve is what an author notices.
+ *
+ * PBR and shadows stay on, as they do natively.
+ */
+const STUDIO_RENDERER_EFFECTS = {
+  hdrEnabled: false,
+  bloomEnabled: false,
+} as const;
+
 export const StudioSceneNavigator = forwardRef<
   StudioSceneNavigatorWebHandle,
   StudioSceneNavigatorWebProps
@@ -328,11 +341,13 @@ export const StudioSceneNavigator = forwardRef<
           slamScriptUrl={slamScriptUrl}
           arOptions={{ detectPlanes: true, ...arOptions }}
           onSessionReady={onSessionReady}
+          {...STUDIO_RENDERER_EFFECTS}
         />
       ) : (
         <Viro3DSceneNavigator
           initialScene={{ scene: SceneComponent }}
           webRendererOptions={webRendererOptions}
+          {...STUDIO_RENDERER_EFFECTS}
         />
       )}
       {recordingIndicator && (

@@ -9,6 +9,7 @@
  */
 import { useState, useEffect, useRef } from "react";
 import {
+  ViroBillboardAxis,
   ViroEventAction,
   ViroClickState,
   type ViroHandle,
@@ -19,6 +20,27 @@ import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 
 const DEG2RAD = Math.PI / 180;
+
+/**
+ * The billboard axis a `transformBehaviors` list asks for, or null for none.
+ *
+ * The three names native recognises and no more: its bridges compare against
+ * "billboard", "billboardX" and "billboardY" and ignore anything else, so a
+ * "billboardZ" invented here would work in a browser and nowhere else.
+ *
+ * Last one wins, because a node carries one constraint.
+ */
+function billboardAxis(behaviors: string): ViroBillboardAxis | null {
+  let axis: ViroBillboardAxis | null = null;
+  for (const raw of behaviors.split(",")) {
+    switch (raw.trim().toLowerCase()) {
+      case "billboard": axis = ViroBillboardAxis.All; break;
+      case "billboardx": axis = ViroBillboardAxis.X; break;
+      case "billboardy": axis = ViroBillboardAxis.Y; break;
+    }
+  }
+  return axis;
+}
 
 type ViroPosition = [number, number, number];
 
@@ -33,6 +55,13 @@ export interface ViroWebNodeProps {
   // included. The path a Studio `material_config` takes, and the only one that
   // reaches a loaded model — see the effect below.
   shaderOverrides?: string | string[];
+  /** Drawn-last wins among equal-depth fragments. */
+  renderingOrder?: number;
+  /** "billboard" | "billboardX" | "billboardY", the three native accepts. */
+  transformBehaviors?: string | string[];
+  /** Masks against a light's influenceBitMask; both must intersect to light. */
+  lightReceivingBitMask?: number;
+  shadowCastingBitMask?: number;
   // Events (world-space position, input source id).
   onClick?: (position: ViroPosition, source: number) => void;
   onClickState?: (
@@ -170,6 +199,33 @@ export function useViroNode(
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, overrideKey, contentReady]);
+
+  // Rendering order, light masks and billboarding. All four are native node
+  // props that had no web path at all: a scene lighting one object with one
+  // light, or turning a label to face the user, did neither here.
+  const renderingOrder = props.renderingOrder;
+  const lightReceivingBitMask = props.lightReceivingBitMask;
+  const shadowCastingBitMask = props.shadowCastingBitMask;
+  useEffect(() => {
+    if (renderingOrder !== undefined) scene.setNodeRenderingOrder(node, renderingOrder);
+    // Recursive: a loaded model's geometry is on child nodes, so a mask set on
+    // the handle alone would miss everything that actually draws.
+    if (lightReceivingBitMask !== undefined) {
+      scene.setNodeLightReceivingBitMask(node, lightReceivingBitMask, true);
+    }
+    if (shadowCastingBitMask !== undefined) {
+      scene.setNodeShadowCastingBitMask(node, shadowCastingBitMask, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, renderingOrder, lightReceivingBitMask, shadowCastingBitMask]);
+
+  const behaviorsKey = Array.isArray(props.transformBehaviors)
+    ? props.transformBehaviors.join(",")
+    : props.transformBehaviors ?? "";
+  useEffect(() => {
+    scene.setNodeBillboard(node, billboardAxis(behaviorsKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, behaviorsKey]);
 
   // Animation (declarative ViroAnimation or model animation).
   useViroAnimation(

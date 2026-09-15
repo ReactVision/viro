@@ -9,6 +9,13 @@ export interface ViroWebNodeProps {
     visible?: boolean;
     materials?: string | string[];
     shaderOverrides?: string | string[];
+    /** Drawn-last wins among equal-depth fragments. */
+    renderingOrder?: number;
+    /** "billboard" | "billboardX" | "billboardY", the three native accepts. */
+    transformBehaviors?: string | string[];
+    /** Masks against a light's influenceBitMask; both must intersect to light. */
+    lightReceivingBitMask?: number;
+    shadowCastingBitMask?: number;
     onClick?: (position: ViroPosition, source: number) => void;
     onClickState?: (clickState: number, position: ViroPosition, source: number) => void;
     onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;

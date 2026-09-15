@@ -27,18 +27,20 @@ import { studioPlacementBannerStore } from "./domain/placementBannerStore";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
-import { StudioPlacementStore } from "./domain/placementStore";
+import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { studioApiError } from "./domain/studioApiError";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
 
+// Tone mapping off here too, or the camera feed takes the default Hable curve for
+// the moment a scene is loading and then snaps when the authored scene mounts.
 function LoadingARScene() {
-  return <ViroARScene />;
+  return <ViroARScene toneMappingEnabled={false} />;
 }
 function LoadingVRScene() {
-  return <ViroScene />;
+  return <ViroScene toneMappingEnabled={false} />;
 }
 
 type ViroOcclusionMode = "peopleOnly" | "depthBased" | undefined;
@@ -425,7 +427,7 @@ export const StudioSceneNavigator = forwardRef<
       // Names for the tap-to-place prompt (overlay reads this on placement).
       placementNamesRef.current = new Map(
         sceneData.assets
-          .filter((a) => a.tap_to_place)
+          .filter((a) => isTapToPlaceAsset(a))
           .map((a) => [a.id, a.name ?? ""])
       );
 
@@ -533,6 +535,20 @@ export const StudioSceneNavigator = forwardRef<
           autofocus={autofocus}
           numberOfTrackedImages={numberOfTrackedImages}
           occlusionMode={occlusionMode}
+          // Bloom defaults on natively and the editor does not preview it, so a
+          // bright material glows on the phone and nowhere else.
+          //
+          // HDR stays ON even though its default tone curve is the other half of
+          // that problem, because PBR rides on it: VROChoreographer::isPBREnabled
+          // is `_hdrEnabled && _pbrEnabled`, and the whole PBR branch of
+          // VROShaderFactory goes with it, so roughness, metalness and the ambient
+          // occlusion map are read by nothing and a PBR material falls back to
+          // Blinn. The tone curve is switched off per scene instead, which is what
+          // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
+          // than left to the native default, so this cannot be switched off again
+          // without meeting the reason it is on.
+          hdrEnabled
+          bloomEnabled={false}
           onExitViro={onExitViro}
           style={StyleSheet.absoluteFill}
         />

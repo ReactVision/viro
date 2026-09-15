@@ -123,7 +123,7 @@ extern const int k2DPointsPerSpatialUnit;
 - (void)setVelocity:(NSArray*)velocity isConstant:(bool)constant;
 - (void)onCollided:(std::string) bodyKey collision:(VROPhysicsBody::VROCollision) collision;
 - (void)clearPhysicsBody;
-+ (std::shared_ptr<VROPhysicsShape>)getPhysicsShape:(NSString *)stringShapeName params:(NSArray *)shapeParams;
++ (std::shared_ptr<VROPhysicsShape>)getPhysicsShape:(NSString *)stringShapeName params:(NSArray *)shapeParams children:(NSArray *)shapeChildren;
 @property (nonatomic, assign) BOOL canCollide;
 @property (nonatomic, assign) BOOL physicsEnabled;
 

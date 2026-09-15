@@ -75,6 +75,7 @@ static NSArray<NSNumber *> *const kDefaultSize = @[@(0), @(0), @(0)];
     if (self) {
         _recticleEnabled = true;
     }
+    _toneMappingEnabled = YES;
     _size = kDefaultSize;
     _wallMaterial = kDefaultMaterial;
     _ceilingMaterial = kDefaultMaterial;
@@ -253,6 +254,10 @@ static NSArray<NSNumber *> *const kDefaultSize = @[@(0), @(0), @(0)];
     
     // we need to reset effects (override the ones from the previous scene) when we appear.
     self.scene->setPostProcessingEffectsUpdated(true);
+
+    // Re-asserted for the same reason, and because the prop can arrive before the
+    // scene exists: a VROScene opens tone-mapped whatever the last one was told.
+    self.scene->setToneMappingEnabled(_toneMappingEnabled);
     
     [self sceneWillAppear];
     [self parentDidAppear];
@@ -323,6 +328,18 @@ static NSArray<NSNumber *> *const kDefaultSize = @[@(0), @(0), @(0)];
         self.scene->setPostProcessingEffects(strEffects);
     } @catch (NSException *exception) {
         NSLog(@"Error setting post process effects: %@", exception.reason);
+    }
+}
+
+// PBR rides on HDR in the choreographer (isPBREnabled returns _hdrEnabled &&
+// _pbrEnabled), so an app that switches HDR off to stop the default Hable curve
+// moving every colour it renders also drops every PBR material back to Blinn,
+// losing roughness, metalness and the ambient occlusion map with it. This is the
+// other lever: HDR stays on and the tone mapping pass passes colour through.
+- (void)setToneMappingEnabled:(BOOL)toneMappingEnabled {
+    _toneMappingEnabled = toneMappingEnabled;
+    if (self.scene) {
+        self.scene->setToneMappingEnabled(toneMappingEnabled);
     }
 }
 

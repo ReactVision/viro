@@ -20,8 +20,10 @@ type SceneFactory = {
  * When only `initialScene` is provided it is used for both modes.
  *
  * Renderer flags (`hdrEnabled`, `pbrEnabled`, `bloomEnabled`, `shadowsEnabled`,
- * `passthroughEnabled`, etc.) are forwarded to ViroVRSceneNavigator on Quest
- * via the intent bridge.
+ * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
+ * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
+ * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`
+ * and `handTrackingEnabled` are Quest-only and go over the bridge alone.
  */
 export declare const ViroXRSceneNavigator: React.ForwardRefExoticComponent<ViewProps & {
     /**

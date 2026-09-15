@@ -38,6 +38,7 @@
 class VRONode;
 class btCollisionShape;
 class btCompoundShape;
+class btTransform;
 class btTriangleMesh;
 
 /*
@@ -55,12 +56,25 @@ public:
         AutoCompound = 1,   // Automatically infer a compound shape from attached geometry.
         Sphere = 2,         // _params[0] represents the radius of the sphere
         Box = 3,            // _params[0],[1],[2] represents the X,Y,Z half span of the Box
-        TriangleMesh = 4    // Triangle mesh for static collision (e.g., depth mesh)
+        TriangleMesh = 4,   // Triangle mesh for static collision (e.g., depth mesh)
+        Compound = 5        // Compound of the boxes and spheres given in _params.
     };
     static const std::string kSphereTag;
     static const std::string kBoxTag;
     static const std::string kAutoCompoundTag;
     static const std::string kTriangleMeshTag;
+
+    /*
+     A Compound carries its parts in its params, this many floats each: the part
+     type (0 box, 1 sphere), then the box's three spans or the sphere's radius in
+     the first of those three slots, then the part's position relative to the
+     node. A part's rotation is not carried. Both tags reach this class as
+     kAutoCompoundTag: with no params it is the AutoCompound inferred from the
+     node's own children, which is what it has always meant, and a trailing
+     partial part is dropped rather than rejected, since isValidShape guards a
+     caller's params and the bridges build this list themselves.
+     */
+    static const int kCompoundChildStride = 7;
 
     /*
      Returns true of the given string and mass represents a valid representation of
@@ -125,6 +139,21 @@ public:
      */
     bool getIsCompoundShape();
 
+    /*
+     Returns the transform between the node's origin and the center of mass that
+     this shape's parts were moved onto when it was built. Null for every shape
+     but a compound built from given parts.
+     */
+    const btTransform *getCompoundCenterOfMassOffset();
+
+    /*
+     Returns the mass of each part of a compound shape. A compound built from
+     given parts splits the body's mass by each part's volume, which is what the
+     editors hand their own engines; one inferred from geometry splits it evenly,
+     as it always has. Empty for a non-compound shape.
+     */
+    std::vector<float> getCompoundChildMasses(float totalMass);
+
 private:
     /*
      Parameters that describe the dimensions of a shape.
@@ -140,6 +169,12 @@ private:
     btTriangleMesh* _triangleMesh = nullptr;
 
     /*
+     Where the center of mass of a compound built from given parts sits relative
+     to the node, saved when the parts were moved onto it.
+     */
+    btTransform* _compoundCenterOfMassOffset = nullptr;
+
+    /*
      Creates an underlying bullet collision shape representing this VROPhysicsShape,
      given the target shape type and associated params.
      */
@@ -150,6 +185,12 @@ private:
      bullet collision shape representing this VROPhysicsShape.
      */
     btCollisionShape *generateBasicBulletShape(std::shared_ptr<VRONode> node);
+
+    /*
+     Creates a compound bullet shape out of the parts given in params, and moves
+     those parts onto the center of mass Bullet will simulate the body about.
+     */
+    btCollisionShape *generateAuthoredCompoundShape(const std::vector<float> &params);
 
     /*
      Recursively examines each node within the given root node's subtree and automatically infer

@@ -83,6 +83,12 @@ public:
     void playerWillBuffer();
     void playerDidBuffer();
 
+    /*
+     Reports the video's dimensions to the delegate. Invoked when the player item
+     becomes ready, which is the first moment a remote asset's tracks can be read.
+     */
+    void notifyVideoSize();
+
     void onFrameWillRender(const VRORenderContext &context);
     void onFrameDidRender(const VRORenderContext &context);
     

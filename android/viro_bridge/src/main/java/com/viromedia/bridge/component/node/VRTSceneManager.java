@@ -71,6 +71,11 @@ public abstract class VRTSceneManager<T extends VRTScene> extends VRTViroViewGro
         scene.setPostProcessEffects(effects);
     }
 
+    @ReactProp(name = "toneMappingEnabled", defaultBoolean = true)
+    public void setToneMappingEnabled(VRTScene scene, boolean toneMappingEnabled) {
+        scene.setToneMappingEnabled(toneMappingEnabled);
+    }
+
     @ReactProp(name = "canCameraTransformUpdate", defaultBoolean = VRTNode.DEFAULT_CAN_CAMERA_TRANSFORM_UPDATE)
     public void setCanCameraTransformUpdate(VRTScene scene, boolean canCameraTransformUpdate) {
         scene.setCanCameraTransformUpdate(canCameraTransformUpdate);

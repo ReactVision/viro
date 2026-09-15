@@ -10,5 +10,14 @@ export interface ViroWebLightProps {
     innerAngle?: number;
     outerAngle?: number;
     castsShadow?: boolean;
+    /** Masks against a node's lightReceivingBitMask; both must intersect to light. */
+    influenceBitMask?: number;
+    /** Shadow tuning. No orthographicPosition: VROLight has no setter for it. */
+    shadowOpacity?: number;
+    shadowMapSize?: number;
+    shadowBias?: number;
+    shadowNearZ?: number;
+    shadowFarZ?: number;
+    shadowOrthographicSize?: number;
 }
 export declare function useViroLight(type: ViroLightType, props: ViroWebLightProps): ViroHandle;

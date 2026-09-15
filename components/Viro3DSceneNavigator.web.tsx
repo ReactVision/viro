@@ -19,6 +19,10 @@ import {
   ViroParentNodeContext,
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
+import {
+  useViroRendererEffects,
+  type ViroRendererEffectProps,
+} from "./Web/useViroRendererEffects";
 
 type Props = {
   initialScene: { scene: React.ComponentType<any> };
@@ -30,7 +34,7 @@ type Props = {
    */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
   [key: string]: any;
-};
+} & ViroRendererEffectProps;
 
 const containerStyle: React.CSSProperties = {
   position: "relative",
@@ -48,6 +52,7 @@ const canvasStyle: React.CSSProperties = {
 export function Viro3DSceneNavigator(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
+  useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
 
   useEffect(() => {

@@ -19,6 +19,7 @@
  */
 import * as React from "react";
 import { ViroArSession, type ViroWebRendererOptions, type ViroArSessionOptions } from "@reactvision/viro-web-renderer";
+import { type ViroRendererEffectProps } from "../Web/useViroRendererEffects";
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
 type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "facingMode" | "intrinsics" | "intrinsicsSize" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
 type Props = {
@@ -51,6 +52,6 @@ type Props = {
     /** Overlay label for the start button. */
     startLabel?: string;
     [key: string]: any;
-};
+} & ViroRendererEffectProps;
 export declare function ViroARSceneNavigator(props: Props): React.JSX.Element;
 export {};

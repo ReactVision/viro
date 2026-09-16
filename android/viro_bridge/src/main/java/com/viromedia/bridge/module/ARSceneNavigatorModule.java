@@ -661,7 +661,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
-                    result.putString("error", "Invalid view type");
+                    result.putString("error", view == null
+                            ? "AR navigator is not mounted yet"
+                            : "Invalid view type");
                     result.putString("state", "ErrorInternal");
                     promise.resolve(result);
                     return;
@@ -846,7 +848,11 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
-                    result.putString("error", "Invalid view type");
+                    // Null on a scene's first frame, before Fabric has mounted the
+                    // navigator. Retryable, so a caller can wait instead of giving up.
+                    result.putString("error", view == null
+                            ? "AR navigator is not mounted yet"
+                            : "Invalid view type");
                     result.putString("state", "ErrorInternal");
                     promise.resolve(result);
                     return;

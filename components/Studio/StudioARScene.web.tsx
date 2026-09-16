@@ -10,10 +10,11 @@
  *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
  *  - Tap-to-place runs off the AR session's hit test rather than a native one,
  *    and the navigator supplies the tap surface.
+ *  - Physics and collision triggers run here: Bullet is compiled into the web
+ *    binary and this host drives it, honouring the scene's own switch.
  *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
- *    (ViroARImageMarker), native physics, drag, collisions, and the gaze and
- *    proximity bindings. `webCapabilities` reports all of them through
- *    `onUnsupported` so the caller can warn.
+ *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
+ *    reports them through `onUnsupported` so the caller can warn.
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 import * as React from "react";
@@ -41,6 +42,10 @@ import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { webUnsupportedFeatures, usesPlaneWrapper } from "./domain/webCapabilities";
+import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
+import { collisionPairKey } from "./domain/collisionPairKey";
+import { parsePhysicsWorldConfig } from "./domain/physicsConfig";
+import { useViroScene } from "../Web/ViroWebContext";
 import {
   evaluateProximityBindings,
   type ProximityRuntimeState,
@@ -380,6 +385,77 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       }
     };
   }, [placementApiRef, placeAtScreenPoint]);
+
+  // ─── Physics ──────────────────────────────────────────────────────────────
+  // Bullet has been inside the web binary all along; nothing reached it. The
+  // scene switch is honoured explicitly because virocore creates a physics world
+  // on demand at its own -9.81 and steps whatever it holds, so a scene with
+  // physics off would simulate anyway.
+  const sceneApi = useViroScene();
+  const physicsWorldConfig = useMemo(
+    () => parsePhysicsWorldConfig(scene.physics_world_config),
+    [scene.physics_world_config],
+  );
+
+  useEffect(() => {
+    const enabled = physicsWorldConfig?.enabled === true;
+    sceneApi.setPhysicsWorld(enabled, physicsWorldConfig?.gravity ?? [0, -9.81, 0]);
+    return () => {
+      sceneApi.setPhysicsWorld(false, [0, -9.81, 0]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id, physicsWorldConfig]);
+
+  // ─── Collision bindings ───────────────────────────────────────────────────
+  // One scene-level callback, routed by tag. Each body reports its own
+  // collisions, so `tag` is this node and `otherTag` the one it hit — the same
+  // shape the native per-node handler takes.
+  const collisionBindings = useMemo(
+    () => sceneData.collision_bindings ?? [],
+    [sceneData],
+  );
+  const collisionCooldownRef = useRef<Map<string, number>>(new Map());
+
+  const bindingsByPairKey = useMemo(() => {
+    const m = new Map<string, typeof collisionBindings>();
+    for (const b of collisionBindings) {
+      const key = collisionPairKey(b.asset_x_id, b.asset_y_id);
+      const list = m.get(key) ?? [];
+      list.push(b);
+      m.set(key, list);
+    }
+    return m;
+  }, [collisionBindings]);
+
+  useEffect(() => {
+    if (collisionBindings.length === 0) return;
+    const bound = new Set<string>();
+    for (const b of collisionBindings) {
+      bound.add(b.asset_x_id);
+      bound.add(b.asset_y_id);
+    }
+
+    sceneApi.setCollisionHandler((collision) => {
+      if (!bound.has(collision.tag)) return;
+      const handler = createPlacementCollisionHandler(
+        collision.tag,
+        bindingsByPairKey,
+        undefined,
+        animations,
+        collisionCooldownRef,
+        (id, key) => triggerAnimationRef.current(id, key),
+        handleSceneChange,
+        runtimeCtx,
+      );
+      handler(collision.otherTag, collision.point, collision.normal);
+    });
+
+    return () => {
+      sceneApi.setCollisionHandler(null);
+      collisionCooldownRef.current.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id, collisionBindings, bindingsByPairKey, animations, handleSceneChange, runtimeCtx]);
 
   // ─── Proximity bindings ───────────────────────────────────────────────────
   // Fires a function when the user comes within `distance` of an asset. The

@@ -46,10 +46,11 @@ exports.StudioARScene = void 0;
  *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
  *  - Tap-to-place runs off the AR session's hit test rather than a native one,
  *    and the navigator supplies the tap surface.
+ *  - Physics and collision triggers run here: Bullet is compiled into the web
+ *    binary and this host drives it, honouring the scene's own switch.
  *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
- *    (ViroARImageMarker), native physics, drag, collisions, and the gaze and
- *    proximity bindings. `webCapabilities` reports all of them through
- *    `onUnsupported` so the caller can warn.
+ *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
+ *    reports them through `onUnsupported` so the caller can warn.
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 const React = __importStar(require("react"));
@@ -73,6 +74,10 @@ const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const webCapabilities_1 = require("./domain/webCapabilities");
+const collisionBindingsRuntime_1 = require("./domain/collisionBindingsRuntime");
+const collisionPairKey_1 = require("./domain/collisionPairKey");
+const physicsConfig_1 = require("./domain/physicsConfig");
+const ViroWebContext_2 = require("../Web/ViroWebContext");
 const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const studioLighting_1 = require("./domain/studioLighting");
 /** Native's throttle: the pose updates every frame, the distances need not. */
@@ -304,6 +309,57 @@ const StudioARSceneInner = (props) => {
             }
         };
     }, [placementApiRef, placeAtScreenPoint]);
+    // ─── Physics ──────────────────────────────────────────────────────────────
+    // Bullet has been inside the web binary all along; nothing reached it. The
+    // scene switch is honoured explicitly because virocore creates a physics world
+    // on demand at its own -9.81 and steps whatever it holds, so a scene with
+    // physics off would simulate anyway.
+    const sceneApi = (0, ViroWebContext_2.useViroScene)();
+    const physicsWorldConfig = (0, react_1.useMemo)(() => (0, physicsConfig_1.parsePhysicsWorldConfig)(scene.physics_world_config), [scene.physics_world_config]);
+    (0, react_1.useEffect)(() => {
+        const enabled = physicsWorldConfig?.enabled === true;
+        sceneApi.setPhysicsWorld(enabled, physicsWorldConfig?.gravity ?? [0, -9.81, 0]);
+        return () => {
+            sceneApi.setPhysicsWorld(false, [0, -9.81, 0]);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id, physicsWorldConfig]);
+    // ─── Collision bindings ───────────────────────────────────────────────────
+    // One scene-level callback, routed by tag. Each body reports its own
+    // collisions, so `tag` is this node and `otherTag` the one it hit — the same
+    // shape the native per-node handler takes.
+    const collisionBindings = (0, react_1.useMemo)(() => sceneData.collision_bindings ?? [], [sceneData]);
+    const collisionCooldownRef = (0, react_1.useRef)(new Map());
+    const bindingsByPairKey = (0, react_1.useMemo)(() => {
+        const m = new Map();
+        for (const b of collisionBindings) {
+            const key = (0, collisionPairKey_1.collisionPairKey)(b.asset_x_id, b.asset_y_id);
+            const list = m.get(key) ?? [];
+            list.push(b);
+            m.set(key, list);
+        }
+        return m;
+    }, [collisionBindings]);
+    (0, react_1.useEffect)(() => {
+        if (collisionBindings.length === 0)
+            return;
+        const bound = new Set();
+        for (const b of collisionBindings) {
+            bound.add(b.asset_x_id);
+            bound.add(b.asset_y_id);
+        }
+        sceneApi.setCollisionHandler((collision) => {
+            if (!bound.has(collision.tag))
+                return;
+            const handler = (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(collision.tag, bindingsByPairKey, undefined, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
+            handler(collision.otherTag, collision.point, collision.normal);
+        });
+        return () => {
+            sceneApi.setCollisionHandler(null);
+            collisionCooldownRef.current.clear();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id, collisionBindings, bindingsByPairKey, animations, handleSceneChange, runtimeCtx]);
     // ─── Proximity bindings ───────────────────────────────────────────────────
     // Fires a function when the user comes within `distance` of an asset. The
     // camera side is the tracked pose; the asset side is its authored position,

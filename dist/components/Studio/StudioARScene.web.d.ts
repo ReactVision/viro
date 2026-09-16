@@ -10,10 +10,11 @@
  *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
  *  - Tap-to-place runs off the AR session's hit test rather than a native one,
  *    and the navigator supplies the tap surface.
+ *  - Physics and collision triggers run here: Bullet is compiled into the web
+ *    binary and this host drives it, honouring the scene's own switch.
  *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
- *    (ViroARImageMarker), native physics, drag, collisions, and the gaze and
- *    proximity bindings. `webCapabilities` reports all of them through
- *    `onUnsupported` so the caller can warn.
+ *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
+ *    reports them through `onUnsupported` so the caller can warn.
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 import * as React from "react";

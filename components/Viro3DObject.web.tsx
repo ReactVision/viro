@@ -37,7 +37,8 @@ type Props = ViroWebNodeProps & {
 
 export function Viro3DObject(props: Props) {
   const [loaded, setLoaded] = useState(false);
-  // Pass `loaded` as animationReady so the model's animations start once loaded.
+  // `loaded` is the hook's contentReady: the model's own animations and any
+  // shader override both need its subtree to exist first.
   const node = useViroNode(props, undefined, loaded);
   const renderer = useViroRenderer();
 

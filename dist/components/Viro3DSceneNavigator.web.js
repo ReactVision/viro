@@ -48,6 +48,7 @@ const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroMaterialRegistry_1 = require("./Web/viroMaterialRegistry");
+const useViroRendererEffects_1 = require("./Web/useViroRendererEffects");
 const containerStyle = {
     position: "relative",
     width: "100%",
@@ -63,6 +64,7 @@ const canvasStyle = {
 function Viro3DSceneNavigator(props) {
     const canvasRef = (0, react_1.useRef)(null);
     const [renderer, setRenderer] = (0, react_1.useState)(null);
+    (0, useViroRendererEffects_1.useViroRendererEffects)(renderer, props);
     const [rootNode, setRootNode] = (0, react_1.useState)(0);
     (0, react_1.useEffect)(() => {
         let cancelled = false;

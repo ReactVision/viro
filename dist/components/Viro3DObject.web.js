@@ -54,7 +54,8 @@ const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroModelLoader_1 = require("./Web/viroModelLoader");
 function Viro3DObject(props) {
     const [loaded, setLoaded] = (0, react_1.useState)(false);
-    // Pass `loaded` as animationReady so the model's animations start once loaded.
+    // `loaded` is the hook's contentReady: the model's own animations and any
+    // shader override both need its subtree to exist first.
     const node = (0, useViroNode_1.useViroNode)(props, undefined, loaded);
     const renderer = (0, ViroWebContext_1.useViroRenderer)();
     const url = (0, viroModelLoader_1.resolveModelSource)(props.source);

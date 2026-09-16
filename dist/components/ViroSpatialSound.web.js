@@ -6,12 +6,15 @@ exports.ViroSpatialSound = ViroSpatialSound;
  * PannerNode. The sound sits at `position` (world space); distance attenuation
  * follows `rolloffModel`/`minDistance`/`maxDistance`. Scene-level (no node).
  *
- * MVP note: the AudioListener stays at the world origin (not camera-tracked yet),
- * so panning is relative to origin. Autoplay may be blocked until a user gesture.
+ * The AudioListener follows the AR session's tracked camera, so panning is
+ * relative to where the user actually is. Outside an AR session there is no pose
+ * to follow and it stays at the origin. Autoplay may be blocked until a user
+ * gesture.
  */
 const react_1 = require("react");
 const viroImageLoader_1 = require("./Web/viroImageLoader");
 const viroAudio_1 = require("./Web/viroAudio");
+const ViroWebContext_1 = require("./Web/ViroWebContext");
 function distanceModel(rolloff) {
     switch (rolloff) {
         case "Logarithmic":
@@ -36,6 +39,14 @@ function setPannerPosition(panner, x, y, z) {
 function ViroSpatialSound(props) {
     const url = (0, viroImageLoader_1.resolveImageSource)(props.source);
     const [px, py, pz] = props.position ?? [0, 0, 0];
+    const { session } = (0, ViroWebContext_1.useViroAR)();
+    // Move the listener with the camera while this sound exists. Ref-counted, so
+    // several sounds share one loop and the last one to unmount stops it.
+    (0, react_1.useEffect)(() => {
+        if (!session)
+            return;
+        return (0, viroAudio_1.trackAudioListener)(session);
+    }, [session]);
     const audioRef = (0, react_1.useRef)(null);
     const pannerRef = (0, react_1.useRef)(null);
     const gainRef = (0, react_1.useRef)(null);

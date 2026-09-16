@@ -24,6 +24,7 @@ import { ViroARSceneNavigator } from "../AR/ViroARSceneNavigator.web";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene.web";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
+import { STUDIO_RENDERER_EFFECTS } from "./domain/studioRendererEffects";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
@@ -169,19 +170,6 @@ const StudioPlacementOverlay: React.FC<{
     />
   );
 };
-
-/**
- * The same two the native navigator switches off, and for the same reason: with
- * HDR on, Hable luminance-only tone mapping renders pure white at about 0.77 and
- * bright materials glow. The editor previews neither, and Studio content is
- * white-heavy text and images, so the tone curve is what an author notices.
- *
- * PBR and shadows stay on, as they do natively.
- */
-const STUDIO_RENDERER_EFFECTS = {
-  hdrEnabled: false,
-  bloomEnabled: false,
-} as const;
 
 export const StudioSceneNavigator = forwardRef<
   StudioSceneNavigatorWebHandle,

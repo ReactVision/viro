@@ -46,6 +46,7 @@ import { createPlacementCollisionHandler } from "./domain/collisionBindingsRunti
 import { collisionPairKey } from "./domain/collisionPairKey";
 import { parsePhysicsWorldConfig } from "./domain/physicsConfig";
 import { useViroScene } from "../Web/ViroWebContext";
+import { STUDIO_TONE_MAPPING_ENABLED } from "./domain/studioRendererEffects";
 import {
   evaluateProximityBindings,
   type ProximityRuntimeState,
@@ -122,7 +123,11 @@ interface Props {
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 export const StudioARScene: React.FC<Props> = (props) => {
   if (!props.sceneData) {
-    return props.mode === "3d" ? <ViroScene /> : <ViroARScene />;
+    return props.mode === "3d" ? (
+      <ViroScene toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED} />
+    ) : (
+      <ViroARScene toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED} />
+    );
   }
   return <StudioARSceneInner {...props} sceneData={props.sceneData} />;
 };
@@ -594,8 +599,14 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   );
 
   return mode === "3d" ? (
-    <ViroScene>{children}</ViroScene>
+    // The editor previews no tone curve, and virocore's default Hable
+    // luminance-only pass renders pure white at about 0.77. Off here rather than
+    // via the navigator's `hdrEnabled`, which would take PBR with it — the same
+    // line StudioARScene draws natively.
+    <ViroScene toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}>{children}</ViroScene>
   ) : (
-    <ViroARScene ref={arSceneRef}>{children}</ViroARScene>
+    <ViroARScene ref={arSceneRef} toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}>
+      {children}
+    </ViroARScene>
   );
 };

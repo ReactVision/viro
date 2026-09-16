@@ -1093,16 +1093,11 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     return true;
   }, [onPlaneDetected]);
 
+  // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
+  // the OpenXR renderer feeds Quest plane anchors through the same
+  // onAnchorFound path ARCore/ARKit use (XR_FB_scene room model), see
+  // VROARSessionOpenXR.cpp in virocore. No Quest-specific branch needed.
   const renderAssets = () => {
-    if (isQuest) {
-      if (planeDetectionMode !== "NONE") {
-        console.warn(
-          `[Studio] Plane detection (${planeDetectionMode}) is not supported on Quest — rendering assets without plane anchor.`
-        );
-      }
-      return <>{renderedPlaneAssets}</>;
-    }
-
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment}>

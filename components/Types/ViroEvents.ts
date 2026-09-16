@@ -470,6 +470,21 @@ export type ViroCloudAnchorState =
   | "ErrorResolvingSdkVersionTooOld"
   | "ErrorResolvingSdkVersionTooNew"
   | "ErrorHostingServiceUnavailable"
+  /*
+   * The five below come from the ReactVision provider rather than ARCore, and
+   * were missing here while native already emitted them: the state crosses the
+   * bridge as an untyped string, so nothing failed to compile and a caller
+   * switching on this union silently missed every one of them.
+   *
+   * ErrorResolvingLocalizationNoMatch is the common one on phones — the 30
+   * second SIFT window closing without two consistent matches. It says the
+   * anchor was not recognised from here, not that it does not exist.
+   */
+  | "ErrorNetworkFailure"
+  | "ErrorAuthenticationFailed"
+  | "ErrorHostingInsufficientVisualFeatures"
+  | "ErrorResolvingLocalizationNoMatch"
+  | "ErrorAnchorExpired"
   /**
    * Emitted by JS platform guards, never by native: the running platform has no
    * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there

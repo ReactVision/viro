@@ -21,6 +21,7 @@ import {
   type ViroHandle,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
+import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
 
@@ -128,8 +129,12 @@ export function resolveSurface(
 export function ViroImage(props: Props) {
   const scene = useViroScene();
 
-  const widthProp = props.width ?? props.style?.width;
-  const heightProp = props.height ?? props.style?.height;
+  // Inside a ViroFlexView the layout decides the size, as it does natively —
+  // and it counts as authored, so resizeMode fits the picture into the slot
+  // rather than resizing the slot to the picture.
+  const slot = useViroFlexSlot();
+  const widthProp = slot?.width ?? props.width ?? props.style?.width;
+  const heightProp = slot?.height ?? props.height ?? props.style?.height;
   const sizeAuthored = widthProp !== undefined || heightProp !== undefined;
   const width = widthProp ?? DEFAULT_SIZE;
   const height = heightProp ?? DEFAULT_SIZE;

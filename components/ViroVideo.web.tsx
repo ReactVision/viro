@@ -17,6 +17,7 @@ import {
   type ViroHandle,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
+import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
 
@@ -50,9 +51,12 @@ export function ViroVideo(props: Props): null {
   // With neither size prop given the surface takes the source's aspect ratio at one
   // unit wide, the rule the phone bridges apply. 1 until the metadata loads.
   const [aspect, setAspect] = useState(1);
-  const sizePropSet = props.width != null || props.height != null;
-  const width = props.width ?? 1;
-  const height = props.height ?? (sizePropSet ? 1 : width / aspect);
+  // Inside a ViroFlexView the layout decides the size, as it does natively, and
+  // that counts as the size being set: the slot does not grow to the video.
+  const slot = useViroFlexSlot();
+  const sizePropSet = slot != null || props.width != null || props.height != null;
+  const width = slot?.width ?? props.width ?? 1;
+  const height = slot?.height ?? props.height ?? (sizePropSet ? 1 : width / aspect);
 
   const geometryRef = useRef<ViroHandle>(0);
   useViroNode(

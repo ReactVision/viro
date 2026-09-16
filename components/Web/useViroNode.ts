@@ -18,6 +18,7 @@ import {
 import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
 import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
+import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -62,6 +63,10 @@ export interface ViroWebNodeProps {
   /** Masks against a light's influenceBitMask; both must intersect to light. */
   lightReceivingBitMask?: number;
   shadowCastingBitMask?: number;
+  /** Rigid body, in the shape Studio's physicsConfig emits. */
+  physicsBody?: ViroPhysicsBodyProp;
+  /** Name a collision reports this node by. */
+  viroTag?: string;
   // Events (world-space position, input source id).
   onClick?: (position: ViroPosition, source: number) => void;
   onClickState?: (
@@ -226,6 +231,17 @@ export function useViroNode(
     scene.setNodeBillboard(node, billboardAxis(behaviorsKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, behaviorsKey]);
+
+  // Physics. Keyed on the serialised body so a changed collider re-attaches and
+  // an unchanged one does not: rebuilding a rigid body every render would reset
+  // its velocity every frame and nothing would ever fall.
+  const physicsKey = props.physicsBody ? JSON.stringify(props.physicsBody) : "";
+  const viroTag = props.viroTag ?? "";
+  useEffect(() => {
+    applyPhysicsBody(scene, node, propsRef.current.physicsBody, viroTag);
+    return () => scene.clearPhysicsBody(node);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, physicsKey, viroTag]);
 
   // Animation (declarative ViroAnimation or model animation).
   useViroAnimation(

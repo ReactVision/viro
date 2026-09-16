@@ -1,5 +1,6 @@
 import { type ViroHandle, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { type ViroAnimationProp } from "./useViroAnimation";
+import { type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 type ViroPosition = [number, number, number];
 export interface ViroWebNodeProps {
     position?: [number, number, number];
@@ -16,6 +17,10 @@ export interface ViroWebNodeProps {
     /** Masks against a light's influenceBitMask; both must intersect to light. */
     lightReceivingBitMask?: number;
     shadowCastingBitMask?: number;
+    /** Rigid body, in the shape Studio's physicsConfig emits. */
+    physicsBody?: ViroPhysicsBodyProp;
+    /** Name a collision reports this node by. */
+    viroTag?: string;
     onClick?: (position: ViroPosition, source: number) => void;
     onClickState?: (clickState: number, position: ViroPosition, source: number) => void;
     onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;

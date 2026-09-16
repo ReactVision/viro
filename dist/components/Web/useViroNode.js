@@ -15,6 +15,7 @@ const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("./ViroWebContext");
 const viroMaterialRegistry_1 = require("./viroMaterialRegistry");
 const useViroAnimation_1 = require("./useViroAnimation");
+const viroPhysicsBody_1 = require("./viroPhysicsBody");
 const DEG2RAD = Math.PI / 180;
 /**
  * The billboard axis a `transformBehaviors` list asks for, or null for none.
@@ -189,6 +190,16 @@ createNodeFn) {
         scene.setNodeBillboard(node, billboardAxis(behaviorsKey));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node, behaviorsKey]);
+    // Physics. Keyed on the serialised body so a changed collider re-attaches and
+    // an unchanged one does not: rebuilding a rigid body every render would reset
+    // its velocity every frame and nothing would ever fall.
+    const physicsKey = props.physicsBody ? JSON.stringify(props.physicsBody) : "";
+    const viroTag = props.viroTag ?? "";
+    (0, react_1.useEffect)(() => {
+        (0, viroPhysicsBody_1.applyPhysicsBody)(scene, node, propsRef.current.physicsBody, viroTag);
+        return () => scene.clearPhysicsBody(node);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [node, physicsKey, viroTag]);
     // Animation (declarative ViroAnimation or model animation).
     (0, useViroAnimation_1.useViroAnimation)(node, props.animation, { position: [px, py, pz], rotation: [rx, ry, rz], scale: [sx, sy, sz], opacity }, contentReady);
     return node;

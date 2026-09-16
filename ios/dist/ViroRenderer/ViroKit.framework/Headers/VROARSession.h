@@ -324,6 +324,19 @@ public:
     virtual void resolveCloudAnchor(std::string cloudAnchorId,
                                     std::function<void(std::shared_ptr<VROARAnchor> anchor)> onSuccess,
                                     std::function<void(std::string error)> onFailure) = 0;
+
+    /*
+     Progress of the resolve currently running. Returns false when none is,
+     which is also the answer from any session with no ReactVision provider.
+
+     Worth having because resolving on a phone is multi-frame SIFT over a 30
+     second window: between issuing the resolve and its callback a caller
+     otherwise has nothing at all to show, and cannot tell "the anchor has never
+     been seen" from "seen once, holding for a second match".
+     */
+    virtual bool getCloudAnchorStatus(std::string &message, float &progress) {
+        return false;
+    }
     
     /*
      Invoke each rendering frame. Updates the AR session with the latest

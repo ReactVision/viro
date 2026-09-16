@@ -3,10 +3,10 @@
  * a node via the C API. The sprite is `image.source` on a quad; spawn behavior
  * and a velocity range come from `spawnBehavior`/`particlePhysics`.
  *
- * MVP scope: image, spawnBehavior (rate/lifetime/maxParticles/spawnVolume),
- * particlePhysics.velocity and .acceleration, run. Appearance modifiers
- * (color/scale/rotation/alpha over life), bursts, explosiveImpulse,
- * spawnOnSurface and emissionRatePerMeter are follow-ups.
+ * Scope: image, spawnBehavior (rate/lifetime/maxParticles/spawnVolume),
+ * particlePhysics.velocity and .acceleration, particleAppearance (colour,
+ * opacity, scale and rotation over the particle's life), run. Bursts,
+ * explosiveImpulse, spawnOnSurface and emissionRatePerMeter are follow-ups.
  */
 import * as React from "react";
 import { useEffect, useRef } from "react";
@@ -17,6 +17,10 @@ import {
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroScene } from "./Web/ViroWebContext";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
+import {
+  resolveParticleAppearance,
+  type ViroParticleAppearanceProp,
+} from "./Web/viroParticleAppearance";
 
 type Vec3 = [number, number, number];
 
@@ -34,6 +38,8 @@ type Props = ViroWebNodeProps & {
     velocity?: VelocityRange;
     acceleration?: VelocityRange;
   };
+  /** Colour, opacity, scale and rotation over the particle's life. */
+  particleAppearance?: ViroParticleAppearanceProp;
   [key: string]: any;
 };
 
@@ -120,6 +126,16 @@ export function ViroParticleEmitter(props: Props): null {
           const [accelMin, accelMax] = velocityRange(accel);
           scene.setParticleAcceleration(node, accelMin, accelMax);
         }
+        for (const call of resolveParticleAppearance(p.particleAppearance)) {
+          scene.setParticleModifier(
+            node,
+            call.property,
+            call.min,
+            call.max,
+            call.factor,
+            call.intervals,
+          );
+        }
         scene.setParticleEmitterRun(node, p.run !== false);
       })
       .catch(() => {});
@@ -132,6 +148,25 @@ export function ViroParticleEmitter(props: Props): null {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, url]);
+
+  // A changed appearance, after the emitter exists. Keyed on the serialised prop
+  // because it arrives as a fresh object literal on every render.
+  const appearanceKey = props.particleAppearance
+    ? JSON.stringify(props.particleAppearance)
+    : "";
+  useEffect(() => {
+    if (!node || !appearanceKey) return;
+    for (const call of resolveParticleAppearance(propsRef.current.particleAppearance)) {
+      scene.setParticleModifier(
+        node,
+        call.property,
+        call.min,
+        call.max,
+        call.factor,
+        call.intervals,
+      );
+    }
+  }, [scene, node, appearanceKey]);
 
   // Run/pause toggling.
   useEffect(() => {

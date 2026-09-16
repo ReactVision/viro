@@ -33,6 +33,15 @@ export type ViroSharedFrameProps = {
         message: string;
         attempt: number;
     }) => void;
+    /**
+     * How many times to re-run a source that failed for a recoverable reason.
+     *
+     * Defaults to 3, one second apart. Only a failed localisation is retried: a missing anchor, an
+     * unsupported platform or a rejected key fails the same way every time, so
+     * retrying those only delays the error. On phones the default matters, since
+     * one 30 second window often ends a metre short of a match.
+     */
+    maxAttempts?: number;
     /** Rendered only while the frame is not yet established. */
     placeholder?: React.ReactNode;
     children?: React.ReactNode;
@@ -58,10 +67,12 @@ export declare class ViroSharedFrame extends React.Component<ViroSharedFrameProp
     private static _unsupportedWarned;
     private _mounted;
     private _pollTimer;
+    private _retryTimer;
     private _attempt;
     componentDidMount(): void;
     componentDidUpdate(prev: ViroSharedFrameProps): void;
     componentWillUnmount(): void;
+    _clearRetry: () => void;
     _stopPolling: () => void;
     _startPolling: () => void;
     _acquire: () => Promise<void>;

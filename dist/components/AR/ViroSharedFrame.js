@@ -44,6 +44,30 @@ const ViroNode_1 = require("../ViroNode");
 /** How often the source is asked what it is doing. */
 const PROGRESS_POLL_MS = 500;
 /**
+ * Pause before re-running a failed source. On Android a resolve issued on the
+ * scene's first frame reaches the bridge before the navigator's native view
+ * exists; three instant retries would spend every attempt in that same
+ * millisecond.
+ */
+const RETRY_DELAY_MS = 1000;
+/**
+ * States worth another go. Everything else is a fact about the anchor, the
+ * platform or the credentials, and a second attempt returns it unchanged.
+ *
+ * ErrorResolvingLocalizationNoMatch is the one that earns this feature: it
+ * means the 30 second SIFT window closed without two consistent matches, and
+ * the next window starts from wherever the user has walked to since.
+ * ErrorResourceExhausted is deliberately absent — retrying a rate limit is how
+ * it gets worse.
+ */
+const RETRYABLE = new Set([
+    "ErrorResolvingLocalizationNoMatch",
+    "ErrorNetworkFailure",
+    "ErrorHostingServiceUnavailable",
+    "ErrorInternal",
+    "TaskInProgress",
+]);
+/**
  * Renders its children in a shared coordinate frame.
  *
  * This is the co-location primitive, independent of how the frame was
@@ -64,6 +88,7 @@ class ViroSharedFrame extends React.Component {
     // expires, so this is a real window, not a theoretical one.
     _mounted = false;
     _pollTimer;
+    _retryTimer;
     _attempt = 0;
     componentDidMount() {
         this._mounted = true;
@@ -73,13 +98,21 @@ class ViroSharedFrame extends React.Component {
         if (prev.source.key !== this.props.source.key) {
             this.setState({ frame: null });
             this._attempt = 0;
+            this._clearRetry();
             this._acquire();
         }
     }
     componentWillUnmount() {
         this._mounted = false;
         this._stopPolling();
+        this._clearRetry();
     }
+    _clearRetry = () => {
+        if (this._retryTimer) {
+            clearTimeout(this._retryTimer);
+            this._retryTimer = undefined;
+        }
+    };
     _stopPolling = () => {
         if (this._pollTimer) {
             clearInterval(this._pollTimer);
@@ -124,6 +157,21 @@ class ViroSharedFrame extends React.Component {
         if (!this._mounted || requested !== this.props.source.key)
             return;
         if (!outcome.success) {
+            const attemptsAllowed = this.props.maxAttempts ?? 3;
+            const retryable = outcome.state === undefined || RETRYABLE.has(outcome.state);
+            if (retryable && this._attempt < attemptsAllowed) {
+                this.props.onLocalizeProgress?.({
+                    message: outcome.error,
+                    attempt: this._attempt,
+                });
+                this._retryTimer = setTimeout(() => {
+                    this._retryTimer = undefined;
+                    if (this._mounted && requested === this.props.source.key) {
+                        this._acquire();
+                    }
+                }, RETRY_DELAY_MS);
+                return;
+            }
             this.props.onLocalizeError?.(outcome.error, outcome.state);
             return;
         }

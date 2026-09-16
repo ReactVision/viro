@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Platform } from "react-native";
 import { Viro3DObject } from "../../Viro3DObject";
 import { ViroImage } from "../../ViroImage";
 import { ViroText } from "../../ViroText";
@@ -245,7 +244,6 @@ function create3DObject(
       dragPlane={config.dragPlane}
       animation={config.animation as any}
       onClick={config.onClick}
-      renderingOrder={Platform.OS === "android" ? 1 : 0}
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
       onError={(e) =>
         console.error(`[Studio] 3D model "${asset.name}" error:`, e)

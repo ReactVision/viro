@@ -1,5 +1,12 @@
 import * as React from "react";
-import { AppState, NativeModules, StyleSheet, View, ViewProps } from "react-native";
+import {
+  AppState,
+  NativeModules,
+  PermissionsAndroid,
+  StyleSheet,
+  View,
+  ViewProps,
+} from "react-native";
 import { ViroARSceneNavigator } from "./AR/ViroARSceneNavigator";
 import { ViroSceneNavigator } from "./ViroSceneNavigator";
 import { isQuest, isVisionOS } from "./Utilities/ViroPlatform";
@@ -32,6 +39,19 @@ const VRLauncher = NativeModules.VRLauncher as
 // AR continues to work on RN >= 0.81 (Expo 54+) — only the Quest VR launch
 // is gated.
 const MIN_RN_FOR_VR = { major: 0, minor: 83 };
+
+// Declared in the manifest by withViroAndroid.ts, but Horizon OS treats these
+// as dangerous runtime permissions — the manifest entry alone doesn't grant
+// them. USE_ANCHOR_API/USE_SCENE gate plane & anchor data (needed now that the
+// ViroARScene root mounts on Quest too); HEADSET_CAMERA gates the passthrough
+// Camera2 feed ViroObjectDetector reads. Requested once before the first VR
+// launch; denial degrades gracefully elsewhere (no planes / no passthrough
+// feed, see QuestPassthroughCamera) rather than blocking VR.
+const QUEST_RUNTIME_PERMISSIONS = [
+  "horizonos.permission.USE_ANCHOR_API",
+  "com.oculus.permission.USE_SCENE",
+  "horizonos.permission.HEADSET_CAMERA",
+];
 
 function checkRNVersionForVR(): void {
   let version = "unknown";
@@ -260,23 +280,32 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       if (!isQuest) return;
       checkRNVersionForVR();
 
-      const scene = vrInitialScene ?? initialScene;
-      if (scene) {
-        VRQuestNavigatorBridge.setIntent(scene, {
-          hdrEnabled,
-          pbrEnabled,
-          bloomEnabled,
-          shadowsEnabled,
-          multisamplingEnabled,
-          vrModeEnabled,
-          passthroughEnabled,
-          handTrackingEnabled,
-          onExitViro,
-          debug,
-        });
-      }
-      VRQuestNavigatorBridge.setVRActive(true);
-      VRLauncher?.launchVRScene?.();
+      const registerIntentAndLaunch = () => {
+        const scene = vrInitialScene ?? initialScene;
+        if (scene) {
+          VRQuestNavigatorBridge.setIntent(scene, {
+            hdrEnabled,
+            pbrEnabled,
+            bloomEnabled,
+            shadowsEnabled,
+            multisamplingEnabled,
+            vrModeEnabled,
+            passthroughEnabled,
+            handTrackingEnabled,
+            onExitViro,
+            debug,
+          });
+        }
+        VRQuestNavigatorBridge.setVRActive(true);
+        VRLauncher?.launchVRScene?.();
+      };
+
+      // Request the runtime grants once before the first launch. Caught and
+      // ignored on failure — a denied/unavailable permission should degrade
+      // (no planes, no passthrough camera), not block VR from opening at all.
+      PermissionsAndroid.requestMultiple(QUEST_RUNTIME_PERMISSIONS as any)
+        .catch(() => undefined)
+        .then(registerIntentAndLaunch);
 
       const sub = AppState.addEventListener("change", (nextState) => {
         const prev = appStateRef.current;

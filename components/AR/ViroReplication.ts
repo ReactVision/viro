@@ -37,6 +37,15 @@
 
 "use strict";
 
+import { isWeb } from "../Utilities/ViroPlatform";
+
+/** React Native's constructor, which the DOM typing does not describe. */
+type HeaderWebSocket = new (
+  url: string,
+  protocols: null,
+  options: { headers: Record<string, string> },
+) => WebSocket;
+
 export type ViroReplicatedEntity = {
   id: string;
   fields: Record<string, unknown>;
@@ -229,15 +238,23 @@ export class ViroReplicationClient {
     if (!cfg) return;
 
     const base = toSocketScheme(cfg.endpoint ?? DEFAULT_ENDPOINT);
-    // Credentials go in the query string because the browser and React Native
-    // WebSocket APIs cannot set request headers. See server/src/auth.ts.
-    const url = `${base}/functions/v1/replication/${encodeURIComponent(cfg.roomId)}` +
-      `?apiKey=${encodeURIComponent(cfg.apiKey)}` +
-      `&projectId=${encodeURIComponent(cfg.projectId)}`;
+    const path = `${base}/functions/v1/replication/${encodeURIComponent(cfg.roomId)}`;
 
     this.setState(this.attempt === 0 ? "connecting" : "reconnecting");
 
-    const ws = new WebSocket(url);
+    // Same headers the pose channel sends. React Native's WebSocket takes them
+    // as a third argument and forwards them to the native handshake; only a
+    // browser cannot set them, and there the credentials go in the query
+    // string, which the relay refuses unless it was started to allow it (a
+    // browser client needs an Origin allowlist first).
+    const ws = isWeb
+      ? new WebSocket(
+        `${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
+          `&projectId=${encodeURIComponent(cfg.projectId)}`,
+      )
+      : new (WebSocket as unknown as HeaderWebSocket)(path, null, {
+        headers: { "x-api-key": cfg.apiKey, "x-project-id": cfg.projectId },
+      });
     this.ws = ws;
 
     ws.onopen = () => {

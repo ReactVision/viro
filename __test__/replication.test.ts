@@ -3,6 +3,13 @@ import {
   type ViroReplicatedEntity,
 } from "../components/AR/ViroReplication";
 
+// The client reads the platform to choose header auth over the query string,
+// and this suite runs with no native environment.
+jest.mock("react-native", () => ({
+  Platform: { OS: "ios", constants: {} },
+  NativeModules: {},
+}));
+
 /** Minimal WebSocket stand-in: records what was sent, injects what arrives. */
 class FakeSocket {
   static last: FakeSocket | null = null;
@@ -14,7 +21,11 @@ class FakeSocket {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
 
-  constructor(public url: string) {
+  constructor(
+    public url: string,
+    _protocols?: null,
+    public options?: { headers?: Record<string, string> },
+  ) {
     FakeSocket.last = this;
   }
 
@@ -63,12 +74,14 @@ const connectAndWelcome = (entities: ViroReplicatedEntity[] = [], seq = 0) => {
 };
 
 describe("connection", () => {
-  it("builds a ws:// url from an http endpoint and passes credentials", () => {
+  it("builds a ws:// url from an http endpoint and sends credentials as headers", () => {
     client.connect(CONFIG);
-    const url = FakeSocket.last!.url;
-    expect(url).toContain("ws://localhost:8787/functions/v1/replication/room-1");
-    expect(url).toContain("apiKey=k");
-    expect(url).toContain("projectId=p");
+    const s = FakeSocket.last!;
+    expect(s.url).toBe("ws://localhost:8787/functions/v1/replication/room-1");
+    // Never in the URL on a native platform: the relay refuses query-string
+    // credentials, and a URL is what ends up in logs.
+    expect(s.url).not.toContain("apiKey");
+    expect(s.options?.headers).toEqual({ "x-api-key": "k", "x-project-id": "p" });
   });
 
   it("is only synced once the welcome arrives, not when the socket opens", () => {

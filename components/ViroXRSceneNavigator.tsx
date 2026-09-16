@@ -9,6 +9,15 @@ import {
   ImmersiveSpaceStyle,
 } from "./VisionOS/ViroVisionOSModule";
 import { VRQuestNavigatorBridge } from "./Utilities/VRQuestNavigatorBridge";
+import { VRModuleOpenXR } from "./Utilities/VRModuleOpenXR";
+import type { Viro3DPoint } from "./Types/ViroUtils";
+
+const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
+  | {
+      project: (tag: number, point: Viro3DPoint) => Promise<any>;
+      unproject: (tag: number, point: Viro3DPoint) => Promise<any>;
+    }
+  | undefined;
 
 const VRLauncher = NativeModules.VRLauncher as
   | { launchVRScene?: () => void }
@@ -164,12 +173,38 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     // AR:    expose the underlying ViroARSceneNavigator instance directly.
     React.useImperativeHandle(ref, () => {
       if (isQuest) {
+        // project/unproject/recenterTracking can't go through dispatchOp — that
+        // queue is fire-and-forget (push/pop/etc. have no return value), while
+        // these three need a result back. Instead they reuse the same viewTag
+        // handoff VRQuestNavigatorBridge already publishes for VRModuleOpenXR:
+        // both activities share one Fabric UIManager, so a tag captured in
+        // VRActivity resolves fine from a native module call made here in the
+        // panel. recenterTracking goes through VRModuleOpenXR (Quest-specific,
+        // already used this way elsewhere); project/unproject reuse the generic
+        // VRTSceneNavigatorModule, which already resolves views by raw tag.
+        const requireViewTag = (): number => {
+          const tag = VRQuestNavigatorBridge.getViewTag();
+          if (tag == null) {
+            throw new Error(
+              "[Viro] Quest VR scene not mounted yet — call this after the VR scene is active."
+            );
+          }
+          return tag;
+        };
         const bridgeNav = {
           push:    (scene: any) => VRQuestNavigatorBridge.dispatchOp({ type: "push",    scene }),
           replace: (scene: any) => VRQuestNavigatorBridge.dispatchOp({ type: "replace", scene }),
           jump:    (scene: any) => VRQuestNavigatorBridge.dispatchOp({ type: "jump",    scene }),
           pop:     ()           => VRQuestNavigatorBridge.dispatchOp({ type: "pop"              }),
           popN:    (n: number)  => VRQuestNavigatorBridge.dispatchOp({ type: "popN",   n       }),
+          recenterTracking: () => VRModuleOpenXR?.recenterTracking?.(requireViewTag()),
+          // async so a missing viewTag rejects the returned promise instead of
+          // throwing synchronously — callers doing `nav.project(p).catch(...)`
+          // without awaiting still get the rejection.
+          project: async (point: Viro3DPoint) =>
+            ViroSceneNavigatorModule?.project(requireViewTag(), point),
+          unproject: async (point: Viro3DPoint) =>
+            ViroSceneNavigatorModule?.unproject(requireViewTag(), point),
         };
         return { sceneNavigator: bridgeNav, arSceneNavigator: bridgeNav };
       }
@@ -224,6 +259,7 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     React.useEffect(() => {
       if (!isQuest) return;
       checkRNVersionForVR();
+
       const scene = vrInitialScene ?? initialScene;
       if (scene) {
         VRQuestNavigatorBridge.setIntent(scene, {

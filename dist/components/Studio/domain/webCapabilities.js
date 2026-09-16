@@ -16,21 +16,6 @@ function usesPlaneWrapper(planeDetection, mode) {
     const detection = (planeDetection ?? "NONE").toUpperCase();
     return detection === "AUTOMATIC" || detection === "MANUAL";
 }
-/** True for a config object that exists and is not explicitly switched off. */
-function isEnabled(config) {
-    if (typeof config !== "object" || config === null)
-        return false;
-    return config.enabled !== false;
-}
-function hasPhysics(world, assets) {
-    // The scene switch gates every body, so a world that is off means nothing
-    // would have simulated and there is nothing to warn about. Reporting it
-    // anyway trains people to ignore the banner.
-    const worldOn = typeof world === "object" &&
-        world !== null &&
-        world.enabled === true;
-    return worldOn && assets.some((a) => isEnabled(a.physics_config));
-}
 function webUnsupportedFeatures(sceneData, 
 /** "3d" has no camera to hit-test against, so guided placement cannot run. */
 mode = "ar") {
@@ -39,8 +24,7 @@ mode = "ar") {
     // The node factory's marker assets are filtered out of the tree entirely.
     if (assets.some((a) => a.trigger_image_url))
         features.push("image markers");
-    if (hasPhysics(scene.physics_world_config, assets))
-        features.push("physics");
+    // Physics runs on web now: Bullet is in the binary and the host drives it.
     // Gaze is a headset affordance: the native host wires it on Quest only, and a
     // browser has no gaze ray either. Standing a mouse hover in for it would give
     // web a behaviour no phone has, which is the opposite of parity.
@@ -54,9 +38,7 @@ mode = "ar") {
         usesPlaneWrapper(scene.plane_detection, mode)) {
         features.push("proximity triggers");
     }
-    // Collisions need a physics world, which web has none of.
-    if (sceneData.collision_bindings?.length)
-        features.push("collision triggers");
+    // Collision triggers ride the physics world, so they run wherever it does.
     // Guided placement needs a tracked camera to hit-test a tap against, so it
     // runs in AR and nowhere else. In 3d the queue would never advance and the
     // assets would stay hidden for the whole scene.

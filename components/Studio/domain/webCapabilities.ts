@@ -10,7 +10,7 @@
  * Each entry is a feature the host actively drops, not one it renders
  * differently. Approximations belong in the component that makes them.
  */
-import type { StudioAsset, StudioSceneResponse } from "../types";
+import type { StudioSceneResponse } from "../types";
 import { isTapToPlaceAsset } from "./placementStore";
 
 /**
@@ -29,26 +29,6 @@ export function usesPlaneWrapper(
   return detection === "AUTOMATIC" || detection === "MANUAL";
 }
 
-/** True for a config object that exists and is not explicitly switched off. */
-function isEnabled(config: unknown): boolean {
-  if (typeof config !== "object" || config === null) return false;
-  return (config as { enabled?: boolean }).enabled !== false;
-}
-
-function hasPhysics(
-  world: unknown,
-  assets: readonly StudioAsset[],
-): boolean {
-  // The scene switch gates every body, so a world that is off means nothing
-  // would have simulated and there is nothing to warn about. Reporting it
-  // anyway trains people to ignore the banner.
-  const worldOn =
-    typeof world === "object" &&
-    world !== null &&
-    (world as { enabled?: boolean }).enabled === true;
-  return worldOn && assets.some((a) => isEnabled(a.physics_config));
-}
-
 export function webUnsupportedFeatures(
   sceneData: StudioSceneResponse,
   /** "3d" has no camera to hit-test against, so guided placement cannot run. */
@@ -60,7 +40,7 @@ export function webUnsupportedFeatures(
   // The node factory's marker assets are filtered out of the tree entirely.
   if (assets.some((a) => a.trigger_image_url)) features.push("image markers");
 
-  if (hasPhysics(scene.physics_world_config, assets)) features.push("physics");
+  // Physics runs on web now: Bullet is in the binary and the host drives it.
 
   // Gaze is a headset affordance: the native host wires it on Quest only, and a
   // browser has no gaze ray either. Standing a mouse hover in for it would give
@@ -78,8 +58,7 @@ export function webUnsupportedFeatures(
     features.push("proximity triggers");
   }
 
-  // Collisions need a physics world, which web has none of.
-  if (sceneData.collision_bindings?.length) features.push("collision triggers");
+  // Collision triggers ride the physics world, so they run wherever it does.
 
   // Guided placement needs a tracked camera to hit-test a tap against, so it
   // runs in AR and nowhere else. In 3d the queue would never advance and the

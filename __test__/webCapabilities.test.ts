@@ -29,14 +29,11 @@ describe("webUnsupportedFeatures", () => {
     expect(webUnsupportedFeatures(sceneData({ assets: [asset()] }))).toEqual([]);
   });
 
-  test("reports gaze and collision, which this host cannot run at all", () => {
-    // Gaze is a headset affordance the native host only wires on Quest;
-    // collisions need a physics world web has none of.
-    expect(
-      webUnsupportedFeatures(
-        sceneData({ gaze_bindings: [{}], collision_bindings: [{}] }),
-      ),
-    ).toEqual(["gaze triggers", "collision triggers"]);
+  test("reports gaze, which is a headset affordance", () => {
+    // The native host wires it on Quest only, and a browser has no gaze ray.
+    expect(webUnsupportedFeatures(sceneData({ gaze_bindings: [{}] }))).toEqual([
+      "gaze triggers",
+    ]);
   });
 
   test("reports proximity only where the distances would be wrong", () => {
@@ -82,39 +79,17 @@ describe("webUnsupportedFeatures", () => {
     expect(features).toEqual(["image markers"]);
   });
 
-  test("reports physics only when something would have simulated", () => {
-    const body = asset({ physics_config: { enabled: true, type: "Dynamic" } });
-
-    // World on and a body present: the one case where physics is really lost.
-    expect(
-      webUnsupportedFeatures(
-        sceneData({
-          scene: { id: "s1", physics_world_config: { enabled: true } },
-          assets: [body],
-        }),
-      ),
-    ).toContain("physics");
-
-    // World off gates every body on both surfaces, so there is nothing to warn
-    // about — a false warning here is what trains people to ignore the banner.
-    expect(
-      webUnsupportedFeatures(
-        sceneData({
-          scene: { id: "s1", physics_world_config: { enabled: false } },
-          assets: [body],
-        }),
-      ),
-    ).not.toContain("physics");
-
-    // World on but no body: nothing would have simulated either.
-    expect(
-      webUnsupportedFeatures(
-        sceneData({
-          scene: { id: "s1", physics_world_config: { enabled: true } },
-          assets: [asset()],
-        }),
-      ),
-    ).not.toContain("physics");
+  test("no longer reports physics or collisions: both run on web", () => {
+    // Bullet is compiled into the web binary and this host drives it, so the
+    // two entries that used to be here are closed rather than declared.
+    const features = webUnsupportedFeatures(
+      sceneData({
+        scene: { id: "s1", physics_world_config: { enabled: true } },
+        assets: [asset({ physics_config: { enabled: true, type: "Dynamic" } })],
+        collision_bindings: [{}],
+      }),
+    );
+    expect(features).toEqual([]);
   });
 
   test("reports manual plane selection, which has no web picker", () => {

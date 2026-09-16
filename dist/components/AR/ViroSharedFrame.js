@@ -41,6 +41,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSharedFrame = void 0;
 const React = __importStar(require("react"));
 const ViroNode_1 = require("../ViroNode");
+/** How often the source is asked what it is doing. */
+const PROGRESS_POLL_MS = 500;
 /**
  * Renders its children in a shared coordinate frame.
  *
@@ -61,6 +63,8 @@ class ViroSharedFrame extends React.Component {
     // anchor resolve retries every AR frame until it localises or the window
     // expires, so this is a real window, not a theoretical one.
     _mounted = false;
+    _pollTimer;
+    _attempt = 0;
     componentDidMount() {
         this._mounted = true;
         this._acquire();
@@ -68,12 +72,37 @@ class ViroSharedFrame extends React.Component {
     componentDidUpdate(prev) {
         if (prev.source.key !== this.props.source.key) {
             this.setState({ frame: null });
+            this._attempt = 0;
             this._acquire();
         }
     }
     componentWillUnmount() {
         this._mounted = false;
+        this._stopPolling();
     }
+    _stopPolling = () => {
+        if (this._pollTimer) {
+            clearInterval(this._pollTimer);
+            this._pollTimer = undefined;
+        }
+    };
+    _startPolling = () => {
+        const { source, arSceneNavigator, onLocalizeProgress } = this.props;
+        if (!source.progress || !onLocalizeProgress)
+            return;
+        this._stopPolling();
+        this._pollTimer = setInterval(async () => {
+            const requested = source.key;
+            const message = await source.progress({ arSceneNavigator });
+            // A poll in flight outlives the acquire that started it, and a stale one
+            // would report the previous anchor's progress against the current one.
+            if (!this._mounted || requested !== this.props.source.key)
+                return;
+            if (message) {
+                this.props.onLocalizeProgress?.({ message, attempt: this._attempt });
+            }
+        }, PROGRESS_POLL_MS);
+    };
     _acquire = async () => {
         const { source, arSceneNavigator } = this.props;
         if (!source.support.ok) {
@@ -87,7 +116,10 @@ class ViroSharedFrame extends React.Component {
             return;
         }
         const requested = source.key;
+        this._attempt += 1;
+        this._startPolling();
         const outcome = await source.acquire({ arSceneNavigator });
+        this._stopPolling();
         // Ignore an acquire that landed after unmount, or after the source changed.
         if (!this._mounted || requested !== this.props.source.key)
             return;

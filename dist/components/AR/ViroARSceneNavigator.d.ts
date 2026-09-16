@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroCloudAnchorStatus, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -437,6 +437,16 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _resolveCloudAnchor: (cloudAnchorId: string) => Promise<ViroResolveCloudAnchorResult>;
     /**
+     * Progress of a resolve in flight. `active` is false when none is running.
+     *
+     * Poll it: resolving a cloud anchor is multi-frame SIFT matching over a 30
+     * second window, and `resolveCloudAnchor()` says nothing until it ends. The
+     * `message` distinguishes the states that matter — downloading the anchor,
+     * looking for it, and having seen it once while it waits for a second
+     * consistent match.
+     */
+    _getCloudAnchorStatus: () => Promise<ViroCloudAnchorStatus>;
+    /**
      * Cancel all pending cloud anchor operations.
      * Use this when exiting a scene or when cloud operations are no longer needed.
      */
@@ -725,6 +735,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         unproject: (point: Viro3DPoint) => Promise<any>;
         hostCloudAnchor: (anchorId: string, ttlDays?: number) => Promise<ViroHostCloudAnchorResult>;
         resolveCloudAnchor: (cloudAnchorId: string) => Promise<ViroResolveCloudAnchorResult>;
+        getCloudAnchorStatus: () => Promise<ViroCloudAnchorStatus>;
         cancelCloudAnchorOperations: () => void;
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
@@ -789,6 +800,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         unproject: (point: Viro3DPoint) => Promise<any>;
         hostCloudAnchor: (anchorId: string, ttlDays?: number) => Promise<ViroHostCloudAnchorResult>;
         resolveCloudAnchor: (cloudAnchorId: string) => Promise<ViroResolveCloudAnchorResult>;
+        getCloudAnchorStatus: () => Promise<ViroCloudAnchorStatus>;
         cancelCloudAnchorOperations: () => void;
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;

@@ -34,6 +34,15 @@ export type ViroSharedFrameProps = {
   /** Fired when the frame cannot be established, including unsupported platforms. */
   onLocalizeError?: (error: string, state?: ViroCloudAnchorState) => void;
 
+  /**
+   * What the source is doing, roughly twice a second while it works.
+   *
+   * Worth rendering: a cloud anchor resolve is multi-frame SIFT over a 30 second
+   * window, and without this the app shows nothing at all until it ends.
+   * `attempt` counts from 1 and rises when a recoverable failure is retried.
+   */
+  onLocalizeProgress?: (status: { message: string; attempt: number }) => void;
+
   /** Rendered only while the frame is not yet established. */
   placeholder?: React.ReactNode;
 
@@ -41,6 +50,9 @@ export type ViroSharedFrameProps = {
 };
 
 type State = { frame: ViroSharedFrameValue | null };
+
+/** How often the source is asked what it is doing. */
+const PROGRESS_POLL_MS = 500;
 
 /**
  * Renders its children in a shared coordinate frame.
@@ -64,6 +76,8 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
   // anchor resolve retries every AR frame until it localises or the window
   // expires, so this is a real window, not a theoretical one.
   private _mounted = false;
+  private _pollTimer: ReturnType<typeof setInterval> | undefined;
+  private _attempt = 0;
 
   componentDidMount() {
     this._mounted = true;
@@ -73,13 +87,39 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
   componentDidUpdate(prev: ViroSharedFrameProps) {
     if (prev.source.key !== this.props.source.key) {
       this.setState({ frame: null });
+      this._attempt = 0;
       this._acquire();
     }
   }
 
   componentWillUnmount() {
     this._mounted = false;
+    this._stopPolling();
   }
+
+  _stopPolling = () => {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = undefined;
+    }
+  };
+
+  _startPolling = () => {
+    const { source, arSceneNavigator, onLocalizeProgress } = this.props;
+    if (!source.progress || !onLocalizeProgress) return;
+
+    this._stopPolling();
+    this._pollTimer = setInterval(async () => {
+      const requested = source.key;
+      const message = await source.progress!({ arSceneNavigator });
+      // A poll in flight outlives the acquire that started it, and a stale one
+      // would report the previous anchor's progress against the current one.
+      if (!this._mounted || requested !== this.props.source.key) return;
+      if (message) {
+        this.props.onLocalizeProgress?.({ message, attempt: this._attempt });
+      }
+    }, PROGRESS_POLL_MS);
+  };
 
   _acquire = async () => {
     const { source, arSceneNavigator } = this.props;
@@ -98,7 +138,10 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
     }
 
     const requested = source.key;
+    this._attempt += 1;
+    this._startPolling();
     const outcome = await source.acquire({ arSceneNavigator });
+    this._stopPolling();
 
     // Ignore an acquire that landed after unmount, or after the source changed.
     if (!this._mounted || requested !== this.props.source.key) return;

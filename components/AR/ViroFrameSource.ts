@@ -70,6 +70,15 @@ export interface ViroFrameSource {
   readonly support: ViroFrameSupport;
 
   acquire(ctx: ViroFrameSourceContext): Promise<ViroFrameOutcome>;
+
+  /**
+   * What `acquire()` is doing right now, polled while it is in flight.
+   *
+   * Optional because only the cloud anchor path takes long enough to be worth
+   * narrating: a Meta anchor resolves from local storage and the visionOS space
+   * converges or does not. Return null when there is nothing to say.
+   */
+  progress?(ctx: ViroFrameSourceContext): Promise<string | null>;
 }
 
 /**
@@ -124,6 +133,18 @@ export function cloudAnchorFrameSource(cloudAnchorId: string): ViroFrameSource {
           error: e?.message ?? String(e),
           state: "ErrorInternal",
         };
+      }
+    },
+
+    async progress(ctx: ViroFrameSourceContext): Promise<string | null> {
+      const nav = ctx.arSceneNavigator;
+      if (!nav?.getCloudAnchorStatus) return null;
+      try {
+        const status = await nav.getCloudAnchorStatus();
+        return status?.active ? status.message : null;
+      } catch {
+        // A poll that fails is not a resolve that failed. Say nothing.
+        return null;
       }
     },
   };

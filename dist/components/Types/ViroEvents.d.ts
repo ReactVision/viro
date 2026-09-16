@@ -455,6 +455,21 @@ export type ViroResolveCloudAnchorResult = {
     state: ViroCloudAnchorState;
 };
 /**
+ * Progress of a cloud anchor resolve, from `getCloudAnchorStatus()`.
+ *
+ * `message` is the useful field: resolving passes through downloading the
+ * anchor, looking for it, and holding after a first match, and only the message
+ * separates "never seen" from "seen once" — which is the difference between a
+ * hopeless spot and one worth standing still in.
+ */
+export type ViroCloudAnchorStatus = {
+    /** False when nothing is resolving; the other fields are then empty. */
+    active: boolean;
+    /** 0 to 1, monotonic within one resolve. */
+    progress: number;
+    message: string;
+};
+/**
  * Result of `rvCreateSharedFrame()` / `rvJoinSharedFrame()` (CL-H).
  *
  * `transform` is the same opaque, column-major CSV a resolved cloud anchor

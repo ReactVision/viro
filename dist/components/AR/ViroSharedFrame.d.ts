@@ -22,6 +22,17 @@ export type ViroSharedFrameProps = {
     onLocalized?: (event: ViroLocalizedEvent) => void;
     /** Fired when the frame cannot be established, including unsupported platforms. */
     onLocalizeError?: (error: string, state?: ViroCloudAnchorState) => void;
+    /**
+     * What the source is doing, roughly twice a second while it works.
+     *
+     * Worth rendering: a cloud anchor resolve is multi-frame SIFT over a 30 second
+     * window, and without this the app shows nothing at all until it ends.
+     * `attempt` counts from 1 and rises when a recoverable failure is retried.
+     */
+    onLocalizeProgress?: (status: {
+        message: string;
+        attempt: number;
+    }) => void;
     /** Rendered only while the frame is not yet established. */
     placeholder?: React.ReactNode;
     children?: React.ReactNode;
@@ -46,9 +57,13 @@ export declare class ViroSharedFrame extends React.Component<ViroSharedFrameProp
     state: State;
     private static _unsupportedWarned;
     private _mounted;
+    private _pollTimer;
+    private _attempt;
     componentDidMount(): void;
     componentDidUpdate(prev: ViroSharedFrameProps): void;
     componentWillUnmount(): void;
+    _stopPolling: () => void;
+    _startPolling: () => void;
     _acquire: () => Promise<void>;
     render(): React.JSX.Element | null;
 }

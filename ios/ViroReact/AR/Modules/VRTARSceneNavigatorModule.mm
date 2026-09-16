@@ -497,6 +497,33 @@ RCT_EXPORT_METHOD(getRecordingStatus:(nonnull NSNumber *)reactTag
     }];
 }
 
+static NSDictionary *VRTEmptyCloudAnchorStatus(void) {
+    return @{ @"active": @NO, @"progress": @0, @"message": @"" };
+}
+
+RCT_EXPORT_METHOD(getCloudAnchorStatus:(nonnull NSNumber *)reactTag
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+        if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+            resolve(VRTEmptyCloudAnchorStatus());
+            return;
+        }
+
+        NSDictionary *status = [(VRTARSceneNavigator *)view cloudAnchorStatus];
+        if (!status) {
+            resolve(VRTEmptyCloudAnchorStatus());
+            return;
+        }
+        resolve(@{
+            @"active": @YES,
+            @"progress": status[@"progress"] ?: @0,
+            @"message": status[@"message"] ?: @""
+        });
+    }];
+}
+
 RCT_EXPORT_METHOD(resolveCloudAnchor:(nonnull NSNumber *)reactTag
                        cloudAnchorId:(NSString *)cloudAnchorId
                              resolve:(RCTPromiseResolveBlock)resolve

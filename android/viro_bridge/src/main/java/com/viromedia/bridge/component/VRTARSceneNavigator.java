@@ -663,6 +663,15 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         return arScene.getRecordingStatus().name();
     }
 
+    /** "progress|message" for a resolve in flight, empty when none is. */
+    public String getCloudAnchorStatus() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            return "";
+        }
+        return arScene.getCloudAnchorStatus();
+    }
+
     public void resolveCloudAnchor(String cloudAnchorId,
                                    ARSceneNavigatorModule.CloudAnchorResolveCallback callback) {
         if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {

@@ -28,8 +28,15 @@ export function ViroQuestEntryPoint() {
 
   // Wire hardware back button to exit VR. Apps that need custom back behaviour
   // can call AppRegistry.registerComponent('VRQuestScene', ...) to override.
+  //
+  // Reads the intent from the bridge at press time (not the `intent` state
+  // closed over above) so a VR relaunch that swaps in a new onExitViro after
+  // this effect's first run is still honoured — exitVRScene() posts the
+  // native finish() to the main looper asynchronously, so calling
+  // onExitViro() first here still runs before VRActivity actually finishes.
   React.useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
       exitVRScene();
       return true;
     });

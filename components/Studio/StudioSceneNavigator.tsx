@@ -502,10 +502,14 @@ export const StudioSceneNavigator = forwardRef<
   const loadErrorView = loadError ? renderError?.(loadError, retryLoad) : null;
   const overlay = isSceneReady ? null : (loadErrorView ?? loadingView ?? null);
 
-  // Quest has no camera passthrough, so during load it always needs something
-  // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
-  // live camera, so its overlay stays opt-in.) This branch sits above the error
-  // boundary, which is why it has to handle loadError itself.
+  // Before vrSceneEntry resolves, VRActivity hasn't been launched yet (Quest)
+  // or the ImmersiveSpace hasn't opened yet (visionOS), so this window has
+  // nothing of its own to show — it always needs something on screen: the
+  // caller's loadingView, else a built-in spinner. (Phone AR shows the live
+  // camera during load, so its overlay stays opt-in.) This branch sits above
+  // the error boundary, which is why it has to handle loadError itself.
+  // (Quest 3/3S do have colour passthrough once the scene mounts — this branch
+  // is about the pre-launch panel window, not about passthrough support.)
   //
   // visionOS needs the same treatment for a different reason: its passthrough lives in
   // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
@@ -534,6 +538,14 @@ export const StudioSceneNavigator = forwardRef<
           numberOfTrackedImages={numberOfTrackedImages}
           occlusionMode={occlusionMode}
           onExitViro={onExitViro}
+          // Quest-only (no-op on phones): the ViroARScene root now mounts on
+          // Quest too (see StudioARScene), so passthrough/hand-tracking need to
+          // be requested explicitly instead of relying on stale defaults.
+          // hdrEnabled=false because the HDR composite otherwise occludes the
+          // passthrough layer on Quest's OpenXR compositor.
+          passthroughEnabled={isQuest ? true : undefined}
+          handTrackingEnabled={isQuest ? true : undefined}
+          hdrEnabled={isQuest ? false : undefined}
           style={StyleSheet.absoluteFill}
         />
         {/* Absolutely filled so the overlay covers the navigator instead of

@@ -6,7 +6,6 @@ import { ViroARImageMarker } from "../AR/ViroARImageMarker";
 import { ViroARPlane } from "../AR/ViroARPlane";
 import { ViroARPlaneSelector } from "../AR/ViroARPlaneSelector";
 import { ViroARScene } from "../AR/ViroARScene";
-import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
@@ -150,7 +149,10 @@ interface StudioARSceneProps {
  */
 export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
   if (!props.sceneData) {
-    return isQuest ? <ViroScene /> : <ViroARScene />;
+    // ViroARScene root works on Quest too: passthrough + XR_FB_scene plane
+    // anchors come from the same OpenXR renderer path used on phones. No
+    // per-platform scene root needed (see ViroARScene.tsx's "No longer gated").
+    return <ViroARScene />;
   }
   return <StudioARSceneInner {...props} sceneData={props.sceneData} />;
 };
@@ -1196,13 +1198,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       ? { onCameraTransformUpdate: handleCameraTransformUpdate }
       : {};
 
-  if (isQuest) {
-    return (
-      <ViroScene {...physicsProps} {...cameraTransformProp}>
-        {children}
-      </ViroScene>
-    );
-  }
+  // Same ViroARScene root on Quest and on phones: passthrough + plane anchors
+  // come from the OpenXR renderer path on Quest, ARCore/ARKit on phones — the
+  // anchor wiring below is platform-agnostic already.
   return (
     <ViroARScene
       ref={arSceneRef}

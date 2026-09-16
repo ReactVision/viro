@@ -21,6 +21,7 @@ import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
@@ -329,6 +330,16 @@ export const StudioSceneNavigator = forwardRef<
   onPlaneDetectedRef.current = onPlaneDetected;
   onPlaneSelectedRef.current = onPlaneSelected;
   noAssetsMessageRef.current = noAssetsMessage;
+
+  // VRActivity is a separate React root — its own error boundary
+  // (ViroQuestEntryPoint) can't reach this component's onError prop directly,
+  // so it relays crashes through VRQuestNavigatorBridge instead. Forwarding
+  // here means a host's existing onError → Sentry wiring for phone-AR errors
+  // picks up Quest scene crashes too, with no changes needed on the host side.
+  React.useEffect(
+    () => VRQuestNavigatorBridge.onQuestError((error) => onErrorRef.current?.(error)),
+    []
+  );
 
   // Stable so passProps stays referentially steady across renders. Idempotent,
   // so StrictMode's dev double-invoke of StudioARScene's onReady effect is safe.

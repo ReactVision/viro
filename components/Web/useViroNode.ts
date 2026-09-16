@@ -56,6 +56,17 @@ export interface ViroWebNodeProps {
   // included. The path a Studio `material_config` takes, and the only one that
   // reaches a loaded model — see the effect below.
   shaderOverrides?: string | string[];
+  /**
+   * This node's renderer handle as it is created, and 0 as it goes.
+   *
+   * How a host asks the renderer where a node actually is, since an authored
+   * position is a world position only while nothing above the node moves — which
+   * stops being true inside a plane wrapper or after a drag. A prop rather than
+   * a ref because these components' props carry an `[key: string]: any` index
+   * signature, and React's `PropsWithoutRef` resolves that to `Omit<P, "ref">`,
+   * which drops every declared prop and would silently untype every caller.
+   */
+  onNodeHandle?: (handle: ViroHandle) => void;
   /** Drawn-last wins among equal-depth fragments. */
   renderingOrder?: number;
   /** "billboard" | "billboardX" | "billboardY", the three native accepts. */
@@ -100,11 +111,19 @@ export function useViroNode(
     createNodeFn ? createNodeFn(scene) : scene.createNode(),
   );
   const geometryRef = useRef<ViroHandle>(0);
+  // Read from a ref wherever an effect must not re-run when a callback's
+  // identity changes; declared here because the mount effect already needs it.
+  const propsRef = useRef(props);
+  propsRef.current = props;
 
   // Node lifecycle: attach to parent on mount; destroy node on unmount.
   useEffect(() => {
     scene.addChildNode(parent, node);
+    propsRef.current.onNodeHandle?.(node);
     return () => {
+      // Handed back before the handle is destroyed: a holder that reads it
+      // afterwards is asking the renderer about freed memory.
+      propsRef.current.onNodeHandle?.(0);
       scene.removeNodeFromParent(node);
       scene.destroyNode(node);
     };
@@ -140,10 +159,8 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, px, py, pz, rx, ry, rz, sx, sy, sz, opacity, visible]);
 
-  // Events: register handlers once (reading latest props from a ref so changing
-  // callback identities don't re-subscribe), and enable the needed event types.
-  const propsRef = useRef(props);
-  propsRef.current = props;
+  // Events: register handlers once, reading the latest props off the ref above,
+  // so a changed callback identity does not re-subscribe.
   const hasClick = !!(props.onClick || props.onClickState);
   const hasHover = !!props.onHover;
   useEffect(() => {

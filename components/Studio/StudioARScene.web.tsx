@@ -195,12 +195,37 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
+  const sceneApi = useViroScene();
+
+  // Live renderer handles for the assets a proximity binding names, kept by the
+  // node factory's mount/unmount callback. An authored position is a world
+  // position only while nothing above the node moves, which is false inside a
+  // plane wrapper and after a tap-to-place; asking the renderer is the only way
+  // to know where the node ended up.
+  const assetNodeHandlesRef = useRef<Map<string, number>>(new Map());
+  const registerProximityNode = useCallback(
+    (assetId: string, handle: number) => {
+      if (handle) {
+        assetNodeHandlesRef.current.set(assetId, handle);
+      } else {
+        assetNodeHandlesRef.current.delete(assetId);
+      }
+    },
+    [],
+  );
+
   const getAssetPosition = useCallback(
     (assetId: string): [number, number, number] | undefined => {
+      const handle = assetNodeHandlesRef.current.get(assetId);
+      if (handle) {
+        const world = sceneApi.getNodeWorldPosition(handle);
+        if (world) return world;
+      }
+      // Before the node mounts, and on a binary that predates the C API call.
       const a = assets.find((x) => x.id === assetId);
       return a ? studioAssetPosition(a) : undefined;
     },
-    [assets],
+    [assets, sceneApi],
   );
 
   const runtimeCtx = useMemo<SequenceRuntimeContext>(
@@ -396,7 +421,6 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // scene switch is honoured explicitly because virocore creates a physics world
   // on demand at its own -9.81 and steps whatever it holds, so a scene with
   // physics off would simulate anyway.
-  const sceneApi = useViroScene();
   const physicsWorldConfig = useMemo(
     () => parsePhysicsWorldConfig(scene.physics_world_config),
     [scene.physics_world_config],
@@ -471,14 +495,19 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     () => sceneData.proximity_bindings ?? [],
     [sceneData],
   );
+  const proximityTargetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const b of proximityBindings) ids.add(b.target_asset_id);
+    return ids;
+  }, [proximityBindings]);
   const proximityStateRef = useRef<Map<string, ProximityRuntimeState>>(new Map());
   useEffect(() => {
     proximityStateRef.current.clear();
   }, [scene.id]);
 
-  const proximityLive =
-    proximityBindings.length > 0 &&
-    !usesPlaneWrapper(scene.plane_detection as string, mode);
+  // Runs wherever there are bindings: the distance is measured from the node's
+  // world position, so a plane wrapper no longer changes what it means.
+  const proximityLive = proximityBindings.length > 0;
 
   useEffect(() => {
     if (!proximityLive || !session) return;
@@ -542,10 +571,25 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
             undefined, // notifyPhysicsDrag
             handleSceneChange,
             runtimeCtx,
+            undefined, // registerProximityTarget: native reads a component ref
+            undefined, // onGaze: no eye gaze on web
+            null, // dragSurface
+            proximityTargetIds.has(asset.id)
+              ? registerProximityNode
+              : undefined,
           ),
         )
         .filter(Boolean) as React.ReactElement[],
-    [animations, scene, animationStates, handleAssetLoaded, handleSceneChange, runtimeCtx],
+    [
+      animations,
+      scene,
+      animationStates,
+      handleAssetLoaded,
+      handleSceneChange,
+      runtimeCtx,
+      proximityTargetIds,
+      registerProximityNode,
+    ],
   );
 
   const renderedAssets = useMemo(
@@ -558,9 +602,8 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   );
 
   // ─── Plane wrapping (AR mode only) ────────────────────────────────────────
-  const planeMode = ((scene.plane_detection as string) ?? "NONE").toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
-  const usePlane = mode === "ar" && (planeMode === "AUTOMATIC" || planeMode === "MANUAL");
+  const usePlane = usesPlaneWrapper(scene.plane_detection as string, mode);
 
   const body = usePlane ? (
     <ViroARPlane

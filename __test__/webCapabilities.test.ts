@@ -36,27 +36,22 @@ describe("webUnsupportedFeatures", () => {
     ]);
   });
 
-  test("reports proximity only where the distances would be wrong", () => {
+  test("no longer reports proximity, wrapped in a plane or not", () => {
+    // It used to, because an authored position is plane-local inside a wrapper
+    // and the host had nothing else to measure from. The host now reads each
+    // target's world position off its renderer handle, so both cases are real.
     const bindings = { proximity_bindings: [{}] };
-
-    // Assets at scene root: their authored position is their world position, so
-    // the distance the runtime measures is the real one.
-    expect(
-      webUnsupportedFeatures(
-        sceneData({ scene: { id: "s1", plane_detection: "NONE" }, ...bindings }),
-      ),
-    ).toEqual([]);
-
-    // Inside a plane wrapper the position is plane-local and web cannot read a
-    // world transform, so the metres would be off with no sign of it.
-    expect(
-      webUnsupportedFeatures(
-        sceneData({
-          scene: { id: "s1", plane_detection: "AUTOMATIC" },
-          ...bindings,
-        }),
-      ),
-    ).toEqual(["proximity triggers"]);
+    // MANUAL is left out: it reports its own limitation, the missing picker.
+    for (const detection of ["NONE", "AUTOMATIC"]) {
+      expect(
+        webUnsupportedFeatures(
+          sceneData({
+            scene: { id: "s1", plane_detection: detection },
+            ...bindings,
+          }),
+        ),
+      ).toEqual([]);
+    }
   });
 
   test("reports tap to place only where there is no camera to tap against", () => {

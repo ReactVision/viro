@@ -57,6 +57,8 @@ export type NodeConfig = {
     source: number
   ) => void;
   animation?: ViroAnimationProp;
+  /** Web only: the renderer handle for this node, as it is created and as it goes. */
+  onNodeHandle?: (handle: number) => void;
 };
 
 export function createNodeConfig(
@@ -244,6 +246,7 @@ function create3DObject(
       dragPlane={config.dragPlane}
       animation={config.animation as any}
       onClick={config.onClick}
+      {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
       onError={(e) =>
         console.error(`[Studio] 3D model "${asset.name}" error:`, e)
@@ -297,6 +300,7 @@ function createImage(
       dragType={config.dragType}
       animation={config.animation as any}
       onClick={config.onClick}
+      {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
       onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)}
       {...(config.dragType
@@ -370,6 +374,7 @@ const VariableText: React.FC<{
       dragType={config.dragType}
       animation={config.animation as any}
       onClick={config.onClick}
+      {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       {...(visible === undefined ? {} : { visible })}
       style={{
         fontFamily: "Arial",
@@ -514,6 +519,7 @@ function createVideo(
       dragType={config.dragType}
       animation={config.animation as any}
       onClick={config.onClick}
+      {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       loop={true}
       muted={false}
       onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)}
@@ -556,7 +562,12 @@ export function createNode(
     source: number
   ) => void,
   // See createNodeConfig.
-  dragSurface?: DragSurface | null
+  dragSurface?: DragSurface | null,
+  // The web host's half of registerProximityTarget. Native reads a node's
+  // transform off its component ref; web reads it off a renderer handle, since
+  // these components' props carry an index signature that makes them unsafe
+  // behind forwardRef (see useViroNode's onNodeHandle). Only one is ever set.
+  registerProximityNode?: (assetId: string, handle: number) => void
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -576,6 +587,10 @@ export function createNode(
   const proximityRef = registerProximityTarget
     ? (ref: unknown) => registerProximityTarget(asset.id, ref)
     : undefined;
+  if (registerProximityNode) {
+    config.onNodeHandle = (handle: number) =>
+      registerProximityNode(asset.id, handle);
+  }
 
   const buildNode = (
     nodeRef?: (ref: unknown) => void

@@ -13,13 +13,7 @@
 import type { StudioSceneResponse } from "../types";
 import { isTapToPlaceAsset } from "./placementStore";
 
-/**
- * Whether the host wraps the scene's assets in a ViroARPlane.
- *
- * It decides more than anchoring: inside a wrapper an asset's authored position
- * is plane-local, and the web C API cannot read a node's world transform, so
- * anything measuring real distances only works outside one.
- */
+/** Whether the host wraps the scene's assets in a ViroARPlane. */
 export function usesPlaneWrapper(
   planeDetection: string | null | undefined,
   mode: "ar" | "3d",
@@ -47,16 +41,9 @@ export function webUnsupportedFeatures(
   // web a behaviour no phone has, which is the opposite of parity.
   if (sceneData.gaze_bindings?.length) features.push("gaze triggers");
 
-  // Proximity measures the distance from the camera to an asset, so it needs the
-  // asset's world position. Inside a plane wrapper the authored position is
-  // plane-local and the web C API cannot read a world transform, so the metres
-  // would be wrong — better declared than quietly off.
-  if (
-    sceneData.proximity_bindings?.length &&
-    usesPlaneWrapper(scene.plane_detection as string, mode)
-  ) {
-    features.push("proximity triggers");
-  }
+  // Proximity runs everywhere now: the host reads each target's world position
+  // off its renderer handle, so a plane-local authored position is no longer
+  // what the metres are measured from.
 
   // Collision triggers ride the physics world, so they run wherever it does.
 

@@ -1298,29 +1298,7 @@ public class VRTNode extends VRTComponent {
         ReadableMapKeySetIterator iter = authored.keySetIterator();
         while (iter.hasNextKey()) {
             String key = iter.nextKey();
-            if (key.endsWith("texture") || key.endsWith("Texture")) {
-                dest.copyProperty(source, key, true);
-            } else if ("diffuseColor".equalsIgnoreCase(key)) {
-                dest.setDiffuseColor(source.getDiffuseColor());
-            } else if ("diffuseIntensity".equalsIgnoreCase(key)) {
-                dest.setDiffuseIntensity(source.getDiffuseIntensity());
-            } else if ("roughness".equalsIgnoreCase(key)) {
-                dest.setRoughness(source.getRoughness());
-            } else if ("metalness".equalsIgnoreCase(key)) {
-                dest.setMetalness(source.getMetalness());
-            } else if ("alpha".equalsIgnoreCase(key)) {
-                dest.setTransparency(source.getTransparency());
-                if (source.getTransparency() < 1.0f) {
-                    // MaterialManager turns depth writing off for a translucent material,
-                    // and with no writesToDepthBuffer key nothing else would carry that.
-                    dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
-                }
-            } else if ("bloomThreshold".equalsIgnoreCase(key)) {
-                dest.setBloomThreshold(source.getBloomThreshold());
-            } else if ("chromaKeyFilteringColor".equalsIgnoreCase(key)) {
-                dest.setChromaKeyFilteringColor(source.getChromaKeyFilteringColor());
-                dest.setChromaKeyFilteringEnabled(true);
-            } else if ("shininess".equalsIgnoreCase(key)) {
+            if ("shininess".equalsIgnoreCase(key)) {
                 dest.setShininess(source.getShininess());
             } else if ("blendMode".equalsIgnoreCase(key)) {
                 dest.setBlendMode(source.getBlendMode());
@@ -1332,6 +1310,34 @@ public class VRTNode extends VRTComponent {
                 dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
             } else if ("readsFromDepthBuffer".equalsIgnoreCase(key)) {
                 dest.setReadsFromDepthBuffer(source.getReadsFromDepthBuffer());
+            } else if ("bloomThreshold".equalsIgnoreCase(key)) {
+                dest.setBloomThreshold(source.getBloomThreshold());
+            } else if ("alpha".equalsIgnoreCase(key)) {
+                dest.setTransparency(source.getTransparency());
+                if (source.getTransparency() < 1.0f) {
+                    // MaterialManager turns depth writing off for a translucent material,
+                    // and with no writesToDepthBuffer key nothing else would carry that.
+                    dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
+                }
+            } else if ("chromaKeyFilteringColor".equalsIgnoreCase(key)) {
+                dest.setChromaKeyFilteringColor(source.getChromaKeyFilteringColor());
+                dest.setChromaKeyFilteringEnabled(source.isChromaKeyFilteringEnabled());
+            } else {
+                // Everything left names a visual facet — diffuse, specular, normal,
+                // reflective, emission, multiply, ambient occlusion, self illumination,
+                // roughness, metalness. virocore resolves the name and moves that one
+                // facet, so this side does not enumerate them: a key it did not know
+                // used to be dropped, which is how specularColor and emissionColor
+                // reached the iPhone and not the Android.
+                //
+                // Every other key is named for the facet it writes, but roughness and
+                // metalness take either a number or a texture source and MaterialManager
+                // writes whichever it was handed.
+                boolean writesTexture = key.endsWith("texture") || key.endsWith("Texture");
+                if ("roughness".equalsIgnoreCase(key) || "metalness".equalsIgnoreCase(key)) {
+                    writesTexture = authored.getType(key) != ReadableType.Number;
+                }
+                dest.copyProperty(source, key, writesTexture);
             }
         }
     }

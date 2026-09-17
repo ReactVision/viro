@@ -349,6 +349,30 @@ describe("reconnection", () => {
     expect(client.error).toBeDefined();
   });
 
+  it("stops for good when the relay says the key or plan was revoked", () => {
+    const s = connectAndWelcome();
+    const before = FakeSocket.last;
+
+    s.drop({ code: 1008, reason: "auth-revoked" });
+    jest.advanceTimersByTime(10000);
+
+    // Retrying cannot change the answer, and with two sockets per device a
+    // refused device otherwise costs the relay ten handshakes.
+    expect(FakeSocket.last).toBe(before);
+    expect(client.state).toBe("failed");
+    expect(client.error).toBeDefined();
+  });
+
+  it("still reconnects on the other 1008 reasons, which are not decisions", () => {
+    const s = connectAndWelcome();
+
+    // Same code, different meaning: back off and come back.
+    s.drop({ code: 1008, reason: "slow-consumer" });
+    expect(client.state).toBe("reconnecting");
+    jest.advanceTimersByTime(500);
+    expect(FakeSocket.last).not.toBe(s);
+  });
+
   it("does not reconnect after an explicit disconnect", () => {
     const s = connectAndWelcome();
     client.disconnect();

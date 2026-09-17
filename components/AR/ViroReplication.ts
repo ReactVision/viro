@@ -291,9 +291,18 @@ export class ViroReplicationClient {
       this.handle(msg);
     };
 
-    const dropped = () => {
+    const dropped = (ev?: { code?: number; reason?: string }) => {
       if (this.closedByUs || this.ws !== ws) return;
       this.ws = null;
+
+      // Keyed on the reason, not the code: 1008 also carries rate-limited,
+      // too-large and slow-consumer, and all three are meant to reconnect.
+      // Only this one is a decision that will not change on a retry.
+      if (ev?.reason === "auth-revoked") {
+        this._error = "this key or plan can no longer join the room";
+        this.setState("failed");
+        return;
+      }
 
       if (this.attempt >= BACKOFF_MS.length) {
         this._error = "replication socket gave up reconnecting";
@@ -305,20 +314,26 @@ export class ViroReplicationClient {
       this.retryTimer = setTimeout(() => this.open(), delay);
     };
     ws.onclose = dropped;
-    ws.onerror = dropped;
+    ws.onerror = () => dropped();
   }
 
   private handle(msg: Record<string, unknown>): void {
     switch (msg.t) {
       case "welcome":
         this._localPeerId = String(msg.you ?? "");
-        this.replaceAll(msg.entities as ViroReplicatedEntity[], Number(msg.seq));
+        this.replaceAll(
+          msg.entities as ViroReplicatedEntity[],
+          Number(msg.seq)
+        );
         this.setState("synced");
         return;
 
       case "snapshot":
         // Arrives when a resync gap exceeded the server's retained history.
-        this.replaceAll(msg.entities as ViroReplicatedEntity[], Number(msg.seq));
+        this.replaceAll(
+          msg.entities as ViroReplicatedEntity[],
+          Number(msg.seq)
+        );
         this.setState("synced");
         return;
 

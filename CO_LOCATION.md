@@ -269,6 +269,7 @@ Point devices at it with `endpoint: 'http://<your-lan-ip>:8787'`; the client tur
 | `available === false` from the hook        | ReactVisionCCA is not linked in this build, or the platform has no WebSocket transport.                                                                                            |
 | Joined, but `peers` stays empty            | Both devices must use the **same `roomId`** and the **same `projectId`**: rooms are scoped per project. Against a local reference server they must also reach the same process.    |
 | `failed` at once, with no reconnect        | The handshake was refused, not dropped. A free-tier organisation, a key that does not belong to that project, or a room id outside the permitted characters.                       |
+| `failed` part way through a session        | The relay closed the socket `auth-revoked`: the API key was revoked or the team's plan lapsed while the session was running. Retrying cannot change it, so the client stops.       |
 | visionOS frame source times out            | Only one side is pumping alignment data. Both must call `sharedSpaceNextOutgoing` / `sharedSpacePushIncoming`.                                                                     |
 | Peers appear in the wrong place            | World coordinates went on the wire. Convert with `worldToLocation` before sending.                                                                                                 |
 

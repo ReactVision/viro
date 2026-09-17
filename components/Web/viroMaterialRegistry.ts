@@ -224,6 +224,11 @@ export function createMaterialFromRegistry(
   if (typeof def.diffuseIntensity === "number") scene.setMaterialDiffuseIntensity(material, def.diffuseIntensity);
   if (typeof def.writesToDepthBuffer === "boolean") scene.setMaterialWritesToDepthBuffer(material, def.writesToDepthBuffer);
   if (typeof def.readsFromDepthBuffer === "boolean") scene.setMaterialReadsFromDepthBuffer(material, def.readsFromDepthBuffer);
+  // No transparencyMode branch: the C API has no setter for it, so a material
+  // used as a shader override carries virocore's default into the merge rather
+  // than an authored value. Inert either way — virocore stores the mode and
+  // nothing in any substrate or shader reads it — so this is a hole in the
+  // mirror of the native merge, not a rendering difference.
   const cull = cullModeValue(def.cullMode as string | undefined);
   if (cull !== undefined) scene.setMaterialCullMode(material, cull);
   const blend = blendModeValue(def.blendMode as string | undefined);

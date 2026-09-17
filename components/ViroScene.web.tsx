@@ -5,6 +5,14 @@
  */
 import * as React from "react";
 
-export function ViroScene(props: { children?: React.ReactNode; [key: string]: any }) {
+import { useViroToneMapping } from "./Web/useViroToneMapping";
+
+export function ViroScene(props: {
+  children?: React.ReactNode;
+  /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
+  toneMappingEnabled?: boolean;
+  [key: string]: any;
+}) {
+  useViroToneMapping(props.toneMappingEnabled);
   return <>{props.children}</>;
 }

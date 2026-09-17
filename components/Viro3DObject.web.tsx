@@ -15,7 +15,11 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import type { ViroAnimationProp } from "./Web/useViroAnimation";
-import { useViroRenderer, ViroParentNodeContext } from "./Web/ViroWebContext";
+import {
+  useViroRenderer,
+  useViroScene,
+  ViroParentNodeContext,
+} from "./Web/ViroWebContext";
 import {
   resolveModelSource,
   modelFormatFor,
@@ -28,6 +32,15 @@ type Props = ViroWebNodeProps & {
   type?: string; // "GLB" | "GLTF" | "VRX" | "OBJ"
   resources?: unknown[]; // external files (an OBJ's .mtl, textures) referenced by name
   animation?: ViroAnimationProp;
+  /**
+   * Blend-shape weights, by the target names the model was exported with. Same
+   * shape as native's: `[{ target: "Smile", weight: 0.8 }]`.
+   */
+  morphTargets?: Array<{ target?: string; weight?: number }>;
+  /** Where the blending runs. Native's default is the CPU path. */
+  morphMode?: "cpu" | "gpu" | "hybrid";
+  /** The names this model morphs by, once it has loaded. */
+  onMorphTargets?: (keys: string[]) => void;
   onLoadStart?: () => void;
   onLoadEnd?: (success?: boolean) => void;
   onError?: (error: unknown) => void;
@@ -37,7 +50,8 @@ type Props = ViroWebNodeProps & {
 
 export function Viro3DObject(props: Props) {
   const [loaded, setLoaded] = useState(false);
-  // Pass `loaded` as animationReady so the model's animations start once loaded.
+  // `loaded` is the hook's contentReady: the model's own animations and any
+  // shader override both need its subtree to exist first.
   const node = useViroNode(props, undefined, loaded);
   const renderer = useViroRenderer();
 
@@ -87,6 +101,33 @@ export function Viro3DObject(props: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, url, type, resourcesKey]);
+
+  // Morph targets, once the model's meshes exist: virocore hangs a morpher off
+  // each mesh as it loads, so a weight set before that reaches nothing.
+  const scene = useViroScene();
+  const { morphTargets, morphMode, onMorphTargets } = props;
+  const morphKey = morphTargets
+    ? morphTargets.map((t) => `${t.target}=${t.weight}`).join(",")
+    : "";
+  useEffect(() => {
+    if (!loaded || !morphMode) return;
+    scene.setMorphMode(node, morphMode);
+  }, [scene, node, loaded, morphMode]);
+
+  useEffect(() => {
+    if (!loaded || !morphTargets) return;
+    for (const { target, weight } of morphTargets) {
+      if (typeof target !== "string") continue;
+      scene.setMorphTargetWeight(node, target, weight ?? 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, node, loaded, morphKey]);
+
+  useEffect(() => {
+    if (!loaded || !onMorphTargets) return;
+    onMorphTargets(scene.getMorphTargetKeys(node));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, node, loaded]);
 
   return (
     <ViroParentNodeContext.Provider value={node}>

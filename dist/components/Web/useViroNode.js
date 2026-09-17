@@ -15,11 +15,39 @@ const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("./ViroWebContext");
 const viroMaterialRegistry_1 = require("./viroMaterialRegistry");
 const useViroAnimation_1 = require("./useViroAnimation");
+const viroPhysicsBody_1 = require("./viroPhysicsBody");
 const DEG2RAD = Math.PI / 180;
+/**
+ * The billboard axis a `transformBehaviors` list asks for, or null for none.
+ *
+ * The three names native recognises and no more: its bridges compare against
+ * "billboard", "billboardX" and "billboardY" and ignore anything else, so a
+ * "billboardZ" invented here would work in a browser and nowhere else.
+ *
+ * Last one wins, because a node carries one constraint.
+ */
+function billboardAxis(behaviors) {
+    let axis = null;
+    for (const raw of behaviors.split(",")) {
+        switch (raw.trim().toLowerCase()) {
+            case "billboard":
+                axis = viro_web_renderer_1.ViroBillboardAxis.All;
+                break;
+            case "billboardx":
+                axis = viro_web_renderer_1.ViroBillboardAxis.X;
+                break;
+            case "billboardy":
+                axis = viro_web_renderer_1.ViroBillboardAxis.Y;
+                break;
+        }
+    }
+    return axis;
+}
 function useViroNode(props, createGeometry, 
-// Gates model animations, which only become available after a model loads.
-// Declarative animations don't need it (default true).
-animationReady = true, 
+// False until a loaded model's subtree exists. Gates the two things that need
+// it: its embedded animations, and the shader-override merge. A node whose
+// geometry this hook builds is ready on mount, hence the default.
+contentReady = true, 
 // When provided, the geometry is rebuilt whenever this key changes (e.g. text
 // re-shapes). Omit for static geometry (box/sphere/surface) — built once.
 geometryKey, 
@@ -111,7 +139,68 @@ createNodeFn) {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node, materialsKey]);
+    // Shader overrides. Separate from `materials` above because that one needs the
+    // geometry handle this hook created, and a loaded model has none: its geometry
+    // belongs to the loader and hangs off child nodes. So a Studio material_config,
+    // which viroNodeFactory sends as `shaderOverrides`, only ever reaches a model
+    // through here.
+    //
+    // Gated on `contentReady` so a model is merged after it loads rather than
+    // against an empty subtree.
+    const overrideKey = Array.isArray(props.shaderOverrides)
+        ? props.shaderOverrides.join(",")
+        : props.shaderOverrides ?? "";
+    (0, react_1.useEffect)(() => {
+        if (!overrideKey || !contentReady)
+            return;
+        // Each name re-merges from the materials the node drew before any override
+        // and replaces them, so with several the last one wins. That is what the
+        // native bridges do too, which is the point: the merge keeps the model's own
+        // colours and textures on both surfaces.
+        for (const name of overrideKey.split(",")) {
+            const material = (0, viroMaterialRegistry_1.createMaterialFromRegistry)(scene, name);
+            if (material)
+                scene.applyShaderOverride(node, material);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [node, overrideKey, contentReady]);
+    // Rendering order, light masks and billboarding. All four are native node
+    // props that had no web path at all: a scene lighting one object with one
+    // light, or turning a label to face the user, did neither here.
+    const renderingOrder = props.renderingOrder;
+    const lightReceivingBitMask = props.lightReceivingBitMask;
+    const shadowCastingBitMask = props.shadowCastingBitMask;
+    (0, react_1.useEffect)(() => {
+        if (renderingOrder !== undefined)
+            scene.setNodeRenderingOrder(node, renderingOrder);
+        // Recursive: a loaded model's geometry is on child nodes, so a mask set on
+        // the handle alone would miss everything that actually draws.
+        if (lightReceivingBitMask !== undefined) {
+            scene.setNodeLightReceivingBitMask(node, lightReceivingBitMask, true);
+        }
+        if (shadowCastingBitMask !== undefined) {
+            scene.setNodeShadowCastingBitMask(node, shadowCastingBitMask, true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [node, renderingOrder, lightReceivingBitMask, shadowCastingBitMask]);
+    const behaviorsKey = Array.isArray(props.transformBehaviors)
+        ? props.transformBehaviors.join(",")
+        : props.transformBehaviors ?? "";
+    (0, react_1.useEffect)(() => {
+        scene.setNodeBillboard(node, billboardAxis(behaviorsKey));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [node, behaviorsKey]);
+    // Physics. Keyed on the serialised body so a changed collider re-attaches and
+    // an unchanged one does not: rebuilding a rigid body every render would reset
+    // its velocity every frame and nothing would ever fall.
+    const physicsKey = props.physicsBody ? JSON.stringify(props.physicsBody) : "";
+    const viroTag = props.viroTag ?? "";
+    (0, react_1.useEffect)(() => {
+        (0, viroPhysicsBody_1.applyPhysicsBody)(scene, node, propsRef.current.physicsBody, viroTag);
+        return () => scene.clearPhysicsBody(node);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [node, physicsKey, viroTag]);
     // Animation (declarative ViroAnimation or model animation).
-    (0, useViroAnimation_1.useViroAnimation)(node, props.animation, { position: [px, py, pz], rotation: [rx, ry, rz], scale: [sx, sy, sz], opacity }, animationReady);
+    (0, useViroAnimation_1.useViroAnimation)(node, props.animation, { position: [px, py, pz], rotation: [rx, ry, rz], scale: [sx, sy, sz], opacity }, contentReady);
     return node;
 }

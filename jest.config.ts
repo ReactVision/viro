@@ -90,7 +90,18 @@ const config: Config = {
   // ],
 
   // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
-  // moduleNameMapper: {},
+  //
+  // The web renderer's entry point reaches `loader.js`, which reads
+  // `import.meta.url` to find the WASM next to itself. Jest runs CommonJS, where
+  // that is a syntax error, so importing the package at all fails a suite even
+  // when the test never loads a renderer. Everything the `components/Web`
+  // modules take from it at runtime is an enum, and those all live in sceneApi,
+  // so point at it directly: real values rather than a stub that has to be kept
+  // in step with VROMaterial.h.
+  moduleNameMapper: {
+    "^@reactvision/viro-web-renderer$":
+      "<rootDir>/../viro-web-renderer/dist/sceneApi.js",
+  },
 
   // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
   // modulePathIgnorePatterns: [],

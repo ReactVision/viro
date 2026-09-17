@@ -36,6 +36,10 @@ import {
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
+import {
+  useViroRendererEffects,
+  type ViroRendererEffectProps,
+} from "../Web/useViroRendererEffects";
 
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
 type ArOptions = Partial<
@@ -83,7 +87,7 @@ type Props = {
   /** Overlay label for the start button. */
   startLabel?: string;
   [key: string]: any;
-};
+} & ViroRendererEffectProps;
 
 const containerStyle: React.CSSProperties = {
   position: "relative",
@@ -178,6 +182,7 @@ function trackingLabel(state: ViroTrackingState): string {
 export function ViroARSceneNavigator(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
+  useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
   const sessionRef = useRef<ViroArSession | null>(null);
 

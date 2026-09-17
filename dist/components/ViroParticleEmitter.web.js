@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.velocityRange = velocityRange;
 exports.ViroParticleEmitter = ViroParticleEmitter;
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
@@ -18,6 +19,26 @@ function shapeEnum(shape) {
 }
 const asVec3 = (a) => [a?.[0] ?? 0, a?.[1] ?? 0, a?.[2] ?? 0];
 const asPair = (a, d = 0) => [a?.[0] ?? d, a?.[1] ?? a?.[0] ?? d];
+/**
+ * The velocity range, from either shape it can arrive in.
+ *
+ * `initialRange` is what ViroParticleEmitter's own API takes, so it is what
+ * every scene written against the native component sends. This read only
+ * `min`/`max`, so those scenes resolved to [0, 0, 0] and their particles were
+ * born and died on the emitter — no warning, and the emitter itself still drew,
+ * so it looked like it worked. `initialRange` wins where both are present.
+ *
+ * A range with one entry is a fixed velocity, not a range from zero.
+ */
+function velocityRange(velocity) {
+    const range = velocity?.initialRange;
+    if (range && range.length > 0) {
+        const min = asVec3(range[0]);
+        return [min, range.length > 1 ? asVec3(range[1]) : min];
+    }
+    const min = asVec3(velocity?.min);
+    return [min, velocity?.max ? asVec3(velocity.max) : min];
+}
 function ViroParticleEmitter(props) {
     const scene = (0, ViroWebContext_1.useViroScene)();
     const node = (0, useViroNode_1.useViroNode)(props);
@@ -38,7 +59,7 @@ function ViroParticleEmitter(props) {
             const texture = scene.createTextureRGBA(img.pixels, img.width, img.height, true);
             texRef.current = texture;
             const sb = p.spawnBehavior ?? {};
-            const vel = p.particlePhysics?.velocity;
+            const [velocityMin, velocityMax] = velocityRange(p.particlePhysics?.velocity);
             scene.createParticleEmitter(node, texture, {
                 particleWidth: p.image?.width ?? 0.1,
                 particleHeight: p.image?.height ?? 0.1,
@@ -47,9 +68,16 @@ function ViroParticleEmitter(props) {
                 particleLifetime: asPair(sb.particleLifetime, 2000),
                 spawnShape: shapeEnum(sb.spawnVolume?.shape),
                 spawnParams: asVec3(sb.spawnVolume?.params),
-                velocityMin: asVec3(vel?.min),
-                velocityMax: asVec3(vel?.max ?? vel?.min),
+                velocityMin,
+                velocityMax,
             });
+            // After the emitter exists: acceleration is set on a live emitter, not
+            // passed to the factory that creates it.
+            const accel = p.particlePhysics?.acceleration;
+            if (accel) {
+                const [accelMin, accelMax] = velocityRange(accel);
+                scene.setParticleAcceleration(node, accelMin, accelMax);
+            }
             scene.setParticleEmitterRun(node, p.run !== false);
         })
             .catch(() => { });

@@ -241,8 +241,8 @@ What that means in practice:
 - **Rooms are scoped to your project.** The room key is your organisation, your project and the room id, so two apps that happen to pick the same room id never meet. It also means both devices must send the same `projectId`, not just the same `roomId`.
 - **Room ids are case-sensitive**, at most 128 characters, and limited to `A-Za-z0-9._~:@+-`. A cloud anchor id or a Meta group uuid already fits; an id you invent yourself should stay inside that set.
 - **Co-location needs a paid plan.** A free-tier organisation is refused at the handshake and the hook reports `failed`. Upgrade the team in its billing settings in ReactVision Studio.
-- **Credentials go in headers**, `x-api-key` and `x-project-id`. Passing them in the query string is refused, because a key in a URL reaches proxy and server logs.
-- **A restart makes every peer rejoin with a new peer id.** Other devices see the old id leave and a new one join. Key your own per-peer state on something the peer tells you, never on `peerId` surviving a reconnect. The frame is unaffected: reconnecting never re-localises.
+- **Credentials go in headers**, `x-api-key` and `x-project-id`. Passing them in the query string is refused, because a key in a URL reaches proxy and server logs. React Native forwards headers on the WebSocket handshake, so both native platforms use them. A browser cannot set them at all, which is why replicated state on react-native-web falls back to the query string and the hosted service refuses it: web co-location is not supported yet.
+- **A restart makes every peer rejoin with a new peer id.** Other devices see the old id leave and a new one join. Key your own per-peer state on something the peer tells you, never on `peerId` surviving a reconnect. The frame is unaffected: reconnecting never re-localises, and replicated state is reloaded from its saved copy.
 
 ### Running a server locally
 

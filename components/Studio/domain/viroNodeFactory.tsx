@@ -19,15 +19,17 @@ import {
   interpolateDisplayTemplate,
 } from "./apiRequestHelpers";
 import { parseMaterialConfig, studioMaterialName } from "./materialConfig";
-import { DragConfiguration } from "./dragConfiguration";
+import { DragConfiguration, type DragSurface } from "./dragConfiguration";
 import {
   buildViroPhysicsBody,
+  isPhysicsWorldEnabled,
   parsePhysicsBodyConfig,
   shouldUseKinematicPhysicsDrag,
 } from "./physicsConfig";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
-import { StudioPlacementStore } from "./placementStore";
+import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
+import { studioAssetPosition } from "./assetPosition";
 
 type SceneNavigator = any;
 
@@ -46,6 +48,7 @@ export type NodeConfig = {
     maxDistance: number;
   };
   physicsBody?: Record<string, unknown>;
+  /** Authored velocity, sent once on mount rather than on the body. */
   viroTag?: string;
   onClick?: () => void;
   // On Gaze (headset eye-gaze). Setting it enables the node's native canHover.
@@ -57,7 +60,6 @@ export type NodeConfig = {
   animation?: ViroAnimationProp;
 };
 
-/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
 export function createNodeConfig(
   asset: StudioAsset,
   sceneNavigator: SceneNavigator | undefined,
@@ -67,56 +69,38 @@ export function createNodeConfig(
   animationStates?: Record<string, ViroAnimationProp>,
   isDragActive?: (assetId: string) => boolean,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  runtimeCtx?: SequenceRuntimeContext
+  runtimeCtx?: SequenceRuntimeContext,
+  // The detected plane this asset is anchored to, once the session has found
+  // one. Only the assets under the plane wrapper have it.
+  dragSurface?: DragSurface | null
 ): NodeConfig {
-  const hasTriggerImage = !!asset.trigger_image_url;
-  // Tap-to-place stores the author position as an OFFSET from the runtime tap
-  // point (PlaceableNode adds it), so the camera-relative -2 default and the
-  // "too close" clamp — both meant for camera/plane assets — must not apply.
-  const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
+  const position = studioAssetPosition(asset);
 
-  // `world_placement` means the coordinates are a point in the world, not a
-  // camera-relative offset an author typed. The clamp below exists to stop an
-  // author putting an object inside the user's face, and it cannot tell the two
-  // apart: applied to a world coordinate it silently rewrites it to -2, which
-  // pins the object in front of the view. That reads as "the anchor does not
-  // stay fixed", and the only notice is the warning below.
-  const isWorldPlacement = !!(asset as { world_placement?: boolean }).world_placement;
-  let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
-  if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
-    console.warn(
-      `[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`
-    );
-    posZ = -2;
-  }
-
-  const position: [number, number, number] = [
-    asset.position_x ?? 0,
-    asset.position_y ?? 0,
-    posZ,
-  ];
-
-  // Apply trigger image orientation offset to rotation Z
-  let rotationZ = asset.rotation_z ?? 0;
-  if (hasTriggerImage && asset.trigger_image_orientation) {
-    const offsets: Record<string, number> = {
-      Left: -90,
-      Right: 90,
-      Down: 180,
-      Up: 0,
-    };
-    rotationZ += offsets[asset.trigger_image_orientation] ?? 0;
-  }
-
+  // A trigger image's orientation describes the uploaded FILE, not the surface
+  // it is printed on and not a rotation for the content: it says where the top
+  // of that file is, so a sideways or upside-down file is still recognised.
+  // virocore acts on it by correcting the pixels before the tracker sees them
+  // (VROARSessionARCore rotates the grayscale buffer, VROARImageTargetiOS passes
+  // a CGImagePropertyOrientation to ARReferenceImage), so the anchor frame comes
+  // back the same whatever it is set to. This used to add Left -90, Right 90 and
+  // Down 180 to rotation Z, which nothing cancelled: content on any non-Up
+  // marker was drawn turned, upside down in the Down case.
   const rotation: [number, number, number] = [
     asset.rotation_x ?? 0,
     asset.rotation_y ?? 0,
-    rotationZ,
+    asset.rotation_z ?? 0,
   ];
 
+  // Zero, negative and non-finite scales are degenerate transforms rather than
+  // small ones, so they fall back to 1. Everything else passes through, large
+  // values included: scale doubles as compensation for a model's own units, so a
+  // mesh authored in centimetres legitimately needs about 100. This replaced a
+  // pair of rules that substituted 0.1 below 0.01 and 2 above 10, which rendered
+  // an asset authored at 13 more than six times too small with no way to tell.
+  // Editors that author these scenes apply the same rule, and hold their own
+  // copy of it since this package does not depend on them.
   let scaleValue = asset.scale ?? 1;
-  if (scaleValue < 0.01) scaleValue = 0.1;
-  if (scaleValue > 10) scaleValue = 2;
+  if (!Number.isFinite(scaleValue) || scaleValue <= 0) scaleValue = 1;
   const scale: [number, number, number] = [scaleValue, scaleValue, scaleValue];
 
   const dragType = DragConfiguration.getDragType(asset, scene);
@@ -125,16 +109,23 @@ export function createNodeConfig(
   if (dragType === "FixedToPlane") {
     dragPlane = DragConfiguration.getDragPlane(
       scene?.plane_direction ?? "Horizontal",
-      position
+      position,
+      dragSurface
     );
   }
 
-  const parsedPhysics = parsePhysicsBodyConfig(asset.physics_config);
+  // Both the body and its collision tag hang off the scene's physics switch
+  // (isPhysicsWorldEnabled), which is what the Studio UI, its editor preview and
+  // the apply_physics tool all treat as the switch.
+  const parsedPhysics = isPhysicsWorldEnabled(scene)
+    ? parsePhysicsBodyConfig(asset.physics_config)
+    : null;
   const dragActive = isDragActive?.(asset.id) ?? false;
   const physicsBody = parsedPhysics
     ? buildViroPhysicsBody(parsedPhysics, {
         kinematicDragOverride:
           dragActive && shouldUseKinematicPhysicsDrag(asset, parsedPhysics),
+        scale: scaleValue,
       })
     : undefined;
   const viroTag = parsedPhysics ? asset.id : undefined;
@@ -236,16 +227,6 @@ function create3DObject(
 
   const modelType = inferModelType(asset.file_url);
 
-  // Android: slightly reduce scale for stability
-  const scale =
-    Platform.OS === "android"
-      ? ([
-          config.scale[0] * 0.8,
-          config.scale[1] * 0.8,
-          config.scale[2] * 0.8,
-        ] as [number, number, number])
-      : config.scale;
-
   const hasMaterialConfig = parseMaterialConfig(asset.material_config) !== null;
   const shaderOverrides = hasMaterialConfig
     ? [studioMaterialName(asset.id)]
@@ -258,7 +239,7 @@ function create3DObject(
       source={{ uri: asset.file_url }}
       position={config.position}
       rotation={config.rotation}
-      scale={scale}
+      scale={config.scale}
       type={modelType}
       dragType={config.dragType}
       dragPlane={config.dragPlane}
@@ -306,6 +287,12 @@ function createImage(
       key={asset.id}
       {...(nodeRef ? { ref: nodeRef as any } : {})}
       source={{ uri: asset.file_url }}
+      // No width or height props, so the bridges derive the height from the
+      // image's own aspect on load, but only build the quad from it under
+      // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
+      // the picture. The crop this mode also selects needs explicit size props,
+      // so the UVs stay 0 to 1.
+      resizeMode="ScaleToFill"
       position={config.position}
       rotation={config.rotation}
       scale={config.scale}
@@ -391,6 +378,9 @@ const VariableText: React.FC<{
         fontSize: 20,
         color: "#FFFFFF",
         textAlign: "center",
+        // Centred on the node rather than hung from the top of its box, so the
+        // authored position is where the text is at any scale.
+        textAlignVertical: "center",
       }}
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
@@ -566,7 +556,9 @@ export function createNode(
     isHovering: boolean,
     position: [number, number, number],
     source: number
-  ) => void
+  ) => void,
+  // See createNodeConfig.
+  dragSurface?: DragSurface | null
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -578,7 +570,8 @@ export function createNode(
     animationStates,
     isDragActive,
     onSceneChange,
-    runtimeCtx
+    runtimeCtx,
+    dragSurface
   );
   config.onGaze = onGaze;
 
@@ -586,60 +579,64 @@ export function createNode(
     ? (ref: unknown) => registerProximityTarget(asset.id, ref)
     : undefined;
 
-  let node: React.ReactElement | null;
-  switch (type) {
-    case "3D-MODEL":
-      // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep both;
-      // a drag-only merge here once silently killed collisions.
-      node = create3DObject(
-        asset,
-        config,
-        onAssetLoaded,
-        notifyPhysicsDrag,
-        onCollision,
-        proximityRef
-      );
-      break;
-    case "IMAGE":
-      node = createImage(
-        asset,
-        config,
-        onAssetLoaded,
-        notifyPhysicsDrag,
-        onCollision,
-        proximityRef
-      );
-      break;
-    case "TEXT":
-      node = createText(
-        asset,
-        config,
-        notifyPhysicsDrag,
-        runtimeCtx?.variableStore,
-        onCollision,
-        proximityRef
-      );
-      break;
-    case "VIDEO":
-      node = createVideo(
-        asset,
-        config,
-        notifyPhysicsDrag,
-        onCollision,
-        proximityRef
-      );
-      break;
-    default:
-      console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);
-      return null;
-  }
+  const buildNode = (
+    nodeRef?: (ref: unknown) => void
+  ): React.ReactElement | null => {
+    switch (type) {
+      case "3D-MODEL":
+        // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep
+        // both; a drag-only merge here once silently killed collisions.
+        return create3DObject(
+          asset,
+          config,
+          onAssetLoaded,
+          notifyPhysicsDrag,
+          onCollision,
+          nodeRef
+        );
+      case "IMAGE":
+        return createImage(
+          asset,
+          config,
+          onAssetLoaded,
+          notifyPhysicsDrag,
+          onCollision,
+          nodeRef
+        );
+      case "TEXT":
+        return createText(
+          asset,
+          config,
+          notifyPhysicsDrag,
+          runtimeCtx?.variableStore,
+          onCollision,
+          nodeRef
+        );
+      case "VIDEO":
+        return createVideo(
+          asset,
+          config,
+          notifyPhysicsDrag,
+          onCollision,
+          nodeRef
+        );
+      default:
+        console.warn(
+          `[Studio] Unknown asset type "${type}" for "${asset.name}"`
+        );
+        return null;
+    }
+  };
+
+  const node = buildNode(proximityRef);
 
   if (!node) return null;
 
   // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
   // node at the tap point with the author position and rotation applied relative
-  // to the user's facing, and wraps it in VisibleNode itself.
-  if (asset.tap_to_place && runtimeCtx?.placementStore) {
+  // to the user's facing, and wraps it in VisibleNode itself. A marker asset is
+  // never gated this way, whatever the flag says (isTapToPlaceAsset).
+  if (isTapToPlaceAsset(asset) && runtimeCtx?.placementStore) {
     return (
       <PlaceableNode
         key={asset.id}

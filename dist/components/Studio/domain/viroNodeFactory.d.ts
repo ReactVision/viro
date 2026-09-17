@@ -1,6 +1,7 @@
 import * as React from "react";
 import { StudioAnimation, StudioAsset, StudioSceneMeta, ViroAnimationProp } from "../types";
 import { SequenceRuntimeContext } from "./sceneNavigationHandler";
+import { type DragSurface } from "./dragConfiguration";
 type SceneNavigator = any;
 export type NodeConfig = {
     position: [number, number, number];
@@ -13,12 +14,12 @@ export type NodeConfig = {
         maxDistance: number;
     };
     physicsBody?: Record<string, unknown>;
+    /** Authored velocity, sent once on mount rather than on the body. */
     viroTag?: string;
     onClick?: () => void;
     onGaze?: (isHovering: boolean, position: [number, number, number], source: number) => void;
     animation?: ViroAnimationProp;
 };
-/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
-export declare function createNodeConfig(asset: StudioAsset, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], scene: StudioSceneMeta | null, onAnimationTrigger?: (targetAssetId: string, animKey: string) => void, animationStates?: Record<string, ViroAnimationProp>, isDragActive?: (assetId: string) => boolean, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext): NodeConfig;
-export declare function createNode(asset: StudioAsset, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], scene: StudioSceneMeta | null, onAnimationTrigger?: (targetAssetId: string, animKey: string) => void, animationStates?: Record<string, ViroAnimationProp>, onAssetLoaded?: (id: string) => void, onCollision?: (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void, isDragActive?: (assetId: string) => boolean, notifyPhysicsDrag?: (assetId: string) => void, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext, registerProximityTarget?: (assetId: string, ref: unknown) => void, onGaze?: (isHovering: boolean, position: [number, number, number], source: number) => void): React.ReactElement | null;
+export declare function createNodeConfig(asset: StudioAsset, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], scene: StudioSceneMeta | null, onAnimationTrigger?: (targetAssetId: string, animKey: string) => void, animationStates?: Record<string, ViroAnimationProp>, isDragActive?: (assetId: string) => boolean, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext, dragSurface?: DragSurface | null): NodeConfig;
+export declare function createNode(asset: StudioAsset, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], scene: StudioSceneMeta | null, onAnimationTrigger?: (targetAssetId: string, animKey: string) => void, animationStates?: Record<string, ViroAnimationProp>, onAssetLoaded?: (id: string) => void, onCollision?: (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void, isDragActive?: (assetId: string) => boolean, notifyPhysicsDrag?: (assetId: string) => void, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext, registerProximityTarget?: (assetId: string, ref: unknown) => void, onGaze?: (isHovering: boolean, position: [number, number, number], source: number) => void, dragSurface?: DragSurface | null): React.ReactElement | null;
 export {};

@@ -28,7 +28,7 @@ in lowp vec4 v_color;
 layout (location = 0) out highp vec4 frag_color;
 
 void main() {
-    _surface.diffuse_color = material_diffuse_surface_color;
+    _surface.diffuse_color = material_diffuse_surface_color * v_color;
     _surface.diffuse_texcoord = v_texcoord;
     _surface.diffuse_intensity = material_diffuse_intensity;
     _surface.shininess = material_shininess;

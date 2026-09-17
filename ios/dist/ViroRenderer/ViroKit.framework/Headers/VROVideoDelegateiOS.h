@@ -56,6 +56,11 @@ public:
     void videoDidFail(std::string error) {
         [_delegate videoDidFail:[NSString stringWithUTF8String:error.c_str()]];
     }
+    void videoDidChangeSize(float width, float height) {
+        if ([_delegate respondsToSelector:@selector(videoDidChangeSize:height:)]) {
+            [_delegate videoDidChangeSize:width height:height];
+        }
+    }
 
 private:
     

@@ -22,6 +22,17 @@ type Props = ViroCommonProps & {
     soundRoom?: ViroSoundRoom;
     physicsWorld?: ViroPhysicsWorld;
     postProcessEffects?: string[];
+    /**
+     * Turns this scene's tone mapping pass on or off. It is on by default, applying
+     * a Hable luminance-only curve that renders pure white at about 0.77 and makes
+     * bright materials glow. Off passes colour through untouched.
+     *
+     * Prefer this over `hdrEnabled={false}` on the navigator when the goal is only
+     * an untouched tone curve: PBR requires HDR, so switching HDR off drops every
+     * PBR material back to Blinn and silently discards roughness, metalness and the
+     * ambient occlusion map.
+     */
+    toneMappingEnabled?: boolean;
 };
 export declare class ViroScene extends ViroBase<Props> {
     _onPlatformUpdate: (event: NativeSyntheticEvent<ViroPlatformEvent>) => void;

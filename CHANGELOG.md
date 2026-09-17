@@ -18,12 +18,12 @@
 - **Quest: `onDrag` followed the idle hand and objects jumped on grab / release when both hands were tracked.** Fixed in `@reactvision/virocore` (drag ownership per aim ray; grip / A / X / Y / thumbstick sources resolve against their own hand's ray).
 - **Quest: clicks on a highlighted button were dropped, and `onClick` (state `Clicked`) rarely fired.** Fixed in `@reactvision/virocore` (aim lasers no longer hit-testable, click grace and press capture, `Clicked` compared on handler nodes, button edges resolved against the current frame's hit).
 
-  > **The two Quest input fixes above are JS-side only in this branch.** Their native half is still on `virocore`'s `fix/quest-dual-pointer-drag` and is *not* in `virocore/develop`, so `viro_renderer-release.aar` here does not carry it — see the Migration note.
+  > **The two Quest input fixes above are still inert in this branch.** Their native half is now on `virocore/develop` (`ffb38acb`, #369), but it landed after this branch's `viro_renderer-release.aar` was built, so the bundled binary does not carry it yet — see the Migration note.
 
 ### Migration
 
 - No breaking changes for phone builds. If an app also sets `android.targetSdkVersion` or `buildArchs` through `expo-build-properties`, the plugin listed earlier in `plugins` wins on the same `gradle.properties` key, because config-plugin mods run in reverse registration order.
-- **The bundled `viro_renderer-release.aar` needs a rebuild before release.** The 2.58.2 back-merge hit a genuine conflict on it: `release/2.58.2`'s AAR carries the Quest input fixes but predates the OBJ material fix, while develop's carries the OBJ fix and not the Quest ones — neither is a superset. Develop's was kept, because taking the other would regress OBJ materials. Rebuild from a `virocore/develop` that has `fix/quest-dual-pointer-drag` merged, and the Quest input fixes stop being inert.
+- **The bundled `viro_renderer-release.aar` needs a rebuild before release.** The 2.58.2 back-merge hit a genuine conflict on it: `release/2.58.2`'s AAR carries the Quest input fixes but predates the OBJ material fix, while develop's carries the OBJ fix and not the Quest ones — neither is a superset. Develop's was kept, because taking the other would regress OBJ materials. The rebuild is no longer waiting on anything: `virocore/develop` now carries the Quest input work (`ffb38acb`, #369) on top of the OBJ fix, so an AAR built from it is the superset neither side was, and the Quest input fixes stop being inert.
 
 ## v2.58.1 — 17 August 2026
 

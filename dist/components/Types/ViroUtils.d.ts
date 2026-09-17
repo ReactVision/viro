@@ -54,12 +54,13 @@ export type ViroPhysicsBody = {
      * |------|----------|
      * |Box| Accepts [width, height, length] parameters used for creating the box.
      * |Sphere| Accepts radius parameter.
-     * |Compound| Usually is set on VRONodes to encapsulate multiple objects in a compound shape. This is achieved by recursing down the scene graph and combining the geometries into a single compound physics shape.
+     * |Compound| Accepts a list of child boxes and spheres, each with its own position relative to this control. Given none, the compound is inferred instead by recursing down the scene graph and combining the geometries of this control's children.
      *
      * Example code:
      *
      * ```typescript
      * shape:{type:'Box', params:[0.4,0.4,0.2]} shape:{type:'Sphere', params:[0.5]}
+     * shape:{type:'Compound', children:[{type:'Box', params:[0.4,0.4,0.2], position:[0,0.2,0]}]}
      * ```
      */
     shape?: ViroPhysicsBodyShape;
@@ -106,6 +107,17 @@ export type ViroPhysicsBodyType = "Dynamic" | "Kinematic" | "Static";
 export type ViroPhysicsBodyShape = {
     type: ViroPhysicsBodyShapeType;
     params: number[];
+    /**
+     * The parts of a Compound shape. Ignored by every other shape type. A part's
+     * `params` follow its own type, `position` is relative to this control, and
+     * the body's mass is split across the parts by volume.
+     */
+    children?: ViroPhysicsBodyShapeChild[];
+};
+export type ViroPhysicsBodyShapeChild = {
+    type: "Box" | "Sphere";
+    params: number[];
+    position: number[];
 };
 export type ViroPhysicsBodyShapeType = "Box" | "Sphere" | "Compound";
 /**

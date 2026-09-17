@@ -338,6 +338,7 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
     std::shared_ptr<VROMaterial> vroMaterial = std::make_shared<VROMaterial>();
     vroMaterial->setName([materialName cStringUsingEncoding:NSASCIIStringEncoding]);
     MaterialWrapper *materialWrapper = [[MaterialWrapper alloc] initWithMaterial:vroMaterial];
+    BOOL authoredDepthWrite = NO;
 
     for (id key in material) {
         NSString *materialPropertyName = (NSString *)key;
@@ -380,6 +381,9 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             if ([@"shininess" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *number = material[key];
                 vroMaterial->setShininess([number floatValue]);
+            } else if ([@"alpha" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
+                NSNumber *number = material[key];
+                vroMaterial->setTransparency([number floatValue]);
             } else if ([@"fresnelExponent" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *number =  material[key];
                 vroMaterial->setFresnelExponent([number floatValue]);
@@ -395,6 +399,7 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             } else if ([@"writesToDepthBuffer" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *booleanVal = material[key];
                 vroMaterial->setWritesToDepthBuffer([booleanVal boolValue]);
+                authoredDepthWrite = YES;
             } else if ([@"readsFromDepthBuffer" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *booleanVal = material[key];
                 vroMaterial->setReadsFromDepthBuffer([booleanVal boolValue]);
@@ -527,6 +532,13 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                 }
             }
         }
+    }
+
+    // A translucent material that still writes depth occludes its own far faces, so
+    // setting alpha and nothing else turns depth writing off. Only the alpha key can
+    // bring transparency under 1 here, so nothing that worked before changes.
+    if (!authoredDepthWrite && vroMaterial->getTransparency() < 1) {
+        vroMaterial->setWritesToDepthBuffer(false);
     }
     return materialWrapper;
 }

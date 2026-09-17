@@ -21,6 +21,7 @@ function useViroAnimation(node, animation, base, ready) {
     const name = animation?.name;
     const run = animation?.run;
     const loop = animation?.loop;
+    const delay = animation?.delay;
     const baseKey = `${base.position.join()}|${base.rotation.join()}|${base.scale.join()}|${base.opacity}`;
     (0, react_1.useEffect)(() => {
         if (!ready || !animation)
@@ -31,7 +32,7 @@ function useViroAnimation(node, animation, base, ready) {
         });
         if (run !== false) {
             // Try a registered declarative animation first, then a model animation.
-            if (!name || !(0, viroAnimationRegistry_1.runDeclarativeAnimation)(scene, node, name, base, !!loop)) {
+            if (!name || !(0, viroAnimationRegistry_1.runDeclarativeAnimation)(scene, node, name, base, !!loop, delay)) {
                 let animName = name;
                 if (!animName || animName === "*") {
                     animName = scene.getAnimationKeys(node)[0];
@@ -49,5 +50,5 @@ function useViroAnimation(node, animation, base, ready) {
             scene.stopAnimation(node, false);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [node, ready, name, run, loop, baseKey]);
+    }, [node, ready, name, run, loop, delay, baseKey]);
 }

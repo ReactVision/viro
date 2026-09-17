@@ -52,11 +52,13 @@ const studioApiError_1 = require("./domain/studioApiError");
 const StudioARScene_1 = require("./StudioARScene");
 const StudioSceneErrorBoundary_1 = require("./StudioSceneErrorBoundary");
 const VRTStudioModule_1 = require("./VRTStudioModule");
+// Tone mapping off here too, or the camera feed takes the default Hable curve for
+// the moment a scene is loading and then snaps when the authored scene mounts.
 function LoadingARScene() {
-    return <ViroARScene_1.ViroARScene />;
+    return <ViroARScene_1.ViroARScene toneMappingEnabled={false}/>;
 }
 function LoadingVRScene() {
-    return <ViroScene_1.ViroScene />;
+    return <ViroScene_1.ViroScene toneMappingEnabled={false}/>;
 }
 function mapOcclusionMode(dbValue) {
     switch (dbValue) {
@@ -287,7 +289,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         loadedSceneIdRef.current = resolvedSceneId;
         // Names for the tap-to-place prompt (overlay reads this on placement).
         placementNamesRef.current = new Map(sceneData.assets
-            .filter((a) => a.tap_to_place)
+            .filter((a) => (0, placementStore_1.isTapToPlaceAsset)(a))
             .map((a) => [a.id, a.name ?? ""]));
         const triggerImageCount = sceneData.assets.filter((a) => !!a.trigger_image_url).length;
         setNumberOfTrackedImages(triggerImageCount > 0 ? Math.min(triggerImageCount, 5) : undefined);
@@ -366,7 +368,20 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     }
     return (<StudioSceneErrorBoundary_1.StudioSceneErrorBoundary sceneId={sceneId} onError={onError} renderError={renderError}>
       <react_native_1.View style={style ?? react_native_1.StyleSheet.absoluteFill}>
-        <ViroXRSceneNavigator_1.ViroXRSceneNavigator ref={navigatorRef} arInitialScene={{ scene: LoadingARScene }} vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }} worldAlignment={worldAlignment} autofocus={autofocus} numberOfTrackedImages={numberOfTrackedImages} occlusionMode={occlusionMode} onExitViro={onExitViro} style={react_native_1.StyleSheet.absoluteFill}/>
+        <ViroXRSceneNavigator_1.ViroXRSceneNavigator ref={navigatorRef} arInitialScene={{ scene: LoadingARScene }} vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }} worldAlignment={worldAlignment} autofocus={autofocus} numberOfTrackedImages={numberOfTrackedImages} occlusionMode={occlusionMode} 
+    // Bloom defaults on natively and the editor does not preview it, so a
+    // bright material glows on the phone and nowhere else.
+    //
+    // HDR stays ON even though its default tone curve is the other half of
+    // that problem, because PBR rides on it: VROChoreographer::isPBREnabled
+    // is `_hdrEnabled && _pbrEnabled`, and the whole PBR branch of
+    // VROShaderFactory goes with it, so roughness, metalness and the ambient
+    // occlusion map are read by nothing and a PBR material falls back to
+    // Blinn. The tone curve is switched off per scene instead, which is what
+    // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
+    // than left to the native default, so this cannot be switched off again
+    // without meeting the reason it is on.
+    hdrEnabled bloomEnabled={false} onExitViro={onExitViro} style={react_native_1.StyleSheet.absoluteFill}/>
         {/* Absolutely filled so the overlay covers the navigator instead of
             taking flow space beneath it. Swapping the overlay's content, rather
             than replacing this subtree, keeps the AR session and its camera

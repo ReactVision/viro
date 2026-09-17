@@ -21,6 +21,7 @@ import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
@@ -332,6 +333,16 @@ export const StudioSceneNavigator = forwardRef<
   onPlaneSelectedRef.current = onPlaneSelected;
   noAssetsMessageRef.current = noAssetsMessage;
 
+  // VRActivity is a separate React root — its own error boundary
+  // (ViroQuestEntryPoint) can't reach this component's onError prop directly,
+  // so it relays crashes through VRQuestNavigatorBridge instead. Forwarding
+  // here means a host's existing onError → Sentry wiring for phone-AR errors
+  // picks up Quest scene crashes too, with no changes needed on the host side.
+  React.useEffect(
+    () => VRQuestNavigatorBridge.onQuestError((error) => onErrorRef.current?.(error)),
+    []
+  );
+
   // Stable so passProps stays referentially steady across renders. Idempotent,
   // so StrictMode's dev double-invoke of StudioARScene's onReady effect is safe.
   const handleSceneReady = useCallback(() => {
@@ -504,10 +515,14 @@ export const StudioSceneNavigator = forwardRef<
   const loadErrorView = loadError ? renderError?.(loadError, retryLoad) : null;
   const overlay = isSceneReady ? null : (loadErrorView ?? loadingView ?? null);
 
-  // Quest has no camera passthrough, so during load it always needs something
-  // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
-  // live camera, so its overlay stays opt-in.) This branch sits above the error
-  // boundary, which is why it has to handle loadError itself.
+  // Before vrSceneEntry resolves, VRActivity hasn't been launched yet (Quest)
+  // or the ImmersiveSpace hasn't opened yet (visionOS), so this window has
+  // nothing of its own to show — it always needs something on screen: the
+  // caller's loadingView, else a built-in spinner. (Phone AR shows the live
+  // camera during load, so its overlay stays opt-in.) This branch sits above
+  // the error boundary, which is why it has to handle loadError itself.
+  // (Quest 3/3S do have colour passthrough once the scene mounts — this branch
+  // is about the pre-launch panel window, not about passthrough support.)
   //
   // visionOS needs the same treatment for a different reason: its passthrough lives in
   // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
@@ -547,9 +562,21 @@ export const StudioSceneNavigator = forwardRef<
           // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
           // than left to the native default, so this cannot be switched off again
           // without meeting the reason it is on.
-          hdrEnabled
+          //
+          // Off on Quest, and only there: the HDR composite occludes the
+          // passthrough layer on that OpenXR compositor, so the room disappears
+          // behind the scene. PBR on Quest goes with it, which is the trade — a
+          // headset that shows nothing of the room is the worse of the two.
+          hdrEnabled={!isQuest}
           bloomEnabled={false}
           onExitViro={onExitViro}
+          // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
+          // than ViroARScene (see StudioARScene for why), and a virtual root
+          // turns none of this on by itself, so both are asked for outright.
+          // They reach VRActivity through the navigator bridge and do not depend
+          // on which root the scene uses.
+          passthroughEnabled={isQuest ? true : undefined}
+          handTrackingEnabled={isQuest ? true : undefined}
           style={StyleSheet.absoluteFill}
         />
         {/* Absolutely filled so the overlay covers the navigator instead of

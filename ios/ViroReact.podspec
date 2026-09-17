@@ -11,8 +11,10 @@ Pod::Spec.new do |s|
   s.license             = { :type => 'MIT', :file => '../LICENSE' }
   s.author              = 'ReactVision'
   s.requires_arc        = true
-  s.platform            = :ios, '12.0'
-  s.ios.deployment_target     = '12.0'
+  # 15.1 because that is React Native 0.86's min_ios_version_supported, which every pod in
+  # the app is built against, and because Xcode 26+ refuses to build anything below 15.0 at all.
+  s.platform            = :ios, '15.1'
+  s.ios.deployment_target     = '15.1'
   # visionOS 26.0, not 1.0: the render loop calls LayerRenderer.Frame.queryDrawables(), which
   # arrived in 26.0, and Drawable.computeProjection(viewIndex:), which arrived in 2.0. Neither is
   # behind an availability check, so this is the version the code actually requires today.

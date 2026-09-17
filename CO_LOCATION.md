@@ -55,7 +55,7 @@ function SharedScene(props) {
 }
 ```
 
-Device A hosts the space with `startScan()` / `finishScan()` on the AR scene navigator; device B receives the returned `cloudAnchorId` however the app likes — QR, paste, your own backend — and both mount the component with it.
+Device A hosts the space with `startScan()` / `finishScan()` on the AR scene navigator; device B needs the resulting `cloudAnchorId`. Getting it there is what **rooms and join codes** below are for: device A turns the anchor into a room and shows a six-character code, device B types it. Passing the uuid yourself still works if the app already has a channel for it.
 
 ---
 
@@ -121,6 +121,43 @@ await sharedSpacePushIncoming(receivedBlob);
 ```
 
 Until both sides pump, the space never converges and the frame source times out.
+
+---
+
+## Rooms and join codes
+
+A room is what several devices join to share a space, and a uuid is not something anyone can read off another phone. `useViroColocationRoom` turns the frame this device established into a room with a six-character code, and turns a typed code back into the room and the frame source that goes with it.
+
+```tsx
+import { useViroColocationRoom, ViroSharedFrame } from "@reactvision/react-viro";
+
+// The device that scanned the space, after finishScan() gave it an anchor id.
+const host = useViroColocationRoom({
+  apiKey,
+  projectId,
+  host: { frameKind: "cloud_anchor", cloudAnchorId, name: "Bay 3" },
+});
+// <Text>{host.displayCode}</Text>   →   "K7M 2QX"
+
+// Everyone else, once they have typed it.
+const guest = useViroColocationRoom({ apiKey, projectId, joinCode: typed });
+
+<ViroSharedFrame
+  source={guest.frameSource}
+  arSceneNavigator={arSceneNavigator}
+  onLocalized={...}
+/>;
+// and the same room id for both sockets:
+useViroColocation({ roomId: guest.roomId!, apiKey, projectId, enabled: framed });
+```
+
+- **The room says how its devices align**, so the joiner picks no frame source of its own: `cloud_anchor` on phones, `meta_group` on Quest (`"create"` for the device that made the room, `"join"` for the rest), `visionos_space` on visionOS. Rooms are still same-family, for the reason in Platform support below.
+- **Codes are six characters** from an alphabet with no `O`/`0`, `I`/`1`/`L` or `U`, so nothing is ambiguous on a screen at arm's length. Input is case-insensitive and spaces and hyphens are ignored, so `k7m 2qx` is the same code as `K7M2QX`. `formatJoinCode` groups it for display and `normaliseJoinCode` cleans up what someone typed.
+- **A code is scoped to your project.** One belonging to another project answers exactly as an unknown one, and you can hold the same code open in two projects without either seeing the other.
+- **Rooms last 90 days**, matching the cloud anchor they were built on. A room on an anchor goes when that anchor does, so a room created late in an anchor's life is the shorter of the two.
+- **`createColocationRoom` and `lookupColocationRoom`** are the same two calls without the hook, for apps that already own their own state.
+
+Rooms are a REST call to the platform rather than to the relay, so `endpoint` here is the platform URL and defaults to it. One request, before a session starts; the frame acquisition that follows takes far longer.
 
 ---
 
@@ -210,11 +247,19 @@ Limits per room: 512 entities and 16 KB of serialised fields per entity.
 
 **Positions stored here are location-frame coordinates, exactly like poses on the channel.** The same `worldToLocation` / `locationToWorld` conversion applies, for the same reason: a world position is per-session and means nothing to the peer receiving it.
 
-### Nothing is persisted
+### What is saved, and what is not
 
-Room state lives as long as the room has occupants and never reaches disk, so a server restart empties it. The channel shrugs that off with a reconnect, because the frame lives on the device. Replicated state does not: the placed objects and the shared step index are simply gone.
+**Replicated state is saved.** The hosted relay writes a room back to the platform when its last peer leaves, on a sweep while a session is running, and again when it is restarted, and it reads that copy back when the room is next opened. Objects placed in a work zone are still there tomorrow, and a deploy mid-session costs a reconnect rather than the room.
 
-The recovery is on the client. Keep a local mirror of what this device created or owns, and after a reconnect re-push whatever the room came back without. The same path covers a device that merely missed updates while backgrounded.
+Three things follow:
+
+- **Owners do not survive.** An entity comes back unowned, because the peer that was holding it belongs to a session that has ended. Claim it again rather than assuming it is still yours.
+- **A room caps at 1 MB of serialised entities**, alongside the 512-entity and 16 KB-per-entity limits. A write that would cross it is rejected `room-too-large`; deleting an entity frees the room up again. The cap exists so a room that fits in the relay always fits in its saved copy.
+- **A room's saved copy can be unavailable.** If the platform cannot answer, the relay refuses the connection with a 503 rather than opening an empty room, and the client retries. An empty room broadcast as the truth would delete the work zone for everyone.
+
+A room that has been idle for 90 days is deleted with the anchor it was built on.
+
+The LAN reference server below saves nothing, and keeps rooms in memory for as long as the process runs.
 
 ---
 

@@ -39,6 +39,13 @@ import {
   getColocationPeers,
 } from "./components/AR/ViroColocation";
 import { useViroColocation } from "./components/hooks/useViroColocation";
+import { useViroColocationRoom } from "./components/hooks/useViroColocationRoom";
+import {
+  createColocationRoom,
+  formatJoinCode,
+  lookupColocationRoom,
+  normaliseJoinCode,
+} from "./components/AR/ViroColocationRooms";
 import { ViroReplicationClient } from "./components/AR/ViroReplication";
 import { useViroReplicatedState } from "./components/hooks/useViroReplicatedState";
 import {
@@ -115,6 +122,17 @@ export type {
   UseViroColocationResult,
   UseViroColocationOptions,
 } from "./components/hooks/useViroColocation";
+export type {
+  UseViroColocationRoomResult,
+  UseViroColocationRoomOptions,
+} from "./components/hooks/useViroColocationRoom";
+export type {
+  ViroColocationRoom,
+  ViroColocationRoomsConfig,
+  ViroColocationRoomResult,
+  ViroFrameKind,
+  ViroRoomFrame,
+} from "./components/AR/ViroColocationRooms";
 export type {
   ViroReplicatedEntity,
   ViroReplicationState,
@@ -312,6 +330,11 @@ export {
   getColocationState,
   getColocationPeers,
   useViroColocation,
+  useViroColocationRoom,
+  createColocationRoom,
+  lookupColocationRoom,
+  normaliseJoinCode,
+  formatJoinCode,
   ViroReplicationClient,
   useViroReplicatedState,
   ViroARImageMarker,

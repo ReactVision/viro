@@ -12,7 +12,16 @@ import {
   useStudioRecording,
   useStudioPlacement,
 } from "./components/Studio";
-import { ViroVisionOSModule, isVisionOS, enterImmersiveSpace, exitImmersiveSpace, setInputTuning, sharedSpaceState, sharedSpaceNextOutgoing, sharedSpacePushIncoming } from "./components/VisionOS/ViroVisionOSModule";
+import {
+  ViroVisionOSModule,
+  isVisionOS,
+  enterImmersiveSpace,
+  exitImmersiveSpace,
+  setInputTuning,
+  sharedSpaceState,
+  sharedSpaceNextOutgoing,
+  sharedSpacePushIncoming,
+} from "./components/VisionOS/ViroVisionOSModule";
 import { Viro3DObject } from "./components/Viro3DObject";
 import { Viro360Image } from "./components/Viro360Image";
 import { Viro360Video } from "./components/Viro360Video";
@@ -63,8 +72,15 @@ import { ViroVirtualJoystick } from "./components/ViroVirtualJoystick";
 import { ViroVirtualButton } from "./components/ViroVirtualButton";
 import { ViroGameLoop } from "./components/ViroGameLoop";
 import { ViroGameLoopUtils } from "./components/ViroGameLoopUtils";
-import { useViroMapCamera, viroMapCameraTransform } from "./components/useViroMapCamera";
-import { useGameLoop, useLateUpdate, useFixedUpdate } from "./components/hooks/useGameLoop";
+import {
+  useViroMapCamera,
+  viroMapCameraTransform,
+} from "./components/useViroMapCamera";
+import {
+  useGameLoop,
+  useLateUpdate,
+  useFixedUpdate,
+} from "./components/hooks/useGameLoop";
 import { ViroDirectionalLight } from "./components/ViroDirectionalLight";
 import { ViroFlexView } from "./components/ViroFlexView";
 import { ViroGeometry } from "./components/ViroGeometry";
@@ -79,8 +95,14 @@ import {
 } from "./components/Material/ViroMaterials";
 import { ViroMaterialVideo } from "./components/ViroMaterialVideo";
 import { ViroCameraTexture } from "./components/ViroCameraTexture";
-export type { ViroCameraPosition, ViroCameraReadyEvent } from "./components/ViroCameraTexture";
-export type { ViroMapCameraState, ViroMapCameraOptions } from "./components/useViroMapCamera";
+export type {
+  ViroCameraPosition,
+  ViroCameraReadyEvent,
+} from "./components/ViroCameraTexture";
+export type {
+  ViroMapCameraState,
+  ViroMapCameraOptions,
+} from "./components/useViroMapCamera";
 export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
 export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
 export type {
@@ -114,7 +136,14 @@ export type {
 } from "./components/AR/ViroFrameSource";
 export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
-export type { ViroDetectorMode, ViroDetectedObject, ViroDetectionBoundingBox, ViroDetectionEvent, ViroDetectorReadyEvent, ViroDetectorErrorEvent } from "./components/ViroObjectDetector";
+export type {
+  ViroDetectorMode,
+  ViroDetectedObject,
+  ViroDetectionBoundingBox,
+  ViroDetectionEvent,
+  ViroDetectorReadyEvent,
+  ViroDetectorErrorEvent,
+} from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
 import { ViroOrbitCamera } from "./components/ViroOrbitCamera";
@@ -252,8 +281,16 @@ import { ViroSceneNavigator } from "./components/ViroSceneNavigator";
 import { VIRO_VERSION } from "./components/Utilities/ViroVersion";
 import { ViroQuestEntryPoint } from "./components/ViroQuestEntryPoint";
 import { VRQuestNavigatorBridge } from "./components/Utilities/VRQuestNavigatorBridge";
-import { VRModuleOpenXR, useVRViewTag, exitVRScene, setPassthroughStyle } from "./components/Utilities/VRModuleOpenXR";
-import type { VRModuleOpenXRType, ViroPassthroughStyle } from "./components/Utilities/VRModuleOpenXR";
+import {
+  VRModuleOpenXR,
+  useVRViewTag,
+  exitVRScene,
+  setPassthroughStyle,
+} from "./components/Utilities/VRModuleOpenXR";
+import type {
+  VRModuleOpenXRType,
+  ViroPassthroughStyle,
+} from "./components/Utilities/VRModuleOpenXR";
 import { StreamingAudioManager } from "./components/Utilities/StreamingAudioManager";
 import { AppRegistry } from "react-native";
 
@@ -486,7 +523,11 @@ export {
 };
 
 export type { VRModuleOpenXRType, ViroPassthroughStyle };
-export type { ImmersiveSpaceStyle, ViroInputTuning, ViroSharedSpaceState } from "./components/VisionOS/ViroVisionOSModule";
+export type {
+  ImmersiveSpaceStyle,
+  ViroInputTuning,
+  ViroSharedSpaceState,
+} from "./components/VisionOS/ViroVisionOSModule";
 
 export type {
   StudioSceneResponse,

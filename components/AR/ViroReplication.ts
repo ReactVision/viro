@@ -43,7 +43,7 @@ import { isWeb } from "../Utilities/ViroPlatform";
 type HeaderWebSocket = new (
   url: string,
   protocols: null,
-  options: { headers: Record<string, string> },
+  options: { headers: Record<string, string> }
 ) => WebSocket;
 
 export type ViroReplicatedEntity = {
@@ -136,7 +136,10 @@ export class ViroReplicationClient {
    * has no previous value to restore — only an entity to remove — and without
    * the id there is nothing to remove it by.
    */
-  private pending = new Map<string, { id: string; before?: ViroReplicatedEntity }>();
+  private pending = new Map<
+    string,
+    { id: string; before?: ViroReplicatedEntity }
+  >();
   private refCounter = 0;
 
   get state(): ViroReplicationState {
@@ -153,7 +156,10 @@ export class ViroReplicationClient {
 
   /** Snapshot of the current state. Safe to hold — it is a copy. */
   getEntities(): ViroReplicatedEntity[] {
-    return [...this.entities.values()].map((e) => ({ ...e, fields: { ...e.fields } }));
+    return [...this.entities.values()].map((e) => ({
+      ...e,
+      fields: { ...e.fields },
+    }));
   }
 
   get(id: string): ViroReplicatedEntity | undefined {
@@ -211,8 +217,17 @@ export class ViroReplicationClient {
   }
 
   /** Merge `fields` into the entity. Creates it if absent. */
-  set(id: string, fields: Record<string, unknown>, opts: ViroWriteOptions = {}): void {
-    const ref = this.send({ op: "set", id, fields, expectVersion: opts.expectVersion });
+  set(
+    id: string,
+    fields: Record<string, unknown>,
+    opts: ViroWriteOptions = {}
+  ): void {
+    const ref = this.send({
+      op: "set",
+      id,
+      fields,
+      expectVersion: opts.expectVersion,
+    });
     if (!opts.optimistic || !ref) return;
 
     // Remember what to restore if the server refuses, then show the change now.
@@ -249,19 +264,20 @@ export class ViroReplicationClient {
     // browser client needs an Origin allowlist first).
     const ws = isWeb
       ? new WebSocket(
-        `${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
-          `&projectId=${encodeURIComponent(cfg.projectId)}`,
-      )
+          `${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
+            `&projectId=${encodeURIComponent(cfg.projectId)}`
+        )
       : new (WebSocket as unknown as HeaderWebSocket)(path, null, {
-        headers: { "x-api-key": cfg.apiKey, "x-project-id": cfg.projectId },
-      });
+          headers: { "x-api-key": cfg.apiKey, "x-project-id": cfg.projectId },
+        });
     this.ws = ws;
 
     ws.onopen = () => {
       this.attempt = 0;
       // State becomes synced on the welcome, not here: an open socket without a
       // snapshot has nothing to answer reads with.
-      if (this.lastSeq >= 0) ws.send(JSON.stringify({ op: "resync", sinceSeq: this.lastSeq }));
+      if (this.lastSeq >= 0)
+        ws.send(JSON.stringify({ op: "resync", sinceSeq: this.lastSeq }));
     };
 
     ws.onmessage = (ev: { data: unknown }) => {
@@ -311,7 +327,13 @@ export class ViroReplicationClient {
         return;
 
       case "reject":
-        this.rollback(msg as unknown as { ref?: string; reason: string; current?: ViroReplicatedEntity });
+        this.rollback(
+          msg as unknown as {
+            ref?: string;
+            reason: string;
+            current?: ViroReplicatedEntity;
+          }
+        );
         return;
     }
   }
@@ -341,8 +363,19 @@ export class ViroReplicationClient {
         this.entities.delete(op.id);
       } else if (op.kind === "owner") {
         const e = this.entities.get(op.id);
-        if (e) this.entities.set(op.id, { ...e, owner: op.owner, version: op.version });
-        else this.entities.set(op.id, { id: op.id, fields: {}, owner: op.owner, version: op.version });
+        if (e)
+          this.entities.set(op.id, {
+            ...e,
+            owner: op.owner,
+            version: op.version,
+          });
+        else
+          this.entities.set(op.id, {
+            id: op.id,
+            fields: {},
+            owner: op.owner,
+            version: op.version,
+          });
       }
       this.lastSeq = op.seq;
     }
@@ -355,9 +388,11 @@ export class ViroReplicationClient {
     this.ws.send(JSON.stringify({ op: "resync", sinceSeq: this.lastSeq }));
   }
 
-  private rollback(
-    msg: { ref?: string; reason: string; current?: ViroReplicatedEntity },
-  ): void {
+  private rollback(msg: {
+    ref?: string;
+    reason: string;
+    current?: ViroReplicatedEntity;
+  }): void {
     if (msg.ref && this.pending.has(msg.ref)) {
       const p = this.pending.get(msg.ref)!;
       this.pending.delete(msg.ref);
@@ -410,4 +445,11 @@ export class ViroReplicationClient {
 type AppliedOp =
   | { kind: "upsert"; seq: number; entity: ViroReplicatedEntity; by: string }
   | { kind: "delete"; seq: number; id: string; by: string }
-  | { kind: "owner"; seq: number; id: string; owner: string | null; version: number; by: string };
+  | {
+      kind: "owner";
+      seq: number;
+      id: string;
+      owner: string | null;
+      version: number;
+      by: string;
+    };

@@ -24,17 +24,29 @@ class FakeSocket {
   constructor(
     public url: string,
     _protocols?: null,
-    public options?: { headers?: Record<string, string> },
+    public options?: { headers?: Record<string, string> }
   ) {
     FakeSocket.last = this;
   }
 
-  send(data: string) { this.sent.push(JSON.parse(data)); }
-  close() { this.readyState = 3; }
+  send(data: string) {
+    this.sent.push(JSON.parse(data));
+  }
+  close() {
+    this.readyState = 3;
+  }
 
-  open() { this.readyState = 1; this.onopen?.(); }
-  deliver(msg: unknown) { this.onmessage?.({ data: JSON.stringify(msg) }); }
-  drop() { this.readyState = 3; this.onclose?.(); }
+  open() {
+    this.readyState = 1;
+    this.onopen?.();
+  }
+  deliver(msg: unknown) {
+    this.onmessage?.({ data: JSON.stringify(msg) });
+  }
+  drop(ev: { code?: number; reason?: string } = {}) {
+    this.readyState = 3;
+    this.onclose?.(ev);
+  }
 }
 
 const CONFIG = {
@@ -44,7 +56,9 @@ const CONFIG = {
   endpoint: "http://localhost:8787",
 };
 
-const entity = (over: Partial<ViroReplicatedEntity> = {}): ViroReplicatedEntity => ({
+const entity = (
+  over: Partial<ViroReplicatedEntity> = {}
+): ViroReplicatedEntity => ({
   id: "cube",
   fields: { x: 1 },
   version: 1,
@@ -81,7 +95,10 @@ describe("connection", () => {
     // Never in the URL on a native platform: the relay refuses query-string
     // credentials, and a URL is what ends up in logs.
     expect(s.url).not.toContain("apiKey");
-    expect(s.options?.headers).toEqual({ "x-api-key": "k", "x-project-id": "p" });
+    expect(s.options?.headers).toEqual({
+      "x-api-key": "k",
+      "x-project-id": "p",
+    });
   });
 
   it("is only synced once the welcome arrives, not when the socket opens", () => {
@@ -107,17 +124,30 @@ describe("connection", () => {
 describe("ordering", () => {
   it("applies deltas in sequence", () => {
     const s = connectAndWelcome([], 0);
-    s.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "me" }] });
     s.deliver({
       t: "delta",
-      ops: [{ kind: "upsert", seq: 2, entity: entity({ fields: { x: 2 }, version: 2 }), by: "me" }],
+      ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "me" }],
+    });
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 2,
+          entity: entity({ fields: { x: 2 }, version: 2 }),
+          by: "me",
+        },
+      ],
     });
     expect(client.get("cube")?.fields.x).toBe(2);
   });
 
   it("ignores a delta it has already applied", () => {
     const s = connectAndWelcome([], 5);
-    s.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }] });
+    s.deliver({
+      t: "delta",
+      ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }],
+    });
     expect(client.get("cube")).toBeUndefined();
   });
 
@@ -126,7 +156,10 @@ describe("ordering", () => {
     s.sent.length = 0;
 
     // seq 3 with nothing at 1 or 2 means two deltas never arrived.
-    s.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }] });
+    s.deliver({
+      t: "delta",
+      ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }],
+    });
 
     expect(s.sent).toEqual([{ op: "resync", sinceSeq: 0 }]);
     expect(client.get("cube")).toBeUndefined();
@@ -153,7 +186,16 @@ describe("authority", () => {
     const s = connectAndWelcome();
     s.deliver({
       t: "delta",
-      ops: [{ kind: "owner", seq: 1, id: "cube", owner: "me", version: 1, by: "me" }],
+      ops: [
+        {
+          kind: "owner",
+          seq: 1,
+          id: "cube",
+          owner: "me",
+          version: 1,
+          by: "me",
+        },
+      ],
     });
     expect(client.get("cube")?.owner).toBe("me");
   });
@@ -162,7 +204,16 @@ describe("authority", () => {
     const s = connectAndWelcome([entity({ owner: "other" })], 1);
     s.deliver({
       t: "delta",
-      ops: [{ kind: "owner", seq: 2, id: "cube", owner: null, version: 2, by: "other" }],
+      ops: [
+        {
+          kind: "owner",
+          seq: 2,
+          id: "cube",
+          owner: null,
+          version: 2,
+          by: "other",
+        },
+      ],
     });
     expect(client.get("cube")?.owner).toBeNull();
   });
@@ -256,7 +307,11 @@ describe("optimistic writes", () => {
     expect(client.get("brand-new")).toBeDefined();
 
     // No `current`: the server has no such entity, so neither should we.
-    s.deliver({ t: "reject", ref: s.sent[s.sent.length - 1].ref, reason: "too-many-entities" });
+    s.deliver({
+      t: "reject",
+      ref: s.sent[s.sent.length - 1].ref,
+      reason: "too-many-entities",
+    });
     expect(client.get("brand-new")).toBeUndefined();
   });
 });
@@ -264,7 +319,10 @@ describe("optimistic writes", () => {
 describe("reconnection", () => {
   it("resyncs from the last applied sequence rather than starting over", () => {
     const s1 = connectAndWelcome([], 0);
-    s1.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "x" }] });
+    s1.deliver({
+      t: "delta",
+      ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "x" }],
+    });
 
     s1.drop();
     expect(client.state).toBe("reconnecting");

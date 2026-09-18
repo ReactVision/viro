@@ -221,6 +221,31 @@ publishPose(
 
 Publishing more often than `VIRO_POSE_INTERVAL_MS` puts nothing extra on the wire, because native drops anything faster than `poseSendHz`. The constant is there so an app driving from a camera callback at 90 Hz does not format 16 floats for every frame that never reaches the socket.
 
+### Smoothing
+
+Poses go out at `poseSendHz`, 20 by default, so a marker driven straight from `peers` moves in 50 ms jumps. That rate assumes the receiver fills in between samples, which is `useViroSmoothedPeers`:
+
+```tsx
+const { peers } = useViroColocation({ roomId, apiKey, projectId });
+const smoothPeers = useViroSmoothedPeers(peers);
+```
+
+`useViroSmoothedEntities` does the same for replicated transforms, naming the fields to blend so a score or a step index is never averaged on the way to the screen:
+
+```tsx
+const smooth = useViroSmoothedEntities(
+  entities,
+  { position: "vec3" },
+  { localPeerId }
+);
+```
+
+Pass `localPeerId` wherever anything here can be dragged. Entities this device owns are then passed straight through, because there is no gap to fill in: the renderer is already moving that node under the finger every frame, and what arrives for it is this device's own writes coming back.
+
+Both take `halfLifeMs`, defaulting to 35. Smoothing buys continuity with lag: at 35 ms the rendered value sits roughly 50 ms behind a continuously moving target. That is worth paying for a marker, where a 100 ms jump reads as unreliable, and is worth tuning down for anything where the exact position matters more than the motion. Timing comes from the frame callback only, never from a pose's `timestampMs`, which is the sender's clock.
+
+Updates land at frame rate while anything is moving and stop entirely once everything settles, so call these in the component that draws the moving things rather than one that draws the whole scene.
+
 ---
 
 ## Replicated state

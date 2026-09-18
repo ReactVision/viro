@@ -50,6 +50,15 @@ import {
 import { ViroReplicationClient } from "./components/AR/ViroReplication";
 import { useViroReplicatedState } from "./components/hooks/useViroReplicatedState";
 import {
+  useViroSmoothedEntities,
+  useViroSmoothedPeers,
+} from "./components/hooks/useViroSmoothing";
+import {
+  approachFactor,
+  approachQuat,
+  approachVec3,
+} from "./components/AR/ViroSmoothing";
+import {
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
   visionOSSharedSpaceFrameSource,
@@ -156,6 +165,12 @@ export type {
   ViroSharedFrameValue,
 } from "./components/AR/ViroFrameSource";
 export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
+export type {
+  ViroSmoothingOptions,
+  ViroEntitySmoothingOptions,
+  ViroSmoothedFields,
+} from "./components/hooks/useViroSmoothing";
+export type { ViroVec3, ViroQuat } from "./components/AR/ViroSmoothing";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
 export type {
   ViroDetectorMode,
@@ -341,6 +356,11 @@ export {
   formatJoinCode,
   ViroReplicationClient,
   useViroReplicatedState,
+  useViroSmoothedPeers,
+  useViroSmoothedEntities,
+  approachFactor,
+  approachVec3,
+  approachQuat,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

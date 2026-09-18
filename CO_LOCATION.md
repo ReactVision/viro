@@ -240,9 +240,9 @@ An entity is `{ id, fields, version, owner }`. The server orders every operation
 - **`optimistic` is per write and off by default.** The default costs one round trip and never shows a value that turns out not to be true. Turn it on for something being dragged, where a round trip per frame is visible.
 - **`clear` is the one operation that ignores ownership**, and it has to be. A reset issued as one `remove` per entity is refused `not-owner` on everything anyone is holding, so exactly the objects still in someone's hand would survive it. Any peer may call `clear`; it empties the room for everyone and arrives as ordinary deletes, so a device that was not listening picks it up on its next resync.
 
-Refusals reach `onReject` as one of `not-owner`, `version-conflict`, `already-owned`, `no-such-entity`, `malformed`, `too-many-entities` or `field-too-large`.
+Refusals reach `onReject` as one of `not-owner`, `version-conflict`, `already-owned`, `no-such-entity`, `malformed`, `too-many-entities`, `field-too-large`, `room-too-large` or `org-too-large`.
 
-Limits per room: 512 entities and 16 KB of serialised fields per entity.
+Limits per room: 512 entities and 16 KB of serialised fields per entity. `org-too-large` is the one that is not about this room: a team's open rooms add up to a ceiling on the relay, so the answer is to reset or close a room rather than to shrink this write.
 
 ### Coordinates, again
 

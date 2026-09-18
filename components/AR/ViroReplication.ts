@@ -69,7 +69,11 @@ export type ViroReplicationRejectReason =
   | "no-such-entity"
   | "malformed"
   | "too-many-entities"
-  | "field-too-large";
+  | "field-too-large"
+  /** The room is at the size its saved copy may be, so nothing more fits. */
+  | "room-too-large"
+  /** Every room this team has open adds up to its ceiling on the relay. */
+  | "org-too-large";
 
 export type ViroReplicationRejection = {
   reason: ViroReplicationRejectReason;

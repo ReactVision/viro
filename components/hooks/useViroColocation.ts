@@ -40,11 +40,40 @@ export type UseViroColocationOptions = ViroColocationConfig & {
   /**
    * How often peers are read back, in ms. Peers arrive on a socket thread and
    * are polled rather than pushed: this codebase has no live event path from a
-   * native module to JS, and 10 Hz of a small array is cheaper than building
-   * one. Swappable for events later without changing this hook's API.
+   * native module to JS. Swappable for events later without changing this
+   * hook's API.
+   *
+   * Deliberately faster than the 10 Hz peers actually arrive at, because the
+   * poll and the arrival are unsynchronised: reading every 100 ms makes a pose
+   * wait 50 ms on average for the next read, which is latency on top of the
+   * network and shows up as a peer marker lagging the person it marks. A read
+   * that finds nothing new does not re-render, so the extra reads cost a native
+   * call rather than a pass over every consumer.
    */
   pollMs?: number;
 };
+
+/**
+ * Whether the list just polled is the one React already holds.
+ *
+ * Peers are polled faster than they arrive, so most reads return an unchanged
+ * list and setting it would re-render every consumer for nothing. A peer's
+ * timestamp moves with the pose that carried its position and rotation, so it
+ * stands in for comparing those. Compared by index: if native ever returned
+ * these unordered the result is a wasted render, which is what every poll did
+ * before.
+ */
+function samePeers(a: ViroColocationPeer[], b: ViroColocationPeer[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (p, i) =>
+        p.peerId === b[i].peerId &&
+        p.timestampMs === b[i].timestampMs &&
+        p.localized === b[i].localized
+    )
+  );
+}
 
 /**
  * Join a co-location room and track its peers.
@@ -62,7 +91,14 @@ export type UseViroColocationOptions = ViroColocationConfig & {
 export function useViroColocation(
   options: UseViroColocationOptions
 ): UseViroColocationResult {
-  const { roomId, apiKey, projectId, endpoint, enabled = true, pollMs = 100 } = options;
+  const {
+    roomId,
+    apiKey,
+    projectId,
+    endpoint,
+    enabled = true,
+    pollMs = 33,
+  } = options;
 
   const [available, setAvailable] = useState(false);
   const [state, setState] = useState<ViroColocationState>("idle");
@@ -85,7 +121,12 @@ export function useViroColocation(
       if (!ok || !enabled || !roomId) return;
 
       activeRoom.current = roomId;
-      const result = await joinColocation({ roomId, apiKey, projectId, endpoint });
+      const result = await joinColocation({
+        roomId,
+        apiKey,
+        projectId,
+        endpoint,
+      });
       if (cancelled || activeRoom.current !== roomId) return;
 
       if (!result.success) {
@@ -96,11 +137,14 @@ export function useViroColocation(
       setError(undefined);
 
       timer = setInterval(async () => {
-        const [s, p] = await Promise.all([getColocationState(), getColocationPeers()]);
+        const [s, p] = await Promise.all([
+          getColocationState(),
+          getColocationPeers(),
+        ]);
         if (cancelled || activeRoom.current !== roomId) return;
         setState(s.state);
         setLocalPeerId(s.localPeerId);
-        setPeers(p);
+        setPeers((prev) => (samePeers(prev, p) ? prev : p));
       }, pollMs);
     };
 

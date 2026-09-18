@@ -404,9 +404,13 @@ export class ViroReplicationClient {
       if (op.seq <= this.lastSeq) continue; // already applied
 
       if (op.kind === "upsert") {
-        this.entities.set(op.entity.id, op.entity);
+        this.entities.set(op.entity.id, this.reconcile(op));
       } else if (op.kind === "delete") {
         this.entities.delete(op.id);
+        // Same rule as an upsert: only this device's own op retires one of its
+        // own writes. Without it another peer's delete, or anyone's `clear`,
+        // would consume the record that holds the next echo back.
+        if (op.by === this._localPeerId) this.settleOwnWrite(op.id);
       } else if (op.kind === "owner") {
         const e = this.entities.get(op.id);
         if (e)
@@ -425,8 +429,49 @@ export class ViroReplicationClient {
       }
       this.lastSeq = op.seq;
     }
-    this.pending.clear();
     this.emit();
+  }
+
+  /**
+   * What an upsert should become locally, given what this device still has in
+   * flight.
+   *
+   * The relay broadcasts to the sender as well, so a drag writing every 33 ms
+   * over a 63 ms round trip has two more writes outstanding by the time the
+   * first comes back. Taking that echo puts the object where the hand was two
+   * writes ago, and the next write pulls it forward again: on the device doing
+   * the dragging that reads as the object trailing the finger and snapping
+   * back, the faster the drag the further back. Only the fields are held; the
+   * version and owner the server assigned are adopted either way.
+   */
+  private reconcile(
+    op: Extract<AppliedOp, { kind: "upsert" }>
+  ): ViroReplicatedEntity {
+    if (op.by !== this._localPeerId) return op.entity;
+    if (!this.settleOwnWrite(op.entity.id)) return op.entity;
+    const held = this.entities.get(op.entity.id);
+    if (!held) return op.entity;
+    // Server fields underneath, so a field only it knows about is not lost.
+    return { ...op.entity, fields: { ...op.entity.fields, ...held.fields } };
+  }
+
+  /**
+   * Retire the oldest optimistic write for `id`, reporting whether there was
+   * one.
+   *
+   * A delta carries no ref, but the relay applies one connection's ops in the
+   * order they were sent and broadcasts them in that order, so the nth echo
+   * settles the nth write. This is also what bounds `pending`, which is why
+   * nothing clears it wholesale: doing that on any delta dropped the record a
+   * later rejection of an unrelated write needed to roll back.
+   */
+  private settleOwnWrite(id: string): boolean {
+    for (const [ref, p] of this.pending) {
+      if (p.id !== id) continue;
+      this.pending.delete(ref);
+      return true;
+    }
+    return false;
   }
 
   private requestResync(): void {

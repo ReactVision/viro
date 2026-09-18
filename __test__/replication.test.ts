@@ -318,6 +318,85 @@ describe("optimistic writes", () => {
     });
     expect(client.get("brand-new")).toBeUndefined();
   });
+
+  it("does not let the echo of its own write undo a newer one", () => {
+    // A drag writes every 33 ms and the round trip is about 63, so two more
+    // writes are usually outstanding when the first comes back. Applying that
+    // echo would put the object where the hand was two writes ago, which on
+    // the device doing the dragging reads as the object snapping backwards.
+    const s = connectAndWelcome();
+
+    client.set("cube", { position: [0, 0, 0] }, { optimistic: true });
+    client.set("cube", { position: [1, 0, 0] }, { optimistic: true });
+
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 1,
+          entity: entity({ fields: { position: [0, 0, 0] }, version: 1 }),
+          by: "me",
+        },
+      ],
+    });
+
+    expect(client.get("cube")?.fields.position).toEqual([1, 0, 0]);
+    // The server's bookkeeping is still adopted: only the fields are held back.
+    expect(client.get("cube")?.version).toBe(1);
+  });
+
+  it("takes the echo once nothing of its own is still in flight", () => {
+    const s = connectAndWelcome();
+    client.set("cube", { position: [1, 0, 0] }, { optimistic: true });
+
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 1,
+          entity: entity({ fields: { position: [1, 0, 0] }, version: 1 }),
+          by: "me",
+        },
+      ],
+    });
+    expect(client.get("cube")?.version).toBe(1);
+
+    // A later change by someone else is authoritative, with nothing pending.
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 2,
+          entity: entity({ fields: { position: [9, 0, 0] }, version: 2 }),
+          by: "other",
+        },
+      ],
+    });
+    expect(client.get("cube")?.fields.position).toEqual([9, 0, 0]);
+  });
+
+  it("keeps another peer's write even while one of its own is in flight", () => {
+    // Holding fields back is only correct for this device's own echo. An
+    // unowned entity is last-writer-wins, and the server has just said who won.
+    const s = connectAndWelcome();
+    client.set("cube", { position: [1, 0, 0] }, { optimistic: true });
+
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 1,
+          entity: entity({ fields: { position: [5, 0, 0] }, version: 1 }),
+          by: "other",
+        },
+      ],
+    });
+    expect(client.get("cube")?.fields.position).toEqual([5, 0, 0]);
+  });
 });
 
 describe("reconnection", () => {

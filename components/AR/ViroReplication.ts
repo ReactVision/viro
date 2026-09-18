@@ -86,7 +86,13 @@ export type ViroReplicationConfig = {
   roomId: string;
   apiKey: string;
   projectId: string;
-  /** Platform base URL; `http(s)` is converted to `ws(s)`. */
+  /**
+   * Co-location relay base URL; `http(s)` is converted to `ws(s)`.
+   *
+   * The relay, not the platform API. `ViroColocationRooms` calls the platform
+   * for join codes and they are different hosts, so one endpoint cannot serve
+   * both.
+   */
   endpoint?: string;
 };
 
@@ -109,7 +115,7 @@ export type ViroWriteOptions = {
 type Listener = () => void;
 
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
-const DEFAULT_ENDPOINT = "https://platform.reactvision.xyz";
+const DEFAULT_ENDPOINT = "https://colocation.reactvision.xyz";
 
 /** https:// → wss://, http:// → ws://. Anything else passes through. */
 function toSocketScheme(endpoint: string): string {

@@ -10,6 +10,7 @@ const VRTStudioModule_1 = require("../VRTStudioModule");
 const apiRequestHelpers_1 = require("./apiRequestHelpers");
 const expressionEvaluator_1 = require("./expressionEvaluator");
 const recordingStore_1 = require("./recordingStore");
+const questAlertStore_1 = require("./questAlertStore");
 const studioApiError_1 = require("./studioApiError");
 const ANIMATION_CHAIN_MAX_DEPTH = 10;
 // The proxy enforces the authored timeout server-side; the client backstop
@@ -517,8 +518,10 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
         const message = fill(alert.alert_message);
         if (ViroPlatform_1.isQuest) {
             // Alert.alert shows a 2D panel dialog — invisible in the VR compositor.
-            // Log it so it's not silently swallowed; in-scene VR alert UI is a TODO.
-            console.warn(`[Studio] Alert (Quest — not shown in VR): "${title}" — ${message}`);
+            // questAlertStore drives an in-scene head-locked panel instead (see
+            // StudioQuestAlertOverlay), dismissed by a controller click, same as
+            // tapping "OK" dismisses the native dialog on phones.
+            questAlertStore_1.questAlertStore.show(title, message);
             return;
         }
         react_native_1.Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);

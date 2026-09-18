@@ -78,6 +78,7 @@ const collisionBindingsRuntime_1 = require("./domain/collisionBindingsRuntime");
 const collisionPairKey_1 = require("./domain/collisionPairKey");
 const physicsConfig_1 = require("./domain/physicsConfig");
 const ViroWebContext_2 = require("../Web/ViroWebContext");
+const studioRendererEffects_1 = require("./domain/studioRendererEffects");
 const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const studioLighting_1 = require("./domain/studioLighting");
 /** Native's throttle: the pose updates every frame, the distances need not. */
@@ -102,7 +103,7 @@ function pickBestHit(results) {
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
-        return props.mode === "3d" ? <ViroScene_web_1.ViroScene /> : <ViroARScene_web_1.ViroARScene />;
+        return props.mode === "3d" ? (<ViroScene_web_1.ViroScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}/>) : (<ViroARScene_web_1.ViroARScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}/>);
     }
     return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
 };
@@ -151,10 +152,32 @@ const StudioARSceneInner = (props) => {
         soundManagerRef.current?.reset();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
+    const sceneApi = (0, ViroWebContext_2.useViroScene)();
+    // Live renderer handles for the assets a proximity binding names, kept by the
+    // node factory's mount/unmount callback. An authored position is a world
+    // position only while nothing above the node moves, which is false inside a
+    // plane wrapper and after a tap-to-place; asking the renderer is the only way
+    // to know where the node ended up.
+    const assetNodeHandlesRef = (0, react_1.useRef)(new Map());
+    const registerProximityNode = (0, react_1.useCallback)((assetId, handle) => {
+        if (handle) {
+            assetNodeHandlesRef.current.set(assetId, handle);
+        }
+        else {
+            assetNodeHandlesRef.current.delete(assetId);
+        }
+    }, []);
     const getAssetPosition = (0, react_1.useCallback)((assetId) => {
+        const handle = assetNodeHandlesRef.current.get(assetId);
+        if (handle) {
+            const world = sceneApi.getNodeWorldPosition(handle);
+            if (world)
+                return world;
+        }
+        // Before the node mounts, and on a binary that predates the C API call.
         const a = assets.find((x) => x.id === assetId);
         return a ? (0, assetPosition_1.studioAssetPosition)(a) : undefined;
-    }, [assets]);
+    }, [assets, sceneApi]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
         variableStore: variableStoreRef.current,
@@ -314,7 +337,6 @@ const StudioARSceneInner = (props) => {
     // scene switch is honoured explicitly because virocore creates a physics world
     // on demand at its own -9.81 and steps whatever it holds, so a scene with
     // physics off would simulate anyway.
-    const sceneApi = (0, ViroWebContext_2.useViroScene)();
     const physicsWorldConfig = (0, react_1.useMemo)(() => (0, physicsConfig_1.parsePhysicsWorldConfig)(scene.physics_world_config), [scene.physics_world_config]);
     (0, react_1.useEffect)(() => {
         const enabled = physicsWorldConfig?.enabled === true;
@@ -366,12 +388,19 @@ const StudioARSceneInner = (props) => {
     // which is its world position only outside a plane wrapper — hence the gate,
     // and hence webCapabilities reporting the wrapped case as unsupported.
     const proximityBindings = (0, react_1.useMemo)(() => sceneData.proximity_bindings ?? [], [sceneData]);
+    const proximityTargetIds = (0, react_1.useMemo)(() => {
+        const ids = new Set();
+        for (const b of proximityBindings)
+            ids.add(b.target_asset_id);
+        return ids;
+    }, [proximityBindings]);
     const proximityStateRef = (0, react_1.useRef)(new Map());
     (0, react_1.useEffect)(() => {
         proximityStateRef.current.clear();
     }, [scene.id]);
-    const proximityLive = proximityBindings.length > 0 &&
-        !(0, webCapabilities_1.usesPlaneWrapper)(scene.plane_detection, mode);
+    // Runs wherever there are bindings: the distance is measured from the node's
+    // world position, so a plane wrapper no longer changes what it means.
+    const proximityLive = proximityBindings.length > 0;
     (0, react_1.useEffect)(() => {
         if (!proximityLive || !session)
             return;
@@ -420,14 +449,27 @@ const StudioARSceneInner = (props) => {
     animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, undefined, // onCollision: no physics on web
     undefined, // isDragActive
     undefined, // notifyPhysicsDrag
-    handleSceneChange, runtimeCtx))
-        .filter(Boolean), [animations, scene, animationStates, handleAssetLoaded, handleSceneChange, runtimeCtx]);
+    handleSceneChange, runtimeCtx, undefined, // registerProximityTarget: native reads a component ref
+    undefined, // onGaze: no eye gaze on web
+    null, // dragSurface
+    proximityTargetIds.has(asset.id)
+        ? registerProximityNode
+        : undefined))
+        .filter(Boolean), [
+        animations,
+        scene,
+        animationStates,
+        handleAssetLoaded,
+        handleSceneChange,
+        runtimeCtx,
+        proximityTargetIds,
+        registerProximityNode,
+    ]);
     const renderedAssets = (0, react_1.useMemo)(() => buildNodes(planeAssets), [buildNodes, planeAssets]);
     const renderedPlacements = (0, react_1.useMemo)(() => buildNodes(tapToPlaceAssets), [buildNodes, tapToPlaceAssets]);
     // ─── Plane wrapping (AR mode only) ────────────────────────────────────────
-    const planeMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
-    const usePlane = mode === "ar" && (planeMode === "AUTOMATIC" || planeMode === "MANUAL");
+    const usePlane = (0, webCapabilities_1.usesPlaneWrapper)(scene.plane_detection, mode);
     const body = usePlane ? (<ViroARPlane_web_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={() => onPlaneDetected?.()}>
       {renderedAssets}
     </ViroARPlane_web_1.ViroARPlane>) : (<>{renderedAssets}</>);
@@ -441,5 +483,12 @@ const StudioARSceneInner = (props) => {
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_web_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{ fontFamily: "Arial", fontSize: 16, color: "#CCCCCC", textAlign: "center" }}/>)}
     </>);
-    return mode === "3d" ? (<ViroScene_web_1.ViroScene>{children}</ViroScene_web_1.ViroScene>) : (<ViroARScene_web_1.ViroARScene ref={arSceneRef}>{children}</ViroARScene_web_1.ViroARScene>);
+    return mode === "3d" ? (
+    // The editor previews no tone curve, and virocore's default Hable
+    // luminance-only pass renders pure white at about 0.77. Off here rather than
+    // via the navigator's `hdrEnabled`, which would take PBR with it — the same
+    // line StudioARScene draws natively.
+    <ViroScene_web_1.ViroScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}>{children}</ViroScene_web_1.ViroScene>) : (<ViroARScene_web_1.ViroARScene ref={arSceneRef} toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}>
+      {children}
+    </ViroARScene_web_1.ViroARScene>);
 };

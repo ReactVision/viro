@@ -1,4 +1,5 @@
 import { type ViroWebNodeProps } from "./Web/useViroNode";
+import { type ViroParticleAppearanceProp } from "./Web/viroParticleAppearance";
 type Vec3 = [number, number, number];
 type Props = ViroWebNodeProps & {
     image: {
@@ -21,6 +22,8 @@ type Props = ViroWebNodeProps & {
         velocity?: VelocityRange;
         acceleration?: VelocityRange;
     };
+    /** Colour, opacity, scale and rotation over the particle's life. */
+    particleAppearance?: ViroParticleAppearanceProp;
     [key: string]: any;
 };
 /** Both `velocity` and `acceleration` take this shape. */

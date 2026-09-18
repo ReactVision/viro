@@ -59,10 +59,18 @@ createNodeFn) {
     const parent = (0, ViroWebContext_1.useViroParentNode)();
     const [node] = (0, react_1.useState)(() => createNodeFn ? createNodeFn(scene) : scene.createNode());
     const geometryRef = (0, react_1.useRef)(0);
+    // Read from a ref wherever an effect must not re-run when a callback's
+    // identity changes; declared here because the mount effect already needs it.
+    const propsRef = (0, react_1.useRef)(props);
+    propsRef.current = props;
     // Node lifecycle: attach to parent on mount; destroy node on unmount.
     (0, react_1.useEffect)(() => {
         scene.addChildNode(parent, node);
+        propsRef.current.onNodeHandle?.(node);
         return () => {
+            // Handed back before the handle is destroyed: a holder that reads it
+            // afterwards is asking the renderer about freed memory.
+            propsRef.current.onNodeHandle?.(0);
             scene.removeNodeFromParent(node);
             scene.destroyNode(node);
         };
@@ -96,10 +104,8 @@ createNodeFn) {
         scene.setNodeVisible(node, visible);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node, px, py, pz, rx, ry, rz, sx, sy, sz, opacity, visible]);
-    // Events: register handlers once (reading latest props from a ref so changing
-    // callback identities don't re-subscribe), and enable the needed event types.
-    const propsRef = (0, react_1.useRef)(props);
-    propsRef.current = props;
+    // Events: register handlers once, reading the latest props off the ref above,
+    // so a changed callback identity does not re-subscribe.
     const hasClick = !!(props.onClick || props.onClickState);
     const hasHover = !!props.onHover;
     (0, react_1.useEffect)(() => {

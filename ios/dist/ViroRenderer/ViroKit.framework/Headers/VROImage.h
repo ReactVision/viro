@@ -35,7 +35,16 @@ class VROImage {
     
 public:
     
-    VROImage() {}
+    /*
+     Initialised, not left to chance: a subclass whose decode fails returns
+     early without setting these, and an uninitialised format reaches
+     VROTextureSubstrateOpenGL::loadFace as a value it does not recognise. RGBA8
+     is the format every loader here converts to anyway, so a failed image is an
+     empty RGBA8 one rather than a garbage enum.
+     */
+    VROImage() :
+        _format(VROTextureFormat::RGBA8),
+        _internalFormat(VROTextureInternalFormat::RGBA8) {}
     virtual ~VROImage() {}
     
     virtual int getWidth() const = 0;

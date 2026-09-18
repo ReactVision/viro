@@ -82,4 +82,8 @@ export declare const VRQuestNavigatorBridge: {
      * setPassthroughEnabled) without a direct ref to ViroVRSceneNavigator.
      */
     onViewTag(cb: (tag: number | null) => void): () => void;
+    /** Called by ViroQuestEntryPoint's error boundary when a Quest scene throws. */
+    reportQuestError(error: Error): void;
+    /** Called by StudioSceneNavigator (panel side) to relay into its onError prop. */
+    onQuestError(cb: (error: Error) => void): () => void;
 };

@@ -40,6 +40,8 @@ exports.ViroScene = ViroScene;
  * under that root. Scene-level props (background, camera) are follow-ups.
  */
 const React = __importStar(require("react"));
+const useViroToneMapping_1 = require("./Web/useViroToneMapping");
 function ViroScene(props) {
+    (0, useViroToneMapping_1.useViroToneMapping)(props.toneMappingEnabled);
     return <>{props.children}</>;
 }

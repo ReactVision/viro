@@ -7,6 +7,7 @@ const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const useViroNode_1 = require("./Web/useViroNode");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroImageLoader_1 = require("./Web/viroImageLoader");
+const viroParticleAppearance_1 = require("./Web/viroParticleAppearance");
 function shapeEnum(shape) {
     switch ((shape ?? "").toLowerCase()) {
         case "box":
@@ -78,6 +79,9 @@ function ViroParticleEmitter(props) {
                 const [accelMin, accelMax] = velocityRange(accel);
                 scene.setParticleAcceleration(node, accelMin, accelMax);
             }
+            for (const call of (0, viroParticleAppearance_1.resolveParticleAppearance)(p.particleAppearance)) {
+                scene.setParticleModifier(node, call.property, call.min, call.max, call.factor, call.intervals);
+            }
             scene.setParticleEmitterRun(node, p.run !== false);
         })
             .catch(() => { });
@@ -90,6 +94,18 @@ function ViroParticleEmitter(props) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node, url]);
+    // A changed appearance, after the emitter exists. Keyed on the serialised prop
+    // because it arrives as a fresh object literal on every render.
+    const appearanceKey = props.particleAppearance
+        ? JSON.stringify(props.particleAppearance)
+        : "";
+    (0, react_1.useEffect)(() => {
+        if (!node || !appearanceKey)
+            return;
+        for (const call of (0, viroParticleAppearance_1.resolveParticleAppearance)(propsRef.current.particleAppearance)) {
+            scene.setParticleModifier(node, call.property, call.min, call.max, call.factor, call.intervals);
+        }
+    }, [scene, node, appearanceKey]);
     // Run/pause toggling.
     (0, react_1.useEffect)(() => {
         if (node)

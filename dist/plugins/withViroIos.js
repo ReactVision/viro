@@ -3,12 +3,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.withViroIos = exports.withDefaultInfoPlist = exports.resolveViroIosRelativePath = void 0;
+exports.withViroIos = exports.withDefaultInfoPlist = void 0;
+exports.resolveViroIosRelativePath = resolveViroIosRelativePath;
 const config_plugins_1 = require("@expo/config-plugins");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const insertLinesHelper_1 = require("./util/insertLinesHelper");
 const withViro_1 = require("./withViro");
+/**
+ * Resolve the on-disk `@reactvision/react-viro/ios` directory as a path
+ * relative to the iOS project root (where the Podfile lives).
+ *
+ * Hardcoding `../node_modules/...` assumes react-viro is installed in the app's
+ * own `node_modules`. That is false under pnpm/yarn workspaces (and npm
+ * workspaces), where the package is hoisted to the monorepo root or nested
+ * under `.pnpm`, so `pod install` fails with "No podspec found for ViroKit".
+ * Resolving via Node follows symlinks/hoisting and works in both flat and
+ * workspace layouts.
+ */
 function resolveViroIosRelativePath(projectRoot, iosRoot) {
     const fallback = "../node_modules/@reactvision/react-viro/ios";
     try {
@@ -24,7 +36,6 @@ function resolveViroIosRelativePath(projectRoot, iosRoot) {
         return fallback;
     }
 }
-exports.resolveViroIosRelativePath = resolveViroIosRelativePath;
 const withViroPods = (config) => {
     config = (0, config_plugins_1.withDangerousMod)(config, [
         "ios",

@@ -3,13 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.usesPlaneWrapper = usesPlaneWrapper;
 exports.webUnsupportedFeatures = webUnsupportedFeatures;
 const placementStore_1 = require("./placementStore");
-/**
- * Whether the host wraps the scene's assets in a ViroARPlane.
- *
- * It decides more than anchoring: inside a wrapper an asset's authored position
- * is plane-local, and the web C API cannot read a node's world transform, so
- * anything measuring real distances only works outside one.
- */
+/** Whether the host wraps the scene's assets in a ViroARPlane. */
 function usesPlaneWrapper(planeDetection, mode) {
     if (mode !== "ar")
         return false;
@@ -30,14 +24,9 @@ mode = "ar") {
     // web a behaviour no phone has, which is the opposite of parity.
     if (sceneData.gaze_bindings?.length)
         features.push("gaze triggers");
-    // Proximity measures the distance from the camera to an asset, so it needs the
-    // asset's world position. Inside a plane wrapper the authored position is
-    // plane-local and the web C API cannot read a world transform, so the metres
-    // would be wrong — better declared than quietly off.
-    if (sceneData.proximity_bindings?.length &&
-        usesPlaneWrapper(scene.plane_detection, mode)) {
-        features.push("proximity triggers");
-    }
+    // Proximity runs everywhere now: the host reads each target's world position
+    // off its renderer handle, so a plane-local authored position is no longer
+    // what the metres are measured from.
     // Collision triggers ride the physics world, so they run wherever it does.
     // Guided placement needs a tracked camera to hit-test a tap against, so it
     // runs in AR and nowhere else. In 3d the queue would never advance and the

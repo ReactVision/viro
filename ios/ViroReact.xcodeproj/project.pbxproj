@@ -246,9 +246,9 @@
 		E1BD61A72FC1A002008FDF74 /* VRTGameLoopViewManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1BD61A22FC1A002008FDF74 /* VRTGameLoopViewManager.h */; };
 		E1BD61E52FBBEC60008FDF74 /* VRTVirtualJoystickView.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1BD618B2FBBEC56008FDF74 /* VRTVirtualJoystickView.h */; };
 		E1BD61E62FBBEC62008FDF74 /* VRTVirtualJoystickViewManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1BD618D2FBBEC56008FDF74 /* VRTVirtualJoystickViewManager.h */; };
-		E1F9E5512FA39DEB00DBE1E8 /* VRTStudioModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */; };
 		E1C0100C2FB100A000DBE1E8 /* VRTColocationModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1C0100B2FB100A000DBE1E8 /* VRTColocationModule.mm */; };
 		E1C0100D2FB100A000DBE1E8 /* VRTColocationModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1C0100A2FB100A000DBE1E8 /* VRTColocationModule.h */; };
+		E1F9E5512FA39DEB00DBE1E8 /* VRTStudioModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */; };
 		E1F9E5B22FA39E0300DBE1E8 /* VRTStudioModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */; };
 /* End PBXBuildFile section */
 
@@ -1169,9 +1169,9 @@
 		E1BD61A12FC1A002008FDF74 /* VRTGameLoopView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTGameLoopView.mm; path = ViroReact/Views/VRTGameLoopView.mm; sourceTree = "<group>"; };
 		E1BD61A22FC1A002008FDF74 /* VRTGameLoopViewManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTGameLoopViewManager.h; path = ViroReact/Views/VRTGameLoopViewManager.h; sourceTree = "<group>"; };
 		E1BD61A32FC1A002008FDF74 /* VRTGameLoopViewManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTGameLoopViewManager.mm; path = ViroReact/Views/VRTGameLoopViewManager.mm; sourceTree = "<group>"; };
-		E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTStudioModule.h; path = ViroReact/Modules/VRTStudioModule.h; sourceTree = "<group>"; };
 		E1C0100A2FB100A000DBE1E8 /* VRTColocationModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTColocationModule.h; path = ViroReact/Modules/VRTColocationModule.h; sourceTree = "<group>"; };
 		E1C0100B2FB100A000DBE1E8 /* VRTColocationModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTColocationModule.mm; path = ViroReact/Modules/VRTColocationModule.mm; sourceTree = "<group>"; };
+		E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTStudioModule.h; path = ViroReact/Modules/VRTStudioModule.h; sourceTree = "<group>"; };
 		E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTStudioModule.mm; path = ViroReact/Modules/VRTStudioModule.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 

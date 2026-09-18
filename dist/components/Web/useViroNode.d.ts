@@ -10,6 +10,17 @@ export interface ViroWebNodeProps {
     visible?: boolean;
     materials?: string | string[];
     shaderOverrides?: string | string[];
+    /**
+     * This node's renderer handle as it is created, and 0 as it goes.
+     *
+     * How a host asks the renderer where a node actually is, since an authored
+     * position is a world position only while nothing above the node moves — which
+     * stops being true inside a plane wrapper or after a drag. A prop rather than
+     * a ref because these components' props carry an `[key: string]: any` index
+     * signature, and React's `PropsWithoutRef` resolves that to `Omit<P, "ref">`,
+     * which drops every declared prop and would silently untype every caller.
+     */
+    onNodeHandle?: (handle: ViroHandle) => void;
     /** Drawn-last wins among equal-depth fragments. */
     renderingOrder?: number;
     /** "billboard" | "billboardX" | "billboardY", the three native accepts. */

@@ -64,6 +64,9 @@ const placementStore_1 = require("./domain/placementStore");
 const utils_1 = require("./domain/utils");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
+const questAlertStore_1 = require("./domain/questAlertStore");
+const StudioQuestAlertOverlay_1 = require("./StudioQuestAlertOverlay");
+const StudioQuestSceneHudOverlay_1 = require("./StudioQuestSceneHudOverlay");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const studioLighting_1 = require("./domain/studioLighting");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
@@ -72,6 +75,11 @@ const physicsConfig_1 = require("./domain/physicsConfig");
 // The native camera-transform event can fire per frame; throttle the proximity
 // distance sweep to this cadence.
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
+// Cadence for updating the Quest head-locked UI's tracked position (alert
+// overlay, exit/scene-name HUD). A little slack behind actual head movement
+// is imperceptible for a static panel and far cheaper than re-rendering it
+// every frame.
+const HEAD_LOCKED_EVAL_INTERVAL_MS = 150;
 // Headset placement has no surface hit-test, so a triggered tap-to-place asset
 // lands this far along the aim ray when no controller hit point is available.
 const HEADSET_PLACEMENT_DISTANCE_M = 1.5;
@@ -122,6 +130,8 @@ const TRACKING_GATE_FALLBACK_MS = 6000;
  */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
+        // Quest keeps its own root here for the reason spelled out at the main
+        // return below.
         return ViroPlatform_1.isQuest ? (<ViroScene_1.ViroScene toneMappingEnabled={false}/>) : (<ViroARScene_1.ViroARScene toneMappingEnabled={false}/>);
     }
     return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
@@ -157,6 +167,9 @@ const StudioARSceneInner = (props) => {
             // Clear a dangling video-recording flag so leaving the experience mid-
             // recording can't block the next session's RECORD_VIDEO toggle.
             (0, sceneNavigationHandler_1.resetVideoRecordingState)();
+            // Dismiss any Quest in-scene alert so a torn-down scene can't leave one
+            // stuck on screen for the next scene.
+            questAlertStore_1.questAlertStore.reset();
         };
     }, []);
     // ─── Variable store ───────────────────────────────────────────────────────
@@ -593,6 +606,11 @@ const StudioARSceneInner = (props) => {
     // Latest camera pose, cached from the transform stream so a headset trigger
     // can project the aim ray without an AR surface hit-test.
     const cameraPoseRef = (0, react_1.useRef)(null);
+    // Throttled *state* mirror of cameraPoseRef, Quest-only: head-locked UI
+    // (StudioQuestAlertOverlay) needs to re-render as the head moves, which a
+    // ref alone can't trigger.
+    const [questHeadLockedPose, setQuestHeadLockedPose] = (0, react_1.useState)(null);
+    const lastHeadLockedEvalRef = (0, react_1.useRef)(0);
     // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
     const [activePlacementId, setActivePlacementId] = (0, react_1.useState)(() => placementStoreRef.current?.activeAssetId() ?? null);
     (0, react_1.useEffect)(() => {
@@ -615,6 +633,17 @@ const StudioARSceneInner = (props) => {
             forward: t.forward,
             up: t.up,
         };
+        if (ViroPlatform_1.isQuest) {
+            const nowHL = Date.now();
+            if (nowHL - lastHeadLockedEvalRef.current >= HEAD_LOCKED_EVAL_INTERVAL_MS) {
+                lastHeadLockedEvalRef.current = nowHL;
+                setQuestHeadLockedPose({
+                    position: t.position,
+                    forward: t.forward,
+                    up: t.up,
+                });
+            }
+        }
         if (!proximityBindings.length)
             return;
         const now = Date.now();
@@ -904,6 +933,10 @@ const StudioARSceneInner = (props) => {
     // automatically; ViroARScene forwards them here via ref. Also surfaces
     // onPlaneDetected / onPlaneSelected to the host.
     const planeSelectorRef = (0, react_1.useRef)(null);
+    // Quest HUD status ("Scanning for planes…" vs "Plane found") — a coarse
+    // found/not-found flag, not a count; the HUD only needs to tell the user
+    // scanning is working, not exactly how many planes exist.
+    const [hasFoundPlane, setHasFoundPlane] = (0, react_1.useState)(false);
     const handleAnchorFound = (0, react_1.useCallback)((anchor) => {
         try {
             if (planeDetectionMode === "MANUAL") {
@@ -911,6 +944,9 @@ const StudioARSceneInner = (props) => {
             }
             if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
                 onPlaneDetected?.();
+            }
+            if (anchor?.type === "plane") {
+                setHasFoundPlane(true);
             }
             // Anchoring places content in world space — refresh cached target
             // positions so proximity metres stay correct once the anchor lands.
@@ -954,13 +990,11 @@ const StudioARSceneInner = (props) => {
         onPlaneDetected?.();
         return true;
     }, [onPlaneDetected]);
+    // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
+    // the OpenXR renderer feeds Quest plane anchors through the same
+    // onAnchorFound path ARCore/ARKit use (XR_FB_scene room model), see
+    // VROARSessionOpenXR.cpp in virocore. No Quest-specific branch needed.
     const renderAssets = () => {
-        if (ViroPlatform_1.isQuest) {
-            if (planeDetectionMode !== "NONE") {
-                console.warn(`[Studio] Plane detection (${planeDetectionMode}) is not supported on Quest — rendering assets without plane anchor.`);
-            }
-            return <>{renderedPlaneAssets}</>;
-        }
         if (planeDetectionMode === "AUTOMATIC") {
             return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={trackDragSurface} onAnchorUpdated={trackDragSurface}>
           {renderedPlaneAssets}
@@ -998,6 +1032,8 @@ const StudioARSceneInner = (props) => {
                 color: "#FFFFFF",
                 textAlign: "center",
             }}/>)}
+      {ViroPlatform_1.isQuest && <StudioQuestAlertOverlay_1.StudioQuestAlertOverlay cameraPose={questHeadLockedPose}/>}
+      {ViroPlatform_1.isQuest && (<StudioQuestSceneHudOverlay_1.StudioQuestSceneHudOverlay cameraPose={questHeadLockedPose} sceneName={scene.name} planeDetectionMode={planeDetectionMode} hasFoundPlane={hasFoundPlane}/>)}
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{
                 fontFamily: "Arial",
@@ -1006,12 +1042,30 @@ const StudioARSceneInner = (props) => {
                 textAlign: "center",
             }}/>)}
     </>);
-    // Wire the camera event when a proximity trigger needs it OR tap-to-place needs
-    // the cached camera pose for headset placement — native gates the per-frame
-    // transform stream on this prop being present.
-    const cameraTransformProp = proximityBindings.length || tapToPlaceAssets.length
+    // Wire the camera event when a proximity trigger needs it, tap-to-place needs
+    // the cached camera pose for headset placement, or we're on Quest (head-locked
+    // UI — alert overlay, exit/scene-name HUD — needs a live pose to track) —
+    // native gates the per-frame transform stream on this prop being present.
+    const cameraTransformProp = ViroPlatform_1.isQuest || proximityBindings.length || tapToPlaceAssets.length
         ? { onCameraTransformUpdate: handleCameraTransformUpdate }
         : {};
+    // Quest mounts ViroScene, not the ViroARScene below, and that is a decision
+    // rather than an oversight — it was made when this branch and the passthrough
+    // prop met in a merge, so here is what each one buys.
+    //
+    // ViroXRSceneNavigator's contract is that a ViroScene root is fully-virtual VR
+    // and a ViroARScene root is mixed reality, which turns passthrough on by itself
+    // and wires XR_EXT_plane_detection into onAnchorFound and ViroARPlane. Passthrough
+    // is not what is lost by keeping ViroScene: StudioSceneNavigator asks for it
+    // outright with `passthroughEnabled` on Quest, which reaches VRActivity through
+    // the navigator bridge and does not depend on the root at all.
+    //
+    // Plane anchors are. With this root a Studio scene on Quest gets no detected
+    // surfaces, so an asset authored to sit on a floor or a wall has nothing to land
+    // on. Nothing regresses against what shipped — ViroScene is the root Quest has
+    // had since April, and the ref that drives tap-to-place hit testing is null on
+    // Quest either way — but unifying the two roots is a real change with a device
+    // test behind it, not something a conflict resolution should decide quietly.
     if (ViroPlatform_1.isQuest) {
         return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp} toneMappingEnabled={false}>
         {children}

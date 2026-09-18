@@ -39,6 +39,19 @@ const react_native_1 = require("react-native");
 const VRQuestNavigatorBridge_1 = require("./Utilities/VRQuestNavigatorBridge");
 const VRModuleOpenXR_1 = require("./Utilities/VRModuleOpenXR");
 const ViroVRSceneNavigator_1 = require("./ViroVRSceneNavigator");
+const StudioSceneErrorBoundary_1 = require("./Studio/StudioSceneErrorBoundary");
+const ViroScene_1 = require("./ViroScene");
+const ViroAmbientLight_1 = require("./ViroAmbientLight");
+const ViroText_1 = require("./ViroText");
+// Rendered in place of the crashed scene. Has to be a full, valid Viro scene
+// (not a plain RN <View>) — VRActivity's display is exclusively driven by the
+// OpenXR compositor, so a bare 2D view would never appear.
+function QuestCrashFallbackScene() {
+    return (<ViroScene_1.ViroScene>
+      <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
+      <ViroText_1.ViroText text="Something went wrong loading this scene." position={[0, 0, -2]} width={3} height={1} style={{ fontFamily: "Arial", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}/>
+    </ViroScene_1.ViroScene>);
+}
 /**
  * Drop-in root component for VRActivity on Meta Quest.
  *
@@ -56,8 +69,15 @@ function ViroQuestEntryPoint() {
     React.useEffect(() => VRQuestNavigatorBridge_1.VRQuestNavigatorBridge.onIntent(setIntent), []);
     // Wire hardware back button to exit VR. Apps that need custom back behaviour
     // can call AppRegistry.registerComponent('VRQuestScene', ...) to override.
+    //
+    // Reads the intent from the bridge at press time (not the `intent` state
+    // closed over above) so a VR relaunch that swaps in a new onExitViro after
+    // this effect's first run is still honoured — exitVRScene() posts the
+    // native finish() to the main looper asynchronously, so calling
+    // onExitViro() first here still runs before VRActivity actually finishes.
     React.useEffect(() => {
         const sub = react_native_1.BackHandler.addEventListener("hardwareBackPress", () => {
+            VRQuestNavigatorBridge_1.VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
             (0, VRModuleOpenXR_1.exitVRScene)();
             return true;
         });
@@ -100,5 +120,7 @@ function ViroQuestEntryPoint() {
     if (!intent)
         return null;
     const { initialScene, rendererConfig } = intent;
-    return (<ViroVRSceneNavigator_1.ViroVRSceneNavigator ref={navRef} key={intent.intentKey} initialScene={initialScene} {...rendererConfig} style={react_native_1.StyleSheet.absoluteFill}/>);
+    return (<StudioSceneErrorBoundary_1.StudioSceneErrorBoundary onError={(error) => VRQuestNavigatorBridge_1.VRQuestNavigatorBridge.reportQuestError(error)} renderError={() => (<ViroVRSceneNavigator_1.ViroVRSceneNavigator initialScene={{ scene: QuestCrashFallbackScene }} style={react_native_1.StyleSheet.absoluteFill}/>)}>
+      <ViroVRSceneNavigator_1.ViroVRSceneNavigator ref={navRef} key={intent.intentKey} initialScene={initialScene} {...rendererConfig} style={react_native_1.StyleSheet.absoluteFill}/>
+    </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);
 }

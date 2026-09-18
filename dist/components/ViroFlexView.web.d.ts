@@ -1,11 +1,16 @@
 /**
  * Web implementation of ViroFlexView — a rectangular container in 3D space with
- * an optional background (color or materials), sized by `style.width`/`height`.
- * Children render under the container node.
+ * an optional background (color or materials), sized by `style.width`/`height`,
+ * that lays its children out with flexbox.
  *
- * MVP scope: sized container + background + children. Automatic flexbox layout
- * (flexDirection/justifyContent/alignItems/padding) is a follow-up — children
- * position themselves via their own transform for now.
+ * The layout is measured, not computed here: see Web/viroFlexLayout. Each child
+ * gets a node of its own, positioned at the frame the layout gave it, and its
+ * measured size travels down the ViroFlexSlot context for the child to rebuild
+ * its geometry from — which is the same pair native pushes onto a laid-out
+ * child from VRTNode's recalcLayout.
+ *
+ * A child that declares `position` absolutely is still laid out; it is CSS
+ * `position: absolute` that takes it out of flow, exactly as in a stylesheet.
  */
 import * as React from "react";
 import { type ViroWebNodeProps } from "./Web/useViroNode";

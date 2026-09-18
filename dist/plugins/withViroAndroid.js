@@ -3,7 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.withViroAndroid = exports.resolveViroAndroidRelativePath = void 0;
+exports.withViroAndroid = void 0;
+exports.resolveViroAndroidRelativePath = resolveViroAndroidRelativePath;
 const config_plugins_1 = require("@expo/config-plugins");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -134,17 +135,17 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
     config.modResults.contents = config.modResults.contents.replace(/implementation\("com.facebook.react:react-android"\)/, `implementation("com.facebook.react:react-android")${viroNewArchDependencies}`);
     return config;
 });
-const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {
-    const viroAndroidRoot = resolveViroAndroidRelativePath(config.modRequest.projectRoot, config.modRequest.platformProjectRoot);
-    config.modResults.contents += `
-include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
-project(':arcore_client').projectDir = new File('${viroAndroidRoot}/arcore_client')
-project(':gvr_common').projectDir = new File('${viroAndroidRoot}/gvr_common')
-project(':viro_renderer').projectDir = new File('${viroAndroidRoot}/viro_renderer')
-project(':react_viro').projectDir = new File('${viroAndroidRoot}/react_viro')
-    `;
-    return config;
-});
+/**
+ * Resolve the on-disk `@reactvision/react-viro/android` directory as a path
+ * relative to the Android project root (where `settings.gradle` lives).
+ *
+ * Hardcoding `../node_modules/...` assumes react-viro is installed in the app's
+ * own `node_modules`. That is false under pnpm/yarn workspaces (and npm
+ * workspaces), where the package is hoisted to the monorepo root or nested
+ * under `.pnpm`, so Gradle fails with "Configuring project ':gvr_common'
+ * without an existing directory is not allowed". Resolving via Node follows
+ * symlinks/hoisting and works in both flat and workspace layouts.
+ */
 function resolveViroAndroidRelativePath(projectRoot, androidRoot) {
     const fallback = "../node_modules/@reactvision/react-viro/android";
     try {
@@ -160,7 +161,17 @@ function resolveViroAndroidRelativePath(projectRoot, androidRoot) {
         return fallback;
     }
 }
-exports.resolveViroAndroidRelativePath = resolveViroAndroidRelativePath;
+const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {
+    const viroAndroidRoot = resolveViroAndroidRelativePath(config.modRequest.projectRoot, config.modRequest.platformProjectRoot);
+    config.modResults.contents += `
+include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
+project(':arcore_client').projectDir = new File('${viroAndroidRoot}/arcore_client')
+project(':gvr_common').projectDir = new File('${viroAndroidRoot}/gvr_common')
+project(':viro_renderer').projectDir = new File('${viroAndroidRoot}/viro_renderer')
+project(':react_viro').projectDir = new File('${viroAndroidRoot}/react_viro')
+    `;
+    return config;
+});
 const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(config, async (newConfig) => {
     const contents = newConfig.modResults;
     contents.manifest.$["xmlns:tools"] = "http://schemas.android.com/tools";

@@ -80,7 +80,10 @@ class ViroReplicationClient {
     }
     /** Snapshot of the current state. Safe to hold — it is a copy. */
     getEntities() {
-        return [...this.entities.values()].map((e) => ({ ...e, fields: { ...e.fields } }));
+        return [...this.entities.values()].map((e) => ({
+            ...e,
+            fields: { ...e.fields },
+        }));
     }
     get(id) {
         const e = this.entities.get(id);
@@ -133,7 +136,12 @@ class ViroReplicationClient {
     }
     /** Merge `fields` into the entity. Creates it if absent. */
     set(id, fields, opts = {}) {
-        const ref = this.send({ op: "set", id, fields, expectVersion: opts.expectVersion });
+        const ref = this.send({
+            op: "set",
+            id,
+            fields,
+            expectVersion: opts.expectVersion,
+        });
         if (!opts.optimistic || !ref)
             return;
         // Remember what to restore if the server refuses, then show the change now.
@@ -188,10 +196,18 @@ class ViroReplicationClient {
             }
             this.handle(msg);
         };
-        const dropped = () => {
+        const dropped = (ev) => {
             if (this.closedByUs || this.ws !== ws)
                 return;
             this.ws = null;
+            // Keyed on the reason, not the code: 1008 also carries rate-limited,
+            // too-large and slow-consumer, and all three are meant to reconnect.
+            // Only this one is a decision that will not change on a retry.
+            if (ev?.reason === "auth-revoked") {
+                this._error = "this key or plan can no longer join the room";
+                this.setState("failed");
+                return;
+            }
             if (this.attempt >= BACKOFF_MS.length) {
                 this._error = "replication socket gave up reconnecting";
                 this.setState("failed");
@@ -202,7 +218,7 @@ class ViroReplicationClient {
             this.retryTimer = setTimeout(() => this.open(), delay);
         };
         ws.onclose = dropped;
-        ws.onerror = dropped;
+        ws.onerror = () => dropped();
     }
     handle(msg) {
         switch (msg.t) {
@@ -252,9 +268,18 @@ class ViroReplicationClient {
             else if (op.kind === "owner") {
                 const e = this.entities.get(op.id);
                 if (e)
-                    this.entities.set(op.id, { ...e, owner: op.owner, version: op.version });
+                    this.entities.set(op.id, {
+                        ...e,
+                        owner: op.owner,
+                        version: op.version,
+                    });
                 else
-                    this.entities.set(op.id, { id: op.id, fields: {}, owner: op.owner, version: op.version });
+                    this.entities.set(op.id, {
+                        id: op.id,
+                        fields: {},
+                        owner: op.owner,
+                        version: op.version,
+                    });
             }
             this.lastSeq = op.seq;
         }

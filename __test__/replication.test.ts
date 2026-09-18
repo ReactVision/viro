@@ -98,6 +98,10 @@ describe("connection", () => {
     expect(s.options?.headers).toEqual({
       "x-api-key": "k",
       "x-project-id": "p",
+      // Logged by the relay so one client build can be told from another. The
+      // version is generated from package.json, so match the shape, not a
+      // number that changes every release.
+      "x-rv-client": expect.stringMatching(/^viro\/\d+\.\d+\.\d+ \(\w+\)$/),
     });
   });
 

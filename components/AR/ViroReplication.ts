@@ -37,7 +37,9 @@
 
 "use strict";
 
+import { Platform } from "react-native";
 import { isWeb } from "../Utilities/ViroPlatform";
+import { VIRO_VERSION } from "../Utilities/ViroVersion";
 
 /** React Native's constructor, which the DOM typing does not describe. */
 type HeaderWebSocket = new (
@@ -290,7 +292,14 @@ export class ViroReplicationClient {
             `&projectId=${encodeURIComponent(cfg.projectId)}`
         )
       : new (WebSocket as unknown as HeaderWebSocket)(path, null, {
-          headers: { "x-api-key": cfg.apiKey, "x-project-id": cfg.projectId },
+          headers: {
+            "x-api-key": cfg.apiKey,
+            "x-project-id": cfg.projectId,
+            // Logged by the relay, never used for a decision. It is what
+            // separates one client build from another when a refusal shows up
+            // in the relay log and every device otherwise looks alike.
+            "x-rv-client": `viro/${VIRO_VERSION} (${Platform.OS})`,
+          },
         });
     this.ws = ws;
 

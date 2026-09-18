@@ -9,6 +9,22 @@ exports.useViroColocation = useViroColocation;
 const react_1 = require("react");
 const ViroColocation_1 = require("../AR/ViroColocation");
 /**
+ * Whether the list just polled is the one React already holds.
+ *
+ * Peers are polled faster than they arrive, so most reads return an unchanged
+ * list and setting it would re-render every consumer for nothing. A peer's
+ * timestamp moves with the pose that carried its position and rotation, so it
+ * stands in for comparing those. Compared by index: if native ever returned
+ * these unordered the result is a wasted render, which is what every poll did
+ * before.
+ */
+function samePeers(a, b) {
+    return (a.length === b.length &&
+        a.every((p, i) => p.peerId === b[i].peerId &&
+            p.timestampMs === b[i].timestampMs &&
+            p.localized === b[i].localized));
+}
+/**
  * Join a co-location room and track its peers.
  *
  * ```tsx
@@ -22,7 +38,7 @@ const ViroColocation_1 = require("../AR/ViroColocation");
  * publishing and after receiving — see `ViroLocationFrame`.
  */
 function useViroColocation(options) {
-    const { roomId, apiKey, projectId, endpoint, enabled = true, pollMs = 100 } = options;
+    const { roomId, apiKey, projectId, endpoint, enabled = true, pollMs = 33, } = options;
     const [available, setAvailable] = (0, react_1.useState)(false);
     const [state, setState] = (0, react_1.useState)("idle");
     const [localPeerId, setLocalPeerId] = (0, react_1.useState)("");
@@ -42,7 +58,12 @@ function useViroColocation(options) {
             if (!ok || !enabled || !roomId)
                 return;
             activeRoom.current = roomId;
-            const result = await (0, ViroColocation_1.joinColocation)({ roomId, apiKey, projectId, endpoint });
+            const result = await (0, ViroColocation_1.joinColocation)({
+                roomId,
+                apiKey,
+                projectId,
+                endpoint,
+            });
             if (cancelled || activeRoom.current !== roomId)
                 return;
             if (!result.success) {
@@ -52,12 +73,15 @@ function useViroColocation(options) {
             }
             setError(undefined);
             timer = setInterval(async () => {
-                const [s, p] = await Promise.all([(0, ViroColocation_1.getColocationState)(), (0, ViroColocation_1.getColocationPeers)()]);
+                const [s, p] = await Promise.all([
+                    (0, ViroColocation_1.getColocationState)(),
+                    (0, ViroColocation_1.getColocationPeers)(),
+                ]);
                 if (cancelled || activeRoom.current !== roomId)
                     return;
                 setState(s.state);
                 setLocalPeerId(s.localPeerId);
-                setPeers(p);
+                setPeers((prev) => (samePeers(prev, p) ? prev : p));
             }, pollMs);
         };
         run();

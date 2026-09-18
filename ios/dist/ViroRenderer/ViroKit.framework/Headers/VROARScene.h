@@ -28,6 +28,7 @@
 #define VROARScene_h
 
 #include <vector>
+#include <functional>
 #include "VROARSession.h"
 #include "VROScene.h"
 #include "VROAtomic.h"
@@ -73,6 +74,12 @@ public:
     std::shared_ptr<VROARSessionDelegate> getSessionDelegate();
     
     void setARSession(std::shared_ptr<VROARSession> arSession);
+    /*
+     Run task once an AR session is attached, or now if one already is. A cloud
+     anchor or scan request on a scene's first frame otherwise races the
+     session's creation and was dropped. Renderer thread, like setARSession.
+     */
+    void runWhenARSessionReady(std::function<void(std::shared_ptr<VROARSession>)> task);
     void setDriver(std::shared_ptr<VRODriver> driver);
 
     /*
@@ -185,6 +192,7 @@ private:
     std::set<VROAnchorDetection> _detectionTypes;
     
     std::weak_ptr<VROARSession> _arSession;
+    std::vector<std::function<void(std::shared_ptr<VROARSession>)>> _sessionReadyTasks;
     std::weak_ptr<VRODriver> _driver;
     std::shared_ptr<VROARDeclarativeSession> _declarativeSession;
     std::shared_ptr<VROARImperativeSession> _imperativeSession;

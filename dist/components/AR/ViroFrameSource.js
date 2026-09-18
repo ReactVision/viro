@@ -114,6 +114,19 @@ function cloudAnchorFrameSource(cloudAnchorId) {
                 };
             }
         },
+        async progress(ctx) {
+            const nav = ctx.arSceneNavigator;
+            if (!nav?.getCloudAnchorStatus)
+                return null;
+            try {
+                const status = await nav.getCloudAnchorStatus();
+                return status?.active ? status.message : null;
+            }
+            catch {
+                // A poll that fails is not a resolve that failed. Say nothing.
+                return null;
+            }
+        },
     };
 }
 /**

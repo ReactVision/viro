@@ -37,8 +37,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroReplicationClient = void 0;
+const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+const ViroVersion_1 = require("../Utilities/ViroVersion");
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
-const DEFAULT_ENDPOINT = "https://platform.reactvision.xyz";
+const DEFAULT_ENDPOINT = "https://colocation.reactvision.xyz";
 /** https:// → wss://, http:// → ws://. Anything else passes through. */
 function toSocketScheme(endpoint) {
     if (endpoint.startsWith("https://"))
@@ -79,7 +82,10 @@ class ViroReplicationClient {
     }
     /** Snapshot of the current state. Safe to hold — it is a copy. */
     getEntities() {
-        return [...this.entities.values()].map((e) => ({ ...e, fields: { ...e.fields } }));
+        return [...this.entities.values()].map((e) => ({
+            ...e,
+            fields: { ...e.fields },
+        }));
     }
     get(id) {
         const e = this.entities.get(id);
@@ -132,7 +138,12 @@ class ViroReplicationClient {
     }
     /** Merge `fields` into the entity. Creates it if absent. */
     set(id, fields, opts = {}) {
-        const ref = this.send({ op: "set", id, fields, expectVersion: opts.expectVersion });
+        const ref = this.send({
+            op: "set",
+            id,
+            fields,
+            expectVersion: opts.expectVersion,
+        });
         if (!opts.optimistic || !ref)
             return;
         // Remember what to restore if the server refuses, then show the change now.
@@ -148,19 +159,43 @@ class ViroReplicationClient {
     delete(id, opts = {}) {
         this.send({ op: "delete", id, expectVersion: opts.expectVersion });
     }
+    /**
+     * Empty the room, whoever is holding what.
+     *
+     * The reset a shared work zone needs, and the one operation that ignores
+     * ownership. Issuing a reset as one `delete` per entity cannot work: an owned
+     * entity refuses `not-owner`, so exactly the objects somebody is still
+     * holding would survive it.
+     */
+    clear() {
+        this.send({ op: "clear" });
+    }
     // ── Socket ────────────────────────────────────────────────────────────────
     open() {
         const cfg = this.config;
         if (!cfg)
             return;
         const base = toSocketScheme(cfg.endpoint ?? DEFAULT_ENDPOINT);
-        // Credentials go in the query string because the browser and React Native
-        // WebSocket APIs cannot set request headers. See server/src/auth.ts.
-        const url = `${base}/functions/v1/replication/${encodeURIComponent(cfg.roomId)}` +
-            `?apiKey=${encodeURIComponent(cfg.apiKey)}` +
-            `&projectId=${encodeURIComponent(cfg.projectId)}`;
+        const path = `${base}/functions/v1/replication/${encodeURIComponent(cfg.roomId)}`;
         this.setState(this.attempt === 0 ? "connecting" : "reconnecting");
-        const ws = new WebSocket(url);
+        // Same headers the pose channel sends. React Native's WebSocket takes them
+        // as a third argument and forwards them to the native handshake; only a
+        // browser cannot set them, and there the credentials go in the query
+        // string, which the relay refuses unless it was started to allow it (a
+        // browser client needs an Origin allowlist first).
+        const ws = ViroPlatform_1.isWeb
+            ? new WebSocket(`${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
+                `&projectId=${encodeURIComponent(cfg.projectId)}`)
+            : new WebSocket(path, null, {
+                headers: {
+                    "x-api-key": cfg.apiKey,
+                    "x-project-id": cfg.projectId,
+                    // Logged by the relay, never used for a decision. It is what
+                    // separates one client build from another when a refusal shows up
+                    // in the relay log and every device otherwise looks alike.
+                    "x-rv-client": `viro/${ViroVersion_1.VIRO_VERSION} (${react_native_1.Platform.OS})`,
+                },
+            });
         this.ws = ws;
         ws.onopen = () => {
             this.attempt = 0;
@@ -181,10 +216,18 @@ class ViroReplicationClient {
             }
             this.handle(msg);
         };
-        const dropped = () => {
+        const dropped = (ev) => {
             if (this.closedByUs || this.ws !== ws)
                 return;
             this.ws = null;
+            // Keyed on the reason, not the code: 1008 also carries rate-limited,
+            // too-large and slow-consumer, and all three are meant to reconnect.
+            // Only this one is a decision that will not change on a retry.
+            if (ev?.reason === "auth-revoked") {
+                this._error = "this key or plan can no longer join the room";
+                this.setState("failed");
+                return;
+            }
             if (this.attempt >= BACKOFF_MS.length) {
                 this._error = "replication socket gave up reconnecting";
                 this.setState("failed");
@@ -195,7 +238,7 @@ class ViroReplicationClient {
             this.retryTimer = setTimeout(() => this.open(), delay);
         };
         ws.onclose = dropped;
-        ws.onerror = dropped;
+        ws.onerror = () => dropped();
     }
     handle(msg) {
         switch (msg.t) {
@@ -237,22 +280,77 @@ class ViroReplicationClient {
             if (op.seq <= this.lastSeq)
                 continue; // already applied
             if (op.kind === "upsert") {
-                this.entities.set(op.entity.id, op.entity);
+                this.entities.set(op.entity.id, this.reconcile(op));
             }
             else if (op.kind === "delete") {
                 this.entities.delete(op.id);
+                // Same rule as an upsert: only this device's own op retires one of its
+                // own writes. Without it another peer's delete, or anyone's `clear`,
+                // would consume the record that holds the next echo back.
+                if (op.by === this._localPeerId)
+                    this.settleOwnWrite(op.id);
             }
             else if (op.kind === "owner") {
                 const e = this.entities.get(op.id);
                 if (e)
-                    this.entities.set(op.id, { ...e, owner: op.owner, version: op.version });
+                    this.entities.set(op.id, {
+                        ...e,
+                        owner: op.owner,
+                        version: op.version,
+                    });
                 else
-                    this.entities.set(op.id, { id: op.id, fields: {}, owner: op.owner, version: op.version });
+                    this.entities.set(op.id, {
+                        id: op.id,
+                        fields: {},
+                        owner: op.owner,
+                        version: op.version,
+                    });
             }
             this.lastSeq = op.seq;
         }
-        this.pending.clear();
         this.emit();
+    }
+    /**
+     * What an upsert should become locally, given what this device still has in
+     * flight.
+     *
+     * The relay broadcasts to the sender as well, so a drag writing every 33 ms
+     * over a 63 ms round trip has two more writes outstanding by the time the
+     * first comes back. Taking that echo puts the object where the hand was two
+     * writes ago, and the next write pulls it forward again: on the device doing
+     * the dragging that reads as the object trailing the finger and snapping
+     * back, the faster the drag the further back. Only the fields are held; the
+     * version and owner the server assigned are adopted either way.
+     */
+    reconcile(op) {
+        if (op.by !== this._localPeerId)
+            return op.entity;
+        if (!this.settleOwnWrite(op.entity.id))
+            return op.entity;
+        const held = this.entities.get(op.entity.id);
+        if (!held)
+            return op.entity;
+        // Server fields underneath, so a field only it knows about is not lost.
+        return { ...op.entity, fields: { ...op.entity.fields, ...held.fields } };
+    }
+    /**
+     * Retire the oldest optimistic write for `id`, reporting whether there was
+     * one.
+     *
+     * A delta carries no ref, but the relay applies one connection's ops in the
+     * order they were sent and broadcasts them in that order, so the nth echo
+     * settles the nth write. This is also what bounds `pending`, which is why
+     * nothing clears it wholesale: doing that on any delta dropped the record a
+     * later rejection of an unrelated write needed to roll back.
+     */
+    settleOwnWrite(id) {
+        for (const [ref, p] of this.pending) {
+            if (p.id !== id)
+                continue;
+            this.pending.delete(ref);
+            return true;
+        }
+        return false;
     }
     requestResync() {
         if (this.ws?.readyState !== 1)

@@ -43,6 +43,30 @@ export declare function locationToWorld(transform: ViroLocationTransform, point:
  */
 export declare function worldToLocation(transform: ViroLocationTransform, point: Viro3DPoint): Viro3DPoint | null;
 /**
+ * A direction through a transform, ignoring where the frame's origin sits.
+ *
+ * `locationToWorld` moves a *point*, which is right for a position and wrong
+ * for a basis vector: a forward vector put through it comes back displaced by
+ * the origin, so an avatar built from it faces a direction that drifts with the
+ * frame. Only the rotation applies to a direction, which is the upper 3x3.
+ */
+export declare function transformDirection(transform: ViroLocationTransform, direction: Viro3DPoint): Viro3DPoint;
+/**
+ * The 16-float pose string the co-location channel carries, from a position and
+ * a look direction. Everything passed in is already location-frame.
+ *
+ * Built from the camera's own forward and up rather than from Euler angles:
+ * a triple of angles needs a convention to mean anything, the convention
+ * differs between the editor, the renderer and the scene graph, and the wrong
+ * one produces an avatar that is subtly wrong in a way nobody notices until
+ * they are standing in the room. Two basis vectors have no convention to get
+ * wrong.
+ *
+ * The camera looks down its own -Z, so the +Z basis is the negated forward.
+ * Reversing that points every avatar away from where its device is pointing.
+ */
+export declare function poseCsv(position: Viro3DPoint, forward: Viro3DPoint, up: Viro3DPoint): string;
+/**
  * General 4×4 inverse.
  *
  * A rigid transform could be inverted far more cheaply, but the resolved

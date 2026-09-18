@@ -3,6 +3,13 @@ import {
   type ViroReplicatedEntity,
 } from "../components/AR/ViroReplication";
 
+// The client reads the platform to choose header auth over the query string,
+// and this suite runs with no native environment.
+jest.mock("react-native", () => ({
+  Platform: { OS: "ios", constants: {} },
+  NativeModules: {},
+}));
+
 /** Minimal WebSocket stand-in: records what was sent, injects what arrives. */
 class FakeSocket {
   static last: FakeSocket | null = null;
@@ -14,16 +21,32 @@ class FakeSocket {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
 
-  constructor(public url: string) {
+  constructor(
+    public url: string,
+    _protocols?: null,
+    public options?: { headers?: Record<string, string> }
+  ) {
     FakeSocket.last = this;
   }
 
-  send(data: string) { this.sent.push(JSON.parse(data)); }
-  close() { this.readyState = 3; }
+  send(data: string) {
+    this.sent.push(JSON.parse(data));
+  }
+  close() {
+    this.readyState = 3;
+  }
 
-  open() { this.readyState = 1; this.onopen?.(); }
-  deliver(msg: unknown) { this.onmessage?.({ data: JSON.stringify(msg) }); }
-  drop() { this.readyState = 3; this.onclose?.(); }
+  open() {
+    this.readyState = 1;
+    this.onopen?.();
+  }
+  deliver(msg: unknown) {
+    this.onmessage?.({ data: JSON.stringify(msg) });
+  }
+  drop(ev: { code?: number; reason?: string } = {}) {
+    this.readyState = 3;
+    this.onclose?.(ev);
+  }
 }
 
 const CONFIG = {
@@ -33,7 +56,9 @@ const CONFIG = {
   endpoint: "http://localhost:8787",
 };
 
-const entity = (over: Partial<ViroReplicatedEntity> = {}): ViroReplicatedEntity => ({
+const entity = (
+  over: Partial<ViroReplicatedEntity> = {}
+): ViroReplicatedEntity => ({
   id: "cube",
   fields: { x: 1 },
   version: 1,
@@ -63,12 +88,21 @@ const connectAndWelcome = (entities: ViroReplicatedEntity[] = [], seq = 0) => {
 };
 
 describe("connection", () => {
-  it("builds a ws:// url from an http endpoint and passes credentials", () => {
+  it("builds a ws:// url from an http endpoint and sends credentials as headers", () => {
     client.connect(CONFIG);
-    const url = FakeSocket.last!.url;
-    expect(url).toContain("ws://localhost:8787/functions/v1/replication/room-1");
-    expect(url).toContain("apiKey=k");
-    expect(url).toContain("projectId=p");
+    const s = FakeSocket.last!;
+    expect(s.url).toBe("ws://localhost:8787/functions/v1/replication/room-1");
+    // Never in the URL on a native platform: the relay refuses query-string
+    // credentials, and a URL is what ends up in logs.
+    expect(s.url).not.toContain("apiKey");
+    expect(s.options?.headers).toEqual({
+      "x-api-key": "k",
+      "x-project-id": "p",
+      // Logged by the relay so one client build can be told from another. The
+      // version is generated from package.json, so match the shape, not a
+      // number that changes every release.
+      "x-rv-client": expect.stringMatching(/^viro\/\d+\.\d+\.\d+ \(\w+\)$/),
+    });
   });
 
   it("is only synced once the welcome arrives, not when the socket opens", () => {
@@ -94,17 +128,30 @@ describe("connection", () => {
 describe("ordering", () => {
   it("applies deltas in sequence", () => {
     const s = connectAndWelcome([], 0);
-    s.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "me" }] });
     s.deliver({
       t: "delta",
-      ops: [{ kind: "upsert", seq: 2, entity: entity({ fields: { x: 2 }, version: 2 }), by: "me" }],
+      ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "me" }],
+    });
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 2,
+          entity: entity({ fields: { x: 2 }, version: 2 }),
+          by: "me",
+        },
+      ],
     });
     expect(client.get("cube")?.fields.x).toBe(2);
   });
 
   it("ignores a delta it has already applied", () => {
     const s = connectAndWelcome([], 5);
-    s.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }] });
+    s.deliver({
+      t: "delta",
+      ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }],
+    });
     expect(client.get("cube")).toBeUndefined();
   });
 
@@ -113,7 +160,10 @@ describe("ordering", () => {
     s.sent.length = 0;
 
     // seq 3 with nothing at 1 or 2 means two deltas never arrived.
-    s.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }] });
+    s.deliver({
+      t: "delta",
+      ops: [{ kind: "upsert", seq: 3, entity: entity(), by: "x" }],
+    });
 
     expect(s.sent).toEqual([{ op: "resync", sinceSeq: 0 }]);
     expect(client.get("cube")).toBeUndefined();
@@ -140,7 +190,16 @@ describe("authority", () => {
     const s = connectAndWelcome();
     s.deliver({
       t: "delta",
-      ops: [{ kind: "owner", seq: 1, id: "cube", owner: "me", version: 1, by: "me" }],
+      ops: [
+        {
+          kind: "owner",
+          seq: 1,
+          id: "cube",
+          owner: "me",
+          version: 1,
+          by: "me",
+        },
+      ],
     });
     expect(client.get("cube")?.owner).toBe("me");
   });
@@ -149,7 +208,16 @@ describe("authority", () => {
     const s = connectAndWelcome([entity({ owner: "other" })], 1);
     s.deliver({
       t: "delta",
-      ops: [{ kind: "owner", seq: 2, id: "cube", owner: null, version: 2, by: "other" }],
+      ops: [
+        {
+          kind: "owner",
+          seq: 2,
+          id: "cube",
+          owner: null,
+          version: 2,
+          by: "other",
+        },
+      ],
     });
     expect(client.get("cube")?.owner).toBeNull();
   });
@@ -243,15 +311,101 @@ describe("optimistic writes", () => {
     expect(client.get("brand-new")).toBeDefined();
 
     // No `current`: the server has no such entity, so neither should we.
-    s.deliver({ t: "reject", ref: s.sent[s.sent.length - 1].ref, reason: "too-many-entities" });
+    s.deliver({
+      t: "reject",
+      ref: s.sent[s.sent.length - 1].ref,
+      reason: "too-many-entities",
+    });
     expect(client.get("brand-new")).toBeUndefined();
+  });
+
+  it("does not let the echo of its own write undo a newer one", () => {
+    // A drag writes every 33 ms and the round trip is about 63, so two more
+    // writes are usually outstanding when the first comes back. Applying that
+    // echo would put the object where the hand was two writes ago, which on
+    // the device doing the dragging reads as the object snapping backwards.
+    const s = connectAndWelcome();
+
+    client.set("cube", { position: [0, 0, 0] }, { optimistic: true });
+    client.set("cube", { position: [1, 0, 0] }, { optimistic: true });
+
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 1,
+          entity: entity({ fields: { position: [0, 0, 0] }, version: 1 }),
+          by: "me",
+        },
+      ],
+    });
+
+    expect(client.get("cube")?.fields.position).toEqual([1, 0, 0]);
+    // The server's bookkeeping is still adopted: only the fields are held back.
+    expect(client.get("cube")?.version).toBe(1);
+  });
+
+  it("takes the echo once nothing of its own is still in flight", () => {
+    const s = connectAndWelcome();
+    client.set("cube", { position: [1, 0, 0] }, { optimistic: true });
+
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 1,
+          entity: entity({ fields: { position: [1, 0, 0] }, version: 1 }),
+          by: "me",
+        },
+      ],
+    });
+    expect(client.get("cube")?.version).toBe(1);
+
+    // A later change by someone else is authoritative, with nothing pending.
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 2,
+          entity: entity({ fields: { position: [9, 0, 0] }, version: 2 }),
+          by: "other",
+        },
+      ],
+    });
+    expect(client.get("cube")?.fields.position).toEqual([9, 0, 0]);
+  });
+
+  it("keeps another peer's write even while one of its own is in flight", () => {
+    // Holding fields back is only correct for this device's own echo. An
+    // unowned entity is last-writer-wins, and the server has just said who won.
+    const s = connectAndWelcome();
+    client.set("cube", { position: [1, 0, 0] }, { optimistic: true });
+
+    s.deliver({
+      t: "delta",
+      ops: [
+        {
+          kind: "upsert",
+          seq: 1,
+          entity: entity({ fields: { position: [5, 0, 0] }, version: 1 }),
+          by: "other",
+        },
+      ],
+    });
+    expect(client.get("cube")?.fields.position).toEqual([5, 0, 0]);
   });
 });
 
 describe("reconnection", () => {
   it("resyncs from the last applied sequence rather than starting over", () => {
     const s1 = connectAndWelcome([], 0);
-    s1.deliver({ t: "delta", ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "x" }] });
+    s1.deliver({
+      t: "delta",
+      ops: [{ kind: "upsert", seq: 1, entity: entity(), by: "x" }],
+    });
 
     s1.drop();
     expect(client.state).toBe("reconnecting");
@@ -276,6 +430,30 @@ describe("reconnection", () => {
     sock.drop();
     expect(client.state).toBe("failed");
     expect(client.error).toBeDefined();
+  });
+
+  it("stops for good when the relay says the key or plan was revoked", () => {
+    const s = connectAndWelcome();
+    const before = FakeSocket.last;
+
+    s.drop({ code: 1008, reason: "auth-revoked" });
+    jest.advanceTimersByTime(10000);
+
+    // Retrying cannot change the answer, and with two sockets per device a
+    // refused device otherwise costs the relay ten handshakes.
+    expect(FakeSocket.last).toBe(before);
+    expect(client.state).toBe("failed");
+    expect(client.error).toBeDefined();
+  });
+
+  it("still reconnects on the other 1008 reasons, which are not decisions", () => {
+    const s = connectAndWelcome();
+
+    // Same code, different meaning: back off and come back.
+    s.drop({ code: 1008, reason: "slow-consumer" });
+    expect(client.state).toBe("reconnecting");
+    jest.advanceTimersByTime(500);
+    expect(FakeSocket.last).not.toBe(s);
   });
 
   it("does not reconnect after an explicit disconnect", () => {
@@ -314,5 +492,53 @@ describe("sending while disconnected", () => {
     // and against a version that has moved on.
     expect(() => client.set("cube", { x: 1 })).not.toThrow();
     expect(client.get("cube")).toBeUndefined();
+  });
+});
+
+describe("clear", () => {
+  it("sends one op rather than a delete per entity", () => {
+    // A reset issued as deletes cannot work: the server refuses not-owner, so
+    // exactly the objects someone is still holding would survive it.
+    const s = connectAndWelcome([entity()]);
+    s.sent.length = 0;
+
+    client.clear();
+    expect(s.sent.length).toBe(1);
+    expect(s.sent[0].op).toBe("clear");
+    // Carries a ref like every other write, so a refusal can name it.
+    expect(typeof s.sent[0].ref).toBe("string");
+  });
+
+  it("empties local state only when the server's deletes arrive", () => {
+    const s = connectAndWelcome([entity()], 4);
+    client.clear();
+    // Still there: clear is not optimistic, and the room is the authority on
+    // what a reset actually removed.
+    expect(client.get("cube")).toBeDefined();
+
+    s.deliver({
+      t: "delta",
+      ops: [{ kind: "delete", seq: 5, id: "cube", by: "them" }],
+    });
+    expect(client.get("cube")).toBeUndefined();
+  });
+
+  it("applies every delete of a cleared room, not just the first", () => {
+    // Each delete carries its own sequence for this reason: an op at or below
+    // the last applied seq is skipped, so a batch sharing one would drop all
+    // but the first and leave the room populated here and empty on the server.
+    const s = connectAndWelcome(
+      [entity(), { ...entity(), id: "cone" }, { ...entity(), id: "sign" }],
+      4
+    );
+    s.deliver({
+      t: "delta",
+      ops: [
+        { kind: "delete", seq: 5, id: "cube", by: "them" },
+        { kind: "delete", seq: 6, id: "cone", by: "them" },
+        { kind: "delete", seq: 7, id: "sign", by: "them" },
+      ],
+    });
+    expect(client.getEntities()).toEqual([]);
   });
 });

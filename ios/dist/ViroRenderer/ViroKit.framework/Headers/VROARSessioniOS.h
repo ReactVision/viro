@@ -87,6 +87,7 @@ public:
     void resolveCloudAnchor(std::string anchorId,
                             std::function<void(std::shared_ptr<VROARAnchor> anchor)> onSuccess,
                             std::function<void(std::string error)> onFailure);
+    bool getCloudAnchorStatus(std::string &message, float &progress) override;
     
     std::unique_ptr<VROARFrame> &updateFrame();
     std::unique_ptr<VROARFrame> &getLastFrame();

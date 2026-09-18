@@ -470,6 +470,21 @@ export type ViroCloudAnchorState =
   | "ErrorResolvingSdkVersionTooOld"
   | "ErrorResolvingSdkVersionTooNew"
   | "ErrorHostingServiceUnavailable"
+  /*
+   * The five below come from the ReactVision provider rather than ARCore, and
+   * were missing here while native already emitted them: the state crosses the
+   * bridge as an untyped string, so nothing failed to compile and a caller
+   * switching on this union silently missed every one of them.
+   *
+   * ErrorResolvingLocalizationNoMatch is the common one on phones — the 30
+   * second SIFT window closing without two consistent matches. It says the
+   * anchor was not recognised from here, not that it does not exist.
+   */
+  | "ErrorNetworkFailure"
+  | "ErrorAuthenticationFailed"
+  | "ErrorHostingInsufficientVisualFeatures"
+  | "ErrorResolvingLocalizationNoMatch"
+  | "ErrorAnchorExpired"
   /**
    * Emitted by JS platform guards, never by native: the running platform has no
    * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there
@@ -576,6 +591,22 @@ export type ViroResolveCloudAnchorResult = {
   anchor?: ViroCloudAnchor;
   error?: string;
   state: ViroCloudAnchorState;
+};
+
+/**
+ * Progress of a cloud anchor resolve, from `getCloudAnchorStatus()`.
+ *
+ * `message` is the useful field: resolving passes through downloading the
+ * anchor, looking for it, and holding after a first match, and only the message
+ * separates "never seen" from "seen once" — which is the difference between a
+ * hopeless spot and one worth standing still in.
+ */
+export type ViroCloudAnchorStatus = {
+  /** False when nothing is resolving; the other fields are then empty. */
+  active: boolean;
+  /** 0 to 1, monotonic within one resolve. */
+  progress: number;
+  message: string;
 };
 
 /**

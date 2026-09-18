@@ -35,8 +35,17 @@ export type UseViroReplicatedStateResult = {
   claim: (id: string, opts?: ViroWriteOptions) => void;
   release: (id: string) => void;
   /** Merge fields. Only the owner may write to an owned entity. */
-  set: (id: string, fields: Record<string, unknown>, opts?: ViroWriteOptions) => void;
+  set: (
+    id: string,
+    fields: Record<string, unknown>,
+    opts?: ViroWriteOptions
+  ) => void;
   remove: (id: string, opts?: ViroWriteOptions) => void;
+  /**
+   * Empty the room for everyone, whatever anyone is holding. Deleting entity by
+   * entity cannot do this: an owned one refuses `not-owner`.
+   */
+  clear: () => void;
   /** True when this device holds authority over `id`. */
   isMine: (id: string) => boolean;
 };
@@ -59,9 +68,16 @@ export type UseViroReplicatedStateResult = {
  * channel: world coordinates are per-session and mean nothing to a peer.
  */
 export function useViroReplicatedState(
-  options: UseViroReplicatedStateOptions,
+  options: UseViroReplicatedStateOptions
 ): UseViroReplicatedStateResult {
-  const { roomId, apiKey, projectId, endpoint, enabled = true, onReject } = options;
+  const {
+    roomId,
+    apiKey,
+    projectId,
+    endpoint,
+    enabled = true,
+    onReject,
+  } = options;
 
   const client = useMemo(() => new ViroReplicationClient(), []);
   const [, force] = useState(0);
@@ -96,6 +112,7 @@ export function useViroReplicatedState(
     release: (id) => client.release(id),
     set: (id, fields, opts) => client.set(id, fields, opts),
     remove: (id, opts) => client.delete(id, opts),
+    clear: () => client.clear(),
     isMine: (id) => {
       const e = client.get(id);
       return !!e && e.owner !== null && e.owner === client.localPeerId;

@@ -26,7 +26,7 @@ const ViroReplication_1 = require("../AR/ViroReplication");
  * channel: world coordinates are per-session and mean nothing to a peer.
  */
 function useViroReplicatedState(options) {
-    const { roomId, apiKey, projectId, endpoint, enabled = true, onReject } = options;
+    const { roomId, apiKey, projectId, endpoint, enabled = true, onReject, } = options;
     const client = (0, react_1.useMemo)(() => new ViroReplication_1.ViroReplicationClient(), []);
     const [, force] = (0, react_1.useState)(0);
     // Kept in a ref so changing the handler does not tear down the connection.
@@ -54,6 +54,7 @@ function useViroReplicatedState(options) {
         release: (id) => client.release(id),
         set: (id, fields, opts) => client.set(id, fields, opts),
         remove: (id, opts) => client.delete(id, opts),
+        clear: () => client.clear(),
         isMine: (id) => {
             const e = client.get(id);
             return !!e && e.owner !== null && e.owner === client.localPeerId;

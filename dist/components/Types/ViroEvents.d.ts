@@ -354,7 +354,7 @@ export type ViroSoundFinishEvent = any;
  * State of a cloud anchor operation.
  * Maps to GARCloudAnchorState (iOS) and Anchor.CloudAnchorState (Android)
  */
-export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable"
+export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable" | "ErrorNetworkFailure" | "ErrorAuthenticationFailed" | "ErrorHostingInsufficientVisualFeatures" | "ErrorResolvingLocalizationNoMatch" | "ErrorAnchorExpired"
 /**
  * Emitted by JS platform guards, never by native: the running platform has no
  * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there
@@ -453,6 +453,21 @@ export type ViroResolveCloudAnchorResult = {
     anchor?: ViroCloudAnchor;
     error?: string;
     state: ViroCloudAnchorState;
+};
+/**
+ * Progress of a cloud anchor resolve, from `getCloudAnchorStatus()`.
+ *
+ * `message` is the useful field: resolving passes through downloading the
+ * anchor, looking for it, and holding after a first match, and only the message
+ * separates "never seen" from "seen once" — which is the difference between a
+ * hopeless spot and one worth standing still in.
+ */
+export type ViroCloudAnchorStatus = {
+    /** False when nothing is resolving; the other fields are then empty. */
+    active: boolean;
+    /** 0 to 1, monotonic within one resolve. */
+    progress: number;
+    message: string;
 };
 /**
  * Result of `rvCreateSharedFrame()` / `rvJoinSharedFrame()` (CL-H).

@@ -104,6 +104,10 @@ typedef void (^CloudAnchorResolveCompletionHandler)(BOOL success,
 - (void)resolveCloudAnchor:(NSString *)cloudAnchorId
          completionHandler:(CloudAnchorResolveCompletionHandler)completionHandler;
 
+// Progress of a resolve in flight, or nil when none is. Polled rather than
+// pushed: resolve localisation runs per AR frame with no event channel to JS.
+- (NSDictionary *)cloudAnchorStatus;
+
 - (void)cancelCloudAnchorOperations;
 
 #pragma mark - AR Session Recording Methods

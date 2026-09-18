@@ -60,11 +60,22 @@ export declare function isColocationAvailable(): Promise<boolean>;
 export declare function joinColocation(config: ViroColocationConfig): Promise<ViroColocationJoinResult>;
 export declare function leaveColocation(): Promise<void>;
 /**
+ * How often it is worth building a pose, in ms.
+ *
+ * Mirrors the native `poseSendHz` default of 20, which drops anything sent
+ * sooner, so publishing faster puts nothing extra on the wire. Calling more
+ * often is safe and only costs the string: this exists so an app driving from a
+ * camera callback at 90 Hz does not format 16 floats nine times per frame that
+ * reaches the socket. **Keep in step with `RVCCAColocationSession.h`.**
+ */
+export declare const VIRO_POSE_INTERVAL_MS = 50;
+/**
  * Publish the local pose, **in the location frame**.
  *
  * Pass the transform as 16 comma-separated floats, column-major — the same
- * encoding `onLocalized`'s `transform` uses. Safe to call every frame: the
- * outbound rate limit lives in native.
+ * encoding `onLocalized`'s `transform` uses, which `poseCsv()` builds from a
+ * position and a look direction. Safe to call every frame: the outbound rate
+ * limit lives in native.
  */
 export declare function setColocationLocalPose(locationFramePoseCsv: string): Promise<void>;
 export declare function getColocationState(): Promise<{

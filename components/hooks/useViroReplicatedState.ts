@@ -35,7 +35,11 @@ export type UseViroReplicatedStateResult = {
   claim: (id: string, opts?: ViroWriteOptions) => void;
   release: (id: string) => void;
   /** Merge fields. Only the owner may write to an owned entity. */
-  set: (id: string, fields: Record<string, unknown>, opts?: ViroWriteOptions) => void;
+  set: (
+    id: string,
+    fields: Record<string, unknown>,
+    opts?: ViroWriteOptions
+  ) => void;
   remove: (id: string, opts?: ViroWriteOptions) => void;
   /** True when this device holds authority over `id`. */
   isMine: (id: string) => boolean;
@@ -59,9 +63,16 @@ export type UseViroReplicatedStateResult = {
  * channel: world coordinates are per-session and mean nothing to a peer.
  */
 export function useViroReplicatedState(
-  options: UseViroReplicatedStateOptions,
+  options: UseViroReplicatedStateOptions
 ): UseViroReplicatedStateResult {
-  const { roomId, apiKey, projectId, endpoint, enabled = true, onReject } = options;
+  const {
+    roomId,
+    apiKey,
+    projectId,
+    endpoint,
+    enabled = true,
+    onReject,
+  } = options;
 
   const client = useMemo(() => new ViroReplicationClient(), []);
   const [, force] = useState(0);

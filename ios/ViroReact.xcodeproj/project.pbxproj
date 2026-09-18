@@ -249,8 +249,6 @@
 		E1C0100C2FB100A000DBE1E8 /* VRTColocationModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1C0100B2FB100A000DBE1E8 /* VRTColocationModule.mm */; };
 		E1C0100D2FB100A000DBE1E8 /* VRTColocationModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1C0100A2FB100A000DBE1E8 /* VRTColocationModule.h */; };
 		E1F9E5512FA39DEB00DBE1E8 /* VRTStudioModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */; };
-		E1C0100C2FB100A000DBE1E8 /* VRTColocationModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = E1C0100B2FB100A000DBE1E8 /* VRTColocationModule.mm */; };
-		E1C0100D2FB100A000DBE1E8 /* VRTColocationModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1C0100A2FB100A000DBE1E8 /* VRTColocationModule.h */; };
 		E1F9E5B22FA39E0300DBE1E8 /* VRTStudioModule.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */; };
 /* End PBXBuildFile section */
 
@@ -1174,8 +1172,6 @@
 		E1C0100A2FB100A000DBE1E8 /* VRTColocationModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTColocationModule.h; path = ViroReact/Modules/VRTColocationModule.h; sourceTree = "<group>"; };
 		E1C0100B2FB100A000DBE1E8 /* VRTColocationModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTColocationModule.mm; path = ViroReact/Modules/VRTColocationModule.mm; sourceTree = "<group>"; };
 		E1F9E54F2FA39DEB00DBE1E8 /* VRTStudioModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTStudioModule.h; path = ViroReact/Modules/VRTStudioModule.h; sourceTree = "<group>"; };
-		E1C0100A2FB100A000DBE1E8 /* VRTColocationModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VRTColocationModule.h; path = ViroReact/Modules/VRTColocationModule.h; sourceTree = "<group>"; };
-		E1C0100B2FB100A000DBE1E8 /* VRTColocationModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTColocationModule.mm; path = ViroReact/Modules/VRTColocationModule.mm; sourceTree = "<group>"; };
 		E1F9E5502FA39DEB00DBE1E8 /* VRTStudioModule.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTStudioModule.mm; path = ViroReact/Modules/VRTStudioModule.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 

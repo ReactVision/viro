@@ -160,7 +160,7 @@ function DemoScene() {
           source={{ uri: animatedGifUrl }}
           onLoadEnd={() => console.log("[harness] animated image loaded")}
         />
-        {/* ViroText: font pipeline (preloaded Helvetica). */}
+        {/* ViroText: font pipeline (preloaded Roboto). */}
         <ViroText
           position={[-3, 3, 0]}
           width={4}

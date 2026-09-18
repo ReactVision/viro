@@ -1,6 +1,6 @@
 /**
  * Web implementation of ViroText — a text geometry rendered by the WASM font
- * pipeline (freetype + preloaded Helvetica). Maps `text`, `style` (fontSize,
+ * pipeline (freetype + preloaded Roboto). Maps `text`, `style` (fontSize,
  * color), `width`/`height`, alignment, line-break, clip and `maxLines` onto the
  * `viroCreateText` C API.
  *

@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createNodeConfig = createNodeConfig;
 exports.createNode = createNode;
 const React = __importStar(require("react"));
-const react_native_1 = require("react-native");
 const Viro3DObject_1 = require("../../Viro3DObject");
 const ViroImage_1 = require("../../ViroImage");
 const ViroText_1 = require("../../ViroText");
@@ -153,7 +152,7 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
     const shaderOverrides = hasMaterialConfig
         ? [(0, materialConfig_1.studioMaterialName)(asset.id)]
         : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
     // Viro derives native canDrag from `onDrag != undefined`; without this prop
     // the drag recognizer is never attached, even when dragType is set.
     {...(config.dragType
@@ -173,7 +172,7 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollisio
     // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
     // the picture. The crop this mode also selects needs explicit size props,
     // so the UVs stay 0 to 1.
-    resizeMode="ScaleToFill" position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
+    resizeMode="ScaleToFill" position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
@@ -199,7 +198,7 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, onCollision, no
         return store.subscribe(() => setText(compute()));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store, template]);
-    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={position ?? config.position} rotation={rotation ?? config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(visible === undefined ? {} : { visible })} style={{
+    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={position ?? config.position} rotation={rotation ?? config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} {...(visible === undefined ? {} : { visible })} style={{
             fontFamily: "Arial",
             fontSize: 20,
             color: "#FFFFFF",
@@ -259,7 +258,7 @@ function createVideo(asset, config, notifyPhysicsDrag, onCollision, nodeRef) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
+    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
@@ -272,13 +271,21 @@ registerProximityTarget,
 // When set (gaze-target assets on a headset), the node's native onGaze handler.
 onGaze, 
 // See createNodeConfig.
-dragSurface) {
+dragSurface, 
+// The web host's half of registerProximityTarget. Native reads a node's
+// transform off its component ref; web reads it off a renderer handle, since
+// these components' props carry an index signature that makes them unsafe
+// behind forwardRef (see useViroNode's onNodeHandle). Only one is ever set.
+registerProximityNode) {
     const type = resolveType(asset);
     const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, dragSurface);
     config.onGaze = onGaze;
     const proximityRef = registerProximityTarget
         ? (ref) => registerProximityTarget(asset.id, ref)
         : undefined;
+    if (registerProximityNode) {
+        config.onNodeHandle = (handle) => registerProximityNode(asset.id, handle);
+    }
     const buildNode = (nodeRef) => {
         switch (type) {
             case "3D-MODEL":

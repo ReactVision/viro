@@ -54,7 +54,8 @@ const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroModelLoader_1 = require("./Web/viroModelLoader");
 function Viro3DObject(props) {
     const [loaded, setLoaded] = (0, react_1.useState)(false);
-    // Pass `loaded` as animationReady so the model's animations start once loaded.
+    // `loaded` is the hook's contentReady: the model's own animations and any
+    // shader override both need its subtree to exist first.
     const node = (0, useViroNode_1.useViroNode)(props, undefined, loaded);
     const renderer = (0, ViroWebContext_1.useViroRenderer)();
     const url = (0, viroModelLoader_1.resolveModelSource)(props.source);
@@ -103,6 +104,34 @@ function Viro3DObject(props) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node, url, type, resourcesKey]);
+    // Morph targets, once the model's meshes exist: virocore hangs a morpher off
+    // each mesh as it loads, so a weight set before that reaches nothing.
+    const scene = (0, ViroWebContext_1.useViroScene)();
+    const { morphTargets, morphMode, onMorphTargets } = props;
+    const morphKey = morphTargets
+        ? morphTargets.map((t) => `${t.target}=${t.weight}`).join(",")
+        : "";
+    (0, react_1.useEffect)(() => {
+        if (!loaded || !morphMode)
+            return;
+        scene.setMorphMode(node, morphMode);
+    }, [scene, node, loaded, morphMode]);
+    (0, react_1.useEffect)(() => {
+        if (!loaded || !morphTargets)
+            return;
+        for (const { target, weight } of morphTargets) {
+            if (typeof target !== "string")
+                continue;
+            scene.setMorphTargetWeight(node, target, weight ?? 0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene, node, loaded, morphKey]);
+    (0, react_1.useEffect)(() => {
+        if (!loaded || !onMorphTargets)
+            return;
+        onMorphTargets(scene.getMorphTargetKeys(node));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene, node, loaded]);
     return (<ViroWebContext_1.ViroParentNodeContext.Provider value={node}>
       {props.children}
     </ViroWebContext_1.ViroParentNodeContext.Provider>);

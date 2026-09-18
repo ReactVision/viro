@@ -16,6 +16,7 @@ exports.ViroVideo = ViroVideo;
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const useViroNode_1 = require("./Web/useViroNode");
+const ViroFlexSlotContext_1 = require("./Web/ViroFlexSlotContext");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroImageLoader_1 = require("./Web/viroImageLoader");
 // requestVideoFrameCallback isn't in every TS DOM lib; access it via a cast.
@@ -34,9 +35,12 @@ function ViroVideo(props) {
     // With neither size prop given the surface takes the source's aspect ratio at one
     // unit wide, the rule the phone bridges apply. 1 until the metadata loads.
     const [aspect, setAspect] = (0, react_1.useState)(1);
-    const sizePropSet = props.width != null || props.height != null;
-    const width = props.width ?? 1;
-    const height = props.height ?? (sizePropSet ? 1 : width / aspect);
+    // Inside a ViroFlexView the layout decides the size, as it does natively, and
+    // that counts as the size being set: the slot does not grow to the video.
+    const slot = (0, ViroFlexSlotContext_1.useViroFlexSlot)();
+    const sizePropSet = slot != null || props.width != null || props.height != null;
+    const width = slot?.width ?? props.width ?? 1;
+    const height = slot?.height ?? props.height ?? (sizePropSet ? 1 : width / aspect);
     const geometryRef = (0, react_1.useRef)(0);
     (0, useViroNode_1.useViroNode)(props, (s) => {
         const geo = s.createSurface(width, height);

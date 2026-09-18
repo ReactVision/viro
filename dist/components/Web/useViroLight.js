@@ -21,7 +21,7 @@ function useViroLight(type, props) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    const { color, intensity, temperature, direction, position, attenuationStartDistance, attenuationEndDistance, innerAngle, outerAngle, castsShadow, } = props;
+    const { color, intensity, temperature, direction, position, attenuationStartDistance, attenuationEndDistance, innerAngle, outerAngle, castsShadow, influenceBitMask, shadowOpacity, shadowMapSize, shadowBias, shadowNearZ, shadowFarZ, shadowOrthographicSize, } = props;
     const dirKey = direction ? direction.join(",") : "";
     const posKey = position ? position.join(",") : "";
     (0, react_1.useEffect)(() => {
@@ -45,6 +45,23 @@ function useViroLight(type, props) {
         }
         if (castsShadow !== undefined)
             scene.setLightCastsShadow(light, castsShadow);
+        if (influenceBitMask !== undefined)
+            scene.setLightInfluenceBitMask(light, influenceBitMask);
+        // Each left alone when absent, so an unset knob keeps VROLight's own default
+        // rather than one this hook invented.
+        if (shadowOpacity !== undefined)
+            scene.setLightShadowOpacity(light, shadowOpacity);
+        if (shadowMapSize !== undefined)
+            scene.setLightShadowMapSize(light, shadowMapSize);
+        if (shadowBias !== undefined)
+            scene.setLightShadowBias(light, shadowBias);
+        if (shadowNearZ !== undefined)
+            scene.setLightShadowNearZ(light, shadowNearZ);
+        if (shadowFarZ !== undefined)
+            scene.setLightShadowFarZ(light, shadowFarZ);
+        if (shadowOrthographicSize !== undefined) {
+            scene.setLightShadowOrthographicSize(light, shadowOrthographicSize);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         light,
@@ -58,6 +75,13 @@ function useViroLight(type, props) {
         innerAngle,
         outerAngle,
         castsShadow,
+        influenceBitMask,
+        shadowOpacity,
+        shadowMapSize,
+        shadowBias,
+        shadowNearZ,
+        shadowFarZ,
+        shadowOrthographicSize,
     ]);
     return light;
 }

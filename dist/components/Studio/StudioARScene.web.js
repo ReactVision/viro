@@ -44,9 +44,13 @@ exports.StudioARScene = void 0;
  *  - Root is ViroARScene (AR via slam) in `mode="ar"`, else ViroScene (3D).
  *  - AUTOMATIC/MANUAL plane detection → wrap plane assets in ViroARPlane (slam).
  *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
+ *  - Tap-to-place runs off the AR session's hit test rather than a native one,
+ *    and the navigator supplies the tap surface.
+ *  - Physics and collision triggers run here: Bullet is compiled into the web
+ *    binary and this host drives it, honouring the scene's own switch.
  *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
- *    (ViroARImageMarker), native physics, drag, collisions. These are reported
- *    via `onUnsupported` so the caller can warn.
+ *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
+ *    reports them through `onUnsupported` so the caller can warn.
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 const React = __importStar(require("react"));
@@ -55,6 +59,8 @@ const ViroAmbientLight_web_1 = require("../ViroAmbientLight.web");
 const ViroDirectionalLight_web_1 = require("../ViroDirectionalLight.web");
 const ViroARPlane_web_1 = require("../AR/ViroARPlane.web");
 const ViroARScene_web_1 = require("../AR/ViroARScene.web");
+const ViroWebContext_1 = require("../Web/ViroWebContext");
+const viroMath_1 = require("../Web/viroMath");
 const ViroScene_web_1 = require("../ViroScene.web");
 const ViroText_web_1 = require("../ViroText.web");
 const animationRegistry_1 = require("./domain/animationRegistry");
@@ -63,20 +69,47 @@ const assetPosition_1 = require("./domain/assetPosition");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const visibilityStore_1 = require("./domain/visibilityStore");
+const placementStore_1 = require("./domain/placementStore");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
 const studioMaterials_1 = require("./domain/studioMaterials");
+const webCapabilities_1 = require("./domain/webCapabilities");
+const collisionBindingsRuntime_1 = require("./domain/collisionBindingsRuntime");
+const collisionPairKey_1 = require("./domain/collisionPairKey");
+const physicsConfig_1 = require("./domain/physicsConfig");
+const ViroWebContext_2 = require("../Web/ViroWebContext");
+const studioRendererEffects_1 = require("./domain/studioRendererEffects");
+const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const studioLighting_1 = require("./domain/studioLighting");
+/** Native's throttle: the pose updates every frame, the distances need not. */
+const PROXIMITY_EVAL_INTERVAL_MS = 100;
+/**
+ * The surface a tap lands on, or null when it lands on nothing usable.
+ *
+ * Nearest wins. The web tracker reports a plane hit with a normal and a
+ * distance and nothing else, so unlike the native pick there is no anchor type
+ * to prefer — the nearest real surface in front of the user is the whole rule.
+ */
+function pickBestHit(results) {
+    let best = null;
+    for (const hit of results) {
+        if (!Number.isFinite(hit.distance) || hit.distance <= 0)
+            continue;
+        if (!best || hit.distance < best.distance)
+            best = hit;
+    }
+    return best;
+}
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
-        return props.mode === "3d" ? <ViroScene_web_1.ViroScene /> : <ViroARScene_web_1.ViroARScene />;
+        return props.mode === "3d" ? (<ViroScene_web_1.ViroScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}/>) : (<ViroARScene_web_1.ViroARScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}/>);
     }
     return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
 };
 exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
-    const { sceneData, mode = "ar", apiRequestExecutor, navigate, onReady, onSceneChange, onPlaneDetected, onUnsupported, noAssetsMessage, variableStore, } = props;
+    const { sceneData, mode = "ar", apiRequestExecutor, navigate, onReady, onSceneChange, onPlaneDetected, onUnsupported, noAssetsMessage, variableStore, placementApiRef, placementStore, } = props;
     const { scene, assets, animations, functions } = sceneData;
     // ─── Runtime singletons (per scene) ───────────────────────────────────────
     const schedulerRef = (0, react_1.useRef)(null);
@@ -106,19 +139,54 @@ const StudioARSceneInner = (props) => {
         visibilityStoreRef.current?.reseed(assets);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
+    const placementStoreRef = (0, react_1.useRef)(null);
+    if (placementStoreRef.current === null) {
+        placementStoreRef.current = placementStore ?? new placementStore_1.StudioPlacementStore();
+        placementStoreRef.current.seed(assets);
+    }
+    (0, react_1.useEffect)(() => {
+        placementStoreRef.current?.reseed(assets);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id]);
     (0, react_1.useEffect)(() => {
         soundManagerRef.current?.reset();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
+    const sceneApi = (0, ViroWebContext_2.useViroScene)();
+    // Live renderer handles for the assets a proximity binding names, kept by the
+    // node factory's mount/unmount callback. An authored position is a world
+    // position only while nothing above the node moves, which is false inside a
+    // plane wrapper and after a tap-to-place; asking the renderer is the only way
+    // to know where the node ended up.
+    const assetNodeHandlesRef = (0, react_1.useRef)(new Map());
+    const registerProximityNode = (0, react_1.useCallback)((assetId, handle) => {
+        if (handle) {
+            assetNodeHandlesRef.current.set(assetId, handle);
+        }
+        else {
+            assetNodeHandlesRef.current.delete(assetId);
+        }
+    }, []);
     const getAssetPosition = (0, react_1.useCallback)((assetId) => {
+        const handle = assetNodeHandlesRef.current.get(assetId);
+        if (handle) {
+            const world = sceneApi.getNodeWorldPosition(handle);
+            if (world)
+                return world;
+        }
+        // Before the node mounts, and on a binary that predates the C API call.
         const a = assets.find((x) => x.id === assetId);
         return a ? (0, assetPosition_1.studioAssetPosition)(a) : undefined;
-    }, [assets]);
+    }, [assets, sceneApi]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
         variableStore: variableStoreRef.current,
         apiRequestExecutor,
         visibilityStore: visibilityStoreRef.current,
+        // Without this the node factory skips its PlaceableNode wrap and mounts a
+        // tap-to-place asset at once, at an offset meant to be added to a tap
+        // point that never happens — which lands it on top of the camera.
+        placementStore: placementStoreRef.current,
         soundManager: soundManagerRef.current,
         getAssetPosition,
         navigate,
@@ -213,14 +281,12 @@ const StudioARSceneInner = (props) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
     // ─── Capability report (features that won't render on web) ────────────────
+    //
+    // Everything this host drops has to be listed here. The three trigger kinds
+    // and tap-to-place used to be missing, so a scene built on them opened looking
+    // fine and then did nothing, with no way to tell a web gap from a bug.
     (0, react_1.useEffect)(() => {
-        const unsupported = [];
-        if (assets.some((a) => a.trigger_image_url))
-            unsupported.push("image markers");
-        if (scene.physics_world_config)
-            unsupported.push("physics");
-        if ((scene.plane_detection ?? "").toUpperCase() === "MANUAL")
-            unsupported.push("manual plane selection");
+        const unsupported = (0, webCapabilities_1.webUnsupportedFeatures)(sceneData, mode);
         if (unsupported.length > 0)
             onUnsupported?.(unsupported);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,21 +296,180 @@ const StudioARSceneInner = (props) => {
         onReady?.();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    // ─── Node mapping (plane assets only; image-triggered are skipped on web) ──
-    const planeAssets = (0, react_1.useMemo)(() => assets.filter((a) => !a.trigger_image_url), [assets]);
-    const renderedAssets = (0, react_1.useMemo)(() => {
-        return planeAssets
-            .map((asset) => (0, viroNodeFactory_1.createNode)(asset, undefined, // sceneNavigator: web navigates via runtimeCtx.navigate
-        animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, undefined, // onCollision: no physics on web
-        undefined, // isDragActive
-        undefined, // notifyPhysicsDrag
-        handleSceneChange, runtimeCtx))
-            .filter(Boolean);
-    }, [planeAssets, animations, scene, animationStates, handleAssetLoaded, handleSceneChange, runtimeCtx]);
+    // ─── Tap to place ─────────────────────────────────────────────────────────
+    // The AR session is the only thing that knows where the camera is, and the
+    // scene handle is the only thing that can hit-test a screen point.
+    const { session } = (0, ViroWebContext_1.useViroAR)();
+    const arSceneRef = (0, react_1.useRef)(null);
+    const placeAtScreenPoint = (0, react_1.useCallback)(async (x, y) => {
+        const store = placementStoreRef.current;
+        const activeId = store?.activeAssetId();
+        if (!store || !activeId || !arSceneRef.current)
+            return "miss";
+        let results = [];
+        try {
+            results = await arSceneRef.current.performARHitTestWithPoint(x, y);
+        }
+        catch {
+            return "miss";
+        }
+        const best = pickBestHit(results);
+        if (!best)
+            return "miss";
+        // The author's rotation is relative to where the user was facing, so the
+        // basis goes in with the point or the asset lands facing world forward.
+        const basis = session ? (0, viroMath_1.cameraBasis)(session.cameraPose.quaternion) : null;
+        store.place(activeId, best.position, basis?.forward, basis?.up);
+        return "placed";
+    }, [session]);
+    (0, react_1.useEffect)(() => {
+        if (!placementApiRef)
+            return;
+        placementApiRef.current = { placeAtScreenPoint };
+        return () => {
+            if (placementApiRef.current?.placeAtScreenPoint === placeAtScreenPoint) {
+                placementApiRef.current = null;
+            }
+        };
+    }, [placementApiRef, placeAtScreenPoint]);
+    // ─── Physics ──────────────────────────────────────────────────────────────
+    // Bullet has been inside the web binary all along; nothing reached it. The
+    // scene switch is honoured explicitly because virocore creates a physics world
+    // on demand at its own -9.81 and steps whatever it holds, so a scene with
+    // physics off would simulate anyway.
+    const physicsWorldConfig = (0, react_1.useMemo)(() => (0, physicsConfig_1.parsePhysicsWorldConfig)(scene.physics_world_config), [scene.physics_world_config]);
+    (0, react_1.useEffect)(() => {
+        const enabled = physicsWorldConfig?.enabled === true;
+        sceneApi.setPhysicsWorld(enabled, physicsWorldConfig?.gravity ?? [0, -9.81, 0]);
+        return () => {
+            sceneApi.setPhysicsWorld(false, [0, -9.81, 0]);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id, physicsWorldConfig]);
+    // ─── Collision bindings ───────────────────────────────────────────────────
+    // One scene-level callback, routed by tag. Each body reports its own
+    // collisions, so `tag` is this node and `otherTag` the one it hit — the same
+    // shape the native per-node handler takes.
+    const collisionBindings = (0, react_1.useMemo)(() => sceneData.collision_bindings ?? [], [sceneData]);
+    const collisionCooldownRef = (0, react_1.useRef)(new Map());
+    const bindingsByPairKey = (0, react_1.useMemo)(() => {
+        const m = new Map();
+        for (const b of collisionBindings) {
+            const key = (0, collisionPairKey_1.collisionPairKey)(b.asset_x_id, b.asset_y_id);
+            const list = m.get(key) ?? [];
+            list.push(b);
+            m.set(key, list);
+        }
+        return m;
+    }, [collisionBindings]);
+    (0, react_1.useEffect)(() => {
+        if (collisionBindings.length === 0)
+            return;
+        const bound = new Set();
+        for (const b of collisionBindings) {
+            bound.add(b.asset_x_id);
+            bound.add(b.asset_y_id);
+        }
+        sceneApi.setCollisionHandler((collision) => {
+            if (!bound.has(collision.tag))
+                return;
+            const handler = (0, collisionBindingsRuntime_1.createPlacementCollisionHandler)(collision.tag, bindingsByPairKey, undefined, animations, collisionCooldownRef, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
+            handler(collision.otherTag, collision.point, collision.normal);
+        });
+        return () => {
+            sceneApi.setCollisionHandler(null);
+            collisionCooldownRef.current.clear();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scene.id, collisionBindings, bindingsByPairKey, animations, handleSceneChange, runtimeCtx]);
+    // ─── Proximity bindings ───────────────────────────────────────────────────
+    // Fires a function when the user comes within `distance` of an asset. The
+    // camera side is the tracked pose; the asset side is its authored position,
+    // which is its world position only outside a plane wrapper — hence the gate,
+    // and hence webCapabilities reporting the wrapped case as unsupported.
+    const proximityBindings = (0, react_1.useMemo)(() => sceneData.proximity_bindings ?? [], [sceneData]);
+    const proximityTargetIds = (0, react_1.useMemo)(() => {
+        const ids = new Set();
+        for (const b of proximityBindings)
+            ids.add(b.target_asset_id);
+        return ids;
+    }, [proximityBindings]);
+    const proximityStateRef = (0, react_1.useRef)(new Map());
+    (0, react_1.useEffect)(() => {
+        proximityStateRef.current.clear();
+    }, [scene.id]);
+    // Runs wherever there are bindings: the distance is measured from the node's
+    // world position, so a plane wrapper no longer changes what it means.
+    const proximityLive = proximityBindings.length > 0;
+    (0, react_1.useEffect)(() => {
+        if (!proximityLive || !session)
+            return;
+        let handle = 0;
+        let last = 0;
+        const step = () => {
+            handle = requestAnimationFrame(step);
+            const now = Date.now();
+            if (now - last < PROXIMITY_EVAL_INTERVAL_MS)
+                return;
+            last = now;
+            (0, proximityBindingsRuntime_1.evaluateProximityBindings)({
+                cameraPosition: session.cameraPose.position,
+                bindings: proximityBindings,
+                getTargetWorldPosition: getAssetPosition,
+                stateRef: proximityStateRef,
+                animations,
+                onSceneChange: handleSceneChange,
+                onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
+                runtimeCtx,
+            });
+        };
+        handle = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(handle);
+    }, [
+        proximityLive,
+        session,
+        proximityBindings,
+        getAssetPosition,
+        animations,
+        handleSceneChange,
+        runtimeCtx,
+    ]);
+    // ─── Node mapping (image-triggered assets are skipped on web) ─────────────
+    // Tap-to-place assets are held out of the plane wrapper: once placed they live
+    // in world space, and a plane wrapper would re-parent them to the plane.
+    const { planeAssets, tapToPlaceAssets } = (0, react_1.useMemo)(() => {
+        const placeable = assets.filter(placementStore_1.isTapToPlaceAsset);
+        return {
+            planeAssets: assets.filter((a) => !a.trigger_image_url && !(0, placementStore_1.isTapToPlaceAsset)(a)),
+            tapToPlaceAssets: placeable,
+        };
+    }, [assets]);
+    const buildNodes = (0, react_1.useCallback)((list) => list
+        .map((asset) => (0, viroNodeFactory_1.createNode)(asset, undefined, // sceneNavigator: web navigates via runtimeCtx.navigate
+    animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, undefined, // onCollision: no physics on web
+    undefined, // isDragActive
+    undefined, // notifyPhysicsDrag
+    handleSceneChange, runtimeCtx, undefined, // registerProximityTarget: native reads a component ref
+    undefined, // onGaze: no eye gaze on web
+    null, // dragSurface
+    proximityTargetIds.has(asset.id)
+        ? registerProximityNode
+        : undefined))
+        .filter(Boolean), [
+        animations,
+        scene,
+        animationStates,
+        handleAssetLoaded,
+        handleSceneChange,
+        runtimeCtx,
+        proximityTargetIds,
+        registerProximityNode,
+    ]);
+    const renderedAssets = (0, react_1.useMemo)(() => buildNodes(planeAssets), [buildNodes, planeAssets]);
+    const renderedPlacements = (0, react_1.useMemo)(() => buildNodes(tapToPlaceAssets), [buildNodes, tapToPlaceAssets]);
     // ─── Plane wrapping (AR mode only) ────────────────────────────────────────
-    const planeMode = (scene.plane_detection ?? "NONE").toUpperCase();
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
-    const usePlane = mode === "ar" && (planeMode === "AUTOMATIC" || planeMode === "MANUAL");
+    const usePlane = (0, webCapabilities_1.usesPlaneWrapper)(scene.plane_detection, mode);
     const body = usePlane ? (<ViroARPlane_web_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={() => onPlaneDetected?.()}>
       {renderedAssets}
     </ViroARPlane_web_1.ViroARPlane>) : (<>{renderedAssets}</>);
@@ -252,8 +477,18 @@ const StudioARSceneInner = (props) => {
       <ViroAmbientLight_web_1.ViroAmbientLight color="#ffffff" intensity={studioLighting_1.STUDIO_AMBIENT_INTENSITY}/>
       <ViroDirectionalLight_web_1.ViroDirectionalLight color="#ffffff" intensity={studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY} direction={studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION}/>
       {body}
+      {/* At scene root: a placed asset is in world space, and the plane wrapper
+            would re-parent it to the plane it happened to be tapped on. */}
+      {renderedPlacements}
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_web_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{ fontFamily: "Arial", fontSize: 16, color: "#CCCCCC", textAlign: "center" }}/>)}
     </>);
-    return mode === "3d" ? <ViroScene_web_1.ViroScene>{children}</ViroScene_web_1.ViroScene> : <ViroARScene_web_1.ViroARScene>{children}</ViroARScene_web_1.ViroARScene>;
+    return mode === "3d" ? (
+    // The editor previews no tone curve, and virocore's default Hable
+    // luminance-only pass renders pure white at about 0.77. Off here rather than
+    // via the navigator's `hdrEnabled`, which would take PBR with it — the same
+    // line StudioARScene draws natively.
+    <ViroScene_web_1.ViroScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}>{children}</ViroScene_web_1.ViroScene>) : (<ViroARScene_web_1.ViroARScene ref={arSceneRef} toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}>
+      {children}
+    </ViroARScene_web_1.ViroARScene>);
 };

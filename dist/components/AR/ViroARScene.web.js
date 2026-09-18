@@ -53,6 +53,7 @@ const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("../Web/ViroWebContext");
 const ViroConstants_1 = require("../ViroConstants");
+const useViroToneMapping_1 = require("../Web/useViroToneMapping");
 function anchorToViro(p) {
     return {
         anchorId: p.id,
@@ -79,6 +80,7 @@ function trackingStateToConstant(state) {
 exports.ViroARScene = (0, react_1.forwardRef)(function ViroARScene(props, ref) {
     const { session, anchors, trackingState } = (0, ViroWebContext_1.useViroAR)();
     const renderer = (0, ViroWebContext_1.useViroRenderer)();
+    (0, useViroToneMapping_1.useViroToneMapping)(props.toneMappingEnabled);
     // Read latest callbacks from a ref so effects don't re-run on identity change.
     const propsRef = (0, react_1.useRef)(props);
     propsRef.current = props;

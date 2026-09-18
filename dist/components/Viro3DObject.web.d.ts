@@ -19,6 +19,18 @@ type Props = ViroWebNodeProps & {
     type?: string;
     resources?: unknown[];
     animation?: ViroAnimationProp;
+    /**
+     * Blend-shape weights, by the target names the model was exported with. Same
+     * shape as native's: `[{ target: "Smile", weight: 0.8 }]`.
+     */
+    morphTargets?: Array<{
+        target?: string;
+        weight?: number;
+    }>;
+    /** Where the blending runs. Native's default is the CPU path. */
+    morphMode?: "cpu" | "gpu" | "hybrid";
+    /** The names this model morphs by, once it has loaded. */
+    onMorphTargets?: (keys: string[]) => void;
     onLoadStart?: () => void;
     onLoadEnd?: (success?: boolean) => void;
     onError?: (error: unknown) => void;

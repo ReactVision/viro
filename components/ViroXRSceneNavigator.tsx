@@ -1,5 +1,12 @@
 import * as React from "react";
-import { AppState, NativeModules, StyleSheet, View, ViewProps } from "react-native";
+import {
+  AppState,
+  NativeModules,
+  PermissionsAndroid,
+  StyleSheet,
+  View,
+  ViewProps,
+} from "react-native";
 import { ViroARSceneNavigator } from "./AR/ViroARSceneNavigator";
 import { ViroSceneNavigator } from "./ViroSceneNavigator";
 import { isQuest, isVisionOS } from "./Utilities/ViroPlatform";
@@ -9,6 +16,15 @@ import {
   ImmersiveSpaceStyle,
 } from "./VisionOS/ViroVisionOSModule";
 import { VRQuestNavigatorBridge } from "./Utilities/VRQuestNavigatorBridge";
+import { VRModuleOpenXR } from "./Utilities/VRModuleOpenXR";
+import type { Viro3DPoint } from "./Types/ViroUtils";
+
+const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
+  | {
+      project: (tag: number, point: Viro3DPoint) => Promise<any>;
+      unproject: (tag: number, point: Viro3DPoint) => Promise<any>;
+    }
+  | undefined;
 
 const VRLauncher = NativeModules.VRLauncher as
   | { launchVRScene?: () => void }
@@ -23,6 +39,19 @@ const VRLauncher = NativeModules.VRLauncher as
 // AR continues to work on RN >= 0.81 (Expo 54+) — only the Quest VR launch
 // is gated.
 const MIN_RN_FOR_VR = { major: 0, minor: 83 };
+
+// Declared in the manifest by withViroAndroid.ts, but Horizon OS treats these
+// as dangerous runtime permissions — the manifest entry alone doesn't grant
+// them. USE_ANCHOR_API/USE_SCENE gate plane & anchor data (needed now that the
+// ViroARScene root mounts on Quest too); HEADSET_CAMERA gates the passthrough
+// Camera2 feed ViroObjectDetector reads. Requested once before the first VR
+// launch; denial degrades gracefully elsewhere (no planes / no passthrough
+// feed, see QuestPassthroughCamera) rather than blocking VR.
+const QUEST_RUNTIME_PERMISSIONS = [
+  "horizonos.permission.USE_ANCHOR_API",
+  "com.oculus.permission.USE_SCENE",
+  "horizonos.permission.HEADSET_CAMERA",
+];
 
 function checkRNVersionForVR(): void {
   let version = "unknown";
@@ -169,12 +198,38 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     // AR:    expose the underlying ViroARSceneNavigator instance directly.
     React.useImperativeHandle(ref, () => {
       if (isQuest) {
+        // project/unproject/recenterTracking can't go through dispatchOp — that
+        // queue is fire-and-forget (push/pop/etc. have no return value), while
+        // these three need a result back. Instead they reuse the same viewTag
+        // handoff VRQuestNavigatorBridge already publishes for VRModuleOpenXR:
+        // both activities share one Fabric UIManager, so a tag captured in
+        // VRActivity resolves fine from a native module call made here in the
+        // panel. recenterTracking goes through VRModuleOpenXR (Quest-specific,
+        // already used this way elsewhere); project/unproject reuse the generic
+        // VRTSceneNavigatorModule, which already resolves views by raw tag.
+        const requireViewTag = (): number => {
+          const tag = VRQuestNavigatorBridge.getViewTag();
+          if (tag == null) {
+            throw new Error(
+              "[Viro] Quest VR scene not mounted yet — call this after the VR scene is active."
+            );
+          }
+          return tag;
+        };
         const bridgeNav = {
           push:    (scene: any) => VRQuestNavigatorBridge.dispatchOp({ type: "push",    scene }),
           replace: (scene: any) => VRQuestNavigatorBridge.dispatchOp({ type: "replace", scene }),
           jump:    (scene: any) => VRQuestNavigatorBridge.dispatchOp({ type: "jump",    scene }),
           pop:     ()           => VRQuestNavigatorBridge.dispatchOp({ type: "pop"              }),
           popN:    (n: number)  => VRQuestNavigatorBridge.dispatchOp({ type: "popN",   n       }),
+          recenterTracking: () => VRModuleOpenXR?.recenterTracking?.(requireViewTag()),
+          // async so a missing viewTag rejects the returned promise instead of
+          // throwing synchronously — callers doing `nav.project(p).catch(...)`
+          // without awaiting still get the rejection.
+          project: async (point: Viro3DPoint) =>
+            ViroSceneNavigatorModule?.project(requireViewTag(), point),
+          unproject: async (point: Viro3DPoint) =>
+            ViroSceneNavigatorModule?.unproject(requireViewTag(), point),
         };
         return { sceneNavigator: bridgeNav, arSceneNavigator: bridgeNav };
       }
@@ -229,23 +284,33 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     React.useEffect(() => {
       if (!isQuest) return;
       checkRNVersionForVR();
-      const scene = vrInitialScene ?? initialScene;
-      if (scene) {
-        VRQuestNavigatorBridge.setIntent(scene, {
-          hdrEnabled,
-          pbrEnabled,
-          bloomEnabled,
-          shadowsEnabled,
-          multisamplingEnabled,
-          vrModeEnabled,
-          passthroughEnabled,
-          handTrackingEnabled,
-          onExitViro,
-          debug,
-        });
-      }
-      VRQuestNavigatorBridge.setVRActive(true);
-      VRLauncher?.launchVRScene?.();
+
+      const registerIntentAndLaunch = () => {
+        const scene = vrInitialScene ?? initialScene;
+        if (scene) {
+          VRQuestNavigatorBridge.setIntent(scene, {
+            hdrEnabled,
+            pbrEnabled,
+            bloomEnabled,
+            shadowsEnabled,
+            multisamplingEnabled,
+            vrModeEnabled,
+            passthroughEnabled,
+            handTrackingEnabled,
+            onExitViro,
+            debug,
+          });
+        }
+        VRQuestNavigatorBridge.setVRActive(true);
+        VRLauncher?.launchVRScene?.();
+      };
+
+      // Request the runtime grants once before the first launch. Caught and
+      // ignored on failure — a denied/unavailable permission should degrade
+      // (no planes, no passthrough camera), not block VR from opening at all.
+      PermissionsAndroid.requestMultiple(QUEST_RUNTIME_PERMISSIONS as any)
+        .catch(() => undefined)
+        .then(registerIntentAndLaunch);
 
       const sub = AppState.addEventListener("change", (nextState) => {
         const prev = appStateRef.current;

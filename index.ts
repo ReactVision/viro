@@ -59,6 +59,11 @@ import {
   approachVec3,
 } from "./components/AR/ViroSmoothing";
 import {
+  useViroThrottledWrite,
+  viroVec3Settled,
+  VIRO_REPLICATION_WRITE_INTERVAL_MS,
+} from "./components/hooks/useViroThrottledWrite";
+import {
   cloudAnchorFrameSource,
   metaSpatialAnchorFrameSource,
   visionOSSharedSpaceFrameSource,
@@ -171,6 +176,10 @@ export type {
   ViroSmoothedFields,
 } from "./components/hooks/useViroSmoothing";
 export type { ViroVec3, ViroQuat } from "./components/AR/ViroSmoothing";
+export type {
+  ViroThrottledWrite,
+  ViroThrottledWriteOptions,
+} from "./components/hooks/useViroThrottledWrite";
 import { ViroObjectDetector } from "./components/ViroObjectDetector";
 export type {
   ViroDetectorMode,
@@ -361,6 +370,9 @@ export {
   approachFactor,
   approachVec3,
   approachQuat,
+  useViroThrottledWrite,
+  viroVec3Settled,
+  VIRO_REPLICATION_WRITE_INTERVAL_MS,
   ViroARImageMarker,
   ViroARObjectMarker,
   ViroARTrackingTargets,

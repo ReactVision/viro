@@ -291,6 +291,40 @@ Limits per room: 512 entities and 16 KB of serialised fields per entity. `org-to
 
 **Positions stored here are location-frame coordinates, exactly like poses on the channel.** The same `worldToLocation` / `locationToWorld` conversion applies, for the same reason: a world position is per-session and means nothing to the peer receiving it.
 
+### Writing at a sane rate
+
+The relay allows 120 messages a second per peer here and closes the socket at 1008 above it, which also refuses that key for the next 30 seconds. Drag callbacks arrive every frame, which is 72 to 90 a second on a headset, so a write wired straight to one exceeds that on its own, and two held objects exceed it twice over.
+
+`useViroThrottledWrite` holds the rate and keeps the last value, which plain throttling would drop and leave the object a frame short of where the hand let go:
+
+```tsx
+const drag = useViroThrottledWrite(
+  (position: ViroVec3) =>
+    replication.set(id, { position }, { optimistic: true }),
+  { unchanged: viroVec3Settled(0.002) }
+);
+// onDrag:     drag.push(positionInFrame)
+// on release: drag.flush(); replication.release(id);
+```
+
+`unchanged` is a deadband, and it is where most of the saving is: placing something precisely is mostly slow movement, and skipping those writes costs no latency at all. It is measured against what was last sent rather than the previous sample, so a slow drag cannot creep any distance one sub-threshold step at a time.
+
+### Leave a dragged node to the renderer
+
+The renderer moves a dragged node itself, every frame, straight to where the ray points, and `onDrag` reports where it put it. Setting `position` at the same time gives that node two authors, and the one arriving through React is always the older of the two: it has been through the write interval, the round trip and the smoother. On the device doing the dragging that reads as the object trailing the hand and snapping back a few centimetres, worse the faster the drag.
+
+So render the replicated position for what other peers are holding, and leave what this device is holding alone:
+
+```tsx
+const [pinned, setPinned] = useState<ViroVec3 | null>(null);
+// ClickDown: setPinned(position); replication.claim(id)
+// ClickUp:   drag.flush(); replication.release(id); setPinned(null)
+
+<ViroBox position={pinned ?? position} dragType="FixedDistance" ... />;
+```
+
+Pinned rather than dropped, because React Native writes a prop only when its value changes, so an unchanged array never reaches the renderer at all. Flush before lifting the pin, so the position that comes back is the one the drag ended on rather than the one before the last write. Clear the pin if ownership is lost without a ClickUp, which a dropped socket or a peer taking the object will do.
+
 ### What is saved, and what is not
 
 **Replicated state is saved.** The hosted relay writes a room back to the platform when its last peer leaves, on a sweep while a session is running, and again when it is restarted, and it reads that copy back when the room is next opened. Objects placed in a work zone are still there tomorrow, and a deploy mid-session costs a reconnect rather than the room.

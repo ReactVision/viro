@@ -43,10 +43,11 @@ export type UseViroColocationOptions = ViroColocationConfig & {
    * native module to JS. Swappable for events later without changing this
    * hook's API.
    *
-   * Deliberately faster than the 10 Hz peers actually arrive at, because the
-   * poll and the arrival are unsynchronised: reading every 100 ms makes a pose
-   * wait 50 ms on average for the next read, which is latency on top of the
-   * network and shows up as a peer marker lagging the person it marks. A read
+   * Deliberately faster than the 20 Hz peers actually arrive at, because the
+   * poll and the arrival are unsynchronised: polling at the arrival rate still
+   * makes a pose wait half an interval on average for the next read, which is
+   * latency on top of the network and shows up as a peer marker lagging the
+   * person it marks. A read
    * that finds nothing new does not re-render, so the extra reads cost a native
    * call rather than a pass over every consumer.
    */

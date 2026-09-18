@@ -22,6 +22,11 @@
 
   > **The two Quest input fixes above are still inert in this branch.** Their native half is now on `virocore/develop` (`ffb38acb`, #369), but it landed after this branch's `viro_renderer-release.aar` was built, so the bundled binary does not carry it yet — see the Migration note.
 
+### Changed
+
+- **Peer poses go out at 20 Hz instead of 10**, so `VIRO_POSE_INTERVAL_MS` is now 50. The old rate assumed receivers interpolate, which nothing did until `useViroSmoothedPeers`, and it left a peer marker visibly staler than a replicated object written at 30 Hz on the other socket. An app that publishes on the constant picks this up with no change; one that publishes on its own timer is still free to, since native drops anything faster. **This needs the rebuilt `ReactVisionCCA` prebuilts to take effect**: the rate lives in `RVCCAColocationSession::Config` and JS cannot reach it.
+- **`useViroColocation` reads peers every 33 ms rather than every 100.** The poll and pose arrival are unsynchronised, so the poll interval adds half itself as latency on top of the network and reads as a marker trailing the person it marks. A read that finds nothing new does not re-render, so the extra reads cost a native call rather than a pass over every consumer.
+
 ### Migration
 
 - No breaking changes for phone builds. If an app also sets `android.targetSdkVersion` or `buildArchs` through `expo-build-properties`, the plugin listed earlier in `plugins` wins on the same `gradle.properties` key, because config-plugin mods run in reverse registration order.

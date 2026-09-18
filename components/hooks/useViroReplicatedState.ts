@@ -41,6 +41,11 @@ export type UseViroReplicatedStateResult = {
     opts?: ViroWriteOptions
   ) => void;
   remove: (id: string, opts?: ViroWriteOptions) => void;
+  /**
+   * Empty the room for everyone, whatever anyone is holding. Deleting entity by
+   * entity cannot do this: an owned one refuses `not-owner`.
+   */
+  clear: () => void;
   /** True when this device holds authority over `id`. */
   isMine: (id: string) => boolean;
 };
@@ -107,6 +112,7 @@ export function useViroReplicatedState(
     release: (id) => client.release(id),
     set: (id, fields, opts) => client.set(id, fields, opts),
     remove: (id, opts) => client.delete(id, opts),
+    clear: () => client.clear(),
     isMine: (id) => {
       const e = client.get(id);
       return !!e && e.owner !== null && e.owner === client.localPeerId;

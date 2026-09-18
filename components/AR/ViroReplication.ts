@@ -246,6 +246,18 @@ export class ViroReplicationClient {
     this.send({ op: "delete", id, expectVersion: opts.expectVersion });
   }
 
+  /**
+   * Empty the room, whoever is holding what.
+   *
+   * The reset a shared work zone needs, and the one operation that ignores
+   * ownership. Issuing a reset as one `delete` per entity cannot work: an owned
+   * entity refuses `not-owner`, so exactly the objects somebody is still
+   * holding would survive it.
+   */
+  clear(): void {
+    this.send({ op: "clear" });
+  }
+
   // ── Socket ────────────────────────────────────────────────────────────────
 
   private open(): void {

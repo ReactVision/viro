@@ -212,7 +212,7 @@ The channel carries frame-native data only: poses and presence. Everything else 
 ```tsx
 import { useViroReplicatedState } from "@reactvision/react-viro";
 
-const { entities, byId, claim, release, set, remove, isMine } =
+const { entities, byId, claim, release, set, remove, clear, isMine } =
   useViroReplicatedState({
     roomId, // the same id that names the frame and the channel
     apiKey,
@@ -238,6 +238,7 @@ An entity is `{ id, fields, version, owner }`. The server orders every operation
 - **A departing peer releases everything it held.** A device that crashes mid-grab does not lock that object for the life of the room.
 - **Unowned entities are last-writer-wins.** Pass `expectVersion` to opt into optimistic concurrency instead: the write is refused `version-conflict` if the entity moved on, and the current value comes back with the refusal.
 - **`optimistic` is per write and off by default.** The default costs one round trip and never shows a value that turns out not to be true. Turn it on for something being dragged, where a round trip per frame is visible.
+- **`clear` is the one operation that ignores ownership**, and it has to be. A reset issued as one `remove` per entity is refused `not-owner` on everything anyone is holding, so exactly the objects still in someone's hand would survive it. Any peer may call `clear`; it empties the room for everyone and arrives as ordinary deletes, so a device that was not listening picks it up on its next resync.
 
 Refusals reach `onReject` as one of `not-owner`, `version-conflict`, `already-owned`, `no-such-entity`, `malformed`, `too-many-entities` or `field-too-large`.
 

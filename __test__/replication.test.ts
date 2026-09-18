@@ -411,3 +411,51 @@ describe("sending while disconnected", () => {
     expect(client.get("cube")).toBeUndefined();
   });
 });
+
+describe("clear", () => {
+  it("sends one op rather than a delete per entity", () => {
+    // A reset issued as deletes cannot work: the server refuses not-owner, so
+    // exactly the objects someone is still holding would survive it.
+    const s = connectAndWelcome([entity()]);
+    s.sent.length = 0;
+
+    client.clear();
+    expect(s.sent.length).toBe(1);
+    expect(s.sent[0].op).toBe("clear");
+    // Carries a ref like every other write, so a refusal can name it.
+    expect(typeof s.sent[0].ref).toBe("string");
+  });
+
+  it("empties local state only when the server's deletes arrive", () => {
+    const s = connectAndWelcome([entity()], 4);
+    client.clear();
+    // Still there: clear is not optimistic, and the room is the authority on
+    // what a reset actually removed.
+    expect(client.get("cube")).toBeDefined();
+
+    s.deliver({
+      t: "delta",
+      ops: [{ kind: "delete", seq: 5, id: "cube", by: "them" }],
+    });
+    expect(client.get("cube")).toBeUndefined();
+  });
+
+  it("applies every delete of a cleared room, not just the first", () => {
+    // Each delete carries its own sequence for this reason: an op at or below
+    // the last applied seq is skipped, so a batch sharing one would drop all
+    // but the first and leave the room populated here and empty on the server.
+    const s = connectAndWelcome(
+      [entity(), { ...entity(), id: "cone" }, { ...entity(), id: "sign" }],
+      4
+    );
+    s.deliver({
+      t: "delta",
+      ops: [
+        { kind: "delete", seq: 5, id: "cube", by: "them" },
+        { kind: "delete", seq: 6, id: "cone", by: "them" },
+        { kind: "delete", seq: 7, id: "sign", by: "them" },
+      ],
+    });
+    expect(client.getEntities()).toEqual([]);
+  });
+});

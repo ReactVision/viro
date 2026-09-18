@@ -37,9 +37,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroReplicationClient = void 0;
+const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+const ViroVersion_1 = require("../Utilities/ViroVersion");
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
-const DEFAULT_ENDPOINT = "https://platform.reactvision.xyz";
+const DEFAULT_ENDPOINT = "https://colocation.reactvision.xyz";
 /** https:// → wss://, http:// → ws://. Anything else passes through. */
 function toSocketScheme(endpoint) {
     if (endpoint.startsWith("https://"))
@@ -157,6 +159,17 @@ class ViroReplicationClient {
     delete(id, opts = {}) {
         this.send({ op: "delete", id, expectVersion: opts.expectVersion });
     }
+    /**
+     * Empty the room, whoever is holding what.
+     *
+     * The reset a shared work zone needs, and the one operation that ignores
+     * ownership. Issuing a reset as one `delete` per entity cannot work: an owned
+     * entity refuses `not-owner`, so exactly the objects somebody is still
+     * holding would survive it.
+     */
+    clear() {
+        this.send({ op: "clear" });
+    }
     // ── Socket ────────────────────────────────────────────────────────────────
     open() {
         const cfg = this.config;
@@ -174,7 +187,14 @@ class ViroReplicationClient {
             ? new WebSocket(`${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
                 `&projectId=${encodeURIComponent(cfg.projectId)}`)
             : new WebSocket(path, null, {
-                headers: { "x-api-key": cfg.apiKey, "x-project-id": cfg.projectId },
+                headers: {
+                    "x-api-key": cfg.apiKey,
+                    "x-project-id": cfg.projectId,
+                    // Logged by the relay, never used for a decision. It is what
+                    // separates one client build from another when a refusal shows up
+                    // in the relay log and every device otherwise looks alike.
+                    "x-rv-client": `viro/${ViroVersion_1.VIRO_VERSION} (${react_native_1.Platform.OS})`,
+                },
             });
         this.ws = ws;
         ws.onopen = () => {

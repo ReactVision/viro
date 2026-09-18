@@ -24,8 +24,15 @@ export type UseViroColocationOptions = ViroColocationConfig & {
     /**
      * How often peers are read back, in ms. Peers arrive on a socket thread and
      * are polled rather than pushed: this codebase has no live event path from a
-     * native module to JS, and 10 Hz of a small array is cheaper than building
-     * one. Swappable for events later without changing this hook's API.
+     * native module to JS. Swappable for events later without changing this
+     * hook's API.
+     *
+     * Deliberately faster than the 10 Hz peers actually arrive at, because the
+     * poll and the arrival are unsynchronised: reading every 100 ms makes a pose
+     * wait 50 ms on average for the next read, which is latency on top of the
+     * network and shows up as a peer marker lagging the person it marks. A read
+     * that finds nothing new does not re-render, so the extra reads cost a native
+     * call rather than a pass over every consumer.
      */
     pollMs?: number;
 };

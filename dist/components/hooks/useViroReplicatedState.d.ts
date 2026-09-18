@@ -23,6 +23,11 @@ export type UseViroReplicatedStateResult = {
     /** Merge fields. Only the owner may write to an owned entity. */
     set: (id: string, fields: Record<string, unknown>, opts?: ViroWriteOptions) => void;
     remove: (id: string, opts?: ViroWriteOptions) => void;
+    /**
+     * Empty the room for everyone, whatever anyone is holding. Deleting entity by
+     * entity cannot do this: an owned one refuses `not-owner`.
+     */
+    clear: () => void;
     /** True when this device holds authority over `id`. */
     isMine: (id: string) => boolean;
 };

@@ -43,7 +43,11 @@ export type ViroReplicatedEntity = {
     owner: string | null;
 };
 export type ViroReplicationState = "idle" | "connecting" | "synced" | "reconnecting" | "failed";
-export type ViroReplicationRejectReason = "not-owner" | "version-conflict" | "already-owned" | "no-such-entity" | "malformed" | "too-many-entities" | "field-too-large";
+export type ViroReplicationRejectReason = "not-owner" | "version-conflict" | "already-owned" | "no-such-entity" | "malformed" | "too-many-entities" | "field-too-large"
+/** The room is at the size its saved copy may be, so nothing more fits. */
+ | "room-too-large"
+/** Every room this team has open adds up to its ceiling on the relay. */
+ | "org-too-large";
 export type ViroReplicationRejection = {
     reason: ViroReplicationRejectReason;
     /** The entity's server state at the time of refusal, when it has one. */
@@ -54,7 +58,13 @@ export type ViroReplicationConfig = {
     roomId: string;
     apiKey: string;
     projectId: string;
-    /** Platform base URL; `http(s)` is converted to `ws(s)`. */
+    /**
+     * Co-location relay base URL; `http(s)` is converted to `ws(s)`.
+     *
+     * The relay, not the platform API. `ViroColocationRooms` calls the platform
+     * for join codes and they are different hosts, so one endpoint cannot serve
+     * both.
+     */
     endpoint?: string;
 };
 export type ViroWriteOptions = {
@@ -109,6 +119,15 @@ export declare class ViroReplicationClient {
     /** Merge `fields` into the entity. Creates it if absent. */
     set(id: string, fields: Record<string, unknown>, opts?: ViroWriteOptions): void;
     delete(id: string, opts?: ViroWriteOptions): void;
+    /**
+     * Empty the room, whoever is holding what.
+     *
+     * The reset a shared work zone needs, and the one operation that ignores
+     * ownership. Issuing a reset as one `delete` per entity cannot work: an owned
+     * entity refuses `not-owner`, so exactly the objects somebody is still
+     * holding would survive it.
+     */
+    clear(): void;
     private open;
     private handle;
     private replaceAll;

@@ -2,6 +2,8 @@ import {
   invertTransform,
   locationToWorld,
   parseLocationTransform,
+  poseCsv,
+  transformDirection,
   worldToLocation,
   type ViroLocationTransform,
 } from "../components/AR/ViroLocationFrame";
@@ -96,5 +98,60 @@ describe("locationToWorld / worldToLocation", () => {
     ];
     closeTo(locationToWorld(scaled, [1, 1, 1]), [3, 4, 5]);
     closeTo(worldToLocation(scaled, [3, 4, 5])!, [1, 1, 1]);
+  });
+});
+
+describe("transformDirection", () => {
+  it("rotates without picking up the frame's origin", () => {
+    // locationToWorld would add the [2, 0, 3] translation, which is right for a
+    // position and turns a unit forward vector into something 3.6 m long.
+    closeTo(transformDirection(YAW90_TRANSLATED, [0, 0, 1]), [1, 0, 0]);
+    closeTo(locationToWorld(YAW90_TRANSLATED, [0, 0, 1]), [3, 0, 3]);
+  });
+
+  it("leaves a direction unit length through a rigid frame", () => {
+    const out = transformDirection(YAW90_TRANSLATED, [0.6, 0, 0.8]);
+    expect(Math.hypot(...out)).toBeCloseTo(1, 5);
+  });
+});
+
+describe("poseCsv", () => {
+  const parse = (csv: string) => csv.split(",").map(Number);
+
+  it("puts the position in the translation elements", () => {
+    const m = parse(poseCsv([1.5, -2, 3], [0, 0, -1], [0, 1, 0]));
+    expect(m).toHaveLength(16);
+    closeTo(m.slice(12), [1.5, -2, 3, 1]);
+  });
+
+  it("points +Z against the look direction, not along it", () => {
+    // The camera looks down its own -Z. Reversing this faces every avatar away
+    // from where its device is pointing, which reads as a plausible scene.
+    const m = parse(poseCsv([0, 0, 0], [0, 0, -1], [0, 1, 0]));
+    closeTo(m.slice(8, 11), [0, 0, 1]);
+  });
+
+  it("produces an orthonormal basis", () => {
+    const m = parse(poseCsv([0, 0, 0], [0.3, -0.5, -0.81], [0.1, 0.99, 0]));
+    const [x, y, z] = [m.slice(0, 3), m.slice(4, 7), m.slice(8, 11)];
+    for (const axis of [x, y, z]) expect(Math.hypot(...axis)).toBeCloseTo(1, 5);
+    const dot = (a: number[], b: number[]) =>
+      a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    expect(dot(x, y)).toBeCloseTo(0, 5);
+    expect(dot(y, z)).toBeCloseTo(0, 5);
+    expect(dot(x, z)).toBeCloseTo(0, 5);
+  });
+
+  it("survives looking straight up, where up and forward are parallel", () => {
+    // The cross product collapses here. Roll is unobservable looking straight
+    // up, so any perpendicular axis is correct, but NaNs are not.
+    const m = parse(poseCsv([0, 0, 0], [0, 1, 0], [0, 1, 0]));
+    expect(m.every((n) => Number.isFinite(n))).toBe(true);
+    closeTo(m.slice(8, 11), [0, -1, 0]);
+  });
+
+  it("writes zeroes rather than NaN when handed a degenerate vector", () => {
+    const m = parse(poseCsv([0, 0, 0], [0, 0, 0], [0, 0, 0]));
+    expect(m.every((n) => Number.isFinite(n))).toBe(true);
   });
 });

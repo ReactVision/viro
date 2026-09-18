@@ -203,6 +203,24 @@ const hereInMyWorld = locationToWorld(frame, theirPosition);
 
 `peers[].position` is already in the frame, so a peer marker rendered **inside** `<ViroSharedFrame>` needs no conversion at all — the scene graph does it. Conversion is only for content you keep outside the frame node.
 
+### Publishing a pose
+
+`publishPose` takes 16 column-major floats as a string. `poseCsv` builds it from a position and a look direction, which is safer than assembling it by hand: the camera looks down its own -Z so the +Z basis is the _negated_ forward, and reversing that points every avatar away from where its device is pointing, in a way that still looks like a plausible scene.
+
+```tsx
+publishPose(
+  poseCsv(
+    locationToWorld(inverse, camera.position),
+    transformDirection(inverse, camera.forward),
+    transformDirection(inverse, camera.up)
+  )
+);
+```
+
+`transformDirection` is the one to reach for on a direction. `locationToWorld` moves a _point_, so a forward vector through it comes back displaced by the frame's origin.
+
+Publishing more often than `VIRO_POSE_INTERVAL_MS` puts nothing extra on the wire, because native drops anything faster than `poseSendHz`. The constant is there so an app driving from a camera callback at 90 Hz does not format 16 floats for every frame that never reaches the socket.
+
 ---
 
 ## Replicated state

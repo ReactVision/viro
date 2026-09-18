@@ -83,6 +83,90 @@ export function worldToLocation(
 }
 
 /**
+ * A direction through a transform, ignoring where the frame's origin sits.
+ *
+ * `locationToWorld` moves a *point*, which is right for a position and wrong
+ * for a basis vector: a forward vector put through it comes back displaced by
+ * the origin, so an avatar built from it faces a direction that drifts with the
+ * frame. Only the rotation applies to a direction, which is the upper 3x3.
+ */
+export function transformDirection(
+  transform: ViroLocationTransform,
+  direction: Viro3DPoint
+): Viro3DPoint {
+  const [x, y, z] = direction;
+  return [
+    transform[0] * x + transform[4] * y + transform[8] * z,
+    transform[1] * x + transform[5] * y + transform[9] * z,
+    transform[2] * x + transform[6] * y + transform[10] * z,
+  ];
+}
+
+function normalise(v: Viro3DPoint): Viro3DPoint {
+  const length = Math.hypot(v[0], v[1], v[2]);
+  if (!(length > 1e-6)) return [0, 0, 1];
+  return [v[0] / length, v[1] / length, v[2] / length];
+}
+
+function cross(a: Viro3DPoint, b: Viro3DPoint): Viro3DPoint {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+/**
+ * The 16-float pose string the co-location channel carries, from a position and
+ * a look direction. Everything passed in is already location-frame.
+ *
+ * Built from the camera's own forward and up rather than from Euler angles:
+ * a triple of angles needs a convention to mean anything, the convention
+ * differs between the editor, the renderer and the scene graph, and the wrong
+ * one produces an avatar that is subtly wrong in a way nobody notices until
+ * they are standing in the room. Two basis vectors have no convention to get
+ * wrong.
+ *
+ * The camera looks down its own -Z, so the +Z basis is the negated forward.
+ * Reversing that points every avatar away from where its device is pointing.
+ */
+export function poseCsv(
+  position: Viro3DPoint,
+  forward: Viro3DPoint,
+  up: Viro3DPoint
+): string {
+  const z = normalise([-forward[0], -forward[1], -forward[2]]);
+  let x = cross(up, z);
+  if (Math.hypot(x[0], x[1], x[2]) < 1e-6) {
+    // Looking straight up or down: `up` is parallel to z and the cross product
+    // collapses. Any perpendicular axis will do, since roll is unobservable.
+    x = cross([0, 0, 1], z);
+  }
+  x = normalise(x);
+  const y = cross(z, x);
+
+  const m = [
+    x[0],
+    x[1],
+    x[2],
+    0,
+    y[0],
+    y[1],
+    y[2],
+    0,
+    z[0],
+    z[1],
+    z[2],
+    0,
+    position[0],
+    position[1],
+    position[2],
+    1,
+  ];
+  return m.map((n) => (Number.isFinite(n) ? n.toFixed(6) : "0")).join(",");
+}
+
+/**
  * General 4×4 inverse.
  *
  * A rigid transform could be inverted far more cheaply, but the resolved

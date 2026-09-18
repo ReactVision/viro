@@ -37,6 +37,7 @@ import {
   setColocationLocalPose,
   getColocationState,
   getColocationPeers,
+  VIRO_POSE_INTERVAL_MS,
 } from "./components/AR/ViroColocation";
 import { useViroColocation } from "./components/hooks/useViroColocation";
 import { useViroColocationRoom } from "./components/hooks/useViroColocationRoom";
@@ -58,6 +59,8 @@ import {
   locationToWorld,
   worldToLocation,
   invertTransform,
+  transformDirection,
+  poseCsv,
 } from "./components/AR/ViroLocationFrame";
 import { ViroARImageMarker } from "./components/AR/ViroARImageMarker";
 import { ViroARObjectMarker } from "./components/AR/ViroARObjectMarker";
@@ -329,6 +332,7 @@ export {
   setColocationLocalPose,
   getColocationState,
   getColocationPeers,
+  VIRO_POSE_INTERVAL_MS,
   useViroColocation,
   useViroColocationRoom,
   createColocationRoom,
@@ -356,6 +360,8 @@ export {
   locationToWorld,
   worldToLocation,
   invertTransform,
+  transformDirection,
+  poseCsv,
   useViroMapCamera,
   viroMapCameraTransform,
   useGameLoop,

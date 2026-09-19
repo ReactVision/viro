@@ -184,6 +184,8 @@ function parseMaterialConfig(raw) {
             config.transparencyMode = r.transparencyMode;
         if (typeof r.cullMode === "string")
             config.cullMode = r.cullMode;
+        if (typeof r.writesToDepthBuffer === "boolean")
+            config.writesToDepthBuffer = r.writesToDepthBuffer;
         for (const key of TEXTURE_KEYS) {
             const v = r[key];
             if (typeof v === "string" || v === null)
@@ -231,6 +233,8 @@ function buildViroMaterialDefinition(config) {
         out.transparencyMode = config.transparencyMode;
     if (config.cullMode !== undefined)
         out.cullMode = config.cullMode;
+    if (config.writesToDepthBuffer !== undefined)
+        out.writesToDepthBuffer = config.writesToDepthBuffer;
     for (const key of TEXTURE_KEYS) {
         const mapped = textureToViro(config[key]);
         if (mapped !== undefined)

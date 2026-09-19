@@ -24,11 +24,13 @@ ViroReact is MIT licensed and free forever.
 
 ## Supported Platforms
 
-| Platform         | Support      |
-| ---------------- | ------------ |
-| iOS (ARKit)      | ✅ Supported |
-| Android (ARCore) | ✅ Supported |
-| Meta Horizon OS  | ✅ Supported |
+| Platform             | Support      | Notes |
+| -------------------- | ------------ | ----- |
+| iOS (ARKit)          | ✅ Supported | Deployment target 15.1 |
+| Android (ARCore)     | ✅ Supported | |
+| Meta Horizon OS      | ✅ Supported | Quest 3 / 3S mixed reality through OpenXR |
+| Apple visionOS       | ✅ Supported | |
+| Web (WebGL2 / WASM)  | ✅ Supported | Needs the optional `@reactvision/viro-web-renderer` peer — see [WEB.md](./WEB.md) |
 
 ViroReact works with both **React Native CLI** and **Expo** projects.
 
@@ -63,6 +65,7 @@ ViroReact ships with a complete spatial computing toolkit out of the box — no 
 - Image and object recognition triggers
 - Cloud Anchors for persistent, multi-user shared AR content _(Platform feature)_
 - Geospatial Anchors that pin content to real-world latitude, longitude, and altitude _(Platform feature)_
+- Co-location: two devices in the same room agreeing on where the scene is, with replicated state on top — see [CO_LOCATION.md](./CO_LOCATION.md)
 
 **Rendering**
 

@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroText = ViroText;
 /**
  * Web implementation of ViroText — a text geometry rendered by the WASM font
- * pipeline (freetype + preloaded Helvetica). Maps `text`, `style` (fontSize,
+ * pipeline (freetype + preloaded Roboto). Maps `text`, `style` (fontSize,
  * color), `width`/`height`, alignment, line-break, clip and `maxLines` onto the
  * `viroCreateText` C API.
  *
@@ -47,6 +47,7 @@ const React = __importStar(require("react"));
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const useViroNode_1 = require("./Web/useViroNode");
+const ViroFlexSlotContext_1 = require("./Web/ViroFlexSlotContext");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroColor_1 = require("./Web/viroColor");
 function hAlign(v) {
@@ -82,7 +83,12 @@ function lineBreak(v) {
     }
 }
 function ViroText(props) {
-    const { text, width = 1, height = 1, maxLines = 0, style, } = props;
+    const { text, maxLines = 0, style, } = props;
+    // Inside a ViroFlexView the layout decides the text box, as it does natively:
+    // the block still wraps and clips to it, it just no longer sizes itself.
+    const slot = (0, ViroFlexSlotContext_1.useViroFlexSlot)();
+    const width = slot?.width ?? props.width ?? 1;
+    const height = slot?.height ?? props.height ?? 1;
     const fontSize = style?.fontSize ?? 18;
     const colorValue = props.color ?? style?.color ?? "#ffffff";
     const clip = props.textClipMode === "None" ? viro_web_renderer_1.ViroTextClipMode.None : viro_web_renderer_1.ViroTextClipMode.ClipToBounds;

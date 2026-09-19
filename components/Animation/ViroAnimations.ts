@@ -72,6 +72,8 @@ export class ViroAnimations {
         }
       }
     }
-    AnimationManager.setJSAnimations(animations);
+    if (AnimationManager) {
+      AnimationManager.setJSAnimations(animations);
+    }
   }
 }

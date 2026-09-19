@@ -79,6 +79,16 @@ let _vrActive = false;
 let _viewTag: number | null = null;
 const _viewTagListeners = new Set<(tag: number | null) => void>();
 
+// ── Quest scene error relay ──────────────────────────────────────────────────
+// VRActivity is a separate React root (see module doc above), so no panel-side
+// error boundary can ever see a scene crash there. ViroQuestEntryPoint's own
+// boundary catches it and reports here; StudioSceneNavigator subscribes and
+// forwards into the same onError prop it already uses for phone-AR errors, so
+// a host's existing Sentry wiring picks up Quest crashes with no changes on
+// its end. Fire-and-forget (no replay-on-subscribe like onIntent/onViewTag) —
+// a crash is an event, not state a late subscriber should see again.
+const _questErrorListeners = new Set<(error: Error) => void>();
+
 export const VRQuestNavigatorBridge = {
   // ── Called by ViroXRSceneNavigator when mounting on Quest ──────────────────
 
@@ -163,6 +173,21 @@ export const VRQuestNavigatorBridge = {
     cb(_viewTag);
     return () => {
       _viewTagListeners.delete(cb);
+    };
+  },
+
+  // ── Quest scene error relay ────────────────────────────────────────────────
+
+  /** Called by ViroQuestEntryPoint's error boundary when a Quest scene throws. */
+  reportQuestError(error: Error): void {
+    _questErrorListeners.forEach((l) => l(error));
+  },
+
+  /** Called by StudioSceneNavigator (panel side) to relay into its onError prop. */
+  onQuestError(cb: (error: Error) => void): () => void {
+    _questErrorListeners.add(cb);
+    return () => {
+      _questErrorListeners.delete(cb);
     };
   },
 };

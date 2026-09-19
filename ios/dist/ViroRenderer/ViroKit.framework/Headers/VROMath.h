@@ -61,6 +61,18 @@ VROMatrix4f VROMathComputePerspectiveProjection(float fovyInDegrees, float aspec
 /*
  Compute an orthographic projection for a right handed coordinate system.
  */
+/*
+ Metal-convention variants of the two projections above: clip-space z maps to [0, 1]
+ instead of OpenGL's [-1, 1]. Metal clips anything with z < 0, so a GL-convention
+ projection loses half the depth range — which matters for any pass that writes into a
+ Metal depth buffer, the shadow map included.
+ */
+VROMatrix4f VROMathComputePerspectiveProjectionZeroToOne(float fovyInDegrees, float aspectRatio,
+                                                         float zNear, float zFar);
+VROMatrix4f VROMathComputeOrthographicProjectionZeroToOne(float left, float right,
+                                                          float bottom, float top,
+                                                          float near, float far);
+
 VROMatrix4f VROMathComputeOrthographicProjection(float left, float right, float bottom, float top,
                                                  float near, float far);
 

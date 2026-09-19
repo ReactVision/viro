@@ -43,15 +43,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSkyBox = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
-const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 /**
  * Used to render a skybox as a scene background.
@@ -74,7 +73,7 @@ class ViroSkyBox extends React.Component {
         let nativeProps = Object.assign({}, this.props);
         if (this.props.source !== undefined) {
             for (var key in this.props.source) {
-                var s = (0, resolveAssetSource_1.default)(this.props.source[key]);
+                var s = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source[key]);
                 skyboxDict[key] = s;
             }
             nativeProps.source = skyboxDict;

@@ -32,9 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARScene = void 0;
 /**
@@ -49,7 +46,9 @@ const ViroSceneContext_1 = require("../ViroSceneContext");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
-const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("../Utilities/ViroAssetSource");
 const ViroBase_1 = require("../ViroBase");
 const ViroConstants_1 = require("../ViroConstants");
 const ViroCameraModule = react_native_1.NativeModules.ViroCameraModule;
@@ -309,7 +308,7 @@ class ViroARScene extends ViroBase_1.ViroBase {
         // parse out displayPointCloud prop
         if (this.props.displayPointCloud) {
             displayPointCloud = true;
-            pointCloudImage = (0, resolveAssetSource_1.default)(this.props.displayPointCloud.imageSource);
+            pointCloudImage = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.displayPointCloud.imageSource);
             pointCloudScale = this.props.displayPointCloud.imageScale;
             pointCloudMaxPoints = this.props.displayPointCloud.maxPoints;
         }

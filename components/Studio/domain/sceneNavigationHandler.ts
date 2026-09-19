@@ -17,6 +17,8 @@ import {
   valueMatchesType,
 } from "./expressionEvaluator";
 import { studioRecordingStore } from "./recordingStore";
+import { questAlertStore } from "./questAlertStore";
+import { studioApiError } from "./studioApiError";
 import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
@@ -721,10 +723,10 @@ export function executeFunctionWithRelations(
     const message = fill(alert.alert_message);
     if (isQuest) {
       // Alert.alert shows a 2D panel dialog — invisible in the VR compositor.
-      // Log it so it's not silently swallowed; in-scene VR alert UI is a TODO.
-      console.warn(
-        `[Studio] Alert (Quest — not shown in VR): "${title}" — ${message}`
-      );
+      // questAlertStore drives an in-scene head-locked panel instead (see
+      // StudioQuestAlertOverlay), dismissed by a controller click, same as
+      // tapping "OK" dismisses the native dialog on phones.
+      questAlertStore.show(title, message);
       return;
     }
     Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);
@@ -996,7 +998,7 @@ async function navigateToScene(
   try {
     const result = await VRTStudioModule.rvGetScene(targetSceneId);
     if (!result?.success) {
-      throw new Error(result?.error ?? "rvGetScene failed");
+      throw studioApiError("rvGetScene", result?.error);
     }
 
     const sceneData: StudioSceneResponse = JSON.parse(result.data!);

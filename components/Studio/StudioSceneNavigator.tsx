@@ -20,24 +20,28 @@ import {
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
 import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
 import { registerSceneAnimations } from "./domain/animationRegistry";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
-import { StudioPlacementStore } from "./domain/placementStore";
+import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
+import { studioApiError } from "./domain/studioApiError";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
 import { VRTStudioModule } from "./VRTStudioModule";
 
+// Tone mapping off here too, or the camera feed takes the default Hable curve for
+// the moment a scene is loading and then snaps when the authored scene mounts.
 function LoadingARScene() {
-  return <ViroARScene />;
+  return <ViroARScene toneMappingEnabled={false} />;
 }
 function LoadingVRScene() {
-  return <ViroScene />;
+  return <ViroScene toneMappingEnabled={false} />;
 }
 
 type ViroOcclusionMode = "peopleOnly" | "depthBased" | undefined;
@@ -201,10 +205,15 @@ export interface StudioSceneNavigatorProps {
    */
   loadingView?: React.ReactNode;
   /**
-   * Opt-in UI for a caught render error. The boundary always catches and calls
-   * `onError`; when this is omitted it renders nothing.
+   * Opt-in UI for a failed scene load or a caught render error. `onError` is
+   * always called either way; when this is omitted it renders nothing, and a
+   * load failure leaves the loading overlay in place.
+   *
+   * `retry` refetches the scene on the load path, or re-mounts the scene tree
+   * on the render path. Errors from a load are StudioApiError, so branch on
+   * `code` rather than matching the message.
    */
-  renderError?: (error: Error) => React.ReactNode;
+  renderError?: (error: Error, retry: () => void) => React.ReactNode;
   /**
    * Show the built-in "recording" indicator (a REC pill) while a RECORD_VIDEO
    * action is recording. Default true, positioned top-centre with an approximate
@@ -265,6 +274,22 @@ export const StudioSceneNavigator = forwardRef<
 
   const [isSceneReady, setIsSceneReady] = useState(false);
 
+  // A failed load has to be state, not just an onError callback: the loading
+  // overlay is gated on isSceneReady, which never flips when the load throws,
+  // so without this the host is left showing its loadingView forever.
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // Deliberately does not clear loadedSceneIdRef: it is only assigned after a
+  // successful parse, so it is already null on the path that can fail. Leaving
+  // it means a retry after a scene did load is a no-op rather than a second
+  // push of the same scene onto the navigator.
+  const retryLoad = useCallback(() => {
+    setLoadError(null);
+    setIsSceneReady(false);
+    setLoadAttempt((attempt) => attempt + 1);
+  }, []);
+
   // Session-scoped variable store: outlives every scene push, resets when the
   // navigator (= the AR/VR session) unmounts.
   const variableStoreRef = useRef<StudioVariableStore | null>(null);
@@ -307,6 +332,16 @@ export const StudioSceneNavigator = forwardRef<
   onPlaneDetectedRef.current = onPlaneDetected;
   onPlaneSelectedRef.current = onPlaneSelected;
   noAssetsMessageRef.current = noAssetsMessage;
+
+  // VRActivity is a separate React root — its own error boundary
+  // (ViroQuestEntryPoint) can't reach this component's onError prop directly,
+  // so it relays crashes through VRQuestNavigatorBridge instead. Forwarding
+  // here means a host's existing onError → Sentry wiring for phone-AR errors
+  // picks up Quest scene crashes too, with no changes needed on the host side.
+  React.useEffect(
+    () => VRQuestNavigatorBridge.onQuestError((error) => onErrorRef.current?.(error)),
+    []
+  );
 
   // Stable so passProps stays referentially steady across renders. Idempotent,
   // so StrictMode's dev double-invoke of StudioARScene's onReady effect is safe.
@@ -351,7 +386,7 @@ export const StudioSceneNavigator = forwardRef<
 
     const projectResult = await VRTStudioModule.rvGetProject();
     if (!projectResult.success) {
-      throw new Error(projectResult.error ?? "rvGetProject failed");
+      throw studioApiError("rvGetProject", projectResult.error);
     }
     if (typeof projectResult.data !== "string") {
       throw new Error("rvGetProject returned no data");
@@ -367,7 +402,11 @@ export const StudioSceneNavigator = forwardRef<
     if (project.scenes.length > 0) {
       return project.scenes[0].id;
     }
-    throw new Error(`Project ${project.id} has no scenes`);
+    // Id on a field, not in the message: interpolated it would open a new
+    // group per project in the host's error reporter.
+    throw Object.assign(new Error("Project has no scenes"), {
+      projectId: project.id,
+    });
   }, [sceneId]);
 
   const loadScene = useCallback(
@@ -385,7 +424,7 @@ export const StudioSceneNavigator = forwardRef<
       const result = await VRTStudioModule.rvGetScene(resolvedSceneId);
       if (isCancelled()) return;
       if (!result.success) {
-        throw new Error(result.error ?? "rvGetScene failed");
+        throw studioApiError("rvGetScene", result.error);
       }
       if (typeof result.data !== "string") {
         throw new Error("rvGetScene returned no data");
@@ -399,7 +438,7 @@ export const StudioSceneNavigator = forwardRef<
       // Names for the tap-to-place prompt (overlay reads this on placement).
       placementNamesRef.current = new Map(
         sceneData.assets
-          .filter((a) => a.tap_to_place)
+          .filter((a) => isTapToPlaceAsset(a))
           .map((a) => [a.id, a.name ?? ""])
       );
 
@@ -416,8 +455,9 @@ export const StudioSceneNavigator = forwardRef<
       // On Quest, pre-register animations and materials before VRActivity
       // launches so the native registrations land before any Viro component
       // mounts; otherwise registerAnimations/createMaterials races the Fabric
-      // commit that creates those components.
-      if (isQuest) {
+      // commit that creates those components. visionOS is the same shape of
+      // problem: the ImmersiveSpace renderer starts outside this commit.
+      if (isQuest || isVisionOS) {
         registerSceneAnimations(sceneData.animations);
         registerStudioMaterialsForAssets(sceneData.assets);
       }
@@ -437,9 +477,11 @@ export const StudioSceneNavigator = forwardRef<
         },
       };
 
-      if (isQuest) {
+      if (isQuest || isVisionOS) {
         // Setting vrSceneEntry mounts ViroXRSceneNavigator with StudioARScene as
-        // vrInitialScene, so VRActivity launches straight into content.
+        // vrInitialScene, so VRActivity launches straight into content. visionOS reads the
+        // same prop — its ImmersiveSpace cannot host a ViroARScene either — so it takes this
+        // path rather than pushing onto a navigator that starts on the loading scene.
         setVrSceneEntry(entry);
       } else {
         navigatorRef.current?.arSceneNavigator?.push(entry);
@@ -455,6 +497,7 @@ export const StudioSceneNavigator = forwardRef<
     loadScene(isCancelled).catch((e: unknown) => {
       if (cancelled) return;
       const err = e instanceof Error ? e : new Error(String(e));
+      setLoadError(err);
       const handler = onErrorRef.current;
       if (handler) handler(err);
       else console.error("[Studio] Failed to load scene:", err);
@@ -463,15 +506,31 @@ export const StudioSceneNavigator = forwardRef<
     return () => {
       cancelled = true;
     };
-  }, [sceneId, loadScene]);
+    // loadAttempt is the retry trigger: loadScene is stable within a mount, so
+    // bumping it is what re-runs the fetch without remounting the AR session.
+  }, [sceneId, loadScene, loadAttempt]);
 
-  // Quest has no camera passthrough, so during load it always needs something
-  // on screen: the caller's loadingView, else a built-in spinner. (AR shows the
-  // live camera, so its overlay stays opt-in.)
-  if (isQuest && !vrSceneEntry) {
+  // Falls back to loadingView when the host passes no renderError, so callers
+  // that never opted in keep exactly their previous behaviour.
+  const loadErrorView = loadError ? renderError?.(loadError, retryLoad) : null;
+  const overlay = isSceneReady ? null : (loadErrorView ?? loadingView ?? null);
+
+  // Before vrSceneEntry resolves, VRActivity hasn't been launched yet (Quest)
+  // or the ImmersiveSpace hasn't opened yet (visionOS), so this window has
+  // nothing of its own to show — it always needs something on screen: the
+  // caller's loadingView, else a built-in spinner. (Phone AR shows the live
+  // camera during load, so its overlay stays opt-in.) This branch sits above
+  // the error boundary, which is why it has to handle loadError itself.
+  // (Quest 3/3S do have colour passthrough once the scene mounts — this branch
+  // is about the pre-launch panel window, not about passthrough support.)
+  //
+  // visionOS needs the same treatment for a different reason: its passthrough lives in
+  // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
+  // while the scene loads.
+  if ((isQuest || isVisionOS) && !vrSceneEntry) {
     return (
       <View style={styles.loader}>
-        {loadingView ?? <ActivityIndicator size="large" color="#ffffff" />}
+        {overlay ?? <ActivityIndicator size="large" color="#ffffff" />}
       </View>
     );
   }
@@ -491,14 +550,40 @@ export const StudioSceneNavigator = forwardRef<
           autofocus={autofocus}
           numberOfTrackedImages={numberOfTrackedImages}
           occlusionMode={occlusionMode}
+          // Bloom defaults on natively and the editor does not preview it, so a
+          // bright material glows on the phone and nowhere else.
+          //
+          // HDR stays ON even though its default tone curve is the other half of
+          // that problem, because PBR rides on it: VROChoreographer::isPBREnabled
+          // is `_hdrEnabled && _pbrEnabled`, and the whole PBR branch of
+          // VROShaderFactory goes with it, so roughness, metalness and the ambient
+          // occlusion map are read by nothing and a PBR material falls back to
+          // Blinn. The tone curve is switched off per scene instead, which is what
+          // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
+          // than left to the native default, so this cannot be switched off again
+          // without meeting the reason it is on.
+          //
+          // Off on Quest, and only there: the HDR composite occludes the
+          // passthrough layer on that OpenXR compositor, so the room disappears
+          // behind the scene. PBR on Quest goes with it, which is the trade — a
+          // headset that shows nothing of the room is the worse of the two.
+          hdrEnabled={!isQuest}
+          bloomEnabled={false}
           onExitViro={onExitViro}
+          // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
+          // than ViroARScene (see StudioARScene for why), and a virtual root
+          // turns none of this on by itself, so both are asked for outright.
+          // They reach VRActivity through the navigator bridge and do not depend
+          // on which root the scene uses.
+          passthroughEnabled={isQuest ? true : undefined}
+          handTrackingEnabled={isQuest ? true : undefined}
           style={StyleSheet.absoluteFill}
         />
         {/* Absolutely filled so the overlay covers the navigator instead of
-            taking flow space beneath it. */}
-        {!isSceneReady && loadingView && (
-          <View style={StyleSheet.absoluteFill}>{loadingView}</View>
-        )}
+            taking flow space beneath it. Swapping the overlay's content, rather
+            than replacing this subtree, keeps the AR session and its camera
+            alive while the error shows, so a retry costs no session restart. */}
+        {overlay && <View style={StyleSheet.absoluteFill}>{overlay}</View>}
         {recordingIndicator && (
           <View
             pointerEvents="box-none"

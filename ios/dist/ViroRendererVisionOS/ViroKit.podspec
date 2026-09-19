@@ -12,6 +12,16 @@ Pod::Spec.new do |s|
   DESC
   s.source              = { :path => '.' } # source is required, but path is defined in the user's Podfile (this value is ignored).
   s.vendored_frameworks = 'ViroKit.xcframework'
+
+  # The Metal shader source, shipped into the app bundle where VRODriverMetal looks for it.
+  #
+  # It has to be a resource rather than a compiled .metallib for two reasons. A static-library
+  # pod contributes nothing to the app's own default.metallib, so -newDefaultLibrary finds
+  # nothing on this path; and a .metallib is built per SDK, which would mean shipping and
+  # selecting one artifact for xros and another for xrsimulator. One text file compiled once at
+  # driver startup avoids both. Without it every pipeline state comes back nil and the renderer
+  # skips every draw call.
+  s.resources = ['ViroShadersSource.txt']
   s.homepage            = 'https://reactvision.xyz'
   s.license             = {:type => 'Copyright', :text => "Copyright 2025 ReactVision" }
   s.author              = 'ReactVision'

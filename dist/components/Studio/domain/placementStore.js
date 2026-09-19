@@ -1,7 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioPlacementStore = void 0;
+exports.isTapToPlaceAsset = isTapToPlaceAsset;
 const utils_1 = require("./utils");
+/**
+ * Image triggering wins over tap-to-place: a marker both triggers its content and
+ * anchors it, since the node is a child of `ViroARImageMarker` and follows the
+ * marker, so there is nothing left for a tap to decide. `StudioARScene` splits the
+ * scene on that rule already; this is the same rule for the two places that gate a
+ * single asset, the placement queue below and the node factory's `PlaceableNode`
+ * wrap, which used to withhold such an asset until a tap and then hand it world
+ * coordinates inside the marker's frame.
+ */
+function isTapToPlaceAsset(asset) {
+    return !!asset?.tap_to_place && !asset.trigger_image_url;
+}
 /**
  * Tap-to-place assets in author-defined queue order: ascending tap_to_place_order,
  * nulls last (an older backend that omits the field keeps its incoming load order
@@ -47,33 +60,34 @@ function multiplyMat(a, b) {
     }
     return r;
 }
-/** Rotation matrix for an Euler triple (degrees), R = Rx·Ry·Rz. */
+/** Rotation matrix for an Euler triple (degrees), R = Rz·Ry·Rx. */
 function eulerToMat(deg) {
-    const ca = Math.cos(deg[0] * RAD), sa = Math.sin(deg[0] * RAD);
-    const cb = Math.cos(deg[1] * RAD), sb = Math.sin(deg[1] * RAD);
-    const cc = Math.cos(deg[2] * RAD), sc = Math.sin(deg[2] * RAD);
+    const cx = Math.cos(deg[0] * RAD), sx = Math.sin(deg[0] * RAD);
+    const cy = Math.cos(deg[1] * RAD), sy = Math.sin(deg[1] * RAD);
+    const cz = Math.cos(deg[2] * RAD), sz = Math.sin(deg[2] * RAD);
     return [
-        [cb * cc, -cb * sc, sb],
-        [ca * sc + sa * sb * cc, ca * cc - sa * sb * sc, -sa * cb],
-        [sa * sc - ca * sb * cc, sa * cc + ca * sb * sc, ca * cb],
+        [cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx],
+        [sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx],
+        [-sy, cy * sx, cy * cx],
     ];
 }
-/** Inverse of eulerToMat: recover the Euler triple (degrees) from R = Rx·Ry·Rz. */
+/** Inverse of eulerToMat: recover the Euler triple (degrees) from R = Rz·Ry·Rx. */
 function matToEuler(m) {
-    const sb = Math.max(-1, Math.min(1, m[0][2]));
-    const b = Math.asin(sb);
-    let a;
-    let c;
-    if (Math.abs(m[0][2]) < 1 - 1e-6) {
-        a = Math.atan2(-m[1][2], m[2][2]);
-        c = Math.atan2(-m[0][1], m[0][0]);
+    const cy = Math.hypot(m[0][0], m[1][0]);
+    const y = Math.atan2(-m[2][0], cy);
+    let x;
+    let z;
+    if (cy > 1e-6) {
+        x = Math.atan2(m[2][1], m[2][2]);
+        z = Math.atan2(m[1][0], m[0][0]);
     }
     else {
-        // Gimbal lock (ry = ±90°): fold the roll into c = 0.
-        c = 0;
-        a = m[0][2] > 0 ? Math.atan2(m[1][0], m[1][1]) : Math.atan2(-m[1][0], m[1][1]);
+        // Gimbal lock (ry = ±90°): X and Z turn about the same axis, so fold them
+        // into Z, which is where VROQuaternion::toEuler puts them too.
+        x = 0;
+        z = Math.atan2(-m[0][1], m[1][1]);
     }
-    return [a * DEG, b * DEG, c * DEG];
+    return [x * DEG, y * DEG, z * DEG];
 }
 /**
  * Camera rotation matrix from its world forward/up vectors — columns are the
@@ -119,7 +133,7 @@ class StudioPlacementStore {
     /** Initialise-if-absent from the tap_to_place flag (idempotent, strict-mode safe). */
     seed(assets) {
         for (const asset of byPlacementOrder(assets)) {
-            if (!asset?.id || !asset.tap_to_place)
+            if (!asset?.id || !isTapToPlaceAsset(asset))
                 continue;
             if (this.status.has(asset.id))
                 continue;
@@ -134,7 +148,7 @@ class StudioPlacementStore {
         this.bases.clear();
         this.order = [];
         for (const asset of byPlacementOrder(assets)) {
-            if (!asset?.id || !asset.tap_to_place)
+            if (!asset?.id || !isTapToPlaceAsset(asset))
                 continue;
             this.status.set(asset.id, "unplaced");
             this.order.push(asset.id);
@@ -170,9 +184,9 @@ class StudioPlacementStore {
     /**
      * Author rotation (Euler degrees) composed with the full tap-time camera
      * orientation, so the asset is oriented exactly as authored relative to how the
-     * user was looking (R = camera · author, decomposed back to Viro's X-Y-Z Euler).
-     * Falls back to the author rotation when no basis was captured. Undefined until
-     * placed.
+     * user was looking (R = camera · author, decomposed back to the euler triple
+     * the renderer reads). Falls back to the author rotation when no basis was
+     * captured. Undefined until placed.
      */
     resolvePlacedRotation(assetId, rotation) {
         if (!this.positions.has(assetId))

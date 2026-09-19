@@ -74,6 +74,23 @@ static NSArray *const kDefaultCameraPosition  = @[@0, @0, @0];
     self.nodeCamera->setFieldOfViewY(fov);
 }
 
+- (void)setProjection:(NSString *)projection {
+    _projection = [projection copy];
+    // Anything other than "orthographic" is perspective, including nil. A typo should give the
+    // ordinary camera rather than a collapsed frustum.
+    BOOL orthographic = [[projection lowercaseString] isEqualToString:@"orthographic"];
+    self.nodeCamera->setProjectionType(orthographic ? VROCameraProjectionType::Orthographic
+                                                    : VROCameraProjectionType::Perspective);
+}
+
+- (void)setOrthographicScale:(float)scale {
+    _orthographicScale = scale;
+    // The camera keeps width and height separately because glTF defines them that way (xmag and
+    // ymag). This prop sets the height; the renderer derives the width from the viewport, which is
+    // what keeps proportions stable when the view resizes.
+    self.nodeCamera->setOrthographicHeight(scale);
+}
+
 - (VROCameraRotationType)rotationType {
     return VROCameraRotationType::Standard;
 }

@@ -34,6 +34,7 @@ import com.facebook.react.bridge.JSApplicationCausedNativeException;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
@@ -1125,6 +1126,9 @@ public class VRTNode extends VRTComponent {
                     // Clone original materials and merge shader modifiers
                     java.util.ArrayList<Material> mergedMaterials = new java.util.ArrayList<>();
                     Log.d(TAG, "Creating merged materials for " + originalMaterials.size() + " original materials");
+                    MaterialManager.MaterialWrapper shaderWrapper =
+                            materialManager.getMaterialWrapper(shaderMaterialName);
+
                     for (Material originalMat : originalMaterials) {
                         // Create a new material copying the original (preserves textures)
                         Log.d(TAG, "Copying material via Material(originalMat) constructor");
@@ -1134,7 +1138,8 @@ public class VRTNode extends VRTComponent {
                         // Copy shader modifiers from shader material
                         // Note: Material class doesn't expose getShaderModifiers in Java,
                         // so we rely on C++ copy constructor handling this
-                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat);
+                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat,
+                                shaderWrapper != null ? shaderWrapper.getMaterialSource() : null);
 
                         mergedMaterials.add(mergedMat);
                         clonedMaterialsList.add(mergedMat);
@@ -1206,10 +1211,14 @@ public class VRTNode extends VRTComponent {
                         mShaderOverrideMap.put(shaderMaterialName, clonedMaterialsList);
                     }
 
+                    MaterialManager.MaterialWrapper shaderWrapper =
+                            materialManager.getMaterialWrapper(shaderMaterialName);
+
                     java.util.ArrayList<Material> mergedMaterials = new java.util.ArrayList<>();
                     for (Material originalMat : originalMaterials) {
                         Material mergedMat = new Material(originalMat);
-                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat);
+                        copyShaderModifiersAndUniforms(shaderMaterial, mergedMat,
+                                shaderWrapper != null ? shaderWrapper.getMaterialSource() : null);
                         mergedMaterials.add(mergedMat);
                         clonedMaterialsList.add(mergedMat);
                     }
@@ -1245,7 +1254,7 @@ public class VRTNode extends VRTComponent {
         }
     }
 
-    private void copyShaderModifiersAndUniforms(Material source, Material dest) {
+    private void copyShaderModifiersAndUniforms(Material source, Material dest, ReadableMap authored) {
         // Copy shader modifiers and uniforms from source (shader override material)
         // to destination (cloned original material that already has textures)
         Log.d(TAG, "=== copyShaderModifiersAndUniforms START ===");
@@ -1259,6 +1268,8 @@ public class VRTNode extends VRTComponent {
             dest.setLightingModel(source.getLightingModel());
         }
 
+        copyAuthoredMaterialProperties(source, dest, authored);
+
         // NOTE: We DON'T clear existing shader modifiers because:
         // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
         // 2. Clearing would remove critical system modifiers like skinning
@@ -1268,6 +1279,67 @@ public class VRTNode extends VRTComponent {
         Log.d(TAG, "Calling copyShaderModifiers...");
         dest.copyShaderModifiers(source);
         Log.d(TAG, "=== copyShaderModifiersAndUniforms END ===");
+    }
+
+    // Copies onto `dest` the properties `authored` names, and only those. A Material
+    // reports a white diffuse and a 0.5 roughness whether or not anyone set them, so
+    // copying them all would white out a textured model; the dictionary the override
+    // was registered from is the only record of what the author asked for. That is why
+    // this merge used to carry nothing but the lighting model, and why a diffuseColor
+    // reached no model on either platform. VRTNode.mm holds the same rule for iOS.
+    //
+    // A texture goes across natively: MaterialManager disposes the Java Texture handle as
+    // soon as it has built the material, so the source's getters hand back a Texture whose
+    // native ref is zero.
+    private void copyAuthoredMaterialProperties(Material source, Material dest, ReadableMap authored) {
+        if (authored == null) {
+            return;
+        }
+        ReadableMapKeySetIterator iter = authored.keySetIterator();
+        while (iter.hasNextKey()) {
+            String key = iter.nextKey();
+            if ("shininess".equalsIgnoreCase(key)) {
+                dest.setShininess(source.getShininess());
+            } else if ("blendMode".equalsIgnoreCase(key)) {
+                dest.setBlendMode(source.getBlendMode());
+            } else if ("transparencyMode".equalsIgnoreCase(key)) {
+                dest.setTransparencyMode(source.getTransparencyMode());
+            } else if ("cullMode".equalsIgnoreCase(key)) {
+                dest.setCullMode(source.getCullMode());
+            } else if ("writesToDepthBuffer".equalsIgnoreCase(key)) {
+                dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
+            } else if ("readsFromDepthBuffer".equalsIgnoreCase(key)) {
+                dest.setReadsFromDepthBuffer(source.getReadsFromDepthBuffer());
+            } else if ("bloomThreshold".equalsIgnoreCase(key)) {
+                dest.setBloomThreshold(source.getBloomThreshold());
+            } else if ("alpha".equalsIgnoreCase(key)) {
+                dest.setTransparency(source.getTransparency());
+                if (source.getTransparency() < 1.0f) {
+                    // MaterialManager turns depth writing off for a translucent material,
+                    // and with no writesToDepthBuffer key nothing else would carry that.
+                    dest.setWritesToDepthBuffer(source.getWritesToDepthBuffer());
+                }
+            } else if ("chromaKeyFilteringColor".equalsIgnoreCase(key)) {
+                dest.setChromaKeyFilteringColor(source.getChromaKeyFilteringColor());
+                dest.setChromaKeyFilteringEnabled(source.isChromaKeyFilteringEnabled());
+            } else {
+                // Everything left names a visual facet — diffuse, specular, normal,
+                // reflective, emission, multiply, ambient occlusion, self illumination,
+                // roughness, metalness. virocore resolves the name and moves that one
+                // facet, so this side does not enumerate them: a key it did not know
+                // used to be dropped, which is how specularColor and emissionColor
+                // reached the iPhone and not the Android.
+                //
+                // Every other key is named for the facet it writes, but roughness and
+                // metalness take either a number or a texture source and MaterialManager
+                // writes whichever it was handed.
+                boolean writesTexture = key.endsWith("texture") || key.endsWith("Texture");
+                if ("roughness".equalsIgnoreCase(key) || "metalness".equalsIgnoreCase(key)) {
+                    writesTexture = authored.getType(key) != ReadableType.Number;
+                }
+                dest.copyProperty(source, key, writesTexture);
+            }
+        }
     }
 
     public void updateShaderOverrideUniforms() {
@@ -1662,7 +1734,12 @@ public class VRTNode extends VRTComponent {
             // the current shapeType (required in JS if providing a physics shape)
             if (shapeTypeProp != null) {
                 propShapeType = shapeTypeProp.getString("type");
-                if (shapeTypeProp.hasKey("params")) {
+                if (propShapeType.equalsIgnoreCase("compound")) {
+                    // A compound's parts are what reaches the renderer, so they
+                    // are what is checked; its params key means nothing.
+                    params = flattenCompoundShapeChildren(
+                            shapeTypeProp.hasKey("children") ? shapeTypeProp.getArray("children") : null);
+                } else if (shapeTypeProp.hasKey("params")) {
                     ReadableArray readableParams = shapeTypeProp.getArray("params");
                     params = new float[readableParams.size()];
                     for (int i = 0; i < readableParams.size(); i++) {
@@ -1682,7 +1759,8 @@ public class VRTNode extends VRTComponent {
                     shape = new PhysicsShapeBox(params[0], params[1], params[2]);
                 }
                 else if (propShapeType.equalsIgnoreCase("compound")) {
-                    shape = new PhysicsShapeAutoCompound();
+                    shape = params.length > 0 ? new CompoundPhysicsShape(params)
+                                              : new PhysicsShapeAutoCompound();
                 }
                 else {
                     throw new JSApplicationCausedNativeException("Invalid shape type [" + propShapeType + "]");
@@ -1695,6 +1773,87 @@ public class VRTNode extends VRTComponent {
             } else {
                 mNodeJni.getPhysicsBody().setShape(shape);
             }
+        }
+    }
+
+    /*
+     Flattens a compound shape's parts into the float list the renderer takes for
+     a shape, laid out as VROPhysicsShape::kCompoundChildStride describes. A
+     part's rotation is not carried, which is also what the editor simulates.
+     */
+    private float[] flattenCompoundShapeChildren(ReadableArray children) {
+        if (children == null) {
+            return new float[0];
+        }
+
+        List<Float> params = new ArrayList<>();
+        for (int i = 0; i < children.size(); i++) {
+            ReadableMap child = children.getMap(i);
+            String childType = child.hasKey("type") ? child.getString("type") : null;
+            ReadableArray childParams = child.hasKey("params") ? child.getArray("params") : null;
+            ReadableArray childPosition = child.hasKey("position") ? child.getArray("position") : null;
+
+            boolean isSphere = "sphere".equalsIgnoreCase(childType);
+            if (childParams == null || childParams.size() < (isSphere ? 1 : 3)
+                    || childPosition == null || childPosition.size() < 3) {
+                ViroLog.warn(TAG, "Ignoring a compound physics shape part with missing dimensions or position");
+                continue;
+            }
+
+            params.add(isSphere ? 1f : 0f);
+            params.add((float) childParams.getDouble(0));
+            params.add(isSphere ? 0f : (float) childParams.getDouble(1));
+            params.add(isSphere ? 0f : (float) childParams.getDouble(2));
+            for (int j = 0; j < 3; j++) {
+                params.add((float) childPosition.getDouble(j));
+            }
+        }
+
+        float[] flattened = new float[params.size()];
+        for (int i = 0; i < params.size(); i++) {
+            flattened[i] = params.get(i);
+        }
+        return flattened;
+    }
+
+    /*
+     Compares two vectors by value. ReadableArray does not define equality, so
+     comparing the objects only ever answers whether it is the same instance.
+     */
+    private static boolean isSameVector(ReadableArray a, ReadableArray b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            if (a.getDouble(i) != b.getDouble(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /*
+     The parts of a compound reach the renderer through the shape params, which
+     is the only thing a PhysicsShape carries.
+     */
+    private static class CompoundPhysicsShape implements PhysicsShape {
+        private final float[] mParams;
+
+        CompoundPhysicsShape(float[] params) {
+            mParams = params;
+        }
+
+        @Override
+        public String getType() {
+            return "Compound";
+        }
+
+        @Override
+        public float[] getParams() {
+            return mParams;
         }
     }
 
@@ -1745,6 +1904,28 @@ public class VRTNode extends VRTComponent {
                 ViroLog.warn(TAG,"Attempted to set useGravity for non-dynamic phsyics bodies.");
             } else {
                 mNodeJni.getPhysicsBody().setUseGravity(map.getBoolean("useGravity"));
+            }
+        }
+
+        // A launch, applied once by the next physics step and then cleared, where
+        // the constant velocity below is reasserted every frame. Sent only when
+        // it changes, since this runs on every physics prop write.
+        if (map.hasKey("instantVelocity")) {
+            ReadableArray instantVelocity = map.getArray("instantVelocity");
+            if (instantVelocity.size() != 3) {
+                throw new JSApplicationCausedNativeException("Incorrect parameters " +
+                        "provided for instantVelocity, expected: [x, y, z]!");
+            }
+
+            ReadableArray currentInstantVelocity =
+                    (mPhysicsMap != null && mPhysicsMap.hasKey("instantVelocity"))
+                            ? mPhysicsMap.getArray("instantVelocity") : null;
+            if (!isSameVector(instantVelocity, currentInstantVelocity)) {
+                float instantArray[] = new float[instantVelocity.size()];
+                for (int i = 0; i < instantVelocity.size(); i ++){
+                    instantArray[i] = (float) instantVelocity.getDouble(i);
+                }
+                mNodeJni.getPhysicsBody().setVelocity(new Vector(instantArray), false);
             }
         }
 

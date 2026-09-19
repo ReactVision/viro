@@ -81,6 +81,8 @@ type RenderInput =
        */
       intrinsics?: { fx: number; fy: number; cx: number; cy: number };
       intrinsicsSize?: { width: number; height: number };
+      /** Display rotation of the video, so the renderer can orient the intrinsics. */
+      intrinsicsRotation?: number;
     };
 
 declare global {
@@ -91,6 +93,15 @@ declare global {
      */
     __playbackStep?: (index: number) => Promise<boolean>;
     __playbackFrameCount?: number;
+    /**
+     * Swap the scene being drawn over the recording, without restarting the
+     * session. An authoring surface changes the scene on every drag of a
+     * position slider; reloading the page for each one would re-initialise the
+     * tracker's WASM and re-open the video to show a box moved two
+     * centimetres. Present only in playback mode with a Studio scene -- caller
+     * TSX has to be recompiled, which this cannot do.
+     */
+    __setScene?: (scene: StudioSceneResponse) => void;
     __RENDER_INPUT__?: RenderInput;
   }
 }
@@ -241,13 +252,25 @@ function PlaybackRoot({
   frames,
   intrinsics,
   intrinsicsSize,
+  intrinsicsRotation,
 }: {
   scene: StudioSceneResponse;
   videoUrl: string;
   frames: ArPlaybackFrame[];
   intrinsics?: { fx: number; fy: number; cx: number; cy: number };
   intrinsicsSize?: { width: number; height: number };
+  intrinsicsRotation?: number;
 }) {
+  // The prop is the initial scene; after mount the live one comes from
+  // __setScene. The headless driver never calls it and sees the prop unchanged.
+  const [live, setLive] = useState(scene);
+  useEffect(() => {
+    window.__setScene = setLive;
+    return () => {
+      delete window.__setScene;
+    };
+  }, []);
+
   const onSessionReady = (session: ViroArSession) => {
     // Hand the driver a stepper rather than letting it reach into the session.
     // It resolves per frame, so the driver can screenshot straight after
@@ -258,13 +281,13 @@ function PlaybackRoot({
   };
 
   return createElement(StudioSceneNavigator, {
-    sceneData: scene,
+    sceneData: live,
     // A recording is an AR session by definition; 3D mode would drop the camera
     // background and defeat the point.
     mode: "ar" as const,
     webRendererOptions,
     arOptions: {
-      playback: { videoUrl, frames, intrinsics, intrinsicsSize },
+      playback: { videoUrl, frames, intrinsics, intrinsicsSize, intrinsicsRotation },
       showCameraBackground: true,
     },
     onSessionReady,
@@ -285,7 +308,8 @@ if (!input) {
     // than as a prop the caller would have had to know to pass.
     setPlaybackSource(
       { videoUrl: input.videoUrl, frames: input.frames,
-        intrinsics: input.intrinsics, intrinsicsSize: input.intrinsicsSize },
+        intrinsics: input.intrinsics, intrinsicsSize: input.intrinsicsSize,
+        intrinsicsRotation: input.intrinsicsRotation },
       (session: any) => {
         window.__playbackStep = (i: number) => session.renderPlaybackFrame(i);
         window.__playbackFrameCount = session.playbackFrameCount;
@@ -303,6 +327,7 @@ if (!input) {
         frames: input.frames,
         intrinsics: input.intrinsics,
         intrinsicsSize: input.intrinsicsSize,
+        intrinsicsRotation: input.intrinsicsRotation,
       }),
     );
   }

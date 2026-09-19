@@ -24,7 +24,7 @@ type Props = ViewProps & {
     /**
      * A flag to enable/disable some debug features
      */
-    debug: boolean;
+    debug?: boolean;
     viroAppProps?: any;
     /**
      * ViroSceneNavigator uses "scene" objects like the following to
@@ -40,16 +40,16 @@ type Props = ViewProps & {
      * Called when either the user physically decides to exit vr (hits
      * the "X" buton).
      */
-    onExitViro: () => void;
+    onExitViro?: () => void;
     /**
      * Renderer settings that can be used to enable or disable various
      * renderer capabilities and algorithms.
      */
-    hdrEnabled: boolean;
-    pbrEnabled: boolean;
-    bloomEnabled: boolean;
-    shadowsEnabled: boolean;
-    multisamplingEnabled: boolean;
+    hdrEnabled?: boolean;
+    pbrEnabled?: boolean;
+    bloomEnabled?: boolean;
+    shadowsEnabled?: boolean;
+    multisamplingEnabled?: boolean;
 };
 type State = {
     sceneDictionary: ViroSceneDictionary;

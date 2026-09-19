@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createNodeConfig = createNodeConfig;
 exports.createNode = createNode;
 const React = __importStar(require("react"));
-const react_native_1 = require("react-native");
 const Viro3DObject_1 = require("../../Viro3DObject");
 const ViroImage_1 = require("../../ViroImage");
 const ViroText_1 = require("../../ViroText");
@@ -46,62 +45,55 @@ const apiRequestHelpers_1 = require("./apiRequestHelpers");
 const materialConfig_1 = require("./materialConfig");
 const dragConfiguration_1 = require("./dragConfiguration");
 const physicsConfig_1 = require("./physicsConfig");
-/** Clamps Z to -2 for non-trigger assets to guarantee visibility. */
-function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx) {
-    const hasTriggerImage = !!asset.trigger_image_url;
-    // Tap-to-place stores the author position as an OFFSET from the runtime tap
-    // point (PlaceableNode adds it), so the camera-relative -2 default and the
-    // "too close" clamp — both meant for camera/plane assets — must not apply.
-    const isTapToPlace = !!asset.tap_to_place && !hasTriggerImage;
-    // `world_placement` means the coordinates are a point in the world, not a
-    // camera-relative offset an author typed. The clamp below exists to stop an
-    // author putting an object inside the user's face, and it cannot tell the two
-    // apart: applied to a world coordinate it silently rewrites it to -2, which
-    // pins the object in front of the view. That reads as "the anchor does not
-    // stay fixed", and the only notice is the warning below.
-    const isWorldPlacement = !!asset.world_placement;
-    let posZ = asset.position_z ?? (isTapToPlace ? 0 : -2);
-    if (!hasTriggerImage && !isTapToPlace && !isWorldPlacement && posZ > -0.5) {
-        console.warn(`[Studio/NodeFactory] Asset "${asset.name}" Z=${posZ} too close, clamping to -2`);
-        posZ = -2;
-    }
-    const position = [
-        asset.position_x ?? 0,
-        asset.position_y ?? 0,
-        posZ,
-    ];
-    // Apply trigger image orientation offset to rotation Z
-    let rotationZ = asset.rotation_z ?? 0;
-    if (hasTriggerImage && asset.trigger_image_orientation) {
-        const offsets = {
-            Left: -90,
-            Right: 90,
-            Down: 180,
-            Up: 0,
-        };
-        rotationZ += offsets[asset.trigger_image_orientation] ?? 0;
-    }
+const placementStore_1 = require("./placementStore");
+const assetPosition_1 = require("./assetPosition");
+function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, 
+// The detected plane this asset is anchored to, once the session has found
+// one. Only the assets under the plane wrapper have it.
+dragSurface) {
+    const position = (0, assetPosition_1.studioAssetPosition)(asset);
+    // A trigger image's orientation describes the uploaded FILE, not the surface
+    // it is printed on and not a rotation for the content: it says where the top
+    // of that file is, so a sideways or upside-down file is still recognised.
+    // virocore acts on it by correcting the pixels before the tracker sees them
+    // (VROARSessionARCore rotates the grayscale buffer, VROARImageTargetiOS passes
+    // a CGImagePropertyOrientation to ARReferenceImage), so the anchor frame comes
+    // back the same whatever it is set to. This used to add Left -90, Right 90 and
+    // Down 180 to rotation Z, which nothing cancelled: content on any non-Up
+    // marker was drawn turned, upside down in the Down case.
     const rotation = [
         asset.rotation_x ?? 0,
         asset.rotation_y ?? 0,
-        rotationZ,
+        asset.rotation_z ?? 0,
     ];
+    // Zero, negative and non-finite scales are degenerate transforms rather than
+    // small ones, so they fall back to 1. Everything else passes through, large
+    // values included: scale doubles as compensation for a model's own units, so a
+    // mesh authored in centimetres legitimately needs about 100. This replaced a
+    // pair of rules that substituted 0.1 below 0.01 and 2 above 10, which rendered
+    // an asset authored at 13 more than six times too small with no way to tell.
+    // Editors that author these scenes apply the same rule, and hold their own
+    // copy of it since this package does not depend on them.
     let scaleValue = asset.scale ?? 1;
-    if (scaleValue < 0.01)
-        scaleValue = 0.1;
-    if (scaleValue > 10)
-        scaleValue = 2;
+    if (!Number.isFinite(scaleValue) || scaleValue <= 0)
+        scaleValue = 1;
     const scale = [scaleValue, scaleValue, scaleValue];
     const dragType = dragConfiguration_1.DragConfiguration.getDragType(asset, scene);
     let dragPlane;
     if (dragType === "FixedToPlane") {
-        dragPlane = dragConfiguration_1.DragConfiguration.getDragPlane(scene?.plane_direction ?? "Horizontal", position);
+        dragPlane = dragConfiguration_1.DragConfiguration.getDragPlane(scene?.plane_direction ?? "Horizontal", position, dragSurface);
     }
-    const parsedPhysics = (0, physicsConfig_1.parsePhysicsBodyConfig)(asset.physics_config);
+    // Both the body and its collision tag hang off the scene's physics switch
+    // (isPhysicsWorldEnabled), which is what the Studio UI, its editor preview and
+    // the apply_physics tool all treat as the switch.
+    const parsedPhysics = (0, physicsConfig_1.isPhysicsWorldEnabled)(scene)
+        ? (0, physicsConfig_1.parsePhysicsBodyConfig)(asset.physics_config)
+        : null;
     const dragActive = isDragActive?.(asset.id) ?? false;
     const physicsBody = parsedPhysics
         ? (0, physicsConfig_1.buildViroPhysicsBody)(parsedPhysics, {
             kinematicDragOverride: dragActive && (0, physicsConfig_1.shouldUseKinematicPhysicsDrag)(asset, parsedPhysics),
+            scale: scaleValue,
         })
         : undefined;
     const viroTag = parsedPhysics ? asset.id : undefined;
@@ -156,19 +148,11 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
         return null;
     }
     const modelType = inferModelType(asset.file_url);
-    // Android: slightly reduce scale for stability
-    const scale = react_native_1.Platform.OS === "android"
-        ? [
-            config.scale[0] * 0.8,
-            config.scale[1] * 0.8,
-            config.scale[2] * 0.8,
-        ]
-        : config.scale;
     const hasMaterialConfig = (0, materialConfig_1.parseMaterialConfig)(asset.material_config) !== null;
     const shaderOverrides = hasMaterialConfig
         ? [(0, materialConfig_1.studioMaterialName)(asset.id)]
         : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} renderingOrder={react_native_1.Platform.OS === "android" ? 1 : 0} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
     // Viro derives native canDrag from `onDrag != undefined`; without this prop
     // the drag recognizer is never attached, even when dragType is set.
     {...(config.dragType
@@ -182,7 +166,13 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollisio
         console.warn(`[Studio] Image "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroImage_1.ViroImage key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
+    return (<ViroImage_1.ViroImage key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} 
+    // No width or height props, so the bridges derive the height from the
+    // image's own aspect on load, but only build the quad from it under
+    // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
+    // the picture. The crop this mode also selects needs explicit size props,
+    // so the UVs stay 0 to 1.
+    resizeMode="ScaleToFill" position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
@@ -208,11 +198,14 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, onCollision, no
         return store.subscribe(() => setText(compute()));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store, template]);
-    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={position ?? config.position} rotation={rotation ?? config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(visible === undefined ? {} : { visible })} style={{
+    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={position ?? config.position} rotation={rotation ?? config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} {...(visible === undefined ? {} : { visible })} style={{
             fontFamily: "Arial",
             fontSize: 20,
             color: "#FFFFFF",
             textAlign: "center",
+            // Centred on the node rather than hung from the top of its box, so the
+            // authored position is where the text is at any scale.
+            textAlignVertical: "center",
         }} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
@@ -265,7 +258,7 @@ function createVideo(asset, config, notifyPhysicsDrag, onCollision, nodeRef) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
+    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
@@ -276,39 +269,48 @@ function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger
 // can read its world transform for the distance check.
 registerProximityTarget, 
 // When set (gaze-target assets on a headset), the node's native onGaze handler.
-onGaze) {
+onGaze, 
+// See createNodeConfig.
+dragSurface, 
+// The web host's half of registerProximityTarget. Native reads a node's
+// transform off its component ref; web reads it off a renderer handle, since
+// these components' props carry an index signature that makes them unsafe
+// behind forwardRef (see useViroNode's onNodeHandle). Only one is ever set.
+registerProximityNode) {
     const type = resolveType(asset);
-    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx);
+    const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, dragSurface);
     config.onGaze = onGaze;
     const proximityRef = registerProximityTarget
         ? (ref) => registerProximityTarget(asset.id, ref)
         : undefined;
-    let node;
-    switch (type) {
-        case "3D-MODEL":
-            // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep both;
-            // a drag-only merge here once silently killed collisions.
-            node = create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, proximityRef);
-            break;
-        case "IMAGE":
-            node = createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, proximityRef);
-            break;
-        case "TEXT":
-            node = createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore, onCollision, proximityRef);
-            break;
-        case "VIDEO":
-            node = createVideo(asset, config, notifyPhysicsDrag, onCollision, proximityRef);
-            break;
-        default:
-            console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);
-            return null;
+    if (registerProximityNode) {
+        config.onNodeHandle = (handle) => registerProximityNode(asset.id, handle);
     }
+    const buildNode = (nodeRef) => {
+        switch (type) {
+            case "3D-MODEL":
+                // NOTE: notifyPhysicsDrag and onCollision are distinct wirings — keep
+                // both; a drag-only merge here once silently killed collisions.
+                return create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, nodeRef);
+            case "IMAGE":
+                return createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, nodeRef);
+            case "TEXT":
+                return createText(asset, config, notifyPhysicsDrag, runtimeCtx?.variableStore, onCollision, nodeRef);
+            case "VIDEO":
+                return createVideo(asset, config, notifyPhysicsDrag, onCollision, nodeRef);
+            default:
+                console.warn(`[Studio] Unknown asset type "${type}" for "${asset.name}"`);
+                return null;
+        }
+    };
+    const node = buildNode(proximityRef);
     if (!node)
         return null;
     // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
     // node at the tap point with the author position and rotation applied relative
-    // to the user's facing, and wraps it in VisibleNode itself.
-    if (asset.tap_to_place && runtimeCtx?.placementStore) {
+    // to the user's facing, and wraps it in VisibleNode itself. A marker asset is
+    // never gated this way, whatever the flag says (isTapToPlaceAsset).
+    if ((0, placementStore_1.isTapToPlaceAsset)(asset) && runtimeCtx?.placementStore) {
         return (<PlaceableNode key={asset.id} assetId={asset.id} store={runtimeCtx.placementStore} authorPosition={config.position} authorRotation={config.rotation} visibilityStore={runtimeCtx?.visibilityStore}>
         {node}
       </PlaceableNode>);

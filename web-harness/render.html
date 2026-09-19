@@ -5,6 +5,16 @@
     <title>Viro web bridge — headless render</title>
     <style>
       html, body, #root { margin: 0; height: 100%; background: #1a1a1f; }
+      /* #root is a plain block box, so the `flex: 1` that every generated TSX
+         scaffold puts on its root react-native-web View resolves against no
+         flex container at all and contributes nothing. The canvas then fell
+         back to half the width — 960x480 inside a 960x720 viewport, 406x203
+         inside 406x720 — so a TSX render came out 2:1 no matter what it was
+         asked for, and no matter the aspect of the recording behind it.
+         Studio scenes size themselves absolutely, which is why only the TSX
+         path showed it. */
+      #root { display: flex; flex-direction: column; }
+      #root > * { flex: 1 1 auto; min-height: 0; }
     </style>
   </head>
   <body>

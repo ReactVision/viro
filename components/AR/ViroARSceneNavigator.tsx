@@ -28,6 +28,8 @@ import {
   ViroProvider,
   ViroCloudAnchorStateChangeEvent,
   ViroHostCloudAnchorResult,
+  ViroSharedFrameResult,
+  ViroCloudAnchorStatus,
   ViroResolveCloudAnchorResult,
   ViroFinishScanResult,
   ViroWorldMeshSnapshotResult,
@@ -883,6 +885,21 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * Progress of a resolve in flight. `active` is false when none is running.
+   *
+   * Poll it: resolving a cloud anchor is multi-frame SIFT matching over a 30
+   * second window, and `resolveCloudAnchor()` says nothing until it ends. The
+   * `message` distinguishes the states that matter — downloading the anchor,
+   * looking for it, and having seen it once while it waits for a second
+   * consistent match.
+   */
+  _getCloudAnchorStatus = async (): Promise<ViroCloudAnchorStatus> => {
+    return await ViroARSceneNavigatorModule.getCloudAnchorStatus(
+      findNodeHandle(this)
+    );
+  };
+
+  /**
    * Cancel all pending cloud anchor operations.
    * Use this when exiting a scene or when cloud operations are no longer needed.
    */
@@ -916,6 +933,29 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     return await ViroARSceneNavigatorModule.rvFinishScan(
       findNodeHandle(this),
       Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
+    );
+  };
+
+  /**
+   * CL-H: establish a platform-native shared coordinate frame and publish it to
+   * `groupId` for other devices in the room to join. Quest only.
+   *
+   * Distinct from a cloud anchor: nothing is uploaded, nothing is relocalised
+   * from camera imagery, and no API key is involved. `groupId` is a UUID the
+   * app picks, and it doubles as the co-location room key.
+   */
+  _rvCreateSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    return await ViroARSceneNavigatorModule.rvCreateSharedFrame(
+      findNodeHandle(this),
+      groupId
+    );
+  };
+
+  /** CL-H: recover a shared frame another device published to `groupId`. */
+  _rvJoinSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    return await ViroARSceneNavigatorModule.rvJoinSharedFrame(
+      findNodeHandle(this),
+      groupId
     );
   };
 
@@ -1583,9 +1623,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     unproject: this._unproject,
     hostCloudAnchor: this._hostCloudAnchor,
     resolveCloudAnchor: this._resolveCloudAnchor,
+    getCloudAnchorStatus: this._getCloudAnchorStatus,
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    rvCreateSharedFrame: this._rvCreateSharedFrame,
+    rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
     loadWorldMeshFromFile: this._loadWorldMeshFromFile,
     // Geospatial API
@@ -1652,9 +1695,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     unproject: this._unproject,
     hostCloudAnchor: this._hostCloudAnchor,
     resolveCloudAnchor: this._resolveCloudAnchor,
+    getCloudAnchorStatus: this._getCloudAnchorStatus,
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    rvCreateSharedFrame: this._rvCreateSharedFrame,
+    rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
     loadWorldMeshFromFile: this._loadWorldMeshFromFile,
     // Geospatial API

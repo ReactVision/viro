@@ -148,6 +148,27 @@ export interface ViroConfigurationOptions {
          * https://developer.oculus.com/manage
          */
         questAppId?: string;
+        /**
+         * Meta Quest device targeting, written to AndroidManifest as
+         * com.oculus.supportedDevices when xRMode includes "QUEST".
+         *
+         * DEFAULTS TO: "quest2|questpro|quest3|quest3s"
+         */
+        questSupportedDevices?: string;
+        /**
+         * targetSdkVersion ceiling applied when xRMode includes "QUEST". The Meta
+         * Quest Store rejects immersive apps above 34. Only ever lowers the value.
+         *
+         * DEFAULTS TO: 34
+         */
+        questTargetSdkVersion?: number;
+        /**
+         * Build arm64-v8a only when xRMode includes "QUEST". Quest hardware is
+         * 64-bit and the store warns on 32-bit libraries.
+         *
+         * DEFAULTS TO: true
+         */
+        questArm64Only?: boolean;
     };
 }
 /**

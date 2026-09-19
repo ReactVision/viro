@@ -38,6 +38,7 @@
 @property (nonatomic, readwrite) std::shared_ptr<VROSceneControllerDelegateiOS> delegate;
 @property (nonatomic, readwrite) std::shared_ptr<VROSceneController> sceneController;
 @property (nonatomic, copy, nullable) NSArray<NSString *> *postProcessEffects;
+@property (nonatomic, assign) BOOL toneMappingEnabled;
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onCameraTransformUpdateViro;
 @property (nonatomic, assign) BOOL canCameraTransformUpdate;
 

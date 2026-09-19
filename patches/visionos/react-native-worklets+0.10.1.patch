@@ -1,0 +1,18 @@
+diff --git a/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm b/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm
+index b93cd2c..8238cb5 100644
+--- a/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm
++++ b/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm
+@@ -39,9 +39,11 @@ - (instancetype)init
+   AssertJavaScriptQueue();
+   if constexpr (worklets::StaticFeatureFlags::getFlag("IOS_DYNAMIC_FRAMERATE_ENABLED")) {
+     bool supportsProMotion = false;
+-#if !TARGET_OS_OSX
++// visionOS has no UIScreen at all — there is no single display to ask about. Leaving this
++// false picks the standard callback, which is what the non-ProMotion path already does.
++#if !TARGET_OS_OSX && !TARGET_OS_VISION
+     supportsProMotion = [UIScreen mainScreen].maximumFramesPerSecond > 60;
+-#endif // !TARGET_OS_OSX
++#endif // !TARGET_OS_OSX && !TARGET_OS_VISION
+ 
+     SEL frameCallback = supportsProMotion ? @selector(executeQueueForProMotion:) : @selector(executeQueue:);
+     currentFrameRate_ = supportsProMotion ? FrameRateRange::BEST : FrameRateRange::STANDARD;

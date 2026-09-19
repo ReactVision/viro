@@ -1,7 +1,12 @@
 /**
  * Parse any CSS color string (hex, rgb(a), named, hsl…) into normalized RGBA
- * [0,1] components for the WASM material C API. Uses a 1x1 canvas so the browser
- * does the parsing; results are cached since materials reuse colors heavily.
+ * [0,1] components for the WASM material C API. Hex is read here; everything
+ * else goes through a 1x1 canvas so the browser does the parsing. Results are
+ * cached since materials reuse colors heavily.
+ *
+ * Hex is not just a fast path: it is what a Studio scene and a stylesheet both
+ * write, and reading it directly means the colour rules can be exercised without
+ * a DOM, which is where their mistakes actually get caught.
  */
 const cache = new Map<string, [number, number, number, number]>();
 let ctx: CanvasRenderingContext2D | null = null;
@@ -20,6 +25,12 @@ export function parseColorToRGBA(
 
   const cached = cache.get(color);
   if (cached) return cached;
+
+  const hex = parseHex(color);
+  if (hex) {
+    cache.set(color, hex);
+    return hex;
+  }
 
   if (!ctx) {
     const canvas = document.createElement("canvas");
@@ -40,4 +51,30 @@ export function parseColorToRGBA(
 
   cache.set(color, rgba);
   return rgba;
+}
+
+/** #rgb, #rgba, #rrggbb and #rrggbbaa. Null for anything else. */
+function parseHex(color: string): [number, number, number, number] | null {
+  const text = color.trim();
+  if (text.charCodeAt(0) !== 35 /* # */) return null;
+  const digits = text.slice(1);
+  if (!/^[0-9a-fA-F]+$/.test(digits)) return null;
+
+  let parts: string[];
+  if (digits.length === 3 || digits.length === 4) {
+    // #rgb is #rrggbb: each digit doubles, so f is ff and not f0.
+    parts = digits.split("").map((d) => d + d);
+  } else if (digits.length === 6 || digits.length === 8) {
+    parts = digits.match(/.{2}/g)!;
+  } else {
+    return null;
+  }
+
+  const [r, g, b, a = "ff"] = parts;
+  return [
+    parseInt(r, 16) / 255,
+    parseInt(g, 16) / 255,
+    parseInt(b, 16) / 255,
+    parseInt(a, 16) / 255,
+  ];
 }

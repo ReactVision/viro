@@ -258,4 +258,51 @@ RCT_EXPORT_SHADOW_PROPERTY(onLayout, BOOL)
 
 RCT_EXPORT_SHADOW_PROPERTY(direction, NSNumberArray)
 
+#pragma mark - Reconciler-free transform commands
+
+/*
+ These back ViroGameLoopUtils. They exist so a per-frame transform update does
+ not have to go through setState and the reconciler: the setters below write
+ straight to the VRONode.
+
+ They live on ViroViewManager rather than on each node manager because every
+ node manager inherits from it, and RCTModuleData walks the class hierarchy when
+ it collects exported methods.
+ */
+
+static void VRTDispatchNodeCommand(RCTBridge *bridge, NSNumber *reactTag, NSString *name,
+                                   void (^apply)(VRTNode *node)) {
+    [bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
+                                   NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+        UIView *view = viewRegistry[reactTag];
+        if (![view isKindOfClass:[VRTNode class]]) {
+            RCTLogError(@"%@ expects a Viro node, got: %@", name, view);
+            return;
+        }
+        apply((VRTNode *)view);
+    }];
+}
+
+RCT_EXPORT_METHOD(setPosition:(nonnull NSNumber *)reactTag position:(NSArray<NSNumber *> *)position)
+{
+    VRTDispatchNodeCommand(self.bridge, reactTag, @"setPosition", ^(VRTNode *node) {
+        node.position = position;
+    });
+}
+
+// Euler degrees, matching the rotation prop.
+RCT_EXPORT_METHOD(setRotationEuler:(nonnull NSNumber *)reactTag rotation:(NSArray<NSNumber *> *)rotation)
+{
+    VRTDispatchNodeCommand(self.bridge, reactTag, @"setRotationEuler", ^(VRTNode *node) {
+        node.rotation = rotation;
+    });
+}
+
+RCT_EXPORT_METHOD(setScale:(nonnull NSNumber *)reactTag scale:(NSArray<NSNumber *> *)scale)
+{
+    VRTDispatchNodeCommand(self.bridge, reactTag, @"setScale", ^(VRTNode *node) {
+        node.scale = scale;
+    });
+}
+
 @end

@@ -43,15 +43,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroImage = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
-const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
 const ViroImageModule = react_native_1.NativeModules.VRTImageModule;
@@ -68,10 +67,10 @@ class ViroImage extends ViroBase_1.ViroBase {
     render() {
         (0, ViroProps_1.checkMisnamedProps)("ViroImage", this.props);
         var defaultPlaceholder = require("./Resources/viro_blank.png");
-        var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);
+        var imgsrc = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source);
         var placeholderSrc;
         if (this.props.placeholderSource) {
-            placeholderSrc = (0, resolveAssetSource_1.default)(this.props.placeholderSource);
+            placeholderSrc = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.placeholderSource);
         }
         else {
             switch (react_native_1.Platform.OS) {
@@ -82,7 +81,7 @@ class ViroImage extends ViroBase_1.ViroBase {
                     */
                     break;
                 case "android":
-                    placeholderSrc = (0, resolveAssetSource_1.default)(defaultPlaceholder);
+                    placeholderSrc = (0, ViroAssetSource_1.resolveViroAssetSource)(defaultPlaceholder);
                     break;
             }
         }
@@ -151,7 +150,7 @@ class ViroImage extends ViroBase_1.ViroBase {
     // be cached if they have the same imageSource.
     static evictFromCache = (imageSource) => {
         if (react_native_1.Platform.OS == "android") {
-            var image = (0, resolveAssetSource_1.default)(imageSource);
+            var image = (0, ViroAssetSource_1.resolveViroAssetSource)(imageSource);
             ViroImageModule.evictFromCache(image);
         }
     };

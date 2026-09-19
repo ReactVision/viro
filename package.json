@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "2.58.1",
+  "version": "3.0.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -25,26 +25,32 @@
     "clean": "rm -rf ./dist/ *.tgz node_modules/",
     "release": "release-it",
     "after:release": "./prepare_release.sh",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "harness:assets": "bash scripts/sync-harness-assets.sh",
+    "preharness": "npm run harness:assets"
   },
   "peerDependencies": {
-    "@reactvision/viro-web-renderer": ">=0.0.1",
-    "expo": ">=55.0.0 <58.0.0",
-    "react": ">=18.0.0",
-    "react-native": ">=0.83.0 <0.87.0",
+    "@reactvision/react-native-visionos": ">=0.86.0 <0.87.0",
+    "@reactvision/viro-web-renderer": "^1.0.0",
+    "expo": ">=57.0.0 <58.0.0",
+    "react": ">=19.0.0",
+    "react-native": ">=0.86.0 <0.87.0",
     "react-native-web": ">=0.19.0"
   },
   "engines": {
-    "react-native": ">=0.83.0 <0.87.0"
+    "react-native": ">=0.86.0 <0.87.0"
   },
   "peerDependenciesMeta": {
+    "@reactvision/react-native-visionos": {
+      "optional": true
+    },
+    "@reactvision/viro-web-renderer": {
+      "optional": true
+    },
     "expo": {
       "optional": true
     },
     "react-native-web": {
-      "optional": true
-    },
-    "@reactvision/viro-web-renderer": {
       "optional": true
     }
   },
@@ -54,6 +60,9 @@
     "index.ts",
     "components",
     "dist",
+    "plugins",
+    "patches",
+    "shims",
     "scripts",
     "examples",
     "app.plugin.js",
@@ -62,12 +71,18 @@
     "android/gvr_common",
     "android/arcore_client",
     "ios/dist",
+    "ios/ViroReact",
+    "ios/*.h",
+    "ios/*.m",
+    "ios/*.mm",
     "ios/ViroReact.podspec",
+    "ios/ViroReactUI.podspec",
     "bin",
     "LICENSE"
   ],
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-react-jsx": "^7.29.7",
     "@babel/preset-env": "^7.25.3",
     "@babel/preset-typescript": "^7.26.0",
     "@babel/standalone": "^7.29.8",
@@ -103,5 +118,8 @@
     "url": "https://github.com/ReactVision/viro/issues"
   },
   "homepage": "https://reactvision.xyz/viro-react",
-  "author": "ReactVision, Inc"
+  "author": "ReactVision, Inc",
+  "dependencies": {
+    "react": "~19.2.3"
+  }
 }

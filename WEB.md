@@ -27,6 +27,11 @@ package:
 npm install @reactvision/react-viro @reactvision/viro-web-renderer react-native-web
 ```
 
+`@reactvision/viro-web-renderer` is an **optional** peer dependency, pinned to
+`^1.0.0`. Nothing outside the `.web.tsx` components reaches for it, so a project
+that ships only to iOS, Android, Quest or visionOS never needs it installed and
+npm will not ask for it.
+
 No COOP/COEP / cross-origin isolation required — the build is single-threaded.
 The reference working setup is the Vite harness in
 [`web-harness/`](./web-harness) (`npm run harness`).

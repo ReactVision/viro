@@ -1,5 +1,23 @@
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- **Replicated room state**: `useViroReplicatedState` and `ViroReplicationClient`. Ordered, conflict-resolved, authoritative application state for co-located sessions — what moved, who is holding it — on a separate socket from the pose channel and the same room id. Entities are claimed before they are changed, so two people grabbing the same object resolves instead of racing: the first `claim` wins and the second is refused with the current owner attached. `expectVersion` opts a write into optimistic concurrency; unowned entities are last-writer-wins; a peer that disconnects releases whatever it held. A delta whose sequence skips ahead triggers a resync rather than leaving a hole in local state, and a reconnect resumes from the last applied sequence. Optimistic writes are opt-in per call and roll back to the server's value if refused.
+
+  One constraint worth reading before building on it. A room is saved when its last peer leaves and reloaded when it is next opened, so a restart no longer costs the state — but two instances holding the same room would diverge, so replication must not run on more than one instance until room homing exists. The detail is in `reactvisioncca/server/README.md`.
+- **`<ViroARCloudAnchor>` — co-located AR.** Renders its children in a resolved cloud anchor's *location frame*, which is the shared coordinate frame two devices in the same space can agree on. Mount it with the same `cloudAnchorId` on both devices and a child at `[0, 0, -1]` is the same physical metre on each, with no coordinate maths in app code — previously `resolveCloudAnchor()` returned position/rotation/scale and no scene node, leaving every app to redo the frame arithmetic itself. Fires `onLocalized` once the frame exists, and `onLocalizeError` when localisation fails or times out.
+- **Location-frame conversion helpers**: `parseLocationTransform`, `locationToWorld`, `worldToLocation`, `invertTransform`. World coordinates are per-session — each AR session picks its origin wherever tracking started — so anything two devices exchange has to travel as location-frame coordinates and be converted on arrival. **Send frame coordinates, never world coordinates.**
+
+### Fixed
+
+- **Quest builds failed Meta Horizon Store validation on Expo projects.** The plugin's targetSdk cap never applied on Expo's template and the GLES declaration was optional, which the store reads as missing. With `"QUEST"` in `xRMode` the plugin now sets `android.targetSdkVersion=34` in `gradle.properties` and requires GLES 3.0.
+
+### Added
+
+- **Quest Store packaging defaults**: arm64-only builds (`android.questArm64Only`, default true) and a `com.oculus.supportedDevices` manifest entry (`android.questSupportedDevices`, default `quest2|questpro|quest3|quest3s`).
+
 ## v2.58.1
 
 ### Fixed

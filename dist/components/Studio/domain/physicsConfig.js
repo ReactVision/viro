@@ -4,6 +4,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parsePhysicsWorldConfig = parsePhysicsWorldConfig;
+exports.isPhysicsWorldEnabled = isPhysicsWorldEnabled;
 exports.parsePhysicsBodyConfig = parsePhysicsBodyConfig;
 exports.buildViroPhysicsWorld = buildViroPhysicsWorld;
 exports.buildViroPhysicsBody = buildViroPhysicsBody;
@@ -36,19 +37,25 @@ function parseShape(raw) {
     }
     return undefined;
 }
-function mapShapeToViro(shape) {
-    if (shape.type === "Box")
-        return { type: "Box", params: [...shape.params] };
-    if (shape.type === "Sphere")
-        return { type: "Sphere", params: [...shape.params] };
+function mapShapeToViro(shape, scale) {
+    if (shape.type === "Box") {
+        return { type: "Box", params: shape.params.map((p) => p * scale) };
+    }
+    if (shape.type === "Sphere") {
+        return { type: "Sphere", params: [shape.params[0] * scale] };
+    }
+    // A part's position scales with its dimensions, so the compound keeps its
+    // shape rather than spreading as the node grows. Scaled here for the same
+    // reason an explicit Box or Sphere is: the renderer builds the parts from
+    // these numbers as given.
     return {
         type: "Compound",
         params: [],
         children: shape.children.map((c) => {
             const base = {
                 type: c.type,
-                params: [...c.params],
-                position: [...c.position],
+                params: c.params.map((p) => p * scale),
+                position: c.position.map((p) => p * scale),
             };
             if (c.rotation)
                 base.rotation = [...c.rotation];
@@ -87,6 +94,21 @@ function parsePhysicsWorldConfig(raw) {
     catch {
         return null;
     }
+}
+/**
+ * The scene-level switch, and the gate on every body: no world, no bodies.
+ *
+ * Without it a placement carrying `physics_config` simulated on the device in a
+ * scene whose author had physics switched off, because virocore adds a body to a
+ * `VROPhysicsWorld` it creates on demand at its own -9.81 gravity
+ * (`VROScene::getPhysicsWorld`) whether or not the scene sent a `physicsWorld`
+ * prop. Nothing landed, since AR has no floor, so the content fell out of sight
+ * while the Studio editor drew it standing still. `StudioARScene` reads the same
+ * flag for the `physicsWorld` prop, where it also carries the gravity.
+ */
+function isPhysicsWorldEnabled(scene) {
+    return (parsePhysicsWorldConfig(scene?.physics_world_config ?? null)?.enabled ===
+        true);
 }
 /**
  * Parses `asset.physics_config` JSON. Returns null if missing or invalid.
@@ -144,21 +166,34 @@ function buildViroPhysicsBody(config, options) {
         config.enabled;
     const type = kinematicDrag ? "Kinematic" : config.type;
     const mass = kinematicDrag ? 0 : config.mass;
-    const shape = mapShapeToViro(config.shape ?? { type: "Box", params: [1, 1, 1] });
     const body = {
         type,
         mass,
-        shape,
         enabled: config.enabled,
     };
+    // No configured shape means "fit the geometry", so the key is left out
+    // entirely: virocore then infers a box or sphere from the node's own bounding
+    // box and applies the node's world scale to it (`VROPhysicsShape(node, false)`
+    // followed by `setLocalScaling`), which is what the editors measure. This used
+    // to send a 1x1x1 box instead, which gave a 0.4 m model a 1 m collider and
+    // stood it 0.3 m off the ground.
+    if (config.shape) {
+        body.shape = mapShapeToViro(config.shape, options?.scale ?? 1);
+    }
     if (config.restitution !== undefined)
         body.restitution = config.restitution;
     if (config.friction !== undefined)
         body.friction = config.friction;
     if (config.useGravity !== undefined)
         body.useGravity = kinematicDrag ? false : config.useGravity;
-    if (config.velocity !== undefined)
-        body.velocity = [...config.velocity];
+    // Sent as `instantVelocity`, never as `velocity`: the bridges pass the latter
+    // to virocore as a CONSTANT velocity, reasserted on the rigid body every
+    // frame, so gravity never gets a turn. The instant one is a latch the next
+    // physics step consumes once, and it rides the node's own props, where a
+    // module call at mount cannot see the view yet under the New Architecture.
+    if (config.velocity !== undefined) {
+        body.instantVelocity = [...config.velocity];
+    }
     if (config.torque !== undefined)
         body.torque = normalizeTorque(config.torque);
     if (config.force !== undefined)

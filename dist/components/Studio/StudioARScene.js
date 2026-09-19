@@ -36,8 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioARScene = void 0;
 const React = __importStar(require("react"));
 const react_1 = require("react");
-const react_native_1 = require("react-native");
 const ViroAmbientLight_1 = require("../ViroAmbientLight");
+const ViroDirectionalLight_1 = require("../ViroDirectionalLight");
 const ViroARImageMarker_1 = require("../AR/ViroARImageMarker");
 const ViroARPlane_1 = require("../AR/ViroARPlane");
 const ViroARPlaneSelector_1 = require("../AR/ViroARPlaneSelector");
@@ -53,23 +53,33 @@ const collisionPairKey_1 = require("./domain/collisionPairKey");
 const proximityBindingsRuntime_1 = require("./domain/proximityBindingsRuntime");
 const gazeBindingsRuntime_1 = require("./domain/gazeBindingsRuntime");
 const triggerImageRegistry_1 = require("./domain/triggerImageRegistry");
+const dragConfiguration_1 = require("./domain/dragConfiguration");
 const viroNodeFactory_1 = require("./domain/viroNodeFactory");
+const assetPosition_1 = require("./domain/assetPosition");
 const defaultApiRequestExecutor_1 = require("./domain/defaultApiRequestExecutor");
 const sceneNavigationHandler_1 = require("./domain/sceneNavigationHandler");
 const variableStore_1 = require("./domain/variableStore");
 const visibilityStore_1 = require("./domain/visibilityStore");
 const placementStore_1 = require("./domain/placementStore");
+const utils_1 = require("./domain/utils");
 const soundManager_1 = require("./domain/soundManager");
 const StudioSounds_1 = require("./domain/StudioSounds");
+const questAlertStore_1 = require("./domain/questAlertStore");
+const StudioQuestAlertOverlay_1 = require("./StudioQuestAlertOverlay");
+const StudioQuestSceneHudOverlay_1 = require("./StudioQuestSceneHudOverlay");
 const studioMaterials_1 = require("./domain/studioMaterials");
+const studioLighting_1 = require("./domain/studioLighting");
 const useStudioShaderTimeUniforms_1 = require("./domain/useStudioShaderTimeUniforms");
 const useStudioShaderViewportUniforms_1 = require("./domain/useStudioShaderViewportUniforms");
 const physicsConfig_1 = require("./domain/physicsConfig");
-const ANDROID_MAX_3D_MODELS = 3;
-const IOS_MAX_3D_MODELS = 10;
 // The native camera-transform event can fire per frame; throttle the proximity
 // distance sweep to this cadence.
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
+// Cadence for updating the Quest head-locked UI's tracked position (alert
+// overlay, exit/scene-name HUD). A little slack behind actual head movement
+// is imperceptible for a static panel and far cheaper than re-rendering it
+// every frame.
+const HEAD_LOCKED_EVAL_INTERVAL_MS = 150;
 // Headset placement has no surface hit-test, so a triggered tap-to-place asset
 // lands this far along the aim ray when no controller hit point is available.
 const HEADSET_PLACEMENT_DISTANCE_M = 1.5;
@@ -120,11 +130,22 @@ const TRACKING_GATE_FALLBACK_MS = 6000;
  */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
-        return ViroPlatform_1.isQuest ? <ViroScene_1.ViroScene /> : <ViroARScene_1.ViroARScene />;
+        // Quest keeps its own root here for the reason spelled out at the main
+        // return below.
+        return ViroPlatform_1.isQuest ? (<ViroScene_1.ViroScene toneMappingEnabled={false}/>) : (<ViroARScene_1.ViroARScene toneMappingEnabled={false}/>);
     }
     return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
 };
 exports.StudioARScene = StudioARScene;
+/** Owns the rig's estimate scale so a light change re-renders these two alone. */
+const StudioLightRig = React.forwardRef(function StudioLightRig(_props, ref) {
+    const [scale, setScale] = (0, react_1.useState)(1);
+    (0, react_1.useImperativeHandle)(ref, () => ({ setScale }), []);
+    return (<>
+        <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={studioLighting_1.STUDIO_AMBIENT_INTENSITY * scale}/>
+        <ViroDirectionalLight_1.ViroDirectionalLight color="#ffffff" intensity={studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY * scale} direction={studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION}/>
+      </>);
+});
 const StudioARSceneInner = (props) => {
     const { sceneNavigator, sceneData, onReady, onSceneChange, onPlaneDetected, onPlaneSelected, noAssetsMessage, variableStore, placementStore, placementApiRef, } = props;
     const { scene, assets, animations, collision_bindings, functions } = sceneData;
@@ -146,6 +167,9 @@ const StudioARSceneInner = (props) => {
             // Clear a dangling video-recording flag so leaving the experience mid-
             // recording can't block the next session's RECORD_VIDEO toggle.
             (0, sceneNavigationHandler_1.resetVideoRecordingState)();
+            // Dismiss any Quest in-scene alert so a torn-down scene can't leave one
+            // stuck on screen for the next scene.
+            questAlertStore_1.questAlertStore.reset();
         };
     }, []);
     // ─── Variable store ───────────────────────────────────────────────────────
@@ -198,13 +222,11 @@ const StudioARSceneInner = (props) => {
         soundManagerRef.current?.reset();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scene.id]);
-    // Position for a spatial PLAY: look up the placed target asset (matches the
-    // node factory's position derivation, position_z defaulting to -2).
+    // Position for a spatial PLAY: the target asset's mounted position, through
+    // the node factory's own rule so the sound and the object agree.
     const getAssetPosition = (0, react_1.useCallback)((assetId) => {
         const a = assets.find((x) => x.id === assetId);
-        if (!a)
-            return undefined;
-        return [a.position_x ?? 0, a.position_y ?? 0, a.position_z ?? -2];
+        return a ? (0, assetPosition_1.studioAssetPosition)(a) : undefined;
     }, [assets]);
     const runtimeCtx = (0, react_1.useMemo)(() => ({
         scheduler: schedulerRef.current,
@@ -238,6 +260,19 @@ const StudioARSceneInner = (props) => {
     // ─── Animation runtime state ──────────────────────────────────────────────
     const [animOverrides, setAnimOverrides] = (0, react_1.useState)({});
     const [loadedAssetIds, setLoadedAssetIds] = (0, react_1.useState)({});
+    // A node has one animation slot, so two animations on one asset cannot
+    // overlap the way they do in the editor. These track what is playing, what is
+    // waiting behind it, and whether this play has already run its on_start.
+    const liveAnimRef = (0, react_1.useRef)(new Map());
+    const queuedAnimRef = (0, react_1.useRef)(new Map());
+    const startedPlayRef = (0, react_1.useRef)(new Set());
+    const loadedAssetIdsRef = (0, react_1.useRef)(loadedAssetIds);
+    loadedAssetIdsRef.current = loadedAssetIds;
+    (0, react_1.useEffect)(() => {
+        liveAnimRef.current.clear();
+        queuedAnimRef.current.clear();
+        startedPlayRef.current.clear();
+    }, [scene.id]);
     // ─── Drag-active state (debounced) ────────────────────────────────────────
     // Viro's onDrag fires per-frame. Track a Record<assetId, true> cleared 220ms
     // after the last drag event; the node factory reads isDragActive to pass
@@ -280,7 +315,53 @@ const StudioARSceneInner = (props) => {
             triggerHandlesRef.current.clear();
         };
     }, []);
+    const markAnimationLive = (0, react_1.useCallback)((assetId, anim) => {
+        startedPlayRef.current.delete(assetId);
+        // An asset that has not loaded yet never starts, so it never reports a
+        // finish either. Leaving it out keeps a later trigger from waiting behind
+        // an animation that is not going to run.
+        if (!loadedAssetIdsRef.current[assetId]) {
+            liveAnimRef.current.delete(assetId);
+            return;
+        }
+        liveAnimRef.current.set(assetId, {
+            key: anim.animation_key,
+            loop: anim.loop,
+            interruptible: anim.interruptible,
+        });
+    }, []);
     const triggerAnimation = (0, react_1.useCallback)((targetAssetId, animationKey) => {
+        const requested = animations.find((a) => a.target_asset_id === targetAssetId &&
+            a.animation_key === animationKey);
+        if (!requested)
+            return;
+        const live = liveAnimRef.current.get(targetAssetId);
+        if (live && live.key !== animationKey) {
+            if (!live.loop && !live.interruptible) {
+                // Let the running one finish and play this next. The editor runs both
+                // at once and the runtime cannot, but in sequence the asset at least
+                // ends up where running both would have left it, and nothing is lost.
+                const queue = queuedAnimRef.current.get(targetAssetId) ?? [];
+                if (queue[queue.length - 1] !== animationKey) {
+                    queue.push(animationKey);
+                    queuedAnimRef.current.set(targetAssetId, queue);
+                }
+                return;
+            }
+            // A loop never finishes and an interruptible animation is one the author
+            // said may be cut short, so this one takes the slot now. Sent as a single
+            // update with `run` still true: the runtime only terminates a running
+            // animation inside `playAnimation`, which a false→true pair never reaches
+            // because the false half pauses it first, and a paused animation resumes
+            // whatever it already holds however the name changed.
+            markAnimationLive(targetAssetId, requested);
+            setAnimOverrides((prev) => ({
+                ...prev,
+                [targetAssetId]: { key: animationKey, run: true, interrupting: true },
+            }));
+            return;
+        }
+        markAnimationLive(targetAssetId, requested);
         // Viro's animation prop is edge-triggered on false→true. Force false first,
         // then flip to true on the next frame so a re-trigger of the same key fires.
         setAnimOverrides((prev) => ({
@@ -297,9 +378,27 @@ const StudioARSceneInner = (props) => {
             });
         });
         triggerHandlesRef.current.add(handle);
-    }, []);
+    }, [animations, markAnimationLive]);
     const triggerAnimationRef = (0, react_1.useRef)(triggerAnimation);
     triggerAnimationRef.current = triggerAnimation;
+    const handleAnimationFinished = (0, react_1.useCallback)((assetId, anim) => {
+        // The runtime loops by replaying the whole animation, so it reports a
+        // finish at every cycle boundary. A loop has not finished: firing
+        // on_finish there repeats a chained function for as long as the loop runs,
+        // and the editor fires it only when an animation ends.
+        if (anim.loop)
+            return;
+        liveAnimRef.current.delete(assetId);
+        startedPlayRef.current.delete(assetId);
+        if (anim.on_finish_function) {
+            (0, sceneNavigationHandler_1.executeOnLoadFunction)(anim.on_finish_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
+        }
+        // on_finish runs first, so an animation it chains holds the slot and this
+        // one waits behind it rather than cutting it off.
+        const next = queuedAnimRef.current.get(assetId)?.shift();
+        if (next)
+            triggerAnimationRef.current(assetId, next);
+    }, [functions, sceneNavigator, animations, handleSceneChange, runtimeCtx]);
     // ─── Computed animation props per asset ──────────────────────────────────
     const animationStates = (0, react_1.useMemo)(() => {
         const states = {};
@@ -332,14 +431,21 @@ const StudioARSceneInner = (props) => {
                     : activeAnim.animation_key,
                 run,
                 loop: activeAnim.loop,
-                interruptible: activeAnim.interruptible,
+                interruptible: activeAnim.interruptible || !!override?.interrupting,
                 delay: activeAnim.delay_ms ?? 0,
                 onStart: activeAnim.on_start_function
-                    ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_start_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx)
+                    ? () => {
+                        // Once per play, not once per loop cycle: the runtime reports a
+                        // start on every replay, and the editor fires it once.
+                        if (startedPlayRef.current.has(assetId))
+                            return;
+                        startedPlayRef.current.add(assetId);
+                        (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_start_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx);
+                    }
                     : undefined,
-                onFinish: activeAnim.on_finish_function
-                    ? () => (0, sceneNavigationHandler_1.executeOnLoadFunction)(activeAnim.on_finish_function, functions, sceneNavigator, animations, (id, key) => triggerAnimationRef.current(id, key), handleSceneChange, runtimeCtx)
-                    : undefined,
+                // Always wired: it carries the author's on_finish and it is also what
+                // releases an animation waiting for this one.
+                onFinish: () => handleAnimationFinished(assetId, activeAnim),
             };
         }
         return states;
@@ -350,6 +456,7 @@ const StudioARSceneInner = (props) => {
         functions,
         sceneNavigator,
         handleSceneChange,
+        handleAnimationFinished,
         runtimeCtx,
     ]);
     // ─── on_load_function ─────────────────────────────────────────────────────
@@ -499,6 +606,11 @@ const StudioARSceneInner = (props) => {
     // Latest camera pose, cached from the transform stream so a headset trigger
     // can project the aim ray without an AR surface hit-test.
     const cameraPoseRef = (0, react_1.useRef)(null);
+    // Throttled *state* mirror of cameraPoseRef, Quest-only: head-locked UI
+    // (StudioQuestAlertOverlay) needs to re-render as the head moves, which a
+    // ref alone can't trigger.
+    const [questHeadLockedPose, setQuestHeadLockedPose] = (0, react_1.useState)(null);
+    const lastHeadLockedEvalRef = (0, react_1.useRef)(0);
     // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
     const [activePlacementId, setActivePlacementId] = (0, react_1.useState)(() => placementStoreRef.current?.activeAssetId() ?? null);
     (0, react_1.useEffect)(() => {
@@ -521,6 +633,17 @@ const StudioARSceneInner = (props) => {
             forward: t.forward,
             up: t.up,
         };
+        if (ViroPlatform_1.isQuest) {
+            const nowHL = Date.now();
+            if (nowHL - lastHeadLockedEvalRef.current >= HEAD_LOCKED_EVAL_INTERVAL_MS) {
+                lastHeadLockedEvalRef.current = nowHL;
+                setQuestHeadLockedPose({
+                    position: t.position,
+                    forward: t.forward,
+                    up: t.up,
+                });
+            }
+        }
         if (!proximityBindings.length)
             return;
         const now = Date.now();
@@ -592,7 +715,7 @@ const StudioARSceneInner = (props) => {
     // tap-to-place since a marker already dictates the anchor.
     const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = (0, react_1.useMemo)(() => {
         const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
-        const tapToPlace = assets.filter((a) => !a.trigger_image_url && a.tap_to_place);
+        const tapToPlace = assets.filter((a) => (0, placementStore_1.isTapToPlaceAsset)(a));
         const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
         return {
             planeAssets: plane,
@@ -600,7 +723,7 @@ const StudioARSceneInner = (props) => {
             tapToPlaceAssets: tapToPlace,
         };
     }, [assets]);
-    const [urlToTargetName, setUrlToTargetName] = (0, react_1.useState)(() => new Map());
+    const [targetNameByAssetId, setTargetNameByAssetId] = (0, react_1.useState)(() => new Map());
     const prevTargetNamesRef = (0, react_1.useRef)([]);
     (0, react_1.useEffect)(() => {
         if (ViroPlatform_1.isQuest) {
@@ -612,13 +735,17 @@ const StudioARSceneInner = (props) => {
         if (imageTriggeredAssets.length === 0) {
             (0, triggerImageRegistry_1.cleanupTriggerImageTargets)(prevTargetNamesRef.current);
             prevTargetNamesRef.current = [];
-            setUrlToTargetName(new Map());
+            setTargetNameByAssetId(new Map());
             return;
         }
         const map = (0, triggerImageRegistry_1.registerTriggerImageTargets)(imageTriggeredAssets);
-        const targetNames = [...map.values()];
+        // Assets sharing a picture share a target name, so delete each one once.
+        const targetNames = [...new Set(map.values())];
+        if ((0, utils_1.isDev)()) {
+            console.log(`[Studio] Registered ${targetNames.length} trigger target(s) for ${imageTriggeredAssets.length} placement(s): ${targetNames.join(", ")}`);
+        }
         prevTargetNamesRef.current = targetNames;
-        setUrlToTargetName(map);
+        setTargetNameByAssetId(map);
         return () => {
             (0, triggerImageRegistry_1.cleanupTriggerImageTargets)(targetNames);
             prevTargetNamesRef.current = [];
@@ -640,6 +767,21 @@ const StudioARSceneInner = (props) => {
             setTrackingReady(true);
         }
     }, []);
+    // ─── Rig scale from the room ──────────────────────────────────────────────
+    // The estimate arrives on every rendered frame, so it goes to the rig's own
+    // component rather than into state here, where a render rebuilds every asset
+    // node, and only once it has moved enough to see. Quest and web never call
+    // this and render the rig as authored.
+    const lightRigRef = (0, react_1.useRef)(null);
+    const lightScaleRef = (0, react_1.useRef)(1);
+    const handleAmbientLightUpdate = (0, react_1.useCallback)((info) => {
+        const scale = (0, studioLighting_1.studioLightScale)(info?.intensity);
+        if (Math.abs(scale - lightScaleRef.current) < studioLighting_1.STUDIO_LIGHT_SCALE_STEP) {
+            return;
+        }
+        lightScaleRef.current = scale;
+        lightRigRef.current?.setScale(scale);
+    }, []);
     (0, react_1.useEffect)(() => {
         if (trackingReady)
             return;
@@ -652,26 +794,38 @@ const StudioARSceneInner = (props) => {
     (0, react_1.useEffect)(() => {
         onReady?.();
     }, []);
+    // ─── Drag surface ─────────────────────────────────────────────────────────
+    // A FixedToPlane drag is confined to a world plane, so a draggable asset
+    // needs the plane its anchor actually found: guessing an axis from
+    // plane_direction drags content off any wall not facing world Z. Only the
+    // plane-wrapped assets are anchored to it, and only their own anchor will do,
+    // since a scene can detect several walls at once.
+    const hasPlaneDrag = (0, react_1.useMemo)(() => planeAssets.some((asset) => asset.is_draggable), [planeAssets]);
+    const [dragSurface, setDragSurface] = (0, react_1.useState)(null);
+    const selectedAnchorIdRef = (0, react_1.useRef)(null);
+    const trackDragSurface = (0, react_1.useCallback)((anchor) => {
+        if (!hasPlaneDrag || !anchor?.position || !anchor?.rotation)
+            return;
+        const next = (0, dragConfiguration_1.dragSurfaceFromAnchor)(anchor.position, anchor.rotation);
+        // The session refines a plane continuously, mostly by sliding the anchor
+        // around inside the surface, which does not move the plane at all. Keep
+        // the previous object in that case or every update re-renders the scene.
+        setDragSurface((prev) => prev && (0, dragConfiguration_1.isSameDragSurface)(prev, next) ? prev : next);
+    }, [hasPlaneDrag]);
+    (0, react_1.useEffect)(() => {
+        setDragSurface(null);
+        selectedAnchorIdRef.current = null;
+    }, [scene.id]);
     // ─── Render helpers ───────────────────────────────────────────────────────
-    const maxModels = react_native_1.Platform.OS === "android" ? ANDROID_MAX_3D_MODELS : IOS_MAX_3D_MODELS;
     const renderedPlaneAssets = (0, react_1.useMemo)(() => {
-        let modelCount = 0;
         return planeAssets
-            .map((asset) => {
-            if (asset.asset_type_name === "3D-MODEL") {
-                modelCount++;
-                if (modelCount > maxModels) {
-                    console.warn(`[Studio] Skipping 3D model "${asset.name}" — ${react_native_1.Platform.OS} limit (${maxModels}) reached`);
-                    return null;
-                }
-            }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
-                ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id));
-        })
+            .map((asset) => (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined, getGazeHandler(asset.id), dragSurface))
             .filter(Boolean);
     }, [
         planeAssets,
+        dragSurface,
         sceneNavigator,
         animations,
         animationStates,
@@ -679,7 +833,6 @@ const StudioARSceneInner = (props) => {
         getCollisionHandler,
         isDragActive,
         notifyPhysicsDrag,
-        maxModels,
         handleSceneChange,
         runtimeCtx,
         proximityTargetIds,
@@ -689,20 +842,10 @@ const StudioARSceneInner = (props) => {
     // Tap-to-place nodes render at scene root (world space); each is gated by the
     // placement store (null until placed, then mounted at the placed world point).
     const renderedTapToPlaceAssets = (0, react_1.useMemo)(() => {
-        let modelCount = 0;
         return tapToPlaceAssets
-            .map((asset) => {
-            if (asset.asset_type_name === "3D-MODEL") {
-                modelCount++;
-                if (modelCount > maxModels) {
-                    console.warn(`[Studio] Skipping 3D model "${asset.name}" — ${react_native_1.Platform.OS} limit (${maxModels}) reached`);
-                    return null;
-                }
-            }
-            return (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
-                ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id));
-        })
+            .map((asset) => (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
+            ? registerProximityTarget
+            : undefined, getGazeHandler(asset.id)))
             .filter(Boolean);
     }, [
         tapToPlaceAssets,
@@ -713,33 +856,43 @@ const StudioARSceneInner = (props) => {
         getCollisionHandler,
         isDragActive,
         notifyPhysicsDrag,
-        maxModels,
         handleSceneChange,
         runtimeCtx,
         proximityTargetIds,
         registerProximityTarget,
         getGazeHandler,
     ]);
+    // One marker per target, carrying every asset on that image. The renderer
+    // attaches a detected anchor to a single marker node, so a second marker on
+    // the same target stays detached and its assets never appear.
     const renderedImageTriggeredAssets = (0, react_1.useMemo)(() => {
         if (ViroPlatform_1.isQuest)
             return [];
-        return imageTriggeredAssets
-            .map((asset) => {
-            const targetName = urlToTargetName.get(asset.trigger_image_url);
+        const nodesByTarget = new Map();
+        for (const asset of imageTriggeredAssets) {
+            const targetName = targetNameByAssetId.get(asset.id);
             if (!targetName)
-                return null;
-            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id)
-                ? registerProximityTarget
-                : undefined, getGazeHandler(asset.id));
+                continue;
+            const node = (0, viroNodeFactory_1.createNode)(asset, sceneNavigator, animations, scene, (id, key) => triggerAnimationRef.current(id, key), animationStates, handleAssetLoaded, getCollisionHandler(asset.id), isDragActive, notifyPhysicsDrag, handleSceneChange, runtimeCtx, proximityTargetIds.has(asset.id) ? registerProximityTarget : undefined, getGazeHandler(asset.id));
             if (!node)
-                return null;
-            return (<ViroARImageMarker_1.ViroARImageMarker key={asset.id} target={targetName}>
-            {node}
-          </ViroARImageMarker_1.ViroARImageMarker>);
-        })
-            .filter(Boolean);
+                continue;
+            const nodes = nodesByTarget.get(targetName);
+            if (nodes)
+                nodes.push(node);
+            else
+                nodesByTarget.set(targetName, [node]);
+        }
+        return [...nodesByTarget].map(([targetName, nodes]) => (<ViroARImageMarker_1.ViroARImageMarker key={targetName} target={targetName} 
+        // Whether the tracker ever recognised the picture is otherwise
+        // invisible, and it is the first thing to establish when content does
+        // not appear on a marker. The native side emits this event either way.
+        onAnchorFound={(0, utils_1.isDev)()
+                ? () => console.log(`[Studio] Trigger image "${targetName}" found, ${nodes.length} placement(s) on it`)
+                : undefined}>
+        {nodes}
+      </ViroARImageMarker_1.ViroARImageMarker>));
     }, [
-        urlToTargetName,
+        targetNameByAssetId,
         imageTriggeredAssets,
         sceneNavigator,
         animations,
@@ -780,6 +933,10 @@ const StudioARSceneInner = (props) => {
     // automatically; ViroARScene forwards them here via ref. Also surfaces
     // onPlaneDetected / onPlaneSelected to the host.
     const planeSelectorRef = (0, react_1.useRef)(null);
+    // Quest HUD status ("Scanning for planes…" vs "Plane found") — a coarse
+    // found/not-found flag, not a count; the HUD only needs to tell the user
+    // scanning is working, not exactly how many planes exist.
+    const [hasFoundPlane, setHasFoundPlane] = (0, react_1.useState)(false);
     const handleAnchorFound = (0, react_1.useCallback)((anchor) => {
         try {
             if (planeDetectionMode === "MANUAL") {
@@ -787,6 +944,9 @@ const StudioARSceneInner = (props) => {
             }
             if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
                 onPlaneDetected?.();
+            }
+            if (anchor?.type === "plane") {
+                setHasFoundPlane(true);
             }
             // Anchoring places content in world space — refresh cached target
             // positions so proximity metres stay correct once the anchor lands.
@@ -800,13 +960,16 @@ const StudioARSceneInner = (props) => {
         try {
             if (planeDetectionMode === "MANUAL") {
                 planeSelectorRef.current?.handleAnchorUpdated(anchor);
+                if (anchor?.anchorId === selectedAnchorIdRef.current) {
+                    trackDragSurface(anchor);
+                }
             }
             refreshAllTargetTransforms();
         }
         catch (error) {
             console.error("[Studio] handleAnchorUpdated failed:", error);
         }
-    }, [planeDetectionMode, refreshAllTargetTransforms]);
+    }, [planeDetectionMode, refreshAllTargetTransforms, trackDragSurface]);
     const handleAnchorRemoved = (0, react_1.useCallback)((anchor) => {
         try {
             if (planeDetectionMode === "MANUAL" && anchor) {
@@ -817,23 +980,23 @@ const StudioARSceneInner = (props) => {
             console.error("[Studio] handleAnchorRemoved failed:", error);
         }
     }, [planeDetectionMode]);
-    const handlePlaneSelected = (0, react_1.useCallback)(() => {
+    const handlePlaneSelected = (0, react_1.useCallback)((plane) => {
+        selectedAnchorIdRef.current = plane?.anchorId ?? null;
+        trackDragSurface(plane);
         onPlaneSelected?.();
-    }, [onPlaneSelected]);
+    }, [onPlaneSelected, trackDragSurface]);
     // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
     const handlePlaneDetectedForSelector = (0, react_1.useCallback)(() => {
         onPlaneDetected?.();
         return true;
     }, [onPlaneDetected]);
+    // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
+    // the OpenXR renderer feeds Quest plane anchors through the same
+    // onAnchorFound path ARCore/ARKit use (XR_FB_scene room model), see
+    // VROARSessionOpenXR.cpp in virocore. No Quest-specific branch needed.
     const renderAssets = () => {
-        if (ViroPlatform_1.isQuest) {
-            if (planeDetectionMode !== "NONE") {
-                console.warn(`[Studio] Plane detection (${planeDetectionMode}) is not supported on Quest — rendering assets without plane anchor.`);
-            }
-            return <>{renderedPlaneAssets}</>;
-        }
         if (planeDetectionMode === "AUTOMATIC") {
-            return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment}>
+            return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={trackDragSurface} onAnchorUpdated={trackDragSurface}>
           {renderedPlaneAssets}
         </ViroARPlane_1.ViroARPlane>);
         }
@@ -859,7 +1022,7 @@ const StudioARSceneInner = (props) => {
                 onClick: (position) => handleHeadsetPlaceTrigger(position),
             }
             : {})}/>)}
-      <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
+      <StudioLightRig ref={lightRigRef}/>
       {trackingReady && renderAssets()}
       {renderedTapToPlaceAssets}
       {renderedImageTriggeredAssets}
@@ -869,6 +1032,8 @@ const StudioARSceneInner = (props) => {
                 color: "#FFFFFF",
                 textAlign: "center",
             }}/>)}
+      {ViroPlatform_1.isQuest && <StudioQuestAlertOverlay_1.StudioQuestAlertOverlay cameraPose={questHeadLockedPose}/>}
+      {ViroPlatform_1.isQuest && (<StudioQuestSceneHudOverlay_1.StudioQuestSceneHudOverlay cameraPose={questHeadLockedPose} sceneName={scene.name} planeDetectionMode={planeDetectionMode} hasFoundPlane={hasFoundPlane}/>)}
       <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
       {assets.length === 0 && (<ViroText_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{
                 fontFamily: "Arial",
@@ -877,18 +1042,40 @@ const StudioARSceneInner = (props) => {
                 textAlign: "center",
             }}/>)}
     </>);
-    // Wire the camera event when a proximity trigger needs it OR tap-to-place needs
-    // the cached camera pose for headset placement — native gates the per-frame
-    // transform stream on this prop being present.
-    const cameraTransformProp = proximityBindings.length || tapToPlaceAssets.length
+    // Wire the camera event when a proximity trigger needs it, tap-to-place needs
+    // the cached camera pose for headset placement, or we're on Quest (head-locked
+    // UI — alert overlay, exit/scene-name HUD — needs a live pose to track) —
+    // native gates the per-frame transform stream on this prop being present.
+    const cameraTransformProp = ViroPlatform_1.isQuest || proximityBindings.length || tapToPlaceAssets.length
         ? { onCameraTransformUpdate: handleCameraTransformUpdate }
         : {};
+    // Quest mounts ViroScene, not the ViroARScene below, and that is a decision
+    // rather than an oversight — it was made when this branch and the passthrough
+    // prop met in a merge, so here is what each one buys.
+    //
+    // ViroXRSceneNavigator's contract is that a ViroScene root is fully-virtual VR
+    // and a ViroARScene root is mixed reality, which turns passthrough on by itself
+    // and wires XR_EXT_plane_detection into onAnchorFound and ViroARPlane. Passthrough
+    // is not what is lost by keeping ViroScene: StudioSceneNavigator asks for it
+    // outright with `passthroughEnabled` on Quest, which reaches VRActivity through
+    // the navigator bridge and does not depend on the root at all.
+    //
+    // Plane anchors are. With this root a Studio scene on Quest gets no detected
+    // surfaces, so an asset authored to sit on a floor or a wall has nothing to land
+    // on. Nothing regresses against what shipped — ViroScene is the root Quest has
+    // had since April, and the ref that drives tap-to-place hit testing is null on
+    // Quest either way — but unifying the two roots is a real change with a device
+    // test behind it, not something a conflict resolution should decide quietly.
     if (ViroPlatform_1.isQuest) {
-        return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp}>
+        return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp} toneMappingEnabled={false}>
         {children}
       </ViroScene_1.ViroScene>);
     }
-    return (<ViroARScene_1.ViroARScene ref={arSceneRef} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
+    return (<ViroARScene_1.ViroARScene ref={arSceneRef} 
+    // The editor previews no tone curve, and virocore's default Hable
+    // luminance-only pass renders pure white at about 0.77. Off here rather
+    // than via the navigator's `hdrEnabled`, which would take PBR with it.
+    toneMappingEnabled={false} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAmbientLightUpdate={handleAmbientLightUpdate} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
       {children}
     </ViroARScene_1.ViroARScene>);
 };

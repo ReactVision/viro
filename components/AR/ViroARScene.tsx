@@ -15,7 +15,9 @@ import {
   requireNativeComponent,
 } from "react-native";
 // @ts-ignore
-import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+import { resolveViroAssetSource as resolveAssetSource } from "../Utilities/ViroAssetSource";
 import {
   ViroAmbientLightInfo,
   ViroAmbientLightUpdateEvent,
@@ -86,6 +88,17 @@ type Props = ViroCommonProps & {
   soundRoom?: ViroSoundRoom;
   physicsWorld?: ViroPhysicsWorld;
   postProcessEffects?: string[];
+  /**
+   * Turns this scene's tone mapping pass on or off. It is on by default, applying
+   * a Hable luminance-only curve that renders pure white at about 0.77 and makes
+   * bright materials glow. Off passes colour through untouched.
+   *
+   * Prefer this over `hdrEnabled={false}` on the navigator when the goal is only
+   * an untouched tone curve: PBR requires HDR, so switching HDR off drops every
+   * PBR material back to Blinn and silently discards roughness, metalness and the
+   * ambient occlusion map.
+   */
+  toneMappingEnabled?: boolean;
 
   /**
    * ##### DEPRECATION WARNING - this prop may be removed in future releases #####

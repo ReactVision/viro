@@ -91,7 +91,21 @@ public:
      vector's x and y components.
      */
     virtual VROVector3f getImageSize() = 0;
-    
+
+    /*
+     Pinhole intrinsics of the camera image itself, in pixels of that image.
+     False when the platform cannot supply them, which is the default.
+
+     Not derivable from getProjection() everywhere: ARKit builds its matrix for
+     the viewport it is handed, but ARCore answers for the display geometry set
+     on the session and ignores the viewport, so on Android a projection read
+     against the camera image describes the screen's aspect instead. Anything
+     doing photogrammetry on the camera image wants these numbers, not that
+     matrix.
+     */
+    virtual bool getImageIntrinsics(float *outFx, float *outFy,
+                                    float *outCx, float *outCy) { return false; }
+
 };
 
 #endif /* VROARCamera_h */

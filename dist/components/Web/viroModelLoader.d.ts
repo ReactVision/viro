@@ -1,6 +1,7 @@
 /**
  * Fetch model bytes and determine container format for the model C API.
- * Self-contained formats (GLB, VRX) need only the single file.
+ * Self-contained formats (GLB, VRX) need only the single file; OBJ needs its
+ * .mtl and that .mtl's textures passed through Viro3DObject's `resources`.
  */
 import { ViroModelFormat } from "@reactvision/viro-web-renderer";
 /** Resolve a Viro model source to a URL. Web supports a string URL or { uri }. */

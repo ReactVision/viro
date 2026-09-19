@@ -71,4 +71,22 @@ namespace ViroOculus{
         EyeGaze         = 12, // eye-gaze ray (XR_EXT_eye_gaze_interaction; Quest Pro only)
     };
 }
+
+namespace ViroVisionOS {
+    /*
+     Hand tracking is the only input a fully immersive visionOS app receives.
+     Gaze-and-pinch is resolved by the system and delivered as a SwiftUI
+     SpatialEventGesture, which needs a view to attach to; CompositorServices hands
+     out a Metal layer and no view, and exposes no input API of its own. So the ray
+     comes from the index finger rather than from where the wearer is looking.
+
+     RightHand keeps the value 1 that every other platform gives its primary source,
+     so anything reading the legacy single-source hit result still resolves to the
+     dominant hand.
+     */
+    enum InputSource {
+        RightHand = 1,
+        LeftHand  = 2,
+    };
+}
 #endif

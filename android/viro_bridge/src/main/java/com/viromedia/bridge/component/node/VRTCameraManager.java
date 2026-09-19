@@ -57,4 +57,16 @@ public class VRTCameraManager extends VRTNodeManager<VRTCamera> {
         camera.setFieldOfView(fov);
     }
 
+    @ReactProp(name = "projection")
+    public void setProjection(VRTCamera camera, String projection) {
+        // Anything other than "orthographic" is perspective, including null: a typo should give
+        // the ordinary camera rather than a collapsed frustum.
+        camera.setOrthographic("orthographic".equalsIgnoreCase(projection));
+    }
+
+    @ReactProp(name = "orthographicScale", defaultFloat = 0)
+    public void setOrthographicScale(VRTCamera camera, float scale) {
+        camera.setOrthographicScale(scale);
+    }
+
 }

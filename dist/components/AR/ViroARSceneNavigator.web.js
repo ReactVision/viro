@@ -58,6 +58,7 @@ const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("../Web/ViroWebContext");
 const viroMaterialRegistry_1 = require("../Web/viroMaterialRegistry");
+const useViroRendererEffects_1 = require("../Web/useViroRendererEffects");
 const containerStyle = {
     position: "relative",
     width: "100%",
@@ -132,19 +133,26 @@ function loadSlamViaScript(url) {
     });
     return slamScriptPromise;
 }
+/*
+ * A status readout, so it reports the state rather than guessing at a cause.
+ * Limited is not only a startup condition — ARKit and ARCore also report it for
+ * poor light or fast motion — so calling it "initializing" would be wrong every
+ * time it happens mid-session.
+ */
 function trackingLabel(state) {
     switch (state) {
         case viro_web_renderer_1.ViroTrackingState.Normal:
             return "Tracking";
         case viro_web_renderer_1.ViroTrackingState.Limited:
-            return "Inicializando…";
+            return "Tracking limited";
         default:
-            return "Buscando tracking…";
+            return "No tracking";
     }
 }
 function ViroARSceneNavigator(props) {
     const canvasRef = (0, react_1.useRef)(null);
     const [renderer, setRenderer] = (0, react_1.useState)(null);
+    (0, useViroRendererEffects_1.useViroRendererEffects)(renderer, props);
     const [rootNode, setRootNode] = (0, react_1.useState)(0);
     const sessionRef = (0, react_1.useRef)(null);
     const [started, setStarted] = (0, react_1.useState)(false);
@@ -172,7 +180,7 @@ function ViroARSceneNavigator(props) {
             }
             catch (err) {
                 console.error("[Viro web AR] failed to initialize renderer:", err);
-                setError("No se pudo inicializar el renderer.");
+                setError("Could not initialize the renderer.");
             }
         })();
         return () => {
@@ -199,14 +207,12 @@ function ViroARSceneNavigator(props) {
         const url = props.slamScriptUrl;
         if (url)
             return () => loadSlamViaScript(url);
-        // Fall back to a pre-loaded global (host injected the <script> itself).
-        return () => {
-            const factory = globalThis.SlamModule;
-            if (!factory) {
-                throw new Error("slam-wasm not found: pass slamScriptUrl or loadSlam, or preload global SlamModule.");
-            }
-            return factory;
-        };
+        // Neither given: let the renderer load the engine it ships with. Returning
+        // undefined is what selects that path -- it is the default, not a failure.
+        // A host that injected the <script> itself is still served, because the
+        // bundled loader reuses an existing `SlamModule` global rather than
+        // fetching a second copy of a 265 KB module to arrive at the same object.
+        return undefined;
     }, [props.loadSlam, props.slamScriptUrl]);
     const startAR = (0, react_1.useCallback)(async () => {
         if (!renderer || starting || started)
@@ -234,7 +240,18 @@ function ViroARSceneNavigator(props) {
             },
         });
         sessionRef.current = session;
-        await session.start();
+        // start() rejects when it cannot start, having already called onError with
+        // the reason. Swallow the rejection here rather than letting it escape an
+        // onClick handler, and above all do not fall through to setStarted(true):
+        // that used to run even on a denied camera, undoing the state onError had
+        // just set and leaving the UI claiming a session that does not exist.
+        try {
+            await session.start();
+        }
+        catch {
+            sessionRef.current = null;
+            return;
+        }
         setStarted(true);
         setStarting(false);
         props.onSessionReady?.(session);
@@ -272,9 +289,9 @@ function ViroARSceneNavigator(props) {
 
       {started ? (<div style={statusStyle}>{trackingLabel(tracking)}</div>) : (<div style={overlayStyle}>
           {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
-          <div>{props.startLabel ?? "AR en la web · cámara + tracking"}</div>
+          <div>{props.startLabel ?? "AR needs access to your camera."}</div>
           <button type="button" style={buttonStyle} disabled={!renderer || starting} onClick={startAR}>
-            {starting ? "Iniciando…" : "Iniciar AR"}
+            {starting ? "Starting…" : "Start AR"}
           </button>
         </div>)}
     </div>);

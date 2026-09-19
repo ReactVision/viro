@@ -30,6 +30,8 @@ type Props = {
     onAnchorFound?: (anchor: ViroWebAnchor) => void;
     onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
     onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
+    /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
+    toneMappingEnabled?: boolean;
     children?: React.ReactNode;
     [key: string]: any;
 };

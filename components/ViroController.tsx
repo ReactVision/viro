@@ -48,12 +48,12 @@ type Props = ViroCommonProps &
 export class ViroController extends React.Component<Props> {
   _component: ViroNativeRef = null;
 
-  _onClick(event: NativeSyntheticEvent<ViroClickEvent>) {
+  _onClick = (event: NativeSyntheticEvent<ViroClickEvent>) => {
     this.props.onClick &&
       this.props.onClick(event.nativeEvent.position, event.nativeEvent.source);
-  }
+  };
 
-  _onClickState(event: NativeSyntheticEvent<ViroClickStateEvent>) {
+  _onClickState = (event: NativeSyntheticEvent<ViroClickStateEvent>) => {
     this.props.onClickState &&
       this.props.onClickState(
         event.nativeEvent.clickState,
@@ -64,40 +64,40 @@ export class ViroController extends React.Component<Props> {
     if (event.nativeEvent.clickState == CLICKED) {
       this._onClick(event);
     }
-  }
+  };
 
-  _onTouch(event: NativeSyntheticEvent<ViroTouchEvent>) {
+  _onTouch = (event: NativeSyntheticEvent<ViroTouchEvent>) => {
     this.props.onTouch &&
       this.props.onTouch(
         event.nativeEvent.touchState,
         event.nativeEvent.touchPos,
         event.nativeEvent.source
       );
-  }
+  };
 
-  _onScroll(event: NativeSyntheticEvent<ViroScrollEvent>) {
+  _onScroll = (event: NativeSyntheticEvent<ViroScrollEvent>) => {
     this.props.onScroll &&
       this.props.onScroll(
         event.nativeEvent.scrollPos,
         event.nativeEvent.source
       );
-  }
+  };
 
-  _onSwipe(event: NativeSyntheticEvent<ViroSwipeEvent>) {
+  _onSwipe = (event: NativeSyntheticEvent<ViroSwipeEvent>) => {
     this.props.onSwipe &&
       this.props.onSwipe(
         event.nativeEvent.swipeState,
         event.nativeEvent.source
       );
-  }
+  };
 
-  _onControllerStatus(event: NativeSyntheticEvent<ViroControllerStatusEvent>) {
+  _onControllerStatus = (event: NativeSyntheticEvent<ViroControllerStatusEvent>) => {
     this.props.onControllerStatus &&
       this.props.onControllerStatus(
         event.nativeEvent.controllerStatus,
         event.nativeEvent.source
       );
-  }
+  };
 
   _onFuse = (event: NativeSyntheticEvent<ViroFuseEvent>) => {
     if (this.props.onFuse) {
@@ -109,23 +109,23 @@ export class ViroController extends React.Component<Props> {
     }
   };
 
-  _onPinch(event: NativeSyntheticEvent<ViroPinchEvent>) {
+  _onPinch = (event: NativeSyntheticEvent<ViroPinchEvent>) => {
     this.props.onPinch &&
       this.props.onPinch(
         event.nativeEvent.pinchState,
         event.nativeEvent.scaleFactor,
         event.nativeEvent.source
       );
-  }
+  };
 
-  _onRotate(event: NativeSyntheticEvent<ViroRotateEvent>) {
+  _onRotate = (event: NativeSyntheticEvent<ViroRotateEvent>) => {
     this.props.onRotate &&
       this.props.onRotate(
         event.nativeEvent.rotateState,
         event.nativeEvent.rotationFactor,
         event.nativeEvent.source
       );
-  }
+  };
 
   async getControllerForwardAsync() {
     return await ViroControllerModule.getForwardVectorAsync(
@@ -137,10 +137,10 @@ export class ViroController extends React.Component<Props> {
     this._component?.setNativeProps(nativeProps);
   }
 
-  _onDrag(event: NativeSyntheticEvent<ViroDragEvent>) {
+  _onDrag = (event: NativeSyntheticEvent<ViroDragEvent>) => {
     this.props.onDrag &&
       this.props.onDrag(event.nativeEvent.dragToPos, event.nativeEvent.source);
-  }
+  };
 
   render() {
     // Uncomment this line to check for misnamed props

@@ -97,6 +97,15 @@ public class VRTVideoSurface extends VRTControl {
             }
             surface.playerOnUpdateTime(currentTime, totalVideoTime);
         }
+
+        @Override
+        public void onVideoSizeChanged(VideoTexture video, float width, float height) {
+            VRTVideoSurface surface = mSurface.get();
+            if (surface == null || surface.isTornDown()) {
+                return;
+            }
+            surface.updateVideoSize(width, height);
+        }
     }
 
     private float mWidth = 1;
@@ -111,6 +120,7 @@ public class VRTVideoSurface extends VRTControl {
     private VideoTexture.PlaybackListener mDelegate = null;
     private String mStereoMode;
     private boolean mGeometryNeedsUpdate = false;
+    private boolean mWidthOrHeightPropSet = false;
 
     public VRTVideoSurface(ReactContext reactContext) {
         super(reactContext);
@@ -184,12 +194,43 @@ public class VRTVideoSurface extends VRTControl {
 
     public void setWidth(float width) {
         mWidth = width;
+        mWidthOrHeightPropSet = true;
         mGeometryNeedsUpdate = true;
     }
 
     public void setHeight(float height) {
         mHeight = height;
+        mWidthOrHeightPropSet = true;
         mGeometryNeedsUpdate = true;
+    }
+
+    /**
+     * With neither size prop given the quad takes the source's aspect ratio at one unit
+     * wide, the rule VRTImage applies to an image. Only the geometry is rebuilt: resetVideo()
+     * would recreate the texture and restart playback.
+     */
+    private void updateVideoSize(float width, float height) {
+        if (mWidthOrHeightPropSet || width <= 0 || height <= 0
+                || mVideoTexture == null || getNodeJni() == null) {
+            return;
+        }
+
+        float scaledHeight = mWidth / (width / height);
+        if (Math.abs(scaledHeight - mHeight) < 1e-4f) {
+            return;
+        }
+        mHeight = scaledHeight;
+
+        Quad previousQuad = mQuad;
+        mQuad = new Quad(mWidth, mHeight, 0, 0, 1, 1);
+        getNodeJni().setGeometry(mQuad);
+        if (mMaterials != null) {
+            applyMaterials();
+        }
+        mQuad.setVideoTexture(mVideoTexture);
+        if (previousQuad != null) {
+            previousQuad.dispose();
+        }
     }
 
     public void setStereoMode(String mode){

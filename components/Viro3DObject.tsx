@@ -15,7 +15,9 @@ import {
 import { ViroNativeRef } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
-const { resolveAssetSource } = Image;
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+import { resolveViroAssetSource as resolveAssetSource } from "./Utilities/ViroAssetSource";
 
 type Props = {
   type: "OBJ" | "VRX" | "GLTF" | "GLB";

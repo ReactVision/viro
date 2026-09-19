@@ -14,3 +14,4 @@ export declare const isQuest: boolean;
  * if you forced VR mode (e.g., for in-app build diagnostics).
  */
 export declare const hasOpenXRSupport: boolean;
+export declare const isVisionOS: boolean;

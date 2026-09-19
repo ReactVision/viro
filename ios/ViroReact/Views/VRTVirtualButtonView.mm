@@ -89,7 +89,9 @@ static int buttonIndexForName(NSString *name) {
     _labelLayer = [CATextLayer layer];
     _labelLayer.alignmentMode  = kCAAlignmentCenter;
     _labelLayer.foregroundColor = [UIColor whiteColor].CGColor;
-    _labelLayer.contentsScale  = [UIScreen mainScreen].scale;
+    // displayScale rather than [UIScreen mainScreen].scale: the trait collection is available
+    // on every platform including visionOS, where UIScreen is not.
+    _labelLayer.contentsScale  = UITraitCollection.currentTraitCollection.displayScale;
     _labelLayer.wrapped        = NO;
     [self.layer addSublayer:_labelLayer];
 

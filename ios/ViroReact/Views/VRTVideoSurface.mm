@@ -36,6 +36,7 @@
     BOOL _videoSurfaceNeedsUpdate;
     std::shared_ptr<VROVideoDelegateiOS> _videoDelegate;
     NSString *_stereoMode;
+    BOOL _widthOrHeightPropSet;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
@@ -47,6 +48,7 @@
         _paused = NO;
         _width = 1;
         _height = 1;
+        _widthOrHeightPropSet = NO;
         _videoSurfaceNeedsUpdate = NO;
         _videoDelegate = std::make_shared<VROVideoDelegateiOS>(self);
     }
@@ -100,11 +102,13 @@
 
 -(void)setWidth:(float)width {
     _width = width;
+    _widthOrHeightPropSet = YES;
     _videoSurfaceNeedsUpdate = YES;
 }
 
 -(void)setHeight:(float)height {
     _height = height;
+    _widthOrHeightPropSet = YES;
     _videoSurfaceNeedsUpdate = YES;
 }
 
@@ -141,12 +145,10 @@
         mode = VROTextureUtil::getStereoModeForString(std::string([self.stereoMode UTF8String]));
     }
     _videoTexture = std::make_shared<VROVideoTextureiOS>(mode);
-    _surface = VROSurface::createSurface(_width, _height);
     _videoTexture->loadVideo(url, self.context->getFrameSynchronizer(), self.driver);
-   
-    [self node]->setGeometry(_surface);
-    [self applyMaterials];
-        
+
+    [self updateSurfaceGeometry];
+
     _videoTexture->setVolume(self.volume);
     _videoTexture->setMuted(self.muted);
     _videoTexture->setLoop(self.loop);
@@ -157,6 +159,12 @@
 
     // set that we did in fact update the surface
     _videoSurfaceNeedsUpdate = NO;
+}
+
+- (void)updateSurfaceGeometry {
+    _surface = VROSurface::createSurface(_width, _height);
+    [self node]->setGeometry(_surface);
+    [self applyMaterials];
 }
 
 - (void)setContext:(VRORenderContext *)context {
@@ -210,6 +218,23 @@
         self.onUpdateTimeViro(@{@"currentTime": @(currentTimeInSeconds),
                                 @"totalTime": @(totalTime)});
     }
+}
+
+- (void)videoDidChangeSize:(float)width height:(float)height {
+    // With neither size prop given the quad takes the source's aspect ratio at one
+    // unit wide, the rule VRTImage applies to an image. The delegate can report the
+    // same size twice (the player is polled when it is attached and again when it
+    // becomes ready), so rebuild only on a change.
+    if (_widthOrHeightPropSet || width <= 0 || height <= 0) {
+        return;
+    }
+    float scaledHeight = _width / (width / height);
+    if (fabsf(scaledHeight - _height) < 1e-4) {
+        return;
+    }
+
+    _height = scaledHeight;
+    [self updateSurfaceGeometry];
 }
 
 - (void)videoDidFail:(NSString *)error {

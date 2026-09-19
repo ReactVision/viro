@@ -37,6 +37,24 @@
 #import "VRTUtils.h"
 #import "VRTCamera.h"
 #import "VRTPortal.h"
+
+#if TARGET_OS_VISION
+// VRTPortal is not compiled for visionOS, so referencing its class object directly would leave an
+// undefined class symbol at link time. Looking the class up by name instead yields nil on
+// visionOS — the branch simply never matches — and resolves normally everywhere else.
+#define VRT_CLASS_PORTAL NSClassFromString(@"VRTPortal")
+#else
+#define VRT_CLASS_PORTAL [VRTPortal class]
+#endif
+
+#if TARGET_OS_VISION
+// VRTVideoSurface is not compiled for visionOS, so referencing its class object directly would
+// leave an undefined class symbol at link time. Looking the class up by name yields nil there —
+// the branch simply never matches — and resolves normally everywhere else.
+#define VRT_CLASS_VIDEO_SURFACE NSClassFromString(@"VRTVideoSurface")
+#else
+#define VRT_CLASS_VIDEO_SURFACE [VRTVideoSurface class]
+#endif
 #import "VRT360Image.h"
 #import "VRT3DObject.h"
 #import "VRTAnimatedComponent.h"
@@ -108,6 +126,137 @@ const double kTransformDelegateDistanceFilter = 0.01;
 static NSHashTable *shaderOverrideNodesRegistry = nil;
 // Static registry to track all nodes with shader materials (weak references)
 static NSHashTable *shaderMaterialsNodesRegistry = nil;
+
+// The VROMaterialVisual a JS material key writes to, or null for a key that is not
+// a visual. Mirrors VRTMaterialManager's own key handling, case-insensitive compare
+// included.
+static VROMaterialVisual *VRTVisualForMaterialKey(const std::shared_ptr<VROMaterial> &material, NSString *key) {
+    if ([key caseInsensitiveCompare:@"diffuseColor"] == NSOrderedSame ||
+        [key caseInsensitiveCompare:@"diffuseTexture"] == NSOrderedSame ||
+        [key caseInsensitiveCompare:@"diffuseIntensity"] == NSOrderedSame) {
+        return &material->getDiffuse();
+    } else if ([key caseInsensitiveCompare:@"specularColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"specularTexture"] == NSOrderedSame) {
+        return &material->getSpecular();
+    } else if ([key caseInsensitiveCompare:@"normalColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"normalTexture"] == NSOrderedSame) {
+        return &material->getNormal();
+    } else if ([key caseInsensitiveCompare:@"reflectiveColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"reflectiveTexture"] == NSOrderedSame) {
+        return &material->getReflective();
+    } else if ([key caseInsensitiveCompare:@"emissionColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"emissionTexture"] == NSOrderedSame) {
+        return &material->getEmission();
+    } else if ([key caseInsensitiveCompare:@"multiplyColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"multiplyTexture"] == NSOrderedSame) {
+        return &material->getMultiply();
+    } else if ([key caseInsensitiveCompare:@"ambientOcclusionColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"ambientOcclusionTexture"] == NSOrderedSame) {
+        return &material->getAmbientOcclusion();
+    } else if ([key caseInsensitiveCompare:@"selfIlluminationColor"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"selfIlluminationTexture"] == NSOrderedSame) {
+        return &material->getSelfIllumination();
+    } else if ([key caseInsensitiveCompare:@"roughness"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"roughnessTexture"] == NSOrderedSame) {
+        return &material->getRoughness();
+    } else if ([key caseInsensitiveCompare:@"metalness"] == NSOrderedSame ||
+               [key caseInsensitiveCompare:@"metalnessTexture"] == NSOrderedSame) {
+        return &material->getMetalness();
+    }
+    return nullptr;
+}
+
+// Copies onto `dest` the colours, textures and PBR values that `sourceJson` names,
+// and only those. A VROMaterial cannot say which of its properties an author set:
+// one built from a dictionary carrying nothing but shader modifiers still reports a
+// white diffuse and a 0.5 roughness, so copying them all would white out a textured
+// model, which is why the merges below skipped them entirely. The dictionary the
+// material was registered from is the only record of what was asked for.
+//
+// One key moves one facet, so a config naming a colour and no texture leaves the
+// model's own texture in place. A scalar roughness or metalness is still ignored by
+// the shader when the model carries a map for it, since the map wins.
+//
+// Call with thread restrictions disabled on `dest`: setColor and setTexture both
+// call updateSubstrate, and this runs off the rendering thread.
+static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial> &dest,
+                                               const std::shared_ptr<VROMaterial> &source,
+                                               NSDictionary *sourceJson) {
+    if (!dest || !source || ![sourceJson isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+
+    for (NSString *key in sourceJson) {
+        if (![key isKindOfClass:[NSString class]]) {
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"shininess"] == NSOrderedSame) {
+            dest->setShininess(source->getShininess());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"blendMode"] == NSOrderedSame) {
+            dest->setBlendMode(source->getBlendMode());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"transparencyMode"] == NSOrderedSame) {
+            dest->setTransparencyMode(source->getTransparencyMode());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"cullMode"] == NSOrderedSame) {
+            dest->setCullMode(source->getCullMode());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"writesToDepthBuffer"] == NSOrderedSame) {
+            dest->setWritesToDepthBuffer(source->getWritesToDepthBuffer());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"readsFromDepthBuffer"] == NSOrderedSame) {
+            dest->setReadsFromDepthBuffer(source->getReadsFromDepthBuffer());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"bloomThreshold"] == NSOrderedSame) {
+            dest->setBloomThreshold(source->getBloomThreshold());
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"alpha"] == NSOrderedSame) {
+            dest->setTransparency(source->getTransparency());
+            if (source->getTransparency() < 1) {
+                // VRTMaterialManager turns depth writing off for a translucent material,
+                // and with no writesToDepthBuffer key nothing else would carry that.
+                dest->setWritesToDepthBuffer(source->getWritesToDepthBuffer());
+            }
+            continue;
+        }
+        if ([key caseInsensitiveCompare:@"chromaKeyFilteringColor"] == NSOrderedSame) {
+            dest->setChromaKeyFilteringColor(source->getChromaKeyFilteringColor());
+            dest->setChromaKeyFilteringEnabled(source->isChromaKeyFilteringEnabled());
+            continue;
+        }
+
+        VROMaterialVisual *destVisual = VRTVisualForMaterialKey(dest, key);
+        VROMaterialVisual *sourceVisual = VRTVisualForMaterialKey(source, key);
+        if (destVisual == nullptr || sourceVisual == nullptr) {
+            continue;
+        }
+
+        // Every other key is named for the facet the manager writes it to, but
+        // roughness and metalness take either a number or a texture source and the
+        // manager writes whichever it was handed.
+        BOOL writesTexture = [key hasSuffix:@"texture"] || [key hasSuffix:@"Texture"];
+        if ([key caseInsensitiveCompare:@"roughness"] == NSOrderedSame ||
+            [key caseInsensitiveCompare:@"metalness"] == NSOrderedSame) {
+            writesTexture = ![sourceJson[key] isKindOfClass:[NSNumber class]];
+        }
+
+        if (writesTexture) {
+            destVisual->setTexture(sourceVisual->getTexture());
+        } else if ([key caseInsensitiveCompare:@"diffuseIntensity"] == NSOrderedSame) {
+            destVisual->setIntensity(sourceVisual->getIntensity());
+        } else {
+            destVisual->setColor(sourceVisual->getColor());
+        }
+    }
+}
 
 @implementation VRTNode
 
@@ -186,7 +335,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         if (cameraView.nodeRootTransformCamera) {
             self.node->addChildNode(cameraView.nodeRootTransformCamera);
         }
-    } else if ([child isKindOfClass:[VRTPortal class]]) {
+    } else if ([child isKindOfClass:VRT_CLASS_PORTAL]) {
         // Ignore, this is only handled by VRTPortal
     } else if ([child isKindOfClass:[VRTNode class]]) {
         VRTNode *nodeView = (VRTNode *)child;
@@ -235,7 +384,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         VRTCamera *cameraView = (VRTCamera *)vroView;
         cameraView.nodeRootTransformCamera->removeFromParentNode();
     }
-    else if ([vroView isKindOfClass:[VRTPortal class]]) {
+    else if ([vroView isKindOfClass:VRT_CLASS_PORTAL]) {
         // Ignore, this is only handled by VRTPortal
     }
     else if([vroView isKindOfClass:[VRT360Image class]]) {
@@ -687,9 +836,8 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
     [self updateVideoTextures];
 
-    // Recursively merge material rendering properties onto child node embedded materials.
-    // This preserves embedded textures and skinning modifiers while applying user-specified
-    // rendering settings (lighting model, bloom, blend mode, etc.) from the first override material.
+    // The root geometry above replaces its materials outright, but a GLB keeps its geometry
+    // on child nodes, so without this merge a `materials` prop reaches nothing a model draws.
     if (recursive && self.materials && self.materials.count > 0) {
         VRTMaterialManager *materialManager = [self.bridge moduleForClass:[VRTMaterialManager class]];
         NSString *firstMaterialName = self.materials[0];
@@ -719,15 +867,15 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                                 // Copy embedded material — preserves textures and skinning modifiers
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Apply rendering properties from the user override only (NOT colors/textures)
+                                // Only the lighting model comes across unconditionally, an
+                                // override being asked for its model above all else. Everything
+                                // else is copied below and only where the author named it.
                                 mergedMat->setLightingModel(overrideMaterial->getLightingModel());
-                                mergedMat->setBloomThreshold(overrideMaterial->getBloomThreshold());
-                                mergedMat->setShininess(overrideMaterial->getShininess());
-                                mergedMat->setBlendMode(overrideMaterial->getBlendMode());
-                                mergedMat->setTransparencyMode(overrideMaterial->getTransparencyMode());
-                                mergedMat->setCullMode(overrideMaterial->getCullMode());
-                                mergedMat->setWritesToDepthBuffer(overrideMaterial->getWritesToDepthBuffer());
-                                mergedMat->setReadsFromDepthBuffer(overrideMaterial->getReadsFromDepthBuffer());
+
+                                mergedMat->setThreadRestrictionEnabled(false);
+                                VRTMergeAuthoredMaterialProperties(mergedMat, overrideMaterial,
+                                                                   materialManager.materials[firstMaterialName]);
+                                mergedMat->setThreadRestrictionEnabled(true);
 
                                 // Propagate shader modifiers (e.g. semantic mask, custom effects)
                                 for (const auto &modifier : overrideMaterial->getShaderModifiers()) {
@@ -866,8 +1014,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     }
 }
 
-// Apply shader modifiers to existing materials without replacing textures.
-// Clones the geometry's current materials and merges shader modifiers from the override materials.
+// Merges the override materials onto the geometry's own materials rather than replacing
+// them, which is what keeps a GLB's embedded textures and its skinning modifier, the
+// loader having hung that modifier on the material being preserved.
 - (void)applyShaderOverridesRecursive:(BOOL)recursive {
     if (!self.node || !self.shaderOverrides) {
         return;
@@ -945,17 +1094,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // Create a new material copying the original (preserves textures)
                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                // CRITICAL: Copy properties from shader override material
-                // Similar to Android's dest.copyShaderModifiers(source) approach
-                // We only copy properties that affect rendering, NOT colors/textures
-                // (colors are set dynamically in shader modifiers)
+                // Only the lighting model comes across unconditionally, an override being
+                // asked for its model above all else. Everything else is copied below and
+                // only where the author named it, which is what keeps a glTF material's own
+                // cull mode and its MASK cutout when nobody asked for either.
                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
-                mergedMat->setShininess(shaderMaterial->getShininess());
-                mergedMat->setBlendMode(shaderMaterial->getBlendMode());
-                mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
-                mergedMat->setCullMode(shaderMaterial->getCullMode());
-                mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
-                mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
 
                 // NOTE: We DON'T clear existing shader modifiers because:
@@ -967,6 +1110,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 // CRITICAL: Disable thread restrictions temporarily (like Android does)
                 // This allows shader modifiers to be copied synchronously during material setup
                 mergedMat->setThreadRestrictionEnabled(false);
+
+                VRTMergeAuthoredMaterialProperties(mergedMat, shaderMaterial,
+                                                   materialManager.materials[shaderMaterialName]);
 
                 // Copy shader modifiers from shader material to merged material
                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -1060,14 +1206,10 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                             for (const auto &originalMat : childOriginalMaterials) {
                                 std::shared_ptr<VROMaterial> mergedMat = std::make_shared<VROMaterial>(originalMat);
 
-                                // Copy rendering properties from shader override (NOT colors/textures)
+                                // Only the lighting model comes across unconditionally, an
+                                // override being asked for its model above all else. Everything
+                                // else is copied below and only where the author named it.
                                 mergedMat->setLightingModel(shaderMaterial->getLightingModel());
-                                mergedMat->setShininess(shaderMaterial->getShininess());
-                                mergedMat->setBlendMode(shaderMaterial->getBlendMode());
-                                mergedMat->setTransparencyMode(shaderMaterial->getTransparencyMode());
-                                mergedMat->setCullMode(shaderMaterial->getCullMode());
-                                mergedMat->setWritesToDepthBuffer(shaderMaterial->getWritesToDepthBuffer());
-                                mergedMat->setReadsFromDepthBuffer(shaderMaterial->getReadsFromDepthBuffer());
 
                                 // NOTE: We DON'T clear existing shader modifiers because:
                                 // 1. We always start from a fresh copy of original materials (which have skinning modifiers)
@@ -1077,6 +1219,9 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
 
                                 // Disable thread restrictions (like Android)
                                 mergedMat->setThreadRestrictionEnabled(false);
+
+                                VRTMergeAuthoredMaterialProperties(mergedMat, shaderMaterial,
+                                                                   materialManager.materials[shaderMaterialName]);
 
                                 // Copy shader modifiers
                                 for (const auto &modifier : shaderMaterial->getShaderModifiers()) {
@@ -1207,11 +1352,11 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     VRTNode *realSuperview;
     
     // Find superview, skipping over animated components.
-    if (self.superview && [self.superview isKindOfClass:[VRTNode class]]) {
-        realSuperview = (VRTNode *)self.superview;
-    } else if(self.superview && [self.superview isKindOfClass:[VRTAnimatedComponent class]]) {
-        if([self.superview.superview isKindOfClass:[VRTNode class]]) {
-            realSuperview = (VRTNode *) self.superview.superview;
+    if (self.viroSuperview && [self.viroSuperview isKindOfClass:[VRTNode class]]) {
+        realSuperview = (VRTNode *)self.viroSuperview;
+    } else if(self.viroSuperview && [self.viroSuperview isKindOfClass:[VRTAnimatedComponent class]]) {
+        if([self.viroSuperview.viroSuperview isKindOfClass:[VRTNode class]]) {
+            realSuperview = (VRTNode *) self.viroSuperview.viroSuperview;
         }
     }
     
@@ -1270,7 +1415,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         [surface setHeight:self.bounds2DFlex.size.height/ k2DPointsPerSpatialUnit];
         [surface didSetProps:nil];
     }
-    else if([self isKindOfClass:[VRTVideoSurface class]]) {
+    else if([self isKindOfClass:VRT_CLASS_VIDEO_SURFACE]) {
         VRTVideoSurface *surface = (VRTVideoSurface *)self;
         //NSLog(@"Video surface position(%f, %f), size:(%f, %f)", transformedX, transformedY,node.bounds2DFlex.size.width/ k2DPointsPerSpatialUnit, node.bounds2DFlex.size.height/ k2DPointsPerSpatialUnit );
         [surface setWidth:self.bounds2DFlex.size.width/ k2DPointsPerSpatialUnit];
@@ -1296,7 +1441,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         return YES;
     }
     
-    VRTNode *superview = ([self.superview isKindOfClass:[VRTAnimatedComponent class]]) ? self.superview.superview : (VRTNode *)self.superview;
+    VRTNode *superview = ([self.viroSuperview isKindOfClass:[VRTAnimatedComponent class]]) ? self.viroSuperview.viroSuperview : (VRTNode *)self.viroSuperview;
     while(superview) {
         
         if([superview isKindOfClass:[VRTNode class]]) {
@@ -1304,10 +1449,10 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
                 return YES;
             }
         }
-        superview = superview.superview;
+        superview = superview.viroSuperview;
         //skip checking animated component superview, ignore it when it comes to flexbox
         if([superview isKindOfClass:[VRTAnimatedComponent class]]){
-            superview = superview.superview;
+            superview = superview.viroSuperview;
         }
     }
     return NO;
@@ -1732,7 +1877,8 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         if (nsShapeDictionaryProp){
             NSString *stringShapeName = [nsShapeDictionaryProp objectForKey:@"type"];
             NSArray *shapeParams = [nsShapeDictionaryProp objectForKey:@"params"];
-            propPhysicsShape = [VRTNode getPhysicsShape:stringShapeName params:shapeParams];
+            NSArray *shapeChildren = [nsShapeDictionaryProp objectForKey:@"children"];
+            propPhysicsShape = [VRTNode getPhysicsShape:stringShapeName params:shapeParams children:shapeChildren];
             if (propPhysicsShape == nullptr){
                 return false;
             }
@@ -1810,6 +1956,20 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
         }
     }
     
+    // A launch, applied once by the next physics step and then cleared, where
+    // the constant velocity below is reasserted every frame. Sent only when it
+    // changes, since this runs on every physics prop write.
+    NSArray *instantVelocity = [dictionary objectForKey:@"instantVelocity"];
+    if (instantVelocity != nil) {
+        if ([instantVelocity count] != 3) {
+            RCTLogError(@"Incorrect parameters provided for instantVelocity, expected: [x, y, z]!");
+            return false;
+        }
+        if (![instantVelocity isEqualToArray:[self.physicsDictionary objectForKey:@"instantVelocity"]]) {
+            [self setVelocity:instantVelocity isConstant:NO];
+        }
+    }
+
     NSArray *velocity = [dictionary objectForKey:@"velocity"];
     if (velocity != nil){
         if ([velocity count] != 3) {
@@ -1935,6 +2095,7 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     std::shared_ptr<VROPhysicsBody> body = [self node]->getPhysicsBody();
     if (!body) {
         RCTLogError(@"Attempted to set a velocity on a non-physics node");
+        return;
     }
     VROVector3f velocity3f = VROVector3f([[velocity objectAtIndex:0] floatValue],
                                          [[velocity objectAtIndex:1] floatValue],
@@ -1942,15 +2103,48 @@ static NSHashTable *shaderMaterialsNodesRegistry = nil;
     body->setVelocity(velocity3f, constant);
 }
 
-+(std::shared_ptr<VROPhysicsShape>)getPhysicsShape:(NSString *)stringShapeName params:(NSArray *)shapeParams {
+/*
+ Flattens a compound shape's parts into the float list the renderer takes for a
+ shape, laid out as VROPhysicsShape::kCompoundChildStride describes. A part's
+ rotation is not carried, which is also what the editor simulates.
+ */
+static std::vector<float> VRTFlattenCompoundShapeChildren(NSArray *children) {
+    std::vector<float> params = {};
+    for (NSDictionary *child in children) {
+        NSString *childType = [child objectForKey:@"type"];
+        NSArray *childParams = [child objectForKey:@"params"];
+        NSArray *childPosition = [child objectForKey:@"position"];
+
+        bool isSphere = [childType isKindOfClass:[NSString class]]
+                        && [childType caseInsensitiveCompare:@"Sphere"] == NSOrderedSame;
+        if ([childParams count] < (isSphere ? 1 : 3) || [childPosition count] < 3) {
+            RCTLogError(@"Ignoring a compound physics shape part with missing dimensions or position");
+            continue;
+        }
+
+        params.push_back(isSphere ? 1 : 0);
+        params.push_back([[childParams objectAtIndex:0] floatValue]);
+        params.push_back(isSphere ? 0 : [[childParams objectAtIndex:1] floatValue]);
+        params.push_back(isSphere ? 0 : [[childParams objectAtIndex:2] floatValue]);
+        for (int i = 0; i < 3; i ++) {
+            params.push_back([[childPosition objectAtIndex:i] floatValue]);
+        }
+    }
+    return params;
+}
+
++(std::shared_ptr<VROPhysicsShape>)getPhysicsShape:(NSString *)stringShapeName params:(NSArray *)shapeParams children:(NSArray *)shapeChildren {
     if (!stringShapeName) {
         RCTLogError(@"Provided an invalid physics shape name to the physics body!");
         return nullptr;
     }
     
-    // Grab the current shapeParams
+    // Grab the current shapeParams. A compound carries its parts instead, and
+    // keeps meaning the one inferred from the node's children when given none.
     std::vector<float> params = {};
-    if (shapeParams) {
+    if ([stringShapeName caseInsensitiveCompare:@"Compound"] == NSOrderedSame) {
+        params = VRTFlattenCompoundShapeChildren(shapeChildren);
+    } else if (shapeParams) {
         for (int i = 0; i < [shapeParams count]; i ++) {
             float value = [[shapeParams objectAtIndex:i] floatValue];
             params.push_back(value);

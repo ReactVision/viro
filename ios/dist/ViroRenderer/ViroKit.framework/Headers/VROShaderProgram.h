@@ -33,9 +33,20 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include "VRODefines.h"
 #include "VROLog.h"
 #include "VROUniform.h"
-#include "VROOpenGL.h"
+#if VRO_METAL
+  // Metal path: provide GL type aliases so the shared class members compile.
+  // These GL fields are unused at runtime on Metal.
+  typedef uint32_t GLuint;
+  typedef uint32_t GLenum;
+  #ifndef GL_INVALID_INDEX
+    #define GL_INVALID_INDEX 0xFFFFFFFFu
+  #endif
+#else
+  #include "VROOpenGL.h"
+#endif
 
 enum class VROGeometrySourceSemantic;
 

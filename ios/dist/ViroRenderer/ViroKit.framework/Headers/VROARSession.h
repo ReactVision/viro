@@ -324,6 +324,19 @@ public:
     virtual void resolveCloudAnchor(std::string cloudAnchorId,
                                     std::function<void(std::shared_ptr<VROARAnchor> anchor)> onSuccess,
                                     std::function<void(std::string error)> onFailure) = 0;
+
+    /*
+     Progress of the resolve currently running. Returns false when none is,
+     which is also the answer from any session with no ReactVision provider.
+
+     Worth having because resolving on a phone is multi-frame SIFT over a 30
+     second window: between issuing the resolve and its callback a caller
+     otherwise has nothing at all to show, and cannot tell "the anchor has never
+     been seen" from "seen once, holding for a second match".
+     */
+    virtual bool getCloudAnchorStatus(std::string &message, float &progress) {
+        return false;
+    }
     
     /*
      Invoke each rendering frame. Updates the AR session with the latest
@@ -643,6 +656,40 @@ public:
         int ttlDays,
         std::function<void(bool success, std::string cloudAnchorId,
                             std::string locationTransformCsv, std::string error)> callback) {
+        if (callback) callback(false, "", "", "Not supported");
+    }
+
+    // ========================================================================
+    // Shared coordinate frame — platform-native co-location (CL-H / CL-I)
+    //
+    // Distinct from cloud anchors on purpose. A cloud anchor is relocalised from
+    // camera imagery; these frames come from the platform's own co-location
+    // primitive (Meta shared spatial anchors, ARKit shared coordinate spaces),
+    // which is what makes them viable on headsets that give no camera access.
+    //
+    // Both take an app-chosen group id, which is also the room key for the
+    // co-location channel: same group, same room, same frame.
+    //
+    // The callback's transform is 16 comma-separated floats, column-major
+    // (VROMatrix4f::getArray() order) — the same encoding resolveCloudAnchor()
+    // hands back, so consumers treat the two identically.
+
+    /* True when this session can establish a platform-native shared frame. */
+    virtual bool rvSupportsSharedFrame() { return false; }
+
+    /* Establish a frame and publish it to `groupId` for others to join. */
+    virtual void rvCreateSharedFrame(
+        std::string groupId,
+        std::function<void(bool success, std::string frameId,
+                            std::string transformCsv, std::string error)> callback) {
+        if (callback) callback(false, "", "", "Not supported");
+    }
+
+    /* Recover a frame previously published to `groupId` by another device. */
+    virtual void rvJoinSharedFrame(
+        std::string groupId,
+        std::function<void(bool success, std::string frameId,
+                            std::string transformCsv, std::string error)> callback) {
         if (callback) callback(false, "", "", "Not supported");
     }
 

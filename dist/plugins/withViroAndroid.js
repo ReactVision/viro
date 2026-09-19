@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.withViroAndroid = void 0;
+exports.resolveViroAndroidRelativePath = resolveViroAndroidRelativePath;
 const config_plugins_1 = require("@expo/config-plugins");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -134,13 +135,40 @@ const withViroAppBuildGradle = (config) => (0, config_plugins_1.withAppBuildGrad
     config.modResults.contents = config.modResults.contents.replace(/implementation\("com.facebook.react:react-android"\)/, `implementation("com.facebook.react:react-android")${viroNewArchDependencies}`);
     return config;
 });
+/**
+ * Resolve the on-disk `@reactvision/react-viro/android` directory as a path
+ * relative to the Android project root (where `settings.gradle` lives).
+ *
+ * Hardcoding `../node_modules/...` assumes react-viro is installed in the app's
+ * own `node_modules`. That is false under pnpm/yarn workspaces (and npm
+ * workspaces), where the package is hoisted to the monorepo root or nested
+ * under `.pnpm`, so Gradle fails with "Configuring project ':gvr_common'
+ * without an existing directory is not allowed". Resolving via Node follows
+ * symlinks/hoisting and works in both flat and workspace layouts.
+ */
+function resolveViroAndroidRelativePath(projectRoot, androidRoot) {
+    const fallback = "../node_modules/@reactvision/react-viro/android";
+    try {
+        const pkgJson = require.resolve("@reactvision/react-viro/package.json", {
+            paths: [projectRoot],
+        });
+        const viroAndroidDir = path_1.default.join(path_1.default.dirname(pkgJson), "android");
+        // Gradle resolves relative File(...) against the settings.gradle dir (androidRoot).
+        // Always emit POSIX separators — Gradle accepts them on every platform.
+        return path_1.default.relative(androidRoot, viroAndroidDir).split(path_1.default.sep).join("/");
+    }
+    catch {
+        return fallback;
+    }
+}
 const withViroSettingsGradle = (config) => (0, config_plugins_1.withSettingsGradle)(config, async (config) => {
+    const viroAndroidRoot = resolveViroAndroidRelativePath(config.modRequest.projectRoot, config.modRequest.platformProjectRoot);
     config.modResults.contents += `
 include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
-project(':arcore_client').projectDir = new File('../node_modules/@reactvision/react-viro/android/arcore_client')
-project(':gvr_common').projectDir = new File('../node_modules/@reactvision/react-viro/android/gvr_common')
-project(':viro_renderer').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_renderer')
-project(':react_viro').projectDir = new File('../node_modules/@reactvision/react-viro/android/react_viro')
+project(':arcore_client').projectDir = new File('${viroAndroidRoot}/arcore_client')
+project(':gvr_common').projectDir = new File('${viroAndroidRoot}/gvr_common')
+project(':viro_renderer').projectDir = new File('${viroAndroidRoot}/viro_renderer')
+project(':react_viro').projectDir = new File('${viroAndroidRoot}/react_viro')
     `;
     return config;
 });
@@ -276,13 +304,13 @@ const withViroManifest = (config) => (0, config_plugins_1.withAndroidManifest)(c
             "tools:replace": "required",
         },
     });
-    // Keep GLES 3.0 declared (required=false) so the Quest Store validator
-    // sees a graphics API. Previously tools:node="remove" silently stripped
-    // this entry from the merged manifest entirely.
+    // The Quest Store validator only counts a *required* GLES/Vulkan
+    // declaration; required=false is reported as "no graphics API". Every
+    // Quest has GLES 3, so require it there and keep it optional on phones.
     contents.manifest["uses-feature"].push({
         $: {
             "android:glEsVersion": "0x00030000",
-            "android:required": "false",
+            "android:required": activeXrModes.includes("QUEST") ? "true" : "false",
             "tools:replace": "required",
         },
     });
@@ -577,9 +605,22 @@ class VRActivity : ReactActivity() {
             return config;
         },
     ]);
-    // 2. Cap targetSdkVersion to 34 — Meta Quest Store rejects targetSdk > 34.
-    config = (0, config_plugins_1.withAppBuildGradle)(config, (config) => {
-        config.modResults.contents = config.modResults.contents.replace(/targetSdk(?:Version)?\s*[=\s]\s*(\d+)/g, (match, ver) => parseInt(ver, 10) > 34 ? match.replace(ver, "34") : match);
+    // 2. Quest Store packaging. Expo's template resolves targetSdk through
+    // rootProject.ext from gradle.properties (`android.targetSdkVersion`), so a
+    // rewrite of app/build.gradle never matched anything. Only ever lower it.
+    // Quest hardware is arm64-only; the other ABIs roughly double the APK and the
+    // store warns on 32-bit libraries.
+    const questTargetSdk = props?.android?.questTargetSdkVersion ?? 34;
+    const questArm64Only = props?.android?.questArm64Only ?? true;
+    config = (0, config_plugins_1.withGradleProperties)(config, (config) => {
+        const current = config.modResults.find((item) => item.type === "property" && item.key === "android.targetSdkVersion");
+        const currentSdk = current?.type === "property" ? parseInt(current.value, 10) : NaN;
+        if (Number.isNaN(currentSdk) || currentSdk > questTargetSdk) {
+            config_plugins_1.AndroidConfig.BuildProperties.updateAndroidBuildProperty(config.modResults, "android.targetSdkVersion", String(questTargetSdk));
+        }
+        if (questArm64Only) {
+            config_plugins_1.AndroidConfig.BuildProperties.updateAndroidBuildProperty(config.modResults, "reactNativeArchitectures", "arm64-v8a");
+        }
         return config;
     });
     // 3. Add VRActivity to AndroidManifest
@@ -637,6 +678,20 @@ class VRActivity : ReactActivity() {
                     },
                 });
             }
+        }
+        // Without this the store assumes every headset, including the retired
+        // Quest 1, and warns on upload.
+        const supportedDevices = props?.android?.questSupportedDevices ?? "quest2|questpro|quest3|quest3s";
+        if (!app["meta-data"])
+            app["meta-data"] = [];
+        const alreadyHasDevices = app["meta-data"].some((m) => m.$?.["android:name"] === "com.oculus.supportedDevices");
+        if (!alreadyHasDevices) {
+            app["meta-data"].push({
+                $: {
+                    "android:name": "com.oculus.supportedDevices",
+                    "android:value": supportedDevices,
+                },
+            });
         }
         return config;
     });

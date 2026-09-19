@@ -16,6 +16,7 @@ exports.ViroVideo = ViroVideo;
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const useViroNode_1 = require("./Web/useViroNode");
+const ViroFlexSlotContext_1 = require("./Web/ViroFlexSlotContext");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 const viroImageLoader_1 = require("./Web/viroImageLoader");
 // requestVideoFrameCallback isn't in every TS DOM lib; access it via a cast.
@@ -30,22 +31,28 @@ function cancelVideoFrame(video, id) {
 }
 function ViroVideo(props) {
     const scene = (0, ViroWebContext_1.useViroScene)();
-    const width = props.width ?? 1;
-    const height = props.height ?? 1;
     const url = (0, viroImageLoader_1.resolveImageSource)(props.source);
+    // With neither size prop given the surface takes the source's aspect ratio at one
+    // unit wide, the rule the phone bridges apply. 1 until the metadata loads.
+    const [aspect, setAspect] = (0, react_1.useState)(1);
+    // Inside a ViroFlexView the layout decides the size, as it does natively, and
+    // that counts as the size being set: the slot does not grow to the video.
+    const slot = (0, ViroFlexSlotContext_1.useViroFlexSlot)();
+    const sizePropSet = slot != null || props.width != null || props.height != null;
+    const width = slot?.width ?? props.width ?? 1;
+    const height = slot?.height ?? props.height ?? (sizePropSet ? 1 : width / aspect);
     const geometryRef = (0, react_1.useRef)(0);
     (0, useViroNode_1.useViroNode)(props, (s) => {
         const geo = s.createSurface(width, height);
         geometryRef.current = geo;
         return geo;
-    });
+    }, true, sizePropSet ? undefined : aspect);
     const videoRef = (0, react_1.useRef)(null);
     const propsRef = (0, react_1.useRef)(props);
     propsRef.current = props;
     // Create the <video> + per-frame texture upload; torn down when the URL changes.
     (0, react_1.useEffect)(() => {
-        const geo = geometryRef.current;
-        if (!geo || !url)
+        if (!url)
             return;
         const video = document.createElement("video");
         video.src = url;
@@ -63,9 +70,12 @@ function ViroVideo(props) {
         const uploadFrame = () => {
             if (cancelled || !ctx)
                 return;
+            // Read per frame rather than capturing: the surface is rebuilt when the
+            // video's aspect ratio arrives, which replaces the handle.
+            const geo = geometryRef.current;
             const w = video.videoWidth;
             const h = video.videoHeight;
-            if (w > 0 && h > 0 && video.readyState >= video.HAVE_CURRENT_DATA) {
+            if (geo && w > 0 && h > 0 && video.readyState >= video.HAVE_CURRENT_DATA) {
                 if (canvas.width !== w || canvas.height !== h) {
                     canvas.width = w;
                     canvas.height = h;
@@ -93,8 +103,14 @@ function ViroVideo(props) {
         };
         const onEnded = () => propsRef.current.onFinish?.();
         const onErr = () => propsRef.current.onError?.(new Error(`video failed: ${url}`));
+        const onMetadata = () => {
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+                setAspect(video.videoWidth / video.videoHeight);
+            }
+        };
         video.addEventListener("ended", onEnded);
         video.addEventListener("error", onErr);
+        video.addEventListener("loadedmetadata", onMetadata);
         scheduleNext();
         return () => {
             cancelled = true;
@@ -104,6 +120,7 @@ function ViroVideo(props) {
                 cancelVideoFrame(video, vfcId);
             video.removeEventListener("ended", onEnded);
             video.removeEventListener("error", onErr);
+            video.removeEventListener("loadedmetadata", onMetadata);
             video.pause();
             video.src = "";
             videoRef.current = null;

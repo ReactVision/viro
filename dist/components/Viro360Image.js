@@ -43,15 +43,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro360Image = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
-const resolveAssetSource_1 = __importDefault(require("react-native/Libraries/Image/resolveAssetSource"));
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 class Viro360Image extends React.Component {
     _component = null;
@@ -69,7 +68,7 @@ class Viro360Image extends React.Component {
     }
     render() {
         (0, ViroProps_1.checkMisnamedProps)("Viro360Image", this.props);
-        var imgsrc = (0, resolveAssetSource_1.default)(this.props.source);
+        var imgsrc = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source);
         // Create native props object.
         let nativeProps = Object.assign({}, this.props);
         nativeProps.source = imgsrc;

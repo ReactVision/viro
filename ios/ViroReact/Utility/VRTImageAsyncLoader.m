@@ -81,6 +81,12 @@
                 }
             }
             else {
+                // Name the URL and the reason. The particle emitter used to report this with
+                // perror(), which prints the calling thread's errno — and the failure happens in
+                // an async download, so that errno belongs to some unrelated syscall. It read as
+                // "Operation not permitted" on device and "Undefined error: 0" in the Simulator
+                // for the same failure.
+                NSLog(@"VRTImageAsyncLoader: failed to load %@ — %@", URL, error);
                 if(self.delegate) {
                     [self.delegate imageLoaderDidEnd:self success:NO image:nil];
                 }
@@ -88,7 +94,7 @@
         });
     }
     else {
-        NSLog(@"ERROR: Attempted to load image with unknown scheme path!");
+        NSLog(@"ERROR: Attempted to load image with unknown scheme path: %@", URL);
         if(self.delegate) {
             [self.delegate imageLoaderDidEnd:self success:NO image:nil];
         }

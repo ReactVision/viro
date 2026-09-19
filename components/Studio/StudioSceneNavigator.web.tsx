@@ -21,7 +21,10 @@ import {
 } from "react";
 import { Viro3DSceneNavigator } from "../Viro3DSceneNavigator.web";
 import { ViroARSceneNavigator } from "../AR/ViroARSceneNavigator.web";
-import { StudioARScene } from "./StudioARScene.web";
+import { StudioARScene, type StudioPlacementApi } from "./StudioARScene.web";
+import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
+import { studioPlacementBannerStore } from "./domain/placementBannerStore";
+import { STUDIO_RENDERER_EFFECTS } from "./domain/studioRendererEffects";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
@@ -85,6 +88,89 @@ function isARScene(sceneData: StudioSceneResponse | undefined): boolean {
   return mode === "AUTOMATIC" || mode === "MANUAL";
 }
 
+/**
+ * The tap surface for guided placement, and the only writer of the prompt state.
+ *
+ * Mounted only while the queue is waiting on an asset, so it never swallows a
+ * tap meant for the scene's own click handlers. The visible pill is a separate
+ * indicator the host positions in its own chrome; this publishes what it shows.
+ *
+ * Screen point to canvas pixels: the hit test works in the renderer's drawing
+ * buffer, which is not the element's CSS size on a scaled display or under a
+ * `devicePixelRatio` other than 1.
+ */
+const StudioPlacementOverlay: React.FC<{
+  store: StudioPlacementStore;
+  apiRef: React.MutableRefObject<StudioPlacementApi | null>;
+  getName: (assetId: string) => string | null;
+}> = ({ store, apiRef, getName }) => {
+  const [activeId, setActiveId] = useState<string | null>(() =>
+    store.activeAssetId(),
+  );
+  const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setActiveId(store.activeAssetId());
+    return store.subscribeActive(() => setActiveId(store.activeAssetId()));
+  }, [store]);
+
+  useEffect(() => {
+    studioPlacementBannerStore.set(!!activeId, activeId ? getName(activeId) : null);
+  }, [activeId, getName]);
+
+  useEffect(
+    () => () => {
+      if (missTimerRef.current) clearTimeout(missTimerRef.current);
+      studioPlacementBannerStore.reset();
+    },
+    [],
+  );
+
+  const handlePointerUp = useCallback(
+    (evt: React.PointerEvent<HTMLDivElement>) => {
+      const api = apiRef.current;
+      if (!api) return;
+      const target = evt.currentTarget;
+      const rect = target.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const canvas = target.parentElement?.querySelector("canvas");
+      const bufferW = canvas?.width ?? rect.width;
+      const bufferH = canvas?.height ?? rect.height;
+      const x = ((evt.clientX - rect.left) / rect.width) * bufferW;
+      const y = ((evt.clientY - rect.top) / rect.height) * bufferH;
+
+      void api.placeAtScreenPoint(x, y).then((result) => {
+        if (result !== "miss") {
+          studioPlacementBannerStore.setShowMiss(false);
+          return;
+        }
+        studioPlacementBannerStore.setShowMiss(true);
+        if (missTimerRef.current) clearTimeout(missTimerRef.current);
+        missTimerRef.current = setTimeout(
+          () => studioPlacementBannerStore.setShowMiss(false),
+          2500,
+        );
+      });
+    },
+    [apiRef],
+  );
+
+  if (!activeId) return null;
+
+  return (
+    <div
+      onPointerUp={handlePointerUp}
+      style={{
+        position: "absolute",
+        inset: 0,
+        // Above the canvas and below the pills, which set pointerEvents none.
+        zIndex: 1,
+        touchAction: "none",
+      }}
+    />
+  );
+};
+
 export const StudioSceneNavigator = forwardRef<
   StudioSceneNavigatorWebHandle,
   StudioSceneNavigatorWebProps
@@ -116,6 +202,10 @@ export const StudioSceneNavigator = forwardRef<
   // Session-scoped variable store (survives NAVIGATION between scenes).
   const variableStoreRef = useRef<StudioVariableStore | null>(null);
   if (variableStoreRef.current === null) variableStoreRef.current = new StudioVariableStore();
+
+  // The guided placement queue, and the scene's imperative handle onto it.
+  const placementStoreRef = useRef<StudioPlacementStore | null>(null);
+  const placementApiRef = useRef<StudioPlacementApi | null>(null);
 
   const [sceneData, setSceneData] = useState<StudioSceneResponse | undefined>(injectedSceneData);
   const [error, setError] = useState<Error | null>(null);
@@ -180,6 +270,17 @@ export const StudioSceneNavigator = forwardRef<
     [],
   );
 
+  // Owned here rather than in the scene so the prompt can read the same queue
+  // the tap surface drives, and so neither survives a scene change.
+  const placementStore = (placementStoreRef.current ??= new StudioPlacementStore());
+
+  const placementNames = new Map(
+    (sceneData?.assets ?? [])
+      .filter(isTapToPlaceAsset)
+      .map((a) => [a.id, a.name ?? ""] as const),
+  );
+  const getPlacementName = (assetId: string) => placementNames.get(assetId) ?? null;
+
   if (error && renderError) return <>{renderError(error)}</>;
   if (!sceneData) return <>{loadingView ?? null}</>;
 
@@ -187,6 +288,8 @@ export const StudioSceneNavigator = forwardRef<
 
   const SceneComponent = () => (
     <StudioARScene
+      placementApiRef={placementApiRef}
+      placementStore={placementStore}
       key={sceneData.scene.id}
       sceneData={sceneData}
       mode={resolvedMode}
@@ -226,11 +329,13 @@ export const StudioSceneNavigator = forwardRef<
           slamScriptUrl={slamScriptUrl}
           arOptions={{ detectPlanes: true, ...arOptions }}
           onSessionReady={onSessionReady}
+          {...STUDIO_RENDERER_EFFECTS}
         />
       ) : (
         <Viro3DSceneNavigator
           initialScene={{ scene: SceneComponent }}
           webRendererOptions={webRendererOptions}
+          {...STUDIO_RENDERER_EFFECTS}
         />
       )}
       {recordingIndicator && (
@@ -238,8 +343,15 @@ export const StudioSceneNavigator = forwardRef<
           <StudioRecordingIndicator />
         </div>
       )}
+      {resolvedMode === "ar" && (
+        <StudioPlacementOverlay
+          store={placementStore}
+          apiRef={placementApiRef}
+          getName={getPlacementName}
+        />
+      )}
       {placementIndicator && (
-        <div style={{ ...overlay, top: 64, padding: "0 24px" }}>
+        <div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
           <StudioPlacementIndicator />
         </div>
       )}

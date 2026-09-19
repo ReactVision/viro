@@ -31,8 +31,8 @@
 #include "VROMatrix4f.h"
 #include "VROMath.h"
 
-#if VRO_METAL
-#include <MetalKit/MetalKit.h>
+#if VRO_METAL && defined(__OBJC__)
+#include <Metal/Metal.h>
 #endif
 
 class VROViewport {
@@ -79,7 +79,7 @@ public:
         _contentScaleFactor = factor;
     }
     
-#if VRO_METAL
+#if VRO_METAL && defined(__OBJC__)
     MTLViewport toMetalViewport() const {
         MTLViewport viewport;
         viewport.originX = _x;
@@ -88,17 +88,17 @@ public:
         viewport.height  = _height;
         viewport.znear   = 0.0;
         viewport.zfar    = 1.0;
-        
+
         return viewport;
     }
-    
+
     MTLScissorRect toMetalScissor() const {
         MTLScissorRect scissor;
         scissor.x = _x;
         scissor.y = _y;
         scissor.width = _width;
         scissor.height = _height;
-        
+
         return scissor;
     }
 #endif

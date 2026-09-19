@@ -41,6 +41,13 @@ public:
     virtual void videoDidFinish() = 0;
     virtual void onVideoUpdatedTime(float currentTimeInSeconds, float totalTimeInSeconds) = 0;
     virtual void videoDidFail(std::string error) = 0;
+
+    /*
+     Invoked with the video's own pixel dimensions, once the player knows them,
+     which is after the source has loaded. Not pure: a delegate that sizes
+     nothing from the video ignores it.
+     */
+    virtual void videoDidChangeSize(float width, float height) {}
 };
 
 #endif /* VROVideoDelegateInternal_h */

@@ -34,7 +34,14 @@
 #import <ViroKit/VROShaderModifier.h>
 #import <ViroKit/VROSemantics.h>
 #import <ViroKit/VROTextureUtil.h>
+// Video textures are not available on visionOS. VROVideoTextureiOS relies on three
+// AVFoundation APIs Apple removed on xros — AVAsset tracksWithMediaType:, the synchronous
+// AVPlayerItem seekToTime:, and a __weak delegate that the ARC-off renderer target cannot
+// hold — so VROVideoTextureiOS.cpp is not in the visionOS build at all. Guarded here rather
+// than excluding this whole file, because material management is otherwise fully supported.
+#if !TARGET_OS_VISION
 #import <ViroKit/VROVideoTextureiOS.h>
+#endif
 #import <ViroKit/VROImageiOS.h>
 #import "VRTNode.h"
 
@@ -126,10 +133,15 @@
     NSURL *videoURL = [NSURL URLWithString:path];
     std::string url = std::string([[videoURL description] UTF8String]);
     
+#if TARGET_OS_VISION
+    RCTLogWarn(@"[Viro] video textures are not supported on visionOS (%s)", url.c_str());
+    return nullptr;
+#else
     std::shared_ptr<VROVideoTexture> videoTexture = std::make_shared<VROVideoTextureiOS>();
     videoTexture->loadVideo(url, context->getFrameSynchronizer(), driver);
     videoTexture->prewarm();
     return videoTexture;
+#endif
 }
 
 RCT_EXPORT_MODULE()
@@ -326,6 +338,7 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
     std::shared_ptr<VROMaterial> vroMaterial = std::make_shared<VROMaterial>();
     vroMaterial->setName([materialName cStringUsingEncoding:NSASCIIStringEncoding]);
     MaterialWrapper *materialWrapper = [[MaterialWrapper alloc] initWithMaterial:vroMaterial];
+    BOOL authoredDepthWrite = NO;
 
     for (id key in material) {
         NSString *materialPropertyName = (NSString *)key;
@@ -340,10 +353,14 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             NSString *path = [self parseImagePath:material[key]];
             if (path != nil) {
                 if ([self isVideoTexture:path]) {
+#if TARGET_OS_VISION
+                    RCTLogWarn(@"[Viro] video texture on material property '%@' ignored: not supported on visionOS", materialPropertyName);
+#else
                      std::shared_ptr<VROVideoTextureiOS> texture = std::make_shared<VROVideoTextureiOS>(VROStereoMode::None);
                     [materialWrapper setVideoTexturePathForMaterialProp:materialPropertyName path:path];
                     [self setTextureForMaterial:vroMaterial texture:texture name:materialPropertyName];
                     [self loadProperties:material forTexture:texture];
+#endif
                 } else {
                     BOOL sRGB = [materialPropertyName caseInsensitiveCompare:@"diffuseTexture"] == NSOrderedSame
                     || [materialPropertyName caseInsensitiveCompare:@"ambientOcclusionTexture"] == NSOrderedSame;
@@ -364,6 +381,9 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             if ([@"shininess" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *number = material[key];
                 vroMaterial->setShininess([number floatValue]);
+            } else if ([@"alpha" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
+                NSNumber *number = material[key];
+                vroMaterial->setTransparency([number floatValue]);
             } else if ([@"fresnelExponent" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *number =  material[key];
                 vroMaterial->setFresnelExponent([number floatValue]);
@@ -379,6 +399,7 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
             } else if ([@"writesToDepthBuffer" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *booleanVal = material[key];
                 vroMaterial->setWritesToDepthBuffer([booleanVal boolValue]);
+                authoredDepthWrite = YES;
             } else if ([@"readsFromDepthBuffer" caseInsensitiveCompare:materialPropertyName] == NSOrderedSame) {
                 NSNumber *booleanVal = material[key];
                 vroMaterial->setReadsFromDepthBuffer([booleanVal boolValue]);
@@ -511,6 +532,13 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
                 }
             }
         }
+    }
+
+    // A translucent material that still writes depth occludes its own far faces, so
+    // setting alpha and nothing else turns depth writing off. Only the alpha key can
+    // bring transparency under 1 here, so nothing that worked before changes.
+    if (!authoredDepthWrite && vroMaterial->getTransparency() < 1) {
+        vroMaterial->setWritesToDepthBuffer(false);
     }
     return materialWrapper;
 }
@@ -808,7 +836,11 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
     
     std::shared_ptr<VROMaterial> material = [materialWrapper getMaterial];
     std::shared_ptr<VROTexture> texture = material->getDiffuse().getTexture();
+#if TARGET_OS_VISION
+    std::shared_ptr<VROVideoTexture> videoTexture = nullptr;
+#else
     std::shared_ptr<VROVideoTexture> videoTexture = std::dynamic_pointer_cast<VROVideoTextureiOS>(texture);
+#endif
         RCTImageSource *imageSource = [RCTConvert RCTImageSource:videoTextureDict[@"diffuseTexture"]];
         NSURL *videoURL = imageSource.request.URL;
         std::string url = std::string([[videoURL description] UTF8String]);

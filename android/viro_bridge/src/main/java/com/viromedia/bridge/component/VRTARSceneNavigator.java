@@ -435,9 +435,6 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mRvApiKey = null;
     private String mRvProjectId = null;
     private String mRvEndpoint = null;
-    // Improvement 5: track whether credentials have been pushed to the native session
-    // so setReactVisionConfig() is called exactly once per provider activation.
-    private boolean mRvConfigApplied = false;
     private boolean mGeoProviderApplied = false;
     private static final String TAG = "ViroAR";
 
@@ -459,8 +456,6 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private boolean mLocationAccuracyReduced = false;
 
     public void setCloudAnchorProvider(String provider) {
-        // Improvement 5: reset so credentials are re-applied on next host/resolve
-        mRvConfigApplied = false;
         mCloudAnchorProvider = provider != null ? provider.toLowerCase() : "none";
 
         Log.i(TAG, "Setting cloud anchor provider: " + mCloudAnchorProvider);
@@ -544,19 +539,16 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         return null;
     }
 
-    /**
-     * Improvement 5: apply ReactVision credentials to the native AR session exactly once
-     * per provider activation. Subsequent calls to hostCloudAnchor / resolveCloudAnchor
-     * skip the JNI call because the session already has the credentials.
-     */
+    // Re-sent on every call rather than latched. The native side now queues the
+    // config until the AR session exists, but a latch once masked a dropped call
+    // and left the session without credentials for the navigator's life. The
+    // C++ setter is idempotent, so re-sending is cheap.
     private void ensureRvConfigApplied(ARScene arScene) {
-        if (mRvConfigApplied) return;
         if (!"reactvision".equals(mCloudAnchorProvider)) return;
         if (arScene == null) return;
         if (mRvApiKey == null || mRvApiKey.isEmpty()) return;
         arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "",
                 mRvEndpoint != null ? mRvEndpoint : "");
-        mRvConfigApplied = true;
     }
 
     private void ensureGeoProviderApplied(ARScene arScene) {
@@ -600,7 +592,6 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
-        // Improvement 5: apply credentials once per provider activation
         ensureRvConfigApplied(arScene);
 
         // Host the anchor via the configured cloud anchor provider
@@ -672,6 +663,15 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         return arScene.getRecordingStatus().name();
     }
 
+    /** "progress|message" for a resolve in flight, empty when none is. */
+    public String getCloudAnchorStatus() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            return "";
+        }
+        return arScene.getCloudAnchorStatus();
+    }
+
     public void resolveCloudAnchor(String cloudAnchorId,
                                    ARSceneNavigatorModule.CloudAnchorResolveCallback callback) {
         if (!"arcore".equals(mCloudAnchorProvider) && !"reactvision".equals(mCloudAnchorProvider)) {
@@ -686,7 +686,6 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
 
-        // Improvement 5: apply credentials once per provider activation
         ensureRvConfigApplied(arScene);
 
         // Resolve the cloud anchor via the configured provider
@@ -1206,6 +1205,21 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
         ensureRvConfigApplied(arScene);
         arScene.rvFinishScan(ttlDays, callback);
+    }
+
+    // CL-H: platform-native shared frames (Quest). No ensureRvConfigApplied —
+    // these never reach the ReactVision backend, so the API key and project id
+    // that cloud anchors need are irrelevant here.
+    public void rvCreateSharedFrame(String groupId, ARScene.RvSharedFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
+        arScene.rvCreateSharedFrame(groupId, callback);
+    }
+
+    public void rvJoinSharedFrame(String groupId, ARScene.RvSharedFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) { if (callback != null) callback.onResult(false, "", "", "AR scene not available"); return; }
+        arScene.rvJoinSharedFrame(groupId, callback);
     }
 
     /**

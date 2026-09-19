@@ -74,6 +74,14 @@ function ViroOrbitCamera(props) {
         if (active)
             scene.setActiveCameraNode(node);
     }, [scene, node, active]);
+    (0, react_1.useEffect)(() => {
+        scene.setCameraProjection(node, props.projection ?? "perspective");
+    }, [scene, node, props.projection]);
+    (0, react_1.useEffect)(() => {
+        if (props.orthographicScale !== undefined) {
+            scene.setCameraOrthographicScale(node, props.orthographicScale);
+        }
+    }, [scene, node, props.orthographicScale]);
     return (<ViroWebContext_1.ViroParentNodeContext.Provider value={node}>
       {props.children}
     </ViroWebContext_1.ViroParentNodeContext.Provider>);

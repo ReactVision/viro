@@ -661,7 +661,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
-                    result.putString("error", "Invalid view type");
+                    result.putString("error", view == null
+                            ? "AR navigator is not mounted yet"
+                            : "Invalid view type");
                     result.putString("state", "ErrorInternal");
                     promise.resolve(result);
                     return;
@@ -776,6 +778,56 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /**
+     * Progress of a resolve in flight, as {@code {progress, message}}, or nulls
+     * when nothing is resolving. Polled rather than pushed: resolve localisation
+     * runs per AR frame and has no event channel to JS.
+     */
+    @ReactMethod
+    public void getCloudAnchorStatus(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.resolve(emptyCloudAnchorStatus());
+            return;
+        }
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    promise.resolve(emptyCloudAnchorStatus());
+                    return;
+                }
+
+                String raw = ((VRTARSceneNavigator) view).getCloudAnchorStatus();
+                int split = raw == null ? -1 : raw.indexOf('|');
+                if (split < 0) {
+                    promise.resolve(emptyCloudAnchorStatus());
+                    return;
+                }
+
+                WritableMap result = Arguments.createMap();
+                result.putBoolean("active", true);
+                try {
+                    result.putDouble("progress", Double.parseDouble(raw.substring(0, split)));
+                } catch (NumberFormatException e) {
+                    result.putDouble("progress", 0);
+                }
+                result.putString("message", raw.substring(split + 1));
+                promise.resolve(result);
+            }
+        });
+    }
+
+    private static WritableMap emptyCloudAnchorStatus() {
+        WritableMap result = Arguments.createMap();
+        result.putBoolean("active", false);
+        result.putDouble("progress", 0);
+        result.putString("message", "");
+        return result;
+    }
+
     @ReactMethod
     public void resolveCloudAnchor(final int sceneNavTag, final String cloudAnchorId,
                                    final Promise promise) {
@@ -796,7 +848,11 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
-                    result.putString("error", "Invalid view type");
+                    // Null on a scene's first frame, before Fabric has mounted the
+                    // navigator. Retryable, so a caller can wait instead of giving up.
+                    result.putString("error", view == null
+                            ? "AR navigator is not mounted yet"
+                            : "Invalid view type");
                     result.putString("state", "ErrorInternal");
                     promise.resolve(result);
                     return;
@@ -1844,6 +1900,45 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     if (!(view instanceof VRTARSceneNavigator)) return;
                     ((VRTARSceneNavigator) view).rvStartScan();
                 } catch (Exception e) { /* no-op — startScan has no promise to reject */ }
+            }
+        });
+    }
+
+    @ReactMethod
+    public void rvCreateSharedFrame(final int sceneNavTag, final String groupId, final Promise promise) {
+        sharedFrameOp(sceneNavTag, groupId, false, promise);
+    }
+
+    @ReactMethod
+    public void rvJoinSharedFrame(final int sceneNavTag, final String groupId, final Promise promise) {
+        sharedFrameOp(sceneNavTag, groupId, true, promise);
+    }
+
+    // create and join differ only in which navigator method runs; everything
+    // around it — the UI block, the view check, the result map — is identical.
+    private void sharedFrameOp(final int sceneNavTag, final String groupId,
+                               final boolean joining, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "UIManager not available"); promise.resolve(r); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
+                    com.viro.core.ARScene.RvSharedFrameCallback cb = (success, frameId, transformCsv, error) -> {
+                        WritableMap r = Arguments.createMap();
+                        r.putBoolean("success", success);
+                        if (success) {
+                            r.putString("frameId", frameId);
+                            r.putString("transform", transformCsv);
+                        } else {
+                            r.putString("error", error);
+                        }
+                        promise.resolve(r);
+                    };
+                    if (joining) ((VRTARSceneNavigator) view).rvJoinSharedFrame(groupId, cb);
+                    else         ((VRTARSceneNavigator) view).rvCreateSharedFrame(groupId, cb);
+                } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }
             }
         });
     }

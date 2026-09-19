@@ -26,4 +26,13 @@ public class ViroCommands {
     public static final String SEEK_TO_TIME_NAME = "seekToTime";
     public static final int PAUSE_INDEX = 1;
     public static final String PAUSE = "pause";
+
+    // Reconciler-free transform writes, backing ViroGameLoopUtils. Available on
+    // every node manager.
+    public static final int SET_POSITION_INDEX = 2;
+    public static final String SET_POSITION_NAME = "setPosition";
+    public static final int SET_ROTATION_EULER_INDEX = 3;
+    public static final String SET_ROTATION_EULER_NAME = "setRotationEuler";
+    public static final int SET_SCALE_INDEX = 4;
+    public static final String SET_SCALE_NAME = "setScale";
 }

@@ -40,10 +40,13 @@ exports.ViroSurface = ViroSurface;
  */
 const React = __importStar(require("react"));
 const useViroNode_1 = require("./Web/useViroNode");
+const ViroFlexSlotContext_1 = require("./Web/ViroFlexSlotContext");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
 function ViroSurface(props) {
-    const width = props.width ?? 1;
-    const height = props.height ?? 1;
+    // Inside a ViroFlexView the layout decides the size, as it does natively.
+    const slot = (0, ViroFlexSlotContext_1.useViroFlexSlot)();
+    const width = slot?.width ?? props.width ?? 1;
+    const height = slot?.height ?? props.height ?? 1;
     const node = (0, useViroNode_1.useViroNode)(props, (scene) => scene.createSurface(width, height));
     return (<ViroWebContext_1.ViroParentNodeContext.Provider value={node}>
       {props.children}

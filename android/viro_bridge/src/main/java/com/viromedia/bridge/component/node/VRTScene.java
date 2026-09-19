@@ -53,6 +53,7 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
     private static final float[] DEFAULT_SIZE = {0,0,0};
 
     protected Scene mNativeScene;
+    private boolean mToneMappingEnabled = true;
     private Renderer mNativeRenderer;
     private VRTCamera mCamera;
     private float[] mSoundRoomSize = DEFAULT_SIZE;
@@ -150,6 +151,18 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
         }
         if (!mNativeScene.setEffects(nativeEffects)){
             onError("Viro: Attempted to set an invalid effect!");
+        }
+    }
+
+    // PBR rides on HDR in the choreographer (isPBREnabled returns _hdrEnabled &&
+    // _pbrEnabled), so an app that switches HDR off to stop the default Hable curve
+    // moving every colour it renders also drops every PBR material back to Blinn,
+    // losing roughness, metalness and the ambient occlusion map with it. This is the
+    // other lever: HDR stays on and the tone mapping pass passes colour through.
+    public void setToneMappingEnabled(boolean toneMappingEnabled) {
+        mToneMappingEnabled = toneMappingEnabled;
+        if (mNativeScene != null) {
+            mNativeScene.setToneMappingEnabled(toneMappingEnabled);
         }
     }
 
@@ -275,6 +288,11 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
      */
     @Override
     public void onSceneWillAppear() {
+        // Re-asserted here because a Scene opens tone-mapped whatever the last one was
+        // told, the same reason the post-process effects are reset on appear.
+        if (mNativeScene != null) {
+            mNativeScene.setToneMappingEnabled(mToneMappingEnabled);
+        }
         sceneWillAppear();
     }
 

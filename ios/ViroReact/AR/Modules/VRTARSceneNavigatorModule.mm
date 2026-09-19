@@ -29,11 +29,60 @@
 #import "VRTARSceneNavigatorModule.h"
 #import "VRTARSceneNavigator.h"
 #import <React/RCTUIManagerUtils.h>
+#import <React/RCTLog.h>
+#import <React/RCTUtils.h>
 #import "VRTUtils.h"
 #import <CoreLocation/CoreLocation.h>
 
 @implementation VRTARSceneNavigatorModule
 @synthesize bridge = _bridge;
+// Views are looked up through RCTViewRegistry, not the NSDictionary the legacy
+// RCTUIManager block hands out: under the new architecture that dictionary
+// never contains interop-mounted views, so every method here answered
+// "Invalid view type", and the legacy block queue itself only drains when
+// something else flushes it (observed 10 to 40 s late in bridgeless mode).
+// The registry returns the interop wrapper, hence the paper-view unwrap.
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
+
+static const int kRVViewLookupMaxFrames = 60;
+
+// Fabric mounts on the main queue after the JS commit that triggered a call, so
+// a method invoked from componentDidMount can run before its navigator view
+// exists. Wait up to about a second of frames for the tag to resolve; each
+// method's own class check still decides after that, and a miss is logged with
+// what the tag actually resolved to.
+- (void)rv_withViewForTag:(NSNumber *)reactTag block:(RCTViewRegistryUIBlock)block {
+    [self rv_withViewForTag:reactTag attempt:0 block:block];
+}
+
+- (void)rv_withViewForTag:(NSNumber *)reactTag attempt:(int)attempt block:(RCTViewRegistryUIBlock)block {
+    RCTViewRegistry *registry = self.viewRegistry_DEPRECATED;
+    if (registry == nil) {
+        RCTLogWarn(@"[ViroAR] viewRegistry_DEPRECATED is nil, view lookup for tag %@ cannot run", reactTag);
+        RCTExecuteOnMainQueue(^{ block(nil); });
+        return;
+    }
+    __weak __typeof(self) weakSelf = self;
+    [registry addUIBlock:^(RCTViewRegistry *viewRegistry) {
+        UIView *found = [viewRegistry viewForReactTag:reactTag];
+        if (found == nil && attempt < kRVViewLookupMaxFrames) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(16 * NSEC_PER_MSEC)),
+                           dispatch_get_main_queue(), ^{
+                [weakSelf rv_withViewForTag:reactTag attempt:attempt + 1 block:block];
+            });
+            return;
+        }
+        UIView *view = RCTPaperViewOrCurrentView(found);
+        if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+            RCTLogWarn(@"[ViroAR] tag %@ resolved to %@ (unwrapped %@) after %d frames, expected VRTARSceneNavigator",
+                       reactTag,
+                       found ? NSStringFromClass([found class]) : @"nil",
+                       view ? NSStringFromClass([view class]) : @"nil",
+                       attempt);
+        }
+        block(viewRegistry);
+    }];
+}
 
 static NSString *const kVRTRecordingKeySuccess = @"success";
 static NSString *const kVRTRecordingKeyUrl = @"url";
@@ -49,9 +98,9 @@ RCT_EXPORT_METHOD(startVideoRecording:(nonnull NSNumber *)reactTag
                              fileName:(NSString *)fileName
                      saveToCameraRoll:(BOOL)saveToCameraRoll
                               callback:(RCTResponseSenderBlock)callback) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 RCTLogError(@"Invalid view returned from registry, expecting VRTARSceneNavigator, got: %@", view);
                 callback(@[@(1)]); // Error code 1: Invalid view
@@ -78,9 +127,9 @@ RCT_EXPORT_METHOD(startVideoRecording:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(stopVideoRecording:(nonnull NSNumber *)reactTag
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 reject(@"invalid_view", @"Invalid view returned from registry, expecting VRTARSceneNavigator", nil);
                 return;
@@ -115,9 +164,9 @@ RCT_EXPORT_METHOD(takeScreenshot:(nonnull NSNumber *)reactTag
                 saveToCameraRoll:(BOOL)saveToCameraRoll
                          resolve:(RCTPromiseResolveBlock)resolve
                           reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 reject(@"invalid_view", @"Invalid view returned from registry, expecting VRTARSceneNavigator", nil);
                 return;
@@ -152,8 +201,8 @@ RCT_EXPORT_METHOD(takeScreenshot:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(resetARSession:(nonnull NSNumber *)reactTag
                   resetTracking:(BOOL)resetTracking
                   removeAnchors:(BOOL)removeAnchors) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTARSceneNavigator, got: %@", view);
         } else {
@@ -184,8 +233,8 @@ RCT_EXPORT_METHOD(resetARSession:(nonnull NSNumber *)reactTag
 
 RCT_EXPORT_METHOD(setWorldOrigin:(nonnull NSNumber *)reactTag
                      worldOrigin:(NSDictionary *)worldOrigin) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTARSceneNavigator, got: %@", view);
         } else {
@@ -245,7 +294,7 @@ RCT_EXPORT_METHOD(project:(nonnull NSNumber *)reactTag
                   position:(NSArray<NSNumber *> *)position
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
             // Validate input parameters
             if (!position || position.count != 3) {
@@ -257,7 +306,7 @@ RCT_EXPORT_METHOD(project:(nonnull NSNumber *)reactTag
                                           [[position objectAtIndex:1] floatValue],
                                           [[position objectAtIndex:2] floatValue]);
             
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 reject(@"invalid_view", @"Invalid view returned from registry, expecting VRTARSceneNavigator", nil);
                 return;
@@ -286,7 +335,7 @@ RCT_EXPORT_METHOD(unproject:(nonnull NSNumber *)reactTag
                   position:(NSArray<NSNumber *> *)position
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
             // Validate input parameters
             if (!position || position.count != 3) {
@@ -298,7 +347,7 @@ RCT_EXPORT_METHOD(unproject:(nonnull NSNumber *)reactTag
                                           [[position objectAtIndex:1] floatValue],
                                           [[position objectAtIndex:2] floatValue]);
 
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 reject(@"invalid_view", @"Invalid view returned from registry, expecting VRTARSceneNavigator", nil);
                 return;
@@ -329,10 +378,9 @@ RCT_EXPORT_METHOD(hostCloudAnchor:(nonnull NSNumber *)reactTag
                           ttlDays:(NSInteger)ttlDays
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 NSDictionary *result = @{
                     @"success": @NO,
@@ -389,10 +437,9 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                         outputDir:(NSString *)outputDir
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 NSDictionary *result = @{ @"success": @NO, @"error": @"Invalid view type" };
                 resolve(result);
@@ -428,9 +475,8 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(stopRecording:(nonnull NSNumber *)reactTag
                          resolve:(RCTPromiseResolveBlock)resolve
                           reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             [(VRTARSceneNavigator *)view stopRecording];
         }
@@ -441,9 +487,8 @@ RCT_EXPORT_METHOD(stopRecording:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(getRecordingStatus:(nonnull NSNumber *)reactTag
                               resolve:(RCTPromiseResolveBlock)resolve
                                reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             resolve([(VRTARSceneNavigator *)view getRecordingStatus]);
         } else {
@@ -452,14 +497,40 @@ RCT_EXPORT_METHOD(getRecordingStatus:(nonnull NSNumber *)reactTag
     }];
 }
 
+static NSDictionary *VRTEmptyCloudAnchorStatus(void) {
+    return @{ @"active": @NO, @"progress": @0, @"message": @"" };
+}
+
+RCT_EXPORT_METHOD(getCloudAnchorStatus:(nonnull NSNumber *)reactTag
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+        if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+            resolve(VRTEmptyCloudAnchorStatus());
+            return;
+        }
+
+        NSDictionary *status = [(VRTARSceneNavigator *)view cloudAnchorStatus];
+        if (!status) {
+            resolve(VRTEmptyCloudAnchorStatus());
+            return;
+        }
+        resolve(@{
+            @"active": @YES,
+            @"progress": status[@"progress"] ?: @0,
+            @"message": status[@"message"] ?: @""
+        });
+    }];
+}
+
 RCT_EXPORT_METHOD(resolveCloudAnchor:(nonnull NSNumber *)reactTag
                        cloudAnchorId:(NSString *)cloudAnchorId
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 NSDictionary *result = @{
                     @"success": @NO,
@@ -510,9 +581,8 @@ RCT_EXPORT_METHOD(resolveCloudAnchor:(nonnull NSNumber *)reactTag
 }
 
 RCT_EXPORT_METHOD(cancelCloudAnchorOperations:(nonnull NSNumber *)reactTag) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
             [component cancelCloudAnchorOperations];
@@ -525,10 +595,9 @@ RCT_EXPORT_METHOD(cancelCloudAnchorOperations:(nonnull NSNumber *)reactTag) {
 RCT_EXPORT_METHOD(isGeospatialModeSupported:(nonnull NSNumber *)reactTag
                                     resolve:(RCTPromiseResolveBlock)resolve
                                      reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"supported": @NO, @"error": @"Invalid view type"});
                 return;
@@ -546,10 +615,9 @@ RCT_EXPORT_METHOD(isGeospatialModeSupported:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(isLocationAccuracyReduced:(nonnull NSNumber *)reactTag
                                      resolve:(RCTPromiseResolveBlock)resolve
                                       reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"reduced": @NO, @"error": @"Invalid view type"});
                 return;
@@ -566,9 +634,8 @@ RCT_EXPORT_METHOD(isLocationAccuracyReduced:(nonnull NSNumber *)reactTag
 
 RCT_EXPORT_METHOD(setGeospatialModeEnabled:(nonnull NSNumber *)reactTag
                                    enabled:(BOOL)enabled) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
             [component setGeospatialModeEnabled:enabled];
@@ -579,10 +646,9 @@ RCT_EXPORT_METHOD(setGeospatialModeEnabled:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(getEarthTrackingState:(nonnull NSNumber *)reactTag
                                 resolve:(RCTPromiseResolveBlock)resolve
                                  reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"state": @"Stopped", @"error": @"Invalid view type"});
                 return;
@@ -600,10 +666,9 @@ RCT_EXPORT_METHOD(getEarthTrackingState:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(getCameraGeospatialPose:(nonnull NSNumber *)reactTag
                                   resolve:(RCTPromiseResolveBlock)resolve
                                    reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -638,10 +703,9 @@ RCT_EXPORT_METHOD(checkVPSAvailability:(nonnull NSNumber *)reactTag
                              longitude:(double)longitude
                                resolve:(RCTPromiseResolveBlock)resolve
                                 reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"availability": @"Unknown", @"error": @"Invalid view type"});
                 return;
@@ -667,10 +731,9 @@ RCT_EXPORT_METHOD(createGeospatialAnchor:(nonnull NSNumber *)reactTag
                               quaternion:(NSArray *)quaternion
                                  resolve:(RCTPromiseResolveBlock)resolve
                                   reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -711,10 +774,9 @@ RCT_EXPORT_METHOD(createTerrainAnchor:(nonnull NSNumber *)reactTag
                            quaternion:(NSArray *)quaternion
                               resolve:(RCTPromiseResolveBlock)resolve
                                reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -755,10 +817,9 @@ RCT_EXPORT_METHOD(createRooftopAnchor:(nonnull NSNumber *)reactTag
                            quaternion:(NSArray *)quaternion
                               resolve:(RCTPromiseResolveBlock)resolve
                                reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -799,9 +860,8 @@ RCT_EXPORT_METHOD(hostGeospatialAnchor:(nonnull NSNumber *)reactTag
                         altitudeMode:(NSString *)altitudeMode
                             resolver:(RCTPromiseResolveBlock)resolve
                             rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                         NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTARSceneNavigator *component = (VRTARSceneNavigator *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTARSceneNavigator *component = (VRTARSceneNavigator *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if (!component || ![component isKindOfClass:[VRTARSceneNavigator class]]) {
             resolve(@{@"success": @NO, @"error": @"Invalid component"});
             return;
@@ -825,9 +885,8 @@ RCT_EXPORT_METHOD(resolveGeospatialAnchor:(nonnull NSNumber *)reactTag
                              quaternion:(id)quaternion
                                resolver:(RCTPromiseResolveBlock)resolve
                                rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                         NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTARSceneNavigator *component = (VRTARSceneNavigator *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTARSceneNavigator *component = (VRTARSceneNavigator *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if (!component || ![component isKindOfClass:[VRTARSceneNavigator class]]) {
             resolve(@{@"success": @NO, @"error": @"Invalid component"});
             return;
@@ -846,9 +905,8 @@ RCT_EXPORT_METHOD(resolveGeospatialAnchor:(nonnull NSNumber *)reactTag
 
 RCT_EXPORT_METHOD(removeGeospatialAnchor:(nonnull NSNumber *)reactTag
                                 anchorId:(NSString *)anchorId) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
             [component removeGeospatialAnchor:anchorId];
@@ -860,10 +918,9 @@ RCT_EXPORT_METHOD(rvGetGeospatialAnchor:(nonnull NSNumber *)reactTag
                                anchorId:(NSString *)anchorId
                                 resolve:(RCTPromiseResolveBlock)resolve
                                  reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -890,10 +947,9 @@ RCT_EXPORT_METHOD(rvFindNearbyGeospatialAnchors:(nonnull NSNumber *)reactTag
                                           limit:(int)limit
                                         resolve:(RCTPromiseResolveBlock)resolve
                                          reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -924,10 +980,9 @@ RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
                                userAssetId:(NSString *)userAssetId
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -958,10 +1013,9 @@ RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
                       appUserId:(NSString *)appUserId
                         resolve:(RCTPromiseResolveBlock)resolve
                          reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -983,10 +1037,9 @@ RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
                         locationTransform:(NSString *)locationTransformCsv
                                      resolve:(RCTPromiseResolveBlock)resolve
                                       reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1005,10 +1058,9 @@ RCT_EXPORT_METHOD(rvLoadWorldMeshFromFile:(nonnull NSNumber *)reactTag
                         resolvedTransform:(NSString *)resolvedTransformCsv
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1027,10 +1079,9 @@ RCT_EXPORT_METHOD(rvDeleteGeospatialAnchor:(nonnull NSNumber *)reactTag
                                   anchorId:(NSString *)anchorId
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -1054,10 +1105,9 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
                                    offset:(NSInteger)offset
                                   resolve:(RCTPromiseResolveBlock)resolve
                                    reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1076,10 +1126,9 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
 // ── Cloud anchor management ───────────────────────────────────────────────────
 
 RCT_EXPORT_METHOD(rvStartScan:(nonnull NSNumber *)reactTag) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
             [(VRTARSceneNavigator *)view rvStartScan];
         } @catch (NSException *ex) { /* no-op — startScan has no promise to reject */ }
@@ -1090,10 +1139,9 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
                         ttlDays:(NSInteger)ttlDays
                         resolve:(RCTPromiseResolveBlock)resolve
                          reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1115,10 +1163,9 @@ RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                            anchorId:(NSString *)anchorId
                             resolve:(RCTPromiseResolveBlock)resolve
                              reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1139,10 +1186,9 @@ RCT_EXPORT_METHOD(rvListCloudAnchors:(nonnull NSNumber *)reactTag
                               offset:(NSInteger)offset
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1165,10 +1211,9 @@ RCT_EXPORT_METHOD(rvUpdateCloudAnchor:(nonnull NSNumber *)reactTag
                                isPublic:(BOOL)isPublic
                                 resolve:(RCTPromiseResolveBlock)resolve
                                  reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1188,10 +1233,9 @@ RCT_EXPORT_METHOD(rvDeleteCloudAnchor:(nonnull NSNumber *)reactTag
                               anchorId:(NSString *)anchorId
                                resolve:(RCTPromiseResolveBlock)resolve
                                 reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1213,10 +1257,9 @@ RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
                                      limit:(NSInteger)limit
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1236,10 +1279,9 @@ RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(rvGetProject:(nonnull NSNumber *)reactTag
                     resolve:(RCTPromiseResolveBlock)resolve
                      reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1258,10 +1300,9 @@ RCT_EXPORT_METHOD(rvGetScene:(nonnull NSNumber *)reactTag
                     sceneId:(NSString *)sceneId
                     resolve:(RCTPromiseResolveBlock)resolve
                      reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1281,10 +1322,9 @@ RCT_EXPORT_METHOD(rvGetSceneAssets:(nonnull NSNumber *)reactTag
                             sceneId:(NSString *)sceneId
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1309,10 +1349,9 @@ RCT_EXPORT_METHOD(rvAttachAssetToCloudAnchor:(nonnull NSNumber *)reactTag
                               externalUserId:(NSString *)externalUserId
                                      resolve:(RCTPromiseResolveBlock)resolve
                                       reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1333,10 +1372,9 @@ RCT_EXPORT_METHOD(rvRemoveAssetFromCloudAnchor:(nonnull NSNumber *)reactTag
                                         assetId:(NSString *)assetId
                                         resolve:(RCTPromiseResolveBlock)resolve
                                          reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1362,10 +1400,9 @@ RCT_EXPORT_METHOD(rvTrackCloudAnchorResolution:(nonnull NSNumber *)reactTag
                                  externalUserId:(NSString *)externalUserId
                                         resolve:(RCTPromiseResolveBlock)resolve
                                          reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
@@ -1387,10 +1424,9 @@ RCT_EXPORT_METHOD(rvTrackCloudAnchorResolution:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(isSemanticModeSupported:(nonnull NSNumber *)reactTag
                                   resolve:(RCTPromiseResolveBlock)resolve
                                    reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"supported": @NO, @"error": @"Invalid view type"});
                 return;
@@ -1407,9 +1443,8 @@ RCT_EXPORT_METHOD(isSemanticModeSupported:(nonnull NSNumber *)reactTag
 
 RCT_EXPORT_METHOD(setSemanticModeEnabled:(nonnull NSNumber *)reactTag
                                  enabled:(BOOL)enabled) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
             [component setSemanticModeEnabled:enabled];
@@ -1420,10 +1455,9 @@ RCT_EXPORT_METHOD(setSemanticModeEnabled:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(getSemanticLabelFractions:(nonnull NSNumber *)reactTag
                                     resolve:(RCTPromiseResolveBlock)resolve
                                      reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"});
                 return;
@@ -1446,10 +1480,9 @@ RCT_EXPORT_METHOD(getSemanticLabelFraction:(nonnull NSNumber *)reactTag
                                      label:(NSString *)label
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"fraction": @0.0, @"error": @"Invalid view type"});
                 return;
@@ -1472,9 +1505,8 @@ RCT_EXPORT_METHOD(getSemanticLabelFraction:(nonnull NSNumber *)reactTag
 
 RCT_EXPORT_METHOD(setPreferMonocularDepth:(nonnull NSNumber *)reactTag
                                    prefer:(BOOL)prefer) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
         if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
             VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
             [component setPreferMonocularDepth:prefer];
@@ -1485,10 +1517,9 @@ RCT_EXPORT_METHOD(setPreferMonocularDepth:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(isPreferMonocularDepth:(nonnull NSNumber *)reactTag
                                  resolve:(RCTPromiseResolveBlock)resolve
                                   reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"preferred": @NO, @"error": @"Invalid view type"});
                 return;
@@ -1508,10 +1539,9 @@ RCT_EXPORT_METHOD(isPreferMonocularDepth:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(isDepthOcclusionSupported:(nonnull NSNumber *)reactTag
                                    resolve:(RCTPromiseResolveBlock)resolve
                                     reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"supported": @NO, @"error": @"Invalid view type - component not found or not initialized"});
                 return;
@@ -1528,10 +1558,9 @@ RCT_EXPORT_METHOD(isDepthOcclusionSupported:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(getGeospatialSetupStatus:(nonnull NSNumber *)reactTag
                                   resolve:(RCTPromiseResolveBlock)resolve
                                    reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{
                     @"geospatialSupported": @NO,
@@ -1572,10 +1601,9 @@ RCT_EXPORT_METHOD(cleanup:(nonnull NSNumber *)reactTag) {
     // This method is called from componentWillUnmount to ensure proper cleanup
     // of AR resources before the native view is deallocated.
 
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
-            VRTView *view = (VRTView *)viewRegistry[reactTag];
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
                 VRTARSceneNavigator *component = (VRTARSceneNavigator *)view;
 

@@ -6,6 +6,28 @@ import {
 } from "./Utilities/VRQuestNavigatorBridge";
 import { exitVRScene } from "./Utilities/VRModuleOpenXR";
 import { ViroVRSceneNavigator } from "./ViroVRSceneNavigator";
+import { StudioSceneErrorBoundary } from "./Studio/StudioSceneErrorBoundary";
+import { ViroScene } from "./ViroScene";
+import { ViroAmbientLight } from "./ViroAmbientLight";
+import { ViroText } from "./ViroText";
+
+// Rendered in place of the crashed scene. Has to be a full, valid Viro scene
+// (not a plain RN <View>) — VRActivity's display is exclusively driven by the
+// OpenXR compositor, so a bare 2D view would never appear.
+function QuestCrashFallbackScene() {
+  return (
+    <ViroScene>
+      <ViroAmbientLight color="#ffffff" intensity={1000} />
+      <ViroText
+        text="Something went wrong loading this scene."
+        position={[0, 0, -2]}
+        width={3}
+        height={1}
+        style={{ fontFamily: "Arial", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}
+      />
+    </ViroScene>
+  );
+}
 
 /**
  * Drop-in root component for VRActivity on Meta Quest.
@@ -28,8 +50,15 @@ export function ViroQuestEntryPoint() {
 
   // Wire hardware back button to exit VR. Apps that need custom back behaviour
   // can call AppRegistry.registerComponent('VRQuestScene', ...) to override.
+  //
+  // Reads the intent from the bridge at press time (not the `intent` state
+  // closed over above) so a VR relaunch that swaps in a new onExitViro after
+  // this effect's first run is still honoured — exitVRScene() posts the
+  // native finish() to the main looper asynchronously, so calling
+  // onExitViro() first here still runs before VRActivity actually finishes.
   React.useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
       exitVRScene();
       return true;
     });
@@ -68,12 +97,22 @@ export function ViroQuestEntryPoint() {
   const { initialScene, rendererConfig } = intent;
 
   return (
-    <ViroVRSceneNavigator
-      ref={navRef}
-      key={intent.intentKey}
-      initialScene={initialScene}
-      {...rendererConfig}
-      style={StyleSheet.absoluteFill}
-    />
+    <StudioSceneErrorBoundary
+      onError={(error) => VRQuestNavigatorBridge.reportQuestError(error)}
+      renderError={() => (
+        <ViroVRSceneNavigator
+          initialScene={{ scene: QuestCrashFallbackScene }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+    >
+      <ViroVRSceneNavigator
+        ref={navRef}
+        key={intent.intentKey}
+        initialScene={initialScene}
+        {...rendererConfig}
+        style={StyleSheet.absoluteFill}
+      />
+    </StudioSceneErrorBoundary>
   );
 }

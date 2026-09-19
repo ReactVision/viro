@@ -25,6 +25,7 @@ import { ViroExitViroEvent } from "./Types/ViroEvents";
 import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroSceneDictionary } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
+import { isVisionOS } from "./Utilities/ViroPlatform";
 
 var ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 
@@ -51,9 +52,13 @@ type Props = ViewProps & {
    */
   initialScene: {
     /**
-     * The React Class to render for this scene.
+     * The React component to render for this scene.
+     *
+     * Typed as a component, not as a `ViroScene` instance: at runtime this is mounted as
+     * `<Component />` (see `sceneClass.scene` below), exactly as ViroARSceneNavigator does.
+     * The old `ViroScene` annotation described a value this navigator never receives.
      */
-    scene: ViroScene;
+    scene: () => React.JSX.Element;
   };
   viroAppProps?: any; // TODO: what is the type of this?
 
@@ -469,9 +474,16 @@ export class ViroSceneNavigator extends React.Component<Props, State> {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroSceneNavigator", this.props);
 
-    console.warn(
-      "<ViroSceneNavigator> has been DEPRECATED. Please use <ViroVRSceneNavigator> instead."
-    );
+    // Not on visionOS: there the replacement does not exist. ViroVRSceneNavigator renders
+    // VRTVRSceneNavigator, which is the Android/OpenXR host and is excluded from the xros
+    // build, while VRTSceneNavigator — this component — is the one that is registered. Sending
+    // visionOS users to a component that cannot mount would be worse than saying nothing, and
+    // the warning would fire on every render of a supported configuration.
+    if (!isVisionOS) {
+      console.warn(
+        "<ViroSceneNavigator> has been DEPRECATED. Please use <ViroVRSceneNavigator> instead."
+      );
+    }
     var items = this._renderSceneStackItems();
 
     // update the sceneNavigator with the latest given props on every render

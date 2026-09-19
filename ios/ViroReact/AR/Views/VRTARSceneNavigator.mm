@@ -1021,6 +1021,27 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
     }
 }
 
+- (NSDictionary *)cloudAnchorStatus {
+    if (!_vroView) {
+        return nil;
+    }
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) {
+        return nil;
+    }
+
+    std::string message;
+    float progress = 0.0f;
+    if (!arSession->getCloudAnchorStatus(message, progress)) {
+        return nil;
+    }
+    return @{
+        @"progress": @(progress),
+        @"message": [NSString stringWithUTF8String:message.c_str()]
+    };
+}
+
 - (void)resolveCloudAnchor:(NSString *)cloudAnchorId
          completionHandler:(CloudAnchorResolveCompletionHandler)completionHandler {
     if (!_vroView) {

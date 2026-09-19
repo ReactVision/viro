@@ -85,7 +85,7 @@
 #define ANSIBackWhite "\e[1;47m"
 #define ANSIBackDefault "\e[1;49m"
 
-#elif VRO_PLATFORM_IOS || VRO_PLATFORM_MACOS
+#elif VRO_PLATFORM_IOS || VRO_PLATFORM_MACOS || VRO_PLATFORM_VISION
 
 /*
  ANSI colors don't resolve on the iOS debug console, so we
@@ -223,11 +223,59 @@ toLevel(const char* value) {
         logLevel != ANDROID_LOG_SILENT && level >= logLevel;    \
     })
 
+#elif VRO_PLATFORM_VISION
+
+/////////////////////////////////////////////////////////////////////////////////
+//
+//  visionOS: Logging (printf-based, no Foundation dependency)
+//  Plain C++ .cpp files include this header; Foundation/ObjC headers must not
+//  be pulled in here.  .mm files can include Foundation directly if needed.
+//
+/////////////////////////////////////////////////////////////////////////////////
+#pragma mark -
+#pragma mark visionOS Logging
+
+#include <assert.h>
+#include <cstdio>
+
+#define passert(condition) (assert(condition))
+#define pverbose(message,...) ((void)0)
+#define pdebug(message,...) ((void)0)
+
+#define pinfo(message,...) \
+do { \
+fprintf(stderr, "[Viro] " #message "\n", ##__VA_ARGS__); \
+} while (0)
+
+#define pwarn(message,...) \
+do { \
+fprintf(stderr, "[Viro WARN] " #message "\n", ##__VA_ARGS__); \
+} while (0)
+
+#define perr(message,...) \
+do { \
+fprintf(stderr, "[Viro ERROR] " #message "\n", ##__VA_ARGS__); \
+} while (0)
+
+#define pfatal(message,...) \
+do { \
+fprintf(stderr, "[Viro FATAL] " #message "\n", ##__VA_ARGS__); \
+} while (0)
+
+#define pthreadpool(message,...) ((void)0)
+#define pthreadtask(message,...) ((void)0)
+#define pthreadtaskexe(message,...) ((void)0)
+#define pthreadtaskerror(message,...) ((void)0)
+
+#define pgllabel(message,...) ((void)0)
+#define pglpush(message,...) ((void)0)
+#define pglpop() ((void)0)
+
 #elif VRO_PLATFORM_IOS || VRO_PLATFORM_MACOS
 
 /////////////////////////////////////////////////////////////////////////////////
 //
-//  iOS: Logging
+//  iOS / macOS: Logging
 //
 /////////////////////////////////////////////////////////////////////////////////
 #pragma mark -

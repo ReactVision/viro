@@ -145,7 +145,7 @@ RCT_EXPORT_METHOD(performARHitTestWithRay:(nonnull NSNumber *)viewTag
             RCTLogError(@"Invalid Ray provided for performARHitTestWithRay!");
         } else {
             VRTARScene *scene = (VRTARScene *)sceneView;
-            UIView *superview = [scene superview];
+            UIView *superview = [scene viroSuperview];
             
             if (superview && [superview isKindOfClass:[VRTARSceneNavigator class]]) {
                 VRTARSceneNavigator *navigator = (VRTARSceneNavigator *)superview;
@@ -183,7 +183,7 @@ RCT_EXPORT_METHOD(performARHitTestWithPosition:(nonnull NSNumber *)viewTag
             RCTLogError(@"Invalid Position provided for performARHitTestWithPosition!");
         } else {
             VRTARScene *scene = (VRTARScene *)sceneView;
-            UIView *superview = [scene superview];
+            UIView *superview = [scene viroSuperview];
             if (superview && [superview isKindOfClass:[VRTARSceneNavigator class]]) {
                 VRTARSceneNavigator *navigator = (VRTARSceneNavigator *)superview;
                 if ([navigator rootVROView]) {
@@ -215,7 +215,7 @@ RCT_EXPORT_METHOD(performARHitTestWithPoint:(nonnull NSNumber *)viewTag
             RCTLogError(@"Invalid view returned when calling performARHitTestWithPoint: expected VRTARScene, got [%@]", sceneView);
         } else {
             VRTARScene *scene = (VRTARScene *)sceneView;
-            UIView *superview = [scene superview];
+            UIView *superview = [scene viroSuperview];
             if (superview && [superview isKindOfClass:[VRTARSceneNavigator class]]) {
                 VRTARSceneNavigator *navigator = (VRTARSceneNavigator *)superview;
                 if ([navigator rootVROView]) {

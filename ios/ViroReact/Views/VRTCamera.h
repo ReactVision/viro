@@ -39,6 +39,15 @@
 - (void)setPosition:(NSArray<NSNumber *> *)position;
 
 @property (nonatomic, assign) float fieldOfView;
+
+// "perspective" (default) or "orthographic". Orthographic draws parallel lines parallel, which is
+// what a floor plan, blueprint or isometric view needs — a perspective camera makes parallel
+// aisles converge, and on a map that reads as wrong rather than as depth.
+@property (nonatomic, copy) NSString *projection;
+
+// Vertical extent of the orthographic view, in world units: the full height, not the half-height.
+// The width follows from the viewport's aspect ratio. Ignored when the projection is perspective.
+@property (nonatomic, assign) float orthographicScale;
 @property (nonatomic, copy) NSArray<NSNumber *> *position;
 @property (readonly, nonatomic) std::shared_ptr<VRONodeCamera> nodeCamera;
 @property (readonly, nonatomic) std::shared_ptr<VRONode> nodeRootTransformCamera;

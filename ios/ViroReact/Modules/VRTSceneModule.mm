@@ -75,7 +75,7 @@ RCT_EXPORT_METHOD(findCollisionsWithShapeAsync:(nonnull NSNumber *)viewTag
                   rejecter:(RCTPromiseRejectBlock)reject) {
     [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
         UIView *sceneView = viewRegistry[viewTag];
-        std::shared_ptr<VROPhysicsShape> shape = [VRTNode getPhysicsShape:shapeTypeString params:shapeParams];
+        std::shared_ptr<VROPhysicsShape> shape = [VRTNode getPhysicsShape:shapeTypeString params:shapeParams children:nil];
         if (![sceneView isKindOfClass:[VRTScene class]]) {
             RCTLogError(@"Invalid view returned when calling findCollisionsWithShapeAsync: expected VRTScene, got [%@]", sceneView);
         } else if ([fromArray count] != 3 || [toArray count] != 3 || tag == nil) {

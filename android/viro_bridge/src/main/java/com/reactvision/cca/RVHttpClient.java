@@ -4,6 +4,17 @@
 // Called from C++ via JNI (NetworkClient_Android.cpp).
 // Handles JSON, binary, and multipart HTTP requests using
 // HttpURLConnection — no extra dependencies required.
+//
+// CANONICAL COPY. This file is vendored verbatim into
+// viro/android/viro_bridge/src/main/java/com/reactvision/cca/RVHttpClient.java,
+// which is the copy that ships to apps. The two must stay byte-identical:
+// edit here, then re-copy. They are the same package, so a divergence is
+// resolved by whichever .java the app's build sees first.
+//
+// Two kinds of caller, which is why apiKey is nullable below:
+//   - JNI (NetworkClient_Android.cpp) always passes a real key → x-api-key.
+//   - Viro's VRTStudioModule session path passes null and supplies
+//     Authorization: Bearer <jwt> via headerNames/headerValues instead.
 
 package com.reactvision.cca;
 

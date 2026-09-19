@@ -33,6 +33,7 @@ import com.viromedia.bridge.component.node.VRTNodeManager;
 import com.viromedia.bridge.utility.ViroCommands;
 import com.viromedia.bridge.utility.ViroEvents;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -121,14 +122,17 @@ public class VRTVideoSurfaceManager extends VRTControlManager<VRTVideoSurface> {
                 video.seekToTime((float) args.getDouble(0));
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported command " + commandType
-                        + " received by" + getClass().getSimpleName());
+                // The node transform commands live on VRTNodeManager.
+                super.receiveCommand(video, commandType, args);
         }
     }
 
+    // Merged with super's, or a video surface would lose the node transform commands.
     @Override
     public Map<String,Integer> getCommandsMap() {
-        return MapBuilder.of(ViroCommands.SEEK_TO_TIME_NAME, ViroCommands.SEEK_TO_TIME_INDEX);
+        Map<String, Integer> commands = new HashMap<>(super.getCommandsMap());
+        commands.put(ViroCommands.SEEK_TO_TIME_NAME, ViroCommands.SEEK_TO_TIME_INDEX);
+        return commands;
     }
 
 }

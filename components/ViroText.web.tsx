@@ -1,6 +1,6 @@
 /**
  * Web implementation of ViroText — a text geometry rendered by the WASM font
- * pipeline (freetype + preloaded Helvetica). Maps `text`, `style` (fontSize,
+ * pipeline (freetype + preloaded Roboto). Maps `text`, `style` (fontSize,
  * color), `width`/`height`, alignment, line-break, clip and `maxLines` onto the
  * `viroCreateText` C API.
  *
@@ -16,6 +16,7 @@ import {
   ViroTextClipMode,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
+import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { ViroParentNodeContext } from "./Web/ViroWebContext";
 import { parseColorToRGBA } from "./Web/viroColor";
 
@@ -73,11 +74,14 @@ function lineBreak(v?: string): ViroLineBreakMode {
 export function ViroText(props: Props) {
   const {
     text,
-    width = 1,
-    height = 1,
     maxLines = 0,
     style,
   } = props;
+  // Inside a ViroFlexView the layout decides the text box, as it does natively:
+  // the block still wraps and clips to it, it just no longer sizes itself.
+  const slot = useViroFlexSlot();
+  const width = slot?.width ?? props.width ?? 1;
+  const height = slot?.height ?? props.height ?? 1;
 
   const fontSize = style?.fontSize ?? 18;
   const colorValue = props.color ?? style?.color ?? "#ffffff";

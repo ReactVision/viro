@@ -40,7 +40,13 @@ typedef NS_ENUM(NSInteger, ViroConstraintType) {
     @protected NSMutableArray *_childViews;
 }
 
-@property(nullable, nonatomic, weak) VRTView *superview;
+// NOT named `superview`. This is Viro's parent in the React element tree, which is a different
+// relationship from UIKit's view hierarchy — a VRTNode is a scene-graph node, not a subview of
+// anything. Declaring it as `superview` synthesised an override of -[UIView superview], so every
+// UIKit internal that asked a VRT view for its superview got Viro's answer. -removeFromSuperview
+// is one of those, and the guards written as `if (!self.superview) return;` before the real
+// removal then skipped it, leaving the view linked in UIKit while React believed it detached.
+@property(nullable, nonatomic, weak) VRTView *viroSuperview;
 @property (nonatomic, readonly, weak) RCTBridge *bridge;
 
 /*

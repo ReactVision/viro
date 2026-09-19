@@ -10,6 +10,8 @@ import { useViroScene, ViroParentNodeContext } from "./Web/ViroWebContext";
 
 type Props = ViroWebNodeProps & {
   active?: boolean;
+  projection?: "perspective" | "orthographic";
+  orthographicScale?: number;
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -18,6 +20,7 @@ export function ViroCamera(props: Props) {
   const node = useViroNode(props);
   const scene = useViroScene();
   const active = props.active !== false;
+  const { projection, orthographicScale } = props;
 
   useEffect(() => {
     scene.setNodeCamera(node);
@@ -26,6 +29,18 @@ export function ViroCamera(props: Props) {
   useEffect(() => {
     if (active) scene.setActiveCameraNode(node);
   }, [scene, node, active]);
+
+  // Order matters only in that the camera must exist first, which the effect
+  // above guarantees — effects run in declaration order.
+  useEffect(() => {
+    scene.setCameraProjection(node, projection ?? "perspective");
+  }, [scene, node, projection]);
+
+  useEffect(() => {
+    if (orthographicScale !== undefined) {
+      scene.setCameraOrthographicScale(node, orthographicScale);
+    }
+  }, [scene, node, orthographicScale]);
 
   return (
     <ViroParentNodeContext.Provider value={node}>

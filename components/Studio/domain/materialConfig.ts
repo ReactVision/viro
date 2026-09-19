@@ -35,6 +35,7 @@ export type MaterialConfig = {
   materialUniforms?: Array<{ name: string; type: string; value: unknown }>;
   transparencyMode?: string;
   cullMode?: string;
+  writesToDepthBuffer?: boolean;
 };
 
 export type ViroMaterialDefinition = Record<string, unknown>;
@@ -238,6 +239,8 @@ export function parseMaterialConfig(raw: unknown): MaterialConfig | null {
     if (typeof r.transparencyMode === "string")
       config.transparencyMode = r.transparencyMode;
     if (typeof r.cullMode === "string") config.cullMode = r.cullMode;
+    if (typeof r.writesToDepthBuffer === "boolean")
+      config.writesToDepthBuffer = r.writesToDepthBuffer;
 
     for (const key of TEXTURE_KEYS) {
       const v = r[key];
@@ -290,6 +293,8 @@ export function buildViroMaterialDefinition(
   if (config.transparencyMode !== undefined)
     out.transparencyMode = config.transparencyMode;
   if (config.cullMode !== undefined) out.cullMode = config.cullMode;
+  if (config.writesToDepthBuffer !== undefined)
+    out.writesToDepthBuffer = config.writesToDepthBuffer;
 
   for (const key of TEXTURE_KEYS) {
     const mapped = textureToViro((config as any)[key]);

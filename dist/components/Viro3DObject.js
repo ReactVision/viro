@@ -38,15 +38,17 @@ const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
-const { resolveAssetSource } = react_native_1.Image;
+// The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
+// see ViroAssetSource.ts for why, and what it falls back to.
+const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 /**
  * Viro3DObject is a component that is used to render 3D models in the scene.
  */
 class Viro3DObject extends ViroBase_1.ViroBase {
     render() {
         (0, ViroProps_1.checkMisnamedProps)("Viro3DObject", this.props);
-        const modelsrc = resolveAssetSource(this.props.source);
-        const resources = this.props.resources?.map((resource) => resolveAssetSource(resource));
+        const modelsrc = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source);
+        const resources = this.props.resources?.map((resource) => (0, ViroAssetSource_1.resolveViroAssetSource)(resource));
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         const materials = typeof this.props.materials === "string"
             ? [this.props.materials]

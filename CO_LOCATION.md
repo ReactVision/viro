@@ -380,7 +380,7 @@ deno task test
 
 Point devices at it with `endpoint: 'http://<your-lan-ip>:8787'`; the client turns `http://` into `ws://` itself. Use the LAN address, not `localhost`: on a phone, `localhost` is the phone.
 
-**It is a reference, not a deployment.** Rooms live in one process's memory, so two peers only meet if they land on the same instance, and its credential check confirms the key and project id are present and nothing more. The wire contract for both sockets is `PROTOCOL.md` beside it.
+**It is a reference, not a deployment.** A room is held by one process and saved back when its last peer leaves, so two peers only meet if they land on the same instance and two instances holding the same room would diverge. Its credential check confirms the key and project id are present and nothing more. The wire contract for both sockets is `PROTOCOL.md` beside it.
 
 ---
 

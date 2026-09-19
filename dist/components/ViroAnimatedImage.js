@@ -50,6 +50,8 @@ const react_native_1 = require("react-native");
 const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 class ViroAnimatedImage extends ViroBase_1.ViroBase {
     _component = null;
     _onLoadStart = (event) => {
@@ -59,6 +61,12 @@ class ViroAnimatedImage extends ViroBase_1.ViroBase {
         this.props.onLoadEnd && this.props.onLoadEnd(event);
     };
     render() {
+        // ViroAnimatedImage's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found".
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroAnimatedImage", "Apple Vision Pro", "Animated images need the OpenGL texture path, which visionOS does not have.");
+            return null;
+        }
         (0, ViroProps_1.checkMisnamedProps)("ViroAnimatedImage", this.props);
         var defaultPlaceholder = require("./Resources/viro_blank.png");
         var imgsrc = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source);

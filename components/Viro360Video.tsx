@@ -32,6 +32,8 @@ import {
 } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroRotation, ViroSource } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 var NativeModules = require("react-native").NativeModules;
 
@@ -112,6 +114,12 @@ export class Viro360Video extends React.Component<Props> {
   };
 
   render() {
+    // Viro360Video's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("Viro360Video", "Apple Vision Pro", "Video textures are not part of the visionOS renderer.");
+      return null;
+    }
     checkMisnamedProps("Viro360Video", this.props);
 
     var vidsrc = resolveAssetSource(this.props.source);

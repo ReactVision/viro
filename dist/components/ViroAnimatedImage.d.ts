@@ -63,6 +63,6 @@ export declare class ViroAnimatedImage extends ViroBase<Props> {
     _component: ViroNativeRef;
     _onLoadStart: (event: NativeSyntheticEvent<ViroLoadStartEvent>) => void;
     _onLoadEnd: (event: NativeSyntheticEvent<ViroLoadEndEvent>) => void;
-    render(): React.JSX.Element;
+    render(): React.JSX.Element | null;
 }
 export {};

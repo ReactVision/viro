@@ -73,6 +73,18 @@ const VRTObjectDetectorView = (0, react_native_1.requireNativeComponent)("VRTObj
  *   confidenceThreshold={0.4}
  *   maxFPS={15}
  *   onDetection={({ detections }) => {
+  // Its view manager is excluded from the visionOS renderer, so React has no view config for it
+  // and mounting fails with "View config not found". visionOS grants no passthrough camera access
+  // without an enterprise entitlement, so there is nothing for the detector to look at either.
+  if (isVisionOS) {
+    warnUnsupported(
+      "ViroObjectDetector",
+      "Apple Vision Pro",
+      "visionOS grants no passthrough camera access without an enterprise entitlement."
+    );
+    return null;
+  }
+
  *     detections.forEach(d => console.log(d.label, d.confidence, d.screenBoundingBox));
  *   }}
  * />

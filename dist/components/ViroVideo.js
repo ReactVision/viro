@@ -50,6 +50,8 @@ const react_native_1 = require("react-native");
 const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 class ViroVideo extends ViroBase_1.ViroBase {
     _onBufferStart = (event) => {
         this.props.onBufferStart && this.props.onBufferStart(event);
@@ -65,6 +67,12 @@ class ViroVideo extends ViroBase_1.ViroBase {
             this.props.onUpdateTime(event.nativeEvent.currentTime, event.nativeEvent.totalTime);
     };
     render() {
+        // ViroVideo's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found".
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroVideo", "Apple Vision Pro", "Video textures are not part of the visionOS renderer.");
+            return null;
+        }
         (0, ViroProps_1.checkMisnamedProps)("ViroVideo", this.props);
         var source = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source);
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.

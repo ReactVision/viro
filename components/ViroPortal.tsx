@@ -15,6 +15,8 @@ import * as React from "react";
 import { requireNativeComponent } from "react-native";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 type Props = {};
 
@@ -23,6 +25,12 @@ type Props = {};
  */
 export class ViroPortal extends ViroBase<Props> {
   render() {
+    // ViroPortal's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("ViroPortal", "Apple Vision Pro", "Portals are not traversed by the visionOS renderer.");
+      return null;
+    }
     checkMisnamedProps("ViroPortal", this.props);
 
     // Since transformBehaviors can be either a string or an array, convert the string to a 1-element array.

@@ -132,6 +132,6 @@ export declare class ViroCameraTexture extends React.Component<Props> {
      *           the written file, or `{ success: false, error }`.
      */
     stopRecording(): Promise<ViroCaptureResult>;
-    render(): React.JSX.Element;
+    render(): React.JSX.Element | null;
 }
 export {};

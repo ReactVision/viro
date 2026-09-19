@@ -22,6 +22,8 @@ import {
   ViroVideoUpdateTimeEvent,
 } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 type Props = ViewProps & {
   material?: string;
@@ -113,6 +115,12 @@ export class ViroMaterialVideo extends React.Component<Props> {
   };
 
   render() {
+    // ViroMaterialVideo's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("ViroMaterialVideo", "Apple Vision Pro", "Video textures are not part of the visionOS renderer.");
+      return null;
+    }
     // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
     //let materials = typeof this.props.materials === 'string' ? new Array(this.props.materials) : this.props.materials;
 

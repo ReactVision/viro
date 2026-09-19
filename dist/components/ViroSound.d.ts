@@ -21,7 +21,7 @@ export declare class ViroSound extends React.Component<Props> {
     _onFinish: (event: NativeSyntheticEvent<ViroSoundFinishEvent>) => void;
     _onError: (event: NativeSyntheticEvent<ViroErrorEvent>) => void;
     setNativeProps: (nativeProps: Props) => void;
-    render(): React.JSX.Element;
+    render(): React.JSX.Element | null;
     seekToTime: (timeInSeconds: number) => void;
 }
 export {};

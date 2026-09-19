@@ -16,6 +16,8 @@ import {
 } from "react-native";
 import { ViroErrorEvent } from "./Types/ViroEvents";
 import { ViroNativeRef } from "./Types/ViroUtils";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 const { VRTCameraTextureModule } = NativeModules;
 
@@ -201,6 +203,12 @@ export class ViroCameraTexture extends React.Component<Props> {
   }
 
   render() {
+    // ViroCameraTexture's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("ViroCameraTexture", "Apple Vision Pro", "visionOS grants no passthrough camera access without an enterprise entitlement.");
+      return null;
+    }
     const nativeProps = Object.assign({} as any, this.props);
     nativeProps.cameraPosition = this.props.cameraPosition ?? "front";
     nativeProps.paused = this.props.paused ?? false;

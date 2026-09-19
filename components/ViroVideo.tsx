@@ -27,6 +27,8 @@ import {
 import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 type Props = {
   stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
@@ -92,6 +94,12 @@ export class ViroVideo extends ViroBase<Props> {
   };
 
   render() {
+    // ViroVideo's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("ViroVideo", "Apple Vision Pro", "Video textures are not part of the visionOS renderer.");
+      return null;
+    }
     checkMisnamedProps("ViroVideo", this.props);
 
     var source = resolveAssetSource(this.props.source);

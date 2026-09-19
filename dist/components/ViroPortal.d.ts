@@ -15,6 +15,6 @@ type Props = {};
  * Frame that serves as a 'window' into a ViroPortal
  */
 export declare class ViroPortal extends ViroBase<Props> {
-    render(): React.JSX.Element;
+    render(): React.JSX.Element | null;
 }
 export {};

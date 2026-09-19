@@ -32,6 +32,8 @@ import {
   ViroSource,
 } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 const SoundModule = NativeModules.VRTSoundModule;
 
@@ -83,6 +85,12 @@ export class ViroSound extends React.Component<Props> {
   };
 
   render() {
+    // ViroSound's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("ViroSound", "Apple Vision Pro", "Audio playback is not part of the visionOS renderer.");
+      return null;
+    }
     checkMisnamedProps("ViroSound", this.props);
 
     var soundSrc = this.props.source;

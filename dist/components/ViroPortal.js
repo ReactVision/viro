@@ -48,11 +48,19 @@ const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 /**
  * Frame that serves as a 'window' into a ViroPortal
  */
 class ViroPortal extends ViroBase_1.ViroBase {
     render() {
+        // ViroPortal's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found".
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroPortal", "Apple Vision Pro", "Portals are not traversed by the visionOS renderer.");
+            return null;
+        }
         (0, ViroProps_1.checkMisnamedProps)("ViroPortal", this.props);
         // Since transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         let transformBehaviors = typeof this.props.transformBehaviors === "string"

@@ -36,6 +36,8 @@ import {
 } from "./Types/ViroUtils";
 import { checkMisnamedProps } from "./Utilities/ViroProps";
 import { ViroBase } from "./ViroBase";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 type Props = ViroCommonProps & {
   source: ViroSource;
@@ -113,6 +115,12 @@ export class ViroAnimatedImage extends ViroBase<Props> {
   };
 
   render() {
+    // ViroAnimatedImage's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found".
+    if (isVisionOS) {
+      warnUnsupported("ViroAnimatedImage", "Apple Vision Pro", "Animated images need the OpenGL texture path, which visionOS does not have.");
+      return null;
+    }
     checkMisnamedProps("ViroAnimatedImage", this.props);
     var defaultPlaceholder = require("./Resources/viro_blank.png");
     var imgsrc = resolveAssetSource(this.props.source);

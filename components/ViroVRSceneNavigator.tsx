@@ -17,6 +17,8 @@ import {
   NativeSyntheticEvent,
   requireNativeComponent,
   StyleSheet,
+  Text,
+  View,
   ViewProps,
 } from "react-native";
 import {
@@ -29,6 +31,8 @@ import {
   ViroScene,
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = NativeModules.VRModuleOpenXR as {
   recenterTracking: (viewTag: number) => void;
@@ -498,6 +502,19 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
   };
 
   render() {
+    // ViroVRSceneNavigator's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found". A message rather than
+    // null: this is the root of a screen, and a blank one says nothing about why.
+    if (isVisionOS) {
+      warnUnsupported("ViroVRSceneNavigator", "Apple Vision Pro", "Use ViroXRSceneNavigator: visionOS is not a phone in a headset and has no stereo view to size.");
+      return (
+        <View style={styles.viroVisionOSFallback}>
+          <Text style={styles.viroVisionOSFallbackText}>
+            ViroVRSceneNavigator is not supported on Apple Vision Pro.
+          </Text>
+        </View>
+      );
+    }
     const items = this._renderSceneStackItems();
 
     // Uncomment this line to check for misnamed props
@@ -533,6 +550,18 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
 }
 
 var styles = StyleSheet.create({
+  viroVisionOSFallback: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+    padding: 24,
+  },
+  viroVisionOSFallbackText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+  },
   container: {
     flex: 1,
     justifyContent: "center",

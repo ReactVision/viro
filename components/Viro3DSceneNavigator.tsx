@@ -16,6 +16,8 @@ import {
   NativeModules,
   requireNativeComponent,
   StyleSheet,
+  Text,
+  View,
   ViewProps,
 } from "react-native";
 import { ViroExitViroEvent } from "./Types/ViroEvents";
@@ -25,6 +27,8 @@ import {
   ViroSceneDictionary,
 } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
+import { isVisionOS } from "./Utilities/ViroPlatform";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 
 const Viro3DSceneNavigatorModule = NativeModules.VRT3DSceneNavigatorModule;
 
@@ -474,6 +478,19 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
   };
 
   render() {
+    // Viro3DSceneNavigator's view manager is excluded from the visionOS renderer, so React has no view
+    // config for it and mounting fails with "View config not found". A message rather than
+    // null: this is the root of a screen, and a blank one says nothing about why.
+    if (isVisionOS) {
+      warnUnsupported("Viro3DSceneNavigator", "Apple Vision Pro", "Use ViroXRSceneNavigator: on visionOS the ImmersiveSpace is the presentation path, not an OpenGL view.");
+      return (
+        <View style={styles.viroVisionOSFallback}>
+          <Text style={styles.viroVisionOSFallbackText}>
+            Viro3DSceneNavigator is not supported on Apple Vision Pro.
+          </Text>
+        </View>
+      );
+    }
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("Viro3DSceneNavigator", this.props);
     const items = this._renderSceneStackItems();
@@ -509,6 +526,18 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
 }
 
 var styles = StyleSheet.create({
+  viroVisionOSFallback: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+    padding: 24,
+  },
+  viroVisionOSFallbackText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+  },
   container: {
     flex: 1,
     justifyContent: "center",

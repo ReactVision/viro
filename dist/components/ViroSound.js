@@ -52,6 +52,8 @@ const react_native_1 = require("react-native");
 // see ViroAssetSource.ts for why, and what it falls back to.
 const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 const SoundModule = react_native_1.NativeModules.VRTSoundModule;
 /**
  * ViroSound is a component that plays a sound file.
@@ -81,6 +83,12 @@ class ViroSound extends React.Component {
         this._component?.setNativeProps(nativeProps);
     };
     render() {
+        // ViroSound's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found".
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroSound", "Apple Vision Pro", "Audio playback is not part of the visionOS renderer.");
+            return null;
+        }
         (0, ViroProps_1.checkMisnamedProps)("ViroSound", this.props);
         var soundSrc = this.props.source;
         if (typeof soundSrc === "number") {

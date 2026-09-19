@@ -47,6 +47,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro3DSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 const Viro3DSceneNavigatorModule = react_native_1.NativeModules.VRT3DSceneNavigatorModule;
 var mathRandomOffset = 0;
 /**
@@ -368,6 +370,17 @@ class Viro3DSceneNavigator extends React.Component {
         viroAppProps: {},
     };
     render() {
+        // Viro3DSceneNavigator's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found". A message rather than
+        // null: this is the root of a screen, and a blank one says nothing about why.
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("Viro3DSceneNavigator", "Apple Vision Pro", "Use ViroXRSceneNavigator: on visionOS the ImmersiveSpace is the presentation path, not an OpenGL view.");
+            return (<react_native_1.View style={styles.viroVisionOSFallback}>
+          <react_native_1.Text style={styles.viroVisionOSFallbackText}>
+            Viro3DSceneNavigator is not supported on Apple Vision Pro.
+          </react_native_1.Text>
+        </react_native_1.View>);
+        }
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("Viro3DSceneNavigator", this.props);
         const items = this._renderSceneStackItems();
@@ -390,6 +403,18 @@ class Viro3DSceneNavigator extends React.Component {
 }
 exports.Viro3DSceneNavigator = Viro3DSceneNavigator;
 var styles = react_native_1.StyleSheet.create({
+    viroVisionOSFallback: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#000",
+        padding: 24,
+    },
+    viroVisionOSFallbackText: {
+        color: "#fff",
+        fontSize: 16,
+        textAlign: "center",
+    },
     container: {
         flex: 1,
         justifyContent: "center",

@@ -47,6 +47,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroVRSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 const ViroSceneNavigatorModule = react_native_1.NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = react_native_1.NativeModules.VRModuleOpenXR;
 var mathRandomOffset = 0;
@@ -372,6 +374,17 @@ class ViroVRSceneNavigator extends React.Component {
         viroAppProps: {},
     };
     render() {
+        // ViroVRSceneNavigator's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found". A message rather than
+        // null: this is the root of a screen, and a blank one says nothing about why.
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroVRSceneNavigator", "Apple Vision Pro", "Use ViroXRSceneNavigator: visionOS is not a phone in a headset and has no stereo view to size.");
+            return (<react_native_1.View style={styles.viroVisionOSFallback}>
+          <react_native_1.Text style={styles.viroVisionOSFallbackText}>
+            ViroVRSceneNavigator is not supported on Apple Vision Pro.
+          </react_native_1.Text>
+        </react_native_1.View>);
+        }
         const items = this._renderSceneStackItems();
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroVRSceneNavigator", this.props)
@@ -393,6 +406,18 @@ class ViroVRSceneNavigator extends React.Component {
 }
 exports.ViroVRSceneNavigator = ViroVRSceneNavigator;
 var styles = react_native_1.StyleSheet.create({
+    viroVisionOSFallback: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#000",
+        padding: 24,
+    },
+    viroVisionOSFallbackText: {
+        color: "#fff",
+        fontSize: 16,
+        textAlign: "center",
+    },
     container: {
         flex: 1,
         justifyContent: "center",

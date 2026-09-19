@@ -44,6 +44,8 @@ exports.ViroMaterialVideo = void 0;
  */
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 class ViroMaterialVideo extends React.Component {
     _component = null;
     componentWillUnmount() {
@@ -80,6 +82,12 @@ class ViroMaterialVideo extends React.Component {
         this._component?.setNativeProps(nativeProps);
     };
     render() {
+        // ViroMaterialVideo's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found".
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroMaterialVideo", "Apple Vision Pro", "Video textures are not part of the visionOS renderer.");
+            return null;
+        }
         // Since materials and transformBehaviors can be either a string or an array, convert the string to a 1-element array.
         //let materials = typeof this.props.materials === 'string' ? new Array(this.props.materials) : this.props.materials;
         let nativeProps = Object.assign({}, this.props);

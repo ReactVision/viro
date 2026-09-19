@@ -52,6 +52,8 @@ const react_native_1 = require("react-native");
 // see ViroAssetSource.ts for why, and what it falls back to.
 const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
 const ViroProps_1 = require("./Utilities/ViroProps");
+const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
 var NativeModules = require("react-native").NativeModules;
 /**
  * Used to render a 360 video on the background sphere.
@@ -78,6 +80,12 @@ class Viro360Video extends React.Component {
         this._component?.setNativeProps(nativeProps);
     };
     render() {
+        // Viro360Video's view manager is excluded from the visionOS renderer, so React has no view
+        // config for it and mounting fails with "View config not found".
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("Viro360Video", "Apple Vision Pro", "Video textures are not part of the visionOS renderer.");
+            return null;
+        }
         (0, ViroProps_1.checkMisnamedProps)("Viro360Video", this.props);
         var vidsrc = (0, ViroAssetSource_1.resolveViroAssetSource)(this.props.source);
         let nativeProps = Object.assign({}, this.props);

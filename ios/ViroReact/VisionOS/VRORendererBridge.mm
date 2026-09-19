@@ -573,6 +573,15 @@ private:
     // VRORenderer keeps its scene controller private, and the bridge is the only thing that ever
     // sets one — so holding our own reference is cheaper than widening the renderer's API.
     std::shared_ptr<VROSceneController>          _activeSceneController;
+    // The scenes React has handed over and not taken back, oldest first, with the last one being
+    // what `_activeSceneController` points at.
+    //
+    // A stack rather than a single slot because several navigators can be mounted at once — a
+    // screen stack keeps the screen underneath alive, and swapping a scene remounts one navigator
+    // while the other is still there. When the one on top goes away, the space should return to
+    // what was under it instead of going empty and staying that way until the app happens to hand
+    // over another scene.
+    std::vector<std::shared_ptr<VROSceneController>> _sceneStack;
     std::shared_ptr<VRONode>                      _cameraNode;
     // VRONode::setEventDelegate stores a weak_ptr, so the scene does not keep the delegate
     // alive. Held here for the lifetime of the bridge; a local would be destroyed as soon as
@@ -1125,6 +1134,7 @@ static std::vector<dispatch_block_t> sRenderThreadQueue;
     if (!_renderer) {
         return;
     }
+    _sceneStack.clear();
     // An empty scene rather than none: VRORenderer always needs something to render, and the
     // point here is only to stop it holding React's nodes.
     auto empty = std::make_shared<VROSceneController>();
@@ -1134,10 +1144,35 @@ static std::vector<dispatch_block_t> sRenderThreadQueue;
 }
 
 - (void)detachNativeSceneControllerIfCurrent:(std::shared_ptr<VROSceneController>)sceneController {
-    if (!sceneController || _activeSceneController != sceneController) {
+    if (!sceneController || !_renderer) {
         return;
     }
-    [self detachNativeSceneController];
+
+    // Out of the stack wherever it sits. A navigator underneath the current one going away is not
+    // a reason to change what is on screen, but its scene must stop being a candidate to come
+    // back to — React is about to destroy the views its nodes are built on.
+    _sceneStack.erase(std::remove(_sceneStack.begin(), _sceneStack.end(), sceneController),
+                      _sceneStack.end());
+
+    if (_activeSceneController != sceneController) {
+        return;
+    }
+
+    if (!_sceneStack.empty()) {
+        // Back to whatever was under it, rather than to an empty room the app has no reason to
+        // think it needs to fill again.
+        auto previous = _sceneStack.back();
+        _renderer->setSceneController(previous, _driver);
+        _activeSceneController = previous;
+        NSLog(@"[Viro] ImmersiveSpace fell back to the scene underneath (%lu still attached)",
+              (unsigned long)_sceneStack.size());
+        return;
+    }
+
+    auto empty = std::make_shared<VROSceneController>();
+    _renderer->setSceneController(empty, _driver);
+    _activeSceneController = empty;
+    NSLog(@"[Viro] React scene detached from the ImmersiveSpace renderer");
 }
 
 - (void)setNativeSceneController:(std::shared_ptr<VROSceneController>)sceneController {
@@ -1146,6 +1181,11 @@ static std::vector<dispatch_block_t> sRenderThreadQueue;
     }
     // No transition duration: this runs when React mounts its scene, and a cross-fade from the
     // placeholder would read as a glitch rather than a transition.
+    // Re-handing the same scene moves it to the top rather than stacking a duplicate.
+    _sceneStack.erase(std::remove(_sceneStack.begin(), _sceneStack.end(), sceneController),
+                      _sceneStack.end());
+    _sceneStack.push_back(sceneController);
+
     _renderer->setSceneController(sceneController, _driver);
     _activeSceneController = sceneController;
 

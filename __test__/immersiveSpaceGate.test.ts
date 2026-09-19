@@ -13,6 +13,7 @@ import {
   markARSceneRoot,
   ownsImmersiveSpace,
   releaseImmersiveSpace,
+  scheduleImmersiveSpaceExit,
   resetImmersiveSpaceOwner,
   sawARSceneRoot,
 } from "../components/VisionOS/ViroImmersiveSpaceGate";
@@ -55,7 +56,11 @@ describe("ImmersiveSpace ownership", () => {
   const first = Symbol("first navigator");
   const second = Symbol("second navigator");
 
-  beforeEach(() => resetImmersiveSpaceOwner());
+  beforeEach(() => {
+    resetImmersiveSpaceOwner();
+    jest.useFakeTimers();
+  });
+  afterEach(() => jest.useRealTimers());
 
   it("gives the space to whoever claimed it", () => {
     claimImmersiveSpace(first);
@@ -69,23 +74,69 @@ describe("ImmersiveSpace ownership", () => {
     expect(ownsImmersiveSpace(second)).toBe(true);
   });
 
-  it("closes the space for the owner on the way out", () => {
+  it("closes the space only when the last navigator is gone", () => {
     claimImmersiveSpace(first);
     expect(releaseImmersiveSpace(first)).toBe(true);
   });
 
-  it("does not close it for a navigator that has since been superseded", () => {
+  it("keeps it open for the navigator still mounted underneath", () => {
     claimImmersiveSpace(first);
     claimImmersiveSpace(second);
-    // The screen underneath unmounts after the one on top opened its own scene. Closing here
-    // would blank what the wearer is looking at.
-    expect(releaseImmersiveSpace(first)).toBe(false);
-    expect(ownsImmersiveSpace(second)).toBe(true);
+    // The one on top unmounts. The wearer should be left with the scene underneath, not an
+    // empty room — which is what closing here would give them.
+    expect(releaseImmersiveSpace(second)).toBe(false);
+    expect(ownsImmersiveSpace(first)).toBe(true);
   });
 
-  it("leaves nobody owning it once the owner is gone, so a stale reopen cannot fire", () => {
+  it("hands ownership back down the stack, so the one underneath can reopen on resume", () => {
+    claimImmersiveSpace(first);
+    claimImmersiveSpace(second);
+    releaseImmersiveSpace(second);
+    expect(ownsImmersiveSpace(first)).toBe(true);
+  });
+
+  it("ignores a release from a navigator that never had it", () => {
+    claimImmersiveSpace(first);
+    expect(releaseImmersiveSpace(second)).toBe(false);
+    expect(ownsImmersiveSpace(first)).toBe(true);
+  });
+});
+
+/**
+ * Swapping the scene on a screen unmounts one navigator and mounts the next in the same commit,
+ * cleanup first. A close that fires between the two blinks the space, or lands after the reopen
+ * and leaves it shut with nothing left to reopen it.
+ */
+describe("closing the ImmersiveSpace", () => {
+  const first = Symbol("first navigator");
+  const second = Symbol("second navigator");
+
+  beforeEach(() => {
+    resetImmersiveSpaceOwner();
+    jest.useFakeTimers();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it("closes when nothing claimed it in the meantime", () => {
+    const exit = jest.fn();
     claimImmersiveSpace(first);
     releaseImmersiveSpace(first);
-    expect(ownsImmersiveSpace(first)).toBe(false);
+    scheduleImmersiveSpaceExit(exit);
+    expect(exit).not.toHaveBeenCalled(); // not before the next navigator had its chance
+    jest.runAllTimers();
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not close when the next navigator claimed it first", () => {
+    const exit = jest.fn();
+    claimImmersiveSpace(first);
+    releaseImmersiveSpace(first);
+    scheduleImmersiveSpaceExit(exit);
+
+    // The replacement mounts, as it does on a keyed swap or a screen change.
+    claimImmersiveSpace(second);
+    jest.runAllTimers();
+    expect(exit).not.toHaveBeenCalled();
+    expect(ownsImmersiveSpace(second)).toBe(true);
   });
 });

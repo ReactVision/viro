@@ -15,6 +15,7 @@ import {
   claimImmersiveSpace,
   ownsImmersiveSpace,
   releaseImmersiveSpace,
+  scheduleImmersiveSpaceExit,
   sawARSceneRoot,
 } from "./VisionOS/ViroImmersiveSpaceGate";
 import {
@@ -321,7 +322,9 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
         // Not on the way out of a screen that no longer owns the space: another navigator has
         // taken it over, and closing it would blank what the wearer is actually looking at.
         if (releaseImmersiveSpace(owner)) {
-          exitImmersiveSpace();
+          scheduleImmersiveSpaceExit(() => {
+            exitImmersiveSpace();
+          });
         }
       };
     }, []);

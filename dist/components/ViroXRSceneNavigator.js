@@ -225,7 +225,9 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
             // Not on the way out of a screen that no longer owns the space: another navigator has
             // taken it over, and closing it would blank what the wearer is actually looking at.
             if ((0, ViroImmersiveSpaceGate_1.releaseImmersiveSpace)(owner)) {
-                (0, ViroVisionOSModule_1.exitImmersiveSpace)();
+                (0, ViroImmersiveSpaceGate_1.scheduleImmersiveSpaceExit)(() => {
+                    (0, ViroVisionOSModule_1.exitImmersiveSpace)();
+                });
             }
         };
     }, []);

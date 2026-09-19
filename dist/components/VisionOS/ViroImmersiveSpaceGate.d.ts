@@ -21,17 +21,32 @@ export declare function beginSceneRootScan(): void;
 export declare function markARSceneRoot(): void;
 /** Called by the navigator in its mount effect, after the children have rendered. */
 export declare function sawARSceneRoot(): boolean;
-/** Takes the space over. The previous owner stops being able to close it. */
+/**
+ * Takes the space over.
+ *
+ * Also cancels an exit another navigator scheduled on its way out. Swapping the scene on a screen
+ * unmounts one navigator and mounts the next in the same commit, cleanup first, so the close is
+ * always scheduled before the claim that makes it wrong.
+ */
 export declare function claimImmersiveSpace(candidate: symbol): void;
 /** Whether this navigator is the one currently driving the space. */
 export declare function ownsImmersiveSpace(candidate: symbol): boolean;
 /**
  * Gives the space up.
  *
- * @returns true when the caller was the owner and the space should now be closed. False when
- *          another navigator has since taken over, which is when closing it would blank the
- *          screen the wearer is actually looking at.
+ * @returns true only when no navigator is left to drive it. A screen stack keeps the screen
+ *          underneath mounted, so the one going away is usually not the last: closing then would
+ *          leave the wearer in an empty room while a perfectly good scene is still attached, and
+ *          the renderer falls back to it on its own.
  */
 export declare function releaseImmersiveSpace(candidate: symbol): boolean;
-/** Test seam: forgets the current owner. */
+/**
+ * Closes the space, but not before the next navigator has had its chance to claim it.
+ *
+ * Immediately is too early: React tears the old screen down before it builds the new one, so an
+ * unconditional close reads as a blink at best, and at worst lands after the reopen and leaves the
+ * space shut with nothing to reopen it.
+ */
+export declare function scheduleImmersiveSpaceExit(exit: () => void): void;
+/** Test seam: forgets the owners and any pending exit. */
 export declare function resetImmersiveSpaceOwner(): void;

@@ -43,32 +43,66 @@ export function sawARSceneRoot(): boolean {
  * on the way out.
  */
 
-let owner: symbol | null = null;
+const owners: symbol[] = [];
+let pendingExit: ReturnType<typeof setTimeout> | null = null;
 
-/** Takes the space over. The previous owner stops being able to close it. */
+/**
+ * Takes the space over.
+ *
+ * Also cancels an exit another navigator scheduled on its way out. Swapping the scene on a screen
+ * unmounts one navigator and mounts the next in the same commit, cleanup first, so the close is
+ * always scheduled before the claim that makes it wrong.
+ */
 export function claimImmersiveSpace(candidate: symbol): void {
-  owner = candidate;
+  if (pendingExit !== null) {
+    clearTimeout(pendingExit);
+    pendingExit = null;
+  }
+  const existing = owners.indexOf(candidate);
+  if (existing !== -1) owners.splice(existing, 1);
+  owners.push(candidate);
 }
 
 /** Whether this navigator is the one currently driving the space. */
 export function ownsImmersiveSpace(candidate: symbol): boolean {
-  return owner === candidate;
+  return owners.length > 0 && owners[owners.length - 1] === candidate;
 }
 
 /**
  * Gives the space up.
  *
- * @returns true when the caller was the owner and the space should now be closed. False when
- *          another navigator has since taken over, which is when closing it would blank the
- *          screen the wearer is actually looking at.
+ * @returns true only when no navigator is left to drive it. A screen stack keeps the screen
+ *          underneath mounted, so the one going away is usually not the last: closing then would
+ *          leave the wearer in an empty room while a perfectly good scene is still attached, and
+ *          the renderer falls back to it on its own.
  */
 export function releaseImmersiveSpace(candidate: symbol): boolean {
-  if (owner !== candidate) return false;
-  owner = null;
-  return true;
+  const at = owners.indexOf(candidate);
+  if (at === -1) return false;
+  owners.splice(at, 1);
+  return owners.length === 0;
 }
 
-/** Test seam: forgets the current owner. */
+/**
+ * Closes the space, but not before the next navigator has had its chance to claim it.
+ *
+ * Immediately is too early: React tears the old screen down before it builds the new one, so an
+ * unconditional close reads as a blink at best, and at worst lands after the reopen and leaves the
+ * space shut with nothing to reopen it.
+ */
+export function scheduleImmersiveSpaceExit(exit: () => void): void {
+  if (pendingExit !== null) clearTimeout(pendingExit);
+  pendingExit = setTimeout(() => {
+    pendingExit = null;
+    if (owners.length === 0) exit();
+  }, 0);
+}
+
+/** Test seam: forgets the owners and any pending exit. */
 export function resetImmersiveSpaceOwner(): void {
-  owner = null;
+  owners.length = 0;
+  if (pendingExit !== null) {
+    clearTimeout(pendingExit);
+    pendingExit = null;
+  }
 }

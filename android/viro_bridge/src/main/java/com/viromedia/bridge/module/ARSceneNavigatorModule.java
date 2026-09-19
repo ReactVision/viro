@@ -1983,6 +1983,27 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         rvResolveScanJson(sceneNavTag, true, promise);
     }
 
+    /** Whether a world mesh exists and how big it is. Poll it: the update event never fires. */
+    @ReactMethod
+    public void rvGetWorldMeshStats(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve("{\"available\":false,\"reason\":\"UIManager not available\"}"); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve("{\"available\":false,\"reason\":\"AR navigator is not mounted yet\"}");
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvGetWorldMeshStatsJson(json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve("{\"available\":false,\"reason\":\"" + String.valueOf(e.getMessage()) + "\"}");
+                }
+            }
+        });
+    }
+
     private void rvResolveScanJson(final int sceneNavTag, final boolean diagnostics,
                                    final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);

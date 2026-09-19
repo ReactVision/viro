@@ -25,10 +25,12 @@
  *   cd visionos && pod install
  *   Open visionos/{AppName}.xcworkspace in Xcode → build for xros Simulator
  *
- * Manual step (one-time, before prebuild):
+ * Manual step (one-time, before prebuild). The template is a whole React Native project whose
+ * visionOS folder is one directory inside it, so it is generated aside and that folder lifted out:
  *   npx @react-native-community/cli@latest init MyApp \
  *     --template github:ReactVision/visionos-template \
- *     --directory visionos --skip-install
+ *     --directory .visionos-template --skip-install
+ *   mv .visionos-template/visionos ./visionos && rm -rf .visionos-template
  */
 
 import {
@@ -74,6 +76,28 @@ function isPkgInstalled(projectRoot: string, pkg: string): boolean {
   }
 }
 
+// The fork can be installed under its own name, or aliased as `react-native` — an app that builds
+// iOS and Android from the same package installs it that way, so there is one copy of React Native
+// and one set of pods instead of two that collide. Everything that points at the fork by path has
+// to follow whichever name it actually arrived under.
+function resolveRNVisionSpecifier(projectRoot: string): string {
+  for (const name of [RNVISION_PKG, "react-native"]) {
+    const pkgJsonPath = path.join(
+      projectRoot,
+      "node_modules",
+      ...name.split("/"),
+      "package.json"
+    );
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+      if (pkgJson.name === RNVISION_PKG) return name;
+    } catch {
+      // not installed under this name
+    }
+  }
+  return RNVISION_PKG;
+}
+
 // ─── 1. Verify visionos/ folder exists ───────────────────────────────────────
 
 const withVisionOSSetup: ConfigPlugin = (config) =>
@@ -83,8 +107,10 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
       const projectRoot = newConfig.modRequest.projectRoot;
       const visionosDir = path.join(projectRoot, "visionos");
 
-      // Warn if missing deps
+      // Warn if missing deps. The fork counts as installed under either name.
+      const rnVisionSpecifier = resolveRNVisionSpecifier(projectRoot);
       for (const pkg of [RNVISION_PKG, RNVISION_PLATFORMS_PKG, RN_COMMUNITY_CLI_PKG]) {
+        if (pkg === RNVISION_PKG && rnVisionSpecifier !== RNVISION_PKG) continue;
         if (!isPkgInstalled(projectRoot, pkg)) {
           WarningAggregator.addWarningIOS(
             "withViroVisionOS",
@@ -101,7 +127,10 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
           `visionos/ folder not found. Create it once before running expo prebuild:\n\n` +
             `  npx @react-native-community/cli@latest init "${appName}" \\\n` +
             `    --template github:ReactVision/visionos-template \\\n` +
-            `    --directory visionos --skip-install\n\n` +
+            `    --directory .visionos-template --skip-install\n` +
+            `  mv .visionos-template/visionos ./visionos && rm -rf .visionos-template\n\n` +
+            `The template is a whole React Native project — only its visionos/ folder belongs in ` +
+            `an Expo app, the rest would collide with what prebuild generates.\n\n` +
             `Then re-run: expo prebuild`
         );
       }
@@ -112,7 +141,7 @@ const withVisionOSSetup: ConfigPlugin = (config) =>
 
 // ─── 2. metro.config.js — visionOS platform resolver ─────────────────────────
 
-const METRO_PATCH = `
+const metroPatch = (rnVisionSpecifier: string) => `
 ${METRO_MARKER} — visionOS platform resolver
 
 // Viro loads these through \`require()\`, and Metro treats anything not in assetExts as source.
@@ -135,7 +164,7 @@ for (const ext of VIRO_ASSET_EXTS) {
 const path = require('path');
 const { getPlatformResolver } = require('${RNVISION_PLATFORMS_PKG}');
 const viroPlatformResolver = getPlatformResolver({
-  platformNameMap: { visionos: '${RNVISION_PKG}' },
+  platformNameMap: { visionos: '${rnVisionSpecifier}' },
 });
 
 // Device builds run their own Metro from the Xcode build phase, which reads this file and
@@ -174,7 +203,7 @@ const withVisionOSMetroConfig: ConfigPlugin = (config) =>
 
       metro = metro.replace(
         "module.exports = config;",
-        METRO_PATCH + "\nmodule.exports = config;"
+        metroPatch(resolveRNVisionSpecifier(projectRoot)) + "\nmodule.exports = config;"
       );
 
       fs.writeFileSync(metroPath, metro, "utf-8");
@@ -302,16 +331,28 @@ const withVisionOSPodfile: ConfigPlugin = (config) =>
       // with "Cannot find module '<other-scope>/react-native-visionos/scripts/react_native_pods.rb'"
       // before a single pod is written — a confusing first failure, and one no amount of
       // reactNativePath configuration fixes, because it happens while the Podfile is being read.
+      const rnVisionSpecifier = resolveRNVisionSpecifier(projectRoot);
       podfile = podfile.replace(
         /"@[a-z0-9-]+\/react-native-visionos\/scripts\/react_native_pods\.rb"/g,
-        `"${RNVISION_PKG}/scripts/react_native_pods.rb"`
+        `"${rnVisionSpecifier}/scripts/react_native_pods.rb"`
       );
 
-      // ── 3b. Ensure config[:reactNativePath] is set correctly ──
-      if (!podfile.includes("config[:reactNativePath]")) {
+      // ── 3b. Point config[:reactNativePath] at where the fork actually is ──
+      //
+      // Rewritten rather than only added when absent: the template ships the line already, spelled
+      // with the package's own name. An app that installs the fork under the `react-native` alias
+      // has no such directory, and CocoaPods then reads a Podfile that autolinks against a path
+      // that is not there.
+      const reactNativePathLine = `config[:reactNativePath] = '../node_modules/${rnVisionSpecifier}'`;
+      if (podfile.includes("config[:reactNativePath]")) {
+        podfile = podfile.replace(
+          /config\[:reactNativePath\] = '[^']*'/g,
+          reactNativePathLine
+        );
+      } else {
         podfile = podfile.replace(
           /(config = use_native_modules!\n)/,
-          `$1  config[:reactNativePath] = '../node_modules/${RNVISION_PKG}'\n`
+          `$1  ${reactNativePathLine}\n`
         );
       }
 
@@ -741,7 +782,10 @@ const withVisionOSBundlePhase: ConfigPlugin = (config) =>
       //
       // The pattern matches this package's own scope too, where the replacement is a no-op.
       const stalePackagePath = /@[a-z0-9-]+\/react-native-visionos\//g;
-      const repointed = pbx.replace(stalePackagePath, `${RNVISION_PKG}/`);
+      const repointed = pbx.replace(
+        stalePackagePath,
+        `${resolveRNVisionSpecifier(projectRoot)}/`
+      );
       if (repointed !== pbx) {
         pbx = repointed;
         fs.writeFileSync(pbxPath, pbx, "utf-8");

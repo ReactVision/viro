@@ -25,10 +25,12 @@
  *   cd visionos && pod install
  *   Open visionos/{AppName}.xcworkspace in Xcode → build for xros Simulator
  *
- * Manual step (one-time, before prebuild):
+ * Manual step (one-time, before prebuild). The template is a whole React Native project whose
+ * visionOS folder is one directory inside it, so it is generated aside and that folder lifted out:
  *   npx @react-native-community/cli@latest init MyApp \
  *     --template github:ReactVision/visionos-template \
- *     --directory visionos --skip-install
+ *     --directory .visionos-template --skip-install
+ *   mv .visionos-template/visionos ./visionos && rm -rf .visionos-template
  */
 import { ConfigPlugin } from "@expo/config-plugins";
 export declare const withViroVisionOS: ConfigPlugin;

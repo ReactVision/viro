@@ -175,15 +175,22 @@ const viroPlatformResolver = viroGetPlatformResolver({
 // nothing else — tsconfig \`paths\` are applied by the Expo dev server, not by that instance.
 // A project using the \`@/\` alias therefore builds in the Simulator and fails on device with
 // "Unable to resolve module @/...". Resolving it here covers both.
+// The rewrite is a fallback, not the first thing tried. Resolving \`@/x\` to an absolute path
+// takes it out of Metro's ordinary path and an asset reached that way loses the treatment that
+// gives it a server location — fonts arrive as bytes CoreText rejects ("CTFontManagerError 104")
+// and images as an empty \`source.uri\`. Where the alias already resolves, which is everywhere the
+// Expo dev server applies tsconfig paths, nothing is rewritten at all.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName.startsWith('@/')) {
+  try {
+    return viroPlatformResolver(context, moduleName, platform);
+  } catch (error) {
+    if (!moduleName.startsWith('@/')) throw error;
     return viroPlatformResolver(
       context,
       viroNodePath.resolve(__dirname, moduleName.slice(2)),
       platform
     );
   }
-  return viroPlatformResolver(context, moduleName, platform);
 };
 `;
 

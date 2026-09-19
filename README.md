@@ -128,16 +128,14 @@ Full walkthrough — including Studio setup, exporting a scene, and wiring `Stud
 - Full API reference and guides: <https://viro-community.readme.io/docs/overview>
 - Getting started tutorial: <https://updates.reactvision.xyz/get-started-with-the-viroreact-and-expo-starter-kit-a9ca88803e5a>
 
-Per-feature guides live in [`docs/`](./docs):
+Guides that ship in this repository:
 
-| Guide | Covers |
-|---|---|
-| [VPS](./docs/VPS_LITE.md) | Scan a room into its own persistent frame, localise back into it, attach a world mesh |
-| [Co-location](./CO_LOCATION.md) | Two devices agreeing on one coordinate frame, with replicated state on top |
-| [visionOS](./docs/VISIONOS_SETUP.md) · [Quest](./docs/QUEST_SETUP.md) | Headset setup, end to end |
-| [Web](./docs/web) | Running Viro in the browser — usage, integration, internals |
-| [Platform extensions](./docs/PLATFORM_EXTENSIONS.md) | Game loop, joystick, streaming audio, world mesh, depth, front camera |
-| [Shaders](./docs/SHADER_REFERENCE.md) · [Object detection](./docs/ViroObjectDetector.md) · [Camera texture](./docs/ViroCameraTexture.md) · [Session recording](./docs/AR_SESSION_RECORDING.md) | Individual subsystems |
+- [`CO_LOCATION.md`](./CO_LOCATION.md) — two devices agreeing on one coordinate frame, with replicated room state on top
+- [`WEB.md`](./WEB.md) — running Viro in the browser
+- [`CHANGELOG.md`](./CHANGELOG.md) — what changed, by release
+
+Feature guides for VPS, visionOS, Quest, the web renderer, platform extensions, shaders, object
+detection, camera texture and session recording are on the documentation site above.
 
 ## Community
 

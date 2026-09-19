@@ -10,6 +10,7 @@
  * place, where the failure modes can be tested.
  */
 import type { ViroFinishScanResult, ViroScanDiagnostics, ViroScanStatus } from "../Types/ViroEvents";
+import type { ViroWorldMeshStatsResult } from "../Types/ViroWorldMesh";
 /**
  * @param json what the native module resolved with
  * @returns the status, or an unavailable one carrying the reason — never a throw. A status poll
@@ -40,3 +41,14 @@ export declare function withScanDiagnostics(result: ViroFinishScanResult, diagno
  * to catch "nothing", "undefined" and a truncated value, which is what actually happens.
  */
 export declare function isLocationTransform(value: unknown): value is string;
+/**
+ * Mesh stats, from either bridge.
+ *
+ * The two platforms disagree on the wire: Android answers with a JSON string, because the value
+ * crosses JNI as one, while iOS resolves a dictionary straight from the C++ struct. Neither is
+ * worth a native round trip to align, so the difference is absorbed here — the one place that
+ * already exists for turning what native says into what the app sees.
+ *
+ * Never throws, on the same reasoning as {@link parseScanStatus}: this is polled on a timer.
+ */
+export declare function parseWorldMeshStats(raw: string | Record<string, unknown> | null | undefined): ViroWorldMeshStatsResult;

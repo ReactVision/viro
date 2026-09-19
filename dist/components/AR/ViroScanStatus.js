@@ -15,6 +15,7 @@ exports.parseScanStatus = parseScanStatus;
 exports.parseScanDiagnostics = parseScanDiagnostics;
 exports.withScanDiagnostics = withScanDiagnostics;
 exports.isLocationTransform = isLocationTransform;
+exports.parseWorldMeshStats = parseWorldMeshStats;
 /**
  * @param json what the native module resolved with
  * @returns the status, or an unavailable one carrying the reason — never a throw. A status poll
@@ -88,4 +89,35 @@ function isLocationTransform(value) {
         const n = Number(p);
         return p.trim().length > 0 && Number.isFinite(n);
     });
+}
+/**
+ * Mesh stats, from either bridge.
+ *
+ * The two platforms disagree on the wire: Android answers with a JSON string, because the value
+ * crosses JNI as one, while iOS resolves a dictionary straight from the C++ struct. Neither is
+ * worth a native round trip to align, so the difference is absorbed here — the one place that
+ * already exists for turning what native says into what the app sees.
+ *
+ * Never throws, on the same reasoning as {@link parseScanStatus}: this is polled on a timer.
+ */
+function parseWorldMeshStats(raw) {
+    if (raw == null) {
+        return { available: false, reason: "No response from the renderer" };
+    }
+    if (typeof raw === "object") {
+        return raw;
+    }
+    if (typeof raw !== "string" || raw.length === 0) {
+        return { available: false, reason: "No response from the renderer" };
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (parsed == null || typeof parsed !== "object") {
+            return { available: false, reason: "Malformed world mesh stats" };
+        }
+        return parsed;
+    }
+    catch {
+        return { available: false, reason: "Malformed world mesh stats" };
+    }
 }

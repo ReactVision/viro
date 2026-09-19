@@ -594,6 +594,22 @@ class ViroARSceneNavigator extends React.Component {
             return { available: false, error: String(error) };
         }
     };
+    /**
+     * Whether a world mesh exists and how big it is.
+     *
+     * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
+     * {@link ViroWorldMeshStatsResult}. `snapshotWorldMeshToFile()` needs a non-zero `vertexCount`,
+     * the mesh takes a few seconds of looking around to accumulate after `worldMeshEnabled` goes
+     * true, so this is how a caller knows when the snapshot is worth attempting.
+     */
+    _getWorldMeshStats = async () => {
+        try {
+            return (0, ViroScanStatus_1.parseWorldMeshStats)(await ViroARSceneNavigatorModule.rvGetWorldMeshStats((0, react_native_1.findNodeHandle)(this)));
+        }
+        catch (error) {
+            return { available: false, reason: String(error) };
+        }
+    };
     /** The measurements behind the last scan-based host, pass or fail. */
     _getScanDiagnostics = async () => {
         try {
@@ -1060,6 +1076,7 @@ class ViroARSceneNavigator extends React.Component {
         startScan: this._startScan,
         finishScan: this._finishScan,
         getScanStatus: this._getScanStatus,
+        getWorldMeshStats: this._getWorldMeshStats,
         getScanDiagnostics: this._getScanDiagnostics,
         rvCreateSharedFrame: this._rvCreateSharedFrame,
         rvJoinSharedFrame: this._rvJoinSharedFrame,
@@ -1134,6 +1151,7 @@ class ViroARSceneNavigator extends React.Component {
         startScan: this._startScan,
         finishScan: this._finishScan,
         getScanStatus: this._getScanStatus,
+        getWorldMeshStats: this._getWorldMeshStats,
         getScanDiagnostics: this._getScanDiagnostics,
         rvCreateSharedFrame: this._rvCreateSharedFrame,
         rvJoinSharedFrame: this._rvJoinSharedFrame,

@@ -13,7 +13,7 @@ import * as React from "react";
 import { ViewProps } from "react-native";
 import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroCloudAnchorStatus, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroScanDiagnostics, ViroScanStatus, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
-import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
+import { ViroWorldMeshConfig, ViroWorldMeshStats, ViroWorldMeshStatsResult } from "../Types/ViroWorldMesh";
 /**
  * Occlusion mode determines how virtual content is occluded by real-world objects.
  */
@@ -481,6 +481,15 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      * buffer's camera poses and triangulates nothing.
      */
     _getScanStatus: () => Promise<ViroScanStatus>;
+    /**
+     * Whether a world mesh exists and how big it is.
+     *
+     * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
+     * {@link ViroWorldMeshStatsResult}. `snapshotWorldMeshToFile()` needs a non-zero `vertexCount`,
+     * the mesh takes a few seconds of looking around to accumulate after `worldMeshEnabled` goes
+     * true, so this is how a caller knows when the snapshot is worth attempting.
+     */
+    _getWorldMeshStats: () => Promise<ViroWorldMeshStatsResult>;
     /** The measurements behind the last scan-based host, pass or fail. */
     _getScanDiagnostics: () => Promise<ViroScanDiagnostics>;
     /**
@@ -756,6 +765,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
         getScanStatus: () => Promise<ViroScanStatus>;
+        getWorldMeshStats: () => Promise<ViroWorldMeshStatsResult>;
         getScanDiagnostics: () => Promise<ViroScanDiagnostics>;
         rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
@@ -823,6 +833,7 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
         getScanStatus: () => Promise<ViroScanStatus>;
+        getWorldMeshStats: () => Promise<ViroWorldMeshStatsResult>;
         getScanDiagnostics: () => Promise<ViroScanDiagnostics>;
         rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;

@@ -21,3 +21,17 @@ export declare function beginSceneRootScan(): void;
 export declare function markARSceneRoot(): void;
 /** Called by the navigator in its mount effect, after the children have rendered. */
 export declare function sawARSceneRoot(): boolean;
+/** Takes the space over. The previous owner stops being able to close it. */
+export declare function claimImmersiveSpace(candidate: symbol): void;
+/** Whether this navigator is the one currently driving the space. */
+export declare function ownsImmersiveSpace(candidate: symbol): boolean;
+/**
+ * Gives the space up.
+ *
+ * @returns true when the caller was the owner and the space should now be closed. False when
+ *          another navigator has since taken over, which is when closing it would blank the
+ *          screen the wearer is actually looking at.
+ */
+export declare function releaseImmersiveSpace(candidate: symbol): boolean;
+/** Test seam: forgets the current owner. */
+export declare function resetImmersiveSpaceOwner(): void;

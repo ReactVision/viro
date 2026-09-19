@@ -32,3 +32,43 @@ export function markARSceneRoot(): void {
 export function sawARSceneRoot(): boolean {
   return sawARRoot;
 }
+
+/**
+ * ── Ownership ────────────────────────────────────────────────────────────────
+ *
+ * The ImmersiveSpace is one surface for the whole app, the way VRActivity is on Quest, and Quest
+ * tracks that with a single `setVRActive` / `isVRActive` flag. This is the same idea: several
+ * navigators can be mounted at once — a screen stack keeps the one underneath alive — and only
+ * the last to claim it is driving the space. One that is not must neither reopen it nor close it
+ * on the way out.
+ */
+
+let owner: symbol | null = null;
+
+/** Takes the space over. The previous owner stops being able to close it. */
+export function claimImmersiveSpace(candidate: symbol): void {
+  owner = candidate;
+}
+
+/** Whether this navigator is the one currently driving the space. */
+export function ownsImmersiveSpace(candidate: symbol): boolean {
+  return owner === candidate;
+}
+
+/**
+ * Gives the space up.
+ *
+ * @returns true when the caller was the owner and the space should now be closed. False when
+ *          another navigator has since taken over, which is when closing it would blank the
+ *          screen the wearer is actually looking at.
+ */
+export function releaseImmersiveSpace(candidate: symbol): boolean {
+  if (owner !== candidate) return false;
+  owner = null;
+  return true;
+}
+
+/** Test seam: forgets the current owner. */
+export function resetImmersiveSpaceOwner(): void {
+  owner = null;
+}

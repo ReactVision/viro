@@ -12,6 +12,9 @@ import { ViroSceneNavigator } from "./ViroSceneNavigator";
 import { isQuest, isVisionOS } from "./Utilities/ViroPlatform";
 import {
   beginSceneRootScan,
+  claimImmersiveSpace,
+  ownsImmersiveSpace,
+  releaseImmersiveSpace,
   sawARSceneRoot,
 } from "./VisionOS/ViroImmersiveSpaceGate";
 import {
@@ -253,6 +256,9 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
 
     // Track AppState so we can detect background → active transitions.
     const appStateRef = React.useRef(AppState.currentState);
+    // Identity of this navigator for ImmersiveSpace ownership. A symbol rather than a
+    // counter: it cannot collide, and it means nothing outside this comparison.
+    const visionOSOwnerRef = React.useRef<symbol>(Symbol("ViroXRSceneNavigator"));
     // Timestamp at which AppState last left "active". Lets us distinguish a
     // genuine Quest-menu return (background lasts seconds) from racy
     // background→active bounces caused by the dual-Activity ReactHost
@@ -280,19 +286,43 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
         );
         return;
       }
+      // Ownership, as on Quest. There VRActivity is the single display and `setVRActive` names
+      // who has it; here the ImmersiveSpace is, and this is the same flag. The last navigator to
+      // claim it is the one driving it, and only that one may close it again.
+      const owner = visionOSOwnerRef.current;
+      claimImmersiveSpace(owner);
+
       let cancelled = false;
-      enterImmersiveSpace(visionOSImmersionStyle).then((opened) => {
-        if (!opened && !cancelled) {
-          console.warn(
-            "[Viro] Could not open the visionOS ImmersiveSpace. Check that the host app's " +
-              "SwiftUI App declares `ImmersiveSpace(id: ViroImmersiveSpace.id)` and applies " +
-              "`.viroImmersiveSpaceController()` to the React Native root view."
-          );
+      const open = () =>
+        enterImmersiveSpace(visionOSImmersionStyle).then((opened) => {
+          if (!opened && !cancelled) {
+            console.warn(
+              "[Viro] Could not open the visionOS ImmersiveSpace. Check that the host app's " +
+                "SwiftUI App declares `ImmersiveSpace(id: ViroImmersiveSpace.id)` and applies " +
+                "`.viroImmersiveSpaceController()` to the React Native root view."
+            );
+          }
+        });
+      open();
+
+      // Quest re-launches VRActivity when the app comes back from the system menu, because the
+      // Activity finishes on the way out. visionOS closes the ImmersiveSpace on the same
+      // transition, so it is reopened for the same reason — and only by whoever owns it, or two
+      // mounted navigators would both reopen and fight over the one surface.
+      const appStateSub = AppState.addEventListener("change", (nextState) => {
+        if (nextState === "active" && ownsImmersiveSpace(owner)) {
+          open();
         }
       });
+
       return () => {
         cancelled = true;
-        exitImmersiveSpace();
+        appStateSub.remove();
+        // Not on the way out of a screen that no longer owns the space: another navigator has
+        // taken it over, and closing it would blank what the wearer is actually looking at.
+        if (releaseImmersiveSpace(owner)) {
+          exitImmersiveSpace();
+        }
       };
     }, []);
 

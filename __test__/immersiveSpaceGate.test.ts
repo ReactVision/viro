@@ -9,7 +9,11 @@
  */
 import {
   beginSceneRootScan,
+  claimImmersiveSpace,
   markARSceneRoot,
+  ownsImmersiveSpace,
+  releaseImmersiveSpace,
+  resetImmersiveSpaceOwner,
   sawARSceneRoot,
 } from "../components/VisionOS/ViroImmersiveSpaceGate";
 
@@ -39,5 +43,49 @@ describe("the ImmersiveSpace gate", () => {
     markARSceneRoot();
     markARSceneRoot();
     expect(sawARSceneRoot()).toBe(true);
+  });
+});
+
+/**
+ * Ownership of the one ImmersiveSpace, which is the same single-display problem Quest solves with
+ * `setVRActive` / `isVRActive`. A screen stack keeps the screen underneath mounted, so two
+ * navigators are alive at once and only one is driving the space.
+ */
+describe("ImmersiveSpace ownership", () => {
+  const first = Symbol("first navigator");
+  const second = Symbol("second navigator");
+
+  beforeEach(() => resetImmersiveSpaceOwner());
+
+  it("gives the space to whoever claimed it", () => {
+    claimImmersiveSpace(first);
+    expect(ownsImmersiveSpace(first)).toBe(true);
+  });
+
+  it("hands it to the navigator that claims it next", () => {
+    claimImmersiveSpace(first);
+    claimImmersiveSpace(second);
+    expect(ownsImmersiveSpace(first)).toBe(false);
+    expect(ownsImmersiveSpace(second)).toBe(true);
+  });
+
+  it("closes the space for the owner on the way out", () => {
+    claimImmersiveSpace(first);
+    expect(releaseImmersiveSpace(first)).toBe(true);
+  });
+
+  it("does not close it for a navigator that has since been superseded", () => {
+    claimImmersiveSpace(first);
+    claimImmersiveSpace(second);
+    // The screen underneath unmounts after the one on top opened its own scene. Closing here
+    // would blank what the wearer is looking at.
+    expect(releaseImmersiveSpace(first)).toBe(false);
+    expect(ownsImmersiveSpace(second)).toBe(true);
+  });
+
+  it("leaves nobody owning it once the owner is gone, so a stale reopen cannot fire", () => {
+    claimImmersiveSpace(first);
+    releaseImmersiveSpace(first);
+    expect(ownsImmersiveSpace(first)).toBe(false);
   });
 });

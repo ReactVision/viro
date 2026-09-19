@@ -1251,11 +1251,33 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
      * {@link ARScene.RvFinishScanCallback} returned.
      */
     public String rvSnapshotWorldMeshToFile(String locationTransformCsv) {
+        return rvSnapshotWorldMeshToFile(locationTransformCsv, null);
+    }
+
+    /**
+     * Same, but says which precondition failed.
+     *
+     * Every path used to answer `null`, which the module turned into "No world mesh available to
+     * snapshot" whichever it was — and "there is no AR scene" and "the mesh has no geometry yet"
+     * ask the caller for opposite things.
+     *
+     * @param outError a one-element array the reason is written into, or null if not wanted
+     */
+    public String rvSnapshotWorldMeshToFile(String locationTransformCsv, String[] outError) {
         ARScene arScene = getCurrentARScene();
-        if (arScene == null) return null;
+        if (arScene == null) {
+            if (outError != null) outError[0] = "No AR scene is mounted";
+            return null;
+        }
 
         byte[] bytes = arScene.rvSnapshotWorldMesh(locationTransformCsv);
-        if (bytes == null || bytes.length == 0) return null;
+        if (bytes == null || bytes.length == 0) {
+            if (outError != null) {
+                outError[0] = "The world mesh is still empty - this device needs depth support, "
+                        + "and the mesh takes a few seconds of looking around to accumulate";
+            }
+            return null;
+        }
 
         try {
             java.io.File outFile = new java.io.File(getContext().getCacheDir(),
@@ -1266,6 +1288,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return outFile.getAbsolutePath();
         } catch (java.io.IOException e) {
             Log.w(TAG, "rvSnapshotWorldMeshToFile: failed to write cache file", e);
+            if (outError != null) outError[0] = "Could not write the mesh to the cache directory";
             return null;
         }
     }

@@ -2012,14 +2012,16 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 try {
                     View view = viewResolver.resolveView(sceneNavTag);
                     if (!(view instanceof VRTARSceneNavigator)) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", "Invalid view type"); promise.resolve(r); return; }
-                    String filePath = ((VRTARSceneNavigator) view).rvSnapshotWorldMeshToFile(locationTransform);
+                    String[] reason = new String[1];
+                    String filePath = ((VRTARSceneNavigator) view).rvSnapshotWorldMeshToFile(locationTransform, reason);
                     WritableMap r = Arguments.createMap();
                     if (filePath != null) {
                         r.putBoolean("success", true);
                         r.putString("filePath", filePath);
                     } else {
                         r.putBoolean("success", false);
-                        r.putString("error", "No world mesh available to snapshot");
+                        r.putString("error", reason[0] != null ? reason[0]
+                                : "No world mesh available to snapshot");
                     }
                     promise.resolve(r);
                 } catch (Exception e) { WritableMap r = Arguments.createMap(); r.putBoolean("success", false); r.putString("error", e.getMessage()); promise.resolve(r); }

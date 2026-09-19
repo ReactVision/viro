@@ -27,3 +27,16 @@ export declare function parseScanDiagnostics(json: string | null | undefined): V
  * it would dress up an absence as a measurement.
  */
 export declare function withScanDiagnostics(result: ViroFinishScanResult, diagnostics: ViroScanDiagnostics): ViroFinishScanResult;
+/**
+ * Whether a string is a location transform this API produced, rather than an empty placeholder.
+ *
+ * `snapshotWorldMeshToFile` and `loadWorldMeshFromFile` both take one, and both are meaningless
+ * without it: the mesh has to be written in the same frame the scan was hosted in, or it lands
+ * somewhere arbitrary on the device that loads it. Calling them before `finishScan()` has
+ * returned one used to reach native with an empty string and fail there, or worse, not fail.
+ *
+ * The check is deliberately shallow — 16 comma-separated finite numbers, the shape
+ * `VROMatrix4f::getArray()` produces. It is not a validity test for the matrix itself; it exists
+ * to catch "nothing", "undefined" and a truncated value, which is what actually happens.
+ */
+export declare function isLocationTransform(value: unknown): value is string;

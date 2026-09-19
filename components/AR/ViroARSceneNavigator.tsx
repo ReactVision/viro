@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import {
+  isLocationTransform,
   parseScanDiagnostics,
   parseScanStatus,
   withScanDiagnostics,
@@ -1029,6 +1030,17 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _snapshotWorldMeshToFile = async (
     locationTransform: string
   ): Promise<ViroWorldMeshSnapshotResult> => {
+    // Refused here rather than sent on. The transform is what puts the mesh in the scan's frame,
+    // and the only source of one is a finishScan() that succeeded — so a missing value means the
+    // caller is ahead of itself, and saying that beats a native failure about a malformed string.
+    if (!isLocationTransform(locationTransform)) {
+      return {
+        success: false,
+        error:
+          "snapshotWorldMeshToFile needs the locationTransform returned by finishScan(). " +
+          "Host a scan first.",
+      } as ViroWorldMeshSnapshotResult;
+    }
     return await ViroARSceneNavigatorModule.rvSnapshotWorldMeshToFile(
       findNodeHandle(this),
       locationTransform
@@ -1053,6 +1065,16 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     filePath: string,
     resolvedTransform: string
   ): Promise<ViroWorldMeshLoadResult> => {
+    // Same reasoning as the snapshot: without the frame the mesh was written in, it loads
+    // somewhere arbitrary. A resolved anchor supplies it; so does the scan that hosted it.
+    if (!filePath || !isLocationTransform(resolvedTransform)) {
+      return {
+        success: false,
+        error:
+          "loadWorldMeshFromFile needs a file path and the transform of the frame the mesh " +
+          "was written in — from a resolved anchor, or from the finishScan() that hosted it.",
+      } as ViroWorldMeshLoadResult;
+    }
     return await ViroARSceneNavigatorModule.rvLoadWorldMeshFromFile(
       findNodeHandle(this),
       filePath,

@@ -72,3 +72,25 @@ export function withScanDiagnostics(
   if (!diagnostics?.valid) return result;
   return { ...result, diagnostics };
 }
+
+/**
+ * Whether a string is a location transform this API produced, rather than an empty placeholder.
+ *
+ * `snapshotWorldMeshToFile` and `loadWorldMeshFromFile` both take one, and both are meaningless
+ * without it: the mesh has to be written in the same frame the scan was hosted in, or it lands
+ * somewhere arbitrary on the device that loads it. Calling them before `finishScan()` has
+ * returned one used to reach native with an empty string and fail there, or worse, not fail.
+ *
+ * The check is deliberately shallow — 16 comma-separated finite numbers, the shape
+ * `VROMatrix4f::getArray()` produces. It is not a validity test for the matrix itself; it exists
+ * to catch "nothing", "undefined" and a truncated value, which is what actually happens.
+ */
+export function isLocationTransform(value: unknown): value is string {
+  if (typeof value !== "string" || value.trim().length === 0) return false;
+  const parts = value.split(",");
+  if (parts.length !== 16) return false;
+  return parts.every((p) => {
+    const n = Number(p);
+    return p.trim().length > 0 && Number.isFinite(n);
+  });
+}

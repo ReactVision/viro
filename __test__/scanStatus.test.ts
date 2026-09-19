@@ -5,6 +5,7 @@
  * must not be able to take the screen down over a malformed reading.
  */
 import {
+  isLocationTransform,
   parseScanDiagnostics,
   parseScanStatus,
   withScanDiagnostics,
@@ -88,5 +89,36 @@ describe("withScanDiagnostics", () => {
     // `valid: false` means no scan has been through the gate yet in this session.
     const failed = { success: false, error: "Provider not available" };
     expect(withScanDiagnostics(failed, { valid: false })).toEqual(failed);
+  });
+});
+
+/**
+ * The mesh calls take the frame the scan was hosted in. Without it they used to reach native with
+ * an empty string, which is a confusing way to learn that the caller ran ahead of finishScan().
+ */
+describe("isLocationTransform", () => {
+  const real =
+    "0.220052,0,0.975486,0,0,1,0,0,-0.975486,0,0.220052,0,0.0378218,0.0133011,0.135534,1";
+
+  it("accepts what finishScan actually returned on device", () => {
+    expect(isLocationTransform(real)).toBe(true);
+  });
+
+  it("accepts an identity matrix", () => {
+    expect(isLocationTransform("1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1")).toBe(true);
+  });
+
+  it.each([
+    ["nothing", undefined],
+    ["null", null],
+    ["an empty string", ""],
+    ["whitespace", "   "],
+    ["a number", 16],
+    ["too few values", "1,0,0,0,0,1,0,0"],
+    ["too many values", "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,1"],
+    ["a gap", "1,0,0,0,0,1,0,0,0,0,1,0,0,0,,1"],
+    ["a word", "1,0,0,0,0,1,0,0,0,0,1,0,0,0,nan,1"],
+  ])("rejects %s", (_label, input) => {
+    expect(isLocationTransform(input)).toBe(false);
   });
 });

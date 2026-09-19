@@ -54,7 +54,8 @@ const ViroConstants_1 = require("../ViroConstants");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const ViroUnsupported_1 = require("../Utilities/ViroUnsupported");
 const ViroImmersiveSpaceGate_1 = require("../VisionOS/ViroImmersiveSpaceGate");
-const ViroCameraModule = react_native_1.NativeModules.ViroCameraModule;
+const ViroNativeModule_1 = require("../Utilities/ViroNativeModule");
+const ViroCameraModule = (0, ViroNativeModule_1.withMissingModuleFallback)(react_native_1.NativeModules.ViroCameraModule, "ViroCameraModule");
 class ViroARScene extends ViroBase_1.ViroBase {
     onTrackingFirstInitialized = false;
     _onCameraARHitTest = (event) => {

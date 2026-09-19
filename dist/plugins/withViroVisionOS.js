@@ -430,6 +430,7 @@ const SHIM_FILES = [
     { file: "BlurView.tsx", requires: "expo-blur" },
     { file: "LinearGradient.tsx", requires: "expo-linear-gradient" },
     { file: "Haptics.ts", requires: "expo-haptics" },
+    { file: "IconSymbol.tsx", requires: "expo-symbols" },
 ];
 const withVisionOSCompatShims = (config) => (0, config_plugins_1.withDangerousMod)(config, [
     "ios",
@@ -464,7 +465,8 @@ const withVisionOSCompatShims = (config) => (0, config_plugins_1.withDangerousMo
                 "Replace these imports in any file that uses them:\n" +
                 "  expo-blur            → @/components/compat/BlurView\n" +
                 "  expo-linear-gradient → @/components/compat/LinearGradient\n" +
-                "  expo-haptics         → @/components/compat/Haptics");
+                "  expo-haptics         → @/components/compat/Haptics\n" +
+                "  expo-symbols         → @/components/compat/IconSymbol");
         }
         return newConfig;
     },

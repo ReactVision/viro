@@ -17,7 +17,8 @@ const react_native_1 = require("react-native");
 // The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
 // see ViroAssetSource.ts for why, and what it falls back to.
 const ViroAssetSource_1 = require("../Utilities/ViroAssetSource");
-const ARTrackingTargetsModule = react_native_1.NativeModules.VRTARTrackingTargetsModule;
+const ViroNativeModule_1 = require("../Utilities/ViroNativeModule");
+const ARTrackingTargetsModule = (0, ViroNativeModule_1.withMissingModuleFallback)(react_native_1.NativeModules.VRTARTrackingTargetsModule, "VRTARTrackingTargetsModule");
 class ViroARTrackingTargets {
     static createTargets(targets) {
         for (var key in targets) {

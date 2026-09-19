@@ -15,7 +15,11 @@ import { NativeModules } from "react-native";
 // The visionOS-safe resolver. Image.resolveAssetSource returns an empty uri there;
 // see ViroAssetSource.ts for why, and what it falls back to.
 import { resolveViroAssetSource as resolveAssetSource } from "../Utilities/ViroAssetSource";
-const ARTrackingTargetsModule = NativeModules.VRTARTrackingTargetsModule;
+import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
+const ARTrackingTargetsModule = withMissingModuleFallback(
+  NativeModules.VRTARTrackingTargetsModule,
+  "VRTARTrackingTargetsModule"
+);
 
 // // Currently only used for reference purposes (we manually validate)
 // var ARTrackingTargetsPropTypes = {

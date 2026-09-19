@@ -23,6 +23,7 @@ import {
   ViewProps,
 } from "react-native";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
   ViroWorldOrigin,
   ViroProvider,
@@ -62,7 +63,10 @@ import {
   ViroWorldMeshStats,
 } from "../Types/ViroWorldMesh";
 
-const ViroARSceneNavigatorModule = NativeModules.VRTARSceneNavigatorModule;
+const ViroARSceneNavigatorModule = withMissingModuleFallback(
+  NativeModules.VRTARSceneNavigatorModule,
+  "VRTARSceneNavigatorModule"
+);
 
 let mathRandomOffset = 0;
 

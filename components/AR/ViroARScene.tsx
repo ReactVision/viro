@@ -55,8 +55,12 @@ import { ViroOrbitCamera } from "components/ViroOrbitCamera";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { markARSceneRoot } from "../VisionOS/ViroImmersiveSpaceGate";
+import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 
-const ViroCameraModule = NativeModules.ViroCameraModule;
+const ViroCameraModule = withMissingModuleFallback(
+  NativeModules.ViroCameraModule,
+  "ViroCameraModule"
+);
 
 type Props = ViroCommonProps & {
   displayPointCloud?: {

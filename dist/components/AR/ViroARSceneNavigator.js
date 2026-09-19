@@ -48,7 +48,8 @@ exports.ViroARSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
-const ViroARSceneNavigatorModule = react_native_1.NativeModules.VRTARSceneNavigatorModule;
+const ViroNativeModule_1 = require("../Utilities/ViroNativeModule");
+const ViroARSceneNavigatorModule = (0, ViroNativeModule_1.withMissingModuleFallback)(react_native_1.NativeModules.VRTARSceneNavigatorModule, "VRTARSceneNavigatorModule");
 let mathRandomOffset = 0;
 /**
  * ViroARSceneNavigator is used to transition between multiple AR Scenes.

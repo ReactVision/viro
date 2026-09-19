@@ -161,9 +161,13 @@ for (const ext of VIRO_ASSET_EXTS) {
   }
 }
 
-const path = require('path');
-const { getPlatformResolver } = require('${RNVISION_PLATFORMS_PKG}');
-const viroPlatformResolver = getPlatformResolver({
+// Prefixed, all of it: this block is appended to a config file that was written without knowing
+// about it, and \`const path = require('path')\` at the top of a Metro config is close to
+// universal. A second \`const path\` in the same scope is a SyntaxError that nothing catches until
+// the bundler runs — which no native build does, so it survives every compile and fails on launch.
+const viroNodePath = require('path');
+const { getPlatformResolver: viroGetPlatformResolver } = require('${RNVISION_PLATFORMS_PKG}');
+const viroPlatformResolver = viroGetPlatformResolver({
   platformNameMap: { visionos: '${rnVisionSpecifier}' },
 });
 
@@ -175,7 +179,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName.startsWith('@/')) {
     return viroPlatformResolver(
       context,
-      path.resolve(__dirname, moduleName.slice(2)),
+      viroNodePath.resolve(__dirname, moduleName.slice(2)),
       platform
     );
   }
@@ -199,12 +203,29 @@ const withVisionOSMetroConfig: ConfigPlugin = (config) =>
       }
 
       let metro = fs.readFileSync(metroPath, "utf-8");
-      if (metro.includes(METRO_MARKER)) return newConfig; // idempotent
+      const patch = metroPatch(resolveRNVisionSpecifier(projectRoot));
 
-      metro = metro.replace(
-        "module.exports = config;",
-        metroPatch(resolveRNVisionSpecifier(projectRoot)) + "\nmodule.exports = config;"
-      );
+      if (metro.includes(METRO_MARKER)) {
+        // Replaced rather than skipped. Skipping is the obvious reading of "idempotent" and it is
+        // wrong here: a config patched by an older version of this plugin keeps whatever that
+        // version got wrong forever, and the block is ours to own from the marker to the export.
+        const start = metro.indexOf(METRO_MARKER);
+        const end = metro.indexOf("module.exports = config;", start);
+        if (end === -1) {
+          WarningAggregator.addWarningIOS(
+            "withViroVisionOS",
+            "metro.config.js carries the visionOS block but no `module.exports = config;` after " +
+              "it — left as is, so nothing is cut in half. Re-add the export and prebuild again."
+          );
+          return newConfig;
+        }
+        metro = metro.slice(0, start) + patch.replace(/^\n/, "") + "\n" + metro.slice(end);
+      } else {
+        metro = metro.replace(
+          "module.exports = config;",
+          patch + "\nmodule.exports = config;"
+        );
+      }
 
       fs.writeFileSync(metroPath, metro, "utf-8");
       return newConfig;
@@ -823,6 +844,166 @@ const withVisionOSBundlePhase: ConfigPlugin = (config) =>
     },
   ]);
 
+// ─── 10. visionos/{App}/Fonts — icon fonts the app draws with ────────────────
+//
+// `@expo/vector-icons` draws a glyph as <Text> in a font it asks expo-font to register at
+// runtime. The visionOS target has no Expo modules — its Podfile installs React Native and Viro,
+// nothing else — so that registration is a no-op stub and every icon renders as a blank box. The
+// platform has a second way in, which needs no native module: a font listed in UIAppFonts and
+// present in the bundle is registered by the system before any JS runs.
+//
+// Only the families the project actually imports are copied. The full set is 3.9 MB and an app
+// typically draws from one or two of them.
+const VECTOR_ICON_FAMILIES = [
+  "AntDesign", "Entypo", "EvilIcons", "Feather", "FontAwesome", "FontAwesome5_Brands",
+  "FontAwesome5_Regular", "FontAwesome5_Solid", "FontAwesome6_Brands", "FontAwesome6_Regular",
+  "FontAwesome6_Solid", "Fontisto", "Foundation", "Ionicons", "MaterialCommunityIcons",
+  "MaterialIcons", "Octicons", "SimpleLineIcons", "Zocial",
+];
+
+function collectSourceText(dir: string, acc: string[], depth = 0): void {
+  if (depth > 6 || !fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectSourceText(full, acc, depth + 1);
+    } else if (/\.(t|j)sx?$/.test(entry.name)) {
+      try {
+        acc.push(fs.readFileSync(full, "utf-8"));
+      } catch {
+        // unreadable file; nothing to scan
+      }
+    }
+  }
+}
+
+const withVisionOSIconFonts: ConfigPlugin = (config) =>
+  withDangerousMod(config, [
+    "ios",
+    async (newConfig) => {
+      const projectRoot = newConfig.modRequest.projectRoot;
+      const projectName = (config.name as string).replace(/[^a-zA-Z0-9]/g, "");
+      const visionosDir = path.join(projectRoot, "visionos");
+      if (!fs.existsSync(visionosDir)) return newConfig;
+
+      let fontsSource: string;
+      try {
+        fontsSource = path.join(
+          path.dirname(
+            require.resolve("@expo/vector-icons/package.json", {
+              paths: [projectRoot],
+            })
+          ),
+          "build",
+          "vendor",
+          "react-native-vector-icons",
+          "Fonts"
+        );
+      } catch {
+        return newConfig; // the app does not use vector icons
+      }
+      if (!fs.existsSync(fontsSource)) return newConfig;
+
+      const sources: string[] = [];
+      for (const dir of ["app", "components", "src"]) {
+        collectSourceText(path.join(projectRoot, dir), sources);
+      }
+      const text = sources.join("\n");
+      const used = VECTOR_ICON_FAMILIES.filter(
+        (family) =>
+          text.includes(`@expo/vector-icons/${family}`) ||
+          new RegExp(`\\b${family}\\b`).test(text)
+      );
+      if (used.length === 0) return newConfig;
+
+      const fontsTarget = path.join(visionosDir, projectName, "Fonts");
+      fs.mkdirSync(fontsTarget, { recursive: true });
+      const copied: string[] = [];
+      for (const family of used) {
+        const from = path.join(fontsSource, `${family}.ttf`);
+        if (!fs.existsSync(from)) continue;
+        fs.copyFileSync(from, path.join(fontsTarget, `${family}.ttf`));
+        copied.push(`${family}.ttf`);
+      }
+      // Fonts the app ships itself, which expo-font would have embedded on iOS.
+      const appFonts = path.join(projectRoot, "assets", "fonts");
+      if (fs.existsSync(appFonts)) {
+        for (const name of fs.readdirSync(appFonts)) {
+          if (!/\.(ttf|otf)$/i.test(name)) continue;
+          fs.copyFileSync(path.join(appFonts, name), path.join(fontsTarget, name));
+          copied.push(name);
+        }
+      }
+      if (copied.length === 0) return newConfig;
+
+      // ── the Xcode target has to copy them ──
+      //
+      // Added as a folder reference rather than one entry per file: the folder's contents are
+      // copied whole, so a family added later needs no second edit here.
+      const pbxPath = path.join(
+        visionosDir,
+        `${projectName}.xcodeproj`,
+        "project.pbxproj"
+      );
+      if (fs.existsSync(pbxPath)) {
+        let pbx = fs.readFileSync(pbxPath, "utf-8");
+        if (!pbx.includes("/* Fonts */")) {
+          const fileRefId = "VIR0F0NT5000000000000001";
+          const buildFileId = "VIR0F0NT5000000000000002";
+          pbx = pbx.replace(
+            /(\/\* Begin PBXFileReference section \*\/\n)/,
+            `$1\t\t${fileRefId} /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fonts; path = ${projectName}/Fonts; sourceTree = "<group>"; };\n`
+          );
+          pbx = pbx.replace(
+            /(\/\* Begin PBXBuildFile section \*\/\n)/,
+            `$1\t\t${buildFileId} /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = ${fileRefId} /* Fonts */; };\n`
+          );
+          // Into the app target's Resources phase, found by the asset catalog it already copies.
+          pbx = pbx.replace(
+            /(\n\t\t\t\t[A-Z0-9]+ \/\* Images\.xcassets in Resources \*\/,)/,
+            `$1\n\t\t\t\t${buildFileId} /* Fonts in Resources */,`
+          );
+          // And into the group beside the asset catalog, so it is visible in Xcode.
+          pbx = pbx.replace(
+            /(\n\t\t\t\t[A-Z0-9]+ \/\* Images\.xcassets \*\/,)/,
+            `$1\n\t\t\t\t${fileRefId} /* Fonts */,`
+          );
+          if (pbx.includes("Fonts in Resources")) {
+            fs.writeFileSync(pbxPath, pbx, "utf-8");
+            console.log(
+              `[withViroVisionOS] Bundled the icon fonts with the visionOS target: ${copied.join(", ")}`
+            );
+          } else {
+            WarningAggregator.addWarningIOS(
+              "withViroVisionOS",
+              "Could not add visionos/Fonts to the Xcode target's Resources phase. Drag the " +
+                "Fonts folder into the target in Xcode, or icons will render as blank boxes."
+            );
+          }
+        }
+      }
+
+      // ── and the system has to be told which files they are ──
+      const plistPath = path.join(visionosDir, projectName, "Info.plist");
+      if (fs.existsSync(plistPath)) {
+        const plist = fs.readFileSync(plistPath, "utf-8");
+        if (!plist.includes("<key>UIAppFonts</key>")) {
+          const entries = copied
+            .map((name) => `\t\t<string>Fonts/${name}</string>`)
+            .join("\n");
+          const updated = plist.replace(
+            /<dict>/,
+            `<dict>\n\t<key>UIAppFonts</key>\n\t<array>\n${entries}\n\t</array>`
+          );
+          if (updated !== plist) fs.writeFileSync(plistPath, updated, "utf-8");
+        }
+      }
+
+      return newConfig;
+    },
+  ]);
+
 export const withViroVisionOS: ConfigPlugin = (config) =>
   withPlugins(config, [
     withVisionOSSetup,         // 1. verify visionos/ folder + deps
@@ -834,6 +1015,7 @@ export const withViroVisionOS: ConfigPlugin = (config) =>
     withVisionOSInfoPlist,     // 7. Info.plist: allow multiple scenes (ImmersiveSpace)
     withVisionOSAppDelegate,   // 8. AppDelegate.swift: Expo entry point + imports
     withVisionOSBundlePhase,   // 9. Xcode bundling phase: Expo entry + skip bundling in Debug
+    withVisionOSIconFonts,     // 10. Fonts/: icon fonts in the bundle + UIAppFonts
   ]);
 
 export default withViroVisionOS;

@@ -36,6 +36,12 @@ type Props = ViewProps & {
      * is rendered. Pass `null` to render nothing.
      */
     questFallback?: React.ReactNode;
+    /**
+     * Optional fallback rendered when this navigator is mounted on Apple Vision Pro, where the AR
+     * subsystem is not part of the visionOS renderer. When omitted, a default message view is
+     * rendered. Pass `null` to render nothing.
+     */
+    visionOSFallback?: React.ReactNode;
     autofocus?: boolean;
     /**
      * iOS only props! Note: these props may change as the underlying platforms coalesce in features.
@@ -217,6 +223,7 @@ type State = {
  */
 export declare class ViroARSceneNavigator extends React.Component<Props, State> {
     static _questWarningLogged: boolean;
+    static _visionOSWarningLogged: boolean;
     _component: ViroNativeRef;
     constructor(props: Props);
     componentDidMount(): void;

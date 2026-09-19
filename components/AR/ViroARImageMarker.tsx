@@ -19,7 +19,8 @@ import {
   ViroARAnchorUpdatedEvent,
 } from "../Types/ViroEvents";
 import { ViroBase } from "../ViroBase";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 /**
  * Container for Viro Components anchored to a detected image.
@@ -48,6 +49,12 @@ export class ViroARImageMarker extends ViroBase<{}> {
   };
 
   render() {
+    // The AR view managers are excluded from the visionOS renderer, so ViroARImageMarker has no
+    // native half there and mounting it would crash rather than render nothing.
+    if (isVisionOS) {
+      warnUnsupported("ViroARImageMarker", "Apple Vision Pro", "Image tracking comes from the AR subsystem, which visionOS does not carry.");
+      return null;
+    }
     if (isQuest) {
       console.warn("[Viro] ViroARImageMarker is not supported on Quest and will not render.");
       return null;

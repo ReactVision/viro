@@ -14,7 +14,8 @@
 import { ViroBase } from "../ViroBase";
 import * as React from "react";
 import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import {
   ViroARAnchorFoundEvent,
   ViroARAnchorRemovedEvent,
@@ -46,6 +47,12 @@ export class ViroARObjectMarker extends ViroBase<Props> {
   }
 
   render() {
+    // The AR view managers are excluded from the visionOS renderer, so ViroARObjectMarker has no
+    // native half there and mounting it would crash rather than render nothing.
+    if (isVisionOS) {
+      warnUnsupported("ViroARObjectMarker", "Apple Vision Pro", "Object tracking comes from the AR subsystem, which visionOS does not carry.");
+      return null;
+    }
     if (isQuest) {
       console.warn("[Viro] ViroARObjectMarker is not supported on Quest and will not render.");
       return null;

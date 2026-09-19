@@ -55,6 +55,7 @@ let mathRandomOffset = 0;
  */
 class ViroARSceneNavigator extends React.Component {
     static _questWarningLogged = false;
+    static _visionOSWarningLogged = false;
     _component = null;
     constructor(props) {
         super(props);
@@ -1131,6 +1132,24 @@ class ViroARSceneNavigator extends React.Component {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroARSceneNavigator", this.props);
+        // visionOS ships no AR subsystem: every VROAR* class is excluded from that renderer, so
+        // VRTARSceneNavigator has no view manager to mount and reaching it takes the app down rather
+        // than rendering nothing. Guarded the same way Quest is, and for the same reason.
+        if (ViroPlatform_1.isVisionOS) {
+            if (!ViroARSceneNavigator._visionOSWarningLogged) {
+                console.warn("[Viro] ViroARSceneNavigator is not supported on Apple Vision Pro. " +
+                    "Use ViroXRSceneNavigator (auto-detects visionOS) or ViroSceneNavigator instead.");
+                ViroARSceneNavigator._visionOSWarningLogged = true;
+            }
+            if ("visionOSFallback" in this.props) {
+                return <>{this.props.visionOSFallback}</>;
+            }
+            return (<react_native_1.View style={[styles.container, styles.questFallback]}>
+          <react_native_1.Text style={styles.questFallbackText}>
+            AR is not supported on Apple Vision Pro.
+          </react_native_1.Text>
+        </react_native_1.View>);
+        }
         if (ViroPlatform_1.isQuest) {
             if (!ViroARSceneNavigator._questWarningLogged) {
                 console.warn("[Viro] ViroARSceneNavigator is not supported on Meta Quest. " +

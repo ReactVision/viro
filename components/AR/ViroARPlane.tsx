@@ -19,7 +19,8 @@ import {
 import { ViroBase } from "../ViroBase";
 import * as React from "react";
 import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 type Props = {
   anchorId?: string;
@@ -59,6 +60,12 @@ export class ViroARPlane extends ViroBase<Props> {
   };
 
   render() {
+    // The AR view managers are excluded from the visionOS renderer, so ViroARPlane has no
+    // native half there and mounting it would crash rather than render nothing.
+    if (isVisionOS) {
+      warnUnsupported("ViroARPlane", "Apple Vision Pro", "Plane anchors come from the AR subsystem, which visionOS does not carry.");
+      return null;
+    }
     // Supported on Quest via XR_FB_scene plane anchors (room model). No longer gated.
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroARPlane", this.props);

@@ -48,6 +48,7 @@ const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroBase_1 = require("../ViroBase");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+const ViroUnsupported_1 = require("../Utilities/ViroUnsupported");
 /**
  * Container for Viro Components anchored to a detected image.
  */
@@ -68,6 +69,12 @@ class ViroARImageMarker extends ViroBase_1.ViroBase {
         }
     };
     render() {
+        // The AR view managers are excluded from the visionOS renderer, so ViroARImageMarker has no
+        // native half there and mounting it would crash rather than render nothing.
+        if (ViroPlatform_1.isVisionOS) {
+            (0, ViroUnsupported_1.warnUnsupported)("ViroARImageMarker", "Apple Vision Pro", "Image tracking comes from the AR subsystem, which visionOS does not carry.");
+            return null;
+        }
         if (ViroPlatform_1.isQuest) {
             console.warn("[Viro] ViroARImageMarker is not supported on Quest and will not render.");
             return null;

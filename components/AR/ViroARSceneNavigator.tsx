@@ -22,7 +22,7 @@ import {
   View,
   ViewProps,
 } from "react-native";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import {
   ViroWorldOrigin,
   ViroProvider,
@@ -90,6 +90,13 @@ type Props = ViewProps & {
    * is rendered. Pass `null` to render nothing.
    */
   questFallback?: React.ReactNode;
+
+  /**
+   * Optional fallback rendered when this navigator is mounted on Apple Vision Pro, where the AR
+   * subsystem is not part of the visionOS renderer. When omitted, a default message view is
+   * rendered. Pass `null` to render nothing.
+   */
+  visionOSFallback?: React.ReactNode;
 
   autofocus?: boolean;
   /**
@@ -290,6 +297,7 @@ type State = {
  */
 export class ViroARSceneNavigator extends React.Component<Props, State> {
   static _questWarningLogged = false;
+  static _visionOSWarningLogged = false;
   _component: ViroNativeRef = null;
 
   constructor(props: Props) {
@@ -1753,6 +1761,29 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   render() {
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroARSceneNavigator", this.props);
+
+    // visionOS ships no AR subsystem: every VROAR* class is excluded from that renderer, so
+    // VRTARSceneNavigator has no view manager to mount and reaching it takes the app down rather
+    // than rendering nothing. Guarded the same way Quest is, and for the same reason.
+    if (isVisionOS) {
+      if (!ViroARSceneNavigator._visionOSWarningLogged) {
+        console.warn(
+          "[Viro] ViroARSceneNavigator is not supported on Apple Vision Pro. " +
+            "Use ViroXRSceneNavigator (auto-detects visionOS) or ViroSceneNavigator instead."
+        );
+        ViroARSceneNavigator._visionOSWarningLogged = true;
+      }
+      if ("visionOSFallback" in this.props) {
+        return <>{this.props.visionOSFallback}</>;
+      }
+      return (
+        <View style={[styles.container, styles.questFallback]}>
+          <Text style={styles.questFallbackText}>
+            AR is not supported on Apple Vision Pro.
+          </Text>
+        </View>
+      );
+    }
 
     if (isQuest) {
       if (!ViroARSceneNavigator._questWarningLogged) {

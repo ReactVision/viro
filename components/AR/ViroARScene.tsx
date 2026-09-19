@@ -52,7 +52,8 @@ import { ViroCamera } from "../ViroCamera";
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import { ViroCommonProps } from "./ViroCommonProps";
 import { ViroOrbitCamera } from "components/ViroOrbitCamera";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const ViroCameraModule = NativeModules.ViroCameraModule;
 
@@ -442,6 +443,12 @@ export class ViroARScene extends ViroBase<Props> {
   };
 
   render() {
+    // The AR view managers are excluded from the visionOS renderer, so ViroARScene has no
+    // native half there and mounting it would crash rather than render nothing.
+    if (isVisionOS) {
+      warnUnsupported("ViroARScene", "Apple Vision Pro", "Use ViroScene instead: visionOS composes the passthrough world itself.");
+      return null;
+    }
     // On Meta Quest, ViroARScene renders as a mixed-reality scene through the
     // OpenXR renderer (passthrough + XR_FB_scene plane anchors). No longer gated.
     // Uncomment this line to check for misnamed props

@@ -39,6 +39,7 @@ const react_native_1 = require("react-native");
 const ViroARSceneNavigator_1 = require("./AR/ViroARSceneNavigator");
 const ViroSceneNavigator_1 = require("./ViroSceneNavigator");
 const ViroPlatform_1 = require("./Utilities/ViroPlatform");
+const ViroImmersiveSpaceGate_1 = require("./VisionOS/ViroImmersiveSpaceGate");
 const ViroVisionOSModule_1 = require("./VisionOS/ViroVisionOSModule");
 const VRQuestNavigatorBridge_1 = require("./Utilities/VRQuestNavigatorBridge");
 const VRModuleOpenXR_1 = require("./Utilities/VRModuleOpenXR");
@@ -106,6 +107,10 @@ function checkRNVersionForVR() {
  * and `handTrackingEnabled` are Quest-only and go over the bridge alone.
  */
 exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(props, ref) {
+    // Opens the scan the mount effect reads. Here rather than in an effect because a parent
+    // renders before its children: this has to run before the scene root does.
+    if (ViroPlatform_1.isVisionOS)
+        (0, ViroImmersiveSpaceGate_1.beginSceneRootScan)();
     const { initialScene, arInitialScene, vrInitialScene, 
     // Renderer config. Destructured because Quest forwards it over the intent
     // bridge rather than as props; the AR branch passes it on by hand below,
@@ -180,6 +185,14 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
     React.useEffect(() => {
         if (!ViroPlatform_1.isVisionOS)
             return;
+        // An AR-rooted scene has nothing to put in the space — ViroARScene cannot mount on visionOS
+        // and rendered null just above. Opening it anyway dims the room and shows an empty world.
+        if ((0, ViroImmersiveSpaceGate_1.sawARSceneRoot)()) {
+            console.warn("[Viro] The scene given to ViroXRSceneNavigator is rooted in ViroARScene, which " +
+                "visionOS does not support, so the ImmersiveSpace was not opened. Root the scene " +
+                "in ViroScene, or pass one through `vrInitialScene`.");
+            return;
+        }
         let cancelled = false;
         (0, ViroVisionOSModule_1.enterImmersiveSpace)(visionOSImmersionStyle).then((opened) => {
             if (!opened && !cancelled) {

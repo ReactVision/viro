@@ -53,6 +53,7 @@ const ViroBase_1 = require("../ViroBase");
 const ViroConstants_1 = require("../ViroConstants");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const ViroUnsupported_1 = require("../Utilities/ViroUnsupported");
+const ViroImmersiveSpaceGate_1 = require("../VisionOS/ViroImmersiveSpaceGate");
 const ViroCameraModule = react_native_1.NativeModules.ViroCameraModule;
 class ViroARScene extends ViroBase_1.ViroBase {
     onTrackingFirstInitialized = false;
@@ -294,6 +295,9 @@ class ViroARScene extends ViroBase_1.ViroBase {
         // native half there and mounting it would crash rather than render nothing.
         if (ViroPlatform_1.isVisionOS) {
             (0, ViroUnsupported_1.warnUnsupported)("ViroARScene", "Apple Vision Pro", "Use ViroScene instead: visionOS composes the passthrough world itself.");
+            // Tells an enclosing ViroXRSceneNavigator not to open the ImmersiveSpace. It renders before
+            // this and reads the answer in its mount effect, which runs after.
+            (0, ViroImmersiveSpaceGate_1.markARSceneRoot)();
             return null;
         }
         // On Meta Quest, ViroARScene renders as a mixed-reality scene through the

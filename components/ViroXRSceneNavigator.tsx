@@ -11,6 +11,10 @@ import { ViroARSceneNavigator } from "./AR/ViroARSceneNavigator";
 import { ViroSceneNavigator } from "./ViroSceneNavigator";
 import { isQuest, isVisionOS } from "./Utilities/ViroPlatform";
 import {
+  beginSceneRootScan,
+  sawARSceneRoot,
+} from "./VisionOS/ViroImmersiveSpaceGate";
+import {
   enterImmersiveSpace,
   exitImmersiveSpace,
   ImmersiveSpaceStyle,
@@ -166,6 +170,10 @@ type Props = ViewProps & {
  */
 export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
   function ViroXRSceneNavigator(props, ref) {
+    // Opens the scan the mount effect reads. Here rather than in an effect because a parent
+    // renders before its children: this has to run before the scene root does.
+    if (isVisionOS) beginSceneRootScan();
+
     const {
       initialScene,
       arInitialScene,
@@ -262,6 +270,16 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     // the native side hands its VRTScene to the CompositorServices render loop.
     React.useEffect(() => {
       if (!isVisionOS) return;
+      // An AR-rooted scene has nothing to put in the space — ViroARScene cannot mount on visionOS
+      // and rendered null just above. Opening it anyway dims the room and shows an empty world.
+      if (sawARSceneRoot()) {
+        console.warn(
+          "[Viro] The scene given to ViroXRSceneNavigator is rooted in ViroARScene, which " +
+            "visionOS does not support, so the ImmersiveSpace was not opened. Root the scene " +
+            "in ViroScene, or pass one through `vrInitialScene`."
+        );
+        return;
+      }
       let cancelled = false;
       enterImmersiveSpace(visionOSImmersionStyle).then((opened) => {
         if (!opened && !cancelled) {

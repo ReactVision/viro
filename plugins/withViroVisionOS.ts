@@ -555,6 +555,7 @@ const withVisionOSPatches: ConfigPlugin = (config) =>
 const SHIM_FILES: { file: string; requires: string }[] = [
   { file: "BlurView.tsx", requires: "expo-blur" },
   { file: "LinearGradient.tsx", requires: "expo-linear-gradient" },
+  { file: "Haptics.ts", requires: "expo-haptics" },
 ];
 
 const withVisionOSCompatShims: ConfigPlugin = (config) =>
@@ -597,7 +598,8 @@ const withVisionOSCompatShims: ConfigPlugin = (config) =>
           "visionOS compat shims installed at components/compat/.\n" +
             "Replace these imports in any file that uses them:\n" +
             "  expo-blur            → @/components/compat/BlurView\n" +
-            "  expo-linear-gradient → @/components/compat/LinearGradient"
+            "  expo-linear-gradient → @/components/compat/LinearGradient\n" +
+            "  expo-haptics         → @/components/compat/Haptics"
         );
       }
 

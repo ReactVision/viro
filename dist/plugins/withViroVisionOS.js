@@ -429,6 +429,7 @@ const withVisionOSPatches = (config) => (0, config_plugins_1.withDangerousMod)(c
 const SHIM_FILES = [
     { file: "BlurView.tsx", requires: "expo-blur" },
     { file: "LinearGradient.tsx", requires: "expo-linear-gradient" },
+    { file: "Haptics.ts", requires: "expo-haptics" },
 ];
 const withVisionOSCompatShims = (config) => (0, config_plugins_1.withDangerousMod)(config, [
     "ios",
@@ -462,7 +463,8 @@ const withVisionOSCompatShims = (config) => (0, config_plugins_1.withDangerousMo
             config_plugins_1.WarningAggregator.addWarningIOS("withViroVisionOS", "visionOS compat shims installed at components/compat/.\n" +
                 "Replace these imports in any file that uses them:\n" +
                 "  expo-blur            → @/components/compat/BlurView\n" +
-                "  expo-linear-gradient → @/components/compat/LinearGradient");
+                "  expo-linear-gradient → @/components/compat/LinearGradient\n" +
+                "  expo-haptics         → @/components/compat/Haptics");
         }
         return newConfig;
     },

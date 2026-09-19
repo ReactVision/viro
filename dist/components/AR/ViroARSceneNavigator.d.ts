@@ -207,8 +207,16 @@ type Props = ViewProps & {
      */
     worldMeshConfig?: ViroWorldMeshConfig;
     /**
-     * Callback fired when the world mesh is updated.
-     * Provides statistics about the current mesh state.
+     * Statistics about the world mesh, delivered on every update.
+     *
+     * @deprecated This event has never fired, and does not fire in 3.0.0. `VROARScene` calls its
+     * delegate on every mesh update, but neither the iOS nor the Android bridge forwards that call,
+     * so nothing reaches JS. Poll {@link ViroARSceneNavigatorMethods.getWorldMeshStats} instead — it
+     * returns the same numbers plus whether capture is on at all.
+     *
+     * It is kept here rather than deleted so existing code keeps compiling, and marked so that no
+     * new code is written against it. Wiring it is tracked for a later release, and will also decide
+     * where it belongs: the renderer emits it from the scene, while this prop sits on the navigator.
      */
     onWorldMeshUpdated?: (stats: ViroWorldMeshStats) => void;
 };

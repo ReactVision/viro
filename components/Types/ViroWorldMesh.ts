@@ -103,6 +103,20 @@ export type ViroWorldMeshStats = {
 };
 
 /**
+ * What `getWorldMeshStats()` answers.
+ *
+ * Poll it. The navigator's `onWorldMeshUpdated` prop looks like the way to learn this, but it
+ * never fires: `VROARScene` calls its delegate on every mesh update and neither the iOS nor the
+ * Android bridge forwards that call, so the event has been dead since it was added.
+ *
+ * `available: false` is an ordinary answer — capture off, or no AR scene mounted yet — and
+ * `reason` says which, so a caller can tell "turn it on" apart from "keep looking around".
+ */
+export type ViroWorldMeshStatsResult =
+  | ({ available: true; enabled: boolean } & ViroWorldMeshStats)
+  | { available: false; enabled?: boolean; reason: string };
+
+/**
  * Event fired when the world mesh is updated.
  */
 export type ViroWorldMeshUpdatedEvent = {

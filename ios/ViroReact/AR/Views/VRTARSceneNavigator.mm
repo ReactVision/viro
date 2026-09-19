@@ -1781,6 +1781,36 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     arSession->rvStartScan();
 }
 
+- (NSDictionary *)rvGetWorldMeshStats {
+    if (!_vroView || !_currentScene) {
+        return @{@"available": @NO, @"reason": @"The AR view is not ready"};
+    }
+
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return @{@"available": @NO, @"reason": @"No scene is mounted"};
+    }
+
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return @{@"available": @NO, @"reason": @"The mounted scene is not a ViroARScene"};
+    }
+
+    if (!arScene->getWorldMesh()) {
+        return @{@"available": @NO, @"enabled": @NO,
+                 @"reason": @"World mesh capture is off - set worldMeshEnabled"};
+    }
+
+    VROWorldMeshStats stats = arScene->getWorldMeshStats();
+    return @{@"available": @YES,
+             @"enabled": @(arScene->isWorldMeshEnabled()),
+             @"vertexCount": @(stats.vertexCount),
+             @"triangleCount": @(stats.triangleCount),
+             @"averageConfidence": @(stats.averageConfidence),
+             @"lastUpdateTimeMs": @(stats.lastUpdateTimeMs),
+             @"isStale": @(stats.isStale)};
+}
+
 - (NSString *)rvGetScanStatusJson {
     if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
     std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];

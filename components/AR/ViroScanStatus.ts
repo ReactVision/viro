@@ -15,6 +15,7 @@ import type {
   ViroScanDiagnostics,
   ViroScanStatus,
 } from "../Types/ViroEvents";
+import type { ViroWorldMeshStatsResult } from "../Types/ViroWorldMesh";
 
 /**
  * @param json what the native module resolved with
@@ -93,4 +94,37 @@ export function isLocationTransform(value: unknown): value is string {
     const n = Number(p);
     return p.trim().length > 0 && Number.isFinite(n);
   });
+}
+
+/**
+ * Mesh stats, from either bridge.
+ *
+ * The two platforms disagree on the wire: Android answers with a JSON string, because the value
+ * crosses JNI as one, while iOS resolves a dictionary straight from the C++ struct. Neither is
+ * worth a native round trip to align, so the difference is absorbed here — the one place that
+ * already exists for turning what native says into what the app sees.
+ *
+ * Never throws, on the same reasoning as {@link parseScanStatus}: this is polled on a timer.
+ */
+export function parseWorldMeshStats(
+  raw: string | Record<string, unknown> | null | undefined
+): ViroWorldMeshStatsResult {
+  if (raw == null) {
+    return { available: false, reason: "No response from the renderer" };
+  }
+  if (typeof raw === "object") {
+    return raw as ViroWorldMeshStatsResult;
+  }
+  if (typeof raw !== "string" || raw.length === 0) {
+    return { available: false, reason: "No response from the renderer" };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed == null || typeof parsed !== "object") {
+      return { available: false, reason: "Malformed world mesh stats" };
+    }
+    return parsed as ViroWorldMeshStatsResult;
+  } catch {
+    return { available: false, reason: "Malformed world mesh stats" };
+  }
 }

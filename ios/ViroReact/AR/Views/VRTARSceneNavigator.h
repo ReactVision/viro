@@ -236,6 +236,11 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 // Cloud anchor management
 - (void)rvStartScan;
 /** Scan status as the renderer's JSON; `{"available":false}` when there is no session. */
+// Whether a world mesh exists and how big it is. Polled, because the `onWorldMeshUpdated`
+// event prop never fires: VROARScene calls its delegate, but neither VROARSceneDelegateiOS nor
+// VRTARScene forwards that call, so the chain to JS was never finished.
+- (NSDictionary *)rvGetWorldMeshStats;
+
 - (NSString *)rvGetScanStatusJson;
 /** Last scan-based host's measurements as the renderer's JSON. */
 - (NSString *)rvGetScanDiagnosticsJson;

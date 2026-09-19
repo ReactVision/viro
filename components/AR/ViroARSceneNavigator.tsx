@@ -27,6 +27,7 @@ import {
   isLocationTransform,
   parseScanDiagnostics,
   parseScanStatus,
+  parseWorldMeshStats,
   withScanDiagnostics,
 } from "./ViroScanStatus";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
@@ -69,6 +70,7 @@ import {
 import {
   ViroWorldMeshConfig,
   ViroWorldMeshStats,
+  ViroWorldMeshStatsResult,
 } from "../Types/ViroWorldMesh";
 
 const ViroARSceneNavigatorModule = withMissingModuleFallback(
@@ -982,6 +984,24 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     }
   };
 
+  /**
+   * Whether a world mesh exists and how big it is.
+   *
+   * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
+   * {@link ViroWorldMeshStatsResult}. `snapshotWorldMeshToFile()` needs a non-zero `vertexCount`,
+   * the mesh takes a few seconds of looking around to accumulate after `worldMeshEnabled` goes
+   * true, so this is how a caller knows when the snapshot is worth attempting.
+   */
+  _getWorldMeshStats = async (): Promise<ViroWorldMeshStatsResult> => {
+    try {
+      return parseWorldMeshStats(
+        await ViroARSceneNavigatorModule.rvGetWorldMeshStats(findNodeHandle(this))
+      );
+    } catch (error) {
+      return { available: false, reason: String(error) };
+    }
+  };
+
   /** The measurements behind the last scan-based host, pass or fail. */
   _getScanDiagnostics = async (): Promise<ViroScanDiagnostics> => {
     try {
@@ -1706,6 +1726,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startScan: this._startScan,
     finishScan: this._finishScan,
     getScanStatus: this._getScanStatus,
+    getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
     rvJoinSharedFrame: this._rvJoinSharedFrame,
@@ -1780,6 +1801,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startScan: this._startScan,
     finishScan: this._finishScan,
     getScanStatus: this._getScanStatus,
+    getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
     rvJoinSharedFrame: this._rvJoinSharedFrame,

@@ -1043,11 +1043,14 @@ RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                 resolve(@{@"success": @NO, @"error": @"Invalid view type"}); return;
             }
-            NSString *filePath = [(VRTARSceneNavigator *)view rvSnapshotWorldMeshToFile:locationTransformCsv];
+            NSString *reason = nil;
+            NSString *filePath = [(VRTARSceneNavigator *)view rvSnapshotWorldMeshToFile:locationTransformCsv
+                                                                                  error:&reason];
             if (filePath) {
                 resolve(@{@"success": @YES, @"filePath": filePath});
             } else {
-                resolve(@{@"success": @NO, @"error": @"No world mesh available to snapshot"});
+                resolve(@{@"success": @NO,
+                          @"error": reason ?: @"No world mesh available to snapshot"});
             }
         } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
     }];

@@ -2176,38 +2176,51 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
 // WS-C: serialize the current world mesh to a temp file, returning its path
 // (or nil on failure/no mesh) — ready to pass straight into rvUploadAsset().
 - (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv {
+    return [self rvSnapshotWorldMeshToFile:locationTransformCsv error:nil];
+}
+
+// Six ways to fail, and they used to be one `nil` that the module turned into "No world mesh
+// available to snapshot" whichever it was. "The scene is not an AR scene" and "the mesh has no
+// geometry yet" call for opposite responses from the caller, so each says which it is.
+- (NSString *)rvSnapshotWorldMeshToFile:(NSString *)locationTransformCsv
+                                  error:(NSString **)outError {
+    #define RV_FAIL(msg) do { if (outError) { *outError = (msg); } return nil; } while (0)
+
     if (!_vroView || !_currentScene || !locationTransformCsv) {
-        return nil;
+        RV_FAIL(@"The AR view is not ready, or no locationTransform was given");
     }
 
     std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
     if (!sceneController) {
-        return nil;
+        RV_FAIL(@"No scene is mounted");
     }
 
     std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
     if (!arScene) {
-        return nil;
+        RV_FAIL(@"The mounted scene is not a ViroARScene");
     }
 
     std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
     if (!worldMesh) {
-        return nil;
+        RV_FAIL(@"World mesh capture is off - set worldMeshEnabled before scanning");
     }
 
     VROMatrix4f locationTransform = rvParseMatrixCsv(locationTransformCsv);
     std::vector<uint8_t> bytes = worldMesh->serializeCurrentMesh(locationTransform);
     if (bytes.empty()) {
-        return nil;
+        RV_FAIL(@"The world mesh is still empty - this device needs LiDAR, and the mesh takes "
+                 "a few seconds of looking around to accumulate");
     }
 
     NSData *data = [NSData dataWithBytes:bytes.data() length:bytes.size()];
     NSString *fileName = [NSString stringWithFormat:@"rvmesh_%@.bin", [[NSUUID UUID] UUIDString]];
     NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
     if (![data writeToFile:filePath atomically:YES]) {
-        return nil;
+        RV_FAIL(@"Could not write the mesh to the temporary directory");
     }
     return filePath;
+
+    #undef RV_FAIL
 }
 
 // WS-C: reverse of rvSnapshotWorldMeshToFile — load a resolved mesh snapshot

@@ -23,6 +23,11 @@ import {
   ViewProps,
 } from "react-native";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import {
+  parseScanDiagnostics,
+  parseScanStatus,
+  withScanDiagnostics,
+} from "./ViroScanStatus";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
   ViroWorldOrigin,
@@ -33,6 +38,8 @@ import {
   ViroCloudAnchorStatus,
   ViroResolveCloudAnchorResult,
   ViroFinishScanResult,
+  ViroScanDiagnostics,
+  ViroScanStatus,
   ViroWorldMeshSnapshotResult,
   ViroWorldMeshLoadResult,
   ViroGeospatialSupportResult,
@@ -942,10 +949,47 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _finishScan = async (
     ttlDays: number = 1
   ): Promise<ViroFinishScanResult> => {
-    return await ViroARSceneNavigatorModule.rvFinishScan(
-      findNodeHandle(this),
-      Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
-    );
+    const nodeHandle = findNodeHandle(this);
+    const result: ViroFinishScanResult =
+      await ViroARSceneNavigatorModule.rvFinishScan(
+        nodeHandle,
+        Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
+      );
+
+    // A failure arrives as a sentence, which is all a person needs and not enough for an app to
+    // say what to do differently. The numbers the gate compared are attached here so a caller can
+    // tell "walk to more positions" from "there was nothing to see".
+    if (!result?.success) {
+      return withScanDiagnostics(result, await this._getScanDiagnostics());
+    }
+    return result;
+  };
+
+  /**
+   * How the scan in progress is doing.
+   *
+   * Cheap enough to poll on a timer while someone walks a room: the renderer reads the keyframe
+   * buffer's camera poses and triangulates nothing.
+   */
+  _getScanStatus = async (): Promise<ViroScanStatus> => {
+    try {
+      return parseScanStatus(
+        await ViroARSceneNavigatorModule.rvGetScanStatus(findNodeHandle(this))
+      );
+    } catch (error) {
+      return { available: false, error: String(error) };
+    }
+  };
+
+  /** The measurements behind the last scan-based host, pass or fail. */
+  _getScanDiagnostics = async (): Promise<ViroScanDiagnostics> => {
+    try {
+      return parseScanDiagnostics(
+        await ViroARSceneNavigatorModule.rvGetScanDiagnostics(findNodeHandle(this))
+      );
+    } catch {
+      return { valid: false };
+    }
   };
 
   /**
@@ -1639,6 +1683,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    getScanStatus: this._getScanStatus,
+    getScanDiagnostics: this._getScanDiagnostics,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
     rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
@@ -1711,6 +1757,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
     startScan: this._startScan,
     finishScan: this._finishScan,
+    getScanStatus: this._getScanStatus,
+    getScanDiagnostics: this._getScanDiagnostics,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
     rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,

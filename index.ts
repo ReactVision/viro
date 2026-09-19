@@ -320,6 +320,9 @@ import {
   ViroHandJoints,
   ViroHandPinchEvent,
   ViroHandUpdateEvent,
+  // VPS-Lite scan observability
+  ViroScanStatus,
+  ViroScanDiagnostics,
 } from "./components/Types/ViroEvents";
 import { ViroSurface } from "./components/ViroSurface";
 import { ViroSceneNavigator } from "./components/ViroSceneNavigator";
@@ -565,6 +568,9 @@ export {
   ViroHandJoints,
   ViroHandPinchEvent,
   ViroHandUpdateEvent,
+  // VPS-Lite scan observability
+  ViroScanStatus,
+  ViroScanDiagnostics,
   // Studio Integration
   StudioSceneNavigator,
   StudioARScene,

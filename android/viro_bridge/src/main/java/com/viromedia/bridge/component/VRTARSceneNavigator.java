@@ -1207,6 +1207,28 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.rvFinishScan(ttlDays, callback);
     }
 
+    /**
+     * Scan status or diagnostics, whichever was asked for, as the renderer's own JSON.
+     *
+     * No ensureRvConfigApplied: this reads state, and a reader should not be the thing that
+     * configures the provider — if there is none, saying so is the answer.
+     */
+    public void rvGetScanJson(boolean diagnostics, ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) {
+                callback.onResult(diagnostics ? "{\"valid\":false}"
+                                              : "{\"available\":false,\"error\":\"AR scene not available\"}");
+            }
+            return;
+        }
+        if (diagnostics) {
+            arScene.rvGetScanDiagnostics(callback);
+        } else {
+            arScene.rvGetScanStatus(callback);
+        }
+    }
+
     // CL-H: platform-native shared frames (Quest). No ensureRvConfigApplied —
     // these never reach the ReactVision backend, so the API key and project id
     // that cloud anchors need are irrelevant here.

@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroCloudAnchorStatus, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroCloudAnchorStatus, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroScanDiagnostics, ViroScanStatus, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats } from "../Types/ViroWorldMesh";
 /**
@@ -475,6 +475,15 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
      */
     _finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
     /**
+     * How the scan in progress is doing.
+     *
+     * Cheap enough to poll on a timer while someone walks a room: the renderer reads the keyframe
+     * buffer's camera poses and triangulates nothing.
+     */
+    _getScanStatus: () => Promise<ViroScanStatus>;
+    /** The measurements behind the last scan-based host, pass or fail. */
+    _getScanDiagnostics: () => Promise<ViroScanDiagnostics>;
+    /**
      * CL-H: establish a platform-native shared coordinate frame and publish it to
      * `groupId` for other devices in the room to join. Quest only.
      *
@@ -746,6 +755,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         cancelCloudAnchorOperations: () => void;
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+        getScanStatus: () => Promise<ViroScanStatus>;
+        getScanDiagnostics: () => Promise<ViroScanDiagnostics>;
         rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;
@@ -811,6 +822,8 @@ export declare class ViroARSceneNavigator extends React.Component<Props, State> 
         cancelCloudAnchorOperations: () => void;
         startScan: () => void;
         finishScan: (ttlDays?: number) => Promise<ViroFinishScanResult>;
+        getScanStatus: () => Promise<ViroScanStatus>;
+        getScanDiagnostics: () => Promise<ViroScanDiagnostics>;
         rvCreateSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         rvJoinSharedFrame: (groupId: string) => Promise<ViroSharedFrameResult>;
         snapshotWorldMeshToFile: (locationTransform: string) => Promise<ViroWorldMeshSnapshotResult>;

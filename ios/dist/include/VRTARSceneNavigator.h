@@ -232,6 +232,11 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 
 // Cloud anchor management
 - (void)rvStartScan;
+/** Scan status as the renderer's JSON; `{"available":false}` when there is no session. */
+- (NSString *)rvGetScanStatusJson;
+/** Last scan-based host's measurements as the renderer's JSON. */
+- (NSString *)rvGetScanDiagnosticsJson;
+
 - (void)rvFinishScan:(NSInteger)ttlDays
    completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId,
                                NSString *locationTransformCsv, NSString *error))completionHandler;

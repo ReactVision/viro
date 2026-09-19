@@ -424,6 +424,56 @@ export type ViroFinishScanResult = {
      */
     locationTransform?: string;
     error?: string;
+    /**
+     * What the coverage gate measured, when it is the reason this failed.
+     *
+     * The message is a sentence for a person; this is the same verdict in numbers, so an app can
+     * say which one fell short instead of repeating "insufficient scan quality".
+     */
+    diagnostics?: ViroScanDiagnostics;
+};
+/**
+ * How a scan is doing while it is still going.
+ *
+ * Safe to poll on a timer: the renderer reads the keyframe buffer's camera poses and
+ * triangulates nothing.
+ */
+export type ViroScanStatus = {
+    /** False when no ReactVision provider is configured — nothing is being scanned. */
+    available: boolean;
+    /** True between startScan() and finishScan(). */
+    scanning?: boolean;
+    keyframes?: number;
+    /** Keyframe pairs at least 3 cm apart — the same measure the coverage gate applies. */
+    viewpointPairs?: number;
+    /**
+     * Bounding-box diagonal of the camera path so far.
+     *
+     * Not the number the gate finally checks, which is the spread of the *triangulated points*
+     * and only exists after finishScan(). Walking a wider path is what produces a wider cloud,
+     * but treat this as guidance, not as a prediction.
+     */
+    cameraSpreadMeters?: number;
+    minKeyframes?: number;
+    minViewpointPairs?: number;
+    minSpreadMeters?: number;
+    meetsKeyframes?: boolean;
+    meetsViewpointPairs?: boolean;
+    meetsSpread?: boolean;
+    error?: string;
+};
+/** The measurements behind the last scan-based host, pass or fail. */
+export type ViroScanDiagnostics = {
+    /** False until a scan has finished or failed in this session. */
+    valid: boolean;
+    keyframes?: number;
+    triangulatedPoints?: number;
+    viewpointPairs?: number;
+    /** Spread of the triangulated points — the number the gate compared. */
+    spreadMeters?: number;
+    minPoints?: number;
+    minViewpointPairs?: number;
+    minSpreadMeters?: number;
 };
 /**
  * Result of snapshotWorldMeshToFile() (WS-C). filePath points at a local

@@ -648,6 +648,31 @@ public:
     virtual void rvStartScan() {
         // Default implementation does nothing
     }
+
+    /**
+     * How the scan in progress is doing, as JSON.
+     *
+     * JSON rather than a struct because this crosses to Java and Objective-C and on to
+     * JavaScript, and every layer in between would otherwise need the same shape written out
+     * again. The keys are: scanning, keyframes, viewpointPairs, cameraSpreadMeters,
+     * minKeyframes, minViewpointPairs, minSpreadMeters, meetsKeyframes, meetsViewpointPairs,
+     * meetsSpread — plus `available`, false when no provider is configured.
+     *
+     * Cheap enough to poll: it reads the keyframe buffer's poses, and triangulates nothing.
+     */
+    virtual std::string rvGetScanStatusJson() {
+        return "{\"available\":false}";
+    }
+
+    /**
+     * The numbers behind the last scan-based host, as JSON.
+     *
+     * Keys: valid, keyframes, triangulatedPoints, viewpointPairs, spreadMeters, minPoints,
+     * minViewpointPairs, minSpreadMeters. `valid` is false until a scan has finished or failed.
+     */
+    virtual std::string rvGetScanDiagnosticsJson() {
+        return "{\"valid\":false}";
+    }
     // WS-C: locationTransform is the 16 values of the VROMatrix4f used to host
     // this scan, comma-separated, column-major (VROMatrix4f::getArray() order).
     // Pass it straight through to rvSnapshotWorldMeshToFile() if attaching a

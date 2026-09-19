@@ -48,6 +48,7 @@ exports.ViroARSceneNavigator = void 0;
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
+const ViroScanStatus_1 = require("./ViroScanStatus");
 const ViroNativeModule_1 = require("../Utilities/ViroNativeModule");
 const ViroARSceneNavigatorModule = (0, ViroNativeModule_1.withMissingModuleFallback)(react_native_1.NativeModules.VRTARSceneNavigatorModule, "VRTARSceneNavigatorModule");
 let mathRandomOffset = 0;
@@ -568,8 +569,39 @@ class ViroARSceneNavigator extends React.Component {
      * @returns Promise resolving to the hosting result with cloudAnchorId
      */
     _finishScan = async (ttlDays = 1) => {
-        return await ViroARSceneNavigatorModule.rvFinishScan((0, react_native_1.findNodeHandle)(this), Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
+        const nodeHandle = (0, react_native_1.findNodeHandle)(this);
+        const result = await ViroARSceneNavigatorModule.rvFinishScan(nodeHandle, Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
         );
+        // A failure arrives as a sentence, which is all a person needs and not enough for an app to
+        // say what to do differently. The numbers the gate compared are attached here so a caller can
+        // tell "walk to more positions" from "there was nothing to see".
+        if (!result?.success) {
+            return (0, ViroScanStatus_1.withScanDiagnostics)(result, await this._getScanDiagnostics());
+        }
+        return result;
+    };
+    /**
+     * How the scan in progress is doing.
+     *
+     * Cheap enough to poll on a timer while someone walks a room: the renderer reads the keyframe
+     * buffer's camera poses and triangulates nothing.
+     */
+    _getScanStatus = async () => {
+        try {
+            return (0, ViroScanStatus_1.parseScanStatus)(await ViroARSceneNavigatorModule.rvGetScanStatus((0, react_native_1.findNodeHandle)(this)));
+        }
+        catch (error) {
+            return { available: false, error: String(error) };
+        }
+    };
+    /** The measurements behind the last scan-based host, pass or fail. */
+    _getScanDiagnostics = async () => {
+        try {
+            return (0, ViroScanStatus_1.parseScanDiagnostics)(await ViroARSceneNavigatorModule.rvGetScanDiagnostics((0, react_native_1.findNodeHandle)(this)));
+        }
+        catch {
+            return { valid: false };
+        }
     };
     /**
      * CL-H: establish a platform-native shared coordinate frame and publish it to
@@ -1008,6 +1040,8 @@ class ViroARSceneNavigator extends React.Component {
         cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
         startScan: this._startScan,
         finishScan: this._finishScan,
+        getScanStatus: this._getScanStatus,
+        getScanDiagnostics: this._getScanDiagnostics,
         rvCreateSharedFrame: this._rvCreateSharedFrame,
         rvJoinSharedFrame: this._rvJoinSharedFrame,
         snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
@@ -1080,6 +1114,8 @@ class ViroARSceneNavigator extends React.Component {
         cancelCloudAnchorOperations: this._cancelCloudAnchorOperations,
         startScan: this._startScan,
         finishScan: this._finishScan,
+        getScanStatus: this._getScanStatus,
+        getScanDiagnostics: this._getScanDiagnostics,
         rvCreateSharedFrame: this._rvCreateSharedFrame,
         rvJoinSharedFrame: this._rvJoinSharedFrame,
         snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,

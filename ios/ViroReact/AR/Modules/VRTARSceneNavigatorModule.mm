@@ -1159,6 +1159,42 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
     }];
 }
 
+// How the scan in progress is doing, and why the last one ended as it did.
+//
+// Both resolve the renderer's own JSON string, parsed on the JS side. The shape is defined once,
+// in VROARSession, instead of being restated in each bridge and drifting between them.
+RCT_EXPORT_METHOD(rvGetScanStatus:(nonnull NSNumber *)reactTag
+                          resolve:(RCTPromiseResolveBlock)resolve
+                           reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@"{\"available\":false,\"error\":\"AR navigator is not mounted yet\"}"); return;
+            }
+            resolve([(VRTARSceneNavigator *)view rvGetScanStatusJson]);
+        } @catch (NSException *ex) {
+            resolve([NSString stringWithFormat:@"{\"available\":false,\"error\":\"%@\"}", ex.reason]);
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvGetScanDiagnostics:(nonnull NSNumber *)reactTag
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@"{\"valid\":false}"); return;
+            }
+            resolve([(VRTARSceneNavigator *)view rvGetScanDiagnosticsJson]);
+        } @catch (NSException *ex) {
+            resolve(@"{\"valid\":false}");
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                            anchorId:(NSString *)anchorId
                             resolve:(RCTPromiseResolveBlock)resolve

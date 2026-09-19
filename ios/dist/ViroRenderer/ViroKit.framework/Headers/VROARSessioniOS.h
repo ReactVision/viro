@@ -204,6 +204,8 @@ public:
 
     // Cloud anchor management
     void rvStartScan() override;
+    std::string rvGetScanStatusJson() override;
+    std::string rvGetScanDiagnosticsJson() override;
     void rvFinishScan(int ttlDays,
         std::function<void(bool, std::string, std::string, std::string)> callback) override;
     void rvGetCloudAnchor(const std::string& anchorId,

@@ -1968,6 +1968,41 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /**
+     * How the scan in progress is doing. Resolves the renderer's JSON verbatim, parsed on the JS
+     * side — the shape is defined once, in VROARSession, rather than restated in three bridges.
+     */
+    @ReactMethod
+    public void rvGetScanStatus(final int sceneNavTag, final Promise promise) {
+        rvResolveScanJson(sceneNavTag, false, promise);
+    }
+
+    /** The numbers behind the last scan-based host. */
+    @ReactMethod
+    public void rvGetScanDiagnostics(final int sceneNavTag, final Promise promise) {
+        rvResolveScanJson(sceneNavTag, true, promise);
+    }
+
+    private void rvResolveScanJson(final int sceneNavTag, final boolean diagnostics,
+                                   final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve("{\"available\":false,\"error\":\"UIManager not available\"}"); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve("{\"available\":false,\"error\":\"AR navigator is not mounted yet\"}");
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvGetScanJson(diagnostics, json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve("{\"available\":false,\"error\":\"" + String.valueOf(e.getMessage()) + "\"}");
+                }
+            }
+        });
+    }
+
     @ReactMethod
     public void rvSnapshotWorldMeshToFile(final int sceneNavTag, final String locationTransform, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);

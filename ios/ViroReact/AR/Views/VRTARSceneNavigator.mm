@@ -1781,6 +1781,20 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     arSession->rvStartScan();
 }
 
+- (NSString *)rvGetScanStatusJson {
+    if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return @"{\"available\":false,\"error\":\"AR session not available\"}";
+    return [NSString stringWithUTF8String:arSession->rvGetScanStatusJson().c_str()];
+}
+
+- (NSString *)rvGetScanDiagnosticsJson {
+    if (!_vroView) return @"{\"valid\":false}";
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return @"{\"valid\":false}";
+    return [NSString stringWithUTF8String:arSession->rvGetScanDiagnosticsJson().c_str()];
+}
+
 - (void)rvFinishScan:(NSInteger)ttlDays
    completionHandler:(void (^)(BOOL, NSString *, NSString *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, nil, nil, @"AR view not initialized"); return; }

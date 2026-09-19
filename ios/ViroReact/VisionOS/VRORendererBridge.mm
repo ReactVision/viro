@@ -1133,6 +1133,13 @@ static std::vector<dispatch_block_t> sRenderThreadQueue;
     NSLog(@"[Viro] React scene detached from the ImmersiveSpace renderer");
 }
 
+- (void)detachNativeSceneControllerIfCurrent:(std::shared_ptr<VROSceneController>)sceneController {
+    if (!sceneController || _activeSceneController != sceneController) {
+        return;
+    }
+    [self detachNativeSceneController];
+}
+
 - (void)setNativeSceneController:(std::shared_ptr<VROSceneController>)sceneController {
     if (!sceneController || !_renderer) {
         return;

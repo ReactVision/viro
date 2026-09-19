@@ -41,6 +41,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// waiting for the next frame.
 - (void)detachNativeSceneController;
 
+/// Drops the scene only if it is the one currently being rendered.
+///
+/// The ImmersiveSpace is one surface for the whole app and the renderer holds one scene, but an
+/// app can have several navigators mounted at once — a stack that keeps the screen underneath
+/// alive is the ordinary case. Whichever hands its scene over last is the one on display, and an
+/// unconditional detach from any of the others blanks it. This detaches only the owner's own.
+- (void)detachNativeSceneControllerIfCurrent:(std::shared_ptr<VROSceneController>)sceneController;
+
 @end
 
 NS_ASSUME_NONNULL_END

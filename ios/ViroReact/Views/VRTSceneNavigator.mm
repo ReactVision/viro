@@ -74,7 +74,15 @@
     if (newWindow == nil) {
         // Leaving the hierarchy: hand the renderer back an empty scene before React starts
         // destroying the views these nodes are built on.
-        [VRORendererBridge.currentBridge detachNativeSceneController];
+        //
+        // Only if the scene on display is this navigator's. A screen stack keeps the screen
+        // underneath mounted, so two navigators can be alive at once, and the one leaving is not
+        // necessarily the one being rendered — detaching unconditionally blanked the ImmersiveSpace
+        // of the screen the wearer was actually looking at.
+        if (_currentScene != nil) {
+            [VRORendererBridge.currentBridge
+                detachNativeSceneControllerIfCurrent:[_currentScene sceneController]];
+        }
         _pendingScene = nil;
     }
 }

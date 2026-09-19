@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.0.0 — 18 September 2026
+## v3.0.0 — 19 September 2026
 
 ### Added
 
@@ -18,11 +18,13 @@
 
 - **Android: a cloud anchor resolve or host issued on a scene's first frame hung forever.** A join flow mounts `<ViroSharedFrame>` or `<ViroARCloudAnchor>` with the id already known, so it resolves on mount, and on Android that reaches the native side before the AR session exists. The renderer dropped the request without answering: the promise never settled, the progress poll had nothing to report, and a second resolve of the same id was refused as already in progress. Fixed in `@reactvision/virocore`, where requests made before the session exists are queued and run the moment it attaches. On the bridge, a resolve that lands before Fabric has mounted the navigator now says "AR navigator is not mounted yet" instead of "Invalid view type", and `<ViroSharedFrame>` waits one second between attempts instead of spending all three within the same millisecond.
 - **Quest builds failed Meta Horizon Store validation on Expo projects.** Two checks the plugin meant to handle never did. The `targetSdkVersion` cap rewrote `app/build.gradle`, but Expo's template resolves targetSdk from `gradle.properties` through `rootProject.ext`, so nothing matched and the APK shipped with targetSdk 36. The GLES `uses-feature` was declared `required="false"`, which the store validator does not count as a graphics API. When `xRMode` includes `"QUEST"`, the plugin now writes `android.targetSdkVersion=34` to `gradle.properties` (only ever lowering it; `android.questTargetSdkVersion` overrides the ceiling) and declares GLES 3.0 as required. Phone-only builds are unchanged.
+- **visionOS: the app failed to link on ReactVisionCCA symbols it never referenced.** `VROColocationSession.o` lives in the visionOS renderer archive and `-ObjC` pulls it into every link, so the missing xros slices of ReactVisionCCA broke any visionOS build — co-location or not, and excluding the module did not help. Both slices are built and merged now, so co-location works on visionOS instead of being left out. `VROColocationBridge.h` ships with them; its class was in the binary while the header was not.
 - **`ViroController` crashed the app on the first button event (`TypeError: Cannot read property 'props' of undefined`).** Its event handlers were prototype methods handed to the native view unbound; React Native dispatches them detached, so `this` was undefined once a click-type prop was set. They are now arrow class fields like `ViroBase`'s.
 - **Quest: `onDrag` followed the idle hand and objects jumped on grab / release when both hands were tracked.** Fixed in `@reactvision/virocore` (drag ownership per aim ray; grip / A / X / Y / thumbstick sources resolve against their own hand's ray).
 - **Quest: clicks on a highlighted button were dropped, and `onClick` (state `Clicked`) rarely fired.** Fixed in `@reactvision/virocore` (aim lasers no longer hit-testable, click grace and press capture, `Clicked` compared on handler nodes, button edges resolved against the current frame's hit).
 
-  > **The two Quest input fixes above are still inert in this branch.** Their native half is now on `virocore/develop` (`ffb38acb`, #369), but it landed after this branch's `viro_renderer-release.aar` was built, so the bundled binary does not carry it yet — see the Migration note.
+
+- **visionOS in an Expo app.** `withViroVisionOS` now follows the name React Native is installed under: an app that installs `@reactvision/react-native-visionos` through the `react-native` alias — which is what keeps iOS and Android on one copy and one set of pods — gets the visionOS Podfile's `require`, its `config[:reactNativePath]` and the Xcode bundling phase pointed at `react-native` rather than at a scoped directory that does not exist. The one-time setup command is also corrected: the template generates a whole React Native project, and only its `visionos/` folder belongs in an Expo app.
 
 ### Changed
 
@@ -32,7 +34,7 @@
 ### Migration
 
 - No breaking changes for phone builds. If an app also sets `android.targetSdkVersion` or `buildArchs` through `expo-build-properties`, the plugin listed earlier in `plugins` wins on the same `gradle.properties` key, because config-plugin mods run in reverse registration order.
-- **The bundled `viro_renderer-release.aar` needs a rebuild before release.** The 2.58.2 back-merge hit a genuine conflict on it: `release/2.58.2`'s AAR carries the Quest input fixes but predates the OBJ material fix, while develop's carries the OBJ fix and not the Quest ones — neither is a superset. Develop's was kept, because taking the other would regress OBJ materials. The rebuild is no longer waiting on anything: `virocore/develop` now carries the Quest input work (`ffb38acb`, #369) on top of the OBJ fix, so an AAR built from it is the superset neither side was, and the Quest input fixes stop being inert.
+- **The bundled `viro_renderer-release.aar` was rebuilt for this release.** The 2.58.2 back-merge had hit a genuine conflict on it — `release/2.58.2`'s AAR carried the Quest input fixes but predated the OBJ material fix, develop's carried the OBJ fix and not the Quest ones, and neither was a superset. The binaries in this package are built from `main` with both, so nothing here is inert.
 
 ## v2.58.1 — 17 August 2026
 

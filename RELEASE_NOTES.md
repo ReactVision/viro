@@ -2,7 +2,17 @@
 
 ## v3.0.0
 
-ViroReact now runs on five platforms from one codebase. This release adds **Apple Vision Pro** and **the web**, brings **mixed reality on Meta Quest** to the standard AR component API, and introduces **co-location** — two devices in the same room agreeing on where the scene is, with shared application state on top.
+ViroReact runs on five platforms from one codebase: iOS, Android, Meta Quest, Apple Vision Pro and the web.
+
+**Vision Pro and the web become usable in this release.** The renderer has supported both for a while, but neither could be reached from an application until the packages they need shipped — `@reactvision/react-native-visionos` and `@reactvision/visionos-template` for Vision Pro, `@reactvision/viro-web-renderer` for the browser. All three are published now.
+
+Three capabilities are new: **VPS**, which turns a scanned room into a coordinate frame that persists and can be localised into later or from another device; **co-location**, two devices agreeing on where the scene is with shared application state on top; and **mixed reality on Meta Quest** through the standard AR component API.
+
+### VPS
+
+Scan a room to define its own persistent coordinate frame, host it, and localise back into it later or from another device, with an optional world mesh for occlusion and physics.
+
+New in this release, `getScanStatus()`, `getScanDiagnostics()` and `getWorldMeshStats()` make a scan observable while it runs. `getScanStatus()` reports keyframes, viewpoint pairs and camera spread, each beside the threshold it is judged against, and is cheap enough to poll once a second. A failed `finishScan()` carries those measurements as `diagnostics`, so an application can tell the user which one fell short rather than repeating a generic failure.
 
 ### Apple Vision Pro
 
@@ -22,12 +32,6 @@ Viro runs in the browser through `react-native-web` and a WebAssembly build of t
 - **Frame helpers** — `parseLocationTransform`, `locationToWorld`, `worldToLocation`, `invertTransform`, `poseCsv` and `transformDirection`. World coordinates are per-session, so anything two devices exchange travels as location-frame coordinates and is converted on arrival.
 
 Co-location requires a paid plan. Replication must run on a single instance until room homing exists; see `reactvisioncca/server/README.md`.
-
-### VPS
-
-Scan a room to define its own persistent coordinate frame, host it, and localise back into it later or from another device, with an optional world mesh for occlusion and physics.
-
-New in this release, `getScanStatus()`, `getScanDiagnostics()` and `getWorldMeshStats()` make a scan observable while it runs. `getScanStatus()` reports keyframes, viewpoint pairs and camera spread, each beside the threshold it is judged against, and is cheap enough to poll once a second. A failed `finishScan()` carries those measurements as `diagnostics`, so an application can tell the user which one fell short rather than repeating a generic failure.
 
 ### Meta Quest
 

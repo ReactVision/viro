@@ -10,13 +10,18 @@
 - **`<ViroARCloudAnchor>` — co-located AR.** Renders its children in a resolved cloud anchor's *location frame*, which is the shared coordinate frame two devices in the same space can agree on. Mount it with the same `cloudAnchorId` on both devices and a child at `[0, 0, -1]` is the same physical metre on each, with no coordinate maths in app code — previously `resolveCloudAnchor()` returned position/rotation/scale and no scene node, leaving every app to redo the frame arithmetic itself. Fires `onLocalized` once the frame exists, and `onLocalizeError` when localisation fails or times out.
 - **Location-frame conversion helpers**: `parseLocationTransform`, `locationToWorld`, `worldToLocation`, `invertTransform`. World coordinates are per-session — each AR session picks its origin wherever tracking started — so anything two devices exchange has to travel as location-frame coordinates and be converted on arrival. **Send frame coordinates, never world coordinates.**
 
+- **VPS scan observability**: `getScanStatus()`, `getScanDiagnostics()` and `getWorldMeshStats()` on the scene's `sceneNavigator`. A scan is silent while it collects, so it used to be indistinguishable from a device doing nothing, and the first signal arrived minutes later as one sentence. `getScanStatus()` reports keyframes, viewpoint pairs and camera spread, each beside the threshold it is judged against, and is cheap enough to poll once a second while someone walks a room. A failed `finishScan()` now carries the measurements as `diagnostics`, so an app can name the number that came up short. `getWorldMeshStats()` reports whether a mesh exists yet — poll it, because the `onWorldMeshUpdated` prop has never fired and is now deprecated.
+- **Quest Store packaging defaults**: arm64-only builds (`android.questArm64Only`, default true) and a `com.oculus.supportedDevices` manifest entry (`android.questSupportedDevices`, default `quest2|questpro|quest3|quest3s`).
+
 ### Fixed
 
 - **Quest builds failed Meta Horizon Store validation on Expo projects.** The plugin's targetSdk cap never applied on Expo's template and the GLES declaration was optional, which the store reads as missing. With `"QUEST"` in `xRMode` the plugin now sets `android.targetSdkVersion=34` in `gradle.properties` and requires GLES 3.0.
+- **Viro's `removeFromSuperview` swizzle stripped gesture recognizers from Apple's own views.** The fix for a Fabric teardown crash was installed on `UIView`, so it ran for every view in the host app. Apple's frameworks re-parent their own controls and need those recognizers to survive it: an app using AVKit alongside Viro lost the tap that toggles fullscreen video controls, and `UIImagePickerController` lost its shutter button. Both swizzles now skip classes owned by Apple.
+- **`finishScan()` hosted whatever was in the buffer with no scan started, and a failed mesh snapshot gave one message for six different causes.** `finishScan()` outside a scan window is now refused, and a snapshot names which precondition broke — capture off, mesh still empty, wrong scene type, and so on. "Capture is off" and "the mesh has not accumulated yet" call for opposite responses, and the old message could not tell them apart.
 
-### Added
+### Deprecated
 
-- **Quest Store packaging defaults**: arm64-only builds (`android.questArm64Only`, default true) and a `com.oculus.supportedDevices` manifest entry (`android.questSupportedDevices`, default `quest2|questpro|quest3|quest3s`).
+- **`onWorldMeshUpdated`** has never fired: `VROARScene` calls its delegate on every mesh update and neither platform's bridge forwards the call. Poll `getWorldMeshStats()` instead. The prop is kept so existing code compiles.
 
 ## v2.58.1
 

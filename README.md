@@ -26,11 +26,11 @@ ViroReact is MIT licensed and free forever.
 
 | Platform             | Support      | Notes |
 | -------------------- | ------------ | ----- |
-| iOS (ARKit)          | ✅ Supported | Deployment target 15.1 |
-| Android (ARCore)     | ✅ Supported | |
-| Meta Horizon OS      | ✅ Supported | Quest 3 / 3S mixed reality through OpenXR |
-| Apple visionOS       | ✅ Supported | |
-| Web (WebGL2 / WASM)  | ✅ Supported | Needs the optional `@reactvision/viro-web-renderer` peer — see [WEB.md](./WEB.md) |
+| iOS (ARKit)          | ✅ | Deployment target 15.1 |
+| Android (ARCore)     | ✅ | |
+| Meta Horizon OS      | ✅ | Quest 3 / 3S mixed reality through OpenXR |
+| Apple visionOS       | ✅ | |
+| Web (WebGL2 / WASM)  | ✅ | Needs the optional `@reactvision/viro-web-renderer` peer — see [WEB.md](./WEB.md) |
 
 ViroReact works with both **React Native CLI** and **Expo** projects.
 

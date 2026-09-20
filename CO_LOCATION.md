@@ -248,8 +248,7 @@ Updates land at frame rate while anything is moving and stop entirely once every
 
 #### Smoothing something the hooks do not cover
 
-Both hooks are built on three exported primitives, for a value neither of them knows about — a
-camera, a scalar, a node you drive yourself:
+Both hooks are built on three exported primitives, for a value neither of them knows about — a camera, a scalar, a node you drive yourself:
 
 ```ts
 import { approachFactor, approachVec3, approachQuat } from "@reactvision/react-viro";
@@ -260,14 +259,9 @@ const next = approachVec3(current, target, t);
 const nextRot = approachQuat(current, target, t);  // shortest arc
 ```
 
-`approachFactor` is the part worth understanding: it converts a half-life and a frame duration into
-a blend weight, which is what makes the result frame-rate independent. A fixed per-frame fraction —
-`current + (target - current) * 0.2` — converges twice as fast at 90 Hz as at 45, so the same code
-feels different on a headset and a phone. Feed it the real frame delta and it does not.
+`approachFactor` is the part worth understanding: it converts a half-life and a frame duration into a blend weight, which is what makes the result frame-rate independent. A fixed per-frame fraction — `current + (target - current) * 0.2` — converges twice as fast at 90 Hz as at 45, so the same code feels different on a headset and a phone. Feed it the real frame delta and it does not.
 
-A frame long enough to cover several half-lives returns 1, which snaps. That is deliberate: after
-the app has been backgrounded you want the object where it is now, not a glide in from where the
-room was a minute ago.
+A frame long enough to cover several half-lives returns 1, which snaps. That is deliberate: after the app has been backgrounded you want the object where it is now, not a glide in from where the room was a minute ago.
 
 ---
 
@@ -298,9 +292,7 @@ Two sockets rather than two message types on one, because poses originate in C++
 
 ### Outside React — `ViroReplicationClient`
 
-`useViroReplicatedState` is a thin hook over `ViroReplicationClient`, which is exported for the
-cases a hook cannot serve: game logic in a plain module, a store you own, or anything that has to
-outlive the component that started it.
+`useViroReplicatedState` is a thin hook over `ViroReplicationClient`, which is exported for the cases a hook cannot serve: game logic in a plain module, a store you own, or anything that has to outlive the component that started it.
 
 ```ts
 import { ViroReplicationClient } from "@reactvision/react-viro";
@@ -317,12 +309,9 @@ stop();
 client.disconnect();
 ```
 
-It carries the same model as the hook — `claim` / `release` / `set` / `delete` / `clear`, `get` and
-`getEntities`, plus `state`, `localPeerId` and `error` — and notifies through `subscribe`, which
-returns its own unsubscribe. The rules below apply to both; only the delivery differs.
+It carries the same model as the hook — `claim` / `release` / `set` / `delete` / `clear`, `get` and `getEntities`, plus `state`, `localPeerId` and `error` — and notifies through `subscribe`, which returns its own unsubscribe. The rules below apply to both; only the delivery differs.
 
-One caveat: nothing disconnects it for you. A hook unmounts, a client does not, so a client that
-outlives its screen keeps a socket open and keeps counting against the room.
+One caveat: nothing disconnects it for you. A hook unmounts, a client does not, so a client that outlives its screen keeps a socket open and keeps counting against the room.
 
 ### The model
 
@@ -342,10 +331,7 @@ Limits per room: 512 entities and 16 KB of serialised fields per entity. `org-to
 
 **Positions stored here are location-frame coordinates, exactly like poses on the channel.** The same `worldToLocation` / `locationToWorld` conversion applies, for the same reason: a world position is per-session and means nothing to the peer receiving it.
 
-The fourth helper, `invertTransform`, is the one you reach for less often: it turns a location
-transform into the transform back, which is what `worldToLocation` uses internally and what you need
-if you are composing frames yourself — for instance placing content relative to one anchor while
-receiving it relative to another.
+The fourth helper, `invertTransform`, is the one you reach for less often: it turns a location transform into the transform back, which is what `worldToLocation` uses internally and what you need if you are composing frames yourself — for instance placing content relative to one anchor while receiving it relative to another.
 
 ### Writing at a sane rate
 
@@ -363,9 +349,7 @@ const drag = useViroThrottledWrite(
 // on release: drag.flush(); replication.release(id);
 ```
 
-The interval defaults to `VIRO_REPLICATION_WRITE_INTERVAL_MS`, which is exported so an app that
-writes on its own timer can pace itself against the same number rather than guessing one that
-happens to stay under the relay's limit.
+The interval defaults to `VIRO_REPLICATION_WRITE_INTERVAL_MS`, which is exported so an app that writes on its own timer can pace itself against the same number rather than guessing one that happens to stay under the relay's limit.
 
 `unchanged` is a deadband, and it is where most of the saving is: placing something precisely is mostly slow movement, and skipping those writes costs no latency at all. It is measured against what was last sent rather than the previous sample, so a slow drag cannot creep any distance one sub-threshold step at a time.
 

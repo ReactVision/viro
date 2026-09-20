@@ -65,7 +65,7 @@ ViroReact ships with a complete spatial computing toolkit out of the box — no 
 - Image and object recognition triggers
 - Cloud Anchors for persistent, multi-user shared AR content _(Platform feature)_
 - Geospatial Anchors that pin content to real-world latitude, longitude, and altitude _(Platform feature)_
-- Co-location: two devices in the same room agreeing on where the scene is, with replicated state on top — see [CO_LOCATION.md](./CO_LOCATION.md)
+- Co-location: two devices in the same room agreeing on where the scene is, with replicated state on top
 - VPS: scan a whole room to define its own persistent coordinate frame, then localise back into it later or from another device, with an optional world mesh for occlusion and physics _(Platform feature)_
 
 **Rendering**
@@ -130,7 +130,6 @@ Full walkthrough — including Studio setup, exporting a scene, and wiring `Stud
 
 Guides that ship in this repository:
 
-- [`CO_LOCATION.md`](./CO_LOCATION.md) — two devices agreeing on one coordinate frame, with replicated room state on top
 - [`WEB.md`](./WEB.md) — running Viro in the browser
 - [`CHANGELOG.md`](./CHANGELOG.md) — what changed, by release
 

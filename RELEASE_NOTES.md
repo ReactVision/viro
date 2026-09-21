@@ -1,5 +1,41 @@
 # Release Notes
 
+## v3.0.1
+
+Co-location works on Meta Quest. It was announced in 3.0.0 and did not run there: `metaSpatialAnchorFrameSource` reported itself supported on a headset, and the call failed at the last step.
+
+Every layer beneath was finished. The OpenXR session has driven Meta's spatial-anchor group sharing since it learned the extension, and `com.viro.core.ARScene` exposed both calls in Java. What was missing was the forwarding — and then, once that was built, four more things, none of which produced an error.
+
+That is the part worth knowing if you are debugging something similar. A missing Android permission does not make the Meta runtime refuse a call; it hides the extension from enumeration, so the headset looks like one that never supported shared anchors. Loading a function from an extension that was never enabled at instance creation returns false quietly. An OpenXR event the renderer does not forward leaves a callback waiting forever, because every spatial-entity call answers by event. And a query filter chained in the wrong field is rejected as a validation failure that names the query rather than the filter.
+
+Verified on a Quest 3: `create` publishes an anchor, `join` recovers the frame.
+
+### Using it
+
+```tsx
+import { ViroSharedFrame, metaSpatialAnchorFrameSource } from "@reactvision/react-viro";
+
+// The headset that publishes the room:
+<ViroSharedFrame source={metaSpatialAnchorFrameSource(roomUuid, "create")} />
+
+// Every other headset joining it:
+<ViroSharedFrame source={metaSpatialAnchorFrameSource(roomUuid, "join")} />
+```
+
+Two requirements, both of which report themselves rather than failing quietly:
+
+**Your scene must be rooted in `ViroARScene`.** Co-location means agreeing on a room, and a fully virtual scene has no room to agree on — no AR session, no anchor to share. Under a `ViroScene` root the call answers *"Co-location needs a mixed-reality scene"*.
+
+**Your app needs the config plugin**, which now declares `horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA`. Run `expo prebuild` after upgrading so the manifest picks it up.
+
+Co-location remains same-family: a Quest on a Meta anchor and a phone on a cloud anchor are in unrelated frames, and nothing has ever observed both. That is a scope decision rather than a gap. Full API in `docs/CO_LOCATION.md`, Quest specifics in `docs/QUEST_SETUP.md` §7d.
+
+### Also in this release
+
+The renderer changes this depends on are in `@reactvision/virocore` 3.0.1, which ships inside this package as prebuilt binaries — there is nothing to install separately.
+
+Nothing else changed. If you are not using co-location on Quest, 3.0.1 is identical to 3.0.0 in behaviour.
+
 ## v3.0.0
 
 ViroReact runs on five platforms from one codebase: iOS, Android, Meta Quest, Apple Vision Pro and the web.

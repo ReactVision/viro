@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.0.1 — 21 September 2026
+
+### Fixed
+
+- **Co-location now works on Meta Quest.** `metaSpatialAnchorFrameSource` reported itself supported on a headset and then failed at the last step with *"This navigator does not expose shared frames"*. Everything beneath was finished — the OpenXR session has driven Meta's group sharing since it learned the extension — and nothing forwarded to it. `ViroXRSceneNavigator`'s Quest branch builds its own navigator object, and that object carried `push`, `pop`, `project` and `unproject` and no `rv*` methods at all. The two calls now go through `VRModuleOpenXR` rather than `ARSceneNavigatorModule`, which resolves its view as a `VRTARSceneNavigator` and rejects anything else — VRActivity hosts the VR navigator instead. Verified on a Quest 3: `create` publishes an anchor and `join` recovers the frame. Four renderer fixes land alongside this one; see `@reactvision/virocore` 3.0.1.
+
+  Co-location on Quest requires a scene rooted in `ViroARScene`. A VR scene has no AR session and therefore no anchor to share, and the call says so rather than failing quietly. See `docs/QUEST_SETUP.md` §7d.
+
+- **The Expo config plugin declares `horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA`.** Without it the Meta runtime does not refuse the co-location calls — it hides `XR_META_spatial_entity_group_sharing` from `xrEnumerateInstanceExtensionProperties` entirely, so an app sees a headset that appears not to support shared anchors at all. Nothing in the logs points at a permission unless you are reading the runtime's own extension enumeration.
+
 ## v3.0.0 — 19 September 2026
 
 ### Added

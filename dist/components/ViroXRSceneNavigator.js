@@ -154,6 +154,20 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
                 // without awaiting still get the rejection.
                 project: async (point) => ViroSceneNavigatorModule?.project(requireViewTag(), point),
                 unproject: async (point) => ViroSceneNavigatorModule?.unproject(requireViewTag(), point),
+                // CL-H. These are the two names `metaSpatialAnchorFrameSource` looks for,
+                // and their absence here is the whole of why co-location did not work on
+                // Quest: the native side has driven Meta's group sharing since the OpenXR
+                // session learned it, and nothing forwarded to it. They go through
+                // VRModuleOpenXR rather than ARSceneNavigatorModule because that module
+                // resolves its view as a VRTARSceneNavigator, which VRActivity does not host.
+                rvCreateSharedFrame: async (groupId) => VRModuleOpenXR_1.VRModuleOpenXR?.rvCreateSharedFrame?.(requireViewTag(), groupId) ?? {
+                    success: false,
+                    error: "VRModuleOpenXR is unavailable — is this a Quest build?",
+                },
+                rvJoinSharedFrame: async (groupId) => VRModuleOpenXR_1.VRModuleOpenXR?.rvJoinSharedFrame?.(requireViewTag(), groupId) ?? {
+                    success: false,
+                    error: "VRModuleOpenXR is unavailable — is this a Quest build?",
+                },
             };
             return { sceneNavigator: bridgeNav, arSceneNavigator: bridgeNav };
         }

@@ -497,6 +497,14 @@ const withViroManifest = (config: ExpoConfig) =>
           // app the headset RGB cameras via Camera2, used by ViroObjectDetector to
           // run on-device object detection over passthrough. Runtime-granted.
           "horizonos.permission.HEADSET_CAMERA",
+          // Co-location (CL-H). Without this the Meta runtime does not merely
+          // refuse the calls — it hides the extension from
+          // xrEnumerateInstanceExtensionProperties entirely, logging
+          // "skipping extension=XR_META_spatial_entity_group_sharing due to:
+          // missing uses-permission string ...". So the app sees a headset that
+          // does not support shared anchors, which is indistinguishable from an
+          // older device. Found on a Quest 3; it is not visible from the code.
+          "horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA",
         ];
         for (const perm of sceneAnchorPerms) {
           if (!existingPermissions.includes(perm)) {

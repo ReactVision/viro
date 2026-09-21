@@ -29,6 +29,9 @@ import com.viro.core.ViroViewGVR;
 import com.viro.core.ViroViewOVR;
 import com.viro.core.ViroViewOpenXR;
 import com.viro.core.ViroView;
+import com.viro.core.ARScene;
+import com.viromedia.bridge.component.node.VRTARScene;
+import android.view.View;
 import com.viromedia.bridge.ReactViroPackage;
 import com.viromedia.bridge.utility.ViroLog;
 
@@ -178,6 +181,63 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
      * Enable or disable XR_FB_passthrough mixed-reality mode.
      * No-op when the underlying view is not a {@link ViroViewOpenXR}.
      */
+    /**
+     * The ARScene this navigator is showing, if it is showing one.
+     *
+     * Quest mounts a plain {@code ViroScene} for VR and a {@code ViroARScene} for mixed
+     * reality, so this is null half the time by design. When it is not null the OpenXR
+     * renderer has already wired the AR session into it — see
+     * VROSceneRendererOpenXR::attachAR — which is what makes the calls below reach
+     * Meta's spatial anchors without any new native code.
+     */
+    private ARScene getCurrentARScene() {
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof VRTARScene) {
+                return (ARScene) ((VRTARScene) child).getNativeScene();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * CL-H: publish this device's frame to {@code groupId} as a Meta spatial anchor.
+     *
+     * The native half has been ready since the OpenXR session learned group sharing;
+     * what was missing was any way to ask for it from JavaScript, because the AR
+     * navigator owns those methods and Quest does not mount one.
+     *
+     * Requires a mixed-reality scene. A VR scene has no AR session and therefore no
+     * anchor to share, which is a real limitation rather than an oversight: co-location
+     * means agreeing on a room, and a fully virtual scene has no room to agree on.
+     */
+    public void rvCreateSharedFrame(String groupId, ARScene.RvSharedFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) {
+                callback.onResult(false, "", "",
+                        "Co-location needs a mixed-reality scene. This navigator is showing a VR "
+                        + "scene — root it in ViroARScene so the OpenXR session is running.");
+            }
+            return;
+        }
+        arScene.rvCreateSharedFrame(groupId, callback);
+    }
+
+    /** CL-H: recover the frame another headset published to {@code groupId}. */
+    public void rvJoinSharedFrame(String groupId, ARScene.RvSharedFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) {
+                callback.onResult(false, "", "",
+                        "Co-location needs a mixed-reality scene. This navigator is showing a VR "
+                        + "scene — root it in ViroARScene so the OpenXR session is running.");
+            }
+            return;
+        }
+        arScene.rvJoinSharedFrame(groupId, callback);
+    }
+
     public void setPassthroughEnabled(boolean enabled) {
         if (mViroView instanceof ViroViewOpenXR) {
             ((ViroViewOpenXR) mViroView).setPassthroughEnabled(enabled);

@@ -14,6 +14,10 @@ import com.facebook.react.module.annotations.ReactModule;
 import com.facebook.react.uimanager.UIManagerHelper;
 import com.viromedia.bridge.component.VRT3DSceneNavigator;
 import com.viromedia.bridge.component.VRTVRSceneNavigator;
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Promise;
+import com.facebook.react.bridge.WritableMap;
+import com.viro.core.ARScene;
 
 /**
  * React Native native module for Meta Quest / OpenXR-specific operations.
@@ -72,6 +76,72 @@ public class VRModuleOpenXR extends ReactContextBaseJavaModule {
      * @param sceneNavTag React tag of the ViroVRSceneNavigator view.
      * @param enabled     {@code true} to show passthrough; {@code false} for fully virtual.
      */
+    /**
+     * CL-H: co-location for Quest, published or joined.
+     *
+     * This lives here rather than on {@code ARSceneNavigatorModule} because that module
+     * resolves its view as a {@code VRTARSceneNavigator} and rejects anything else —
+     * and on Quest the VRActivity hosts a {@code VRTVRSceneNavigator}. Same native call
+     * underneath; the only thing that differs is which view knows how to reach it.
+     *
+     * Resolves rather than rejects on failure. A frame source reads {@code success} and
+     * turns a false into a {@code ViroFrameOutcome}, so a rejected promise would be an
+     * exception for something the caller already handles as a value.
+     */
+    @ReactMethod
+    public void rvCreateSharedFrame(final int sceneNavTag, final String groupId, final Promise promise) {
+        sharedFrameOp(sceneNavTag, groupId, false, promise);
+    }
+
+    /** CL-H: recover the frame another headset published to {@code groupId}. */
+    @ReactMethod
+    public void rvJoinSharedFrame(final int sceneNavTag, final String groupId, final Promise promise) {
+        sharedFrameOp(sceneNavTag, groupId, true, promise);
+    }
+
+    private static void resolveFailure(Promise promise, String error) {
+        WritableMap r = Arguments.createMap();
+        r.putBoolean("success", false);
+        r.putString("error", error);
+        promise.resolve(r);
+    }
+
+    private void sharedFrameOp(final int sceneNavTag, final String groupId,
+                               final boolean joining, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            resolveFailure(promise, "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTVRSceneNavigator)) {
+                        resolveFailure(promise, "Invalid view type — this call is for the Quest VR navigator");
+                        return;
+                    }
+                    ARScene.RvSharedFrameCallback cb = (success, frameId, transformCsv, error) -> {
+                        WritableMap r = Arguments.createMap();
+                        r.putBoolean("success", success);
+                        if (success) {
+                            r.putString("frameId", frameId);
+                            r.putString("transform", transformCsv);
+                        } else {
+                            r.putString("error", error);
+                        }
+                        promise.resolve(r);
+                    };
+                    if (joining) ((VRTVRSceneNavigator) view).rvJoinSharedFrame(groupId, cb);
+                    else         ((VRTVRSceneNavigator) view).rvCreateSharedFrame(groupId, cb);
+                } catch (Exception e) {
+                    resolveFailure(promise, e.getMessage());
+                }
+            }
+        });
+    }
+
     @ReactMethod
     public void setPassthroughEnabled(final int sceneNavTag, final boolean enabled) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);

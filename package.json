@@ -28,7 +28,8 @@
     "after:release": "./prepare_release.sh",
     "prepare": "npm run build",
     "harness:assets": "bash scripts/sync-harness-assets.sh",
-    "preharness": "npm run harness:assets"
+    "preharness": "npm run harness:assets",
+    "audit:events": "node scripts/audit-events.cjs"
   },
   "peerDependencies": {
     "@reactvision/react-native-visionos": ">=0.86.0 <0.87.0",

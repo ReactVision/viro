@@ -11,7 +11,7 @@
  */
 import * as React from "react";
 import { ViewProps } from "react-native";
-import { ViroWorldOrigin, ViroProvider, ViroCloudAnchorStateChangeEvent, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroCloudAnchorStatus, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroScanDiagnostics, ViroScanStatus, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
+import { ViroWorldOrigin, ViroProvider, ViroHostCloudAnchorResult, ViroSharedFrameResult, ViroCloudAnchorStatus, ViroResolveCloudAnchorResult, ViroFinishScanResult, ViroScanDiagnostics, ViroScanStatus, ViroWorldMeshSnapshotResult, ViroWorldMeshLoadResult, ViroGeospatialSupportResult, ViroLocationAccuracyResult, ViroEarthTrackingStateResult, ViroGeospatialPoseResult, ViroVPSAvailabilityResult, ViroCreateGeospatialAnchorResult, ViroQuaternion, ViroSemanticSupportResult, ViroSemanticLabelFractionsResult, ViroSemanticLabelFractionResult, ViroSemanticLabel, ViroMonocularDepthPreferenceResult, ViroDepthOcclusionSupportResult, ViroGeospatialSetupStatusResult } from "../Types/ViroEvents";
 import { Viro3DPoint, ViroNativeRef, ViroScene, ViroSceneDictionary } from "../Types/ViroUtils";
 import { ViroWorldMeshConfig, ViroWorldMeshStats, ViroWorldMeshStatsResult } from "../Types/ViroWorldMesh";
 /**
@@ -183,11 +183,6 @@ type Props = ViewProps & {
      * @platform ios,android
      */
     provider?: ViroProvider;
-    /**
-     * Callback fired when a cloud anchor state changes.
-     * This includes progress updates during hosting/resolving operations.
-     */
-    onCloudAnchorStateChange?: (event: ViroCloudAnchorStateChangeEvent) => void;
     /**
      * Enable world mesh for physics collision with real-world surfaces.
      * When enabled, virtual physics objects will collide with detected

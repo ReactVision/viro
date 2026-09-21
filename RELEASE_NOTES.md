@@ -34,7 +34,15 @@ Co-location remains same-family: a Quest on a Meta anchor and a phone on a cloud
 
 The renderer changes this depends on are in `@reactvision/virocore` 3.0.1, which ships inside this package as prebuilt binaries — there is nothing to install separately.
 
-Nothing else changed. If you are not using co-location on Quest, 3.0.1 is identical to 3.0.0 in behaviour.
+**One prop was removed.** `onCloudAnchorStateChange` on `ViroARSceneNavigator` was documented as firing "when a cloud anchor state changes, including progress updates during hosting/resolving", and was wired to nothing on either platform — no handler, no native event. An app that set it heard silence with no error to explain it. Removing a declared prop is the kind of change that normally waits for a major; this one never did anything, so nothing can break that was working.
+
+The state it promised was always available, in three places depending on what you are asking: `hostCloudAnchor()` and `resolveCloudAnchor()` resolve with `state`; `getCloudAnchorStatus()` reports progress while a resolve is running, which is what the callback was reaching for and carries more than a state change would; and `rvGetCloudAnchor(anchorId)` gives the current state of an anchor you did not just touch. `docs/VPS_LITE.md` has the table.
+
+`ViroCloudAnchorStateChangeEvent` stays exported, deprecated, so an existing import still compiles.
+
+Found by a new audit — `npm run audit:events` — that checks every declared `on*` callback against what Android emits, iOS names, or a JS parent invokes. It is in the repository because this is the second time a callback has shipped wired to nothing; `onWorldMeshUpdated` was the first.
+
+Nothing else changed.
 
 ## v3.0.0
 

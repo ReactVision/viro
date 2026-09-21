@@ -2,6 +2,14 @@
 
 ## v3.0.1 — 21 September 2026
 
+### Removed
+
+- **`onCloudAnchorStateChange` on `ViroARSceneNavigator`.** The prop was declared and documented as firing "when a cloud anchor state changes, including progress updates during hosting/resolving operations", and was never wired to anything: no handler on the component, no native event constant on Android or iOS. An app that set it heard nothing, with no error to explain the silence. Found by auditing every declared `on*` callback against what the native side actually emits.
+
+  Nothing is lost. `hostCloudAnchor()` and `resolveCloudAnchor()` already resolve with `state` on the result; `getCloudAnchorStatus()` reports progress while a resolve is in flight, which is what the callback was reaching for and reports considerably more than a state change would; and `rvGetCloudAnchor(anchorId)` returns the current state of an anchor you did not just touch. See `docs/VPS_LITE.md`.
+
+  `ViroCloudAnchorStateChangeEvent` stays exported and is marked deprecated, so an existing import still compiles. It will go in the next major.
+
 ### Fixed
 
 - **Co-location now works on Meta Quest.** `metaSpatialAnchorFrameSource` reported itself supported on a headset and then failed at the last step with *"This navigator does not expose shared frames"*. Everything beneath was finished — the OpenXR session has driven Meta's group sharing since it learned the extension — and nothing forwarded to it. `ViroXRSceneNavigator`'s Quest branch builds its own navigator object, and that object carried `push`, `pop`, `project` and `unproject` and no `rv*` methods at all. The two calls now go through `VRModuleOpenXR` rather than `ARSceneNavigatorModule`, which resolves its view as a `VRTARSceneNavigator` and rejects anything else — VRActivity hosts the VR navigator instead. Verified on a Quest 3: `create` publishes an anchor and `join` recovers the frame. Four renderer fixes land alongside this one; see `@reactvision/virocore` 3.0.1.

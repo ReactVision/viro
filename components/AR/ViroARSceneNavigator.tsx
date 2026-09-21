@@ -34,7 +34,6 @@ import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
   ViroWorldOrigin,
   ViroProvider,
-  ViroCloudAnchorStateChangeEvent,
   ViroHostCloudAnchorResult,
   ViroSharedFrameResult,
   ViroCloudAnchorStatus,
@@ -264,12 +263,6 @@ type Props = ViewProps & {
    * @platform ios,android
    */
   provider?: ViroProvider;
-
-  /**
-   * Callback fired when a cloud anchor state changes.
-   * This includes progress updates during hosting/resolving operations.
-   */
-  onCloudAnchorStateChange?: (event: ViroCloudAnchorStateChangeEvent) => void;
 
   /**
    * Enable world mesh for physics collision with real-world surfaces.

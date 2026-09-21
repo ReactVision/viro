@@ -694,7 +694,18 @@ export type ViroLocalizedEvent = {
 };
 
 /**
- * Event fired when a cloud anchor state changes.
+ * @deprecated Never fired. The `onCloudAnchorStateChange` prop this typed was
+ * declared on `ViroARSceneNavigator` and never wired to anything — no handler,
+ * no native event constant on either platform — so an app that set it heard
+ * nothing. The prop was removed in 3.0.1; this type is kept exported so an
+ * existing import does not break, and will go in the next major.
+ *
+ * Cloud anchor state is available without it, and always was:
+ *
+ * - `hostCloudAnchor()` and `resolveCloudAnchor()` resolve with `state` on the
+ *   result, which is the outcome this event would have reported.
+ * - `rvGetCloudAnchor(anchorId)` returns the current state of a known anchor,
+ *   for polling one you did not just host or resolve.
  */
 export type ViroCloudAnchorStateChangeEvent = {
   anchorId: string;

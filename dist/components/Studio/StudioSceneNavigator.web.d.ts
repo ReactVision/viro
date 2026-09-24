@@ -11,7 +11,9 @@
  * (for API_REQUEST functions) is likewise injected.
  */
 import * as React from "react";
+import type { ViroRendererAbortError } from "@reactvision/viro-web-renderer";
 import type { SequenceRuntimeContext } from "./domain/sceneNavigationHandler";
+import type { StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import type { StudioSceneResponse } from "./types";
 export interface StudioSceneNavigatorWebHandle {
     takeScreenshot: (fileName: string) => Promise<{
@@ -35,7 +37,20 @@ export interface StudioSceneNavigatorWebProps {
     /** slam-wasm loading for AR mode (see ViroARSceneNavigator.web). */
     slamScriptUrl?: string;
     onSceneReady?: () => void;
+    /** A scene failed to load or navigate. */
     onError?: (err: Error) => void;
+    /**
+     * An asset's model, image or video failed to load. The scene carries on
+     * without it; each failure is also logged to the console, as before.
+     */
+    onAssetError?: StudioAssetErrorHandler;
+    /**
+     * The renderer's WASM runtime aborted — out of memory, most often. Unlike an
+     * asset error this is terminal: the canvas stops drawing and nothing on it
+     * responds until the navigator is remounted. `renderError`, when given, is
+     * rendered in its place.
+     */
+    onRendererAbort?: (err: ViroRendererAbortError) => void;
     onSceneChange?: (sceneId: string, sceneName: string) => void;
     onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
     onPlaneDetected?: () => void;

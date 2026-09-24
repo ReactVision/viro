@@ -57,6 +57,18 @@ const studioRendererEffects_1 = require("./domain/studioRendererEffects");
 const variableStore_1 = require("./domain/variableStore");
 const StudioPlacementIndicator_web_1 = require("./StudioPlacementIndicator.web");
 const StudioRecordingIndicator_web_1 = require("./StudioRecordingIndicator.web");
+/**
+ * What the navigators mount as the scene. At module scope on purpose: it used to
+ * be a closure built in the render body, so every navigator render handed React
+ * a new component type, which unmounts and remounts the whole scene subtree and
+ * rebuilds every node in the renderer. A three-image scene rendered three times
+ * on first load, and a 29 MB model was fetched twice, doubling peak heap. The
+ * props now travel through `viroAppProps`, which both navigators spread onto it.
+ */
+function StudioSceneRoot({ sceneNavigator: _sceneNavigator, ...props }) {
+    return <StudioARScene_web_1.StudioARScene key={props.sceneData?.scene.id} {...props}/>;
+}
+const STUDIO_SCENE = { scene: StudioSceneRoot };
 function isARScene(sceneData) {
     const mode = (sceneData?.scene?.plane_detection ?? "NONE").toUpperCase();
     return mode === "AUTOMATIC" || mode === "MANUAL";
@@ -122,7 +134,7 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
         }}/>);
 };
 exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
-    const { recordingIndicator = true, placementIndicator = true, arOptions, onSessionReady, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
+    const { recordingIndicator = true, placementIndicator = true, arOptions, onSessionReady, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onAssetError, onRendererAbort, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
     const containerRef = (0, react_1.useRef)(null);
     // Session-scoped variable store (survives NAVIGATION between scenes).
     const variableStoreRef = (0, react_1.useRef)(null);
@@ -135,6 +147,17 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
     const [error, setError] = (0, react_1.useState)(null);
     const onSceneLoadedRef = (0, react_1.useRef)(onSceneLoaded);
     onSceneLoadedRef.current = onSceneLoaded;
+    // The navigators read their renderer options once, when they create it.
+    const onRendererAbortRef = (0, react_1.useRef)(onRendererAbort);
+    onRendererAbortRef.current = onRendererAbort;
+    const rendererOptions = (0, react_1.useMemo)(() => ({
+        ...webRendererOptions,
+        onAbort: (err) => {
+            webRendererOptions?.onAbort?.(err);
+            onRendererAbortRef.current?.(err);
+            setError(err);
+        },
+    }), [webRendererOptions]);
     const applyScene = (0, react_1.useCallback)((next) => {
         setSceneData(next);
         onSceneLoadedRef.current?.(next);
@@ -197,7 +220,21 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
     if (!sceneData)
         return <>{loadingView ?? null}</>;
     const resolvedMode = mode ?? (isARScene(sceneData) ? "ar" : "3d");
-    const SceneComponent = () => (<StudioARScene_web_1.StudioARScene placementApiRef={placementApiRef} placementStore={placementStore} key={sceneData.scene.id} sceneData={sceneData} mode={resolvedMode} apiRequestExecutor={apiRequestExecutor} navigate={navigate} onReady={onSceneReady} onSceneChange={onSceneChange} onPlaneDetected={onPlaneDetected} onUnsupported={onUnsupported} noAssetsMessage={noAssetsMessage} variableStore={variableStoreRef.current ?? undefined}/>);
+    const sceneProps = {
+        placementApiRef,
+        placementStore,
+        sceneData,
+        mode: resolvedMode,
+        apiRequestExecutor,
+        navigate,
+        onReady: onSceneReady,
+        onSceneChange,
+        onPlaneDetected,
+        onUnsupported,
+        onAssetError,
+        noAssetsMessage,
+        variableStore: variableStoreRef.current ?? undefined,
+    };
     // The two HUD pills sit over the canvas rather than in it: they are DOM
     // siblings, so neither the WebGL capture nor a canvas recorder sees them,
     // which is the same guarantee the native ones give. Offsets mirror the
@@ -211,7 +248,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
         pointerEvents: "none",
     };
     return (<div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {resolvedMode === "ar" ? (<ViroARSceneNavigator_web_1.ViroARSceneNavigator initialScene={{ scene: SceneComponent }} webRendererOptions={webRendererOptions} slamScriptUrl={slamScriptUrl} arOptions={{ detectPlanes: true, ...arOptions }} onSessionReady={onSessionReady} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>) : (<Viro3DSceneNavigator_web_1.Viro3DSceneNavigator initialScene={{ scene: SceneComponent }} webRendererOptions={webRendererOptions} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>)}
+      {resolvedMode === "ar" ? (<ViroARSceneNavigator_web_1.ViroARSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} slamScriptUrl={slamScriptUrl} arOptions={{ detectPlanes: true, ...arOptions }} onSessionReady={onSessionReady} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>) : (<Viro3DSceneNavigator_web_1.Viro3DSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>)}
       {recordingIndicator && (<div style={{ ...overlay, top: 52 }}>
           <StudioRecordingIndicator_web_1.StudioRecordingIndicator />
         </div>)}

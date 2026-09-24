@@ -68,6 +68,10 @@ export function ViroAnimatedImage(props: Props): null {
     const material = scene.createMaterial();
     scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
     scene.setMaterialBlendMode(material, ViroBlendMode.Alpha);
+    // Blended, so no depth write: virocore defaults it on and only discards under
+    // an alpha cutoff, so a fully transparent border still wrote depth and punched
+    // a hole in whatever was drawn behind it after it.
+    scene.setMaterialWritesToDepthBuffer(material, false);
 
     let currentTex = 0;
     let rafId = 0;

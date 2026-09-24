@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Web: the Studio scene no longer remounts on every navigator render (`StudioSceneNavigator.web`).** The scene component was a closure built in the render body, so each render handed React a new component type and the whole subtree — every node in the renderer — was torn down and rebuilt. A three-image scene rendered three times on first load and a 29 MB model was fetched twice. It is a module-level component now, fed through `viroAppProps`.
+- **Web: asset load failures reach the host.** `onAssetError(asset, error)` on `StudioSceneNavigator` (web); they used to go to `console.error` alone, which no error tracker hooks. `onRendererAbort` reports the terminal case — the renderer's runtime has aborted — and shows `renderError` in the canvas's place.
+- **Web: a denied motion permission stops AR from starting with nothing on screen (`ViroARSceneNavigator.web`).** The result was discarded; without an IMU the tracker never leaves initializing. A denial now shows why and does not start the session, and a grant that delivers no events is reported after three seconds. Both reach `onMotionUnavailable`. `renderWhileLimited` still starts regardless.
+- **Web: alpha-blended images no longer write depth (`ViroImage.web`, `ViroAnimatedImage.web`),** so a fully transparent border stops punching a hole in what is drawn behind it.
+
 ## v3.0.1 — 21 September 2026
 
 ### Removed

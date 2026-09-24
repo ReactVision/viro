@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "license": "MIT",
   "publishConfig": {
     "access": "public",

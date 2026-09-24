@@ -1,6 +1,11 @@
 # CHANGELOG
 
-## Unreleased
+## v3.0.2 — 24 September 2026
+
+### Changed
+
+- **The `@reactvision/viro-web-renderer` peer range is `^1.0.1`.** The heap, tap and dropout fixes live in its renderer build, not in this package.
+- **Native renderer binaries rebuilt on virocore 3.0.2** (`ViroKit`, `viro_renderer-release.aar`): glTF loads no longer copy the parsed model or its images.
 
 ### Fixed
 

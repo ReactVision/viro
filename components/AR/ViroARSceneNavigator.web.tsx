@@ -47,6 +47,9 @@ type ArOptions = Partial<
     ViroArSessionOptions,
     | "captureWidth"
     | "captureHeight"
+    | "feedWidth"
+    | "feedHeight"
+    | "poseSmoothing"
     | "facingMode"
     | "intrinsics"
     | "intrinsicsSize"

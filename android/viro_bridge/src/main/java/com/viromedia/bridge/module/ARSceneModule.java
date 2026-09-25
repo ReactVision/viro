@@ -43,7 +43,10 @@ import com.viro.core.ARNode;
 import com.viro.core.Matrix;
 import com.viro.core.Renderer;
 import com.viro.core.Vector;
+import com.viro.core.ViroView;
 import com.viro.core.ViroViewARCore;
+import com.viro.core.ViroViewOpenXR;
+import com.viromedia.bridge.component.VRT3DSceneNavigator;
 import com.viromedia.bridge.component.VRTARSceneNavigator;
 import com.viromedia.bridge.component.node.VRTARNode;
 import com.viromedia.bridge.utility.ARUtils;
@@ -56,6 +59,18 @@ import java.util.UUID;
 
 @ReactModule(name = "VRTARSceneModule")
 public class ARSceneModule extends ReactContextBaseJavaModule {
+
+    /**
+     * The OpenXR view a scene renders in on Quest, or null. A Quest AR scene hangs off a
+     * VR navigator rather than VRTARSceneNavigator, so the ARCore lookup never finds it.
+     */
+    private static ViroViewOpenXR openXRViewFor(View sceneView) {
+        if (sceneView == null || !(sceneView.getParent() instanceof VRT3DSceneNavigator)) {
+            return null;
+        }
+        ViroView view = ((VRT3DSceneNavigator) sceneView.getParent()).getViroView();
+        return (view instanceof ViroViewOpenXR) ? (ViroViewOpenXR) view : null;
+    }
 
     // Storage for hit test results to enable anchor creation
     private final Map<String, ARHitTestResult> mStoredHitResults = new HashMap<>();
@@ -131,13 +146,11 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View sceneView = viewResolver.resolveView(viewTag);
-                if (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
+                ViroViewOpenXR xrView = openXRViewFor(sceneView);
+                if (xrView == null && (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator))) {
                     promise.reject("ERROR", "Invalid view returned when calling performARHitTestWithRay: expected ViroARSceneNavigator as parent");
                     return;
                 }
-
-                VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
-                ViroViewARCore arView = arSceneNavigator.getARView();
 
                 if (ray.size() != 3) {
                     promise.resolve(Arguments.createArray());
@@ -149,6 +162,20 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
                 rayArray[1] = (float) ray.getDouble(1);
                 rayArray[2] = (float) ray.getDouble(2);
 
+                ARHitTestListener listener = new ARHitTestListener() {
+                    @Override
+                    public void onHitTestFinished(ARHitTestResult[] arHitTestResults) {
+                        WritableArray returnArray = storeHitResults(arHitTestResults);
+                        promise.resolve(returnArray);
+                    }
+                };
+                if (xrView != null) {
+                    xrView.performARHitTestWithRay(new Vector(rayArray), listener);
+                    return;
+                }
+
+                VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
+                ViroViewARCore arView = arSceneNavigator.getARView();
                 arView.performARHitTestWithRay(new Vector(rayArray), new ARHitTestListener() {
                     @Override
                     public void onHitTestFinished(ARHitTestResult[] arHitTestResults) {
@@ -173,13 +200,11 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View sceneView = viewResolver.resolveView(viewTag);
-                if (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator)) {
+                ViroViewOpenXR xrView = openXRViewFor(sceneView);
+                if (xrView == null && (sceneView == null || sceneView.getParent() == null || !(sceneView.getParent() instanceof VRTARSceneNavigator))) {
                     promise.reject("ERROR", "Invalid view returned when calling performARHitTestWithRay: expected ViroARSceneNavigator as parent");
                     return;
                 }
-
-                VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
-                ViroViewARCore arView = arSceneNavigator.getARView();
 
                 if ((origin.size() != 3) || (destination.size() != 3)) {
                     promise.resolve(Arguments.createArray());
@@ -196,6 +221,20 @@ public class ARSceneModule extends ReactContextBaseJavaModule {
                 destArray[1] = (float) destination.getDouble(1);
                 destArray[2] = (float) destination.getDouble(2);
 
+                ARHitTestListener listener = new ARHitTestListener() {
+                    @Override
+                    public void onHitTestFinished(ARHitTestResult[] arHitTestResults) {
+                        WritableArray returnArray = storeHitResults(arHitTestResults);
+                        promise.resolve(returnArray);
+                    }
+                };
+                if (xrView != null) {
+                    xrView.performARHitTestWithRay(new Vector(originArray), new Vector(destArray), listener);
+                    return;
+                }
+
+                VRTARSceneNavigator arSceneNavigator = (VRTARSceneNavigator) sceneView.getParent();
+                ViroViewARCore arView = arSceneNavigator.getARView();
                 arView.performARHitTestWithRay(new Vector(originArray), new Vector(destArray), new ARHitTestListener() {
                     @Override
                     public void onHitTestFinished(ARHitTestResult[] arHitTestResults) {

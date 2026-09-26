@@ -28,7 +28,7 @@ import { cameraBasis } from "../Web/viroMath";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
-import { createNode } from "./domain/viroNodeFactory";
+import { createNode, type StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import { studioAssetPosition } from "./domain/assetPosition";
 import {
   executeOnLoadFunction,
@@ -118,6 +118,8 @@ interface Props {
   placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
   /** Injected so the navigator can drive its own prompt off the same queue. */
   placementStore?: StudioPlacementStore;
+  /** Told when an asset's model, image or video fails to load. */
+  onAssetError?: StudioAssetErrorHandler;
 }
 
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
@@ -148,6 +150,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     variableStore,
     placementApiRef,
     placementStore,
+    onAssetError,
   } = props;
   const { scene, assets, animations, functions } = sceneData;
 
@@ -269,6 +272,15 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Animation runtime state ──────────────────────────────────────────────
   const [animOverrides, setAnimOverrides] = useState<Record<string, AnimOverride>>({});
   const [loadedAssetIds, setLoadedAssetIds] = useState<Record<string, true>>({});
+
+  // Through a ref, so a host passing a fresh arrow each render does not rebuild
+  // every node.
+  const onAssetErrorRef = useRef(onAssetError);
+  onAssetErrorRef.current = onAssetError;
+  const onAssetErrorStable = useCallback<StudioAssetErrorHandler>(
+    (asset, error) => onAssetErrorRef.current?.(asset, error),
+    [],
+  );
 
   const handleAssetLoaded = useCallback((assetId: string) => {
     setLoadedAssetIds((prev) => (prev[assetId] ? prev : { ...prev, [assetId]: true }));
@@ -577,6 +589,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
             proximityTargetIds.has(asset.id)
               ? registerProximityNode
               : undefined,
+            onAssetErrorStable,
           ),
         )
         .filter(Boolean) as React.ReactElement[],
@@ -589,6 +602,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       runtimeCtx,
       proximityTargetIds,
       registerProximityNode,
+      onAssetErrorStable,
     ],
   );
 

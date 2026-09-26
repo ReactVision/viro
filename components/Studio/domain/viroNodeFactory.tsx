@@ -59,7 +59,34 @@ export type NodeConfig = {
   animation?: ViroAnimationProp;
   /** Web only: the renderer handle for this node, as it is created and as it goes. */
   onNodeHandle?: (handle: number) => void;
+  /** Told when this asset's model, image or video fails to load. */
+  onAssetError?: StudioAssetErrorHandler;
 };
+
+/** An asset that failed to load, and why. */
+export type StudioAssetErrorHandler = (asset: StudioAsset, error: Error) => void;
+
+/**
+ * The asset's onError: logged as before, and handed to the host when it asked.
+ * Before this the console was the only place a failure went, and a host's error
+ * tracking hooks window.onerror and unhandledrejection, neither of which a
+ * caught load error ever reaches.
+ */
+function assetErrorHandler(asset: StudioAsset, config: NodeConfig, kind: string) {
+  return (e: unknown) => {
+    console.error(`[Studio] ${kind} "${asset.name}" error:`, e);
+    if (!config.onAssetError) return;
+    const error =
+      e instanceof Error
+        ? e
+        : new Error(
+            typeof e === "object" && e && "nativeEvent" in e
+              ? JSON.stringify((e as { nativeEvent: unknown }).nativeEvent)
+              : String(e)
+          );
+    config.onAssetError(asset, error);
+  };
+}
 
 export function createNodeConfig(
   asset: StudioAsset,
@@ -248,9 +275,7 @@ function create3DObject(
       onClick={config.onClick}
       {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
-      onError={(e) =>
-        console.error(`[Studio] 3D model "${asset.name}" error:`, e)
-      }
+      onError={assetErrorHandler(asset, config, "3D model")}
       // Viro derives native canDrag from `onDrag != undefined`; without this prop
       // the drag recognizer is never attached, even when dragType is set.
       {...(config.dragType
@@ -302,7 +327,7 @@ function createImage(
       onClick={config.onClick}
       {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
-      onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)}
+      onError={assetErrorHandler(asset, config, "Image")}
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
@@ -522,7 +547,7 @@ function createVideo(
       {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       loop={true}
       muted={false}
-      onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)}
+      onError={assetErrorHandler(asset, config, "Video")}
       {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})}
@@ -567,7 +592,8 @@ export function createNode(
   // transform off its component ref; web reads it off a renderer handle, since
   // these components' props carry an index signature that makes them unsafe
   // behind forwardRef (see useViroNode's onNodeHandle). Only one is ever set.
-  registerProximityNode?: (assetId: string, handle: number) => void
+  registerProximityNode?: (assetId: string, handle: number) => void,
+  onAssetError?: StudioAssetErrorHandler
 ): React.ReactElement | null {
   const type = resolveType(asset);
   const config = createNodeConfig(
@@ -583,6 +609,7 @@ export function createNode(
     dragSurface
   );
   config.onGaze = onGaze;
+  config.onAssetError = onAssetError;
 
   const proximityRef = registerProximityTarget
     ? (ref: unknown) => registerProximityTarget(asset.id, ref)

@@ -139,6 +139,11 @@ function loadSlamViaScript(url) {
  * poor light or fast motion — so calling it "initializing" would be wrong every
  * time it happens mid-session.
  */
+const MOTION_DENIED = "Motion access was denied. AR needs the motion sensors to track: allow " +
+    "Motion & Orientation Access for this site and try again.";
+const MOTION_MISSING = "No motion sensor data. AR can't start tracking on this device.";
+/** How long NoGravity may last before the tracker is taken to have no IMU. */
+const NO_MOTION_AFTER_MS = 3000;
 function trackingLabel(state) {
     switch (state) {
         case viro_web_renderer_1.ViroTrackingState.Normal:
@@ -159,6 +164,9 @@ function ViroARSceneNavigator(props) {
     const [starting, setStarting] = (0, react_1.useState)(false);
     const [error, setError] = (0, react_1.useState)(null);
     const [tracking, setTracking] = (0, react_1.useState)(viro_web_renderer_1.ViroTrackingState.Unavailable);
+    const [motionMissing, setMotionMissing] = (0, react_1.useState)(false);
+    const noGravitySinceRef = (0, react_1.useRef)(null);
+    const motionMissingRef = (0, react_1.useRef)(false);
     const [anchors, setAnchors] = (0, react_1.useState)([]);
     (0, react_1.useEffect)(() => {
         let cancelled = false;
@@ -224,13 +232,44 @@ function ViroARSceneNavigator(props) {
         // cannot use the answer.
         if (!props.arOptions?.playback) {
             // Request DeviceMotion permission from within this tap (required on iOS).
-            await (0, viro_web_renderer_1.requestDeviceMotionPermission)();
+            // The answer used to be ignored: a denial started the session anyway,
+            // with no IMU, and the tracker then never left "initializing" while the
+            // screen said nothing about why. renderWhileLimited is the one caller
+            // that wants to go on regardless (a desktop preview has no IMU at all).
+            const motion = await (0, viro_web_renderer_1.requestDeviceMotionPermission)();
+            if (!motion && !props.arOptions?.renderWhileLimited) {
+                setError(MOTION_DENIED);
+                setStarting(false);
+                props.onMotionUnavailable?.("denied");
+                return;
+            }
         }
+        noGravitySinceRef.current = null;
+        motionMissingRef.current = false;
+        setMotionMissing(false);
         const session = new viro_web_renderer_1.ViroArSession({
             sceneApi: renderer.scene,
             loadSlam: resolveLoadSlam(),
             ...props.arOptions,
-            onStatus: (state) => setTracking(state),
+            onStatus: (state, _quality, detail) => {
+                setTracking(state);
+                // Granted is not the same as arriving: some browsers grant and then
+                // deliver nothing. NoGravity past a few seconds means no IMU at all.
+                if (detail?.reason === viro_web_renderer_1.TrackingReason.NoGravity) {
+                    const now = performance.now();
+                    noGravitySinceRef.current ??= now;
+                    if (!motionMissingRef.current && now - noGravitySinceRef.current > NO_MOTION_AFTER_MS) {
+                        motionMissingRef.current = true;
+                        setMotionMissing(true);
+                        props.onMotionUnavailable?.("no-events");
+                    }
+                }
+                else if (noGravitySinceRef.current !== null) {
+                    noGravitySinceRef.current = null;
+                    motionMissingRef.current = false;
+                    setMotionMissing(false);
+                }
+            },
             onAnchorsUpdated: (next) => setAnchors(next),
             onError: (err) => {
                 console.error("[Viro web AR] session error:", err);
@@ -255,7 +294,15 @@ function ViroARSceneNavigator(props) {
         setStarted(true);
         setStarting(false);
         props.onSessionReady?.(session);
-    }, [renderer, starting, started, resolveLoadSlam, props.arOptions, props.onSessionReady]);
+    }, [
+        renderer,
+        starting,
+        started,
+        resolveLoadSlam,
+        props.arOptions,
+        props.onSessionReady,
+        props.onMotionUnavailable,
+    ]);
     // Replay starts on its own. The button exists to satisfy a browser that will
     // not open a camera without a gesture; there is no camera here, and a preview
     // that waits for a click nobody is there to make would simply never render.
@@ -287,7 +334,11 @@ function ViroARSceneNavigator(props) {
           </ViroWebContext_1.ViroARContext.Provider>
         </ViroWebContext_1.ViroRendererContext.Provider>) : null}
 
-      {started ? (<div style={statusStyle}>{trackingLabel(tracking)}</div>) : (<div style={overlayStyle}>
+      {started ? (<div style={statusStyle}>
+          {motionMissing && !props.arOptions?.renderWhileLimited
+                ? MOTION_MISSING
+                : trackingLabel(tracking)}
+        </div>) : (<div style={overlayStyle}>
           {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
           <div>{props.startLabel ?? "AR needs access to your camera."}</div>
           <button type="button" style={buttonStyle} disabled={!renderer || starting} onClick={startAR}>

@@ -118,6 +118,10 @@ function ViroImage(props) {
             const material = scene.createMaterial();
             scene.setMaterialLightingModel(material, viro_web_renderer_1.ViroLightingModel.Constant);
             scene.setMaterialBlendMode(material, viro_web_renderer_1.ViroBlendMode.Alpha);
+            // Blended, so no depth write: virocore defaults it on and only discards under
+            // an alpha cutoff, so a fully transparent border still wrote depth and punched
+            // a hole in whatever was drawn behind it after it.
+            scene.setMaterialWritesToDepthBuffer(material, false);
             scene.setMaterialTexture(material, viro_web_renderer_1.ViroTextureChannel.Diffuse, texture);
             scene.setGeometryMaterial(geo, material);
             textureRef.current = texture;

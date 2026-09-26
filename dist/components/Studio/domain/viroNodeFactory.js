@@ -47,6 +47,25 @@ const dragConfiguration_1 = require("./dragConfiguration");
 const physicsConfig_1 = require("./physicsConfig");
 const placementStore_1 = require("./placementStore");
 const assetPosition_1 = require("./assetPosition");
+/**
+ * The asset's onError: logged as before, and handed to the host when it asked.
+ * Before this the console was the only place a failure went, and a host's error
+ * tracking hooks window.onerror and unhandledrejection, neither of which a
+ * caught load error ever reaches.
+ */
+function assetErrorHandler(asset, config, kind) {
+    return (e) => {
+        console.error(`[Studio] ${kind} "${asset.name}" error:`, e);
+        if (!config.onAssetError)
+            return;
+        const error = e instanceof Error
+            ? e
+            : new Error(typeof e === "object" && e && "nativeEvent" in e
+                ? JSON.stringify(e.nativeEvent)
+                : String(e));
+        config.onAssetError(asset, error);
+    };
+}
 function createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, 
 // The detected plane this asset is anchored to, once the session has found
 // one. Only the assets under the plane wrapper have it.
@@ -152,7 +171,7 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
     const shaderOverrides = hasMaterialConfig
         ? [(0, materialConfig_1.studioMaterialName)(asset.id)]
         : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] 3D model "${asset.name}" error:`, e)} 
+    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={assetErrorHandler(asset, config, "3D model")} 
     // Viro derives native canDrag from `onDrag != undefined`; without this prop
     // the drag recognizer is never attached, even when dragType is set.
     {...(config.dragType
@@ -172,7 +191,7 @@ function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollisio
     // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
     // the picture. The crop this mode also selects needs explicit size props,
     // so the UVs stay 0 to 1.
-    resizeMode="ScaleToFill" position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={(e) => console.error(`[Studio] Image "${asset.name}" error:`, e)} {...(config.dragType
+    resizeMode="ScaleToFill" position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={assetErrorHandler(asset, config, "Image")} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
@@ -258,7 +277,7 @@ function createVideo(asset, config, notifyPhysicsDrag, onCollision, nodeRef) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} loop={true} muted={false} onError={(e) => console.error(`[Studio] Video "${asset.name}" error:`, e)} {...(config.dragType
+    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} loop={true} muted={false} onError={assetErrorHandler(asset, config, "Video")} {...(config.dragType
         ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
         : {})} {...(config.physicsBody
         ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
@@ -276,10 +295,11 @@ dragSurface,
 // transform off its component ref; web reads it off a renderer handle, since
 // these components' props carry an index signature that makes them unsafe
 // behind forwardRef (see useViroNode's onNodeHandle). Only one is ever set.
-registerProximityNode) {
+registerProximityNode, onAssetError) {
     const type = resolveType(asset);
     const config = createNodeConfig(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, isDragActive, onSceneChange, runtimeCtx, dragSurface);
     config.onGaze = onGaze;
+    config.onAssetError = onAssetError;
     const proximityRef = registerProximityTarget
         ? (ref) => registerProximityTarget(asset.id, ref)
         : undefined;

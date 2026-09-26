@@ -195,3 +195,47 @@ describe("the node factory's props", () => {
     expect(props.scale).toEqual([0.5, 0.5, 0.5]);
   });
 });
+
+describe("asset load failures", () => {
+  function withErrorHandler(a: StudioAsset, onAssetError: (a: StudioAsset, e: Error) => void) {
+    return createNode(
+      a, undefined, [], emptyScene, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, null,
+      undefined, onAssetError,
+    );
+  }
+
+  test("reach the host with the asset, not only the console", () => {
+    // They used to go to console.error alone, which no error tracker hooks.
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const seen: Array<[string, string]> = [];
+    const record = (a: StudioAsset, e: Error) => seen.push([a.id, e.message]);
+    for (const [id, type] of [["m", "3D-MODEL"], ["i", "IMAGE"], ["v", "VIDEO"]] as const) {
+      const el = inner(withErrorHandler(asset({ id, asset_type_name: type }), record));
+      (el.props as { onError: (e: unknown) => void }).onError(new Error(`${id} failed`));
+    }
+    expect(seen).toEqual([["m", "m failed"], ["i", "i failed"], ["v", "v failed"]]);
+    expect(spy).toHaveBeenCalledTimes(3);
+    spy.mockRestore();
+  });
+
+  test("a native error event arrives as an Error", () => {
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    let got: Error | null = null;
+    const el = inner(
+      withErrorHandler(asset({ id: "m", asset_type_name: "3D-MODEL" }), (_a, e) => { got = e; }),
+    );
+    (el.props as { onError: (e: unknown) => void }).onError({ nativeEvent: { error: "bad glb" } });
+    expect(got).toBeInstanceOf(Error);
+    expect((got as unknown as Error).message).toContain("bad glb");
+    spy.mockRestore();
+  });
+
+  test("without a handler they are still logged", () => {
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const el = inner(build(asset({ id: "m", asset_type_name: "3D-MODEL" })));
+    (el.props as { onError: (e: unknown) => void }).onError(new Error("x"));
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+});

@@ -16,9 +16,11 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
+import type { ViroRendererAbortError } from "@reactvision/viro-web-renderer";
 import { Viro3DSceneNavigator } from "../Viro3DSceneNavigator.web";
 import { ViroARSceneNavigator } from "../AR/ViroARSceneNavigator.web";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene.web";
@@ -29,6 +31,7 @@ import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
 import type { SequenceRuntimeContext } from "./domain/sceneNavigationHandler";
+import type { StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import type { StudioSceneResponse } from "./types";
 
 export interface StudioSceneNavigatorWebHandle {
@@ -51,7 +54,20 @@ export interface StudioSceneNavigatorWebProps {
   /** slam-wasm loading for AR mode (see ViroARSceneNavigator.web). */
   slamScriptUrl?: string;
   onSceneReady?: () => void;
+  /** A scene failed to load or navigate. */
   onError?: (err: Error) => void;
+  /**
+   * An asset's model, image or video failed to load. The scene carries on
+   * without it; each failure is also logged to the console, as before.
+   */
+  onAssetError?: StudioAssetErrorHandler;
+  /**
+   * The renderer's WASM runtime aborted — out of memory, most often. Unlike an
+   * asset error this is terminal: the canvas stops drawing and nothing on it
+   * responds until the navigator is remounted. `renderError`, when given, is
+   * rendered in its place.
+   */
+  onRendererAbort?: (err: ViroRendererAbortError) => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
   onPlaneDetected?: () => void;
@@ -82,6 +98,23 @@ export interface StudioSceneNavigatorWebProps {
   loadingView?: React.ReactNode;
   renderError?: (error: Error) => React.ReactNode;
 }
+
+type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
+  sceneNavigator?: unknown;
+};
+
+/**
+ * What the navigators mount as the scene. At module scope on purpose: it used to
+ * be a closure built in the render body, so every navigator render handed React
+ * a new component type, which unmounts and remounts the whole scene subtree and
+ * rebuilds every node in the renderer. A three-image scene rendered three times
+ * on first load, and a 29 MB model was fetched twice, doubling peak heap. The
+ * props now travel through `viroAppProps`, which both navigators spread onto it.
+ */
+function StudioSceneRoot({ sceneNavigator: _sceneNavigator, ...props }: StudioSceneRootProps) {
+  return <StudioARScene key={props.sceneData?.scene.id} {...props} />;
+}
+const STUDIO_SCENE = { scene: StudioSceneRoot };
 
 function isARScene(sceneData: StudioSceneResponse | undefined): boolean {
   const mode = ((sceneData?.scene?.plane_detection as string) ?? "NONE").toUpperCase();
@@ -189,6 +222,8 @@ export const StudioSceneNavigator = forwardRef<
     slamScriptUrl,
     onSceneReady,
     onError,
+    onAssetError,
+    onRendererAbort,
     onSceneChange,
     onSceneLoaded,
     onPlaneDetected,
@@ -212,6 +247,21 @@ export const StudioSceneNavigator = forwardRef<
 
   const onSceneLoadedRef = useRef(onSceneLoaded);
   onSceneLoadedRef.current = onSceneLoaded;
+
+  // The navigators read their renderer options once, when they create it.
+  const onRendererAbortRef = useRef(onRendererAbort);
+  onRendererAbortRef.current = onRendererAbort;
+  const rendererOptions = useMemo(
+    () => ({
+      ...webRendererOptions,
+      onAbort: (err: ViroRendererAbortError) => {
+        webRendererOptions?.onAbort?.(err);
+        onRendererAbortRef.current?.(err);
+        setError(err);
+      },
+    }),
+    [webRendererOptions],
+  );
 
   const applyScene = useCallback((next: StudioSceneResponse) => {
     setSceneData(next);
@@ -286,23 +336,21 @@ export const StudioSceneNavigator = forwardRef<
 
   const resolvedMode = mode ?? (isARScene(sceneData) ? "ar" : "3d");
 
-  const SceneComponent = () => (
-    <StudioARScene
-      placementApiRef={placementApiRef}
-      placementStore={placementStore}
-      key={sceneData.scene.id}
-      sceneData={sceneData}
-      mode={resolvedMode}
-      apiRequestExecutor={apiRequestExecutor}
-      navigate={navigate}
-      onReady={onSceneReady}
-      onSceneChange={onSceneChange}
-      onPlaneDetected={onPlaneDetected}
-      onUnsupported={onUnsupported}
-      noAssetsMessage={noAssetsMessage}
-      variableStore={variableStoreRef.current ?? undefined}
-    />
-  );
+  const sceneProps: StudioSceneRootProps = {
+    placementApiRef,
+    placementStore,
+    sceneData,
+    mode: resolvedMode,
+    apiRequestExecutor,
+    navigate,
+    onReady: onSceneReady,
+    onSceneChange,
+    onPlaneDetected,
+    onUnsupported,
+    onAssetError,
+    noAssetsMessage,
+    variableStore: variableStoreRef.current ?? undefined,
+  };
 
   // The two HUD pills sit over the canvas rather than in it: they are DOM
   // siblings, so neither the WebGL capture nor a canvas recorder sees them,
@@ -324,8 +372,9 @@ export const StudioSceneNavigator = forwardRef<
     >
       {resolvedMode === "ar" ? (
         <ViroARSceneNavigator
-          initialScene={{ scene: SceneComponent }}
-          webRendererOptions={webRendererOptions}
+          initialScene={STUDIO_SCENE}
+          viroAppProps={sceneProps}
+          webRendererOptions={rendererOptions}
           slamScriptUrl={slamScriptUrl}
           arOptions={{ detectPlanes: true, ...arOptions }}
           onSessionReady={onSessionReady}
@@ -333,8 +382,9 @@ export const StudioSceneNavigator = forwardRef<
         />
       ) : (
         <Viro3DSceneNavigator
-          initialScene={{ scene: SceneComponent }}
-          webRendererOptions={webRendererOptions}
+          initialScene={STUDIO_SCENE}
+          viroAppProps={sceneProps}
+          webRendererOptions={rendererOptions}
           {...STUDIO_RENDERER_EFFECTS}
         />
       )}

@@ -198,7 +198,8 @@ protected:
      (e.g. OpenXR with two hands tracked at once).
      */
     void updateHitNode(int source, const VROCamera &camera,
-                       VROVector3f origin, VROVector3f ray);
+                       VROVector3f origin, VROVector3f ray,
+                       bool mirrorToLegacy = true);
 
     /*
      Returns the per-source hit result recorded for this source's ray (see

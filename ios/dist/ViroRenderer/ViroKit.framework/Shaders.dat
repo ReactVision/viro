@@ -1,5 +1,5 @@
 dependencies: \
-  /tmp/claude-501/-Users-dorantes-Documents-ViroWorkspace/b676196e-4c5e-4cf7-b1b0-6b56af47e280/scratchpad/rel/virocore/ViroRenderer/Shaders.metal \
+  /Users/dorantes/Documents/ViroWorkspace/virocore/ViroRenderer/Shaders.metal \
   /private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.nDHotI/Metal.xctoolchain/usr/metal/32023/lib/clang/32023/include/metal/module.modulemap \
-  /tmp/claude-501/-Users-dorantes-Documents-ViroWorkspace/b676196e-4c5e-4cf7-b1b0-6b56af47e280/scratchpad/rel/virocore/ViroRenderer/VROSharedStructures.h \
-  /tmp/claude-501/-Users-dorantes-Documents-ViroWorkspace/b676196e-4c5e-4cf7-b1b0-6b56af47e280/scratchpad/rel/virocore/ViroRenderer/VRODefines.h
+  /Users/dorantes/Documents/ViroWorkspace/virocore/ViroRenderer/VROSharedStructures.h \
+  /Users/dorantes/Documents/ViroWorkspace/virocore/ViroRenderer/VRODefines.h

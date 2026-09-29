@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## v3.0.2 — 29 September 2026
 
 ### Added
 
@@ -34,16 +34,6 @@
 - **Android: the vendored ReactVisionCCA Java (`RVHttpClient`, `RVWebSocket`) is re-synced with ReactVisionCCA.** The frame channel no longer retries a handshake refused with 400 or 403, or a socket closed with `auth-revoked`. A 401 on the first connect is final, but a 401 on a reconnect gets one more attempt, so a token that expired while the app was in the background doesn't end the session. Each reconnect asks native for fresh handshake headers, so a refreshed session token is sent. `RVHttpClient.sendMultipart` gains an overload that carries extra request headers.
 
 - **Leaving a co-location session cancels the native work in progress (`StudioSceneNavigator`, `cancelCloudAnchorOperations`).** `cancelCloudAnchorOperations()` was a no-op on both platforms, so leaving during a scan left it collecting and leaving mid-host let the upload finish. It now cancels the ReactVision provider's pending hosts and resolves, which report the new `ErrorCancelled` state, and closes the scan window. An upload already in flight can still leave an anchor, which expires with its TTL.
-
-### Migration
-
-- **No breaking changes.** An existing `ViroColocationRooms` or `ViroReplicationClient` caller that passes `apiKey` and `projectId` behaves as before.
-- **The native renderer binaries (`ViroKit`, `viro_renderer-release.aar`) must be rebuilt for this release** on a `@reactvision/virocore` with `VROReactVisionAuth`, and on ReactVisionCCA libraries with `RVCCACloudAnchorProvider::Config::authProvider` and `RVCCAColocationSession::Config::headersProvider`. The session path in the bridge and the re-synced Java both depend on them.
-
-## v3.0.2 — 24 September 2026
-
-### Changed
-
 - **The `@reactvision/viro-web-renderer` peer range is `^1.0.1`.** The heap, tap and dropout fixes live in its renderer build, not in this package.
 - **Native renderer binaries rebuilt on virocore 3.0.2** (`ViroKit`, `viro_renderer-release.aar`): glTF loads no longer copy the parsed model or its images.
 
@@ -53,6 +43,11 @@
 - **Web: asset load failures reach the host.** `onAssetError(asset, error)` on `StudioSceneNavigator` (web); they used to go to `console.error` alone, which no error tracker hooks. `onRendererAbort` reports the terminal case — the renderer's runtime has aborted — and shows `renderError` in the canvas's place.
 - **Web: a denied motion permission stops AR from starting with nothing on screen (`ViroARSceneNavigator.web`).** The result was discarded; without an IMU the tracker never leaves initializing. A denial now shows why and does not start the session, and a grant that delivers no events is reported after three seconds. Both reach `onMotionUnavailable`. `renderWhileLimited` still starts regardless.
 - **Web: alpha-blended images no longer write depth (`ViroImage.web`, `ViroAnimatedImage.web`),** so a fully transparent border stops punching a hole in what is drawn behind it.
+
+### Migration
+
+- **No breaking changes.** An existing `ViroColocationRooms` or `ViroReplicationClient` caller that passes `apiKey` and `projectId` behaves as before.
+- **The native renderer binaries (`ViroKit`, `viro_renderer-release.aar`) must be rebuilt for this release** on a `@reactvision/virocore` with `VROReactVisionAuth`, and on ReactVisionCCA libraries with `RVCCACloudAnchorProvider::Config::authProvider` and `RVCCAColocationSession::Config::headersProvider`. The session path in the bridge and the re-synced Java both depend on them.
 
 ## v3.0.1 — 21 September 2026
 

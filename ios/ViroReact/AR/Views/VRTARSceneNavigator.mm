@@ -1102,8 +1102,13 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
 }
 
 - (void)cancelCloudAnchorOperations {
-    // Currently a no-op - cloud operations are fire-and-forget
-    // Future implementation could track and cancel pending operations
+    // Cancels ReactVision hosts, resolves and an open scan window; each pending one reports
+    // ErrorCancelled. ARCore's own cloud anchor tasks have no cancel and run to their end.
+    if (!_vroView) return;
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) return;
+    arSession->rvCancelOperations();
 }
 
 #pragma mark - Geospatial API Methods

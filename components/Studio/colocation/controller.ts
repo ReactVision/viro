@@ -447,9 +447,10 @@ export class StudioColocationController {
   private anchorProjectSet = false;
   /**
    * A scan, a host or a resolve is running natively. Leaving asks native to
-   * cancel it; neither platform can stop one yet (iOS and Android both answer
-   * with a no-op, and there is no call that stops a scan), so what an
-   * abandoned operation resolves with later is dropped by its run check.
+   * cancel it: the ReactVision provider closes the scan window and reports
+   * pending hosts and resolves as `ErrorCancelled`. An upload already in flight
+   * can still finish, and whatever an abandoned operation resolves with later
+   * is dropped by its run check.
    */
   private nativeBusy = false;
 

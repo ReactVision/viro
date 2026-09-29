@@ -656,9 +656,12 @@ public:
      * JavaScript, and every layer in between would otherwise need the same shape written out
      * again. The keys are: scanning, keyframes, viewpointPairs, cameraSpreadMeters,
      * minKeyframes, minViewpointPairs, minSpreadMeters, meetsKeyframes, meetsViewpointPairs,
-     * meetsSpread — plus `available`, false when no provider is configured.
+     * meetsSpread, triangulatedPoints, minTriangulatedPoints (the hosting floor, 300) — plus
+     * `available`, false when no provider is configured.
      *
-     * Cheap enough to poll: it reads the keyframe buffer's poses, and triangulates nothing.
+     * Cheap enough to poll: it reads the keyframe buffer's poses, and never triangulates on the
+     * calling thread. triangulatedPoints is the last background count, so it trails the scan
+     * and is 0 until the first count finishes; compare it to minTriangulatedPoints.
      */
     virtual std::string rvGetScanStatusJson() {
         return "{\"available\":false}";

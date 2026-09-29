@@ -303,6 +303,14 @@ private:
     VROCloudAnchorProviderReactVision *_cloudAnchorProviderRV = nil;
 
     /*
+     The ReactVision provider for a request, created here when ReactVision is
+     selected and a key or session now exists, so a sign-in after the scene
+     mounted still gets one. nil with `error` set otherwise, including
+     VROReactVisionAuth::kNoCredentialsError when there is no key and no session.
+     */
+    VROCloudAnchorProviderReactVision *ensureReactVisionProvider(std::string &error);
+
+    /*
      The ReactVision geospatial provider instance.
      Active when setGeospatialAnchorProvider(ReactVision) is called.
      */

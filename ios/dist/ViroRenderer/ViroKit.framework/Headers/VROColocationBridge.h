@@ -41,9 +41,9 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
 + (instancetype)shared;
 
 /**
- * Sets the VROReactVisionAuth session that ReactVision cloud anchors and a
- * join with an empty `apiKey` use. nil or empty `baseUrl` or `accessToken`
- * clears it.
+ * Sets the VROReactVisionAuth session that ReactVision cloud anchors and the
+ * co-location channel use, in preference to a key. nil or empty `baseUrl` or
+ * `accessToken` clears it.
  */
 + (void)setStudioSessionBaseUrl:(nullable NSString *)baseUrl
                     accessToken:(nullable NSString *)accessToken
@@ -58,8 +58,9 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
 /**
  * Join the room named by `roomId` — the cloud anchor id, Meta group id or
  * visionOS session id that already names the shared frame. Leaves any current
- * room. Pass nil for `endpoint` to use the default. An empty `apiKey` joins on
- * the session, and fails at once when there is none.
+ * room. Pass nil for `endpoint` to use the default. The session wins over
+ * `apiKey` when both exist; an empty `apiKey` joins on the session alone, and
+ * fails at once when there is none.
  */
 - (void)joinRoom:(NSString *)roomId
           apiKey:(NSString *)apiKey

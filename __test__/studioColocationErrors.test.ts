@@ -230,6 +230,18 @@ describe("studioColocationIndicatorContent", () => {
     ).toEqual({ enabled: true });
   });
 
+  it("shows how many scan points are mapped while the scan is short", () => {
+    expect(
+      studioColocationIndicatorContent({
+        status: "scanning",
+        canFinish: false,
+        points: { count: 120, needed: 300 },
+      })?.detail
+    ).toBe(
+      "Walk slowly around the area everyone will share, pointing at walls and furniture. 120 of 300 points mapped."
+    );
+  });
+
   it("tells a joiner how many times the space has matched", () => {
     expect(
       studioColocationIndicatorContent({

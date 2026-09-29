@@ -58,7 +58,16 @@ export type StudioColocationRoom = {
 
 export type StudioColocationState =
   | { status: "idle" }
-  | { status: "scanning"; canFinish: boolean }
+  | {
+      status: "scanning";
+      /** The scan covers enough to host: `finishColocationScan()` and Done work. */
+      canFinish: boolean;
+      /**
+       * Points triangulated so far, of the `needed` hosting takes. Only from a
+       * renderer that reports them.
+       */
+      points?: { count: number; needed: number };
+    }
   | { status: "hosting" }
   | { status: "creating_room" }
   | { status: "looking_up" }

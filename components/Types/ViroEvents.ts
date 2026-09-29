@@ -596,6 +596,12 @@ export type ViroScanStatus = {
   meetsKeyframes?: boolean;
   meetsViewpointPairs?: boolean;
   meetsSpread?: boolean;
+  /**
+   * Points triangulated from the scan so far, and the count hosting needs.
+   * Sent by renderers that triangulate while scanning; absent from older ones.
+   */
+  triangulatedPoints?: number;
+  minTriangulatedPoints?: number;
   error?: string;
 };
 

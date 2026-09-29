@@ -1860,3 +1860,71 @@ describe("StudioColocationController: finishing a scan", () => {
     expect(h.controller.finishScan()).toBe(false);
   });
 });
+
+describe("StudioColocationController: scan points", () => {
+  const gates = {
+    available: true,
+    scanning: true,
+    meetsKeyframes: true,
+    meetsViewpointPairs: true,
+    meetsSpread: true,
+    keyframes: 40,
+  };
+
+  async function scanning(h: Harness) {
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene());
+    await flush();
+    await advance(500);
+  }
+
+  it("holds Done until enough points are triangulated, and reports them", async () => {
+    const h = harness();
+    h.nav.getScanStatus.mockResolvedValue({
+      ...gates,
+      triangulatedPoints: 120,
+      minTriangulatedPoints: 300,
+    });
+    await scanning(h);
+    expect(h.last()).toEqual({
+      status: "scanning",
+      canFinish: false,
+      points: { count: 120, needed: 300 },
+    });
+    expect(h.controller.finishScan()).toBe(false);
+
+    h.nav.getScanStatus.mockResolvedValue({
+      ...gates,
+      triangulatedPoints: 300,
+      minTriangulatedPoints: 300,
+    });
+    await advance(500);
+    expect(h.last()).toEqual({
+      status: "scanning",
+      canFinish: true,
+      points: { count: 300, needed: 300 },
+    });
+  });
+
+  it("still needs 30 keyframes with enough points", async () => {
+    const h = harness();
+    h.nav.getScanStatus.mockResolvedValue({
+      ...gates,
+      keyframes: 29,
+      triangulatedPoints: 900,
+      minTriangulatedPoints: 300,
+    });
+    await scanning(h);
+    expect(h.last()).toMatchObject({ status: "scanning", canFinish: false });
+  });
+
+  it("gates on keyframes alone when native sends no point count", async () => {
+    const h = harness();
+    h.nav.getScanStatus.mockResolvedValue({
+      ...gates,
+      triangulatedPoints: 50,
+    });
+    await scanning(h);
+    expect(h.last()).toEqual({ status: "scanning", canFinish: true });
+  });
+});

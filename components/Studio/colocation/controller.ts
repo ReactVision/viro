@@ -323,9 +323,24 @@ export function resolveMatches(
   return matches > 0 && needed > 0 ? { matches, needed } : null;
 }
 
+function isCount(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0;
+}
+
+/** The scan's triangulated points and their floor, when native reports both. */
+export function scanPoints(
+  status: ViroScanStatus | null
+): { count: number; needed: number } | null {
+  if (!status?.available) return null;
+  const count = status.triangulatedPoints;
+  const needed = status.minTriangulatedPoints;
+  return isCount(count) && isCount(needed) ? { count, needed } : null;
+}
+
 /** Every coverage gate native reports, or null when it reports none. */
 function scanGuidance(status: ViroScanStatus | null): boolean | null {
   if (!status?.available) return null;
+  const points = scanPoints(status);
   const gates = [
     status.meetsKeyframes,
     status.meetsViewpointPairs,
@@ -333,6 +348,7 @@ function scanGuidance(status: ViroScanStatus | null): boolean | null {
     typeof status.keyframes === "number"
       ? status.keyframes >= MIN_SCAN_KEYFRAMES
       : undefined,
+    points ? points.count >= points.needed : undefined,
   ].filter((g): g is boolean => typeof g === "boolean");
   return gates.length === 0 ? null : gates.every(Boolean);
 }
@@ -356,7 +372,12 @@ function sameState(
 ): boolean {
   switch (a.status) {
     case "scanning":
-      return b.status === "scanning" && a.canFinish === b.canFinish;
+      return (
+        b.status === "scanning" &&
+        a.canFinish === b.canFinish &&
+        a.points?.count === b.points?.count &&
+        a.points?.needed === b.points?.needed
+      );
     case "resolving":
       return (
         b.status === "resolving" &&
@@ -938,7 +959,12 @@ export class StudioColocationController {
         const canFinish =
           scanGuidance(status) ??
           this.deps.now() - startedAt >= SCAN_FALLBACK_MS;
-        this.setState({ status: "scanning", canFinish });
+        const points = scanPoints(status);
+        this.setState(
+          points
+            ? { status: "scanning", canFinish, points }
+            : { status: "scanning", canFinish }
+        );
       };
       const stop = this.every(run, SCAN_STATUS_POLL_MS, poll);
       // Resolved on teardown too, so a scan left mid-way does not hold the flow open.

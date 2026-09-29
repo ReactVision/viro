@@ -36,16 +36,20 @@ export function studioColocationIndicatorContent(
   switch (state.status) {
     case "idle":
       return null;
-    case "scanning":
+    case "scanning": {
+      const points = state.points
+        ? ` ${state.points.count} of ${state.points.needed} points mapped.`
+        : "";
       return {
         title: "Scan the area",
         detail: state.canFinish
           ? "That is enough to share. Tap Done, or keep walking to cover more."
-          : "Walk slowly around the area everyone will share, pointing at walls and furniture.",
+          : `Walk slowly around the area everyone will share, pointing at walls and furniture.${points}`,
         code: null,
         done: { enabled: state.canFinish },
         tone: "progress",
       };
+    }
     case "hosting":
       return {
         title: "Saving the scan",

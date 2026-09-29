@@ -9,8 +9,10 @@ import {
   StudioARScene,
   StudioRecordingIndicator,
   StudioPlacementIndicator,
+  StudioColocationIndicator,
   useStudioRecording,
   useStudioPlacement,
+  useStudioColocation,
 } from "./components/Studio";
 import {
   ViroVisionOSModule,
@@ -576,8 +578,10 @@ export {
   StudioARScene,
   StudioRecordingIndicator,
   StudioPlacementIndicator,
+  StudioColocationIndicator,
   useStudioRecording,
   useStudioPlacement,
+  useStudioColocation,
   // VisionOS
   ViroVisionOSModule,
   isVisionOS,
@@ -608,6 +612,10 @@ export type {
   StudioSceneNavigatorProps,
   StudioApiError,
   StudioApiErrorFields,
+  StudioColocationErrorCode,
+  StudioColocationOptions,
+  StudioColocationRoom,
+  StudioColocationState,
 } from "./components/Studio";
 
 export { isStudioApiError } from "./components/Studio";

@@ -471,6 +471,11 @@ export type ViroCloudAnchorState =
   | "ErrorResolvingSdkVersionTooNew"
   | "ErrorHostingServiceUnavailable"
   /*
+   * The ReactVision provider's host, resolve or scan was cancelled through
+   * cancelCloudAnchorOperations(), for example by leaving a co-location session.
+   */
+  | "ErrorCancelled"
+  /*
    * The five below come from the ReactVision provider rather than ARCore, and
    * were missing here while native already emitted them: the state crosses the
    * bridge as an untyped string, so nothing failed to compile and a caller
@@ -596,6 +601,12 @@ export type ViroScanStatus = {
   meetsKeyframes?: boolean;
   meetsViewpointPairs?: boolean;
   meetsSpread?: boolean;
+  /**
+   * Points triangulated from the scan so far, and the count hosting needs.
+   * Sent by renderers that triangulate while scanning; absent from older ones.
+   */
+  triangulatedPoints?: number;
+  minTriangulatedPoints?: number;
   error?: string;
 };
 

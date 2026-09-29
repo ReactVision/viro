@@ -17,12 +17,30 @@ export interface StudioSessionConfig {
   clientTag?: string;
 }
 
+/** @internal */
+export type StudioAuthMode = "session" | "api_key" | "none";
+
+/**
+ * @internal The credentials native would send, for the JS clients that call
+ * the platform or the relay themselves. `baseUrl` is what `/functions/v1/`
+ * paths are built on, null in mode "none"; `projectId` is the manifest
+ * RVProjectId in every mode.
+ */
+export interface StudioAuthContext {
+  mode: StudioAuthMode;
+  baseUrl: string | null;
+  headers: Record<string, string>;
+  projectId: string | null;
+}
+
 interface StudioNativeModule {
   rvGetScene(sceneId: string): Promise<StudioModuleResult>;
   rvGetProject(): Promise<StudioModuleResult>;
   rvGetProjectId(): Promise<string | null>;
   rvStudioApiRequest(bodyJson: string): Promise<StudioModuleResult>;
   rvSetStudioSession(config: StudioSessionConfig | null): Promise<void>;
+  rvGetAuthHeaders(): Promise<StudioAuthContext>;
+  rvSetCloudAnchorProject(projectId: string | null): Promise<void>;
 }
 
 const native = NativeModules.VRTStudio as StudioNativeModule | undefined;
@@ -72,5 +90,29 @@ export const VRTStudioModule = {
     if (typeof native?.rvSetStudioSession !== "function")
       return Promise.resolve();
     return native.rvSetStudioSession(config);
+  },
+  /**
+   * @internal Re-read per request rather than cached: a session token is
+   * replaced when it refreshes. Same method-level guard as rvSetStudioSession.
+   */
+  rvGetAuthHeaders: (): Promise<StudioAuthContext> => {
+    if (typeof native?.rvGetAuthHeaders !== "function")
+      return Promise.resolve({
+        mode: "none",
+        baseUrl: null,
+        headers: {},
+        projectId: null,
+      });
+    return native.rvGetAuthHeaders();
+  },
+  /**
+   * @internal Points the ReactVision cloud anchor provider at a project other
+   * than the manifest's; null clears the override. Call before hosting or
+   * resolving. Same method-level guard as rvSetStudioSession.
+   */
+  rvSetCloudAnchorProject: (projectId: string | null): Promise<void> => {
+    if (typeof native?.rvSetCloudAnchorProject !== "function")
+      return Promise.resolve();
+    return native.rvSetCloudAnchorProject(projectId);
   },
 };

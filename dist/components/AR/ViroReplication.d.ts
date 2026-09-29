@@ -56,7 +56,11 @@ export type ViroReplicationRejection = {
 export type ViroReplicationConfig = {
     /** Same id that names the frame and the channel room. */
     roomId: string;
-    apiKey: string;
+    /**
+     * Required unless `headers` is given. The only credential a browser can
+     * send.
+     */
+    apiKey?: string;
     projectId: string;
     /**
      * Co-location relay base URL; `http(s)` is converted to `ws(s)`.
@@ -66,6 +70,13 @@ export type ViroReplicationConfig = {
      * both.
      */
     endpoint?: string;
+    /**
+     * Handshake credentials, called before every connect and reconnect so a
+     * token that refreshed in the meantime reaches the next attempt. Sent
+     * alongside `x-api-key` when `apiKey` is also given. Native only: a browser
+     * cannot set handshake headers.
+     */
+    headers?: () => Promise<Record<string, string>> | Record<string, string>;
 };
 export type ViroWriteOptions = {
     /**
@@ -94,6 +105,8 @@ export declare class ViroReplicationClient {
     private attempt;
     private closedByUs;
     private retryTimer;
+    /** Bumped per open and on disconnect, so a late `headers` answer is dropped. */
+    private openSeq;
     private listeners;
     /**
      * Optimistic writes awaiting confirmation, by ref.
@@ -129,6 +142,9 @@ export declare class ViroReplicationClient {
      */
     clear(): void;
     private open;
+    private attach;
+    private retryOrFail;
+    private fail;
     private handle;
     private replaceAll;
     private applyDeltas;

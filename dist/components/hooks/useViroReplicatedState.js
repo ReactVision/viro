@@ -26,24 +26,35 @@ const ViroReplication_1 = require("../AR/ViroReplication");
  * channel: world coordinates are per-session and mean nothing to a peer.
  */
 function useViroReplicatedState(options) {
-    const { roomId, apiKey, projectId, endpoint, enabled = true, onReject, } = options;
+    const { roomId, apiKey, projectId, endpoint, headers, enabled = true, onReject, } = options;
     const client = (0, react_1.useMemo)(() => new ViroReplication_1.ViroReplicationClient(), []);
     const [, force] = (0, react_1.useState)(0);
     // Kept in a ref so changing the handler does not tear down the connection.
     const rejectRef = (0, react_1.useRef)(onReject);
     rejectRef.current = onReject;
+    // Same for the header provider, which the client calls again on every
+    // reconnect anyway.
+    const headersRef = (0, react_1.useRef)(headers);
+    headersRef.current = headers;
+    const hasHeaders = headers !== undefined;
     (0, react_1.useEffect)(() => {
         client.onReject = (r) => rejectRef.current?.(r);
         const unsubscribe = client.subscribe(() => force((n) => n + 1));
         if (enabled && roomId) {
-            client.connect({ roomId, apiKey, projectId, endpoint });
+            client.connect({
+                roomId,
+                apiKey,
+                projectId,
+                endpoint,
+                headers: hasHeaders ? () => headersRef.current?.() ?? {} : undefined,
+            });
         }
         return () => {
             unsubscribe();
             client.onReject = undefined;
             client.disconnect();
         };
-    }, [client, roomId, apiKey, projectId, endpoint, enabled]);
+    }, [client, roomId, apiKey, projectId, endpoint, hasHeaders, enabled]);
     return {
         state: client.state,
         localPeerId: client.localPeerId,

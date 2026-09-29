@@ -36,6 +36,9 @@ export type ViroColocationRoom = {
   cloudAnchorId: string | null;
   frameRef: string | null;
   name: string | null;
+  projectId: string | null;
+  /** The scene the room was created for, if it was created for one. */
+  sceneId: string | null;
 };
 
 /** How this room's devices establish their shared frame. */
@@ -45,18 +48,31 @@ export type ViroRoomFrame =
   | { frameKind: "visionos_space" };
 
 export type ViroColocationRoomsConfig = {
-  apiKey: string;
-  projectId: string;
+  /** Required unless `headers` is given. */
+  apiKey?: string;
+  /**
+   * Sent as `x-project-id`. Required with `apiKey`. With `headers` it may be
+   * left out of a lookup by code, which then finds the room from the code alone.
+   */
+  projectId?: string;
   /**
    * Platform base URL, not the relay's. Rooms are a REST call to Studio, while
    * poses and replicated state go to the co-location relay.
    */
   endpoint?: string;
+  /** Credentials sent verbatim in place of `apiKey`. */
+  headers?: Record<string, string>;
 };
 
 export type ViroColocationRoomResult =
   | { success: true; room: ViroColocationRoom }
-  | { success: false; error: string; code?: string };
+  | {
+      success: false;
+      error: string;
+      code?: string;
+      /** HTTP status, absent when no response arrived. */
+      status?: number;
+    };
 
 const DEFAULT_ENDPOINT = "https://platform.reactvision.xyz";
 
@@ -88,11 +104,12 @@ export { CODE_ALPHABET };
  */
 export async function createColocationRoom(
   config: ViroColocationRoomsConfig,
-  frame: ViroRoomFrame & { name?: string }
+  frame: ViroRoomFrame & { name?: string; sceneId?: string }
 ): Promise<ViroColocationRoomResult> {
   const body: Record<string, unknown> = {
     frame_kind: frame.frameKind,
     name: frame.name,
+    scene_id: frame.sceneId,
   };
   if (frame.frameKind === "cloud_anchor")
     body.cloud_anchor_id = frame.cloudAnchorId;
@@ -126,15 +143,37 @@ async function request(
   const base = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
   const url = `${base}/functions/v1/colocation${path}`;
 
+  let headers: Record<string, string>;
+  if (config.headers) {
+    headers = { "content-type": "application/json", ...config.headers };
+    if (config.projectId) headers["x-project-id"] = config.projectId;
+  } else if (!config.apiKey) {
+    // The platform's own codes for the same refusal, so a caller handles one
+    // set whether or not the request was spent.
+    return {
+      success: false,
+      error: "Pass an apiKey or headers.",
+      code: "MISSING_API_KEY",
+    };
+  } else if (!config.projectId) {
+    return {
+      success: false,
+      error: "A projectId is required with an apiKey.",
+      code: "MISSING_PROJECT_ID",
+    };
+  } else {
+    headers = {
+      "content-type": "application/json",
+      "x-api-key": config.apiKey,
+      "x-project-id": config.projectId,
+    };
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {
       method,
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": config.apiKey,
-        "x-project-id": config.projectId,
-      },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (e: any) {
@@ -153,6 +192,7 @@ async function request(
       success: false,
       error: parsed?.error?.message ?? `Request failed (${response.status})`,
       code: parsed?.error?.code,
+      status: response.status,
     };
   }
 
@@ -168,5 +208,7 @@ function toRoom(raw: any): ViroColocationRoom {
     cloudAnchorId: raw.cloud_anchor_id ?? null,
     frameRef: raw.frame_ref ?? null,
     name: raw.name ?? null,
+    projectId: raw.project_id ?? null,
+    sceneId: raw.scene_id ?? null,
   };
 }

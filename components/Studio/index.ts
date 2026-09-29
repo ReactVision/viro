@@ -1,9 +1,17 @@
 export { StudioARScene } from "./StudioARScene";
 export { StudioRecordingIndicator } from "./StudioRecordingIndicator";
 export { StudioPlacementIndicator } from "./StudioPlacementIndicator";
+export { StudioColocationIndicator } from "./StudioColocationIndicator";
 export { StudioSceneNavigator } from "./StudioSceneNavigator";
 export { useStudioRecording } from "./useStudioRecording";
 export { useStudioPlacement } from "./useStudioPlacement";
+export { useStudioColocation } from "./useStudioColocation";
+export type {
+  StudioColocationErrorCode,
+  StudioColocationOptions,
+  StudioColocationRoom,
+  StudioColocationState,
+} from "./colocation/types";
 export type {
   StudioSceneNavigatorHandle,
   StudioSceneNavigatorProps,

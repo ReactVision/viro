@@ -1,6 +1,7 @@
 import * as React from "react";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore } from "./domain/placementStore";
+import { type StudioColocationController } from "./colocation/controller";
 import { StudioSceneResponse } from "./types";
 /** Imperative placement surface the navigator's tap overlay drives (mobile AR). */
 export type StudioPlacementApi = {
@@ -24,6 +25,13 @@ interface StudioARSceneProps {
     placementStore?: StudioPlacementStore;
     /** The navigator's tap overlay writes the placement API here (mobile AR). */
     placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
+    /** The navigator's shared-session controller; absent renders the scene alone. */
+    colocation?: StudioColocationController;
+    /**
+     * Set when a shared session followed another device here: that device ran
+     * the scene's on_load function, and what it changed arrives as shared state.
+     */
+    skipOnLoadFunction?: boolean;
 }
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until

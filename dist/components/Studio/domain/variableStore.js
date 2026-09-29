@@ -14,6 +14,7 @@ const utils_1 = require("./utils");
 class StudioVariableStore {
     values = new Map();
     listeners = new utils_1.GlobalListeners();
+    changes = new utils_1.ChangeListeners();
     get(name) {
         return this.values.get(name);
     }
@@ -21,7 +22,11 @@ class StudioVariableStore {
     subscribe(listener) {
         return this.listeners.subscribe(listener);
     }
-    set(name, value) {
+    /** Each change with the variable's name (null after reset) and its origin. */
+    subscribeChanges(listener) {
+        return this.changes.subscribe(listener);
+    }
+    set(name, value, origin = "local") {
         // Values are primitives; skip the no-op write so unchanged values don't
         // log or wake subscribers.
         if (Object.is(this.values.get(name), value))
@@ -31,6 +36,7 @@ class StudioVariableStore {
             console.log(`[Studio] Variable "${name}" =`, value);
         }
         this.listeners.notify();
+        this.changes.notify(name, origin);
     }
     seed(declarations) {
         for (const decl of declarations) {
@@ -53,6 +59,7 @@ class StudioVariableStore {
     reset() {
         this.values.clear();
         this.listeners.notify();
+        this.changes.notify(null, "local");
     }
     snapshot() {
         const out = {};

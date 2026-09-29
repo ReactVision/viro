@@ -19,6 +19,13 @@ const ROOM_ROW = {
   cloud_anchor_id: "aaaa0000-0000-4000-8000-aaaaaaaaaaaa",
   frame_ref: null,
   name: "Bay 3",
+  project_id: "5eed0000-0000-4000-8000-000000000013",
+  scene_id: "cccc0000-0000-4000-8000-cccccccccccc",
+};
+
+const SESSION_HEADERS = {
+  Authorization: "Bearer jwt-token",
+  "x-rv-client": "studio-go",
 };
 
 const ok = (body: unknown) =>
@@ -99,6 +106,79 @@ describe("createColocationRoom", () => {
     expect(body.cloud_anchor_id).toBeUndefined();
   });
 
+  it("sends the scene id and reads the room's project and scene back", async () => {
+    const fetchMock = ok({ room: ROOM_ROW });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const result = await createColocationRoom(CONFIG, {
+      frameKind: "cloud_anchor",
+      cloudAnchorId: ROOM_ROW.cloud_anchor_id,
+      sceneId: ROOM_ROW.scene_id,
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).scene_id).toBe(
+      ROOM_ROW.scene_id
+    );
+    expect(result.success && result.room.projectId).toBe(ROOM_ROW.project_id);
+    expect(result.success && result.room.sceneId).toBe(ROOM_ROW.scene_id);
+  });
+
+  it("leaves scene_id out when there is no scene, and reads a missing one as null", async () => {
+    const fetchMock = ok({ room: { ...ROOM_ROW, scene_id: undefined } });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const result = await createColocationRoom(CONFIG, {
+      frameKind: "visionos_space",
+    });
+
+    expect("scene_id" in JSON.parse(fetchMock.mock.calls[0][1].body)).toBe(
+      false
+    );
+    expect(result.success && result.room.sceneId).toBeNull();
+  });
+
+  it("sends caller headers verbatim in place of the key", async () => {
+    const fetchMock = ok({ room: ROOM_ROW });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    await createColocationRoom(
+      {
+        headers: SESSION_HEADERS,
+        projectId: CONFIG.projectId,
+        endpoint: CONFIG.endpoint,
+      },
+      { frameKind: "visionos_space" }
+    );
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      "content-type": "application/json",
+      ...SESSION_HEADERS,
+      "x-project-id": CONFIG.projectId,
+    });
+  });
+
+  it("refuses to send without credentials rather than sending undefined", async () => {
+    const fetchMock = ok({ room: ROOM_ROW });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const noKey = await createColocationRoom(
+      { projectId: CONFIG.projectId },
+      { frameKind: "visionos_space" }
+    );
+    const noProject = await createColocationRoom(
+      { apiKey: CONFIG.apiKey },
+      { frameKind: "visionos_space" }
+    );
+
+    expect(!noKey.success && noKey.code).toBe("MISSING_API_KEY");
+    expect(!noProject.success && noProject.code).toBe("MISSING_PROJECT_ID");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("reports the platform's own refusal rather than a status code", async () => {
     // @ts-expect-error installing the stub
     global.fetch = failed(
@@ -116,6 +196,8 @@ describe("createColocationRoom", () => {
     expect(!result.success && result.error).toBe(
       "Co-location requires a paid plan."
     );
+    // Beside the code, for callers that sort refusals by class.
+    expect(!result.success && result.status).toBe(403);
   });
 
   it("does not throw when the network does", async () => {
@@ -129,6 +211,7 @@ describe("createColocationRoom", () => {
     });
     expect(result.success).toBe(false);
     expect(!result.success && result.error).toBe("Network request failed");
+    expect(!result.success && result.status).toBeUndefined();
   });
 });
 
@@ -165,5 +248,25 @@ describe("lookupColocationRoom", () => {
     const result = await lookupColocationRoom(CONFIG, "K7M2QZ");
     expect(result.success).toBe(false);
     expect(!result.success && result.code).toBe("ROOM_NOT_FOUND");
+    expect(!result.success && result.status).toBe(404);
+  });
+
+  it("looks a code up with caller headers and no project", async () => {
+    // The platform finds the room from the code alone, so there is no
+    // x-project-id to send.
+    const fetchMock = ok({ room: ROOM_ROW });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const result = await lookupColocationRoom(
+      { headers: SESSION_HEADERS, endpoint: CONFIG.endpoint },
+      "K7M2QX"
+    );
+
+    expect(result.success && result.room.projectId).toBe(ROOM_ROW.project_id);
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      "content-type": "application/json",
+      ...SESSION_HEADERS,
+    });
   });
 });

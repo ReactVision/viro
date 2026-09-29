@@ -14,7 +14,9 @@ type Props = {
  * in MainActivity, out of view once VRActivity takes the display (see
  * ViroXRSceneNavigator, which renders null on Quest). This is the in-scene
  * replacement: a small persistent head-locked HUD with the scene name, plane
- * status, and an in-scene "Exit" the hardware back button already covers,
+ * status (or a shared session's status and join code, unless the navigator's
+ * colocationIndicator is false), and an in-scene "Exit" the hardware back button
+ * already covers,
  * but this makes it discoverable and provides a scene name / plane status
  * that has no other Quest-visible equivalent.
  *

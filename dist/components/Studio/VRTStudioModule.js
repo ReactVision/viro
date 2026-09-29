@@ -52,4 +52,28 @@ exports.VRTStudioModule = {
             return Promise.resolve();
         return native.rvSetStudioSession(config);
     },
+    /**
+     * @internal Re-read per request rather than cached: a session token is
+     * replaced when it refreshes. Same method-level guard as rvSetStudioSession.
+     */
+    rvGetAuthHeaders: () => {
+        if (typeof native?.rvGetAuthHeaders !== "function")
+            return Promise.resolve({
+                mode: "none",
+                baseUrl: null,
+                headers: {},
+                projectId: null,
+            });
+        return native.rvGetAuthHeaders();
+    },
+    /**
+     * @internal Points the ReactVision cloud anchor provider at a project other
+     * than the manifest's; null clears the override. Call before hosting or
+     * resolving. Same method-level guard as rvSetStudioSession.
+     */
+    rvSetCloudAnchorProject: (projectId) => {
+        if (typeof native?.rvSetCloudAnchorProject !== "function")
+            return Promise.resolve();
+        return native.rvSetCloudAnchorProject(projectId);
+    },
 };

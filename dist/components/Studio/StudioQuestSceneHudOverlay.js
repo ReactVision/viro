@@ -41,6 +41,10 @@ const ViroText_1 = require("../ViroText");
 const VRModuleOpenXR_1 = require("../Utilities/VRModuleOpenXR");
 const VRQuestNavigatorBridge_1 = require("../Utilities/VRQuestNavigatorBridge");
 const questHeadLockedTransform_1 = require("./domain/questHeadLockedTransform");
+const indicatorContent_1 = require("./colocation/indicatorContent");
+const colocationStore_1 = require("./domain/colocationStore");
+const useStudioColocation_1 = require("./useStudioColocation");
+const subscribeToColocation = (onChange) => colocationStore_1.studioColocationStore.subscribe(onChange);
 // Same exit path as the hardware back button (ViroQuestEntryPoint's
 // BackHandler, see roadmap task 2): invoke the current intent's onExitViro
 // before finishing VRActivity.
@@ -53,7 +57,9 @@ function handleExitClick() {
  * in MainActivity, out of view once VRActivity takes the display (see
  * ViroXRSceneNavigator, which renders null on Quest). This is the in-scene
  * replacement: a small persistent head-locked HUD with the scene name, plane
- * status, and an in-scene "Exit" the hardware back button already covers,
+ * status (or a shared session's status and join code, unless the navigator's
+ * colocationIndicator is false), and an in-scene "Exit" the hardware back button
+ * already covers,
  * but this makes it discoverable and provides a scene name / plane status
  * that has no other Quest-visible equivalent.
  *
@@ -61,14 +67,19 @@ function handleExitClick() {
  * ALERT firing at the same time doesn't render on top of it.
  */
 function StudioQuestSceneHudOverlay({ cameraPose, sceneName, planeDetectionMode, hasFoundPlane, }) {
+    const session = (0, indicatorContent_1.studioColocationIndicatorContent)((0, useStudioColocation_1.useStudioColocation)(), null, "headset");
+    const showSession = React.useSyncExternalStore(subscribeToColocation, () => colocationStore_1.studioColocationStore.isBuiltInIndicatorShown(), () => true);
+    const colocation = showSession ? session : null;
     if (!cameraPose)
         return null;
+    const height = colocation ? (colocation.detail ? 0.9 : 0.55) : 0.5;
     const { position, rotation } = (0, questHeadLockedTransform_1.computeHeadLockedTransform)(cameraPose, {
         distanceM: 1.2,
-        verticalOffsetM: -0.4,
+        // Grows downwards, so its top edge stays where an alert expects it.
+        verticalOffsetM: -0.4 - (height - 0.5) / 2,
     });
     return (<ViroNode_1.ViroNode position={position} rotation={rotation}>
-      <ViroFlexView_1.ViroFlexView width={1.6} height={0.5} style={{
+      <ViroFlexView_1.ViroFlexView width={1.6} height={height} style={{
             backgroundColor: "rgba(0,0,0,0.6)",
             justifyContent: "center",
             alignItems: "center",
@@ -80,7 +91,25 @@ function StudioQuestSceneHudOverlay({ cameraPose, sceneName, planeDetectionMode,
             color: "#FFFFFF",
             textAlign: "center",
         }}/>
-        {planeDetectionMode !== "NONE" && (<ViroText_1.ViroText text={hasFoundPlane ? "Plane found" : "Scanning for planes…"} width={1.5} height={0.12} style={{
+        {colocation && (<ViroText_1.ViroText text={colocation.code
+                ? `${colocation.title}   ${colocation.code}`
+                : colocation.title} width={1.5} height={0.15} style={{
+                fontFamily: "Arial",
+                fontSize: 13,
+                color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
+                textAlign: "center",
+            }}/>)}
+        {colocation?.detail && (<ViroText_1.ViroText text={colocation.detail} width={1.5} 
+        // Three lines: a failure's reason runs long, and ViroText drops
+        // what does not fit without a sign.
+        height={0.36} style={{
+                fontFamily: "Arial",
+                fontSize: 11,
+                color: "#CCCCCC",
+                textAlign: "center",
+            }}/>)}
+        {/* A shared scene sits on the shared frame, not on a plane. */}
+        {!session && planeDetectionMode !== "NONE" && (<ViroText_1.ViroText text={hasFoundPlane ? "Plane found" : "Scanning for planes…"} width={1.5} height={0.12} style={{
                 fontFamily: "Arial",
                 fontSize: 11,
                 color: "#CCCCCC",

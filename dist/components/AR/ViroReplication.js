@@ -42,6 +42,9 @@ const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const ViroVersion_1 = require("../Utilities/ViroVersion");
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
 const DEFAULT_ENDPOINT = "https://colocation.reactvision.xyz";
+function isThenable(value) {
+    return typeof value?.then === "function";
+}
 /** https:// → wss://, http:// → ws://. Anything else passes through. */
 function toSocketScheme(endpoint) {
     if (endpoint.startsWith("https://"))
@@ -61,6 +64,8 @@ class ViroReplicationClient {
     attempt = 0;
     closedByUs = false;
     retryTimer;
+    /** Bumped per open and on disconnect, so a late `headers` answer is dropped. */
+    openSeq = 0;
     listeners = new Set();
     /**
      * Optimistic writes awaiting confirmation, by ref.
@@ -104,6 +109,7 @@ class ViroReplicationClient {
     }
     disconnect() {
         this.closedByUs = true;
+        this.openSeq++;
         if (this.retryTimer)
             clearTimeout(this.retryTimer);
         this.retryTimer = undefined;
@@ -183,19 +189,57 @@ class ViroReplicationClient {
         // browser cannot set them, and there the credentials go in the query
         // string, which the relay refuses unless it was started to allow it (a
         // browser client needs an Origin allowlist first).
-        const ws = ViroPlatform_1.isWeb
-            ? new WebSocket(`${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
-                `&projectId=${encodeURIComponent(cfg.projectId)}`)
-            : new WebSocket(path, null, {
-                headers: {
-                    "x-api-key": cfg.apiKey,
-                    "x-project-id": cfg.projectId,
-                    // Logged by the relay, never used for a decision. It is what
-                    // separates one client build from another when a refusal shows up
-                    // in the relay log and every device otherwise looks alike.
-                    "x-rv-client": `viro/${ViroVersion_1.VIRO_VERSION} (${react_native_1.Platform.OS})`,
-                },
-            });
+        if (ViroPlatform_1.isWeb) {
+            if (!cfg.apiKey) {
+                this.fail("a browser can only join with an apiKey");
+                return;
+            }
+            this.attach(new WebSocket(`${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
+                `&projectId=${encodeURIComponent(cfg.projectId)}`));
+            return;
+        }
+        if (!cfg.apiKey && !cfg.headers) {
+            this.fail("an apiKey or a headers provider is required");
+            return;
+        }
+        const seq = ++this.openSeq;
+        const connectWith = (provided) => {
+            if (seq !== this.openSeq)
+                return;
+            const headers = { ...provided };
+            if (cfg.apiKey)
+                headers["x-api-key"] = cfg.apiKey;
+            headers["x-project-id"] = cfg.projectId;
+            // Logged by the relay, never used for a decision. It is what separates
+            // one client build from another when a refusal shows up in the relay log
+            // and every device otherwise looks alike. An app tag from the provider
+            // stays in front of it, as on the pose channel's handshake.
+            const build = `viro/${ViroVersion_1.VIRO_VERSION} (${react_native_1.Platform.OS})`;
+            const app = headers["x-rv-client"];
+            headers["x-rv-client"] = app ? `${app} ${build}` : build;
+            this.attach(new WebSocket(path, null, { headers }));
+        };
+        // A provider that cannot answer is treated as a dropped socket, so it
+        // backs off and retries on the same ladder.
+        const providerFailed = () => {
+            if (seq === this.openSeq)
+                this.retryOrFail();
+        };
+        let provided;
+        try {
+            provided = cfg.headers?.() ?? {};
+        }
+        catch {
+            providerFailed();
+            return;
+        }
+        // Synchronous answers connect synchronously, as a bare apiKey always has.
+        if (isThenable(provided))
+            provided.then(connectWith, providerFailed);
+        else
+            connectWith(provided);
+    }
+    attach(ws) {
         this.ws = ws;
         ws.onopen = () => {
             this.attempt = 0;
@@ -224,21 +268,26 @@ class ViroReplicationClient {
             // too-large and slow-consumer, and all three are meant to reconnect.
             // Only this one is a decision that will not change on a retry.
             if (ev?.reason === "auth-revoked") {
-                this._error = "this key or plan can no longer join the room";
-                this.setState("failed");
+                this.fail("these credentials or this plan can no longer join the room");
                 return;
             }
-            if (this.attempt >= BACKOFF_MS.length) {
-                this._error = "replication socket gave up reconnecting";
-                this.setState("failed");
-                return;
-            }
-            const delay = BACKOFF_MS[this.attempt++];
-            this.setState("reconnecting");
-            this.retryTimer = setTimeout(() => this.open(), delay);
+            this.retryOrFail();
         };
         ws.onclose = dropped;
         ws.onerror = () => dropped();
+    }
+    retryOrFail() {
+        if (this.attempt >= BACKOFF_MS.length) {
+            this.fail("replication socket gave up reconnecting");
+            return;
+        }
+        const delay = BACKOFF_MS[this.attempt++];
+        this.setState("reconnecting");
+        this.retryTimer = setTimeout(() => this.open(), delay);
+    }
+    fail(error) {
+        this._error = error;
+        this.setState("failed");
     }
     handle(msg) {
         switch (msg.t) {

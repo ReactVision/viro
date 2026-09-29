@@ -125,6 +125,155 @@ describe("connection", () => {
   });
 });
 
+/** Lets the provider's promise and the client's `.then` both settle. */
+const settle = async () => {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
+
+describe("header providers", () => {
+  const SESSION = {
+    roomId: "room-1",
+    projectId: "p",
+    endpoint: CONFIG.endpoint,
+  };
+
+  it("sends the provider's headers in place of a key", () => {
+    client.connect({
+      ...SESSION,
+      headers: () => ({ Authorization: "Bearer t1", "x-rv-client": "app" }),
+    });
+
+    expect(FakeSocket.last!.options?.headers).toEqual({
+      Authorization: "Bearer t1",
+      "x-project-id": "p",
+      // The app tag stays in front of the build tag, as on the pose channel.
+      "x-rv-client": expect.stringMatching(/^app viro\/\d+\.\d+\.\d+ \(\w+\)$/),
+    });
+  });
+
+  it("waits for an async provider before opening the socket", async () => {
+    FakeSocket.last = null;
+    client.connect({
+      ...SESSION,
+      headers: async () => ({ Authorization: "Bearer t1" }),
+    });
+    expect(FakeSocket.last).toBeNull();
+    expect(client.state).toBe("connecting");
+
+    await settle();
+    expect(FakeSocket.last!.options?.headers?.Authorization).toBe("Bearer t1");
+  });
+
+  it("asks again before every reconnect, so a refreshed token is used", async () => {
+    let token = "t1";
+    const headers = jest.fn(async () => ({ Authorization: `Bearer ${token}` }));
+    client.connect({ ...SESSION, headers });
+    await settle();
+    const s1 = FakeSocket.last!;
+    s1.open();
+    s1.deliver({ t: "welcome", you: "me", seq: 0, entities: [] });
+
+    token = "t2";
+    s1.drop();
+    jest.advanceTimersByTime(500);
+    await settle();
+
+    expect(headers).toHaveBeenCalledTimes(2);
+    expect(FakeSocket.last).not.toBe(s1);
+    expect(FakeSocket.last!.options?.headers?.Authorization).toBe("Bearer t2");
+  });
+
+  it("drops an answer that arrives after a disconnect", async () => {
+    FakeSocket.last = null;
+    client.connect({
+      ...SESSION,
+      headers: async () => ({ Authorization: "Bearer t1" }),
+    });
+    client.disconnect();
+    await settle();
+
+    expect(FakeSocket.last).toBeNull();
+    expect(client.state).toBe("idle");
+  });
+
+  it("drops the first answer when connect is called again before it lands", async () => {
+    client.connect({
+      ...SESSION,
+      roomId: "room-a",
+      headers: async () => ({ Authorization: "Bearer a" }),
+    });
+    client.connect({
+      ...SESSION,
+      roomId: "room-b",
+      headers: async () => ({ Authorization: "Bearer b" }),
+    });
+    const created: FakeSocket[] = [];
+    const Base = FakeSocket;
+    (globalThis as any).WebSocket = class extends Base {
+      constructor(...args: ConstructorParameters<typeof FakeSocket>) {
+        super(...args);
+        created.push(this);
+      }
+    };
+    await settle();
+
+    expect(created).toHaveLength(1);
+    expect(created[0].url).toContain("room-b");
+  });
+
+  it("backs off and retries when the provider fails", async () => {
+    const headers = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("token refresh failed"))
+      .mockResolvedValue({ Authorization: "Bearer t1" });
+    FakeSocket.last = null;
+    client.connect({ ...SESSION, headers });
+    await settle();
+
+    expect(FakeSocket.last).toBeNull();
+    expect(client.state).toBe("reconnecting");
+
+    jest.advanceTimersByTime(500);
+    await settle();
+    expect(FakeSocket.last!.options?.headers?.Authorization).toBe("Bearer t1");
+  });
+
+  it("treats a provider that throws like one that rejects", () => {
+    FakeSocket.last = null;
+    client.connect({
+      ...SESSION,
+      headers: () => {
+        throw new Error("no session");
+      },
+    });
+
+    expect(FakeSocket.last).toBeNull();
+    expect(client.state).toBe("reconnecting");
+  });
+
+  it("sends the key beside the provider's headers when given both", () => {
+    client.connect({
+      ...CONFIG,
+      headers: () => ({ Authorization: "Bearer t1" }),
+    });
+
+    expect(FakeSocket.last!.options?.headers).toMatchObject({
+      Authorization: "Bearer t1",
+      "x-api-key": "k",
+      "x-project-id": "p",
+    });
+  });
+
+  it("fails without opening a socket when given no credential at all", () => {
+    FakeSocket.last = null;
+    client.connect(SESSION);
+
+    expect(FakeSocket.last).toBeNull();
+    expect(client.state).toBe("failed");
+    expect(client.error).toBeDefined();
+  });
+});
+
 describe("ordering", () => {
   it("applies deltas in sequence", () => {
     const s = connectAndWelcome([], 0);
@@ -540,5 +689,47 @@ describe("clear", () => {
       ],
     });
     expect(client.getEntities()).toEqual([]);
+  });
+});
+
+describe("in a browser", () => {
+  // `isWeb` is read once at import, so the client is loaded again against a
+  // web platform. Reset rather than isolated: an isolated registry still
+  // hands back the react-native mock this file already built.
+  const loadWebClient = (): ViroReplicationClient => {
+    jest.resetModules();
+    jest.doMock("react-native", () => ({
+      Platform: { OS: "web", constants: {} },
+      NativeModules: {},
+    }));
+    const {
+      ViroReplicationClient: Client,
+    } = require("../components/AR/ViroReplication");
+    return new Client();
+  };
+
+  it("keeps the key in the query string and ignores a header provider", () => {
+    const web = loadWebClient();
+    const headers = jest.fn(() => ({ Authorization: "Bearer t1" }));
+    web.connect({ ...CONFIG, headers });
+
+    expect(FakeSocket.last!.url).toBe(
+      "ws://localhost:8787/functions/v1/replication/room-1?apiKey=k&projectId=p"
+    );
+    expect(headers).not.toHaveBeenCalled();
+    web.disconnect();
+  });
+
+  it("fails rather than connecting with headers it cannot send", () => {
+    const web = loadWebClient();
+    FakeSocket.last = null;
+    web.connect({
+      roomId: "room-1",
+      projectId: "p",
+      headers: () => ({ Authorization: "Bearer t1" }),
+    });
+
+    expect(FakeSocket.last).toBeNull();
+    expect(web.state).toBe("failed");
   });
 });

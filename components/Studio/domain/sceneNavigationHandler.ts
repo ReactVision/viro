@@ -23,6 +23,9 @@ import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 import { StudioPlacementStore } from "./placementStore";
+import type { StudioDragStore } from "./dragStore";
+import type { StudioColocationController } from "../colocation/controller";
+import type { StudioEffectOrigin } from "./utils";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
@@ -159,11 +162,17 @@ export type SequenceRuntimeContext = {
   visibilityStore?: StudioVisibilityStore;
   placementStore?: StudioPlacementStore;
   soundManager?: StudioSoundManager;
+  dragStore?: StudioDragStore;
   getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
   // Scene navigation transport. When set (web host), NAVIGATION functions call
   // this to fetch + re-render the target scene. When absent (native), the
   // walker falls back to navigateToScene() which pushes onto the Viro navigator.
   navigate?: (targetSceneId: string) => void;
+  // The navigator's shared session. While one runs, NAVIGATION goes through it
+  // so every device follows; otherwise it is handed on to the scene pushed.
+  colocation?: StudioColocationController;
+  // Given to the sounds this dispatch plays and stops; "local" when absent.
+  effectOrigin?: StudioEffectOrigin;
 };
 
 function resolveById(
@@ -314,7 +323,8 @@ function runSteps(
               // A sibling lane aborted while this clip was playing: don't advance.
               if (deps.isCancelled?.()) return;
               advance();
-            }
+            },
+            deps.runtimeCtx.effectOrigin
           );
           return;
         }
@@ -703,13 +713,15 @@ export function executeFunctionWithRelations(
       runtimeCtx.navigate(nav.navigate_to);
       return;
     }
+    if (runtimeCtx?.colocation?.navigate(nav.navigate_to)) return;
     if (!sceneNavigator) return;
     void navigateToScene(
       sceneNavigator,
       nav.navigate_to,
       animations,
       onSceneChange,
-      runtimeCtx?.variableStore
+      runtimeCtx?.variableStore,
+      runtimeCtx?.colocation
     );
   } else if (fn.function_type === "ALERT") {
     const alert = fn.scene_alert;
@@ -834,17 +846,22 @@ export function executeFunctionWithRelations(
       const position = s.target_asset_id
         ? runtimeCtx?.getAssetPosition?.(s.target_asset_id)
         : undefined;
-      manager.play({
-        // PLAY always has audio_asset_id per the scene_sounds CHECK constraint.
-        audioAssetId: s.audio_asset_id ?? "",
-        url: s.audio_url,
-        position,
-        volume: s.volume,
-        loop: s.loop,
-        stopOthers: s.stop_other_sounds,
-      });
+      manager.play(
+        {
+          // PLAY always has audio_asset_id per the scene_sounds CHECK constraint.
+          audioAssetId: s.audio_asset_id ?? "",
+          url: s.audio_url,
+          position,
+          volume: s.volume,
+          loop: s.loop,
+          stopOthers: s.stop_other_sounds,
+        },
+        undefined,
+        runtimeCtx?.effectOrigin
+      );
     } else {
-      manager.stop(s.audio_asset_id ?? null); // null = all sounds
+      // null = all sounds
+      manager.stop(s.audio_asset_id ?? null, runtimeCtx?.effectOrigin);
     }
   } else if (fn.function_type === "TAKE_PHOTO") {
     // Captures the AR view via the navigator's native takeScreenshot, which
@@ -985,7 +1002,8 @@ async function navigateToScene(
   targetSceneId: string,
   currentAnimations: StudioAnimation[],
   onSceneChange?: (sceneId: string, sceneName: string) => void,
-  variableStore?: StudioVariableStore
+  variableStore?: StudioVariableStore,
+  colocation?: StudioColocationController
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");
@@ -1014,6 +1032,9 @@ async function navigateToScene(
         // The session store rides along on every push so values survive scene
         // transitions for the navigator's whole lifetime.
         variableStore,
+        // So does the shared session: the AR session and its frame outlive a
+        // push, so the next scene renders in the same frame without a resolve.
+        colocation,
       },
     });
 

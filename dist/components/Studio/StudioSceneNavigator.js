@@ -44,7 +44,10 @@ const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const VRQuestNavigatorBridge_1 = require("../Utilities/VRQuestNavigatorBridge");
 const StudioRecordingIndicator_1 = require("./StudioRecordingIndicator");
 const StudioPlacementIndicator_1 = require("./StudioPlacementIndicator");
+const StudioColocationIndicator_1 = require("./StudioColocationIndicator");
 const placementBannerStore_1 = require("./domain/placementBannerStore");
+const colocationStore_1 = require("./domain/colocationStore");
+const controller_1 = require("./colocation/controller");
 const animationRegistry_1 = require("./domain/animationRegistry");
 const studioMaterials_1 = require("./domain/studioMaterials");
 const variableStore_1 = require("./domain/variableStore");
@@ -100,8 +103,17 @@ const styles = react_native_1.StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 24,
     },
+    colocationOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        alignItems: "center",
+        paddingHorizontal: 24,
+    },
 });
 const PLACEMENT_BANNER_TOP = react_native_1.Platform.OS === "android" ? (react_native_1.StatusBar.currentHeight ?? 24) + 12 : 64;
+// Bottom-centre, clear of the top pills; approximate, like the top insets.
+const COLOCATION_INDICATOR_BOTTOM = react_native_1.Platform.OS === "android" ? 24 : 40;
 /**
  * Mobile AR placement layer: a full-screen tap catcher shown while a tap-to-place
  * asset is awaiting placement. Each tap hit-tests a real surface (via the scene's
@@ -164,7 +176,7 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
  * ready. This means VRActivity always launches with the actual content scene
  * as its initial scene, avoiding the LoadingVRScene → replace timing race.
  */
-exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, recordingIndicator = true, placementIndicator = true, }, ref) {
+exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavigator({ sceneId, worldAlignment = "Gravity", autofocus = true, style, onSceneReady, onError, onSceneChange, onExitViro, onSceneLoaded, onPlaneDetected, onPlaneSelected, noAssetsMessage, loadingView, renderError, recordingIndicator = true, placementIndicator = true, colocation, colocationIndicator = true, onColocationStateChange, onColocationRoom, }, ref) {
     const navigatorRef = (0, react_1.useRef)(null);
     const loadedSceneIdRef = (0, react_1.useRef)(null);
     const [isSceneReady, setIsSceneReady] = (0, react_1.useState)(false);
@@ -205,6 +217,60 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     const placementApiRef = (0, react_1.useRef)(null);
     const placementNamesRef = (0, react_1.useRef)(new Map());
     const getPlacementName = (0, react_1.useCallback)((assetId) => placementNamesRef.current.get(assetId) ?? null, []);
+    const rememberPlacementNames = (0, react_1.useCallback)((sceneData) => {
+        placementNamesRef.current = new Map(sceneData.assets
+            .filter((a) => (0, placementStore_1.isTapToPlaceAsset)(a))
+            .map((a) => [a.id, a.name ?? ""]));
+    }, []);
+    const onColocationStateChangeRef = (0, react_1.useRef)(onColocationStateChange);
+    const onColocationRoomRef = (0, react_1.useRef)(onColocationRoom);
+    onColocationStateChangeRef.current = onColocationStateChange;
+    onColocationRoomRef.current = onColocationRoom;
+    // One controller for the navigator's lifetime, handed to every scene like
+    // the variable store, so a session survives scene pushes. The AR session
+    // persists across a push too, so nothing re-resolves on NAVIGATE.
+    const colocationRef = (0, react_1.useRef)(null);
+    // This navigator's token in the module-level store, which another mounted
+    // navigator may be writing too.
+    const [colocationStoreOwner] = (0, react_1.useState)(() => ({}));
+    if (colocationRef.current === null) {
+        const controller = new controller_1.StudioColocationController();
+        controller.setNavigatorAccessor(() => navigatorRef.current?.arSceneNavigator);
+        controller.onStateChange = (state) => {
+            colocationStore_1.studioColocationStore.set(state, colocationStoreOwner);
+            onColocationStateChangeRef.current?.(state);
+        };
+        controller.onRoom = (room) => onColocationRoomRef.current?.(room);
+        controller.onOriginPrompt = (prompt) => colocationStore_1.studioColocationStore.setOriginPrompt(prompt, colocationStoreOwner);
+        colocationRef.current = controller;
+    }
+    (0, react_1.useEffect)(() => {
+        const controller = colocationRef.current;
+        colocationStore_1.studioColocationStore.setFinishScanHandler(() => controller?.finishScan() ?? false, colocationStoreOwner);
+        return () => {
+            controller?.dispose();
+            colocationStore_1.studioColocationStore.reset(colocationStoreOwner);
+        };
+    }, [colocationStoreOwner]);
+    (0, react_1.useEffect)(() => {
+        colocationStore_1.studioColocationStore.setBuiltInIndicatorShown(colocationIndicator, colocationStoreOwner);
+    }, [colocationIndicator, colocationStoreOwner]);
+    (0, react_1.useEffect)(() => {
+        colocationRef.current?.request(colocation ?? null, {
+            restartFailed: false,
+        });
+    }, [colocation]);
+    // The tap-to-place overlay would catch taps for content that is withheld
+    // while a shared session is set up.
+    const [colocationPending, setColocationPending] = (0, react_1.useState)(false);
+    (0, react_1.useEffect)(() => {
+        const controller = colocationRef.current;
+        if (!controller)
+            return;
+        const update = () => setColocationPending(controller.getFrame().phase === "pending");
+        update();
+        return controller.subscribe(update);
+    }, []);
     const onSceneReadyRef = (0, react_1.useRef)(onSceneReady);
     const onErrorRef = (0, react_1.useRef)(onError);
     const onSceneChangeRef = (0, react_1.useRef)(onSceneChange);
@@ -231,6 +297,39 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         setIsSceneReady(true);
         onSceneReadyRef.current?.();
     }, []);
+    // What every scene the navigator pushes is given. The first-scene callbacks
+    // reach the initial scene alone, as their props say.
+    const sceneEntry = (0, react_1.useCallback)((sceneData, initial, skipOnLoadFunction = false) => ({
+        scene: StudioARScene_1.StudioARScene,
+        passProps: {
+            sceneData,
+            ...(initial
+                ? {
+                    onReady: handleSceneReady,
+                    onPlaneDetected: onPlaneDetectedRef.current,
+                    onPlaneSelected: onPlaneSelectedRef.current,
+                }
+                : {}),
+            onSceneChange: onSceneChangeRef.current,
+            noAssetsMessage: noAssetsMessageRef.current,
+            variableStore: variableStoreRef.current,
+            placementStore: placementStoreRef.current,
+            placementApiRef,
+            colocation: colocationRef.current,
+            ...(skipOnLoadFunction ? { skipOnLoadFunction } : {}),
+        },
+    }), [handleSceneReady]);
+    // A shared session navigates through here, on the device that ran the
+    // NAVIGATE and on every device that follows it.
+    (0, react_1.useEffect)(() => {
+        const controller = colocationRef.current;
+        controller?.setScenePusher((sceneData, { skipOnLoadFunction }) => {
+            rememberPlacementNames(sceneData);
+            navigatorRef.current?.arSceneNavigator?.push(sceneEntry(sceneData, false, skipOnLoadFunction));
+            onSceneChangeRef.current?.(sceneData.scene.id, sceneData.scene.name ?? sceneData.scene.id);
+        });
+        return () => controller?.setScenePusher(null);
+    }, [sceneEntry, rememberPlacementNames]);
     // On Quest: holds the resolved scene entry. ViroXRSceneNavigator is not
     // rendered until this is non-null, so VRActivity always launches into content.
     const [vrSceneEntry, setVrSceneEntry] = (0, react_1.useState)(null);
@@ -248,6 +347,10 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
             }
             return nav.takeScreenshot(fileName, saveToCameraRoll);
         },
+        leaveColocation: () => colocationRef.current?.leave(),
+        retryColocation: () => colocationRef.current?.retry() ?? false,
+        getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
+        finishColocationScan: () => colocationRef.current?.finishScan() ?? false,
     }), []);
     const resolveSceneId = (0, react_1.useCallback)(async () => {
         if (sceneId)
@@ -295,9 +398,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
             return;
         loadedSceneIdRef.current = resolvedSceneId;
         // Names for the tap-to-place prompt (overlay reads this on placement).
-        placementNamesRef.current = new Map(sceneData.assets
-            .filter((a) => (0, placementStore_1.isTapToPlaceAsset)(a))
-            .map((a) => [a.id, a.name ?? ""]));
+        rememberPlacementNames(sceneData);
         const triggerImageCount = sceneData.assets.filter((a) => !!a.trigger_image_url).length;
         setNumberOfTrackedImages(triggerImageCount > 0 ? Math.min(triggerImageCount, 5) : undefined);
         setOcclusionMode(mapOcclusionMode(sceneData.project?.occlusion_mode));
@@ -311,20 +412,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
             (0, animationRegistry_1.registerSceneAnimations)(sceneData.animations);
             (0, studioMaterials_1.registerStudioMaterialsForAssets)(sceneData.assets);
         }
-        const entry = {
-            scene: StudioARScene_1.StudioARScene,
-            passProps: {
-                sceneData,
-                onReady: handleSceneReady,
-                onSceneChange: onSceneChangeRef.current,
-                onPlaneDetected: onPlaneDetectedRef.current,
-                onPlaneSelected: onPlaneSelectedRef.current,
-                noAssetsMessage: noAssetsMessageRef.current,
-                variableStore: variableStoreRef.current,
-                placementStore: placementStoreRef.current,
-                placementApiRef,
-            },
-        };
+        const entry = sceneEntry(sceneData, true);
         if (ViroPlatform_1.isQuest || ViroPlatform_1.isVisionOS) {
             // Setting vrSceneEntry mounts ViroXRSceneNavigator with StudioARScene as
             // vrInitialScene, so VRActivity launches straight into content. visionOS reads the
@@ -335,7 +423,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         else {
             navigatorRef.current?.arSceneNavigator?.push(entry);
         }
-    }, [resolveSceneId, handleSceneReady]);
+    }, [resolveSceneId, sceneEntry, rememberPlacementNames]);
     (0, react_1.useEffect)(() => {
         let cancelled = false;
         const isCancelled = () => cancelled;
@@ -399,8 +487,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     // headset that shows nothing of the room is the worse of the two.
     hdrEnabled={!ViroPlatform_1.isQuest} bloomEnabled={false} onExitViro={onExitViro} 
     // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
-    // than ViroARScene (see StudioARScene for why), and a virtual root
-    // turns none of this on by itself, so both are asked for outright.
+    // than ViroARScene outside a shared session (see StudioARScene for
+    // why), and a virtual root turns none of this on by itself, so both
+    // are asked for outright.
     // They reach VRActivity through the navigator bridge and do not depend
     // on which root the scene uses.
     passthroughEnabled={ViroPlatform_1.isQuest ? true : undefined} handTrackingEnabled={ViroPlatform_1.isQuest ? true : undefined} style={react_native_1.StyleSheet.absoluteFill}/>
@@ -412,9 +501,15 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
         {recordingIndicator && (<react_native_1.View pointerEvents="box-none" style={[styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }]}>
             <StudioRecordingIndicator_1.StudioRecordingIndicator />
           </react_native_1.View>)}
-        {!ViroPlatform_1.isQuest && placementStoreRef.current && (<StudioPlacementOverlay store={placementStoreRef.current} apiRef={placementApiRef} getName={getPlacementName}/>)}
+        {!ViroPlatform_1.isQuest && placementStoreRef.current && !colocationPending && (<StudioPlacementOverlay store={placementStoreRef.current} apiRef={placementApiRef} getName={getPlacementName}/>)}
         {placementIndicator && (<react_native_1.View pointerEvents="none" style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}>
             <StudioPlacementIndicator_1.StudioPlacementIndicator />
+          </react_native_1.View>)}
+        {colocationIndicator && (<react_native_1.View pointerEvents="box-none" style={[
+                styles.colocationOverlay,
+                { bottom: COLOCATION_INDICATOR_BOTTOM },
+            ]}>
+            <StudioColocationIndicator_1.StudioColocationIndicator />
           </react_native_1.View>)}
       </react_native_1.View>
     </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);

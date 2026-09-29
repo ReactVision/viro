@@ -29,8 +29,12 @@ import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
 import { studioAssetPosition } from "./assetPosition";
+import type { StudioDragStore } from "./dragStore";
+import type { Vec3 } from "../colocation/frameMath";
 
 type SceneNavigator = any;
+/** A drag reports its world position; the scene tracks and shares it. */
+type DragNotify = (assetId: string, worldPosition?: Vec3) => void;
 
 export type NodeConfig = {
   position: [number, number, number];
@@ -47,6 +51,8 @@ export type NodeConfig = {
     maxDistance: number;
   };
   physicsBody?: Record<string, unknown>;
+  /** The body while another device drags it: kinematic, so it follows their writes. */
+  lockedPhysicsBody?: Record<string, unknown>;
   /** Authored velocity, sent once on mount rather than on the body. */
   viroTag?: string;
   onClick?: () => void;
@@ -157,6 +163,15 @@ export function createNodeConfig(
       })
     : undefined;
   const viroTag = parsedPhysics ? asset.id : undefined;
+  const lockedPhysicsBody =
+    parsedPhysics &&
+    dragType &&
+    shouldUseKinematicPhysicsDrag(asset, parsedPhysics)
+      ? buildViroPhysicsBody(parsedPhysics, {
+          kinematicDragOverride: true,
+          scale: scaleValue,
+        })
+      : undefined;
 
   const onClick = createOnClickHandler(
     asset,
@@ -176,6 +191,7 @@ export function createNodeConfig(
     dragType,
     dragPlane,
     physicsBody,
+    ...(lockedPhysicsBody ? { lockedPhysicsBody } : {}),
     viroTag,
     onClick,
     animation,
@@ -240,7 +256,7 @@ function create3DObject(
   asset: StudioAsset,
   config: NodeConfig,
   onAssetLoaded?: (id: string) => void,
-  notifyPhysicsDrag?: (assetId: string) => void,
+  notifyPhysicsDrag?: DragNotify,
   onCollision?: (
     viroTag: string,
     collidedPoint: [number, number, number],
@@ -279,7 +295,7 @@ function create3DObject(
       // Viro derives native canDrag from `onDrag != undefined`; without this prop
       // the drag recognizer is never attached, even when dragType is set.
       {...(config.dragType
-        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        ? { onDrag: (to: Vec3) => notifyPhysicsDrag?.(asset.id, to) }
         : {})}
       {...(shaderOverrides ? { shaderOverrides } : {})}
       {...(config.physicsBody
@@ -295,7 +311,7 @@ function createImage(
   asset: StudioAsset,
   config: NodeConfig,
   onAssetLoaded?: (id: string) => void,
-  notifyPhysicsDrag?: (assetId: string) => void,
+  notifyPhysicsDrag?: DragNotify,
   onCollision?: (
     viroTag: string,
     collidedPoint: [number, number, number],
@@ -329,7 +345,7 @@ function createImage(
       onLoadEnd={() => onAssetLoaded?.(asset.id)}
       onError={assetErrorHandler(asset, config, "Image")}
       {...(config.dragType
-        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        ? { onDrag: (to: Vec3) => notifyPhysicsDrag?.(asset.id, to) }
         : {})}
       {...(config.physicsBody
         ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
@@ -350,7 +366,7 @@ const VariableText: React.FC<{
   asset: StudioAsset;
   config: NodeConfig;
   store?: StudioVariableStore;
-  notifyPhysicsDrag?: (assetId: string) => void;
+  notifyPhysicsDrag?: DragNotify;
   onCollision?: (
     viroTag: string,
     collidedPoint: [number, number, number],
@@ -363,6 +379,9 @@ const VariableText: React.FC<{
   visible?: boolean;
   position?: [number, number, number];
   rotation?: [number, number, number];
+  // From DragNode while another device holds the asset.
+  dragLocked?: boolean;
+  physicsBody?: Record<string, unknown>;
 }> = ({
   asset,
   config,
@@ -373,7 +392,10 @@ const VariableText: React.FC<{
   visible,
   position,
   rotation,
+  dragLocked,
+  physicsBody,
 }) => {
+  const body = physicsBody ?? config.physicsBody;
   const template = asset.name ?? "";
   const compute = () =>
     store
@@ -410,12 +432,10 @@ const VariableText: React.FC<{
         // authored position is where the text is at any scale.
         textAlignVertical: "center",
       }}
-      {...(config.dragType
-        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+      {...(config.dragType && !dragLocked
+        ? { onDrag: (to: Vec3) => notifyPhysicsDrag?.(asset.id, to) }
         : {})}
-      {...(config.physicsBody
-        ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
-        : {})}
+      {...(body ? { physicsBody: body as any, viroTag: config.viroTag } : {})}
       {...(onCollision ? { onCollision: onCollision as any } : {})}
       {...(config.onGaze ? { onGaze: config.onGaze as any } : {})}
     />
@@ -453,8 +473,9 @@ const VisibleNode: React.FC<{
  * asset, then mounts it at the tap point with the author position AND rotation
  * applied relative to where the user was facing when they tapped (see
  * StudioPlacementStore.resolvePlacedPosition / resolvePlacedRotation), and hands
- * off to VisibleNode so Set Visibility still applies. Rendered at scene root
- * (world space), never inside a plane wrapper.
+ * off to VisibleNode so Set Visibility still applies. Never inside a plane
+ * wrapper: the position is in the frame the node renders in, world coordinates
+ * at the scene root, or scene-origin coordinates while shared.
  */
 const PlaceableNode: React.FC<{
   assetId: string;
@@ -471,14 +492,20 @@ const PlaceableNode: React.FC<{
   visibilityStore,
   children,
 }) => {
-  const [placed, setPlaced] = React.useState(() => store.isPlaced(assetId));
+  // The position rather than a placed flag: a shared session can move an asset
+  // that is already placed, and only a new position re-renders it.
+  const [placedAt, setPlacedAt] = React.useState(() =>
+    store.getPosition(assetId)
+  );
 
   React.useEffect(() => {
-    setPlaced(store.isPlaced(assetId));
-    return store.subscribe(assetId, () => setPlaced(store.isPlaced(assetId)));
+    setPlacedAt(store.getPosition(assetId));
+    return store.subscribe(assetId, () =>
+      setPlacedAt(store.getPosition(assetId))
+    );
   }, [store, assetId]);
 
-  if (!placed) return null;
+  if (!placedAt) return null;
 
   const position =
     store.resolvePlacedPosition(assetId, authorPosition) ?? authorPosition;
@@ -492,10 +519,86 @@ const PlaceableNode: React.FC<{
   );
 };
 
+/** Far below what can be seen, and enough to make a prop a change. */
+const DRAG_REPAINT_NUDGE_M = 1e-6;
+
+/**
+ * The props a DragNode hands its node. Injected ones (from VisibleNode and
+ * PlaceableNode) pass through, another device's drag position wins over them,
+ * and while that device holds the asset it cannot be dragged here.
+ */
+export function dragNodeProps(
+  drag: { position?: Vec3; locked: boolean; revision: number },
+  injected: Record<string, unknown>,
+  childPosition: Vec3 | undefined,
+  isText: boolean,
+  lockedPhysicsBody?: Record<string, unknown>
+): Record<string, unknown> {
+  const props: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(injected)) {
+    if (value !== undefined) props[key] = value;
+  }
+  const base =
+    drag.position ?? (props.position as Vec3 | undefined) ?? childPosition;
+  // A prop equal to the last one is never sent to native, and a refused drag
+  // moved the node there natively, so a repaint has to differ from it.
+  if (base) {
+    props.position =
+      drag.revision % 2 === 1
+        ? [base[0], base[1] + DRAG_REPAINT_NUDGE_M, base[2]]
+        : base;
+  }
+  if (drag.locked) {
+    // canDrag follows onDrag (see create3DObject).
+    if (isText) props.dragLocked = true;
+    else props.onDrag = undefined;
+    if (lockedPhysicsBody) props.physicsBody = lockedPhysicsBody;
+  }
+  return props;
+}
+
+/**
+ * Moves a draggable node where another device in a shared session dragged it,
+ * subscribing to its own asset so a remote drag repaints this node alone.
+ */
+const DragNode: React.FC<{
+  assetId: string;
+  store: StudioDragStore;
+  lockedPhysicsBody?: Record<string, unknown>;
+  children: React.ReactElement<any>;
+  visible?: boolean;
+  position?: Vec3;
+  rotation?: Vec3;
+}> = ({ assetId, store, lockedPhysicsBody, children, ...injected }) => {
+  const read = () => ({
+    position: store.getPosition(assetId),
+    locked: store.isLocked(assetId),
+    revision: store.revision(assetId),
+  });
+  const [drag, setDrag] = React.useState(read);
+
+  React.useEffect(() => {
+    setDrag(read());
+    return store.subscribe(assetId, () => setDrag(read()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, assetId]);
+
+  return React.cloneElement(
+    children,
+    dragNodeProps(
+      drag,
+      injected,
+      children.props.position ?? children.props.config?.position,
+      children.type === VariableText,
+      lockedPhysicsBody
+    )
+  );
+};
+
 function createText(
   asset: StudioAsset,
   config: NodeConfig,
-  notifyPhysicsDrag?: (assetId: string) => void,
+  notifyPhysicsDrag?: DragNotify,
   store?: StudioVariableStore,
   onCollision?: (
     viroTag: string,
@@ -520,7 +623,7 @@ function createText(
 function createVideo(
   asset: StudioAsset,
   config: NodeConfig,
-  notifyPhysicsDrag?: (assetId: string) => void,
+  notifyPhysicsDrag?: DragNotify,
   onCollision?: (
     viroTag: string,
     collidedPoint: [number, number, number],
@@ -549,7 +652,7 @@ function createVideo(
       muted={false}
       onError={assetErrorHandler(asset, config, "Video")}
       {...(config.dragType
-        ? { onDrag: () => notifyPhysicsDrag?.(asset.id) }
+        ? { onDrag: (to: Vec3) => notifyPhysicsDrag?.(asset.id, to) }
         : {})}
       {...(config.physicsBody
         ? { physicsBody: config.physicsBody as any, viroTag: config.viroTag }
@@ -574,7 +677,7 @@ export function createNode(
     collidedNormal: [number, number, number]
   ) => void,
   isDragActive?: (assetId: string) => boolean,
-  notifyPhysicsDrag?: (assetId: string) => void,
+  notifyPhysicsDrag?: DragNotify,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
   runtimeCtx?: SequenceRuntimeContext,
   // When set (proximity-target assets), captures the live Viro node so the host
@@ -668,9 +771,24 @@ export function createNode(
     }
   };
 
-  const node = buildNode(proximityRef);
+  const built = buildNode(proximityRef);
 
-  if (!node) return null;
+  if (!built) return null;
+
+  // Marker content sits on each device's own image, so its drags stay local.
+  const dragStore = runtimeCtx?.dragStore;
+  const node =
+    dragStore && config.dragType && !asset.trigger_image_url ? (
+      <DragNode
+        assetId={asset.id}
+        store={dragStore}
+        lockedPhysicsBody={config.lockedPhysicsBody}
+      >
+        {built}
+      </DragNode>
+    ) : (
+      built
+    );
 
   // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
   // node at the tap point with the author position and rotation applied relative

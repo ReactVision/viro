@@ -54,6 +54,7 @@ async function createColocationRoom(config, frame) {
     const body = {
         frame_kind: frame.frameKind,
         name: frame.name,
+        scene_id: frame.sceneId,
     };
     if (frame.frameKind === "cloud_anchor")
         body.cloud_anchor_id = frame.cloudAnchorId;
@@ -76,15 +77,40 @@ async function lookupColocationRoom(config, code) {
 async function request(config, method, path, body) {
     const base = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
     const url = `${base}/functions/v1/colocation${path}`;
+    let headers;
+    if (config.headers) {
+        headers = { "content-type": "application/json", ...config.headers };
+        if (config.projectId)
+            headers["x-project-id"] = config.projectId;
+    }
+    else if (!config.apiKey) {
+        // The platform's own codes for the same refusal, so a caller handles one
+        // set whether or not the request was spent.
+        return {
+            success: false,
+            error: "Pass an apiKey or headers.",
+            code: "MISSING_API_KEY",
+        };
+    }
+    else if (!config.projectId) {
+        return {
+            success: false,
+            error: "A projectId is required with an apiKey.",
+            code: "MISSING_PROJECT_ID",
+        };
+    }
+    else {
+        headers = {
+            "content-type": "application/json",
+            "x-api-key": config.apiKey,
+            "x-project-id": config.projectId,
+        };
+    }
     let response;
     try {
         response = await fetch(url, {
             method,
-            headers: {
-                "content-type": "application/json",
-                "x-api-key": config.apiKey,
-                "x-project-id": config.projectId,
-            },
+            headers,
             body: body === undefined ? undefined : JSON.stringify(body),
         });
     }
@@ -103,6 +129,7 @@ async function request(config, method, path, body) {
             success: false,
             error: parsed?.error?.message ?? `Request failed (${response.status})`,
             code: parsed?.error?.code,
+            status: response.status,
         };
     }
     return { success: true, room: toRoom(parsed.room) };
@@ -116,5 +143,7 @@ function toRoom(raw) {
         cloudAnchorId: raw.cloud_anchor_id ?? null,
         frameRef: raw.frame_ref ?? null,
         name: raw.name ?? null,
+        projectId: raw.project_id ?? null,
+        sceneId: raw.scene_id ?? null,
     };
 }

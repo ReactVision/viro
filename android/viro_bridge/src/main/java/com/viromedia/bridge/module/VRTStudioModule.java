@@ -11,6 +11,7 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.Arguments;
 import com.reactvision.cca.RVHttpClient;
+import com.viro.core.ReactVisionAuth;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -113,9 +114,15 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
         promise.resolve(readMeta(PROJECT_ID_META));
     }
 
+    // @internal True while a first-party session is set (see studioSession).
+    public static boolean hasStudioSession() {
+        return studioSession != null;
+    }
+
     // @internal — sets/clears the first-party session auth (see studioSession).
     // A map { baseUrl, accessToken, clientTag? } enables session mode; null /
-    // malformed reverts to manifest RVApiKey mode.
+    // malformed reverts to manifest RVApiKey mode. The renderer keeps its own
+    // copy, which cloud anchors and the co-location channel read.
     @ReactMethod
     public void rvSetStudioSession(ReadableMap config, Promise promise) {
         String baseUrl = config != null && config.hasKey("baseUrl")
@@ -124,12 +131,56 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
                 ? config.getString("accessToken") : null;
         if (baseUrl == null || baseUrl.isEmpty() || accessToken == null || accessToken.isEmpty()) {
             studioSession = null;
+            pushSessionToRenderer(null);
             promise.resolve(null);
             return;
         }
         while (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         String clientTag = config.hasKey("clientTag") ? config.getString("clientTag") : null;
-        studioSession = new StudioSession(baseUrl, accessToken, clientTag);
+        StudioSession session = new StudioSession(baseUrl, accessToken, clientTag);
+        studioSession = session;
+        pushSessionToRenderer(session);
+        promise.resolve(null);
+    }
+
+    // @internal Credentials for JS clients that talk to the platform or the
+    // relay directly: { mode, baseUrl, headers, projectId }, projectId being the
+    // manifest RVProjectId in every mode.
+    @ReactMethod
+    public void rvGetAuthHeaders(Promise promise) {
+        RequestAuth auth = resolveAuth();
+        WritableMap headers = Arguments.createMap();
+        WritableMap r = Arguments.createMap();
+        if (auth == null) {
+            r.putString("mode", "none");
+            r.putNull("baseUrl");
+        } else if (auth.apiKey != null) {
+            r.putString("mode", "api_key");
+            r.putString("baseUrl", auth.baseUrl);
+            headers.putString("x-api-key", auth.apiKey);
+        } else {
+            r.putString("mode", "session");
+            r.putString("baseUrl", auth.baseUrl);
+            for (int i = 0; i < auth.headerNames.length; i++) {
+                headers.putString(auth.headerNames[i], auth.headerValues[i]);
+            }
+        }
+        r.putMap("headers", headers);
+        String projectId = readMeta(PROJECT_ID_META);
+        if (projectId != null) r.putString("projectId", projectId);
+        else r.putNull("projectId");
+        promise.resolve(r);
+    }
+
+    // @internal Project the ReactVision cloud anchor provider files anchors
+    // under, overriding RVProjectId. null or empty clears the override.
+    @ReactMethod
+    public void rvSetCloudAnchorProject(String projectId, Promise promise) {
+        try {
+            ReactVisionAuth.setProjectId(projectId);
+        } catch (Throwable ignored) {
+            // See pushSessionToRenderer.
+        }
         promise.resolve(null);
     }
 
@@ -209,6 +260,20 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
         return new RequestAuth(BASE_URL, apiKey, null, null);
     }
 
+    // Throwable, not Exception: a missing renderer library surfaces as
+    // UnsatisfiedLinkError or NoClassDefFoundError, and the JS-side session must
+    // still work for the fetch methods above.
+    private static void pushSessionToRenderer(StudioSession session) {
+        try {
+            if (session == null) {
+                ReactVisionAuth.clearSession();
+            } else {
+                ReactVisionAuth.setSession(session.baseUrl, session.accessToken, session.clientTag);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     private void resolve(Promise promise, boolean success, String data, String error) {
         WritableMap r = Arguments.createMap();
         r.putBoolean("success", success);
@@ -228,7 +293,8 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
                     .getApplicationInfo(
                             getReactApplicationContext().getPackageName(),
                             PackageManager.GET_META_DATA);
-            return ai.metaData != null ? ai.metaData.getString(key) : null;
+            String v = ai.metaData != null ? ai.metaData.getString(key) : null;
+            return (v != null && !v.isEmpty()) ? v : null;
         } catch (Exception e) {
             return null;
         }

@@ -204,6 +204,7 @@ public:
 
     // Cloud anchor management
     void rvStartScan() override;
+    void rvCancelOperations() override;
     std::string rvGetScanStatusJson() override;
     std::string rvGetScanDiagnosticsJson() override;
     void rvFinishScan(int ttlDays,
@@ -297,10 +298,18 @@ private:
     VROCloudAnchorProviderARCore *_cloudAnchorProviderARCore = nil;
 
     /*
-     The ReactVision cloud anchor provider instance.
-     Reads RVApiKey and RVProjectId from Info.plist.
+     The ReactVision cloud anchor provider instance. Created when Info.plist has
+     RVApiKey and RVProjectId or a VROReactVisionAuth session exists.
      */
     VROCloudAnchorProviderReactVision *_cloudAnchorProviderRV = nil;
+
+    /*
+     The ReactVision provider for a request, created here when ReactVision is
+     selected and a key or session now exists, so a sign-in after the scene
+     mounted still gets one. nil with `error` set otherwise, including
+     VROReactVisionAuth::kNoCredentialsError when there is no key and no session.
+     */
+    VROCloudAnchorProviderReactVision *ensureReactVisionProvider(std::string &error);
 
     /*
      The ReactVision geospatial provider instance.

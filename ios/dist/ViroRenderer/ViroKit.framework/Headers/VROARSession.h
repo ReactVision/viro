@@ -650,15 +650,28 @@ public:
     }
 
     /**
+     * Cancel the ReactVision provider's pending hosts and resolves, and close an open scan
+     * window without hosting it. Each pending operation reports `ErrorCancelled` once; work
+     * already running stops at its next checkpoint. An upload already in flight can still
+     * leave an anchor behind, which expires with its TTL.
+     */
+    virtual void rvCancelOperations() {
+        // Default implementation does nothing
+    }
+
+    /**
      * How the scan in progress is doing, as JSON.
      *
      * JSON rather than a struct because this crosses to Java and Objective-C and on to
      * JavaScript, and every layer in between would otherwise need the same shape written out
      * again. The keys are: scanning, keyframes, viewpointPairs, cameraSpreadMeters,
      * minKeyframes, minViewpointPairs, minSpreadMeters, meetsKeyframes, meetsViewpointPairs,
-     * meetsSpread — plus `available`, false when no provider is configured.
+     * meetsSpread, triangulatedPoints, minTriangulatedPoints (the hosting floor, 300) — plus
+     * `available`, false when no provider is configured.
      *
-     * Cheap enough to poll: it reads the keyframe buffer's poses, and triangulates nothing.
+     * Cheap enough to poll: it reads the keyframe buffer's poses, and never triangulates on the
+     * calling thread. triangulatedPoints is the last background count, so it trails the scan
+     * and is 0 until the first count finishes; compare it to minTriangulatedPoints.
      */
     virtual std::string rvGetScanStatusJson() {
         return "{\"available\":false}";

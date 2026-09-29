@@ -417,7 +417,13 @@ export class StudioColocationController {
   private projectId: string | null = null;
   private relayUrl = STUDIO_COLOCATION_DEFAULT_RELAY_URL;
   private anchorProjectSet = false;
-  private resolving = false;
+  /**
+   * A scan, a host or a resolve is running natively. Leaving asks native to
+   * cancel it; neither platform can stop one yet (iOS and Android both answer
+   * with a no-op, and there is no call that stops a scan), so what an
+   * abandoned operation resolves with later is dropped by its run check.
+   */
+  private nativeBusy = false;
 
   private location: Mat4 | null = null;
   private locationInverse: Mat4 | null = null;
@@ -736,6 +742,7 @@ export class StudioColocationController {
     run: number,
     nav: any
   ): Promise<ViroRoomFrame | null> {
+    this.nativeBusy = true;
     nav.startScan();
     this.setState({ status: "scanning", canFinish: false });
     await this.scan(run, nav);
@@ -746,10 +753,14 @@ export class StudioColocationController {
     try {
       hosted = await nav.finishScan(HOST_ANCHOR_TTL_DAYS);
     } catch (e) {
+      if (!this.isCurrent(run)) return null;
+      this.nativeBusy = false;
       this.fail(run, { code: "HOST_FAILED", message: errorMessage(e) });
       return null;
     }
+    // Left while hosting: this anchor belongs to nobody now.
     if (!this.isCurrent(run)) return null;
+    this.nativeBusy = false;
     const location = parseLocationTransform(hosted?.locationTransform);
     if (!hosted?.success || !hosted.cloudAnchorId || !location) {
       this.fail(run, {
@@ -950,7 +961,7 @@ export class StudioColocationController {
           ? { status: "hosting" }
           : { status: "resolving", attempt }
       );
-      this.resolving = true;
+      this.nativeBusy = true;
       const stopProgress =
         role === "join" && source.progress
           ? this.every(run, RESOLVE_PROGRESS_POLL_MS, async () => {
@@ -970,7 +981,7 @@ export class StudioColocationController {
       const outcome = await this.acquireOnce(run, source, timeoutMs);
       stopProgress();
       if (!this.isCurrent(run)) return null;
-      this.resolving = false;
+      this.nativeBusy = false;
       if (!outcome) {
         const needs =
           role === "host"
@@ -1418,8 +1429,8 @@ export class StudioColocationController {
     cleanups.forEach((fn) => fn());
     this.finishScanWaiter = null;
     this.active = false;
-    if (this.resolving) this.getNavigator()?.cancelCloudAnchorOperations?.();
-    this.resolving = false;
+    if (this.nativeBusy) this.getNavigator()?.cancelCloudAnchorOperations?.();
+    this.nativeBusy = false;
     this.replication = null;
     if (this.channelJoined) this.deps.leaveChannel().catch(() => {});
     this.channelJoined = false;

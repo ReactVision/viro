@@ -1766,3 +1766,53 @@ describe("StudioColocationController: retry", () => {
     expect(h.controller.retry()).toBe(false);
   });
 });
+
+describe("StudioColocationController: leaving native work", () => {
+  it("asks native to cancel when left during a scan", async () => {
+    const h = harness();
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene());
+    await flush();
+    expect(h.last().status).toBe("scanning");
+    h.controller.leave();
+    expect(h.nav.cancelCloudAnchorOperations).toHaveBeenCalledTimes(1);
+    expect(h.last()).toEqual({ status: "idle" });
+    await advance(1000);
+    expect(h.nav.getScanStatus).not.toHaveBeenCalled();
+  });
+
+  it("cancels while hosting and drops the anchor that arrives late", async () => {
+    const h = harness();
+    let finish!: (value: unknown) => void;
+    h.nav.finishScan.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene());
+    await flush();
+    await advance(500);
+    h.controller.finishScan();
+    await flush();
+    expect(h.last().status).toBe("hosting");
+    h.controller.leave();
+    expect(h.nav.cancelCloudAnchorOperations).toHaveBeenCalledTimes(1);
+    finish({
+      success: true,
+      cloudAnchorId: "anchor-late",
+      locationTransform: csv(HOST_LOCATION),
+    });
+    await flush();
+    expect(h.deps.createRoom).not.toHaveBeenCalled();
+    expect(h.last()).toEqual({ status: "idle" });
+    expect(h.controller.getFrame().phase).toBe("off");
+  });
+
+  it("does not cancel once hosting has returned", async () => {
+    const h = harness();
+    await hostToLive(h);
+    h.controller.leave();
+    expect(h.nav.cancelCloudAnchorOperations).not.toHaveBeenCalled();
+  });
+});

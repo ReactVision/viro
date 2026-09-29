@@ -716,8 +716,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     public void cancelCloudAnchorOperations() {
-        // ARCore doesn't have explicit cancel - operations will just time out
-        // This is a placeholder for future implementation if needed
+        // Intentionally empty: virocore's ARScene exposes no cancel for a host,
+        // a resolve or a scan (rvStartScan has no stop), so an operation runs
+        // to its own end. Callers drop what an abandoned one reports; the
+        // Studio co-location controller does this by run, and iOS is the same
+        // no-op.
     }
 
     // ========================================================================

@@ -49,6 +49,10 @@ public final class RVWebSocket extends WebSocketListener {
     private final AtomicBoolean closed  = new AtomicBoolean(false);
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicInteger attempt = new AtomicInteger(0);
+    // The link opened at least once: a later handshake is a reconnect.
+    private final AtomicBoolean everOpen    = new AtomicBoolean(false);
+    // A reconnect 401 already got its one retry with freshly read headers.
+    private final AtomicBoolean authRetried = new AtomicBoolean(false);
 
     private volatile WebSocket socket;
     private volatile boolean   nativeHeadersLinked = true;
@@ -124,6 +128,8 @@ public final class RVWebSocket extends WebSocketListener {
     public void onOpen(WebSocket webSocket, Response response) {
         if (closed.get()) return;
         attempt.set(0);
+        everOpen.set(true);
+        authRetried.set(false);
         nativeOnOpen(nativeHandle);
     }
 
@@ -147,7 +153,7 @@ public final class RVWebSocket extends WebSocketListener {
         int status = response == null ? 0 : response.code();
         String reason = t.getMessage() == null ? t.toString() : t.getMessage();
         if (status != 0) reason = reason + " (HTTP " + status + ")";
-        handleDrop(reason, isTerminalStatus(status));
+        handleDrop(reason, isTerminalRefusal(status));
     }
 
     /**
@@ -160,9 +166,25 @@ public final class RVWebSocket extends WebSocketListener {
      * Deliberately not 404: during a relay deploy the platform's own router
      * answers 404 until the container is listening, so that one is exactly the
      * case where backing off and trying again is right.
+     *
+     * A 401 on a reconnect is the exception, see isTerminalRefusal().
      */
     private static boolean isTerminalStatus(int status) {
         return status == 400 || status == 401 || status == 403;
+    }
+
+    /**
+     * A socket outlives the token it opened with, so after a long background
+     * the provider can hand a reconnect an expired token and the relay answers
+     * 401. That is the one refusal a retry can change: connect() asks native
+     * for the headers again, and a refresh may have landed meanwhile. Allow it
+     * once, on the normal backoff; a second 401 in a row is an answer. A 401
+     * on the first connect stays terminal, since those headers were just read.
+     * Mirrors isTerminalRefusal in NetworkSocket_iOS.mm.
+     */
+    private boolean isTerminalRefusal(int status) {
+        if (status == 401 && everOpen.get() && !authRetried.getAndSet(true)) return false;
+        return isTerminalStatus(status);
     }
 
     private void handleDrop(String reason, boolean terminal) {

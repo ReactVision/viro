@@ -101,6 +101,14 @@ export function studioColocationIndicatorContent(
         done: null,
         tone: "progress",
       };
+    case "waiting_for_host":
+      return {
+        title: "Waiting for the host",
+        detail: "Connected. The scene appears once the host has placed it.",
+        code: null,
+        done: null,
+        tone: "progress",
+      };
     case "live":
       return {
         title: state.room.isHost ? "Sharing this room" : "Joined this room",

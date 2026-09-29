@@ -261,8 +261,11 @@ export interface StudioSceneNavigatorProps {
    * distinct value: re-rendering with an equal value changes nothing.
    *
    * Content is withheld while the session is set up and then renders where the
-   * host placed it on every device. If the session fails, the scene renders
-   * alone again and `onColocationStateChange` reports why.
+   * host placed it on every device. A joiner that is aligned and connected
+   * before the host has placed the scene reports `waiting_for_host`. If the
+   * session fails, the scene renders alone again and `onColocationStateChange`
+   * reports why; `connectTimeoutMs` bounds the wait for the room once the
+   * frame is known (`CONNECT_TIMEOUT`, `HOST_TIMEOUT`).
    *
    * Variables, visibility and tap-to-place positions are shared, the last
    * write winning; a device that joins or reconnects takes the room's copy

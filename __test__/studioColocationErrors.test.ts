@@ -244,6 +244,20 @@ describe("studioColocationIndicatorContent", () => {
     ).toBe("Still looking. Move slowly around the area the host scanned.");
   });
 
+  it("tells a connected joiner it is waiting for the host", () => {
+    expect(
+      studioColocationIndicatorContent({
+        status: "waiting_for_host",
+        room: { ...room, isHost: false },
+      })
+    ).toMatchObject({
+      title: "Waiting for the host",
+      detail: "Connected. The scene appears once the host has placed it.",
+      tone: "progress",
+      done: null,
+    });
+  });
+
   it("shows the host the code and the peer count", () => {
     const content = studioColocationIndicatorContent({
       status: "live",

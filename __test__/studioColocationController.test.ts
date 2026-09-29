@@ -779,7 +779,10 @@ describe("StudioColocationController: join", () => {
     // Connected, but nothing is shown until the host's origin arrives.
     h.replication.sync();
     await advance(500);
-    expect(h.last().status).toBe("resolving");
+    expect(h.last()).toEqual({
+      status: "waiting_for_host",
+      room: expect.objectContaining({ roomId: "room-1", isHost: false }),
+    });
     expect(h.controller.getFrame().phase).toBe("pending");
     expect(h.rooms).toEqual([]);
 
@@ -1611,5 +1614,97 @@ describe("StudioColocationController: shared navigation", () => {
         }),
       },
     ]);
+  });
+});
+
+describe("StudioColocationController: waiting and timeouts", () => {
+  const ORIGIN = {
+    id: "scene:origin",
+    fields: { p: [0, 0, 0], q: [0, 0, 0, 1], sceneId: "scene-1" },
+    version: 1,
+    owner: null,
+  };
+
+  async function joinAndConnect(h: Harness, options = {}) {
+    h.controller.request({ mode: "join", code: "K7M2QX", ...options });
+    h.controller.attachScene(scene());
+    await flush();
+    h.replication.sync();
+    await advance(500);
+  }
+
+  it("waits for the host once aligned and connected, then goes live", async () => {
+    const h = harness();
+    await joinAndConnect(h);
+    expect(h.last()).toMatchObject({
+      status: "waiting_for_host",
+      room: { roomId: "room-1" },
+    });
+    expect(h.controller.getFrame().phase).toBe("pending");
+    h.replication.upsert(ORIGIN);
+    expect(h.last()).toMatchObject({ status: "live" });
+    // Live before the timeout: nothing fails later.
+    await advance(120000);
+    expect(h.last().status).toBe("live");
+  });
+
+  it("fails a joiner whose host never places the scene", async () => {
+    const h = harness();
+    await joinAndConnect(h);
+    await advance(59000);
+    expect(h.last().status).toBe("waiting_for_host");
+    await advance(1000);
+    expect(h.last()).toMatchObject({ status: "failed", code: "HOST_TIMEOUT" });
+    expect(h.deps.leaveChannel).toHaveBeenCalled();
+    expect(h.replication.disconnected).toBe(true);
+  });
+
+  it("fails a joiner whose channel never connects, after connectTimeoutMs", async () => {
+    const h = harness();
+    h.channel.state = "joining";
+    await joinAndConnect(h, { connectTimeoutMs: 5000 });
+    expect(h.last().status).toBe("resolving");
+    await advance(4500);
+    expect(h.last()).toMatchObject({ status: "failed", code: "CONNECT_TIMEOUT" });
+  });
+
+  it("fails a host whose channel never connects", async () => {
+    const h = harness();
+    h.channel.state = "joining";
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene());
+    await flush();
+    await advance(500);
+    h.controller.finishScan();
+    await flush();
+    h.controller.proposeOrigin(IDENTITY);
+    h.replication.sync();
+    await advance(59000);
+    expect(h.last().status).toBe("creating_room");
+    await advance(1000);
+    expect(h.last()).toMatchObject({
+      status: "failed",
+      code: "CONNECT_TIMEOUT",
+    });
+  });
+
+  it("does not time a connected host waiting to place the scene", async () => {
+    const h = harness();
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene({ plane_detection: "MANUAL" }));
+    await flush();
+    await advance(500);
+    h.controller.finishScan();
+    await flush();
+    h.replication.sync();
+    await advance(180000);
+    expect(h.last().status).toBe("creating_room");
+  });
+
+  it("waits indefinitely with connectTimeoutMs 0", async () => {
+    const h = harness();
+    await joinAndConnect(h, { connectTimeoutMs: 0 });
+    await advance(600000);
+    expect(h.last().status).toBe("waiting_for_host");
   });
 });

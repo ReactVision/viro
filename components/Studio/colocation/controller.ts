@@ -111,6 +111,8 @@ const FOLLOW_RETRY_DELAY_MS = 1000;
  * unanswered while the headset has no mixed-reality session to run it in.
  */
 const SHARED_FRAME_TIMEOUT_MS = 30000;
+/** The default `connectTimeoutMs`. */
+export const STUDIO_COLOCATION_CONNECT_TIMEOUT_MS = 60000;
 
 /** Same set as ViroSharedFrame: a failure that another window can change. */
 const RETRYABLE_RESOLVE_STATES: ReadonlySet<string> = new Set([
@@ -364,8 +366,9 @@ function sameState(
       );
     case "live":
       return b.status === "live" && a.room === b.room && a.peers === b.peers;
+    case "waiting_for_host":
     case "reconnecting":
-      return b.status === "reconnecting" && a.room === b.room;
+      return b.status === a.status && a.room === b.room;
     case "failed":
       return (
         b.status === "failed" && a.code === b.code && a.message === b.message
@@ -427,6 +430,8 @@ export class StudioColocationController {
   private channelState: ViroColocationState = "idle";
   private peerCount = 0;
   private connectedOnce = false;
+  /** The channel and the shared state were both up at least once this run. */
+  private reachedConnected = false;
   private diagnosing = false;
   private lastPoseAt = -Infinity;
   private finishScanWaiter: (() => void) | null = null;
@@ -694,6 +699,7 @@ export class StudioColocationController {
     this.room = this.toStudioRoom(created.room, true, frame.frameKind);
     this.announce();
     this.updateFrame();
+    this.startConnectTimeout(run);
     await this.connect(run);
   }
 
@@ -800,6 +806,7 @@ export class StudioColocationController {
     const frame = await this.acquire(run, source, "join", frameKind);
     if (!frame || !this.isCurrent(run)) return;
     this.setLocation(frameToLocation(frame));
+    this.startConnectTimeout(run);
     await this.connect(run);
   }
 
@@ -1131,10 +1138,17 @@ export class StudioColocationController {
       return;
     }
     if (client.state === "synced") this.syncOrigin(client);
-    if (!this.origin) return;
-
     const connected =
       this.channelState === "joined" && client.state === "synced";
+    if (connected) this.reachedConnected = true;
+    if (!this.origin) {
+      // A joiner is aligned and in the room, and only the host's origin is missing.
+      if (connected && !room.isHost) {
+        this.setState({ status: "waiting_for_host", room });
+      }
+      return;
+    }
+
     if (connected) {
       this.connectedOnce = true;
       this.setState({ status: "live", room, peers: this.peerCount });
@@ -1232,6 +1246,36 @@ export class StudioColocationController {
         ? refused
         : { code: "UNAVAILABLE", message }
     );
+  }
+
+  /**
+   * From the frame on: a host must connect, and a joiner go live, within
+   * `connectTimeoutMs`. A host placing its origin is not timed, since that
+   * waits on the person holding the device.
+   */
+  private startConnectTimeout(run: number): void {
+    const ms =
+      this.options?.connectTimeoutMs ?? STUDIO_COLOCATION_CONNECT_TIMEOUT_MS;
+    if (!(ms > 0) || !Number.isFinite(ms)) return;
+    const id = setTimeout(() => {
+      if (!this.isCurrent(run)) return;
+      const isHost = this.options?.mode === "host";
+      if (isHost ? this.reachedConnected : this.connectedOnce) return;
+      const seconds = Math.round(ms / 1000);
+      this.fail(
+        run,
+        !isHost && this.reachedConnected
+          ? {
+              code: "HOST_TIMEOUT",
+              message: `Connected to the room, but the host did not place the scene within ${seconds} seconds.`,
+            }
+          : {
+              code: "CONNECT_TIMEOUT",
+              message: `Could not connect to the room within ${seconds} seconds.`,
+            }
+      );
+    }, ms);
+    this.cleanups.push(() => clearTimeout(id));
   }
 
   // ── Shared navigation ─────────────────────────────────────────────────────
@@ -1365,6 +1409,7 @@ export class StudioColocationController {
     this.channelState = "idle";
     this.peerCount = 0;
     this.connectedOnce = false;
+    this.reachedConnected = false;
     this.diagnosing = false;
     this.lastPoseAt = -Infinity;
   }

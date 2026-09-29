@@ -48,7 +48,7 @@ export interface StudioSceneNavigatorWebHandle {
   /** Always false on web, where no session can start. */
   retryColocation: () => boolean;
   getColocationRoom: () => StudioColocationRoom | null;
-  finishColocationScan: () => void;
+  finishColocationScan: () => boolean;
 }
 
 export interface StudioSceneNavigatorWebProps {
@@ -367,7 +367,7 @@ export const StudioSceneNavigator = forwardRef<
       leaveColocation: () => {},
       retryColocation: () => false,
       getColocationRoom: () => null,
-      finishColocationScan: () => {},
+      finishColocationScan: () => false,
     }),
     [],
   );

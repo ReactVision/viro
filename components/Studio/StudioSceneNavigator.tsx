@@ -205,8 +205,12 @@ export interface StudioSceneNavigatorHandle {
    */
   retryColocation: () => boolean;
   getColocationRoom: () => StudioColocationRoom | null;
-  /** Host: end the scan and host it. The indicator's Done button does the same. */
-  finishColocationScan: () => void;
+  /**
+   * Host: end the scan and host it, as the indicator's Done button does. Only
+   * once the scan covers enough (`canFinish` in the `scanning` state): true
+   * when the scan ended, false, changing nothing, before then or outside a scan.
+   */
+  finishColocationScan: () => boolean;
 }
 
 export interface StudioSceneNavigatorProps {
@@ -444,7 +448,9 @@ export const StudioSceneNavigator = forwardRef<
   }
   useEffect(() => {
     const controller = colocationRef.current;
-    studioColocationStore.setFinishScanHandler(() => controller?.finishScan());
+    studioColocationStore.setFinishScanHandler(
+      () => controller?.finishScan() ?? false
+    );
     return () => {
       controller?.dispose();
       studioColocationStore.reset();
@@ -581,7 +587,7 @@ export const StudioSceneNavigator = forwardRef<
       leaveColocation: () => colocationRef.current?.leave(),
       retryColocation: () => colocationRef.current?.retry() ?? false,
       getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
-      finishColocationScan: () => colocationRef.current?.finishScan(),
+      finishColocationScan: () => colocationRef.current?.finishScan() ?? false,
     }),
     []
   );

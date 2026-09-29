@@ -284,6 +284,7 @@ async function hostToLive(h: Harness, sceneData = scene()) {
   h.controller.request({ mode: "host", name: "Lab" });
   h.controller.attachScene(sceneData);
   await flush();
+  await advance(500);
   h.controller.finishScan();
   await flush();
   h.controller.proposeOrigin(IDENTITY);
@@ -533,6 +534,7 @@ describe("StudioColocationController: host", () => {
       headers: { ...SESSION.headers, Authorization: "Bearer t2" },
     };
     h.deps.getAuth.mockResolvedValue(later);
+    await advance(500);
     h.controller.finishScan();
     await flush();
     expect(h.deps.createRoom).toHaveBeenCalledWith(
@@ -578,6 +580,7 @@ describe("StudioColocationController: host", () => {
       headers: {},
       projectId: null,
     });
+    await advance(500);
     h.controller.finishScan();
     await flush();
     expect(h.deps.createRoom).not.toHaveBeenCalled();
@@ -629,6 +632,7 @@ describe("StudioColocationController: host", () => {
     h.controller.attachScene(scene({ plane_detection: "MANUAL" }));
     await flush();
     expect(prompts).toEqual([]);
+    await advance(500);
     h.controller.finishScan();
     await flush();
     h.replication.sync();
@@ -957,6 +961,7 @@ describe("StudioColocationController: failures", () => {
       error: "Scan too small",
     });
     await startHost(h);
+    await advance(500);
     h.controller.finishScan();
     await flush();
     expect(h.last()).toEqual({
@@ -981,6 +986,7 @@ describe("StudioColocationController: failures", () => {
           .mockResolvedValue({ success: false, error: "no", code, status }),
       });
       await startHost(h);
+      await advance(500);
       h.controller.finishScan();
       await flush();
       expect(failed(h)).toBe(expected);
@@ -1193,6 +1199,7 @@ describe("StudioColocationController: shared scene state", () => {
     h.controller.request({ mode: "host", name: "Lab" });
     h.controller.attachScene(sceneData, s);
     await flush();
+    await advance(500);
     h.controller.finishScan();
     await flush();
     h.controller.proposeOrigin(IDENTITY);
@@ -1319,6 +1326,7 @@ describe("StudioColocationController: shared navigation", () => {
     h.controller.request({ mode: "host", name: "Lab" });
     h.controller.attachScene(sceneData, undefined, { leave });
     await flush();
+    await advance(500);
     h.controller.finishScan();
     await flush();
     h.controller.proposeOrigin(IDENTITY);
@@ -1814,5 +1822,41 @@ describe("StudioColocationController: leaving native work", () => {
     await hostToLive(h);
     h.controller.leave();
     expect(h.nav.cancelCloudAnchorOperations).not.toHaveBeenCalled();
+  });
+});
+
+describe("StudioColocationController: finishing a scan", () => {
+  it("refuses to finish before the scan covers enough", async () => {
+    const h = harness();
+    h.nav.getScanStatus.mockResolvedValue({
+      available: true,
+      scanning: true,
+      meetsKeyframes: true,
+      meetsViewpointPairs: true,
+      meetsSpread: true,
+      keyframes: 12,
+    });
+    expect(h.controller.finishScan()).toBe(false);
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene());
+    await flush();
+    await advance(500);
+    expect(h.last()).toEqual({ status: "scanning", canFinish: false });
+    expect(h.controller.finishScan()).toBe(false);
+    await flush();
+    expect(h.nav.finishScan).not.toHaveBeenCalled();
+    expect(h.last().status).toBe("scanning");
+
+    h.nav.getScanStatus.mockResolvedValue({
+      available: true,
+      scanning: true,
+      keyframes: 30,
+    });
+    await advance(500);
+    expect(h.controller.finishScan()).toBe(true);
+    await flush();
+    expect(h.nav.finishScan).toHaveBeenCalledTimes(1);
+    // Once hosting, a second Done is outside the scan.
+    expect(h.controller.finishScan()).toBe(false);
   });
 });

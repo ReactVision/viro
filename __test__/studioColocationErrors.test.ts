@@ -312,3 +312,15 @@ describe("studioColocationIndicatorContent", () => {
     ).toMatchObject({ tone: "error", detail: "This room is full." });
   });
 });
+
+describe("studioColocationStore.finishScan", () => {
+  afterEach(() => studioColocationStore.reset());
+
+  it("reports whether the handler finished the scan", () => {
+    expect(studioColocationStore.finishScan()).toBe(false);
+    studioColocationStore.setFinishScanHandler(() => false);
+    expect(studioColocationStore.finishScan()).toBe(false);
+    studioColocationStore.setFinishScanHandler(() => true);
+    expect(studioColocationStore.finishScan()).toBe(true);
+  });
+});

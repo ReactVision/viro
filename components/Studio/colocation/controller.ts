@@ -578,9 +578,17 @@ export class StudioColocationController {
     this.updateFrame();
   }
 
-  /** Ignored outside `scanning`. */
-  finishScan(): void {
-    if (this.state.status === "scanning") this.finishScanWaiter?.();
+  /**
+   * Host: ends the scan and hosts it, once the scan covers enough
+   * (`canFinish`). False, changing nothing, outside `scanning` or before then.
+   */
+  finishScan(): boolean {
+    const state = this.state;
+    if (state.status !== "scanning" || !state.canFinish) return false;
+    const finish = this.finishScanWaiter;
+    if (!finish) return false;
+    finish();
+    return true;
   }
 
   /** Unmount: leave, and forget the requested value so a remount starts afresh. */

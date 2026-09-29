@@ -14,7 +14,7 @@ const IDLE: StudioColocationState = { status: "idle" };
 class StudioColocationStore {
   private state: StudioColocationState = IDLE;
   private originPrompt: StudioColocationOriginPrompt | null = null;
-  private finishScanHandler: (() => void) | null = null;
+  private finishScanHandler: (() => boolean) | null = null;
   private builtInIndicator = true;
   private listeners = new GlobalListeners();
 
@@ -53,12 +53,13 @@ class StudioColocationStore {
     this.listeners.notify();
   }
 
-  setFinishScanHandler(handler: (() => void) | null): void {
+  setFinishScanHandler(handler: (() => boolean) | null): void {
     this.finishScanHandler = handler;
   }
 
-  finishScan(): void {
-    this.finishScanHandler?.();
+  /** False when no session is scanning or the scan cannot finish yet. */
+  finishScan(): boolean {
+    return this.finishScanHandler?.() ?? false;
   }
 
   /** Force idle so a torn-down session cannot leave the indicator showing. */

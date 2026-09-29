@@ -650,6 +650,16 @@ public:
     }
 
     /**
+     * Cancel the ReactVision provider's pending hosts and resolves, and close an open scan
+     * window without hosting it. Each pending operation reports `ErrorCancelled` once; work
+     * already running stops at its next checkpoint. An upload already in flight can still
+     * leave an anchor behind, which expires with its TTL.
+     */
+    virtual void rvCancelOperations() {
+        // Default implementation does nothing
+    }
+
+    /**
      * How the scan in progress is doing, as JSON.
      *
      * JSON rather than a struct because this crosses to Java and Objective-C and on to

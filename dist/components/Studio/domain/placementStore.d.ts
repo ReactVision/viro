@@ -1,5 +1,12 @@
 import { StudioAsset } from "../types";
+import { type StudioChangeOrigin, type StudioStoreChangeListener } from "./utils";
 type Vec3 = [number, number, number];
+/** A placement as recorded: the tap point and the camera's aim at tap time. */
+export type StudioPlacement = {
+    position: Vec3;
+    forward: Vec3 | null;
+    up: Vec3 | null;
+};
 /**
  * Image triggering wins over tap-to-place: a marker both triggers its content and
  * anchors it, since the node is a child of `ViroARImageMarker` and follows the
@@ -13,7 +20,8 @@ export declare function isTapToPlaceAsset(asset: StudioAsset | null | undefined)
 /**
  * Per-scene store for tap-to-place assets, keyed by asset placement id. A
  * tap-to-place asset is withheld from the scene until the end user places it,
- * then rendered at the placed world position. Placement is ephemeral runtime
+ * then rendered at the placed position, in world coordinates alone or in
+ * scene-origin coordinates while shared. Placement is ephemeral runtime
  * state: nothing is persisted, so reopening the scene starts unplaced again.
  *
  * Two listener sets: per-asset (a placement repaints only that node) and a
@@ -27,6 +35,7 @@ export declare class StudioPlacementStore {
     private order;
     private keyed;
     private active;
+    private changes;
     /** Initialise-if-absent from the tap_to_place flag (idempotent, strict-mode safe). */
     seed(assets: StudioAsset[]): void;
     /** Re-initialise for a new scene, then wake every subscriber. */
@@ -35,6 +44,7 @@ export declare class StudioPlacementStore {
     isTracked(assetId: string): boolean;
     isPlaced(assetId: string): boolean;
     getPosition(assetId: string): Vec3 | undefined;
+    getPlacement(assetId: string): StudioPlacement | undefined;
     /**
      * Placed world position with the author position applied as an offset in the
      * full tap-time camera frame: +X = the user's right, +Y = their up, +Z = toward
@@ -56,12 +66,16 @@ export declare class StudioPlacementStore {
     /**
      * Record a placement at a tap point, with the camera forward/up at tap time so
      * the author position and rotation resolve in the user's full tap-time frame.
-     * No-op if the asset is untracked or already placed.
+     * No-op if the asset is untracked, or already placed for a local placement; a
+     * remote one also moves an asset that is placed, since the room's last write
+     * wins.
      */
-    place(assetId: string, position: Vec3, forward?: Vec3, up?: Vec3): void;
+    place(assetId: string, position: Vec3, forward?: Vec3, up?: Vec3, origin?: StudioChangeOrigin): void;
     /** Subscribe to one asset's placement changes; returns an unsubscribe fn. */
     subscribe(assetId: string, listener: () => void): () => void;
     /** Subscribe to active-asset changes (the placement UI); returns unsubscribe. */
     subscribeActive(listener: () => void): () => void;
+    /** Each placement with its asset id (null after a reseed) and its origin. */
+    subscribeChanges(listener: StudioStoreChangeListener): () => void;
 }
 export {};

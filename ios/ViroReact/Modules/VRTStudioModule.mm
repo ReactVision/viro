@@ -1,6 +1,7 @@
 #import "VRTStudioModule.h"
 #import "RVStudioWatermarkState.h"
 #import <React/RCTUtils.h>
+#import <ViroKit/VROColocationBridge.h>
 
 static NSString *const kBaseUrl      = @"https://platform.reactvision.xyz";
 static NSString *const kApiKeyKey    = @"RVApiKey";
@@ -16,6 +17,12 @@ static const NSTimeInterval kApiRequestTimeout = 40.0;
 // Immutable snapshot; module methods run serially on one methodQueue.
 static NSDictionary *gStudioSession = nil;
 
+// Called off the method queue (the AR navigator's main-thread prop setter), so
+// it only compares the pointer and never dereferences the snapshot.
+BOOL VRTStudioHasSession(void) {
+    return gStudioSession != nil;
+}
+
 @implementation VRTStudioModule
 
 RCT_EXPORT_MODULE(VRTStudio);
@@ -29,8 +36,8 @@ RCT_EXPORT_MODULE(VRTStudio);
 - (NSString *)readApiKey    { return [self readInfoString:kApiKeyKey]; }
 - (NSString *)readProjectId { return [self readInfoString:kProjectIdKey]; }
 
-// Resolves { baseUrl, headers } for the active auth mode. A set session wins
-// over the manifest RVApiKey. Returns nil when neither is available.
+// Resolves { mode, baseUrl, headers } for the active auth mode. A set session
+// wins over the manifest RVApiKey. Returns nil when neither is available.
 - (NSDictionary *)authContext {
     NSDictionary *session = gStudioSession;
     if (session) {
@@ -38,11 +45,11 @@ RCT_EXPORT_MODULE(VRTStudio);
         headers[@"Authorization"] = [NSString stringWithFormat:@"Bearer %@", session[@"accessToken"]];
         NSString *clientTag = session[@"clientTag"];
         if (clientTag.length > 0) headers[@"x-rv-client"] = clientTag;
-        return @{@"baseUrl": session[@"baseUrl"], @"headers": headers};
+        return @{@"mode": @"session", @"baseUrl": session[@"baseUrl"], @"headers": headers};
     }
     NSString *apiKey = [self readApiKey];
     if (!apiKey) return nil;
-    return @{@"baseUrl": kBaseUrl, @"headers": @{@"x-api-key": apiKey}};
+    return @{@"mode": @"api_key", @"baseUrl": kBaseUrl, @"headers": @{@"x-api-key": apiKey}};
 }
 
 - (void)runGet:(NSString *)url headers:(NSDictionary *)headers resolve:(RCTPromiseResolveBlock)resolve {
@@ -185,7 +192,8 @@ RCT_EXPORT_METHOD(rvGetProjectId:(RCTPromiseResolveBlock)resolve
 
 // @internal — sets/clears the first-party session auth (see gStudioSession).
 // A dict { baseUrl, accessToken, clientTag? } enables session mode; null /
-// NSNull / malformed reverts to manifest RVApiKey mode.
+// NSNull / malformed reverts to manifest RVApiKey mode. The renderer keeps its
+// own copy, which cloud anchors and the co-location channel read.
 RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
@@ -193,6 +201,7 @@ RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
     NSString *accessToken = [config isKindOfClass:[NSDictionary class]] ? config[@"accessToken"] : nil;
     if (baseUrl.length == 0 || accessToken.length == 0) {
         gStudioSession = nil;
+        [VROColocationBridge setStudioSessionBaseUrl:nil accessToken:nil clientTag:nil];
         resolve([NSNull null]);
         return;
     }
@@ -204,6 +213,34 @@ RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
     NSString *clientTag = config[@"clientTag"];
     if (clientTag.length > 0) snapshot[@"clientTag"] = clientTag;
     gStudioSession = [snapshot copy];
+    [VROColocationBridge setStudioSessionBaseUrl:baseUrl
+                                     accessToken:accessToken
+                                       clientTag:snapshot[@"clientTag"]];
+    resolve([NSNull null]);
+}
+
+// @internal Credentials for JS clients that talk to the platform or the relay
+// directly: { mode, baseUrl, headers, projectId }, projectId being the
+// manifest RVProjectId in every mode.
+RCT_EXPORT_METHOD(rvGetAuthHeaders:(RCTPromiseResolveBlock)resolve
+                            reject:(RCTPromiseRejectBlock)reject) {
+    NSDictionary *ctx = [self authContext];
+    NSString *projectId = [self readProjectId];
+    resolve(@{
+        @"mode":      ctx[@"mode"] ?: @"none",
+        @"baseUrl":   ctx[@"baseUrl"] ?: [NSNull null],
+        @"headers":   ctx[@"headers"] ?: @{},
+        @"projectId": projectId ?: [NSNull null],
+    });
+}
+
+// @internal Project the ReactVision cloud anchor provider files anchors under,
+// overriding RVProjectId. null / NSNull / empty clears the override.
+RCT_EXPORT_METHOD(rvSetCloudAnchorProject:(id)projectId
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    NSString *value = [projectId isKindOfClass:[NSString class]] ? projectId : nil;
+    [VROColocationBridge setCloudAnchorProjectId:value];
     resolve([NSNull null]);
 }
 

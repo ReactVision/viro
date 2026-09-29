@@ -12,6 +12,7 @@
  */
 import * as React from "react";
 import type { ViroRendererAbortError } from "@reactvision/viro-web-renderer";
+import type { StudioColocationOptions, StudioColocationRoom, StudioColocationState } from "./colocation/types";
 import type { SequenceRuntimeContext } from "./domain/sceneNavigationHandler";
 import type { StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import type { StudioSceneResponse } from "./types";
@@ -20,6 +21,10 @@ export interface StudioSceneNavigatorWebHandle {
         success: boolean;
         url?: string;
     }>;
+    /** No-ops on web, where no shared session can start. */
+    leaveColocation: () => void;
+    getColocationRoom: () => StudioColocationRoom | null;
+    finishColocationScan: () => void;
 }
 export interface StudioSceneNavigatorWebProps {
     /** Scene data injected directly (single scene, no fetching). */
@@ -80,5 +85,16 @@ export interface StudioSceneNavigatorWebProps {
     noAssetsMessage?: string;
     loadingView?: React.ReactNode;
     renderError?: (error: Error) => React.ReactNode;
+    /**
+     * Accepted for parity with native. No web frame source can align a browser
+     * with a device's space, so a value reports `failed` with
+     * `FRAME_KIND_UNSUPPORTED` and the scene renders alone.
+     */
+    colocation?: StudioColocationOptions;
+    /** Show the co-location pill (here, only ever the failure). Default true. */
+    colocationIndicator?: boolean;
+    onColocationStateChange?: (state: StudioColocationState) => void;
+    /** Never called on web: no room is ever joined. */
+    onColocationRoom?: (room: StudioColocationRoom) => void;
 }
 export declare const StudioSceneNavigator: React.ForwardRefExoticComponent<StudioSceneNavigatorWebProps & React.RefAttributes<StudioSceneNavigatorWebHandle>>;

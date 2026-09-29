@@ -28,7 +28,7 @@ const ViroColocationRooms_1 = require("../AR/ViroColocationRooms");
  * takes 12 to 30 seconds on phones, so this is not the slow part.
  */
 function useViroColocationRoom(options) {
-    const { apiKey, projectId, endpoint, host, joinCode, enabled = true, } = options;
+    const { apiKey, projectId, endpoint, headers, host, joinCode, enabled = true, } = options;
     const [status, setStatus] = (0, react_1.useState)("idle");
     const [room, setRoom] = (0, react_1.useState)(null);
     const [error, setError] = (0, react_1.useState)();
@@ -37,6 +37,12 @@ function useViroColocationRoom(options) {
     // one. This is what an effect that can run twice needs instead of a guard on
     // the request itself.
     const inFlight = (0, react_1.useRef)(null);
+    // Read when the request goes out, not a dependency: a token refresh would
+    // restart the effect and drop an in-flight create's result, which the guard
+    // above then never requests again. Headers first arriving do restart it.
+    const headersRef = (0, react_1.useRef)(headers);
+    headersRef.current = headers;
+    const hasHeaders = headers !== undefined;
     const hostKey = host
         ? [
             host.frameKind,
@@ -59,7 +65,12 @@ function useViroColocationRoom(options) {
         setStatus("working");
         setError(undefined);
         const run = async () => {
-            const config = { apiKey, projectId, endpoint };
+            const config = {
+                apiKey,
+                projectId,
+                endpoint,
+                headers: headersRef.current,
+            };
             const result = joinCode
                 ? await (0, ViroColocationRooms_1.lookupColocationRoom)(config, joinCode)
                 : await (0, ViroColocationRooms_1.createColocationRoom)(config, host);
@@ -80,7 +91,7 @@ function useViroColocationRoom(options) {
         // `status` is deliberately absent: it changes inside the effect, and the
         // retry path goes through `attempt` instead.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [apiKey, projectId, endpoint, target, enabled, attempt]);
+    }, [apiKey, projectId, endpoint, hasHeaders, target, enabled, attempt]);
     const frameSource = (0, react_1.useMemo)(() => {
         if (!room)
             return null;

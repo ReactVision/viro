@@ -57,6 +57,8 @@ const studioRendererEffects_1 = require("./domain/studioRendererEffects");
 const variableStore_1 = require("./domain/variableStore");
 const StudioPlacementIndicator_web_1 = require("./StudioPlacementIndicator.web");
 const StudioRecordingIndicator_web_1 = require("./StudioRecordingIndicator.web");
+const StudioColocationIndicator_web_1 = require("./StudioColocationIndicator.web");
+const colocationStore_1 = require("./domain/colocationStore");
 /**
  * What the navigators mount as the scene. At module scope on purpose: it used to
  * be a closure built in the render body, so every navigator render handed React
@@ -134,7 +136,7 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
         }}/>);
 };
 exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
-    const { recordingIndicator = true, placementIndicator = true, arOptions, onSessionReady, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onAssetError, onRendererAbort, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
+    const { recordingIndicator = true, placementIndicator = true, colocation, colocationIndicator = true, onColocationStateChange, arOptions, onSessionReady, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onAssetError, onRendererAbort, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
     const containerRef = (0, react_1.useRef)(null);
     // Session-scoped variable store (survives NAVIGATION between scenes).
     const variableStoreRef = (0, react_1.useRef)(null);
@@ -147,6 +149,26 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
     const [error, setError] = (0, react_1.useState)(null);
     const onSceneLoadedRef = (0, react_1.useRef)(onSceneLoaded);
     onSceneLoadedRef.current = onSceneLoaded;
+    const onColocationStateChangeRef = (0, react_1.useRef)(onColocationStateChange);
+    onColocationStateChangeRef.current = onColocationStateChange;
+    const colocationRequested = colocation !== undefined;
+    // Idle is only news after a failure was reported, as on native.
+    const colocationReportedRef = (0, react_1.useRef)(false);
+    (0, react_1.useEffect)(() => {
+        if (!colocationRequested && !colocationReportedRef.current)
+            return;
+        colocationReportedRef.current = colocationRequested;
+        const state = colocationRequested
+            ? {
+                status: "failed",
+                code: "FRAME_KIND_UNSUPPORTED",
+                message: "Co-location rooms need a phone or headset: a browser cannot align with a device's scan.",
+            }
+            : { status: "idle" };
+        colocationStore_1.studioColocationStore.set(state);
+        onColocationStateChangeRef.current?.(state);
+    }, [colocationRequested]);
+    (0, react_1.useEffect)(() => () => colocationStore_1.studioColocationStore.reset(), []);
     // The navigators read their renderer options once, when they create it.
     const onRendererAbortRef = (0, react_1.useRef)(onRendererAbort);
     onRendererAbortRef.current = onRendererAbort;
@@ -207,6 +229,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
                 return { success: false };
             }
         },
+        leaveColocation: () => { },
+        getColocationRoom: () => null,
+        finishColocationScan: () => { },
     }), []);
     // Owned here rather than in the scene so the prompt can read the same queue
     // the tap surface drives, and so neither survives a scene change.
@@ -255,6 +280,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
       {resolvedMode === "ar" && (<StudioPlacementOverlay store={placementStore} apiRef={placementApiRef} getName={getPlacementName}/>)}
       {placementIndicator && (<div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
           <StudioPlacementIndicator_web_1.StudioPlacementIndicator />
+        </div>)}
+      {colocationIndicator && (<div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
+          <StudioColocationIndicator_web_1.StudioColocationIndicator />
         </div>)}
     </div>);
 });

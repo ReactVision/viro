@@ -114,7 +114,8 @@ function cameraBasis(forward, up) {
 /**
  * Per-scene store for tap-to-place assets, keyed by asset placement id. A
  * tap-to-place asset is withheld from the scene until the end user places it,
- * then rendered at the placed world position. Placement is ephemeral runtime
+ * then rendered at the placed position, in world coordinates alone or in
+ * scene-origin coordinates while shared. Placement is ephemeral runtime
  * state: nothing is persisted, so reopening the scene starts unplaced again.
  *
  * Two listener sets: per-asset (a placement repaints only that node) and a
@@ -130,6 +131,7 @@ class StudioPlacementStore {
     order = [];
     keyed = new utils_1.KeyedListeners();
     active = new utils_1.GlobalListeners();
+    changes = new utils_1.ChangeListeners();
     /** Initialise-if-absent from the tap_to_place flag (idempotent, strict-mode safe). */
     seed(assets) {
         for (const asset of byPlacementOrder(assets)) {
@@ -155,6 +157,7 @@ class StudioPlacementStore {
         }
         this.keyed.notifyAll();
         this.active.notify();
+        this.changes.notify(null, "local");
     }
     /** True for assets this store gates (tap_to_place). */
     isTracked(assetId) {
@@ -165,6 +168,20 @@ class StudioPlacementStore {
     }
     getPosition(assetId) {
         return this.positions.get(assetId);
+    }
+    getPlacement(assetId) {
+        const position = this.positions.get(assetId);
+        if (!position)
+            return undefined;
+        const basis = this.bases.get(assetId);
+        if (!basis)
+            return { position, forward: null, up: null };
+        // cameraBasis() columns: right, up, backward.
+        return {
+            position,
+            forward: [-basis[0][2], -basis[1][2], -basis[2][2]],
+            up: [basis[0][1], basis[1][1], basis[2][1]],
+        };
     }
     /**
      * Placed world position with the author position applied as an offset in the
@@ -207,21 +224,27 @@ class StudioPlacementStore {
     /**
      * Record a placement at a tap point, with the camera forward/up at tap time so
      * the author position and rotation resolve in the user's full tap-time frame.
-     * No-op if the asset is untracked or already placed.
+     * No-op if the asset is untracked, or already placed for a local placement; a
+     * remote one also moves an asset that is placed, since the room's last write
+     * wins.
      */
-    place(assetId, position, forward, up) {
-        if (this.status.get(assetId) !== "unplaced")
+    place(assetId, position, forward, up, origin = "local") {
+        const status = this.status.get(assetId);
+        if (status === undefined || (origin === "local" && status === "placed"))
             return;
         this.status.set(assetId, "placed");
         this.positions.set(assetId, position);
         const basis = cameraBasis(forward, up);
         if (basis)
             this.bases.set(assetId, basis);
+        else
+            this.bases.delete(assetId);
         if ((0, utils_1.isDev)()) {
             console.log(`[Studio] Placed "${assetId}" at`, position);
         }
         this.keyed.notify(assetId);
         this.active.notify();
+        this.changes.notify(assetId, origin);
     }
     /** Subscribe to one asset's placement changes; returns an unsubscribe fn. */
     subscribe(assetId, listener) {
@@ -230,6 +253,10 @@ class StudioPlacementStore {
     /** Subscribe to active-asset changes (the placement UI); returns unsubscribe. */
     subscribeActive(listener) {
         return this.active.subscribe(listener);
+    }
+    /** Each placement with its asset id (null after a reseed) and its origin. */
+    subscribeChanges(listener) {
+        return this.changes.subscribe(listener);
     }
 }
 exports.StudioPlacementStore = StudioPlacementStore;

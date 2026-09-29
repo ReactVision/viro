@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { ViroAmbientLight } from "../ViroAmbientLight";
 import { ViroDirectionalLight } from "../ViroDirectionalLight";
@@ -13,6 +14,7 @@ import { ViroARImageMarker } from "../AR/ViroARImageMarker";
 import { ViroARPlane } from "../AR/ViroARPlane";
 import { ViroARPlaneSelector } from "../AR/ViroARPlaneSelector";
 import { ViroARScene } from "../AR/ViroARScene";
+import { ViroNode } from "../ViroNode";
 import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
@@ -56,7 +58,9 @@ import {
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
-import { isDev } from "./domain/utils";
+import { StudioDragStore } from "./domain/dragStore";
+import { StudioAnimationSlots } from "./domain/animationSlots";
+import { isDev, type StudioEffectOrigin } from "./domain/utils";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
@@ -78,6 +82,23 @@ import {
   buildViroPhysicsWorld,
   parsePhysicsWorldConfig,
 } from "./domain/physicsConfig";
+import {
+  STUDIO_COLOCATION_OFF_FRAME,
+  type StudioColocationController,
+  type StudioColocationFrame,
+  studioSceneRootsInAR,
+} from "./colocation/controller";
+import {
+  dragSurfaceFromSceneToWorld,
+  fromPositionEuler,
+  IDENTITY,
+  invert,
+  rotateDirection,
+  toNodeTransform,
+  transformPoint,
+} from "./colocation/frameMath";
+import { StudioColocationPeers } from "./colocation/StudioColocationPeers";
+import { collisionBindingsRunHere } from "./colocation/sharedState";
 import {
   StudioAnimation,
   StudioSceneResponse,
@@ -136,6 +157,45 @@ function pickBestHit(results: ViroARHitTestResult[]): ViroARHitTestResult | null
   return null;
 }
 
+const subscribeToNothing = () => () => {};
+const offFrame = () => STUDIO_COLOCATION_OFF_FRAME;
+
+/**
+ * A world-space placement in the frame shared content renders in, which is the
+ * scene origin while shared and world otherwise.
+ */
+function placementInSceneFrame(
+  frame: StudioColocationFrame,
+  position: Vec3,
+  forward?: Vec3,
+  up?: Vec3
+): [Vec3, Vec3 | undefined, Vec3 | undefined] {
+  const m = frame.phase === "shared" ? frame.worldToScene : null;
+  if (!m) return [position, forward, up];
+  return [
+    transformPoint(m, position),
+    forward && rotateDirection(m, forward),
+    up && rotateDirection(m, up),
+  ];
+}
+
+/**
+ * A plane-selector pick as a pose: the plane's orientation at the tapped point,
+ * which is where the selector would have put its children.
+ */
+function selectedPlanePose(plane: ViroAnchor, tapWorld?: Vec3) {
+  const pose = fromPositionEuler(plane.position, plane.rotation);
+  const inverse = tapWorld ? invert(pose) : null;
+  if (!tapWorld || !inverse) return pose;
+  const local = transformPoint(inverse, tapWorld);
+  const onSurface = transformPoint(pose, [local[0], 0, local[2]]);
+  const out = [...pose];
+  out[12] = onSurface[0];
+  out[13] = onSurface[1];
+  out[14] = onSurface[2];
+  return out;
+}
+
 /** Fixed-distance point along the cached camera-forward ray (headset fallback). */
 function projectAlongCameraForward(
   pose: { position: Vec3; forward: Vec3 } | null
@@ -166,9 +226,6 @@ type AnimOverride = {
   interrupting?: boolean;
 };
 
-/** What is playing on an asset right now, as `triggerAnimation` needs to read it. */
-type LiveAnimation = { key: string; loop: boolean; interruptible: boolean };
-
 interface StudioARSceneProps {
   sceneNavigator?: any;
   sceneData: StudioSceneResponse | null;
@@ -187,6 +244,13 @@ interface StudioARSceneProps {
   placementStore?: StudioPlacementStore;
   /** The navigator's tap overlay writes the placement API here (mobile AR). */
   placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
+  /** The navigator's shared-session controller; absent renders the scene alone. */
+  colocation?: StudioColocationController;
+  /**
+   * Set when a shared session followed another device here: that device ran
+   * the scene's on_load function, and what it changed arrives as shared state.
+   */
+  skipOnLoadFunction?: boolean;
 }
 
 /**
@@ -247,9 +311,24 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     variableStore,
     placementStore,
     placementApiRef,
+    colocation,
+    skipOnLoadFunction,
   } = props;
   const { scene, assets, animations, collision_bindings, functions } =
     sceneData;
+
+  // ─── Shared session ───────────────────────────────────────────────────────
+  // Changes a handful of times a session (phase, frame, origin), never per
+  // peer or per pose, so it can be scene state.
+  const colocationFrame = useSyncExternalStore(
+    colocation?.subscribe ?? subscribeToNothing,
+    colocation?.getFrame ?? offFrame,
+    offFrame
+  );
+  const colocationFrameRef = useRef(colocationFrame);
+  colocationFrameRef.current = colocationFrame;
+  const colocationPhase = colocationFrame.phase;
+  const [sceneMount] = useState(() => colocation?.claimSceneMount() ?? 0);
 
   // ─── Sequence scheduler ───────────────────────────────────────────────────
   // One per scene. Drives WAIT steps; cancelled on unmount and on navigation so
@@ -301,6 +380,17 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
+  // ─── Drag store ───────────────────────────────────────────────────────────
+  // Scene-scoped: where another device in a shared session dragged an asset,
+  // read by each draggable node on its own.
+  const dragStoreRef = useRef<StudioDragStore | null>(null);
+  if (dragStoreRef.current === null) {
+    dragStoreRef.current = new StudioDragStore();
+  }
+  useEffect(() => {
+    dragStoreRef.current?.reset();
+  }, [scene.id]);
+
   // ─── Placement store (tap to place) ───────────────────────────────────────
   // Scene-scoped, seeded from each asset's author-time tap_to_place flag.
   // Normally owned by the navigator (so its tap overlay can read active state);
@@ -315,6 +405,21 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     placementStoreRef.current?.reseed(assets);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
+  // Placements are world points outside a shared session and scene-frame
+  // points inside one, so crossing that boundary drops them. Only the scene on
+  // screen reseeds: the navigator's store is shared by every scene it pushed.
+  const placementsSharedRef = useRef(colocationPhase === "shared");
+  useEffect(() => {
+    const shared = colocationPhase === "shared";
+    if (placementsSharedRef.current === shared) return;
+    placementsSharedRef.current = shared;
+    // Scene-frame positions too. Entering has nothing to drop: the session
+    // has just applied the room's drags.
+    if (!shared) dragStoreRef.current?.reset();
+    if (colocation && !colocation.isCurrentScene(scene.id)) return;
+    placementStoreRef.current?.reseed(assets);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colocationPhase]);
 
   // ─── Sound manager ────────────────────────────────────────────────────────
   // Per-scene. PLAY/STOP scene-function actions drive it; <StudioSounds> renders
@@ -347,9 +452,15 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       visibilityStore: visibilityStoreRef.current!,
       placementStore: placementStoreRef.current!,
       soundManager: soundManagerRef.current!,
+      dragStore: dragStoreRef.current!,
       getAssetPosition,
+      colocation,
     }),
-    [getAssetPosition]
+    [getAssetPosition, colocation]
+  );
+  const deviceRuntimeCtx = useMemo(
+    () => ({ ...runtimeCtx, effectOrigin: "device" as const }),
+    [runtimeCtx]
   );
 
   // Cancel this scene's pending WAITs before handing off to the next scene.
@@ -386,18 +497,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const [loadedAssetIds, setLoadedAssetIds] = useState<Record<string, true>>(
     {}
   );
-  // A node has one animation slot, so two animations on one asset cannot
-  // overlap the way they do in the editor. These track what is playing, what is
-  // waiting behind it, and whether this play has already run its on_start.
-  const liveAnimRef = useRef<Map<string, LiveAnimation>>(new Map());
-  const queuedAnimRef = useRef<Map<string, string[]>>(new Map());
-  const startedPlayRef = useRef<Set<string>>(new Set());
+  const animationSlotsRef = useRef<StudioAnimationSlots | null>(null);
+  if (animationSlotsRef.current === null) {
+    animationSlotsRef.current = new StudioAnimationSlots();
+  }
   const loadedAssetIdsRef = useRef(loadedAssetIds);
   loadedAssetIdsRef.current = loadedAssetIds;
   useEffect(() => {
-    liveAnimRef.current.clear();
-    queuedAnimRef.current.clear();
-    startedPlayRef.current.clear();
+    animationSlotsRef.current?.reset();
   }, [scene.id]);
 
   // ─── Drag-active state (debounced) ────────────────────────────────────────
@@ -412,23 +519,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     new Map()
   );
 
-  const notifyPhysicsDrag = useCallback((assetId: string) => {
-    setDragActiveByAssetId((prev) =>
-      prev[assetId] ? prev : { ...prev, [assetId]: true }
-    );
-    const existing = dragTimersRef.current.get(assetId);
-    if (existing) clearTimeout(existing);
-    const t = setTimeout(() => {
-      setDragActiveByAssetId((prev) => {
-        if (!prev[assetId]) return prev;
-        const next = { ...prev };
-        delete next[assetId];
-        return next;
-      });
-      dragTimersRef.current.delete(assetId);
-    }, 220);
-    dragTimersRef.current.set(assetId, t);
-  }, []);
+  const notifyPhysicsDrag = useCallback(
+    (assetId: string, worldPosition?: Vec3) => {
+      if (worldPosition) dragStoreRef.current?.moved(assetId, worldPosition);
+      setDragActiveByAssetId((prev) =>
+        prev[assetId] ? prev : { ...prev, [assetId]: true }
+      );
+      const existing = dragTimersRef.current.get(assetId);
+      if (existing) clearTimeout(existing);
+      const t = setTimeout(() => {
+        setDragActiveByAssetId((prev) => {
+          if (!prev[assetId]) return prev;
+          const next = { ...prev };
+          delete next[assetId];
+          return next;
+        });
+        dragTimersRef.current.delete(assetId);
+      }, 220);
+      dragTimersRef.current.set(assetId, t);
+    },
+    []
+  );
 
   const isDragActive = useCallback(
     (assetId: string) => !!dragActiveByAssetId[assetId],
@@ -457,62 +568,39 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     };
   }, []);
 
-  const markAnimationLive = useCallback(
-    (assetId: string, anim: StudioAnimation) => {
-      startedPlayRef.current.delete(assetId);
-      // An asset that has not loaded yet never starts, so it never reports a
-      // finish either. Leaving it out keeps a later trigger from waiting behind
-      // an animation that is not going to run.
-      if (!loadedAssetIdsRef.current[assetId]) {
-        liveAnimRef.current.delete(assetId);
-        return;
-      }
-      liveAnimRef.current.set(assetId, {
-        key: anim.animation_key,
-        loop: anim.loop,
-        interruptible: anim.interruptible,
-      });
-    },
-    []
-  );
-
-  const triggerAnimation = useCallback(
-    (targetAssetId: string, animationKey: string) => {
+  // Returns false when the scene has no such animation.
+  const startAnimation = useCallback(
+    (
+      targetAssetId: string,
+      animationKey: string,
+      origin: StudioEffectOrigin
+    ) => {
       const requested = animations.find(
         (a) =>
           a.target_asset_id === targetAssetId &&
           a.animation_key === animationKey
       );
-      if (!requested) return;
+      if (!requested) return false;
 
-      const live = liveAnimRef.current.get(targetAssetId);
-      if (live && live.key !== animationKey) {
-        if (!live.loop && !live.interruptible) {
-          // Let the running one finish and play this next. The editor runs both
-          // at once and the runtime cannot, but in sequence the asset at least
-          // ends up where running both would have left it, and nothing is lost.
-          const queue = queuedAnimRef.current.get(targetAssetId) ?? [];
-          if (queue[queue.length - 1] !== animationKey) {
-            queue.push(animationKey);
-            queuedAnimRef.current.set(targetAssetId, queue);
-          }
-          return;
-        }
-        // A loop never finishes and an interruptible animation is one the author
-        // said may be cut short, so this one takes the slot now. Sent as a single
-        // update with `run` still true: the runtime only terminates a running
-        // animation inside `playAnimation`, which a false→true pair never reaches
-        // because the false half pauses it first, and a paused animation resumes
-        // whatever it already holds however the name changed.
-        markAnimationLive(targetAssetId, requested);
+      const play = animationSlotsRef.current!.request(
+        requested,
+        !!loadedAssetIdsRef.current[targetAssetId],
+        origin
+      );
+      if (play === "queued") return true;
+      if (play === "interrupt") {
+        // Sent as a single update with `run` still true: the runtime only
+        // terminates a running animation inside `playAnimation`, which a
+        // false→true pair never reaches because the false half pauses it
+        // first, and a paused animation resumes whatever it already holds
+        // however the name changed.
         setAnimOverrides((prev) => ({
           ...prev,
           [targetAssetId]: { key: animationKey, run: true, interrupting: true },
         }));
-        return;
+        return true;
       }
 
-      markAnimationLive(targetAssetId, requested);
       // Viro's animation prop is edge-triggered on false→true. Force false first,
       // then flip to true on the next frame so a re-trigger of the same key fires.
       setAnimOverrides((prev) => ({
@@ -529,12 +617,44 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         });
       });
       triggerHandlesRef.current.add(handle);
+      return true;
     },
-    [animations, markAnimationLive]
+    [animations]
+  );
+
+  const startAnimationRef = useRef(startAnimation);
+  startAnimationRef.current = startAnimation;
+
+  // A trigger on this device, which a shared session repeats on the others.
+  const triggerAnimation = useCallback(
+    (targetAssetId: string, animationKey: string) => {
+      if (startAnimation(targetAssetId, animationKey, "local")) {
+        colocation?.shareAnimation(scene.id, targetAssetId, animationKey);
+      }
+    },
+    [startAnimation, colocation, scene.id]
   );
 
   const triggerAnimationRef = useRef(triggerAnimation);
   triggerAnimationRef.current = triggerAnimation;
+
+  // What an animation's on_start and on_finish dispatch with: a `device` play
+  // keeps what they cause on this device too.
+  const effectChain = useCallback(
+    (origin: StudioEffectOrigin) =>
+      origin === "device"
+        ? {
+            trigger: (id: string, key: string) =>
+              startAnimationRef.current(id, key, "device"),
+            ctx: deviceRuntimeCtx,
+          }
+        : {
+            trigger: (id: string, key: string) =>
+              triggerAnimationRef.current(id, key),
+            ctx: runtimeCtx,
+          },
+    [runtimeCtx, deviceRuntimeCtx]
+  );
 
   const handleAnimationFinished = useCallback(
     (assetId: string, anim: StudioAnimation) => {
@@ -543,25 +663,26 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       // on_finish there repeats a chained function for as long as the loop runs,
       // and the editor fires it only when an animation ends.
       if (anim.loop) return;
-      liveAnimRef.current.delete(assetId);
-      startedPlayRef.current.delete(assetId);
-      if (anim.on_finish_function) {
+      const slots = animationSlotsRef.current!;
+      const chain = effectChain(slots.origin(assetId));
+      if (slots.finish(assetId) && anim.on_finish_function) {
         executeOnLoadFunction(
           anim.on_finish_function,
           functions,
           sceneNavigator,
           animations,
-          (id, key) => triggerAnimationRef.current(id, key),
+          chain.trigger,
           handleSceneChange,
-          runtimeCtx
+          chain.ctx
         );
       }
       // on_finish runs first, so an animation it chains holds the slot and this
-      // one waits behind it rather than cutting it off.
-      const next = queuedAnimRef.current.get(assetId)?.shift();
-      if (next) triggerAnimationRef.current(assetId, next);
+      // one waits behind it rather than cutting it off. A queued play was shared
+      // when it was triggered, so it starts without being shared again.
+      const next = slots.next(assetId);
+      if (next) startAnimationRef.current(assetId, next.key, next.origin);
     },
-    [functions, sceneNavigator, animations, handleSceneChange, runtimeCtx]
+    [functions, sceneNavigator, animations, handleSceneChange, effectChain]
   );
 
   // ─── Computed animation props per asset ──────────────────────────────────
@@ -601,16 +722,17 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           ? () => {
               // Once per play, not once per loop cycle: the runtime reports a
               // start on every replay, and the editor fires it once.
-              if (startedPlayRef.current.has(assetId)) return;
-              startedPlayRef.current.add(assetId);
+              const slots = animationSlotsRef.current!;
+              if (!slots.runsOnStart(assetId)) return;
+              const chain = effectChain(slots.origin(assetId));
               executeOnLoadFunction(
                 activeAnim.on_start_function!,
                 functions,
                 sceneNavigator,
                 animations,
-                (id, key) => triggerAnimationRef.current(id, key),
+                chain.trigger,
                 handleSceneChange,
-                runtimeCtx
+                chain.ctx
               );
             }
           : undefined,
@@ -628,13 +750,45 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     sceneNavigator,
     handleSceneChange,
     handleAnimationFinished,
-    runtimeCtx,
+    effectChain,
   ]);
+
+  // ─── Shared session attach ────────────────────────────────────────────────
+  // After every per-scene reset above (stores, sounds, animation slots), so a
+  // shared session's rows and the events it held for this scene land on them
+  // rather than being reset by them, and before on_load, whose effects the
+  // session shares as this scene's.
+  useEffect(() => {
+    if (!colocation) return;
+    const stores = {
+      variables: variableStoreRef.current!,
+      visibility: visibilityStoreRef.current!,
+      placement: placementStoreRef.current!,
+      drags: dragStoreRef.current!,
+      sounds: soundManagerRef.current!,
+    };
+    colocation.attachScene(
+      sceneData,
+      stores,
+      {
+        playAnimation: (assetId, key) =>
+          startAnimationRef.current(assetId, key, "remote"),
+        leave: () => schedulerRef.current?.cancelAll(),
+      },
+      sceneMount
+    );
+    return () => colocation.detachScene(stores);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colocation, scene.id]);
 
   // ─── on_load_function ─────────────────────────────────────────────────────
   const onLoadExecutedRef = useRef(false);
   useEffect(() => {
-    if (scene.on_load_function && !onLoadExecutedRef.current) {
+    if (
+      scene.on_load_function &&
+      !onLoadExecutedRef.current &&
+      !skipOnLoadFunction
+    ) {
       onLoadExecutedRef.current = true;
       executeOnLoadFunction(
         scene.on_load_function,
@@ -671,18 +825,26 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
 
   const collisionCooldownRef = useRef<Map<string, number>>(new Map());
 
+  // Image-triggered content sits on each device's own marker rather than in
+  // the shared frame, so its contacts are that device's and run there, and
+  // the sounds and animations they cause are not shared: every device that
+  // sees the marker has the same contact.
   const getCollisionHandler = useCallback(
-    (placementId: string) => {
+    (placementId: string, inSharedFrame = true) => {
       if (!collisionAssetIds.has(placementId)) return undefined;
+      const chain = effectChain(inSharedFrame ? "local" : "device");
       return createPlacementCollisionHandler(
         placementId,
         bindingsByPairKey,
         sceneNavigator,
         animations,
         collisionCooldownRef,
-        (id, key) => triggerAnimationRef.current(id, key),
+        chain.trigger,
         handleSceneChange,
-        runtimeCtx
+        chain.ctx,
+        inSharedFrame
+          ? () => collisionBindingsRunHere(colocationFrameRef.current)
+          : undefined
       );
     },
     [
@@ -691,7 +853,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       sceneNavigator,
       animations,
       handleSceneChange,
-      runtimeCtx,
+      effectChain,
     ]
   );
 
@@ -862,6 +1024,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         forward: t.forward,
         up: t.up,
       };
+      colocation?.publishCameraPose(t.position, t.forward, t.up);
       if (isQuest) {
         const nowHL = Date.now();
         if (nowHL - lastHeadLockedEvalRef.current >= HEAD_LOCKED_EVAL_INTERVAL_MS) {
@@ -891,7 +1054,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         runtimeCtx,
       });
     },
-    [proximityBindings, sceneNavigator, animations, handleSceneChange, runtimeCtx]
+    [
+      proximityBindings,
+      sceneNavigator,
+      animations,
+      handleSceneChange,
+      runtimeCtx,
+      colocation,
+    ]
   );
 
   // Mobile AR: hit-test the tapped screen point and place the active asset on the
@@ -902,6 +1072,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       const store = placementStoreRef.current;
       const activeId = store?.activeAssetId();
       if (!store || !activeId || !arSceneRef.current) return "miss";
+      // Content is withheld until the shared origin exists, so there is
+      // nothing a placement could land in yet.
+      if (colocationFrameRef.current.phase === "pending") return "miss";
       let results: ViroARHitTestResult[] = [];
       try {
         results = await arSceneRef.current.performARHitTestWithPoint(x, y);
@@ -912,9 +1085,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       if (!best) return "miss";
       store.place(
         activeId,
-        best.transform.position as Vec3,
-        cameraPoseRef.current?.forward,
-        cameraPoseRef.current?.up
+        ...placementInSceneFrame(
+          colocationFrameRef.current,
+          best.transform.position as Vec3,
+          cameraPoseRef.current?.forward,
+          cameraPoseRef.current?.up
+        )
       );
       return "placed";
     },
@@ -938,15 +1114,19 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     const store = placementStoreRef.current;
     const activeId = store?.activeAssetId();
     if (!store || !activeId) return;
+    if (colocationFrameRef.current.phase === "pending") return;
     const pos = isUsablePoint(hitPosition)
       ? hitPosition
       : projectAlongCameraForward(cameraPoseRef.current);
     if (!pos) return;
     store.place(
       activeId,
-      pos,
-      cameraPoseRef.current?.forward,
-      cameraPoseRef.current?.up
+      ...placementInSceneFrame(
+        colocationFrameRef.current,
+        pos,
+        cameraPoseRef.current?.forward,
+        cameraPoseRef.current?.up
+      )
     );
   }, []);
 
@@ -1088,6 +1268,20 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     selectedAnchorIdRef.current = null;
   }, [scene.id]);
 
+  // Shared content sits on the origin, not on a plane anchor, and the origin
+  // keeps the picked plane's orientation, so its +Y is the surface to drag on.
+  const sharedSceneToWorld =
+    colocationPhase === "shared" ? colocationFrame.sceneToWorld : null;
+  const sharedDragSurface = useMemo(
+    () =>
+      hasPlaneDrag && sharedSceneToWorld
+        ? dragSurfaceFromSceneToWorld(sharedSceneToWorld)
+        : null,
+    [hasPlaneDrag, sharedSceneToWorld]
+  );
+  const effectiveDragSurface =
+    colocationPhase === "shared" ? sharedDragSurface : dragSurface;
+
   // ─── Render helpers ───────────────────────────────────────────────────────
   const renderedPlaneAssets = useMemo(() => {
     return planeAssets
@@ -1109,13 +1303,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
             ? registerProximityTarget
             : undefined,
           getGazeHandler(asset.id),
-          dragSurface
+          effectiveDragSurface
         )
       )
       .filter(Boolean) as React.ReactElement[];
   }, [
     planeAssets,
-    dragSurface,
+    effectiveDragSurface,
     sceneNavigator,
     animations,
     animationStates,
@@ -1130,8 +1324,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     getGazeHandler,
   ]);
 
-  // Tap-to-place nodes render at scene root (world space); each is gated by the
-  // placement store (null until placed, then mounted at the placed world point).
+  // Tap-to-place nodes render at the scene root (world space), or under the
+  // shared origin while shared; each is gated by the placement store (null
+  // until placed, then mounted at the placed point in that frame).
   const renderedTapToPlaceAssets = useMemo(() => {
     return tapToPlaceAssets
       .map((asset) =>
@@ -1188,7 +1383,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         (id, key) => triggerAnimationRef.current(id, key),
         animationStates,
         handleAssetLoaded,
-        getCollisionHandler(asset.id),
+        getCollisionHandler(asset.id, false),
         isDragActive,
         notifyPhysicsDrag,
         handleSceneChange,
@@ -1249,8 +1444,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // Exception: tap-to-place placement runs surface hit tests, which return no
   // plane results while detection is off — keep the native default on when the
   // scene has any tap-to-place asset.
+  //
+  // In a shared session the plane mode only picks the host's origin, so its
+  // planes are looked for until then and never on a joiner.
+  const detectsScenePlanes =
+    (planeDetectionMode === "AUTOMATIC" || planeDetectionMode === "MANUAL") &&
+    (colocationPhase === "off" || colocationFrame.needsOrigin);
   const anchorDetectionTypes = useMemo((): string[] => {
-    if (planeDetectionMode !== "AUTOMATIC" && planeDetectionMode !== "MANUAL") {
+    if (!detectsScenePlanes) {
       return tapToPlaceAssets.length
         ? ["planesHorizontal", "planesVertical"]
         : [];
@@ -1259,7 +1460,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     if (dir === "vertical") return ["planesVertical"];
     if (dir.includes("horizontal")) return ["planesHorizontal"];
     return ["planesHorizontal", "planesVertical"];
-  }, [planeDetectionMode, scene.plane_direction, tapToPlaceAssets]);
+  }, [detectsScenePlanes, scene.plane_direction, tapToPlaceAssets]);
 
   // ViroARPlaneSelector (react-viro 2.54+) no longer receives scene anchors
   // automatically; ViroARScene forwards them here via ref. Also surfaces
@@ -1340,6 +1541,97 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     return true;
   }, [onPlaneDetected]);
 
+  // ─── Shared origin (host) ─────────────────────────────────────────────────
+  // The host places the scene the way it was authored, and that pose becomes
+  // everyone's origin: the world origin for NONE, the first plane for
+  // AUTOMATIC, the selected plane at the tapped point for MANUAL.
+  const needsOrigin = colocationFrame.needsOrigin;
+  useEffect(() => {
+    if (needsOrigin && planeDetectionMode === "NONE") {
+      colocation?.proposeOrigin(IDENTITY);
+    }
+  }, [needsOrigin, planeDetectionMode, colocation]);
+
+  const proposePlaneOrigin = useCallback(
+    (anchor: ViroAnchor) => {
+      if (!anchor?.position || !anchor?.rotation) return;
+      colocation?.proposeOrigin(
+        fromPositionEuler(anchor.position, anchor.rotation)
+      );
+    },
+    [colocation]
+  );
+
+  const handleOriginPlaneSelected = useCallback(
+    (plane: ViroAnchor, tapPosition?: Vec3) => {
+      handlePlaneSelected(plane);
+      if (!plane?.position || !plane?.rotation) return;
+      colocation?.proposeOrigin(selectedPlanePose(plane, tapPosition));
+    },
+    [handlePlaneSelected, colocation]
+  );
+
+  // Detection only, at the scene root: a plane anchor writes its world pose
+  // into its node's local transform, so it can never sit inside the shared
+  // (transformed) nodes.
+  const renderOriginPicker = () => {
+    if (planeDetectionMode === "AUTOMATIC") {
+      return (
+        <ViroARPlane
+          minHeight={0.1}
+          minWidth={0.1}
+          alignment={planeAlignment}
+          onAnchorFound={proposePlaneOrigin}
+        />
+      );
+    }
+    if (planeDetectionMode === "MANUAL") {
+      return (
+        <ViroARPlaneSelector
+          ref={planeSelectorRef}
+          minHeight={0.1}
+          minWidth={0.1}
+          alignment={planeAlignment}
+          onPlaneDetected={handlePlaneDetectedForSelector}
+          onPlaneSelected={handleOriginPlaneSelected}
+        />
+      );
+    }
+    return null;
+  };
+
+  const sharedNodes = useMemo(() => {
+    const { location, origin } = colocationFrame;
+    if (colocationPhase !== "shared" || !location || !origin) return null;
+    return {
+      location: toNodeTransform(location),
+      origin: toNodeTransform(origin),
+    };
+  }, [colocationFrame, colocationPhase]);
+
+  const renderSharedContent = () => {
+    if (!sharedNodes || !colocation) return null;
+    return (
+      <ViroNode
+        position={sharedNodes.location.position}
+        rotation={sharedNodes.location.rotation}
+        scale={sharedNodes.location.scale}
+      >
+        {/* Scenes under a push stay mounted; only the one on screen polls. */}
+        {colocationFrame.sceneId === scene.id && (
+          <StudioColocationPeers readPeers={colocation.readPeers} />
+        )}
+        <ViroNode
+          position={sharedNodes.origin.position}
+          rotation={sharedNodes.origin.rotation}
+        >
+          {trackingReady && renderedPlaneAssets}
+          {renderedTapToPlaceAssets}
+        </ViroNode>
+      </ViroNode>
+    );
+  };
+
   // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
   // the OpenXR renderer feeds Quest plane anchors through the same
   // onAnchorFound path ARCore/ARKit use (XR_FB_scene room model), see
@@ -1403,8 +1695,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         />
       )}
       <StudioLightRig ref={lightRigRef} />
-      {trackingReady && renderAssets()}
-      {renderedTapToPlaceAssets}
+      {colocationPhase === "off" && trackingReady && renderAssets()}
+      {colocationPhase === "off" && renderedTapToPlaceAssets}
+      {needsOrigin && renderOriginPicker()}
+      {renderSharedContent()}
       {renderedImageTriggeredAssets}
       {isQuest && activePlacementId && (
         <ViroText
@@ -1451,8 +1745,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // the cached camera pose for headset placement, or we're on Quest (head-locked
   // UI — alert overlay, exit/scene-name HUD — needs a live pose to track) —
   // native gates the per-frame transform stream on this prop being present.
+  // A shared session publishes this device's pose from it.
   const cameraTransformProp =
-    isQuest || proximityBindings.length || tapToPlaceAssets.length
+    isQuest ||
+    proximityBindings.length ||
+    tapToPlaceAssets.length ||
+    colocationPhase === "shared"
       ? { onCameraTransformUpdate: handleCameraTransformUpdate }
       : {};
 
@@ -1473,7 +1771,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // had since April, and the ref that drives tap-to-place hit testing is null on
   // Quest either way — but unifying the two roots is a real change with a device
   // test behind it, not something a conflict resolution should decide quietly.
-  if (isQuest) {
+  //
+  // The scene on screen during a shared session is the one exception
+  // (studioSceneRootsInAR). Its content sits in the shared frame rather than on
+  // planes, so the AR root changes nothing it renders, and the scene returns to
+  // ViroScene when the session ends. Changing the root remounts everything
+  // below it, which is the cost the `colocation` prop doc states.
+  if (!studioSceneRootsInAR(colocationFrame, sceneMount, isQuest)) {
     return (
       <ViroScene
         {...physicsProps}

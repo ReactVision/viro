@@ -1,8 +1,22 @@
 import { StudioAsset } from "../types";
-import { GlobalListeners, KeyedListeners, isDev } from "./utils";
+import {
+  ChangeListeners,
+  GlobalListeners,
+  KeyedListeners,
+  isDev,
+  type StudioChangeOrigin,
+  type StudioStoreChangeListener,
+} from "./utils";
 
 type Vec3 = [number, number, number];
 type PlacementStatus = "unplaced" | "placed";
+
+/** A placement as recorded: the tap point and the camera's aim at tap time. */
+export type StudioPlacement = {
+  position: Vec3;
+  forward: Vec3 | null;
+  up: Vec3 | null;
+};
 
 /**
  * Image triggering wins over tap-to-place: a marker both triggers its content and
@@ -138,7 +152,8 @@ function cameraBasis(forward?: Vec3, up?: Vec3): Mat3 | null {
 /**
  * Per-scene store for tap-to-place assets, keyed by asset placement id. A
  * tap-to-place asset is withheld from the scene until the end user places it,
- * then rendered at the placed world position. Placement is ephemeral runtime
+ * then rendered at the placed position, in world coordinates alone or in
+ * scene-origin coordinates while shared. Placement is ephemeral runtime
  * state: nothing is persisted, so reopening the scene starts unplaced again.
  *
  * Two listener sets: per-asset (a placement repaints only that node) and a
@@ -154,6 +169,7 @@ export class StudioPlacementStore {
   private order: string[] = [];
   private keyed = new KeyedListeners();
   private active = new GlobalListeners();
+  private changes = new ChangeListeners();
 
   /** Initialise-if-absent from the tap_to_place flag (idempotent, strict-mode safe). */
   seed(assets: StudioAsset[]): void {
@@ -178,6 +194,7 @@ export class StudioPlacementStore {
     }
     this.keyed.notifyAll();
     this.active.notify();
+    this.changes.notify(null, "local");
   }
 
   /** True for assets this store gates (tap_to_place). */
@@ -191,6 +208,19 @@ export class StudioPlacementStore {
 
   getPosition(assetId: string): Vec3 | undefined {
     return this.positions.get(assetId);
+  }
+
+  getPlacement(assetId: string): StudioPlacement | undefined {
+    const position = this.positions.get(assetId);
+    if (!position) return undefined;
+    const basis = this.bases.get(assetId);
+    if (!basis) return { position, forward: null, up: null };
+    // cameraBasis() columns: right, up, backward.
+    return {
+      position,
+      forward: [-basis[0][2], -basis[1][2], -basis[2][2]],
+      up: [basis[0][1], basis[1][1], basis[2][1]],
+    };
   }
 
   /**
@@ -233,19 +263,31 @@ export class StudioPlacementStore {
   /**
    * Record a placement at a tap point, with the camera forward/up at tap time so
    * the author position and rotation resolve in the user's full tap-time frame.
-   * No-op if the asset is untracked or already placed.
+   * No-op if the asset is untracked, or already placed for a local placement; a
+   * remote one also moves an asset that is placed, since the room's last write
+   * wins.
    */
-  place(assetId: string, position: Vec3, forward?: Vec3, up?: Vec3): void {
-    if (this.status.get(assetId) !== "unplaced") return;
+  place(
+    assetId: string,
+    position: Vec3,
+    forward?: Vec3,
+    up?: Vec3,
+    origin: StudioChangeOrigin = "local"
+  ): void {
+    const status = this.status.get(assetId);
+    if (status === undefined || (origin === "local" && status === "placed"))
+      return;
     this.status.set(assetId, "placed");
     this.positions.set(assetId, position);
     const basis = cameraBasis(forward, up);
     if (basis) this.bases.set(assetId, basis);
+    else this.bases.delete(assetId);
     if (isDev()) {
       console.log(`[Studio] Placed "${assetId}" at`, position);
     }
     this.keyed.notify(assetId);
     this.active.notify();
+    this.changes.notify(assetId, origin);
   }
 
   /** Subscribe to one asset's placement changes; returns an unsubscribe fn. */
@@ -256,5 +298,10 @@ export class StudioPlacementStore {
   /** Subscribe to active-asset changes (the placement UI); returns unsubscribe. */
   subscribeActive(listener: () => void): () => void {
     return this.active.subscribe(listener);
+  }
+
+  /** Each placement with its asset id (null after a reseed) and its origin. */
+  subscribeChanges(listener: StudioStoreChangeListener): () => void {
+    return this.changes.subscribe(listener);
   }
 }

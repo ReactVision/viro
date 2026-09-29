@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ViewStyle } from "react-native";
+import type { StudioColocationOptions, StudioColocationRoom, StudioColocationState } from "./colocation/types";
 import { StudioSceneResponse } from "./types";
 /** Imperative handle exposed via ref. */
 export interface StudioSceneNavigatorHandle {
@@ -9,6 +10,11 @@ export interface StudioSceneNavigatorHandle {
         url?: string;
         errorCode?: string;
     }>;
+    /** Leave the shared session; the current `colocation` value stays left. */
+    leaveColocation: () => void;
+    getColocationRoom: () => StudioColocationRoom | null;
+    /** Host: end the scan and host it. The indicator's Done button does the same. */
+    finishColocationScan: () => void;
 }
 export interface StudioSceneNavigatorProps {
     /**
@@ -60,6 +66,61 @@ export interface StudioSceneNavigatorProps {
      * custom UI via `useStudioPlacement()`) itself.
      */
     placementIndicator?: boolean;
+    /**
+     * Share the scene with other devices in the same physical space. `host` scans
+     * the space and creates a room with a join code; `join` looks a code up and
+     * aligns to the host's space. Absent, the scene renders alone exactly as
+     * before, and changing it to absent leaves the room. One session runs per
+     * distinct value: re-rendering with an equal value changes nothing.
+     *
+     * Content is withheld while the session is set up and then renders where the
+     * host placed it on every device. If the session fails, the scene renders
+     * alone again and `onColocationStateChange` reports why.
+     *
+     * Variables, visibility and tap-to-place positions are shared, the last
+     * write winning; a device that joins or reconnects takes the room's copy
+     * over its own. A drag is shared while it runs: the device dragging an
+     * asset holds it, and nobody else can drag it until that drag ends.
+     * Animation triggers and sounds play on every device, while the function
+     * that caused them runs on one, so nothing it changes is applied twice. A
+     * NAVIGATE on any device takes every device to that scene, and the devices
+     * that follow do not run its on_load function; a device that joins on
+     * another scene moves to the room's. A scene outside the session's project
+     * is not entered, and is reported as one that failed to load.
+     * Collision bindings run on the host only, except for image-triggered
+     * content, which sits on each device's own marker and runs its bindings and
+     * drags there; the sounds and animations those bindings cause, including
+     * what those animations' on_start and on_finish play, stay on that device.
+     * Gaze and proximity run on each device against its own camera, and what
+     * they change is shared.
+     * Physics simulates on each device, so a dynamic body nobody is dragging can
+     * come to rest in different places on different devices.
+     *
+     * A Meta Quest host shares a Meta spatial anchor instead of scanning, and the
+     * scene sits on that anchor rather than on a surface. Rooms do not cross
+     * device families: one hosted from a phone is joined from phones, and one
+     * hosted from a Quest from Quest headsets; the other family's join fails
+     * with `FRAME_KIND_UNSUPPORTED`.
+     *
+     * On Quest the scene on screen roots in ViroARScene while a session is set
+     * up or shared, and in ViroScene otherwise. Changing the root remounts the
+     * whole scene, so a sound that is playing starts again from the beginning
+     * when a session starts after the scene mounted, and again when a session
+     * ends or fails. Set this before the scene mounts to avoid the first.
+     */
+    colocation?: StudioColocationOptions;
+    /**
+     * Show the built-in co-location pill (scan guidance and a Done button, then
+     * the join code and peer count). Default true, positioned bottom-centre. Set
+     * false and render `<StudioColocationIndicator />` (or a custom UI via
+     * `useStudioColocation()`) in the host's own chrome. On Quest the status and
+     * the join code also show in the scene's head-locked HUD either way, since
+     * nothing 2D is visible from inside the headset.
+     */
+    colocationIndicator?: boolean;
+    onColocationStateChange?: (state: StudioColocationState) => void;
+    /** Once per room: when the host has its code, or when a joiner is in. */
+    onColocationRoom?: (room: StudioColocationRoom) => void;
 }
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on

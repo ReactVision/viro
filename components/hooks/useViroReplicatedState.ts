@@ -75,6 +75,7 @@ export function useViroReplicatedState(
     apiKey,
     projectId,
     endpoint,
+    headers,
     enabled = true,
     onReject,
   } = options;
@@ -85,13 +86,24 @@ export function useViroReplicatedState(
   // Kept in a ref so changing the handler does not tear down the connection.
   const rejectRef = useRef(onReject);
   rejectRef.current = onReject;
+  // Same for the header provider, which the client calls again on every
+  // reconnect anyway.
+  const headersRef = useRef(headers);
+  headersRef.current = headers;
+  const hasHeaders = headers !== undefined;
 
   useEffect(() => {
     client.onReject = (r) => rejectRef.current?.(r);
     const unsubscribe = client.subscribe(() => force((n) => n + 1));
 
     if (enabled && roomId) {
-      client.connect({ roomId, apiKey, projectId, endpoint });
+      client.connect({
+        roomId,
+        apiKey,
+        projectId,
+        endpoint,
+        headers: hasHeaders ? () => headersRef.current?.() ?? {} : undefined,
+      });
     }
 
     return () => {
@@ -99,7 +111,7 @@ export function useViroReplicatedState(
       client.onReject = undefined;
       client.disconnect();
     };
-  }, [client, roomId, apiKey, projectId, endpoint, enabled]);
+  }, [client, roomId, apiKey, projectId, endpoint, hasHeaders, enabled]);
 
   return {
     state: client.state,

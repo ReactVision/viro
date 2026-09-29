@@ -86,7 +86,11 @@ export type ViroReplicationRejection = {
 export type ViroReplicationConfig = {
   /** Same id that names the frame and the channel room. */
   roomId: string;
-  apiKey: string;
+  /**
+   * Required unless `headers` is given. The only credential a browser can
+   * send.
+   */
+  apiKey?: string;
   projectId: string;
   /**
    * Co-location relay base URL; `http(s)` is converted to `ws(s)`.
@@ -96,6 +100,13 @@ export type ViroReplicationConfig = {
    * both.
    */
   endpoint?: string;
+  /**
+   * Handshake credentials, called before every connect and reconnect so a
+   * token that refreshed in the meantime reaches the next attempt. Sent
+   * alongside `x-api-key` when `apiKey` is also given. Native only: a browser
+   * cannot set handshake headers.
+   */
+  headers?: () => Promise<Record<string, string>> | Record<string, string>;
 };
 
 export type ViroWriteOptions = {
@@ -119,6 +130,10 @@ type Listener = () => void;
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
 const DEFAULT_ENDPOINT = "https://colocation.reactvision.xyz";
 
+function isThenable<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return typeof (value as PromiseLike<T> | null)?.then === "function";
+}
+
 /** https:// → wss://, http:// → ws://. Anything else passes through. */
 function toSocketScheme(endpoint: string): string {
   if (endpoint.startsWith("https://")) return "wss://" + endpoint.slice(8);
@@ -139,6 +154,8 @@ export class ViroReplicationClient {
   private attempt = 0;
   private closedByUs = false;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Bumped per open and on disconnect, so a late `headers` answer is dropped. */
+  private openSeq = 0;
 
   private listeners = new Set<Listener>();
   /**
@@ -194,6 +211,7 @@ export class ViroReplicationClient {
 
   disconnect(): void {
     this.closedByUs = true;
+    this.openSeq++;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
     if (this.ws) {
@@ -286,21 +304,60 @@ export class ViroReplicationClient {
     // browser cannot set them, and there the credentials go in the query
     // string, which the relay refuses unless it was started to allow it (a
     // browser client needs an Origin allowlist first).
-    const ws = isWeb
-      ? new WebSocket(
+    if (isWeb) {
+      if (!cfg.apiKey) {
+        this.fail("a browser can only join with an apiKey");
+        return;
+      }
+      this.attach(
+        new WebSocket(
           `${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
             `&projectId=${encodeURIComponent(cfg.projectId)}`
         )
-      : new (WebSocket as unknown as HeaderWebSocket)(path, null, {
-          headers: {
-            "x-api-key": cfg.apiKey,
-            "x-project-id": cfg.projectId,
-            // Logged by the relay, never used for a decision. It is what
-            // separates one client build from another when a refusal shows up
-            // in the relay log and every device otherwise looks alike.
-            "x-rv-client": `viro/${VIRO_VERSION} (${Platform.OS})`,
-          },
-        });
+      );
+      return;
+    }
+    if (!cfg.apiKey && !cfg.headers) {
+      this.fail("an apiKey or a headers provider is required");
+      return;
+    }
+
+    const seq = ++this.openSeq;
+    const connectWith = (provided: Record<string, string> | undefined) => {
+      if (seq !== this.openSeq) return;
+      const headers: Record<string, string> = { ...provided };
+      if (cfg.apiKey) headers["x-api-key"] = cfg.apiKey;
+      headers["x-project-id"] = cfg.projectId;
+      // Logged by the relay, never used for a decision. It is what separates
+      // one client build from another when a refusal shows up in the relay log
+      // and every device otherwise looks alike. An app tag from the provider
+      // stays in front of it, as on the pose channel's handshake.
+      const build = `viro/${VIRO_VERSION} (${Platform.OS})`;
+      const app = headers["x-rv-client"];
+      headers["x-rv-client"] = app ? `${app} ${build}` : build;
+      this.attach(
+        new (WebSocket as unknown as HeaderWebSocket)(path, null, { headers })
+      );
+    };
+    // A provider that cannot answer is treated as a dropped socket, so it
+    // backs off and retries on the same ladder.
+    const providerFailed = () => {
+      if (seq === this.openSeq) this.retryOrFail();
+    };
+
+    let provided: Record<string, string> | PromiseLike<Record<string, string>>;
+    try {
+      provided = cfg.headers?.() ?? {};
+    } catch {
+      providerFailed();
+      return;
+    }
+    // Synchronous answers connect synchronously, as a bare apiKey always has.
+    if (isThenable(provided)) provided.then(connectWith, providerFailed);
+    else connectWith(provided);
+  }
+
+  private attach(ws: WebSocket): void {
     this.ws = ws;
 
     ws.onopen = () => {
@@ -330,22 +387,28 @@ export class ViroReplicationClient {
       // too-large and slow-consumer, and all three are meant to reconnect.
       // Only this one is a decision that will not change on a retry.
       if (ev?.reason === "auth-revoked") {
-        this._error = "this key or plan can no longer join the room";
-        this.setState("failed");
+        this.fail("these credentials or this plan can no longer join the room");
         return;
       }
-
-      if (this.attempt >= BACKOFF_MS.length) {
-        this._error = "replication socket gave up reconnecting";
-        this.setState("failed");
-        return;
-      }
-      const delay = BACKOFF_MS[this.attempt++];
-      this.setState("reconnecting");
-      this.retryTimer = setTimeout(() => this.open(), delay);
+      this.retryOrFail();
     };
     ws.onclose = dropped;
     ws.onerror = () => dropped();
+  }
+
+  private retryOrFail(): void {
+    if (this.attempt >= BACKOFF_MS.length) {
+      this.fail("replication socket gave up reconnecting");
+      return;
+    }
+    const delay = BACKOFF_MS[this.attempt++];
+    this.setState("reconnecting");
+    this.retryTimer = setTimeout(() => this.open(), delay);
+  }
+
+  private fail(error: string): void {
+    this._error = error;
+    this.setState("failed");
   }
 
   private handle(msg: Record<string, unknown>): void {

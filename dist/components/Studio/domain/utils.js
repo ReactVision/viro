@@ -1,7 +1,7 @@
 "use strict";
 // Small shared helpers for the Studio runtime domain.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.KeyedListeners = exports.GlobalListeners = exports.isDev = void 0;
+exports.ChangeListeners = exports.KeyedListeners = exports.GlobalListeners = exports.isDev = void 0;
 /** True only in a dev build; gates verbose runtime logging in the Studio stores. */
 const isDev = () => typeof __DEV__ !== "undefined" && __DEV__;
 exports.isDev = isDev;
@@ -46,3 +46,16 @@ class KeyedListeners {
     }
 }
 exports.KeyedListeners = KeyedListeners;
+class ChangeListeners {
+    listeners = new Set();
+    subscribe(listener) {
+        this.listeners.add(listener);
+        return () => {
+            this.listeners.delete(listener);
+        };
+    }
+    notify(key, origin) {
+        [...this.listeners].forEach((fn) => fn(key, origin));
+    }
+}
+exports.ChangeListeners = ChangeListeners;

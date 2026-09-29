@@ -1,5 +1,11 @@
 import { StudioAsset } from "../types";
-import { KeyedListeners, isDev } from "./utils";
+import {
+  ChangeListeners,
+  KeyedListeners,
+  isDev,
+  type StudioChangeOrigin,
+  type StudioStoreChangeListener,
+} from "./utils";
 
 /**
  * Per-scene visibility store, keyed by scene asset placement id. Seeded from
@@ -14,6 +20,7 @@ import { KeyedListeners, isDev } from "./utils";
 export class StudioVisibilityStore {
   private visible = new Map<string, boolean>();
   private listeners = new KeyedListeners();
+  private changes = new ChangeListeners();
 
   /** Current visibility; defaults to visible for assets never seeded/set. */
   isVisible(assetId: string): boolean {
@@ -23,6 +30,11 @@ export class StudioVisibilityStore {
   /** Subscribe to changes for one asset; returns an unsubscribe fn. */
   subscribe(assetId: string, listener: () => void): () => void {
     return this.listeners.subscribe(assetId, listener);
+  }
+
+  /** Each change with its asset id (null after a reseed) and its origin. */
+  subscribeChanges(listener: StudioStoreChangeListener): () => void {
+    return this.changes.subscribe(listener);
   }
 
   /** Initialise-if-absent from author-time defaults (idempotent, strict-mode safe). */
@@ -38,7 +50,11 @@ export class StudioVisibilityStore {
    * Apply a Set Visibility action. TOGGLE flips the live value; VISIBLE/HIDDEN
    * set it absolutely. No-op writes don't wake subscribers.
    */
-  apply(assetId: string, state: "VISIBLE" | "HIDDEN" | "TOGGLE"): void {
+  apply(
+    assetId: string,
+    state: "VISIBLE" | "HIDDEN" | "TOGGLE",
+    origin: StudioChangeOrigin = "local"
+  ): void {
     const next =
       state === "TOGGLE" ? !this.isVisible(assetId) : state === "VISIBLE";
     if (this.visible.get(assetId) === next) return;
@@ -47,6 +63,7 @@ export class StudioVisibilityStore {
       console.log(`[Studio] Visibility "${assetId}" =`, next);
     }
     this.listeners.notify(assetId);
+    this.changes.notify(assetId, origin);
   }
 
   /**
@@ -62,5 +79,6 @@ export class StudioVisibilityStore {
       this.visible.set(asset.id, !asset.hidden_on_load);
     }
     this.listeners.notifyAll();
+    this.changes.notify(null, "local");
   }
 }

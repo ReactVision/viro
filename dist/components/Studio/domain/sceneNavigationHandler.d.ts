@@ -3,6 +3,9 @@ import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
 import { StudioVisibilityStore } from "./visibilityStore";
 import { StudioPlacementStore } from "./placementStore";
+import type { StudioDragStore } from "./dragStore";
+import type { StudioColocationController } from "../colocation/controller";
+import type { StudioEffectOrigin } from "./utils";
 type SceneNavigator = any;
 export declare function resetVideoRecordingState(): void;
 export declare class SequenceScheduler {
@@ -34,8 +37,11 @@ export type SequenceRuntimeContext = {
     visibilityStore?: StudioVisibilityStore;
     placementStore?: StudioPlacementStore;
     soundManager?: StudioSoundManager;
+    dragStore?: StudioDragStore;
     getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
     navigate?: (targetSceneId: string) => void;
+    colocation?: StudioColocationController;
+    effectOrigin?: StudioEffectOrigin;
 };
 /** Used by onClick, onCollision, and on_load_function triggers. */
 export declare function executeFunctionWithRelations(fn: StudioSceneFunction, sceneNavigator: SceneNavigator | undefined, animations: StudioAnimation[], onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void, depth?: number, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext): void;

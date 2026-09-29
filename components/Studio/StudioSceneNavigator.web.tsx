@@ -30,12 +30,23 @@ import { STUDIO_RENDERER_EFFECTS } from "./domain/studioRendererEffects";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
+import { StudioColocationIndicator } from "./StudioColocationIndicator.web";
+import { studioColocationStore } from "./domain/colocationStore";
+import type {
+  StudioColocationOptions,
+  StudioColocationRoom,
+  StudioColocationState,
+} from "./colocation/types";
 import type { SequenceRuntimeContext } from "./domain/sceneNavigationHandler";
 import type { StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import type { StudioSceneResponse } from "./types";
 
 export interface StudioSceneNavigatorWebHandle {
   takeScreenshot: (fileName: string) => Promise<{ success: boolean; url?: string }>;
+  /** No-ops on web, where no shared session can start. */
+  leaveColocation: () => void;
+  getColocationRoom: () => StudioColocationRoom | null;
+  finishColocationScan: () => void;
 }
 
 export interface StudioSceneNavigatorWebProps {
@@ -97,6 +108,17 @@ export interface StudioSceneNavigatorWebProps {
   noAssetsMessage?: string;
   loadingView?: React.ReactNode;
   renderError?: (error: Error) => React.ReactNode;
+  /**
+   * Accepted for parity with native. No web frame source can align a browser
+   * with a device's space, so a value reports `failed` with
+   * `FRAME_KIND_UNSUPPORTED` and the scene renders alone.
+   */
+  colocation?: StudioColocationOptions;
+  /** Show the co-location pill (here, only ever the failure). Default true. */
+  colocationIndicator?: boolean;
+  onColocationStateChange?: (state: StudioColocationState) => void;
+  /** Never called on web: no room is ever joined. */
+  onColocationRoom?: (room: StudioColocationRoom) => void;
 }
 
 type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
@@ -211,6 +233,9 @@ export const StudioSceneNavigator = forwardRef<
   const {
     recordingIndicator = true,
     placementIndicator = true,
+    colocation,
+    colocationIndicator = true,
+    onColocationStateChange,
     arOptions,
     onSessionReady,
     sceneData: injectedSceneData,
@@ -247,6 +272,27 @@ export const StudioSceneNavigator = forwardRef<
 
   const onSceneLoadedRef = useRef(onSceneLoaded);
   onSceneLoadedRef.current = onSceneLoaded;
+
+  const onColocationStateChangeRef = useRef(onColocationStateChange);
+  onColocationStateChangeRef.current = onColocationStateChange;
+  const colocationRequested = colocation !== undefined;
+  // Idle is only news after a failure was reported, as on native.
+  const colocationReportedRef = useRef(false);
+  useEffect(() => {
+    if (!colocationRequested && !colocationReportedRef.current) return;
+    colocationReportedRef.current = colocationRequested;
+    const state: StudioColocationState = colocationRequested
+      ? {
+          status: "failed",
+          code: "FRAME_KIND_UNSUPPORTED",
+          message:
+            "Co-location rooms need a phone or headset: a browser cannot align with a device's scan.",
+        }
+      : { status: "idle" };
+    studioColocationStore.set(state);
+    onColocationStateChangeRef.current?.(state);
+  }, [colocationRequested]);
+  useEffect(() => () => studioColocationStore.reset(), []);
 
   // The navigators read their renderer options once, when they create it.
   const onRendererAbortRef = useRef(onRendererAbort);
@@ -316,6 +362,9 @@ export const StudioSceneNavigator = forwardRef<
           return { success: false };
         }
       },
+      leaveColocation: () => {},
+      getColocationRoom: () => null,
+      finishColocationScan: () => {},
     }),
     [],
   );
@@ -403,6 +452,11 @@ export const StudioSceneNavigator = forwardRef<
       {placementIndicator && (
         <div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
           <StudioPlacementIndicator />
+        </div>
+      )}
+      {colocationIndicator && (
+        <div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
+          <StudioColocationIndicator />
         </div>
       )}
     </div>

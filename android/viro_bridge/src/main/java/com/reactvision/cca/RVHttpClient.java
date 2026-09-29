@@ -11,10 +11,10 @@
 // edit here, then re-copy. They are the same package, so a divergence is
 // resolved by whichever .java the app's build sees first.
 //
-// Two kinds of caller, which is why apiKey is nullable below:
-//   - JNI (NetworkClient_Android.cpp) always passes a real key → x-api-key.
-//   - Viro's VRTStudioModule session path passes null and supplies
-//     Authorization: Bearer <jwt> via headerNames/headerValues instead.
+// apiKey is nullable below: a null key sends no x-api-key, and the caller
+// supplies Authorization: Bearer <jwt> via headerNames/headerValues instead.
+// JNI (NetworkClient_Android.cpp) passes null for a request authenticated by a
+// session, and Viro's VRTStudioModule session path does the same.
 
 package com.reactvision.cca;
 
@@ -48,11 +48,7 @@ public class RVHttpClient {
         HttpURLConnection conn = null;
         try {
             conn = openConnection(url, method, apiKey, timeoutSec);
-
-            if (headerNames != null) {
-                for (int i = 0; i < headerNames.length; i++)
-                    conn.setRequestProperty(headerNames[i], headerValues[i]);
-            }
+            applyHeaders(conn, headerNames, headerValues);
 
             if (body != null && body.length > 0) {
                 conn.setDoOutput(true);
@@ -89,6 +85,24 @@ public class RVHttpClient {
             byte[][] fileData,
             String[] filenames,
             String[] contentTypes) {
+        return sendMultipart(url, apiKey, timeoutSec, textNames, textValues,
+                fileNames, fileData, filenames, contentTypes, null, null);
+    }
+
+    // Same, plus extra request headers (nullable), for an upload authenticated
+    // by a session rather than a key.
+    public static String[] sendMultipart(
+            String   url,
+            String   apiKey,
+            int      timeoutSec,
+            String[] textNames,
+            String[] textValues,
+            String[] fileNames,
+            byte[][] fileData,
+            String[] filenames,
+            String[] contentTypes,
+            String[] headerNames,
+            String[] headerValues) {
 
         HttpURLConnection conn = null;
         try {
@@ -96,6 +110,7 @@ public class RVHttpClient {
                     + UUID.randomUUID().toString().replace("-", "");
 
             conn = openConnection(url, "POST", apiKey, timeoutSec);
+            applyHeaders(conn, headerNames, headerValues);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type",
                     "multipart/form-data; boundary=" + boundary);
@@ -169,13 +184,18 @@ public class RVHttpClient {
         conn.setRequestMethod(method.toUpperCase());
         conn.setConnectTimeout(timeoutSec * 1000);
         conn.setReadTimeout(timeoutSec * 1000);
-        // Session callers pass null and supply Authorization via headerNames/Values;
-        // JNI callers always pass a real key. Only set the header when present.
         if (apiKey != null) {
             conn.setRequestProperty("x-api-key", apiKey);
         }
         conn.setInstanceFollowRedirects(true);
         return conn;
+    }
+
+    private static void applyHeaders(
+            HttpURLConnection conn, String[] headerNames, String[] headerValues) {
+        if (headerNames == null || headerValues == null) return;
+        for (int i = 0; i < headerNames.length && i < headerValues.length; i++)
+            conn.setRequestProperty(headerNames[i], headerValues[i]);
     }
 
     private static String[] readResponse(HttpURLConnection conn)

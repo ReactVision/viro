@@ -16,8 +16,10 @@ export declare function dispatchCollisionBindingActions(params: {
     cooldownMs?: number;
     lastFiredRef: MutableRefObject<Map<string, number>>;
     runtimeCtx?: SequenceRuntimeContext;
+    /** Read per contact; false drops it before the cooldown sees it. */
+    canDispatch?: () => boolean;
 }): void;
 /**
  * Returns an onCollision handler for a given placement asset ID.
  */
-export declare function createPlacementCollisionHandler(placementId: string, bindingsByPairKey: Map<string, StudioCollisionBinding[]>, sceneNavigator: unknown, animations: StudioAnimation[], lastFiredRef: MutableRefObject<Map<string, number>>, onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext): (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void;
+export declare function createPlacementCollisionHandler(placementId: string, bindingsByPairKey: Map<string, StudioCollisionBinding[]>, sceneNavigator: unknown, animations: StudioAnimation[], lastFiredRef: MutableRefObject<Map<string, number>>, onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void, onSceneChange?: (sceneId: string, sceneName: string) => void, runtimeCtx?: SequenceRuntimeContext, canDispatch?: () => boolean): (viroTag: string, collidedPoint: [number, number, number], collidedNormal: [number, number, number]) => void;

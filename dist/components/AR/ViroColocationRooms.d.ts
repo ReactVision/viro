@@ -32,6 +32,9 @@ export type ViroColocationRoom = {
     cloudAnchorId: string | null;
     frameRef: string | null;
     name: string | null;
+    projectId: string | null;
+    /** The scene the room was created for, if it was created for one. */
+    sceneId: string | null;
 };
 /** How this room's devices establish their shared frame. */
 export type ViroRoomFrame = {
@@ -44,13 +47,20 @@ export type ViroRoomFrame = {
     frameKind: "visionos_space";
 };
 export type ViroColocationRoomsConfig = {
-    apiKey: string;
-    projectId: string;
+    /** Required unless `headers` is given. */
+    apiKey?: string;
+    /**
+     * Sent as `x-project-id`. Required with `apiKey`. With `headers` it may be
+     * left out of a lookup by code, which then finds the room from the code alone.
+     */
+    projectId?: string;
     /**
      * Platform base URL, not the relay's. Rooms are a REST call to Studio, while
      * poses and replicated state go to the co-location relay.
      */
     endpoint?: string;
+    /** Credentials sent verbatim in place of `apiKey`. */
+    headers?: Record<string, string>;
 };
 export type ViroColocationRoomResult = {
     success: true;
@@ -59,6 +69,8 @@ export type ViroColocationRoomResult = {
     success: false;
     error: string;
     code?: string;
+    /** HTTP status, absent when no response arrived. */
+    status?: number;
 };
 /**
  * The 30 characters a code can hold. O and 0, I and 1 and L, and U against V
@@ -77,6 +89,7 @@ export { CODE_ALPHABET };
  */
 export declare function createColocationRoom(config: ViroColocationRoomsConfig, frame: ViroRoomFrame & {
     name?: string;
+    sceneId?: string;
 }): Promise<ViroColocationRoomResult>;
 /** Look a room up by the code someone typed. */
 export declare function lookupColocationRoom(config: ViroColocationRoomsConfig, code: string): Promise<ViroColocationRoomResult>;

@@ -8,10 +8,12 @@ import { type ViroColocationRoom, type ViroColocationRoomsConfig, type ViroRoomF
 export type UseViroColocationRoomOptions = ViroColocationRoomsConfig & {
     /**
      * Create a room for a frame this device has established. The host path.
-     * Mutually exclusive with `joinCode`.
+     * Mutually exclusive with `joinCode`. `name` and `sceneId` are sent once,
+     * with the frame, so set them before the frame or `enabled`.
      */
     host?: ViroRoomFrame & {
         name?: string;
+        sceneId?: string;
     };
     /** Join a room someone read out. The guest path. */
     joinCode?: string;

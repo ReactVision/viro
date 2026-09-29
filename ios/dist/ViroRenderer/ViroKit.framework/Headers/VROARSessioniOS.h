@@ -297,8 +297,8 @@ private:
     VROCloudAnchorProviderARCore *_cloudAnchorProviderARCore = nil;
 
     /*
-     The ReactVision cloud anchor provider instance.
-     Reads RVApiKey and RVProjectId from Info.plist.
+     The ReactVision cloud anchor provider instance. Created when Info.plist has
+     RVApiKey and RVProjectId or a VROReactVisionAuth session exists.
      */
     VROCloudAnchorProviderReactVision *_cloudAnchorProviderRV = nil;
 

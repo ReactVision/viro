@@ -225,7 +225,7 @@ function runSteps(steps, deps, onDone, onAbort) {
                         if (deps.isCancelled?.())
                             return;
                         advance();
-                    });
+                    }, deps.runtimeCtx.effectOrigin);
                     return;
                 }
                 // Loop PLAY / STOP / no manager: fire-and-forget through the dispatcher.
@@ -502,9 +502,11 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
             runtimeCtx.navigate(nav.navigate_to);
             return;
         }
+        if (runtimeCtx?.colocation?.navigate(nav.navigate_to))
+            return;
         if (!sceneNavigator)
             return;
-        void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange, runtimeCtx?.variableStore);
+        void navigateToScene(sceneNavigator, nav.navigate_to, animations, onSceneChange, runtimeCtx?.variableStore, runtimeCtx?.colocation);
     }
     else if (fn.function_type === "ALERT") {
         const alert = fn.scene_alert;
@@ -617,10 +619,11 @@ function executeFunctionWithRelations(fn, sceneNavigator, animations, onAnimatio
                 volume: s.volume,
                 loop: s.loop,
                 stopOthers: s.stop_other_sounds,
-            });
+            }, undefined, runtimeCtx?.effectOrigin);
         }
         else {
-            manager.stop(s.audio_asset_id ?? null); // null = all sounds
+            // null = all sounds
+            manager.stop(s.audio_asset_id ?? null, runtimeCtx?.effectOrigin);
         }
     }
     else if (fn.function_type === "TAKE_PHOTO") {
@@ -704,7 +707,7 @@ function executeOnLoadFunction(functionId, functions, sceneNavigator, animations
  * The sceneNavigator object exposes rvGetScene as a method — no separate
  * API client needed here.
  */
-async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations, onSceneChange, variableStore) {
+async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations, onSceneChange, variableStore, colocation) {
     if (!sceneNavigator) {
         console.error("[Studio] SceneNavigator not available for navigation");
         react_native_1.Alert.alert("Navigation Error", "Unable to navigate to scene");
@@ -727,6 +730,9 @@ async function navigateToScene(sceneNavigator, targetSceneId, currentAnimations,
                 // The session store rides along on every push so values survive scene
                 // transitions for the navigator's whole lifetime.
                 variableStore,
+                // So does the shared session: the AR session and its frame outlive a
+                // push, so the next scene renders in the same frame without a resolve.
+                colocation,
             },
         });
         onSceneChange?.(targetSceneId, sceneData.scene.name ?? targetSceneId);

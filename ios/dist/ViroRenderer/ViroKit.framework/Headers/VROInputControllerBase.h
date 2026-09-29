@@ -96,9 +96,15 @@ public:
     }
 
     void attachScene(std::shared_ptr<VROScene> scene) {
+        // Drags hold nodes of the scene they started in; one left open across
+        // a scene change would keep freezing its ray's hit in the new scene.
+        if (scene != _scene) {
+            endAllDrags();
+        }
         _scene = scene;
     }
     void detachScene() {
+        endAllDrags();
         _scene = nullptr;
     }
     
@@ -240,36 +246,73 @@ protected:
          */
         VROVector3f _position;
         VROVector3f _forward;
+
+        /*
+         Last drag-to position reported through onDrag for this drag, used to
+         throttle notifications. Seeded from _lastDraggedNodePosition so a
+         single-pointer backend throttles exactly as it did with one slot.
+         */
+        VROVector3f _lastNotifiedPosition;
     };
     static constexpr int kUnownedSource = -1;
     
     /*
-     Last hit result that we are performing a drag event on.
+     Active drags, keyed by the ray that owns each one (VRODraggedObject::_source).
+     Multi-pointer backends (OpenXR: one entry per hand) can hold several at
+     once; single-pointer backends hold at most one, under kUnownedSource.
+     A node is never in more than one entry.
      */
-    std::shared_ptr<VRODraggedObject> _lastDraggedNode;
+    std::map<int, std::shared_ptr<VRODraggedObject>> _draggedObjects;
+
+    /*
+     The drag moved or ended by the given ray: the one it owns, otherwise an
+     unowned (single-pointer) drag. nullptr if neither exists.
+     */
+    std::shared_ptr<VRODraggedObject> getDraggedObject(int ray) const;
+
+    /*
+     True while any drag is active on this controller.
+     */
+    bool isDragging() const {
+        return !_draggedObjects.empty();
+    }
+
+    /*
+     End the drag stored under the given key, if any. endAllDrags ends every one.
+     */
+    void endDrag(int key);
+    void endAllDrags();
+
+    /*
+     True if node is ancestor itself or lies in ancestor's subtree.
+     */
+    static bool isSameOrAncestor(const std::shared_ptr<VRONode> &ancestor,
+                                 std::shared_ptr<VRONode> node);
 
     /*
      This function is meant to be called to run the dragging logic after onMove
      deals with other events, etc. This allows for the dragging logic to be overridden.
+     It moves only the drag owned by the given source (see getDraggedObject).
      */
     virtual void processDragging(int source);
 
     /*
      This function returns the next drag position for drag type FixedDistance
      */
-    VROVector3f getDragPositionFixedDistance();
+    VROVector3f getDragPositionFixedDistance(const std::shared_ptr<VRODraggedObject> &drag);
 
     /*
      This function returns the next drag position for drag type FixedToPlane
      */
-    VROVector3f getDragPositionFixedToPlane();
+    VROVector3f getDragPositionFixedToPlane(const std::shared_ptr<VRODraggedObject> &drag);
 
     /*
      Returns the position of the intersection point on the given node's configured fixed
      plane, based on a rayIntersectPlane test performed from the owning ray's pose stored
-     on _lastDraggedNode.
+     on the given drag.
      */
-    VROVector3f getPlaneIntersect(std::shared_ptr<VRONode> node);
+    VROVector3f getPlaneIntersect(std::shared_ptr<VRONode> node,
+                                  const std::shared_ptr<VRODraggedObject> &drag);
 
     /*
      Last result that was returned from the hit test.
@@ -291,6 +334,17 @@ protected:
      Last known position of the node that was dragged previously by this controller.
      */
     VROVector3f _lastDraggedNodePosition;
+
+    /*
+     Latest pose each source reported through onMove. A ClickDown seeds its
+     drag from its own ray's pose rather than _lastKnown*, which holds
+     whichever source moved last this frame.
+     */
+    struct VROSourcePose {
+        VROVector3f position;
+        VROVector3f forward;
+    };
+    std::map<int, VROSourcePose> _lastKnownPoseBySource;
     
     /*
      The pointer's normalized forward vector indicating where the controller

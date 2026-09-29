@@ -336,3 +336,54 @@ describe("studioColocationStore.finishScan", () => {
     expect(studioColocationStore.finishScan()).toBe(true);
   });
 });
+
+describe("studioColocationStore ownership", () => {
+  afterEach(() => studioColocationStore.reset());
+  const scanning = { status: "scanning" as const, canFinish: true };
+
+  it("keeps the live navigator's session when another navigator unmounts", () => {
+    const live = {};
+    const other = {};
+    studioColocationStore.setFinishScanHandler(() => true, live);
+    studioColocationStore.setFinishScanHandler(() => false, other);
+    studioColocationStore.set(scanning, live);
+    studioColocationStore.set({ status: "idle" }, other);
+    studioColocationStore.setOriginPrompt({ joinCode: "X", tap: true }, other);
+    studioColocationStore.reset(other);
+    expect(studioColocationStore.getState()).toBe(scanning);
+    expect(studioColocationStore.getOriginPrompt()).toBeNull();
+    expect(studioColocationStore.finishScan()).toBe(true);
+  });
+
+  it("resets when the owner unmounts, and then takes another writer", () => {
+    const live = {};
+    const next = {};
+    studioColocationStore.set(scanning, live);
+    studioColocationStore.reset(live);
+    expect(studioColocationStore.getState()).toEqual({ status: "idle" });
+    studioColocationStore.set({ status: "hosting" }, next);
+    expect(studioColocationStore.getState()).toEqual({ status: "hosting" });
+  });
+
+  it("frees the store once its owner reports idle", () => {
+    const a = {};
+    const b = {};
+    studioColocationStore.set(scanning, a);
+    studioColocationStore.set({ status: "hosting" }, b);
+    expect(studioColocationStore.getState()).toBe(scanning);
+    studioColocationStore.set({ status: "idle" }, a);
+    studioColocationStore.set({ status: "hosting" }, b);
+    expect(studioColocationStore.getState()).toEqual({ status: "hosting" });
+  });
+
+  it("follows the owning navigator's indicator setting", () => {
+    const a = {};
+    const b = {};
+    studioColocationStore.setBuiltInIndicatorShown(false, a);
+    studioColocationStore.setBuiltInIndicatorShown(true, b);
+    studioColocationStore.set(scanning, a);
+    expect(studioColocationStore.isBuiltInIndicatorShown()).toBe(false);
+    studioColocationStore.reset(b);
+    expect(studioColocationStore.isBuiltInIndicatorShown()).toBe(false);
+  });
+});

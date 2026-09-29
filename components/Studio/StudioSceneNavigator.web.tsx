@@ -280,6 +280,7 @@ export const StudioSceneNavigator = forwardRef<
   const colocationRequested = colocation !== undefined;
   // Idle is only news after a failure was reported, as on native.
   const colocationReportedRef = useRef(false);
+  const [colocationStoreOwner] = useState(() => ({}));
   useEffect(() => {
     if (!colocationRequested && !colocationReportedRef.current) return;
     colocationReportedRef.current = colocationRequested;
@@ -291,10 +292,13 @@ export const StudioSceneNavigator = forwardRef<
             "Co-location rooms need a phone or headset: a browser cannot align with a device's scan.",
         }
       : { status: "idle" };
-    studioColocationStore.set(state);
+    studioColocationStore.set(state, colocationStoreOwner);
     onColocationStateChangeRef.current?.(state);
-  }, [colocationRequested]);
-  useEffect(() => () => studioColocationStore.reset(), []);
+  }, [colocationRequested, colocationStoreOwner]);
+  useEffect(
+    () => () => studioColocationStore.reset(colocationStoreOwner),
+    [colocationStoreOwner]
+  );
 
   // The navigators read their renderer options once, when they create it.
   const onRendererAbortRef = useRef(onRendererAbort);

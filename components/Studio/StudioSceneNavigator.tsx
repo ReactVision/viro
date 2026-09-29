@@ -434,34 +434,40 @@ export const StudioSceneNavigator = forwardRef<
   // the variable store, so a session survives scene pushes. The AR session
   // persists across a push too, so nothing re-resolves on NAVIGATE.
   const colocationRef = useRef<StudioColocationController | null>(null);
+  // This navigator's token in the module-level store, which another mounted
+  // navigator may be writing too.
+  const [colocationStoreOwner] = useState(() => ({}));
   if (colocationRef.current === null) {
     const controller = new StudioColocationController();
     controller.setNavigatorAccessor(
       () => navigatorRef.current?.arSceneNavigator
     );
     controller.onStateChange = (state) => {
-      studioColocationStore.set(state);
+      studioColocationStore.set(state, colocationStoreOwner);
       onColocationStateChangeRef.current?.(state);
     };
     controller.onRoom = (room) => onColocationRoomRef.current?.(room);
     controller.onOriginPrompt = (prompt) =>
-      studioColocationStore.setOriginPrompt(prompt);
+      studioColocationStore.setOriginPrompt(prompt, colocationStoreOwner);
     colocationRef.current = controller;
   }
   useEffect(() => {
     const controller = colocationRef.current;
     studioColocationStore.setFinishScanHandler(
-      () => controller?.finishScan() ?? false
+      () => controller?.finishScan() ?? false,
+      colocationStoreOwner
     );
     return () => {
       controller?.dispose();
-      studioColocationStore.reset();
+      studioColocationStore.reset(colocationStoreOwner);
     };
-  }, []);
+  }, [colocationStoreOwner]);
   useEffect(() => {
-    studioColocationStore.setBuiltInIndicatorShown(colocationIndicator);
-    return () => studioColocationStore.setBuiltInIndicatorShown(true);
-  }, [colocationIndicator]);
+    studioColocationStore.setBuiltInIndicatorShown(
+      colocationIndicator,
+      colocationStoreOwner
+    );
+  }, [colocationIndicator, colocationStoreOwner]);
   useEffect(() => {
     colocationRef.current?.request(colocation ?? null, {
       restartFailed: false,

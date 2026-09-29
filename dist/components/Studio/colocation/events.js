@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StudioEventRing = exports.STUDIO_EVENT_WAIT_MS = exports.STUDIO_EVENT_SLOTS = exports.STUDIO_EVENT_PREFIX = void 0;
+exports.StudioEventRing = exports.STUDIO_EVENT_WAIT_MS = exports.STUDIO_EVENT_HISTORY = exports.STUDIO_EVENT_PREFIX = void 0;
 exports.sceneAudioUrls = sceneAudioUrls;
 const frameMath_1 = require("./frameMath");
 exports.STUDIO_EVENT_PREFIX = "evt:";
-exports.STUDIO_EVENT_SLOTS = 16;
+/** Events each device's row keeps, so a batched or coalesced write loses none. */
+exports.STUDIO_EVENT_HISTORY = 8;
 /** How long an event for a scene this device is still loading waits for it. */
 exports.STUDIO_EVENT_WAIT_MS = 10000;
 const MAX_DEPTH = 16;
@@ -124,22 +125,45 @@ function decode(fields) {
     };
 }
 function eventNumber(fields) {
-    const { n } = fields;
-    return typeof n === "number" && Number.isFinite(n) ? n : null;
+    const { s } = fields;
+    return typeof s === "number" && Number.isFinite(s) ? s : null;
+}
+/** A row's events, oldest first, each with its number. */
+function rowEvents(fields) {
+    const list = Array.isArray(fields.events) ? fields.events : [];
+    const out = [];
+    for (const item of list) {
+        if (!item || typeof item !== "object")
+            continue;
+        const n = eventNumber(item);
+        if (n !== null)
+            out.push({ s: n, fields: item });
+    }
+    return out.sort((a, b) => a.s - b.s);
 }
 /**
- * `evt:<slot>`: a ring of 16 rows holding the room's latest animation triggers
- * and sound commands. An event goes into slot `n % 16`, `n` one past the
- * newest this device has seen, and each accepted write to a slot fires once on
- * every other device. A welcome or snapshot only marks the slots seen, so a
+ * `evt:<peerId>` = `{ events }`: each device's own row, holding its latest
+ * `STUDIO_EVENT_HISTORY` animation triggers and sound commands, each numbered
+ * by that device. Only the device writes its row, so two devices firing at
+ * once never share one, and every write carries the history, so a write the
+ * outbox coalesced or a delta that folded several versions together still
+ * delivers each event. Every other device fires the numbers past the last it
+ * saw from that row. A welcome or snapshot only marks the rows seen, so a
  * device that joins or reconnects replays nothing and gets the resulting state
- * from the other rows.
+ * from the other rows. Rows of devices that left are removed by the room's
+ * authority (see StudioSharedState).
  */
 class StudioEventRing {
     host;
     target = null;
     unsubscribeSounds = null;
-    newest = 0;
+    /** This device's row: the peer id it is written under, and what it holds. */
+    ownPeer = "";
+    ownCount = 0;
+    history = [];
+    /** The newest event number fired or marked seen, per row. */
+    lastSeen = new Map();
+    arrivals = 0;
     /** Events for a scene this device is on its way to, until it attaches. */
     waiting = [];
     constructor(host) {
@@ -168,27 +192,54 @@ class StudioEventRing {
         this.waiting = [];
         due.forEach((w) => this.fire(target, w.event));
     }
+    /** The row this device writes its events to. */
+    ownRowId() {
+        return exports.STUDIO_EVENT_PREFIX + this.host.localPeerId();
+    }
     emit(event) {
         if (!this.host.isSynced())
             return;
-        const n = ++this.newest;
-        this.host.write(`${exports.STUDIO_EVENT_PREFIX}${n % exports.STUDIO_EVENT_SLOTS}`, {
-            ...encode(event),
-            n,
-            from: this.host.localPeerId(),
-        });
+        const peer = this.host.localPeerId();
+        if (peer !== this.ownPeer) {
+            // A new connection is a new row; the old one goes with the old peer id.
+            this.ownPeer = peer;
+            this.ownCount = 0;
+            this.history = [];
+        }
+        const s = ++this.ownCount;
+        this.history = this.history
+            .concat({ ...encode(event), s })
+            .slice(-exports.STUDIO_EVENT_HISTORY);
+        this.host.write(exports.STUDIO_EVENT_PREFIX + peer, { events: this.history });
     }
-    /** An accepted write to a slot, in the room's order. */
-    receive(fields) {
-        const n = eventNumber(fields);
-        if (n === null)
+    /** An accepted write to `evt:<rowPeer>`, in the room's order. */
+    receive(rowPeer, fields) {
+        if (rowPeer === this.host.localPeerId())
             return;
-        this.newest = Math.max(this.newest, n);
-        if (fields.from === this.host.localPeerId())
+        const last = this.lastSeen.get(rowPeer) ?? 0;
+        const fresh = rowEvents(fields).filter((e) => e.s > last);
+        if (fresh.length === 0)
             return;
-        const event = decode(fields);
-        if (!event)
+        this.lastSeen.set(rowPeer, fresh[fresh.length - 1].s);
+        for (const { fields: item } of fresh) {
+            const event = decode(item);
+            if (event)
+                this.deliver(event);
+        }
+    }
+    /** A row whose events came in a welcome or snapshot: counted, not fired. */
+    seen(rowPeer, fields) {
+        const events = rowEvents(fields);
+        if (events.length === 0)
             return;
+        const newest = events[events.length - 1].s;
+        this.lastSeen.set(rowPeer, Math.max(this.lastSeen.get(rowPeer) ?? 0, newest));
+    }
+    /** A row was deleted: its peer left, and a row under that id starts afresh. */
+    forget(rowPeer) {
+        this.lastSeen.delete(rowPeer);
+    }
+    deliver(event) {
         const target = this.target;
         if (target && event.sceneId === target.sceneId) {
             this.fire(target, event);
@@ -197,14 +248,8 @@ class StudioEventRing {
         const cutoff = this.host.now() - exports.STUDIO_EVENT_WAIT_MS;
         this.waiting = this.waiting
             .filter((w) => w.at >= cutoff)
-            .concat({ event, n, at: this.host.now() })
-            .slice(-exports.STUDIO_EVENT_SLOTS);
-    }
-    /** A slot whose writes in between went unseen: counted, not fired. */
-    seen(fields) {
-        const n = eventNumber(fields);
-        if (n !== null)
-            this.newest = Math.max(this.newest, n);
+            .concat({ event, n: ++this.arrivals, at: this.host.now() })
+            .slice(-exports.STUDIO_EVENT_HISTORY * 2);
     }
     dispose() {
         this.unsubscribeSounds?.();

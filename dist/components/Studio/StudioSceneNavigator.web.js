@@ -154,6 +154,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
     const colocationRequested = colocation !== undefined;
     // Idle is only news after a failure was reported, as on native.
     const colocationReportedRef = (0, react_1.useRef)(false);
+    const [colocationStoreOwner] = (0, react_1.useState)(() => ({}));
     (0, react_1.useEffect)(() => {
         if (!colocationRequested && !colocationReportedRef.current)
             return;
@@ -165,10 +166,10 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
                 message: "Co-location rooms need a phone or headset: a browser cannot align with a device's scan.",
             }
             : { status: "idle" };
-        colocationStore_1.studioColocationStore.set(state);
+        colocationStore_1.studioColocationStore.set(state, colocationStoreOwner);
         onColocationStateChangeRef.current?.(state);
-    }, [colocationRequested]);
-    (0, react_1.useEffect)(() => () => colocationStore_1.studioColocationStore.reset(), []);
+    }, [colocationRequested, colocationStoreOwner]);
+    (0, react_1.useEffect)(() => () => colocationStore_1.studioColocationStore.reset(colocationStoreOwner), [colocationStoreOwner]);
     // The navigators read their renderer options once, when they create it.
     const onRendererAbortRef = (0, react_1.useRef)(onRendererAbort);
     onRendererAbortRef.current = onRendererAbort;
@@ -230,8 +231,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
             }
         },
         leaveColocation: () => { },
+        retryColocation: () => false,
         getColocationRoom: () => null,
-        finishColocationScan: () => { },
+        finishColocationScan: () => false,
     }), []);
     // Owned here rather than in the scene so the prompt can read the same queue
     // the tap surface drives, and so neither survives a scene change.

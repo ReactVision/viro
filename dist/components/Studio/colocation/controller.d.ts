@@ -2,6 +2,7 @@ import { getColocationPeers, getColocationState, joinColocation, leaveColocation
 import { createColocationRoom, lookupColocationRoom, type ViroColocationRoom } from "../../AR/ViroColocationRooms";
 import { type ViroFrameSource, type ViroFrameSupport } from "../../AR/ViroFrameSource";
 import { ViroReplicationClient } from "../../AR/ViroReplication";
+import type { ViroScanStatus } from "../../Types/ViroEvents";
 import type { StudioSceneResponse } from "../types";
 import { type StudioAuthContext } from "../VRTStudioModule";
 import { type Mat4, type Vec3 } from "./frameMath";
@@ -11,6 +12,8 @@ import { type StudioSharedSceneHooks, type StudioSharedSceneStores } from "./sha
 import type { StudioColocationOptions, StudioColocationRoom, StudioColocationState } from "./types";
 export declare const STUDIO_COLOCATION_DEFAULT_RELAY_URL = "https://colocation.reactvision.xyz";
 export declare const STUDIO_COLOCATION_ORIGIN_ENTITY = "scene:origin";
+/** The default `connectTimeoutMs`. */
+export declare const STUDIO_COLOCATION_CONNECT_TIMEOUT_MS = 60000;
 /**
  * `off`: render the scene alone. `pending`: a shared session is being set up
  * and scene content is withheld. `shared`: content renders in the shared frame.
@@ -19,6 +22,12 @@ export type StudioColocationPhase = "off" | "pending" | "shared";
 export type StudioColocationFrame = {
     phase: StudioColocationPhase;
     role: "host" | "join" | null;
+    /**
+     * This device runs the room's once-per-room logic (collision bindings): the
+     * host while it is connected, else the connected device with the lowest
+     * peer id. False while off.
+     */
+    authority: boolean;
     /** Host only: nothing has said yet where the scene's origin goes. */
     needsOrigin: boolean;
     /** The scene attached last, the one on screen. Null while off. */
@@ -79,6 +88,11 @@ export declare function resolveMatches(message: string | null | undefined): {
     matches: number;
     needed: number;
 } | null;
+/** The scan's triangulated points and their floor, when native reports both. */
+export declare function scanPoints(status: ViroScanStatus | null): {
+    count: number;
+    needed: number;
+} | null;
 /**
  * One instance lives as long as the navigator and reaches every scene through
  * passProps. `request()` starts a session once per distinct `colocation`
@@ -115,7 +129,13 @@ export declare class StudioColocationController {
     private projectId;
     private relayUrl;
     private anchorProjectSet;
-    private resolving;
+    /**
+     * A scan, a host or a resolve is running natively. Leaving asks native to
+     * cancel it; neither platform can stop one yet (iOS and Android both answer
+     * with a no-op, and there is no call that stops a scan), so what an
+     * abandoned operation resolves with later is dropped by its run check.
+     */
+    private nativeBusy;
     private location;
     private locationInverse;
     private origin;
@@ -126,6 +146,8 @@ export declare class StudioColocationController {
     private channelState;
     private peerCount;
     private connectedOnce;
+    /** The channel and the shared state were both up at least once this run. */
+    private reachedConnected;
     private diagnosing;
     private lastPoseAt;
     private finishScanWaiter;
@@ -137,10 +159,22 @@ export declare class StudioColocationController {
     setScenePusher(push: StudioScenePusher | null): void;
     /**
      * The navigator's `colocation` prop. A value equal to the one already
-     * requested (same mode, code and relay) only refreshes the options, so a
-     * session left or failed under it does not restart until the value changes.
+     * requested (same mode, code and relay) only refreshes the options, except
+     * that it starts a failed session again unless `restartFailed` is false. A
+     * session left under it stays left until the value changes or `retry()`.
+     *
+     * The navigator passes `restartFailed: false`: a host re-rendering with an
+     * equal value after every state change would otherwise retry in a loop.
      */
-    request(options: StudioColocationOptions | null): void;
+    request(options: StudioColocationOptions | null, { restartFailed }?: {
+        restartFailed?: boolean;
+    }): void;
+    /**
+     * Starts the requested value's session again after it failed or was left.
+     * False, changing nothing, while one is running or none is requested.
+     */
+    retry(): boolean;
+    private restart;
     /** Numbers a scene in mount order, at its first render. */
     claimSceneMount(): number;
     /**
@@ -160,8 +194,11 @@ export declare class StudioColocationController {
     shareAnimation(sceneId: string, assetId: string, key: string): void;
     /** The same `colocation` value stays left until it changes. */
     leave(): void;
-    /** Ignored outside `scanning`. */
-    finishScan(): void;
+    /**
+     * Host: ends the scan and hosts it, once the scan covers enough
+     * (`canFinish`). False, changing nothing, outside `scanning` or before then.
+     */
+    finishScan(): boolean;
     /** Unmount: leave, and forget the requested value so a remount starts afresh. */
     dispose(): void;
     getState(): StudioColocationState;
@@ -224,6 +261,12 @@ export declare class StudioColocationController {
      * lapsed, a member removed, a full room); otherwise it is the network.
      */
     private diagnose;
+    /**
+     * From the frame on: a host must connect, and a joiner go live, within
+     * `connectTimeoutMs`. A host placing its origin is not timed, since that
+     * waits on the person holding the device.
+     */
+    private startConnectTimeout;
     /**
      * A scene this device put on screen other than by following the room, such
      * as a host changing `sceneId`: a navigation of this device's own.

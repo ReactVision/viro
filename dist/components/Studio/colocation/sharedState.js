@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StudioSharedState = exports.STUDIO_SHARED_PENDING_TIMEOUT_MS = void 0;
+exports.StudioSharedState = exports.STUDIO_PRESENCE_PREFIX = exports.STUDIO_SHARED_PENDING_TIMEOUT_MS = void 0;
 exports.collisionBindingsRunHere = collisionBindingsRunHere;
 const expressionEvaluator_1 = require("../domain/expressionEvaluator");
 const drags_1 = require("./drags");
@@ -20,12 +20,28 @@ const SIZE_REFUSALS = new Set([
 ]);
 /**
  * Physics simulates on every device, so one contact would run a collision
- * binding once per device; while shared only the host's contacts run them.
+ * binding once per device; while shared only the room's authority (the host
+ * while it is connected, see `StudioSharedState.hasAuthority`) runs them.
  * Gaze and proximity follow each device's own camera and run everywhere, and
  * what they change is shared like any other change.
  */
 function collisionBindingsRunHere(frame) {
-    return frame.phase !== "shared" || frame.role === "host";
+    return frame.phase !== "shared" || frame.authority;
+}
+/**
+ * `peer:<role>:<peerId>`, an empty row claimed by that device. The relay
+ * releases a departed peer's claims, so an owned row is a connected device.
+ * The role is in the id so a claim alone announces it.
+ */
+exports.STUDIO_PRESENCE_PREFIX = "peer:";
+function parsePresence(id) {
+    if (!id.startsWith(exports.STUDIO_PRESENCE_PREFIX))
+        return null;
+    const rest = id.slice(exports.STUDIO_PRESENCE_PREFIX.length);
+    const at = rest.indexOf(":");
+    if (at <= 0 || at === rest.length - 1)
+        return null;
+    return { role: rest.slice(0, at), peer: rest.slice(at + 1) };
 }
 /** Every field written reads back the same; fields another writer added do not count. */
 function sameFields(room, written) {
@@ -442,6 +458,9 @@ class StudioSharedState {
     removing = new Map();
     sweepTimer = null;
     warned = new Set();
+    authority;
+    /** Rows of departed peers this device has asked the relay to delete. */
+    collecting = new Set();
     constructor(client, context, options = {}) {
         this.client = client;
         this.context = context;
@@ -495,8 +514,18 @@ class StudioSharedState {
             write: (id, fields) => this.outbox.write(id, fields),
             now: this.now,
         });
+        this.authority = context.role === "host";
         this.unsubscribe = client.subscribe(this.handleChange);
         this.handleChange();
+    }
+    /**
+     * Whether this device runs the room's once-per-room logic (collision
+     * bindings): the host always, and while the host is not connected, the
+     * connected device with the lowest peer id. Every device reads the same
+     * presence rows, so they agree once those rows have reached them.
+     */
+    hasAuthority() {
+        return this.authority;
     }
     /** The scene on screen, its stores and hooks; null stops sharing them. */
     bindScene(sceneData, stores, hooks = null) {
@@ -575,6 +604,7 @@ class StudioSharedState {
     }
     dispose() {
         this.disposed = true;
+        this.collecting.clear();
         this.unsubscribe();
         this.outbox.dispose();
         this.cancelSweep();
@@ -584,6 +614,10 @@ class StudioSharedState {
         this.synced = false;
     }
     handleChange = () => {
+        this.handleChangeInner();
+        this.updateAuthority();
+    };
+    handleChangeInner() {
         if (this.client.state !== "synced") {
             if (this.synced)
                 this.unsync();
@@ -595,6 +629,7 @@ class StudioSharedState {
             if (this.synced)
                 this.unsync();
             const first = !this.everSynced;
+            const previousPeer = this.peerId;
             this.everSynced = true;
             this.synced = true;
             this.peerId = peerId;
@@ -603,9 +638,16 @@ class StudioSharedState {
                 if (this.tracked(e.id))
                     this.versions.set(e.id, e.version);
                 // What the room did before this welcome is not replayed.
-                if (e.id.startsWith(events_1.STUDIO_EVENT_PREFIX))
-                    this.events.seen(e.fields);
+                if (e.id.startsWith(events_1.STUDIO_EVENT_PREFIX)) {
+                    this.events.seen(e.id.slice(events_1.STUDIO_EVENT_PREFIX.length), e.fields);
+                }
             }
+            // This device's events row under its last connection's peer id.
+            const stale = events_1.STUDIO_EVENT_PREFIX + previousPeer;
+            if (previousPeer && previousPeer !== peerId && this.client.get(stale)) {
+                this.outbox.remove(stale);
+            }
+            this.announcePresence();
             this.bridges.forEach((b) => b.sync(first));
             this.drags.sync();
             return;
@@ -631,21 +673,83 @@ class StudioSharedState {
             if (id.startsWith(drags_1.STUDIO_DRAG_PREFIX)) {
                 this.drags.removed(id.slice(drags_1.STUDIO_DRAG_PREFIX.length));
             }
+            else if (id.startsWith(events_1.STUDIO_EVENT_PREFIX)) {
+                this.events.forget(id.slice(events_1.STUDIO_EVENT_PREFIX.length));
+            }
         }
         for (const id of this.removing.keys()) {
             if (!present.has(id))
                 this.removing.delete(id);
         }
-    };
+    }
+    /** Claimed at each welcome, under that connection's peer id. */
+    announcePresence() {
+        this.client.claim(`${exports.STUDIO_PRESENCE_PREFIX}${this.context.role}:${this.peerId}`);
+    }
+    /** Connected peers by id, with the role each announced. */
+    presentPeers(entities) {
+        const peers = new Map();
+        for (const e of entities) {
+            const presence = parsePresence(e.id);
+            if (presence && e.owner === presence.peer) {
+                peers.set(presence.peer, presence.role);
+            }
+        }
+        return peers;
+    }
+    updateAuthority() {
+        let next = this.context.role === "host";
+        if (!next && this.synced && !this.disposed) {
+            const entities = this.client.getEntities();
+            const peers = this.presentPeers(entities);
+            peers.set(this.peerId, this.context.role);
+            const hostHere = [...peers.values()].includes("host");
+            const lowest = [...peers.keys()].sort()[0];
+            next = !hostHere && lowest === this.peerId;
+        }
+        if (next && this.synced && !this.disposed)
+            this.collectDeparted();
+        if (next === this.authority)
+            return;
+        this.authority = next;
+        this.context.onAuthorityChange?.();
+    }
+    /**
+     * The authority deletes the presence and event rows of peers that left,
+     * which would otherwise stay in the room for its lifetime.
+     */
+    collectDeparted() {
+        const entities = this.client.getEntities();
+        const peers = this.presentPeers(entities);
+        peers.set(this.peerId, this.context.role);
+        const ids = new Set(entities.map((e) => e.id));
+        for (const id of this.collecting)
+            if (!ids.has(id))
+                this.collecting.delete(id);
+        for (const e of entities) {
+            if (this.collecting.has(e.id))
+                continue;
+            const presence = parsePresence(e.id);
+            const events = e.id.startsWith(events_1.STUDIO_EVENT_PREFIX);
+            if (!presence && !events)
+                continue;
+            // A presence row is gone once released; an event row once its peer is.
+            const departed = presence
+                ? e.owner === null
+                : !peers.has(e.id.slice(events_1.STUDIO_EVENT_PREFIX.length));
+            if (!departed)
+                continue;
+            this.collecting.add(e.id);
+            this.client.delete(e.id);
+        }
+    }
     deliver(e, skipped) {
         if (e.id.startsWith(drags_1.STUDIO_DRAG_PREFIX)) {
             this.drags.receive(e.id.slice(drags_1.STUDIO_DRAG_PREFIX.length), e);
         }
         else if (e.id.startsWith(events_1.STUDIO_EVENT_PREFIX)) {
-            if (skipped)
-                this.events.seen(e.fields);
-            else
-                this.events.receive(e.fields);
+            // The row carries its own history, so a version jump loses nothing.
+            this.events.receive(e.id.slice(events_1.STUDIO_EVENT_PREFIX.length), e.fields);
         }
         else {
             const bridge = this.bridgeFor(e.id);

@@ -13,16 +13,20 @@ function studioColocationIndicatorContent(state, originPrompt = null, device = "
     switch (state.status) {
         case "idle":
             return null;
-        case "scanning":
+        case "scanning": {
+            const points = state.points
+                ? ` ${state.points.count} of ${state.points.needed} points mapped.`
+                : "";
             return {
                 title: "Scan the area",
                 detail: state.canFinish
                     ? "That is enough to share. Tap Done, or keep walking to cover more."
-                    : "Walk slowly around the area everyone will share, pointing at walls and furniture.",
+                    : `Walk slowly around the area everyone will share, pointing at walls and furniture.${points}`,
                 code: null,
                 done: { enabled: state.canFinish },
                 tone: "progress",
             };
+        }
         case "hosting":
             return {
                 title: "Saving the scan",
@@ -74,6 +78,14 @@ function studioColocationIndicatorContent(state, originPrompt = null, device = "
                         : state.attempt > 1
                             ? "Still looking. Move slowly around the area the host scanned."
                             : "Move your device slowly around the area the host scanned.",
+                code: null,
+                done: null,
+                tone: "progress",
+            };
+        case "waiting_for_host":
+            return {
+                title: "Waiting for the host",
+                detail: "Connected. The scene appears once the host has placed it.",
                 code: null,
                 done: null,
                 tone: "progress",

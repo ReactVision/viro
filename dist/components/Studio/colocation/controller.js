@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StudioColocationController = exports.STUDIO_COLOCATION_OFF_FRAME = exports.STUDIO_COLOCATION_ORIGIN_ENTITY = exports.STUDIO_COLOCATION_DEFAULT_RELAY_URL = void 0;
+exports.StudioColocationController = exports.STUDIO_COLOCATION_OFF_FRAME = exports.STUDIO_COLOCATION_CONNECT_TIMEOUT_MS = exports.STUDIO_COLOCATION_ORIGIN_ENTITY = exports.STUDIO_COLOCATION_DEFAULT_RELAY_URL = void 0;
 exports.studioSceneRootsInAR = studioSceneRootsInAR;
 exports.resolveMatches = resolveMatches;
+exports.scanPoints = scanPoints;
 const react_native_1 = require("react-native");
 const ViroColocation_1 = require("../../AR/ViroColocation");
 const ViroColocationRooms_1 = require("../../AR/ViroColocationRooms");
@@ -42,6 +43,8 @@ const FOLLOW_RETRY_DELAY_MS = 1000;
  * unanswered while the headset has no mixed-reality session to run it in.
  */
 const SHARED_FRAME_TIMEOUT_MS = 30000;
+/** The default `connectTimeoutMs`. */
+exports.STUDIO_COLOCATION_CONNECT_TIMEOUT_MS = 60000;
 /** Same set as ViroSharedFrame: a failure that another window can change. */
 const RETRYABLE_RESOLVE_STATES = new Set([
     "ErrorResolvingLocalizationNoMatch",
@@ -54,6 +57,7 @@ const IDLE = { status: "idle" };
 exports.STUDIO_COLOCATION_OFF_FRAME = {
     phase: "off",
     role: null,
+    authority: false,
     needsOrigin: false,
     sceneId: null,
     sceneMount: null,
@@ -172,10 +176,22 @@ function resolveMatches(message) {
     const needed = Number(m[2]);
     return matches > 0 && needed > 0 ? { matches, needed } : null;
 }
+function isCount(v) {
+    return typeof v === "number" && Number.isFinite(v) && v >= 0;
+}
+/** The scan's triangulated points and their floor, when native reports both. */
+function scanPoints(status) {
+    if (!status?.available)
+        return null;
+    const count = status.triangulatedPoints;
+    const needed = status.minTriangulatedPoints;
+    return isCount(count) && isCount(needed) ? { count, needed } : null;
+}
 /** Every coverage gate native reports, or null when it reports none. */
 function scanGuidance(status) {
     if (!status?.available)
         return null;
+    const points = scanPoints(status);
     const gates = [
         status.meetsKeyframes,
         status.meetsViewpointPairs,
@@ -183,6 +199,7 @@ function scanGuidance(status) {
         typeof status.keyframes === "number"
             ? status.keyframes >= MIN_SCAN_KEYFRAMES
             : undefined,
+        points ? points.count >= points.needed : undefined,
     ].filter((g) => typeof g === "boolean");
     return gates.length === 0 ? null : gates.every(Boolean);
 }
@@ -200,7 +217,10 @@ function sameMatrix(a, b) {
 function sameState(a, b) {
     switch (a.status) {
         case "scanning":
-            return b.status === "scanning" && a.canFinish === b.canFinish;
+            return (b.status === "scanning" &&
+                a.canFinish === b.canFinish &&
+                a.points?.count === b.points?.count &&
+                a.points?.needed === b.points?.needed);
         case "resolving":
             return (b.status === "resolving" &&
                 a.attempt === b.attempt &&
@@ -208,8 +228,9 @@ function sameState(a, b) {
                 a.seen?.needed === b.seen?.needed);
         case "live":
             return b.status === "live" && a.room === b.room && a.peers === b.peers;
+        case "waiting_for_host":
         case "reconnecting":
-            return b.status === "reconnecting" && a.room === b.room;
+            return b.status === a.status && a.room === b.room;
         case "failed":
             return (b.status === "failed" && a.code === b.code && a.message === b.message);
         default:
@@ -252,7 +273,13 @@ class StudioColocationController {
     projectId = null;
     relayUrl = exports.STUDIO_COLOCATION_DEFAULT_RELAY_URL;
     anchorProjectSet = false;
-    resolving = false;
+    /**
+     * A scan, a host or a resolve is running natively. Leaving asks native to
+     * cancel it; neither platform can stop one yet (iOS and Android both answer
+     * with a no-op, and there is no call that stops a scan), so what an
+     * abandoned operation resolves with later is dropped by its run check.
+     */
+    nativeBusy = false;
     location = null;
     locationInverse = null;
     origin = null;
@@ -263,6 +290,8 @@ class StudioColocationController {
     channelState = "idle";
     peerCount = 0;
     connectedOnce = false;
+    /** The channel and the shared state were both up at least once this run. */
+    reachedConnected = false;
     diagnosing = false;
     lastPoseAt = -Infinity;
     finishScanWaiter = null;
@@ -281,20 +310,44 @@ class StudioColocationController {
     // ── Session lifecycle ─────────────────────────────────────────────────────
     /**
      * The navigator's `colocation` prop. A value equal to the one already
-     * requested (same mode, code and relay) only refreshes the options, so a
-     * session left or failed under it does not restart until the value changes.
+     * requested (same mode, code and relay) only refreshes the options, except
+     * that it starts a failed session again unless `restartFailed` is false. A
+     * session left under it stays left until the value changes or `retry()`.
+     *
+     * The navigator passes `restartFailed: false`: a host re-rendering with an
+     * equal value after every state change would otherwise retry in a loop.
      */
-    request(options) {
+    request(options, { restartFailed = true } = {}) {
         const key = options ? optionsKey(options) : null;
         if (key === this.requestedKey) {
             if (options)
                 this.options = options;
+            if (options && restartFailed && this.state.status === "failed") {
+                this.restart();
+            }
             return;
         }
-        this.teardown();
         this.requestedKey = key;
         this.options = options;
-        this.pendingStart = options !== null;
+        this.restart();
+    }
+    /**
+     * Starts the requested value's session again after it failed or was left.
+     * False, changing nothing, while one is running or none is requested.
+     */
+    retry() {
+        if (!this.options)
+            return false;
+        const stopped = this.state.status === "failed" ||
+            (this.state.status === "idle" && !this.active && !this.pendingStart);
+        if (!stopped)
+            return false;
+        this.restart();
+        return true;
+    }
+    restart() {
+        this.teardown();
+        this.pendingStart = this.options !== null;
         this.setState(IDLE);
         if (this.pendingStart && this.scene)
             this.begin();
@@ -363,10 +416,19 @@ class StudioColocationController {
         this.setState(IDLE);
         this.updateFrame();
     }
-    /** Ignored outside `scanning`. */
+    /**
+     * Host: ends the scan and hosts it, once the scan covers enough
+     * (`canFinish`). False, changing nothing, outside `scanning` or before then.
+     */
     finishScan() {
-        if (this.state.status === "scanning")
-            this.finishScanWaiter?.();
+        const state = this.state;
+        if (state.status !== "scanning" || !state.canFinish)
+            return false;
+        const finish = this.finishScanWaiter;
+        if (!finish)
+            return false;
+        finish();
+        return true;
     }
     /** Unmount: leave, and forget the requested value so a remount starts afresh. */
     dispose() {
@@ -501,10 +563,12 @@ class StudioColocationController {
         this.room = this.toStudioRoom(created.room, true, frame.frameKind);
         this.announce();
         this.updateFrame();
+        this.startConnectTimeout(run);
         await this.connect(run);
     }
     /** Phone: the scan is hosted as a cloud anchor, whose location frame is the room's. */
     async hostCloudAnchor(run, nav) {
+        this.nativeBusy = true;
         nav.startScan();
         this.setState({ status: "scanning", canFinish: false });
         await this.scan(run, nav);
@@ -516,11 +580,16 @@ class StudioColocationController {
             hosted = await nav.finishScan(HOST_ANCHOR_TTL_DAYS);
         }
         catch (e) {
+            if (!this.isCurrent(run))
+                return null;
+            this.nativeBusy = false;
             this.fail(run, { code: "HOST_FAILED", message: (0, errors_1.errorMessage)(e) });
             return null;
         }
+        // Left while hosting: this anchor belongs to nobody now.
         if (!this.isCurrent(run))
             return null;
+        this.nativeBusy = false;
         const location = (0, ViroLocationFrame_1.parseLocationTransform)(hosted?.locationTransform);
         if (!hosted?.success || !hosted.cloudAnchorId || !location) {
             this.fail(run, {
@@ -598,6 +667,7 @@ class StudioColocationController {
         if (!frame || !this.isCurrent(run))
             return;
         this.setLocation(frameToLocation(frame));
+        this.startConnectTimeout(run);
         await this.connect(run);
     }
     checkBudget(run, scene) {
@@ -679,7 +749,10 @@ class StudioColocationController {
                     return;
                 const canFinish = scanGuidance(status) ??
                     this.deps.now() - startedAt >= SCAN_FALLBACK_MS;
-                this.setState({ status: "scanning", canFinish });
+                const points = scanPoints(status);
+                this.setState(points
+                    ? { status: "scanning", canFinish, points }
+                    : { status: "scanning", canFinish });
             };
             const stop = this.every(run, SCAN_STATUS_POLL_MS, poll);
             // Resolved on teardown too, so a scan left mid-way does not hold the flow open.
@@ -701,7 +774,7 @@ class StudioColocationController {
             this.setState(role === "host"
                 ? { status: "hosting" }
                 : { status: "resolving", attempt });
-            this.resolving = true;
+            this.nativeBusy = true;
             const stopProgress = role === "join" && source.progress
                 ? this.every(run, RESOLVE_PROGRESS_POLL_MS, async () => {
                     const message = await source.progress({
@@ -719,7 +792,7 @@ class StudioColocationController {
             stopProgress();
             if (!this.isCurrent(run))
                 return null;
-            this.resolving = false;
+            this.nativeBusy = false;
             if (!outcome) {
                 const needs = role === "host"
                     ? "Sharing a room on Quest needs"
@@ -843,6 +916,7 @@ class StudioColocationController {
             origin: () => this.origin,
             worldToLocation: () => this.locationInverse,
             role: isHost ? "host" : "join",
+            onAuthorityChange: () => this.updateFrame(),
         });
         // The host's scene is the room's first; a joiner's is its own until it
         // reads the room's.
@@ -906,9 +980,16 @@ class StudioColocationController {
         }
         if (client.state === "synced")
             this.syncOrigin(client);
-        if (!this.origin)
-            return;
         const connected = this.channelState === "joined" && client.state === "synced";
+        if (connected)
+            this.reachedConnected = true;
+        if (!this.origin) {
+            // A joiner is aligned and in the room, and only the host's origin is missing.
+            if (connected && !room.isHost) {
+                this.setState({ status: "waiting_for_host", room });
+            }
+            return;
+        }
         if (connected) {
             this.connectedOnce = true;
             this.setState({ status: "live", room, peers: this.peerCount });
@@ -993,6 +1074,34 @@ class StudioColocationController {
         this.fail(run, refused && refused.code !== "UNAVAILABLE"
             ? refused
             : { code: "UNAVAILABLE", message });
+    }
+    /**
+     * From the frame on: a host must connect, and a joiner go live, within
+     * `connectTimeoutMs`. A host placing its origin is not timed, since that
+     * waits on the person holding the device.
+     */
+    startConnectTimeout(run) {
+        const ms = this.options?.connectTimeoutMs ?? exports.STUDIO_COLOCATION_CONNECT_TIMEOUT_MS;
+        if (!(ms > 0) || !Number.isFinite(ms))
+            return;
+        const id = setTimeout(() => {
+            if (!this.isCurrent(run))
+                return;
+            const isHost = this.options?.mode === "host";
+            if (isHost ? this.reachedConnected : this.connectedOnce)
+                return;
+            const seconds = Math.round(ms / 1000);
+            this.fail(run, !isHost && this.reachedConnected
+                ? {
+                    code: "HOST_TIMEOUT",
+                    message: `Connected to the room, but the host did not place the scene within ${seconds} seconds.`,
+                }
+                : {
+                    code: "CONNECT_TIMEOUT",
+                    message: `Could not connect to the room within ${seconds} seconds.`,
+                });
+        }, ms);
+        this.cleanups.push(() => clearTimeout(id));
     }
     // ── Shared navigation ─────────────────────────────────────────────────────
     /**
@@ -1094,9 +1203,9 @@ class StudioColocationController {
         cleanups.forEach((fn) => fn());
         this.finishScanWaiter = null;
         this.active = false;
-        if (this.resolving)
+        if (this.nativeBusy)
             this.getNavigator()?.cancelCloudAnchorOperations?.();
-        this.resolving = false;
+        this.nativeBusy = false;
         this.replication = null;
         if (this.channelJoined)
             this.deps.leaveChannel().catch(() => { });
@@ -1115,6 +1224,7 @@ class StudioColocationController {
         this.channelState = "idle";
         this.peerCount = 0;
         this.connectedOnce = false;
+        this.reachedConnected = false;
         this.diagnosing = false;
         this.lastPoseAt = -Infinity;
     }
@@ -1154,6 +1264,9 @@ class StudioColocationController {
                 ? "pending"
                 : "off";
         const role = phase === "off" ? null : this.options?.mode === "host" ? "host" : "join";
+        const authority = phase === "off"
+            ? false
+            : (this.sharedState?.hasAuthority() ?? role === "host");
         const needsOrigin = phase === "pending" &&
             this.picksOrigin() &&
             !this.proposedWorldOrigin &&
@@ -1164,6 +1277,7 @@ class StudioColocationController {
         const prev = this.frame;
         if (prev.phase === phase &&
             prev.role === role &&
+            prev.authority === authority &&
             prev.needsOrigin === needsOrigin &&
             prev.sceneId === sceneId &&
             prev.sceneMount === sceneMount &&
@@ -1188,6 +1302,7 @@ class StudioColocationController {
                 : {
                     phase,
                     role,
+                    authority,
                     needsOrigin,
                     sceneId,
                     sceneMount,

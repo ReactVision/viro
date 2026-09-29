@@ -23,8 +23,10 @@ export interface StudioSceneNavigatorWebHandle {
     }>;
     /** No-ops on web, where no shared session can start. */
     leaveColocation: () => void;
+    /** Always false on web, where no session can start. */
+    retryColocation: () => boolean;
     getColocationRoom: () => StudioColocationRoom | null;
-    finishColocationScan: () => void;
+    finishColocationScan: () => boolean;
 }
 export interface StudioSceneNavigatorWebProps {
     /** Scene data injected directly (single scene, no fetching). */

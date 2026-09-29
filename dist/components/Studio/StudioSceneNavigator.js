@@ -230,31 +230,35 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     // the variable store, so a session survives scene pushes. The AR session
     // persists across a push too, so nothing re-resolves on NAVIGATE.
     const colocationRef = (0, react_1.useRef)(null);
+    // This navigator's token in the module-level store, which another mounted
+    // navigator may be writing too.
+    const [colocationStoreOwner] = (0, react_1.useState)(() => ({}));
     if (colocationRef.current === null) {
         const controller = new controller_1.StudioColocationController();
         controller.setNavigatorAccessor(() => navigatorRef.current?.arSceneNavigator);
         controller.onStateChange = (state) => {
-            colocationStore_1.studioColocationStore.set(state);
+            colocationStore_1.studioColocationStore.set(state, colocationStoreOwner);
             onColocationStateChangeRef.current?.(state);
         };
         controller.onRoom = (room) => onColocationRoomRef.current?.(room);
-        controller.onOriginPrompt = (prompt) => colocationStore_1.studioColocationStore.setOriginPrompt(prompt);
+        controller.onOriginPrompt = (prompt) => colocationStore_1.studioColocationStore.setOriginPrompt(prompt, colocationStoreOwner);
         colocationRef.current = controller;
     }
     (0, react_1.useEffect)(() => {
         const controller = colocationRef.current;
-        colocationStore_1.studioColocationStore.setFinishScanHandler(() => controller?.finishScan());
+        colocationStore_1.studioColocationStore.setFinishScanHandler(() => controller?.finishScan() ?? false, colocationStoreOwner);
         return () => {
             controller?.dispose();
-            colocationStore_1.studioColocationStore.reset();
+            colocationStore_1.studioColocationStore.reset(colocationStoreOwner);
         };
-    }, []);
+    }, [colocationStoreOwner]);
     (0, react_1.useEffect)(() => {
-        colocationStore_1.studioColocationStore.setBuiltInIndicatorShown(colocationIndicator);
-        return () => colocationStore_1.studioColocationStore.setBuiltInIndicatorShown(true);
-    }, [colocationIndicator]);
+        colocationStore_1.studioColocationStore.setBuiltInIndicatorShown(colocationIndicator, colocationStoreOwner);
+    }, [colocationIndicator, colocationStoreOwner]);
     (0, react_1.useEffect)(() => {
-        colocationRef.current?.request(colocation ?? null);
+        colocationRef.current?.request(colocation ?? null, {
+            restartFailed: false,
+        });
     }, [colocation]);
     // The tap-to-place overlay would catch taps for content that is withheld
     // while a shared session is set up.
@@ -344,8 +348,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
             return nav.takeScreenshot(fileName, saveToCameraRoll);
         },
         leaveColocation: () => colocationRef.current?.leave(),
+        retryColocation: () => colocationRef.current?.retry() ?? false,
         getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
-        finishColocationScan: () => colocationRef.current?.finishScan(),
+        finishColocationScan: () => colocationRef.current?.finishScan() ?? false,
     }), []);
     const resolveSceneId = (0, react_1.useCallback)(async () => {
         if (sceneId)

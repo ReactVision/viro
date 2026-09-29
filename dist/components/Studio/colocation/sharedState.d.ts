@@ -30,16 +30,25 @@ export type StudioSharedStateContext = {
     worldToLocation?: () => Mat4 | null;
     /** The host's state at its first sync defines the room. */
     role: "host" | "join";
+    /** `hasAuthority()` changed. */
+    onAuthorityChange?: () => void;
 };
 /** A write not seen back by then was refused or lost, so the room's copy wins. */
 export declare const STUDIO_SHARED_PENDING_TIMEOUT_MS = 5000;
 /**
  * Physics simulates on every device, so one contact would run a collision
- * binding once per device; while shared only the host's contacts run them.
+ * binding once per device; while shared only the room's authority (the host
+ * while it is connected, see `StudioSharedState.hasAuthority`) runs them.
  * Gaze and proximity follow each device's own camera and run everywhere, and
  * what they change is shared like any other change.
  */
-export declare function collisionBindingsRunHere(frame: StudioColocationFrame): boolean;
+export declare function collisionBindingsRunHere(frame: Pick<StudioColocationFrame, "phase" | "authority">): boolean;
+/**
+ * `peer:<role>:<peerId>`, an empty row claimed by that device. The relay
+ * releases a departed peer's claims, so an owned row is a connected device.
+ * The role is in the id so a claim alone announces it.
+ */
+export declare const STUDIO_PRESENCE_PREFIX = "peer:";
 /**
  * A shared session's scene state over the room's replication client: one
  * bridge per store, one outbox for their writes. Created with the client and
@@ -73,7 +82,17 @@ export declare class StudioSharedState {
     private removing;
     private sweepTimer;
     private warned;
+    private authority;
+    /** Rows of departed peers this device has asked the relay to delete. */
+    private collecting;
     constructor(client: StudioReplicationPort, context: StudioSharedStateContext, options?: StudioOutboxOptions);
+    /**
+     * Whether this device runs the room's once-per-room logic (collision
+     * bindings): the host always, and while the host is not connected, the
+     * connected device with the lowest peer id. Every device reads the same
+     * presence rows, so they agree once those rows have reached them.
+     */
+    hasAuthority(): boolean;
     /** The scene on screen, its stores and hooks; null stops sharing them. */
     bindScene(sceneData: StudioSceneResponse | null, stores: StudioSharedSceneStores | null, hooks?: StudioSharedSceneHooks | null): void;
     /** This session's copy of the room's scene, for its whole life. */
@@ -90,6 +109,17 @@ export declare class StudioSharedState {
     handleReject(rejection: ViroReplicationRejection): void;
     dispose(): void;
     private handleChange;
+    private handleChangeInner;
+    /** Claimed at each welcome, under that connection's peer id. */
+    private announcePresence;
+    /** Connected peers by id, with the role each announced. */
+    private presentPeers;
+    private updateAuthority;
+    /**
+     * The authority deletes the presence and event rows of peers that left,
+     * which would otherwise stay in the room for its lifetime.
+     */
+    private collectDeparted;
     private deliver;
     /** A delete not seen back by then was refused or lost, so the room's row stands. */
     private expireRemovals;

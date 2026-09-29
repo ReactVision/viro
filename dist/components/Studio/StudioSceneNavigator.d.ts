@@ -12,9 +12,19 @@ export interface StudioSceneNavigatorHandle {
     }>;
     /** Leave the shared session; the current `colocation` value stays left. */
     leaveColocation: () => void;
+    /**
+     * Start the current `colocation` value's session again after it failed or
+     * was left. Re-rendering with an equal value never restarts it. False, and
+     * nothing changes, while a session is running or no value is set.
+     */
+    retryColocation: () => boolean;
     getColocationRoom: () => StudioColocationRoom | null;
-    /** Host: end the scan and host it. The indicator's Done button does the same. */
-    finishColocationScan: () => void;
+    /**
+     * Host: end the scan and host it, as the indicator's Done button does. Only
+     * once the scan covers enough (`canFinish` in the `scanning` state): true
+     * when the scan ended, false, changing nothing, before then or outside a scan.
+     */
+    finishColocationScan: () => boolean;
 }
 export interface StudioSceneNavigatorProps {
     /**
@@ -74,8 +84,11 @@ export interface StudioSceneNavigatorProps {
      * distinct value: re-rendering with an equal value changes nothing.
      *
      * Content is withheld while the session is set up and then renders where the
-     * host placed it on every device. If the session fails, the scene renders
-     * alone again and `onColocationStateChange` reports why.
+     * host placed it on every device. A joiner that is aligned and connected
+     * before the host has placed the scene reports `waiting_for_host`. If the
+     * session fails, the scene renders alone again and `onColocationStateChange`
+     * reports why; `connectTimeoutMs` bounds the wait for the room once the
+     * frame is known (`CONNECT_TIMEOUT`, `HOST_TIMEOUT`).
      *
      * Variables, visibility and tap-to-place positions are shared, the last
      * write winning; a device that joins or reconnects takes the room's copy
@@ -87,7 +100,9 @@ export interface StudioSceneNavigatorProps {
      * that follow do not run its on_load function; a device that joins on
      * another scene moves to the room's. A scene outside the session's project
      * is not entered, and is reported as one that failed to load.
-     * Collision bindings run on the host only, except for image-triggered
+     * Collision bindings run on one device: the host while it is connected,
+     * and otherwise the connected device with the lowest peer id, so they keep
+     * running when the host leaves. The exception is image-triggered
      * content, which sits on each device's own marker and runs its bindings and
      * drags there; the sounds and animations those bindings cause, including
      * what those animations' on_start and on_finish play, stay on that device.

@@ -1611,15 +1611,18 @@ describe("StudioColocationController: shared navigation", () => {
     const events = h.replication.writes.filter((w) => w.id.startsWith("evt:"));
     expect(events).toEqual([
       {
-        id: "evt:1",
-        fields: expect.objectContaining({
-          n: 1,
-          kind: "animation",
-          sceneId: "scene-1",
-          assetId: "lamp",
-          key: "spin",
-          from: "me",
-        }),
+        id: "evt:me",
+        fields: {
+          events: [
+            {
+              s: 1,
+              kind: "animation",
+              sceneId: "scene-1",
+              assetId: "lamp",
+              key: "spin",
+            },
+          ],
+        },
       },
     ]);
   });

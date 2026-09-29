@@ -7,9 +7,10 @@ import type { StudioSceneResponse } from "../types";
  */
 export const STUDIO_COLOCATION_ENTITY_LIMIT = 480;
 
-/** `scene:origin`, `scene:current` and the ring of event slots. */
+/** `scene:origin` and `scene:current`. */
 const FIXED_ENTITIES = 2;
-const EVENT_SLOTS = 16;
+/** One `evt:<peerId>` row per device, up to the relay's peer ceiling. */
+const EVENT_ROWS = 16;
 
 /**
  * Entities a shared session of this scene can hold at once: one per variable,
@@ -24,6 +25,6 @@ export function estimateSharedEntities(sceneData: StudioSceneResponse): number {
     assets.length +
     assets.filter((a) => isTapToPlaceAsset(a)).length +
     assets.filter((a) => a.is_draggable).length +
-    EVENT_SLOTS
+    EVENT_ROWS
   );
 }

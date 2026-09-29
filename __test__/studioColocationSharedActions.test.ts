@@ -100,6 +100,17 @@ class FakeRelay {
     }
   }
 
+  /** As process(), with every op applied delivered to each peer in one delta. */
+  processBatched(): void {
+    this.batch = [];
+    this.process();
+    const ops = this.batch;
+    this.batch = null;
+    for (const peer of this.peers.keys()) peer.deliver({ t: "delta", ops });
+  }
+
+  private batch: unknown[] | null = null;
+
   drop(socket: RelaySocket): void {
     const peer = this.peers.get(socket);
     this.peers.delete(socket);
@@ -198,6 +209,10 @@ class FakeRelay {
   }
 
   private broadcast(applied: unknown): void {
+    if (this.batch) {
+      this.batch.push(applied);
+      return;
+    }
     for (const peer of this.peers.keys()) {
       peer.deliver({ t: "delta", ops: [applied] });
     }
@@ -604,34 +619,36 @@ describe("shared events", () => {
     expect(relay.ops(b.peer, "evt:")).toEqual([]);
   });
 
-  it("writes each event to the next slot of a 16-slot ring", () => {
+  it("writes every event to the device's own row, with its recent history", () => {
     const a = online();
-    for (let i = 0; i < 17; i++) {
+    for (let i = 0; i < 10; i++) {
       a.shared.emitAnimation("scene-1", "crate", "spin");
       jest.advanceTimersByTime(40);
     }
-    const ids = relay.ops(a.peer, "evt:").map((o) => o.id);
-    expect(ids.slice(0, 3)).toEqual(["evt:1", "evt:2", "evt:3"]);
-    expect(ids[15]).toBe("evt:0");
-    expect(ids[16]).toBe("evt:1");
-    expect(relay.ops(a.peer, "evt:")[16].fields!.n).toBe(17);
+    const ops = relay.ops(a.peer, "evt:");
+    expect(new Set(ops.map((o) => o.id))).toEqual(new Set([`evt:${a.peer}`]));
+    const last = ops[ops.length - 1].fields!.events as Array<{ s: number }>;
+    expect(last.map((e) => e.s)).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
   });
 
-  it("marks the slots a welcome carries seen without firing them, and numbers past them", () => {
-    relay.seed("evt:5", {
-      n: 5,
-      from: "gone",
-      kind: "animation",
-      sceneId: "scene-1",
-      assetId: "crate",
-      key: "spin",
+  it("marks the rows a welcome carries seen without firing them", () => {
+    relay.seed("evt:gone", {
+      events: [
+        {
+          s: 5,
+          kind: "animation",
+          sceneId: "scene-1",
+          assetId: "crate",
+          key: "spin",
+        },
+      ],
     });
     const b = online();
     expect(b.played).toEqual([]);
     b.shared.emitAnimation("scene-1", "crate", "spin");
     const [op] = relay.ops(b.peer, "evt:");
-    expect(op.id).toBe("evt:6");
-    expect(op.fields!.n).toBe(6);
+    expect(op.id).toBe(`evt:${b.peer}`);
+    expect(op.fields!.events).toEqual([expect.objectContaining({ s: 1 })]);
   });
 
   it("does not replay what happened while it was reconnecting", () => {
@@ -645,22 +662,61 @@ describe("shared events", () => {
     expect(b.played).toEqual([]);
   });
 
-  it("fires both of two events written to one slot at once", () => {
+  it("fires both of two devices' simultaneous events on a third", () => {
     const a = online();
     const b = online();
     const c = online();
     a.shared.emitAnimation("scene-1", "crate", "spin");
-    b.shared.emitAnimation("scene-1", "crate", "spin");
-    relay.process();
-    expect(relay.ops(a.peer, "evt:")[0].id).toBe(
+    b.shared.emitAnimation("scene-1", "door", "open");
+    relay.processBatched();
+    expect(relay.ops(a.peer, "evt:")[0].id).not.toBe(
       relay.ops(b.peer, "evt:")[0].id
     );
     expect(c.played).toEqual([
       ["crate", "spin"],
-      ["crate", "spin"],
+      ["door", "open"],
     ]);
-    expect(a.played).toEqual([["crate", "spin"]]);
+    expect(a.played).toEqual([["door", "open"]]);
     expect(b.played).toEqual([["crate", "spin"]]);
+  });
+
+  it("fires every event of a row whose versions arrive folded together", () => {
+    const a = online();
+    const b = online();
+    for (let i = 0; i < 3; i++) {
+      a.shared.emitAnimation("scene-1", "crate", `k${i}`);
+      jest.advanceTimersByTime(40);
+    }
+    relay.processBatched();
+    expect(b.played).toEqual([
+      ["crate", "k0"],
+      ["crate", "k1"],
+      ["crate", "k2"],
+    ]);
+  });
+
+  it("writes a new row after a reconnect and removes the old one", () => {
+    const a = online();
+    const b = online();
+    a.shared.emitAnimation("scene-1", "crate", "spin");
+    relay.process();
+    const before = a.peer;
+    a.socket.dropConnection();
+    jest.advanceTimersByTime(500);
+    const rejoined = relay.accept(lastSocket!);
+    relay.process();
+    jest.advanceTimersByTime(100);
+    relay.process();
+    expect(relay.entities.has(`evt:${before}`)).toBe(false);
+    a.shared.emitAnimation("scene-1", "crate", "again");
+    relay.process();
+    expect(relay.entities.get(`evt:${rejoined}`)?.fields.events).toEqual([
+      expect.objectContaining({ s: 1, key: "again" }),
+    ]);
+    expect(b.played).toEqual([
+      ["crate", "spin"],
+      ["crate", "again"],
+    ]);
   });
 
   it("repeats a sound command on the scene's own sound manager, without echo", () => {
@@ -684,10 +740,15 @@ describe("shared events", () => {
       }),
     ]);
     a.sounds.stop("door-clip");
+    // One row per device: a second write within the interval trails it.
+    jest.advanceTimersByTime(40);
     relay.process();
     expect(b.sounds.getActive()).toEqual([]);
     expect(relay.ops(b.peer, "evt:")).toEqual([]);
-    expect(relay.ops(a.peer, "evt:").map((o) => o.fields!.action)).toEqual([
+    const events = relay.ops(a.peer, "evt:").map(
+      (o) => o.fields!.events as Array<{ action: string }>
+    );
+    expect(events[events.length - 1].map((e) => e.action)).toEqual([
       "play",
       "stop",
     ]);

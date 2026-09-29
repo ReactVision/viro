@@ -776,6 +776,7 @@ export class StudioSharedState {
     if (!this.synced || peerId !== this.peerId) {
       if (this.synced) this.unsync();
       const first = !this.everSynced;
+      const previousPeer = this.peerId;
       this.everSynced = true;
       this.synced = true;
       this.peerId = peerId;
@@ -783,7 +784,14 @@ export class StudioSharedState {
       for (const e of entities) {
         if (this.tracked(e.id)) this.versions.set(e.id, e.version);
         // What the room did before this welcome is not replayed.
-        if (e.id.startsWith(STUDIO_EVENT_PREFIX)) this.events.seen(e.fields);
+        if (e.id.startsWith(STUDIO_EVENT_PREFIX)) {
+          this.events.seen(e.id.slice(STUDIO_EVENT_PREFIX.length), e.fields);
+        }
+      }
+      // This device's events row under its last connection's peer id.
+      const stale = STUDIO_EVENT_PREFIX + previousPeer;
+      if (previousPeer && previousPeer !== peerId && this.client.get(stale)) {
+        this.outbox.remove(stale);
       }
       this.bridges.forEach((b) => b.sync(first));
       this.drags.sync();
@@ -805,6 +813,8 @@ export class StudioSharedState {
       this.versions.delete(id);
       if (id.startsWith(STUDIO_DRAG_PREFIX)) {
         this.drags.removed(id.slice(STUDIO_DRAG_PREFIX.length));
+      } else if (id.startsWith(STUDIO_EVENT_PREFIX)) {
+        this.events.forget(id.slice(STUDIO_EVENT_PREFIX.length));
       }
     }
     for (const id of this.removing.keys()) {
@@ -816,8 +826,8 @@ export class StudioSharedState {
     if (e.id.startsWith(STUDIO_DRAG_PREFIX)) {
       this.drags.receive(e.id.slice(STUDIO_DRAG_PREFIX.length), e);
     } else if (e.id.startsWith(STUDIO_EVENT_PREFIX)) {
-      if (skipped) this.events.seen(e.fields);
-      else this.events.receive(e.fields);
+      // The row carries its own history, so a version jump loses nothing.
+      this.events.receive(e.id.slice(STUDIO_EVENT_PREFIX.length), e.fields);
     } else {
       const bridge = this.bridgeFor(e.id)!;
       bridge.receive(e.id.slice(bridge.prefix.length), e.fields, skipped);

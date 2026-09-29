@@ -10,7 +10,8 @@ import type {
 import { isVec3 } from "./frameMath";
 
 export const STUDIO_EVENT_PREFIX = "evt:";
-export const STUDIO_EVENT_SLOTS = 16;
+/** Events each device's row keeps, so a batched or coalesced write loses none. */
+export const STUDIO_EVENT_HISTORY = 8;
 /** How long an event for a scene this device is still loading waits for it. */
 export const STUDIO_EVENT_WAIT_MS = 10000;
 
@@ -159,22 +160,44 @@ function decode(fields: Fields): StudioSharedEvent | null {
 }
 
 function eventNumber(fields: Fields): number | null {
-  const { n } = fields;
-  return typeof n === "number" && Number.isFinite(n) ? n : null;
+  const { s } = fields;
+  return typeof s === "number" && Number.isFinite(s) ? s : null;
+}
+
+/** A row's events, oldest first, each with its number. */
+function rowEvents(fields: Fields): Array<{ s: number; fields: Fields }> {
+  const list = Array.isArray(fields.events) ? fields.events : [];
+  const out: Array<{ s: number; fields: Fields }> = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const n = eventNumber(item as Fields);
+    if (n !== null) out.push({ s: n, fields: item as Fields });
+  }
+  return out.sort((a, b) => a.s - b.s);
 }
 
 /**
- * `evt:<slot>`: a ring of 16 rows holding the room's latest animation triggers
- * and sound commands. An event goes into slot `n % 16`, `n` one past the
- * newest this device has seen, and each accepted write to a slot fires once on
- * every other device. A welcome or snapshot only marks the slots seen, so a
+ * `evt:<peerId>` = `{ events }`: each device's own row, holding its latest
+ * `STUDIO_EVENT_HISTORY` animation triggers and sound commands, each numbered
+ * by that device. Only the device writes its row, so two devices firing at
+ * once never share one, and every write carries the history, so a write the
+ * outbox coalesced or a delta that folded several versions together still
+ * delivers each event. Every other device fires the numbers past the last it
+ * saw from that row. A welcome or snapshot only marks the rows seen, so a
  * device that joins or reconnects replays nothing and gets the resulting state
- * from the other rows.
+ * from the other rows. Rows of devices that left are removed by the room's
+ * authority (see StudioSharedState).
  */
 export class StudioEventRing {
   private target: StudioEventTarget | null = null;
   private unsubscribeSounds: (() => void) | null = null;
-  private newest = 0;
+  /** This device's row: the peer id it is written under, and what it holds. */
+  private ownPeer = "";
+  private ownCount = 0;
+  private history: Fields[] = [];
+  /** The newest event number fired or marked seen, per row. */
+  private lastSeen = new Map<string, number>();
+  private arrivals = 0;
   /** Events for a scene this device is on its way to, until it attaches. */
   private waiting: Array<{ event: StudioSharedEvent; n: number; at: number }> =
     [];
@@ -204,24 +227,57 @@ export class StudioEventRing {
     due.forEach((w) => this.fire(target, w.event));
   }
 
-  emit(event: StudioSharedEvent): void {
-    if (!this.host.isSynced()) return;
-    const n = ++this.newest;
-    this.host.write(`${STUDIO_EVENT_PREFIX}${n % STUDIO_EVENT_SLOTS}`, {
-      ...encode(event),
-      n,
-      from: this.host.localPeerId(),
-    });
+  /** The row this device writes its events to. */
+  ownRowId(): string {
+    return STUDIO_EVENT_PREFIX + this.host.localPeerId();
   }
 
-  /** An accepted write to a slot, in the room's order. */
-  receive(fields: Fields): void {
-    const n = eventNumber(fields);
-    if (n === null) return;
-    this.newest = Math.max(this.newest, n);
-    if (fields.from === this.host.localPeerId()) return;
-    const event = decode(fields);
-    if (!event) return;
+  emit(event: StudioSharedEvent): void {
+    if (!this.host.isSynced()) return;
+    const peer = this.host.localPeerId();
+    if (peer !== this.ownPeer) {
+      // A new connection is a new row; the old one goes with the old peer id.
+      this.ownPeer = peer;
+      this.ownCount = 0;
+      this.history = [];
+    }
+    const s = ++this.ownCount;
+    this.history = this.history
+      .concat({ ...encode(event), s })
+      .slice(-STUDIO_EVENT_HISTORY);
+    this.host.write(STUDIO_EVENT_PREFIX + peer, { events: this.history });
+  }
+
+  /** An accepted write to `evt:<rowPeer>`, in the room's order. */
+  receive(rowPeer: string, fields: Fields): void {
+    if (rowPeer === this.host.localPeerId()) return;
+    const last = this.lastSeen.get(rowPeer) ?? 0;
+    const fresh = rowEvents(fields).filter((e) => e.s > last);
+    if (fresh.length === 0) return;
+    this.lastSeen.set(rowPeer, fresh[fresh.length - 1].s);
+    for (const { fields: item } of fresh) {
+      const event = decode(item);
+      if (event) this.deliver(event);
+    }
+  }
+
+  /** A row whose events came in a welcome or snapshot: counted, not fired. */
+  seen(rowPeer: string, fields: Fields): void {
+    const events = rowEvents(fields);
+    if (events.length === 0) return;
+    const newest = events[events.length - 1].s;
+    this.lastSeen.set(
+      rowPeer,
+      Math.max(this.lastSeen.get(rowPeer) ?? 0, newest)
+    );
+  }
+
+  /** A row was deleted: its peer left, and a row under that id starts afresh. */
+  forget(rowPeer: string): void {
+    this.lastSeen.delete(rowPeer);
+  }
+
+  private deliver(event: StudioSharedEvent): void {
     const target = this.target;
     if (target && event.sceneId === target.sceneId) {
       this.fire(target, event);
@@ -230,14 +286,8 @@ export class StudioEventRing {
     const cutoff = this.host.now() - STUDIO_EVENT_WAIT_MS;
     this.waiting = this.waiting
       .filter((w) => w.at >= cutoff)
-      .concat({ event, n, at: this.host.now() })
-      .slice(-STUDIO_EVENT_SLOTS);
-  }
-
-  /** A slot whose writes in between went unseen: counted, not fired. */
-  seen(fields: Fields): void {
-    const n = eventNumber(fields);
-    if (n !== null) this.newest = Math.max(this.newest, n);
+      .concat({ event, n: ++this.arrivals, at: this.host.now() })
+      .slice(-STUDIO_EVENT_HISTORY * 2);
   }
 
   dispose(): void {

@@ -646,8 +646,11 @@ describe("shared events", () => {
     const b = online();
     expect(b.played).toEqual([]);
     b.shared.emitAnimation("scene-1", "crate", "spin");
-    const [op] = relay.ops(b.peer, "evt:");
-    expect(op.id).toBe(`evt:${b.peer}`);
+    // b is alone, so it is the room's authority and deletes the departed row.
+    relay.process();
+    expect(relay.entities.has("evt:gone")).toBe(false);
+    const [op] = relay.ops(b.peer, `evt:${b.peer}`);
+    expect(op.op).toBe("set");
     expect(op.fields!.events).toEqual([expect.objectContaining({ s: 1 })]);
   });
 
@@ -960,10 +963,9 @@ describe("removing a scene's rows", () => {
         .map((o) => o.id)
         .sort()
     ).toEqual(["drag:crate", "place:crate", "vis:door"]);
-    expect([...relay.entities.keys()].sort()).toEqual([
-      "var:x",
-      "vis:elsewhere",
-    ]);
+    expect(
+      [...relay.entities.keys()].filter((id) => !id.startsWith("peer:")).sort()
+    ).toEqual(["var:x", "vis:elsewhere"]);
   });
 
   /** The same scene entered again: fresh stores, as a new StudioARScene has. */
@@ -1010,7 +1012,9 @@ describe("removing a scene's rows", () => {
     check();
     relay.process();
     check();
-    expect(relay.entities.size).toBe(0);
+    expect(
+      [...relay.entities.keys()].filter((id) => !id.startsWith("peer:"))
+    ).toEqual([]);
   });
 
   it("takes back a row whose delete the room refused", () => {
@@ -1042,5 +1046,79 @@ describe("removing a scene's rows", () => {
     a.socket.dropConnection();
     a.shared.removeSceneRows(scene());
     expect(relay.ops(a.peer).filter((o) => o.op === "delete")).toEqual([]);
+  });
+});
+
+describe("authority", () => {
+  it("is the host while it is connected", () => {
+    const host = online(scene(), "host");
+    const b = online();
+    const c = online();
+    relay.process();
+    expect(host.shared.hasAuthority()).toBe(true);
+    expect(b.shared.hasAuthority()).toBe(false);
+    expect(c.shared.hasAuthority()).toBe(false);
+  });
+
+  it("passes to the connected device with the lowest peer id when the host leaves, and back", () => {
+    const host = online(scene(), "host");
+    const b = online();
+    const c = online();
+    relay.process();
+    host.socket.dropConnection();
+    expect(b.shared.hasAuthority()).toBe(true);
+    expect(c.shared.hasAuthority()).toBe(false);
+
+    // The host reconnects under a new peer id and takes it back.
+    jest.advanceTimersByTime(500);
+    relay.accept(lastSocket!);
+    relay.process();
+    expect(host.shared.hasAuthority()).toBe(true);
+    expect(b.shared.hasAuthority()).toBe(false);
+    expect(c.shared.hasAuthority()).toBe(false);
+  });
+
+  it("passes on again when that device leaves too", () => {
+    const host = online(scene(), "host");
+    const b = online();
+    const c = online();
+    relay.process();
+    host.socket.dropConnection();
+    b.socket.dropConnection();
+    expect(c.shared.hasAuthority()).toBe(true);
+  });
+
+  it("removes the presence and event rows of devices that left", () => {
+    const host = online(scene(), "host");
+    const b = online();
+    relay.process();
+    b.shared.emitAnimation("scene-1", "crate", "spin");
+    relay.process();
+    expect(relay.entities.has(`evt:${b.peer}`)).toBe(true);
+    b.socket.dropConnection();
+    relay.process();
+    expect(relay.entities.has(`evt:${b.peer}`)).toBe(false);
+    expect(relay.entities.has(`peer:join:${b.peer}`)).toBe(false);
+    expect(relay.entities.has(`peer:host:${host.peer}`)).toBe(true);
+    expect(relay.ops(host.peer, "evt:").map((o) => o.op)).toEqual(["delete"]);
+  });
+
+  it("reports a change of authority", () => {
+    const changes = jest.fn();
+    const client = new ViroReplicationClient();
+    const shared = new StudioSharedState(client, {
+      origin: () => ORIGIN,
+      role: "join",
+      onAuthorityChange: changes,
+    });
+    const host = online(scene(), "host");
+    relay.process();
+    client.connect({ roomId: "room-1", apiKey: "k", projectId: "proj-1" });
+    relay.accept(lastSocket!);
+    relay.process();
+    expect(shared.hasAuthority()).toBe(false);
+    host.socket.dropConnection();
+    expect(shared.hasAuthority()).toBe(true);
+    expect(changes).toHaveBeenCalledTimes(1);
   });
 });

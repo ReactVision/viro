@@ -26,6 +26,7 @@ const frame = (
 ): StudioColocationFrame => ({
   phase: "off",
   role: null,
+  authority: false,
   needsOrigin: false,
   sceneId: null,
   sceneMount: null,
@@ -40,8 +41,17 @@ describe("collisionBindingsRunHere", () => {
   it.each([
     ["alone", frame(), true],
     ["setting up", frame({ phase: "pending", role: "join" }), true],
-    ["shared, host", frame({ phase: "shared", role: "host" }), true],
+    [
+      "shared, host",
+      frame({ phase: "shared", role: "host", authority: true }),
+      true,
+    ],
     ["shared, joined", frame({ phase: "shared", role: "join" }), false],
+    [
+      "shared, joined, host gone",
+      frame({ phase: "shared", role: "join", authority: true }),
+      true,
+    ],
   ])("%s", (_label, f, expected) => {
     expect(collisionBindingsRunHere(f)).toBe(expected);
   });
@@ -90,7 +100,9 @@ describe("collision bindings in a shared session", () => {
   }
 
   it("runs a binding on the host and not on a device that joined", () => {
-    const host = contact({ frame: frame({ phase: "shared", role: "host" }) });
+    const host = contact({
+      frame: frame({ phase: "shared", role: "host", authority: true }),
+    });
     const joined = contact({ frame: frame({ phase: "shared", role: "join" }) });
     host.hit();
     joined.hit();

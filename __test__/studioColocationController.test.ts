@@ -1931,3 +1931,53 @@ describe("StudioColocationController: scan points", () => {
     expect(h.last()).toEqual({ status: "scanning", canFinish: true });
   });
 });
+
+describe("StudioColocationController: authority", () => {
+  it("hands a joiner's frame the authority while the host is away", async () => {
+    const h = harness();
+    h.controller.request({ mode: "join", code: "K7M2QX" });
+    h.controller.attachScene(scene());
+    await flush();
+    const origin = {
+      id: "scene:origin",
+      fields: { p: [0, 0, 0], q: [0, 0, 0, 1], sceneId: "scene-1" },
+      version: 1,
+      owner: null,
+    };
+    const hostHere = {
+      id: "peer:host:h1",
+      fields: {},
+      version: 1,
+      owner: "h1",
+    };
+    h.replication.sync([origin, hostHere]);
+    await advance(500);
+    expect(h.controller.getFrame()).toMatchObject({
+      phase: "shared",
+      role: "join",
+      authority: false,
+    });
+    const frames: boolean[] = [];
+    h.controller.subscribe(() =>
+      frames.push(h.controller.getFrame().authority)
+    );
+    h.replication.upsert({ ...hostHere, owner: null, version: 2 });
+    expect(h.controller.getFrame().authority).toBe(true);
+    h.replication.upsert({ ...hostHere, id: "peer:host:h2", owner: "h2" });
+    expect(h.controller.getFrame().authority).toBe(false);
+    expect(frames).toEqual([true, false]);
+  });
+
+  it("gives a live host the authority", async () => {
+    const h = harness();
+    await hostToLive(h);
+    expect(h.controller.getFrame()).toMatchObject({
+      phase: "shared",
+      authority: true,
+    });
+    expect(h.replication.ops).toContainEqual({
+      op: "claim",
+      id: "peer:host:me",
+    });
+  });
+});

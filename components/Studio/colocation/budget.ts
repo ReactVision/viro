@@ -9,8 +9,8 @@ export const STUDIO_COLOCATION_ENTITY_LIMIT = 480;
 
 /** `scene:origin` and `scene:current`. */
 const FIXED_ENTITIES = 2;
-/** One `evt:<peerId>` row per device, up to the relay's peer ceiling. */
-const EVENT_ROWS = 16;
+/** One `evt:<peerId>` and one `peer:<peerId>` row per device, up to the relay's peer ceiling. */
+const PEER_ROWS = 2 * 16;
 
 /**
  * Entities a shared session of this scene can hold at once: one per variable,
@@ -25,6 +25,6 @@ export function estimateSharedEntities(sceneData: StudioSceneResponse): number {
     assets.length +
     assets.filter((a) => isTapToPlaceAsset(a)).length +
     assets.filter((a) => a.is_draggable).length +
-    EVENT_ROWS
+    PEER_ROWS
   );
 }

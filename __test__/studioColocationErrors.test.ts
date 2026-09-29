@@ -88,8 +88,8 @@ describe("estimateSharedEntities", () => {
       ],
       variables: [{}, {}, {}],
     } as unknown as StudioSceneResponse;
-    // 2 + 3 variables + 4 assets + 1 placement + 1 drag + 16 event slots
-    expect(estimateSharedEntities(sceneData)).toBe(27);
+    // 2 + 3 variables + 4 assets + 1 placement + 1 drag + 16 event rows + 16 presence rows
+    expect(estimateSharedEntities(sceneData)).toBe(43);
   });
 
   it("stays under the relay's room cap", () => {

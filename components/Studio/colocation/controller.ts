@@ -134,6 +134,12 @@ export type StudioColocationPhase = "off" | "pending" | "shared";
 export type StudioColocationFrame = {
   phase: StudioColocationPhase;
   role: "host" | "join" | null;
+  /**
+   * This device runs the room's once-per-room logic (collision bindings): the
+   * host while it is connected, else the connected device with the lowest
+   * peer id. False while off.
+   */
+  authority: boolean;
   /** Host only: nothing has said yet where the scene's origin goes. */
   needsOrigin: boolean;
   /** The scene attached last, the one on screen. Null while off. */
@@ -151,6 +157,7 @@ export type StudioColocationFrame = {
 export const STUDIO_COLOCATION_OFF_FRAME: StudioColocationFrame = {
   phase: "off",
   role: null,
+  authority: false,
   needsOrigin: false,
   sceneId: null,
   sceneMount: null,
@@ -1147,6 +1154,7 @@ export class StudioColocationController {
       origin: () => this.origin,
       worldToLocation: () => this.locationInverse,
       role: isHost ? "host" : "join",
+      onAuthorityChange: () => this.updateFrame(),
     });
     // The host's scene is the room's first; a joiner's is its own until it
     // reads the room's.
@@ -1526,6 +1534,10 @@ export class StudioColocationController {
           : "off";
     const role =
       phase === "off" ? null : this.options?.mode === "host" ? "host" : "join";
+    const authority =
+      phase === "off"
+        ? false
+        : (this.sharedState?.hasAuthority() ?? role === "host");
     const needsOrigin =
       phase === "pending" &&
       this.picksOrigin() &&
@@ -1538,6 +1550,7 @@ export class StudioColocationController {
     if (
       prev.phase === phase &&
       prev.role === role &&
+      prev.authority === authority &&
       prev.needsOrigin === needsOrigin &&
       prev.sceneId === sceneId &&
       prev.sceneMount === sceneMount &&
@@ -1564,6 +1577,7 @@ export class StudioColocationController {
         : {
             phase,
             role,
+            authority,
             needsOrigin,
             sceneId,
             sceneMount,

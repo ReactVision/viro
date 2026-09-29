@@ -75,6 +75,8 @@ export type StudioSharedStateContext = {
   worldToLocation?: () => Mat4 | null;
   /** The host's state at its first sync defines the room. */
   role: "host" | "join";
+  /** `hasAuthority()` changed. */
+  onAuthorityChange?: () => void;
 };
 
 /** The rows that belong to one scene's assets, which leave with it. */
@@ -93,14 +95,32 @@ const SIZE_REFUSALS: ReadonlySet<ViroReplicationRejectReason> =
 
 /**
  * Physics simulates on every device, so one contact would run a collision
- * binding once per device; while shared only the host's contacts run them.
+ * binding once per device; while shared only the room's authority (the host
+ * while it is connected, see `StudioSharedState.hasAuthority`) runs them.
  * Gaze and proximity follow each device's own camera and run everywhere, and
  * what they change is shared like any other change.
  */
 export function collisionBindingsRunHere(
-  frame: StudioColocationFrame
+  frame: Pick<StudioColocationFrame, "phase" | "authority">
 ): boolean {
-  return frame.phase !== "shared" || frame.role === "host";
+  return frame.phase !== "shared" || frame.authority;
+}
+
+/**
+ * `peer:<role>:<peerId>`, an empty row claimed by that device. The relay
+ * releases a departed peer's claims, so an owned row is a connected device.
+ * The role is in the id so a claim alone announces it.
+ */
+export const STUDIO_PRESENCE_PREFIX = "peer:";
+
+function parsePresence(
+  id: string
+): { role: string; peer: string } | null {
+  if (!id.startsWith(STUDIO_PRESENCE_PREFIX)) return null;
+  const rest = id.slice(STUDIO_PRESENCE_PREFIX.length);
+  const at = rest.indexOf(":");
+  if (at <= 0 || at === rest.length - 1) return null;
+  return { role: rest.slice(0, at), peer: rest.slice(at + 1) };
 }
 
 type BridgeHost = {
@@ -603,6 +623,9 @@ export class StudioSharedState {
   private removing = new Map<string, number>();
   private sweepTimer: ReturnType<typeof setTimeout> | null = null;
   private warned = new Set<string>();
+  private authority: boolean;
+  /** Rows of departed peers this device has asked the relay to delete. */
+  private collecting = new Set<string>();
 
   constructor(
     private client: StudioReplicationPort,
@@ -663,8 +686,19 @@ export class StudioSharedState {
       write: (id, fields) => this.outbox.write(id, fields),
       now: this.now,
     });
+    this.authority = context.role === "host";
     this.unsubscribe = client.subscribe(this.handleChange);
     this.handleChange();
+  }
+
+  /**
+   * Whether this device runs the room's once-per-room logic (collision
+   * bindings): the host always, and while the host is not connected, the
+   * connected device with the lowest peer id. Every device reads the same
+   * presence rows, so they agree once those rows have reached them.
+   */
+  hasAuthority(): boolean {
+    return this.authority;
   }
 
   /** The scene on screen, its stores and hooks; null stops sharing them. */
@@ -757,6 +791,7 @@ export class StudioSharedState {
 
   dispose(): void {
     this.disposed = true;
+    this.collecting.clear();
     this.unsubscribe();
     this.outbox.dispose();
     this.cancelSweep();
@@ -767,6 +802,11 @@ export class StudioSharedState {
   }
 
   private handleChange = (): void => {
+    this.handleChangeInner();
+    this.updateAuthority();
+  };
+
+  private handleChangeInner(): void {
     if (this.client.state !== "synced") {
       if (this.synced) this.unsync();
       return;
@@ -793,6 +833,7 @@ export class StudioSharedState {
       if (previousPeer && previousPeer !== peerId && this.client.get(stale)) {
         this.outbox.remove(stale);
       }
+      this.announcePresence();
       this.bridges.forEach((b) => b.sync(first));
       this.drags.sync();
       return;
@@ -820,7 +861,67 @@ export class StudioSharedState {
     for (const id of this.removing.keys()) {
       if (!present.has(id)) this.removing.delete(id);
     }
-  };
+  }
+
+  /** Claimed at each welcome, under that connection's peer id. */
+  private announcePresence(): void {
+    this.client.claim(
+      `${STUDIO_PRESENCE_PREFIX}${this.context.role}:${this.peerId}`
+    );
+  }
+
+  /** Connected peers by id, with the role each announced. */
+  private presentPeers(entities: ViroReplicatedEntity[]): Map<string, string> {
+    const peers = new Map<string, string>();
+    for (const e of entities) {
+      const presence = parsePresence(e.id);
+      if (presence && e.owner === presence.peer) {
+        peers.set(presence.peer, presence.role);
+      }
+    }
+    return peers;
+  }
+
+  private updateAuthority(): void {
+    let next = this.context.role === "host";
+    if (!next && this.synced && !this.disposed) {
+      const entities = this.client.getEntities();
+      const peers = this.presentPeers(entities);
+      peers.set(this.peerId, this.context.role);
+      const hostHere = [...peers.values()].includes("host");
+      const lowest = [...peers.keys()].sort()[0];
+      next = !hostHere && lowest === this.peerId;
+    }
+    if (next && this.synced && !this.disposed) this.collectDeparted();
+    if (next === this.authority) return;
+    this.authority = next;
+    this.context.onAuthorityChange?.();
+  }
+
+  /**
+   * The authority deletes the presence and event rows of peers that left,
+   * which would otherwise stay in the room for its lifetime.
+   */
+  private collectDeparted(): void {
+    const entities = this.client.getEntities();
+    const peers = this.presentPeers(entities);
+    peers.set(this.peerId, this.context.role);
+    const ids = new Set(entities.map((e) => e.id));
+    for (const id of this.collecting) if (!ids.has(id)) this.collecting.delete(id);
+    for (const e of entities) {
+      if (this.collecting.has(e.id)) continue;
+      const presence = parsePresence(e.id);
+      const events = e.id.startsWith(STUDIO_EVENT_PREFIX);
+      if (!presence && !events) continue;
+      // A presence row is gone once released; an event row once its peer is.
+      const departed = presence
+        ? e.owner === null
+        : !peers.has(e.id.slice(STUDIO_EVENT_PREFIX.length));
+      if (!departed) continue;
+      this.collecting.add(e.id);
+      this.client.delete(e.id);
+    }
+  }
 
   private deliver(e: ViroReplicatedEntity, skipped: boolean): void {
     if (e.id.startsWith(STUDIO_DRAG_PREFIX)) {

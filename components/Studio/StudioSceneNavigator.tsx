@@ -287,7 +287,9 @@ export interface StudioSceneNavigatorProps {
    * that follow do not run its on_load function; a device that joins on
    * another scene moves to the room's. A scene outside the session's project
    * is not entered, and is reported as one that failed to load.
-   * Collision bindings run on the host only, except for image-triggered
+   * Collision bindings run on one device: the host while it is connected,
+   * and otherwise the connected device with the lowest peer id, so they keep
+   * running when the host leaves. The exception is image-triggered
    * content, which sits on each device's own marker and runs its bindings and
    * drags there; the sounds and animations those bindings cause, including
    * what those animations' on_start and on_finish play, stay on that device.

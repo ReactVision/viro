@@ -381,7 +381,10 @@ describe("welcome and snapshot precedence", () => {
       ["door", "remote"],
     ]);
     expect(host.visibility.isVisible("door")).toBe(false);
-    expect(relay.received).toEqual([]);
+    // Presence claims only.
+    expect(
+      relay.received.filter((r) => !(r.op.id ?? "").startsWith("peer:"))
+    ).toEqual([]);
   });
 
   it("writes only what differs from the scene's defaults into a new room", () => {

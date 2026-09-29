@@ -1708,3 +1708,61 @@ describe("StudioColocationController: waiting and timeouts", () => {
     expect(h.last().status).toBe("waiting_for_host");
   });
 });
+
+describe("StudioColocationController: retry", () => {
+  const NONE: StudioAuthContext = {
+    mode: "none",
+    baseUrl: null,
+    headers: {},
+    projectId: null,
+  } as unknown as StudioAuthContext;
+
+  async function failedHost() {
+    const h = harness();
+    h.deps.getAuth.mockResolvedValueOnce(NONE);
+    h.controller.request({ mode: "host" });
+    h.controller.attachScene(scene());
+    await flush();
+    expect(h.last()).toMatchObject({ status: "failed", code: "NOT_AUTHORIZED" });
+    return h;
+  }
+
+  it("starts a failed session again for an equal value", async () => {
+    const h = await failedHost();
+    h.controller.request({ mode: "host" });
+    await flush();
+    expect(h.last()).toEqual({ status: "scanning", canFinish: false });
+    expect(h.nav.startScan).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a failed session alone when asked not to restart it", async () => {
+    const h = await failedHost();
+    h.controller.request({ mode: "host" }, { restartFailed: false });
+    await flush();
+    expect(h.last().status).toBe("failed");
+    expect(h.deps.getAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a failed or left session, and nothing that is running", async () => {
+    const h = await failedHost();
+    expect(h.controller.retry()).toBe(true);
+    await flush();
+    expect(h.last().status).toBe("scanning");
+    expect(h.controller.retry()).toBe(false);
+    expect(h.nav.startScan).toHaveBeenCalledTimes(1);
+
+    h.controller.leave();
+    expect(h.controller.retry()).toBe(true);
+    await flush();
+    expect(h.last().status).toBe("scanning");
+    expect(h.nav.startScan).toHaveBeenCalledTimes(2);
+  });
+
+  it("has nothing to retry without a value", () => {
+    const h = harness();
+    expect(h.controller.retry()).toBe(false);
+    h.controller.request({ mode: "host" });
+    h.controller.request(null);
+    expect(h.controller.retry()).toBe(false);
+  });
+});

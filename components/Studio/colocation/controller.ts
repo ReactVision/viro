@@ -456,19 +456,47 @@ export class StudioColocationController {
 
   /**
    * The navigator's `colocation` prop. A value equal to the one already
-   * requested (same mode, code and relay) only refreshes the options, so a
-   * session left or failed under it does not restart until the value changes.
+   * requested (same mode, code and relay) only refreshes the options, except
+   * that it starts a failed session again unless `restartFailed` is false. A
+   * session left under it stays left until the value changes or `retry()`.
+   *
+   * The navigator passes `restartFailed: false`: a host re-rendering with an
+   * equal value after every state change would otherwise retry in a loop.
    */
-  request(options: StudioColocationOptions | null): void {
+  request(
+    options: StudioColocationOptions | null,
+    { restartFailed = true }: { restartFailed?: boolean } = {}
+  ): void {
     const key = options ? optionsKey(options) : null;
     if (key === this.requestedKey) {
       if (options) this.options = options;
+      if (options && restartFailed && this.state.status === "failed") {
+        this.restart();
+      }
       return;
     }
-    this.teardown();
     this.requestedKey = key;
     this.options = options;
-    this.pendingStart = options !== null;
+    this.restart();
+  }
+
+  /**
+   * Starts the requested value's session again after it failed or was left.
+   * False, changing nothing, while one is running or none is requested.
+   */
+  retry(): boolean {
+    if (!this.options) return false;
+    const stopped =
+      this.state.status === "failed" ||
+      (this.state.status === "idle" && !this.active && !this.pendingStart);
+    if (!stopped) return false;
+    this.restart();
+    return true;
+  }
+
+  private restart(): void {
+    this.teardown();
+    this.pendingStart = this.options !== null;
     this.setState(IDLE);
     if (this.pendingStart && this.scene) this.begin();
     this.updateFrame();

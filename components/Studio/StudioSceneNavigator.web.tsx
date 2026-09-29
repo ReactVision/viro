@@ -45,6 +45,8 @@ export interface StudioSceneNavigatorWebHandle {
   takeScreenshot: (fileName: string) => Promise<{ success: boolean; url?: string }>;
   /** No-ops on web, where no shared session can start. */
   leaveColocation: () => void;
+  /** Always false on web, where no session can start. */
+  retryColocation: () => boolean;
   getColocationRoom: () => StudioColocationRoom | null;
   finishColocationScan: () => void;
 }
@@ -363,6 +365,7 @@ export const StudioSceneNavigator = forwardRef<
         }
       },
       leaveColocation: () => {},
+      retryColocation: () => false,
       getColocationRoom: () => null,
       finishColocationScan: () => {},
     }),

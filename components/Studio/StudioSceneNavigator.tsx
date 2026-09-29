@@ -198,6 +198,12 @@ export interface StudioSceneNavigatorHandle {
   ) => Promise<{ success: boolean; url?: string; errorCode?: string }>;
   /** Leave the shared session; the current `colocation` value stays left. */
   leaveColocation: () => void;
+  /**
+   * Start the current `colocation` value's session again after it failed or
+   * was left. Re-rendering with an equal value never restarts it. False, and
+   * nothing changes, while a session is running or no value is set.
+   */
+  retryColocation: () => boolean;
   getColocationRoom: () => StudioColocationRoom | null;
   /** Host: end the scan and host it. The indicator's Done button does the same. */
   finishColocationScan: () => void;
@@ -449,7 +455,9 @@ export const StudioSceneNavigator = forwardRef<
     return () => studioColocationStore.setBuiltInIndicatorShown(true);
   }, [colocationIndicator]);
   useEffect(() => {
-    colocationRef.current?.request(colocation ?? null);
+    colocationRef.current?.request(colocation ?? null, {
+      restartFailed: false,
+    });
   }, [colocation]);
 
   // The tap-to-place overlay would catch taps for content that is withheld
@@ -571,6 +579,7 @@ export const StudioSceneNavigator = forwardRef<
         return nav.takeScreenshot(fileName, saveToCameraRoll);
       },
       leaveColocation: () => colocationRef.current?.leave(),
+      retryColocation: () => colocationRef.current?.retry() ?? false,
       getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
       finishColocationScan: () => colocationRef.current?.finishScan(),
     }),

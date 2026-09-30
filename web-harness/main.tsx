@@ -172,8 +172,8 @@ function DemoScene() {
       {/* Tap target (W2): fixed, off both screen centres and in front of the
           spinning content, so a tap mirrored in x or y lands on nothing. */}
       <ViroBox
-        position={[0.9, 0.7, -2.5]}
-        scale={[0.35, 0.35, 0.35]}
+        position={[0.5, 0.8, -2.5]}
+        scale={[0.3, 0.3, 0.3]}
         materials={[taps % 2 ? "redBox" : "blueBox"]}
         onClick={() => {
           tapsRef.current += 1;
@@ -182,7 +182,7 @@ function DemoScene() {
         }}
       />
       <ViroText
-        position={[0.9, 1.05, -2.5]}
+        position={[0.5, 1.1, -2.5]}
         width={1.2}
         height={0.3}
         text={`taps: ${taps}`}

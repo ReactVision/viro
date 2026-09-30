@@ -58,10 +58,11 @@ export function makeStudioScene(opts: {
         name: "Alpha borders",
         file_url: opts.alphaImageUrl,
         // Between the camera and the helmet, so the border has to show it.
-        position_x: 1.4,
+        // Positions keep both on a portrait phone screen.
+        position_x: 0.45,
         position_y: 0,
         position_z: -2,
-        scale: 0.9,
+        scale: 0.8,
       }),
     );
   }
@@ -72,7 +73,7 @@ export function makeStudioScene(opts: {
         asset_type_name: "3D-MODEL",
         name: "Missing model (404)",
         file_url: opts.missingModelUrl,
-        position_x: -1.6,
+        position_x: -0.9,
         position_y: -1.2,
         position_z: -3,
       }),
@@ -119,7 +120,7 @@ export function makeStudioScene(opts: {
         asset_type_name: "IMAGE",
         name: "Picture",
         file_url: opts.imageUrl,
-        position_x: -1.6,
+        position_x: -0.9,
         position_y: 0,
         position_z: -3,
       }),
@@ -128,7 +129,7 @@ export function makeStudioScene(opts: {
         asset_type_name: "3D-MODEL",
         name: "Helmet",
         file_url: opts.modelUrl,
-        position_x: 1.4,
+        position_x: 0.7,
         position_y: 0,
         position_z: -3,
         scale: 0.8,

@@ -33,6 +33,7 @@
 #import "VRTARSceneNavigator.h"
 #import "VRTARHitTestUtil.h"
 #import "VRTARAnchorNode.h"
+#import "VRTViewLookup.h"
 
 @interface VRTARSceneModule ()
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSValue *> *storedHitResults;
@@ -41,6 +42,7 @@
 
 @implementation VRTARSceneModule
 @synthesize bridge = _bridge;
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 static const NSTimeInterval kHitResultTimeoutSeconds = 30.0;
 
@@ -137,8 +139,8 @@ RCT_EXPORT_METHOD(performARHitTestWithRay:(nonnull NSNumber *)viewTag
                   ray:(NSArray *)ray
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *sceneView = viewRegistry[viewTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, viewTag, [VRTARScene class], ^(UIView *resolvedView) {
+        UIView *sceneView = (UIView *)resolvedView;
         if (![sceneView isKindOfClass:[VRTARScene class]]) {
             RCTLogError(@"Invalid view returned when calling performARHitTestWithRay: expected VRTARScene, got [%@]", sceneView);
         } else if ([ray count] != 3) {
@@ -161,7 +163,7 @@ RCT_EXPORT_METHOD(performARHitTestWithRay:(nonnull NSNumber *)viewTag
                 }
             }
         }
-    }];
+    });
 }
 
 // Android and Quest only. ViroKit exposes no origin-to-destination AR hit test, so iOS
@@ -180,8 +182,8 @@ RCT_EXPORT_METHOD(performARHitTestWithPosition:(nonnull NSNumber *)viewTag
                   position:(NSArray *)position
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *sceneView = viewRegistry[viewTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, viewTag, [VRTARScene class], ^(UIView *resolvedView) {
+        UIView *sceneView = (UIView *)resolvedView;
         if (![sceneView isKindOfClass:[VRTARScene class]]) {
             RCTLogError(@"Invalid view returned when calling performARHitTestWithPosition: expected VRTARScene, got [%@]", sceneView);
         } else if ([position count] != 3) {
@@ -206,7 +208,7 @@ RCT_EXPORT_METHOD(performARHitTestWithPosition:(nonnull NSNumber *)viewTag
                 }
             }
         }
-    }];
+    });
 }
 
 RCT_EXPORT_METHOD(performARHitTestWithPoint:(nonnull NSNumber *)viewTag
@@ -214,8 +216,8 @@ RCT_EXPORT_METHOD(performARHitTestWithPoint:(nonnull NSNumber *)viewTag
                   y:(int)y
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *sceneView = viewRegistry[viewTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, viewTag, [VRTARScene class], ^(UIView *resolvedView) {
+        UIView *sceneView = (UIView *)resolvedView;
         if (![sceneView isKindOfClass:[VRTARScene class]]) {
             RCTLogError(@"Invalid view returned when calling performARHitTestWithPoint: expected VRTARScene, got [%@]", sceneView);
         } else {
@@ -232,7 +234,7 @@ RCT_EXPORT_METHOD(performARHitTestWithPoint:(nonnull NSNumber *)viewTag
                 }
             }
         }
-    }];
+    });
 }
 
 /**
@@ -265,9 +267,8 @@ RCT_EXPORT_METHOD(createAnchoredNodeFromHitResult:(NSString *)hitResultId
         return;
     }
 
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *sceneView = viewRegistry[sceneTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, sceneTag, [VRTARScene class], ^(UIView *resolvedView) {
+        UIView *sceneView = (UIView *)resolvedView;
 
         if (![sceneView isKindOfClass:[VRTARScene class]]) {
             reject(@"AR_SCENE_NOT_FOUND", @"ARScene view not found or invalid", nil);
@@ -312,7 +313,7 @@ RCT_EXPORT_METHOD(createAnchoredNodeFromHitResult:(NSString *)hitResultId
         }
 
         resolve(nodeRef);
-    }];
+    });
 #else
     reject(@"NOT_SUPPORTED",
            @"AR anchor creation requires iOS 11.0 or later",

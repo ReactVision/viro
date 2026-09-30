@@ -164,11 +164,16 @@ RCT_EXPORT_METHOD(performARHitTestWithRay:(nonnull NSNumber *)viewTag
     }];
 }
 
+// Android and Quest only. ViroKit exposes no origin-to-destination AR hit test, so iOS
+// answers with no results rather than leaving the promise unsettled. The signature must match
+// the JS call (tag, origin, destination), or RCTModuleMethod rejects it on the argument count.
 RCT_EXPORT_METHOD(performARHitTestWithWorldPoints:(nonnull NSNumber *)viewTag
-                  ray:(NSArray *)ray
+                  origin:(NSArray *)origin
+                  destination:(NSArray *)destination
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    // No-op for iOS, used only in Android
+    RCTLogWarn(@"performARHitTestWithWorldPoints is not supported on iOS; use performARHitTestWithRay or performARHitTestWithPosition");
+    resolve(@[]);
 }
 
 RCT_EXPORT_METHOD(performARHitTestWithPosition:(nonnull NSNumber *)viewTag

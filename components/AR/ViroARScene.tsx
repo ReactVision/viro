@@ -336,7 +336,7 @@ export class ViroARScene extends ViroBase<Props> {
     origin: Viro3DPoint,
     destination: Viro3DPoint
   ) => {
-    return await NativeModules.VRTARSceneModule.performARHitTestWithRay(
+    return await NativeModules.VRTARSceneModule.performARHitTestWithWorldPoints(
       findNodeHandle(this),
       origin,
       destination

@@ -44,6 +44,7 @@ import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
 import { ViroAnimations } from "../components/Animation/ViroAnimations";
+import { HarnessPanels, clearStatus, hlog } from "./harnessLog";
 
 import helmetUrl from "./models/DamagedHelmet.glb?url";
 
@@ -364,6 +365,12 @@ function CameraScene(props: { cameraRef?: React.Ref<CameraHandle> }) {
 
 const MODES = ["3d", "ar", "studio", "input", "camera"] as const;
 type Mode = (typeof MODES)[number];
+
+// URL params (see README.md): ?mode= picks the initial mode; the rest feed the
+// individual modes.
+const params = new URLSearchParams(window.location.search);
+const paramMode = params.get("mode")?.toLowerCase();
+const initialMode: Mode = MODES.includes(paramMode as Mode) ? (paramMode as Mode) : "3d";
 const MODE_LABEL: Record<Mode, string> = {
   "3d": "3D",
   ar: "AR",
@@ -378,7 +385,15 @@ const studioScene = makeStudioScene({ modelUrl: helmetUrl, imageUrl: checkerUrl 
 const studioApiRequestExecutor = async () => ({ ok: true, status: 200, body: {} });
 
 function App() {
-  const [mode, setMode] = useState<Mode>("3d");
+  const [mode, setMode] = useState<Mode>(initialMode);
+  useEffect(() => {
+    clearStatus();
+    hlog("mode", mode);
+    // Keep the URL in step so a reload (or a copied link) lands on this mode.
+    const url = new URL(window.location.href);
+    url.searchParams.set("mode", mode);
+    window.history.replaceState(null, "", url);
+  }, [mode]);
   const cameraRef = useRef<CameraHandle>(null);
   const [captureMsg, setCaptureMsg] = useState<string>("");
 
@@ -429,6 +444,7 @@ function App() {
       <button style={toggle} onClick={next}>
         {`Modo: ${MODE_LABEL[mode]} →`}
       </button>
+      <HarnessPanels />
       {mode === "3d" && (
         <Viro3DSceneNavigator initialScene={{ scene: DemoScene }} webRendererOptions={webRendererOptions} />
       )}

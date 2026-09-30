@@ -33,6 +33,7 @@ import {
 } from "./Types/ViroUtils";
 import { isVisionOS } from "./Utilities/ViroPlatform";
 import { warnUnsupported } from "./Utilities/ViroUnsupported";
+import { VRCapture } from "./Utilities/VRModuleOpenXR";
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = NativeModules.VRModuleOpenXR as {
   recenterTracking: (viewTag: number) => void;
@@ -469,6 +470,48 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     );
   };
 
+  /**
+   * Takes a screenshot of the rendered scene, as ViroARSceneNavigator does.
+   *
+   * Meta Quest only: the left eye of the next frame, saved as `fileName`.jpg in
+   * app storage and also to the gallery when `saveToCameraRoll`. Resolves
+   * `{ success, url, errorCode }` and never rejects. Elsewhere it resolves with
+   * `RECORD_ERROR_UNSUPPORTED_PLATFORM`, and on Quest with
+   * `RECORD_ERROR_NOT_READY` until the XR session is rendering. A capture of a
+   * passthrough scene holds the virtual content only.
+   */
+  _takeScreenshot = async (fileName: string, saveToCameraRoll: boolean) => {
+    return await VRCapture.takeScreenshot(
+      findNodeHandle(this),
+      fileName,
+      saveToCameraRoll
+    );
+  };
+
+  /**
+   * Starts recording the rendered scene (left eye) and the microphone, as
+   * ViroARSceneNavigator does. Meta Quest only; `onError` receives a
+   * ViroRecordingErrorConstants code, `RECORD_ERROR_UNSUPPORTED_PLATFORM`
+   * elsewhere.
+   */
+  _startVideoRecording = (
+    fileName: string,
+    saveToCameraRoll: boolean,
+    onError: (errorCode: number) => void
+  ) => {
+    VRCapture.startVideoRecording(
+      findNodeHandle(this),
+      fileName,
+      saveToCameraRoll,
+      onError
+    );
+  };
+
+  /** Stops the recording. Resolves `{ success, url, errorCode }`. */
+  _stopVideoRecording = async () => {
+    return await VRCapture.stopVideoRecording(findNodeHandle(this));
+  };
+
   _renderSceneStackItems() {
     let views = [];
     var i = 0;
@@ -498,6 +541,12 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     project: this._project,
     unproject: this._unproject,
     recenterTracking: this._recenterTracking,
+    // Screen capture, with ViroARSceneNavigator's signatures and results, so a
+    // scene captures through `sceneNavigator` on any platform. Meta Quest only;
+    // elsewhere they report RECORD_ERROR_UNSUPPORTED_PLATFORM.
+    takeScreenshot: this._takeScreenshot,
+    startVideoRecording: this._startVideoRecording,
+    stopVideoRecording: this._stopVideoRecording,
     viroAppProps: {} as any,
   };
 

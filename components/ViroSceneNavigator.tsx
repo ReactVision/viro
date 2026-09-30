@@ -26,6 +26,7 @@ import { Viro3DPoint } from "./Types/ViroUtils";
 import { ViroSceneDictionary } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
 import { isVisionOS } from "./Utilities/ViroPlatform";
+import { unsupportedCapture } from "./Utilities/VRModuleOpenXR";
 
 var ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 
@@ -95,6 +96,12 @@ export class ViroSceneNavigator extends React.Component<Props, State> {
     recenterTracking: this._recenterTracking,
     project: this._project,
     unproject: this._unproject,
+    // No capture on this navigator (visionOS, iOS VR): the names are here so a
+    // scene written for AR or Quest gets RECORD_ERROR_UNSUPPORTED_PLATFORM
+    // back instead of calling something undefined.
+    takeScreenshot: unsupportedCapture.takeScreenshot,
+    startVideoRecording: unsupportedCapture.startVideoRecording,
+    stopVideoRecording: unsupportedCapture.stopVideoRecording,
     viroAppProps: this.props.viroAppProps || {},
   };
 

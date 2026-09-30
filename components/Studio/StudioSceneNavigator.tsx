@@ -191,7 +191,11 @@ const StudioPlacementOverlay: React.FC<{
 
 /** Imperative handle exposed via ref. */
 export interface StudioSceneNavigatorHandle {
-  /** Screenshots the AR renderer. Resolves `{ success: false }` (no-op) on Quest. */
+  /**
+   * Screenshots the renderer. On Meta Quest it captures the left eye, without
+   * the passthrough room, and resolves `errorCode` 7 (`RECORD_ERROR_NOT_READY`)
+   * until the VR scene is rendering.
+   */
   takeScreenshot: (
     fileName: string,
     saveToCameraRoll: boolean
@@ -592,7 +596,8 @@ export const StudioSceneNavigator = forwardRef<
     (): StudioSceneNavigatorHandle => ({
       takeScreenshot: (fileName, saveToCameraRoll) => {
         // On AR the handle is the ViroARSceneNavigator instance (has
-        // arSceneNavigator.takeScreenshot); on Quest it's a bridge without it.
+        // arSceneNavigator.takeScreenshot); on Quest it's the XR navigator's
+        // bridge, which forwards it to VRModuleOpenXR.
         const nav = navigatorRef.current?.arSceneNavigator;
         if (typeof nav?.takeScreenshot !== "function") {
           return Promise.resolve({ success: false });

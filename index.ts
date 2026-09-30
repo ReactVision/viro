@@ -339,6 +339,7 @@ import {
 } from "./components/Utilities/VRModuleOpenXR";
 import type {
   VRModuleOpenXRType,
+  ViroCaptureResult,
   ViroPassthroughStyle,
 } from "./components/Utilities/VRModuleOpenXR";
 import { StreamingAudioManager } from "./components/Utilities/StreamingAudioManager";
@@ -593,7 +594,7 @@ export {
   setInputTuning,
 };
 
-export type { VRModuleOpenXRType, ViroPassthroughStyle };
+export type { VRModuleOpenXRType, ViroCaptureResult, ViroPassthroughStyle };
 export type {
   ImmersiveSpaceStyle,
   ViroInputTuning,

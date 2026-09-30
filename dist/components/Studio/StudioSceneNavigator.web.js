@@ -136,7 +136,7 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
         }}/>);
 };
 exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
-    const { recordingIndicator = true, placementIndicator = true, colocation, colocationIndicator = true, onColocationStateChange, arOptions, onSessionReady, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onAssetError, onRendererAbort, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
+    const { recordingIndicator = true, placementIndicator = true, colocation, colocationIndicator = true, onColocationStateChange, arOptions, onSessionReady, onMotionUnavailable, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onAssetError, onRendererAbort, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
     const containerRef = (0, react_1.useRef)(null);
     // Session-scoped variable store (survives NAVIGATION between scenes).
     const variableStoreRef = (0, react_1.useRef)(null);
@@ -275,7 +275,7 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
         pointerEvents: "none",
     };
     return (<div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {resolvedMode === "ar" ? (<ViroARSceneNavigator_web_1.ViroARSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} slamScriptUrl={slamScriptUrl} arOptions={{ detectPlanes: true, ...arOptions }} onSessionReady={onSessionReady} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>) : (<Viro3DSceneNavigator_web_1.Viro3DSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>)}
+      {resolvedMode === "ar" ? (<ViroARSceneNavigator_web_1.ViroARSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} slamScriptUrl={slamScriptUrl} arOptions={{ detectPlanes: true, ...arOptions }} onSessionReady={onSessionReady} onMotionUnavailable={onMotionUnavailable} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>) : (<Viro3DSceneNavigator_web_1.Viro3DSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>)}
       {recordingIndicator && (<div style={{ ...overlay, top: 52 }}>
           <StudioRecordingIndicator_web_1.StudioRecordingIndicator />
         </div>)}

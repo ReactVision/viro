@@ -11,8 +11,22 @@ export type VRSharedFrameResult = {
     transform?: string;
     error?: string;
 };
+/**
+ * What screenshot and stop-recording resolve to, on every navigator. `url` is
+ * the local file path on success; `errorCode` is a
+ * {@link ViroRecordingErrorConstants} value (`RECORD_ERROR_NONE` on success).
+ */
+export type ViroCaptureResult = {
+    success: boolean;
+    url?: string | null;
+    errorCode: number;
+};
 export type VRModuleOpenXRType = {
     recenterTracking?: (viewTag: number) => void;
+    /** Left-eye capture of the next frame. Resolves, never rejects. */
+    takeScreenshot?: (viewTag: number, fileName: string, saveToCameraRoll: boolean) => Promise<ViroCaptureResult>;
+    startVideoRecording?: (viewTag: number, fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+    stopVideoRecording?: (viewTag: number) => Promise<ViroCaptureResult>;
     /** CL-H: publish this headset's frame to a Meta spatial anchor group. */
     rvCreateSharedFrame?: (viewTag: number, groupId: string) => Promise<VRSharedFrameResult>;
     /** CL-H: recover the frame another headset published to that group. */
@@ -61,3 +75,34 @@ export declare const VRModuleOpenXR: VRModuleOpenXRType | undefined;
  * ```
  */
 export declare function useVRViewTag(): number | null;
+/**
+ * Screen capture on the Quest navigator, by view tag, with the same arguments
+ * and results as ViroARSceneNavigator's. What the VR scene navigator and the
+ * Quest branch of ViroXRSceneNavigator hand scenes as
+ * `sceneNavigator.takeScreenshot` / `startVideoRecording` / `stopVideoRecording`.
+ *
+ * Off Quest (iOS, visionOS, Cardboard on Android) there is no VRModuleOpenXR
+ * and every call reports `RECORD_ERROR_UNSUPPORTED_PLATFORM`. A null tag —
+ * the VR scene has not mounted — reports `RECORD_ERROR_NOT_READY`, as native
+ * does while the XR session has no swapchains.
+ *
+ * The capture is the left eye, sized to its swapchain. Passthrough is
+ * composited by the OS beneath the app's layer, so a mixed-reality capture
+ * holds the virtual content only, over black.
+ */
+export declare const VRCapture: {
+    takeScreenshot(viewTag: number | null, fileName: string, saveToCameraRoll: boolean): Promise<ViroCaptureResult>;
+    startVideoRecording(viewTag: number | null, fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void): void;
+    stopVideoRecording(viewTag: number | null): Promise<ViroCaptureResult>;
+};
+/**
+ * The same three calls for a navigator that can never capture — the generic
+ * ViroSceneNavigator, which visionOS and iOS VR host. They report
+ * `RECORD_ERROR_UNSUPPORTED_PLATFORM` rather than leaving a scene written for
+ * AR or Quest to call something undefined.
+ */
+export declare const unsupportedCapture: {
+    takeScreenshot: (_fileName: string, _saveToCameraRoll: boolean) => Promise<ViroCaptureResult>;
+    startVideoRecording: (_fileName: string, _saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+    stopVideoRecording: () => Promise<ViroCaptureResult>;
+};

@@ -340,7 +340,8 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     (0, react_1.useImperativeHandle)(ref, () => ({
         takeScreenshot: (fileName, saveToCameraRoll) => {
             // On AR the handle is the ViroARSceneNavigator instance (has
-            // arSceneNavigator.takeScreenshot); on Quest it's a bridge without it.
+            // arSceneNavigator.takeScreenshot); on Quest it's the XR navigator's
+            // bridge, which forwards it to VRModuleOpenXR.
             const nav = navigatorRef.current?.arSceneNavigator;
             if (typeof nav?.takeScreenshot !== "function") {
                 return Promise.resolve({ success: false });

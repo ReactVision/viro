@@ -20,6 +20,15 @@ type SceneFactory = {
  * When only `initialScene` is provided it is used for both modes.
  *
  * Renderer flags (`hdrEnabled`, `pbrEnabled`, `bloomEnabled`, `shadowsEnabled`,
+ * Screen capture is on the same `sceneNavigator` everywhere:
+ * `takeScreenshot(fileName, saveToCameraRoll)` and `stopVideoRecording()`
+ * resolve `{ success, url, errorCode }`, and `startVideoRecording(fileName,
+ * saveToCameraRoll, onError)` reports failures to `onError`. On Quest the
+ * ref's `sceneNavigator` and the scene's own forward to VRModuleOpenXR, which
+ * captures the left eye without the passthrough room and reports
+ * `RECORD_ERROR_NOT_READY` until the XR session is rendering. visionOS has
+ * no capture, and reports `RECORD_ERROR_UNSUPPORTED_PLATFORM`.
+ *
  * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
  * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
  * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`

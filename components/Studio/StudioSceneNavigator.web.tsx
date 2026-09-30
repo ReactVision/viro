@@ -107,6 +107,13 @@ export interface StudioSceneNavigatorWebProps {
    * rather than only observe it — stepping a replay, for instance.
    */
   onSessionReady?: (session: any) => void;
+  /**
+   * AR mode only. Called when AR cannot track for want of motion data: the
+   * viewer denied motion access, or granted it and no events arrive. The
+   * navigator still shows its own message; this lets the host react too.
+   * Forwarded to ViroARSceneNavigator.
+   */
+  onMotionUnavailable?: (reason: "denied" | "no-events") => void;
   noAssetsMessage?: string;
   loadingView?: React.ReactNode;
   renderError?: (error: Error) => React.ReactNode;
@@ -240,6 +247,7 @@ export const StudioSceneNavigator = forwardRef<
     onColocationStateChange,
     arOptions,
     onSessionReady,
+    onMotionUnavailable,
     sceneData: injectedSceneData,
     loadScene,
     sceneId,
@@ -434,6 +442,7 @@ export const StudioSceneNavigator = forwardRef<
           slamScriptUrl={slamScriptUrl}
           arOptions={{ detectPlanes: true, ...arOptions }}
           onSessionReady={onSessionReady}
+          onMotionUnavailable={onMotionUnavailable}
           {...STUDIO_RENDERER_EFFECTS}
         />
       ) : (

@@ -62,6 +62,9 @@ export declare class ViroSceneNavigator extends React.Component<Props, State> {
         recenterTracking: () => void;
         project: (point: Viro3DPoint) => Promise<any>;
         unproject: (point: Viro3DPoint) => Promise<any>;
+        takeScreenshot: (_fileName: string, _saveToCameraRoll: boolean) => Promise<import("./Utilities/VRModuleOpenXR").ViroCaptureResult>;
+        startVideoRecording: (_fileName: string, _saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+        stopVideoRecording: () => Promise<import("./Utilities/VRModuleOpenXR").ViroCaptureResult>;
         viroAppProps: any;
     };
     /**

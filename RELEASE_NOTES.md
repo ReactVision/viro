@@ -19,12 +19,12 @@
 - **The Studio scene mounts once**, so models are no longer fetched and parsed more than once.
 - **Taps are no longer mirrored vertically.**
 - **Web AR holds its last pose through a dropout** and smooths it. `arOptions` accepts `feedWidth`, `feedHeight` and `poseSmoothing`.
-- **A denied motion permission is reported** through `onMotionUnavailable`, with a message on screen.
+- **A denied motion permission is reported** through `onMotionUnavailable` on `ViroARSceneNavigator` and `StudioSceneNavigator`, with a message on screen.
 - **Transparent image borders no longer hide what is behind them.**
 
 ### Native
 
-- **Meta Quest gets gaze on every headset, screen capture, AR hit test from JS (`performARHitTestWithRay` / `WithWorldPoints`), click haptics and the left-palm menu pinch.**
+- **Meta Quest gets gaze on every headset, screen capture, AR hit test from JS (`performARHitTestWithRay` / `WithWorldPoints`), click haptics and the left-palm menu pinch.** Capture is `sceneNavigator.takeScreenshot`, `startVideoRecording` and `stopVideoRecording`, as on AR. It records the left eye and not the passthrough room, and reports `RECORD_ERROR_NOT_READY` until the headset is rendering.
 - **iOS: a gesture during AR teardown no longer crashes.**
 - **`cancelCloudAnchorOperations()` cancels** ReactVision hosts, resolves and scans (`ErrorCancelled`). It used to be a no-op.
 - **The renderer binaries are rebuilt on virocore 3.0.2**, which also raises the scan-host floor to 300 points.

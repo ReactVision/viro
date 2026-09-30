@@ -11,11 +11,6 @@
  * the names below — a command a manager does not declare is a runtime error, not
  * a silent no-op.
  *
- * The vector is sent flattened as the command args ([x, y, z]), not wrapped in
- * an array. The native signatures must match that shape: on iOS each method
- * takes the react tag plus x, y and z (the interop layer prepends the tag), and
- * on Android applyTransformCommand reads args as a flat float array.
- *
  * Copyright © 2026 ReactVision. All rights reserved.
  */
 

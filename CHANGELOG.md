@@ -39,7 +39,6 @@
 
 ### Fixed
 
-- **`ViroGameLoopUtils` works on iOS.** `setPosition`, `setRotation` and `setScale` sent their vector flattened, as Android expects, but the iOS commands took a single array, so every call failed on iOS: a redbox in debug builds and a likely crash in release. The iOS commands now take the same flattened arguments. This also fixes pan, orbit and fly-to in `useViroMapCamera` on iOS.
 - **Web: the Studio scene no longer remounts on every navigator render (`StudioSceneNavigator.web`).** The scene component was a closure built in the render body, so each render handed React a new component type and the whole subtree — every node in the renderer — was torn down and rebuilt. A three-image scene rendered three times on first load and a 29 MB model was fetched twice. It is a module-level component now, fed through `viroAppProps`.
 - **Web: asset load failures reach the host.** `onAssetError(asset, error)` on `StudioSceneNavigator` (web); they used to go to `console.error` alone, which no error tracker hooks. `onRendererAbort` reports the terminal case — the renderer's runtime has aborted — and shows `renderError` in the canvas's place.
 - **Web: a denied motion permission stops AR from starting with nothing on screen (`ViroARSceneNavigator.web`).** The result was discarded; without an IMU the tracker never leaves initializing. A denial now shows why and does not start the session, and a grant that delivers no events is reported after three seconds. Both reach `onMotionUnavailable`. `renderWhileLimited` still starts regardless.

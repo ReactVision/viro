@@ -131,6 +131,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     self.vroSubview = (VRTNode *)subview;
     self.managedAnimation.node = self.vroSubview.node;
     

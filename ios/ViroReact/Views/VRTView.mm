@@ -55,6 +55,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     // Subclasses must override to perform physical actions (i.e adding
     // nodes in the renderer), then invoke this
     

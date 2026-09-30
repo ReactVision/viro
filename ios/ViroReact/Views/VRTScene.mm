@@ -206,6 +206,7 @@ static NSArray<NSNumber *> *const kDefaultSize = @[@(0), @(0), @(0)];
 #pragma mark - Scene-specific subviews
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(view, atIndex);
     [super insertReactSubview:view atIndex:atIndex];
 }
 

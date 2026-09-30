@@ -321,6 +321,7 @@ static NSString * const kRVWatermarkURL =
 
 //VROComponent overrides...
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     RCTAssert([subview isKindOfClass:[VRTARScene class]], @"VRTARNavigator only accepts VRTARScene subviews");
     [super insertReactSubview:subview atIndex:atIndex];
     

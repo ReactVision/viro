@@ -59,6 +59,11 @@ export function setStatus(key: string, value: string | number | null) {
   emit();
 }
 
+export function clearLog() {
+  lines = [];
+  emit();
+}
+
 export function clearStatus() {
   status = {};
   emit();
@@ -133,10 +138,7 @@ export function HarnessPanels() {
           {!collapsed && (
             <button
               style={smallBtn}
-              onClick={() => {
-                lines = [];
-                emit();
-              }}
+              onClick={clearLog}
             >
               clear
             </button>

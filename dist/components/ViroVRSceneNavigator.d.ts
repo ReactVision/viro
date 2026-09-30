@@ -153,6 +153,26 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
     _recenterTracking: () => void;
     _project: (point: Viro3DPoint) => Promise<any>;
     _unproject: (point: Viro3DPoint) => Promise<any>;
+    /**
+     * Takes a screenshot of the rendered scene, as ViroARSceneNavigator does.
+     *
+     * Meta Quest only: the left eye of the next frame, saved as `fileName`.jpg in
+     * app storage and also to the gallery when `saveToCameraRoll`. Resolves
+     * `{ success, url, errorCode }` and never rejects. Elsewhere it resolves with
+     * `RECORD_ERROR_UNSUPPORTED_PLATFORM`, and on Quest with
+     * `RECORD_ERROR_NOT_READY` until the XR session is rendering. A capture of a
+     * passthrough scene holds the virtual content only.
+     */
+    _takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<import("./Utilities/VRModuleOpenXR").ViroCaptureResult>;
+    /**
+     * Starts recording the rendered scene (left eye) and the microphone, as
+     * ViroARSceneNavigator does. Meta Quest only; `onError` receives a
+     * ViroRecordingErrorConstants code, `RECORD_ERROR_UNSUPPORTED_PLATFORM`
+     * elsewhere.
+     */
+    _startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+    /** Stops the recording. Resolves `{ success, url, errorCode }`. */
+    _stopVideoRecording: () => Promise<import("./Utilities/VRModuleOpenXR").ViroCaptureResult>;
     _renderSceneStackItems(): React.JSX.Element[];
     sceneNavigator: {
         push: (param1?: ViroScene | string, param2?: ViroScene) => void;
@@ -163,6 +183,9 @@ export declare class ViroVRSceneNavigator extends React.Component<Props, State> 
         project: (point: Viro3DPoint) => Promise<any>;
         unproject: (point: Viro3DPoint) => Promise<any>;
         recenterTracking: () => void;
+        takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<import("./Utilities/VRModuleOpenXR").ViroCaptureResult>;
+        startVideoRecording: (fileName: string, saveToCameraRoll: boolean, onError: (errorCode: number) => void) => void;
+        stopVideoRecording: () => Promise<import("./Utilities/VRModuleOpenXR").ViroCaptureResult>;
         viroAppProps: any;
     };
     render(): React.JSX.Element;

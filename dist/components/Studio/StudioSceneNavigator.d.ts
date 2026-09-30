@@ -4,7 +4,11 @@ import type { StudioColocationOptions, StudioColocationRoom, StudioColocationSta
 import { StudioSceneResponse } from "./types";
 /** Imperative handle exposed via ref. */
 export interface StudioSceneNavigatorHandle {
-    /** Screenshots the AR renderer. Resolves `{ success: false }` (no-op) on Quest. */
+    /**
+     * Screenshots the renderer. On Meta Quest it captures the left eye, without
+     * the passthrough room, and resolves `errorCode` 7 (`RECORD_ERROR_NOT_READY`)
+     * until the VR scene is rendering.
+     */
     takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<{
         success: boolean;
         url?: string;
@@ -44,6 +48,13 @@ export interface StudioSceneNavigatorProps {
     /** Threaded to the initial scene's StudioARScene (initial scene only). */
     onPlaneDetected?: () => void;
     onPlaneSelected?: () => void;
+    /**
+     * Web only, where AR tracks from the browser's motion sensors: called when
+     * the viewer denied motion access or no motion events arrive. Accepted here
+     * so one set of props types on both, and never called on native, where the
+     * AR session reads the IMU itself.
+     */
+    onMotionUnavailable?: (reason: "denied" | "no-events") => void;
     noAssetsMessage?: string;
     /**
      * Opt-in overlay shown until the scene mounts. Omit to render nothing on AR

@@ -209,7 +209,7 @@ class ViroARScene extends ViroBase_1.ViroBase {
         return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithRay((0, react_native_1.findNodeHandle)(this), ray);
     };
     performARHitTestWithWorldPoints = async (origin, destination) => {
-        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithRay((0, react_native_1.findNodeHandle)(this), origin, destination);
+        return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithWorldPoints((0, react_native_1.findNodeHandle)(this), origin, destination);
     };
     performARHitTestWithPosition = async (position) => {
         return await react_native_1.NativeModules.VRTARSceneModule.performARHitTestWithPosition((0, react_native_1.findNodeHandle)(this), position);

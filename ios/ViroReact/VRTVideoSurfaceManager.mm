@@ -28,8 +28,11 @@
 #import <React/RCTUIManager.h>
 #import "VRTVideoSurfaceManager.h"
 #import "./Views/VRTVideoSurface.h"
+#import "VRTViewLookup.h"
 
 @implementation VRTVideoSurfaceManager
+
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 RCT_EXPORT_MODULE()
 
 RCT_EXPORT_VIEW_PROPERTY(materials, NSArray<NSString *>)
@@ -91,15 +94,15 @@ RCT_EXPORT_VIEW_PROPERTY(dragPlane, NSDictionary)
 
 RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTVideoSurface class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRTVideoSurface class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTVideoSurface, got: %@", view);
         } else {
             VRTVideoSurface *component = (VRTVideoSurface *)view;
             [component seekToTime:time];
         }
-    }];
+    });
 }
 @end
 

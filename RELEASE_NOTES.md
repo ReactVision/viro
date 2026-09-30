@@ -19,7 +19,7 @@
 - **The Studio scene mounts once**, so models are no longer fetched and parsed more than once.
 - **Taps are no longer mirrored vertically.**
 - **Web AR holds its last pose through a dropout** and smooths it. `arOptions` accepts `feedWidth`, `feedHeight` and `poseSmoothing`.
-- **A denied motion permission is reported** through `onMotionUnavailable`, with a message on screen.
+- **A denied motion permission is reported** through `onMotionUnavailable` on `ViroARSceneNavigator` and `StudioSceneNavigator`, with a message on screen.
 - **Transparent image borders no longer hide what is behind them.**
 
 ### Native

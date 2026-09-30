@@ -231,6 +231,13 @@ export interface StudioSceneNavigatorProps {
   /** Threaded to the initial scene's StudioARScene (initial scene only). */
   onPlaneDetected?: () => void;
   onPlaneSelected?: () => void;
+  /**
+   * Web only, where AR tracks from the browser's motion sensors: called when
+   * the viewer denied motion access or no motion events arrive. Accepted here
+   * so one set of props types on both, and never called on native, where the
+   * AR session reads the IMU itself.
+   */
+  onMotionUnavailable?: (reason: "denied" | "no-events") => void;
   noAssetsMessage?: string;
   /**
    * Opt-in overlay shown until the scene mounts. Omit to render nothing on AR

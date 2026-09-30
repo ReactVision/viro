@@ -28,8 +28,11 @@
 #import <React/RCTUIManager.h>
 #import "VRT360VideoManager.h"
 #import "VRT360Video.h"
+#import "VRTViewLookup.h"
 
 @implementation VRT360VideoManager
+
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 
@@ -53,15 +56,15 @@ RCT_EXPORT_VIEW_PROPERTY(stereoMode, NSString)
 
 RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView*> *viewRegistry) {
-        VRTView *view = (UIView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRT360Video class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRT360Video class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTVideoSurface, got: %@", view);
         } else {
             VRT360Video *component = (VRT360Video *)view;
             [component seekToTime:time];
         }
-    }];
+    });
 }
 
 @end

@@ -28,8 +28,10 @@
 #import "VRTControllerModule.h"
 #import "VRTController.h"
 #import <React/RCTUIManagerUtils.h>
+#import "VRTViewLookup.h"
 @implementation VRTControllerModule
 @synthesize bridge = _bridge;
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 
@@ -40,8 +42,8 @@ RCT_EXPORT_MODULE()
 RCT_EXPORT_METHOD(getForwardVectorAsync:(nonnull NSNumber *)viewTag
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *controllerView = viewRegistry[viewTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, viewTag, [VRTController class], ^(UIView *resolvedView) {
+        UIView *controllerView = (UIView *)resolvedView;
         
         if (![controllerView isKindOfClass:[VRTController class]]) {
             RCTLogError(@"Invalid view returned when getForwardVectorAsync: expected VRTController, got [%@]", controllerView);
@@ -50,7 +52,7 @@ RCT_EXPORT_METHOD(getForwardVectorAsync:(nonnull NSNumber *)viewTag
             VRTController *controller = (VRTController *)controllerView;
             resolve([controller getControllerForwardVector]);
         }
-    }];
+    });
 }
 
 @end

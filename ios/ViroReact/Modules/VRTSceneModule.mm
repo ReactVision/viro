@@ -28,9 +28,11 @@
 #import <React/RCTUIManagerUtils.h>
 #import "VRTScene.h"
 #import "VRTSceneModule.h"
+#import "VRTViewLookup.h"
 
 @implementation VRTSceneModule
 @synthesize bridge = _bridge;
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 
@@ -45,8 +47,8 @@ RCT_EXPORT_METHOD(findCollisionsWithRayAsync:(nonnull NSNumber *)viewTag
                   rayTag:(NSString *)tag
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *sceneView = viewRegistry[viewTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, viewTag, [VRTScene class], ^(UIView *resolvedView) {
+        UIView *sceneView = (UIView *)resolvedView;
         if (![sceneView isKindOfClass:[VRTScene class]]) {
             RCTLogError(@"Invalid view returned when calling findCollisionsWithRayAsync: expected VRTScene, got [%@]", sceneView);
         } else if ([fromArray count] != 3 || [toArray count] != 3) {
@@ -62,7 +64,7 @@ RCT_EXPORT_METHOD(findCollisionsWithRayAsync:(nonnull NSNumber *)viewTag
             bool hasHit = [scene scene]->getPhysicsWorld()->findCollisionsWithRay(from, to, returnClosests, strTag);
             resolve(@(hasHit));
         }
-    }];
+    });
 }
 
 RCT_EXPORT_METHOD(findCollisionsWithShapeAsync:(nonnull NSNumber *)viewTag
@@ -73,8 +75,7 @@ RCT_EXPORT_METHOD(findCollisionsWithShapeAsync:(nonnull NSNumber *)viewTag
                   rayTag:(NSString *)tag
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        UIView *sceneView = viewRegistry[viewTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, viewTag, [VRTScene class], ^(UIView *sceneView) {
         std::shared_ptr<VROPhysicsShape> shape = [VRTNode getPhysicsShape:shapeTypeString params:shapeParams children:nil];
         if (![sceneView isKindOfClass:[VRTScene class]]) {
             RCTLogError(@"Invalid view returned when calling findCollisionsWithShapeAsync: expected VRTScene, got [%@]", sceneView);
@@ -92,7 +93,7 @@ RCT_EXPORT_METHOD(findCollisionsWithShapeAsync:(nonnull NSNumber *)viewTag
             bool hasHit = [scene scene]->getPhysicsWorld()->findCollisionsWithShape(from, to, shape, strTag);
             resolve(@(hasHit));
         }
-    }];
+    });
 }
 
 - (VROVector3f)NSArrayToVector3fHelper:(NSArray *)array{

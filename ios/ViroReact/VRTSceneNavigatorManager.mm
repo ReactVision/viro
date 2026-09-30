@@ -28,9 +28,12 @@
 #import <React/RCTUIManager.h>
 #import "VRTSceneNavigatorManager.h"
 #import "VRTSceneNavigator.h"
+#import "VRTViewLookup.h"
 
 
 @implementation VRTSceneNavigatorManager
+
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 
@@ -45,15 +48,15 @@ RCT_EXPORT_VIEW_PROPERTY(onExitViro, RCTDirectEventBlock)
 
 RCT_EXPORT_METHOD(requestExit:(nonnull NSNumber *)reactTag)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSceneNavigator class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRTSceneNavigator class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTSceneNavigator, got: %@", view);
         } else {
             VRTSceneNavigator *component = (VRTSceneNavigator *)view;
             [component userDidRequestExitVR];
         }
-    }];
+    });
 }
 
 @end

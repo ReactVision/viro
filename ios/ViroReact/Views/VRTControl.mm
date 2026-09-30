@@ -34,6 +34,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(view, atIndex);
     RCTLogError(@"A control component cannot have children. Only containers such <ViroNode> or <ViroFlexView> are allowed to have children");
 }
 

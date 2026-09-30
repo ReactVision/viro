@@ -325,6 +325,7 @@ static void VRTMergeAuthoredMaterialProperties(const std::shared_ptr<VROMaterial
 }
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(view, atIndex);
     VRTView *child = (VRTView *)view;
     
     if ([child isKindOfClass:[VRTLight class]]) {

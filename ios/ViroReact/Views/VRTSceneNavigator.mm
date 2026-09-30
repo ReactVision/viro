@@ -168,6 +168,7 @@
 
 //VROComponent overrides...
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     RCTAssert([subview isKindOfClass:[VRTScene class]], @"VRTSceneNavigator only accepts VRTScene subviews");
     VRTScene *sceneView = (VRTScene *)subview;
     BOOL isVRViewInit = [self initVRView];

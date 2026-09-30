@@ -65,6 +65,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(view, atIndex);
     if ([view isKindOfClass:VRT_CLASS_PORTAL]) {
         VRTPortal *frameView = (VRTPortal *)view;
         [self portal]->setPortalEntrance([frameView portalFrame]);

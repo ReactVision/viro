@@ -157,6 +157,7 @@
 #pragma mark - VRTNode overrides.
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)index {
+    VRT_RETURN_IF_NIL_SUBVIEW(view, index);
     VRTView *vrtView = (VRTView *)view;
     if ([vrtView isKindOfClass:[VRTImage class]] ||
         [vrtView isKindOfClass:[VRTText class]] ||

@@ -289,23 +289,38 @@ static void VRTDispatchNodeCommand(RCTBridge *bridge, NSNumber *reactTag, NSStri
     }];
 }
 
-RCT_EXPORT_METHOD(setPosition:(nonnull NSNumber *)reactTag position:(NSArray<NSNumber *> *)position)
+// The command args arrive flattened ([x, y, z]), matching ViroGameLoopUtils.ts and
+// VRTNodeManager on Android. The interop layer prepends the react tag, so each method
+// takes the tag plus three numbers. Keep these three in step with both of those.
+RCT_EXPORT_METHOD(setPosition:(nonnull NSNumber *)reactTag
+                            x:(nonnull NSNumber *)x
+                            y:(nonnull NSNumber *)y
+                            z:(nonnull NSNumber *)z)
 {
+    NSArray<NSNumber *> *position = @[x, y, z];
     VRTDispatchNodeCommand(self.bridge, reactTag, @"setPosition", ^(VRTNode *node) {
         node.position = position;
     });
 }
 
 // Euler degrees, matching the rotation prop.
-RCT_EXPORT_METHOD(setRotationEuler:(nonnull NSNumber *)reactTag rotation:(NSArray<NSNumber *> *)rotation)
+RCT_EXPORT_METHOD(setRotationEuler:(nonnull NSNumber *)reactTag
+                                 x:(nonnull NSNumber *)x
+                                 y:(nonnull NSNumber *)y
+                                 z:(nonnull NSNumber *)z)
 {
+    NSArray<NSNumber *> *rotation = @[x, y, z];
     VRTDispatchNodeCommand(self.bridge, reactTag, @"setRotationEuler", ^(VRTNode *node) {
         node.rotation = rotation;
     });
 }
 
-RCT_EXPORT_METHOD(setScale:(nonnull NSNumber *)reactTag scale:(NSArray<NSNumber *> *)scale)
+RCT_EXPORT_METHOD(setScale:(nonnull NSNumber *)reactTag
+                         x:(nonnull NSNumber *)x
+                         y:(nonnull NSNumber *)y
+                         z:(nonnull NSNumber *)z)
 {
+    NSArray<NSNumber *> *scale = @[x, y, z];
     VRTDispatchNodeCommand(self.bridge, reactTag, @"setScale", ^(VRTNode *node) {
         node.scale = scale;
     });

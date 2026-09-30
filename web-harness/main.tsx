@@ -39,7 +39,12 @@ import { ViroVirtualButton } from "../components/ViroVirtualButton";
 import { useVirtualController } from "../components/Web/viroVirtualController";
 import { ViroQuad } from "../components/ViroQuad";
 import { makeStudioScene } from "./studioFixture";
-import { makeCheckerDataUrl, makeAnimatedGifDataUrl } from "./placeholderAssets";
+import {
+  makeCheckerDataUrl,
+  makeAnimatedGifDataUrl,
+  makeTransparentBorderPngDataUrl,
+} from "./placeholderAssets";
+import type { StudioSceneResponse } from "../components/Studio/types";
 import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
@@ -534,8 +539,206 @@ const MODE_LABEL: Record<Mode, string> = {
 
 // Studio scene fixture (no backend): rendered through the web host to validate
 // that Studio-authored scenes play on web via our renderer + runtime.
-const studioScene = makeStudioScene({ modelUrl: helmetUrl, imageUrl: checkerUrl });
-const studioApiRequestExecutor = async () => ({ ok: true, status: 200, body: {} });
+// Studio mode. Without ?scene= it renders the local fixture (no backend); with
+// ?scene=<uuid>&key=<apiKey> it fetches the real scene the way native does.
+const sceneParam = params.get("scene");
+const apiKeyParam = params.get("key");
+/** ?base=<url>: platform origin, for staging. Native's is fixed to production. */
+const platformBase = (params.get("base") ?? "https://platform.reactvision.xyz").replace(/\/+$/, "");
+/** ?ticker=1: start the parent re-render ticker on load. */
+const tickerOnLoad = params.get("ticker") === "1";
+
+const studioScene = makeStudioScene({
+  modelUrl: helmetUrl,
+  imageUrl: checkerUrl,
+  alphaImageUrl: makeTransparentBorderPngDataUrl(),
+  // A path under /models/ with an extension, so Vite answers 404 rather than
+  // the SPA fallback page.
+  missingModelUrl: "/models/__missing__.glb",
+  extraModelUrl: glbParam ?? undefined,
+});
+
+/** Fetch failures that never reach an HTTP status: CORS or the network. */
+function describeFetchFailure(url: string, e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  return (
+    `fetch ${shortUrl(url)} failed with no HTTP status (${msg}). ` +
+    `From a browser that is almost always CORS: the platform did not allow ` +
+    `this origin or the x-api-key header in its preflight.`
+  );
+}
+
+/**
+ * Mirrors native VRTStudioModule.rvGetScene: GET
+ * {base}/functions/v1/scenes/{id} with `x-api-key: <RVApiKey>`, body is the
+ * StudioSceneResponse JSON. Also serves NAVIGATION to other scenes.
+ */
+async function fetchStudioScene(sceneId: string): Promise<StudioSceneResponse> {
+  const url = `${platformBase}/functions/v1/scenes/${encodeURIComponent(sceneId)}`;
+  if (!apiKeyParam) {
+    const e = new Error("?scene= needs ?key=<apiKey> as well");
+    herr("studio", e.message);
+    throw e;
+  }
+  hlog("studio", `GET ${url}`);
+  const started = performance.now();
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { "x-api-key": apiKeyParam } });
+  } catch (e) {
+    herr("studio", describeFetchFailure(url, e));
+    throw e;
+  }
+  const body = await res.text();
+  const ms = Math.round(performance.now() - started);
+  hlog("studio", `HTTP ${res.status} in ${ms} ms, ${body.length} bytes`);
+  if (!res.ok) {
+    herr("studio", body.slice(0, 240));
+    throw new Error(`GET scene ${sceneId}: HTTP ${res.status}`);
+  }
+  const data = JSON.parse(body) as StudioSceneResponse;
+  hlog(
+    "studio",
+    `scene "${data.scene?.name}": ${data.assets?.length ?? 0} assets, plane_detection ${data.scene?.plane_detection}`,
+  );
+  return data;
+}
+
+/**
+ * API_REQUEST transport. With a key it mirrors native rvStudioApiRequest (POST
+ * {base}/functions/v1/scene-api-request, {function_id, variables}); without
+ * one (the fixture) it answers a canned success.
+ */
+async function studioApiRequestExecutor(
+  functionId: string,
+  variables: Record<string, boolean | number | string>,
+) {
+  if (!apiKeyParam) {
+    hlog("studio", `API_REQUEST ${functionId} (stubbed)`);
+    return { ok: true, status: 200, body: {} };
+  }
+  const url = `${platformBase}/functions/v1/scene-api-request`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKeyParam },
+      body: JSON.stringify({ function_id: functionId, variables }),
+    });
+    hlog("studio", `API_REQUEST ${functionId}: HTTP ${res.status}`);
+    const envelope = await res.json().catch(() => ({}));
+    return {
+      ok: envelope.ok === true,
+      status: typeof envelope.status === "number" ? envelope.status : null,
+      body: envelope.body,
+      error_code: envelope.error_code ?? (res.ok ? null : "NETWORK_ERROR"),
+      error_message: envelope.error_message ?? null,
+    };
+  } catch (e) {
+    herr("studio", describeFetchFailure(url, e));
+    return { ok: false, status: null, error_code: "NETWORK_ERROR", error_message: String(e) };
+  }
+}
+
+/**
+ * Studio mode host. The ticker re-renders this component (and so hands the
+ * navigator fresh inline callbacks) every 500 ms; the scene must still mount
+ * exactly once (W8). Two counters make that visible: onSceneReady, which the
+ * scene fires from its mount effect, and <canvas> elements added under the
+ * navigator, which counts renderer remounts.
+ */
+function StudioHost() {
+  const [ticking, setTicking] = useState(tickerOnLoad);
+  const [renders, setRenders] = useState(0);
+  const [ready, setReady] = useState(0);
+  const [canvases, setCanvases] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ticking) return;
+    const id = setInterval(() => setRenders((n) => n + 1), 500);
+    return () => clearInterval(id);
+  }, [ticking]);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const count = (nodes: NodeList) => {
+      let n = 0;
+      nodes.forEach((node) => {
+        if (node instanceof HTMLCanvasElement) n++;
+        else if (node instanceof Element) n += node.querySelectorAll("canvas").length;
+      });
+      return n;
+    };
+    setCanvases(el.querySelectorAll("canvas").length);
+    const mo = new MutationObserver((records) => {
+      let added = 0;
+      for (const r of records) added += count(r.addedNodes);
+      if (added) setCanvases((n) => n + added);
+    });
+    mo.observe(el, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setStatus("scene mounts", `${ready} (onSceneReady; must stay 1)`);
+    setStatus("canvas mounts", canvases);
+    setStatus("parent renders", `${renders} (ticker ${ticking ? "on" : "off"})`);
+  }, [ready, canvases, renders, ticking]);
+
+  // Passed straight through; StudioSceneNavigator.web may not forward it yet.
+  const passThrough: Record<string, unknown> = { onMotionUnavailable };
+
+  return (
+    <div ref={wrapRef} style={{ width: "100%", height: "100%" }}>
+      <button
+        data-testid="ticker-toggle"
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          zIndex: 10,
+          padding: "8px 14px",
+          borderRadius: 999,
+          border: "none",
+          background: ticking ? "#b23" : "#111",
+          color: "#fff",
+          font: "600 13px system-ui, sans-serif",
+        }}
+        onClick={() => setTicking((t) => !t)}
+      >
+        {ticking ? "ticker: on" : "ticker: off"}
+      </button>
+      <StudioSceneNavigator
+        {...(sceneParam
+          ? { sceneId: sceneParam, loadScene: fetchStudioScene }
+          : { sceneData: studioScene, loadScene: async () => studioScene })}
+        apiRequestExecutor={studioApiRequestExecutor}
+        webRendererOptions={webRendererOptions}
+        slamScriptUrl="/tinyvio-slam.js"
+        onSessionReady={onARSessionReady}
+        onSceneReady={() => {
+          setReady((n) => n + 1);
+          hlog("studio", "onSceneReady");
+        }}
+        onSceneLoaded={(d: StudioSceneResponse) => hlog("studio", `loaded "${d.scene?.name}"`)}
+        onSceneChange={(id: string, name: string) => hlog("studio", `scene change → ${name} (${id})`)}
+        onError={(e: Error) => herr("studio", "scene error:", e)}
+        onAssetError={(asset: any, error: Error) =>
+          herr("studio", `onAssetError "${asset?.name}" (${shortUrl(asset?.file_url ?? "")}):`, error)
+        }
+        onRendererAbort={(err: Error) => herr("studio", "onRendererAbort:", err)}
+        onUnsupported={(f: string[]) => hlog("studio", "unsupported:", f.join(", "))}
+        renderError={(e: Error) => (
+          <div style={{ color: "#ff8a80", padding: 60, font: "500 14px system-ui" }}>
+            Studio error: {e.message}
+          </div>
+        )}
+        {...passThrough}
+      />
+    </div>
+  );
+}
 
 function App() {
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -614,14 +817,7 @@ function App() {
         />
       )}
       {mode === "studio" && (
-        <StudioSceneNavigator
-          sceneData={studioScene}
-          loadScene={async () => studioScene}
-          apiRequestExecutor={studioApiRequestExecutor}
-          webRendererOptions={webRendererOptions}
-          onSceneReady={() => console.log("[harness] studio scene ready")}
-          onUnsupported={(f) => console.log("[harness] studio unsupported:", f)}
-        />
+        <StudioHost />
       )}
       {mode === "input" && (
         <>

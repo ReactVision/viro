@@ -15,9 +15,13 @@ import com.facebook.react.uimanager.UIManagerHelper;
 import com.viromedia.bridge.component.VRT3DSceneNavigator;
 import com.viromedia.bridge.component.VRTVRSceneNavigator;
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.WritableMap;
 import com.viro.core.ARScene;
+import com.viro.core.ViroMediaRecorder;
+import com.viro.core.ViroView;
+import com.viro.core.ViroViewOpenXR;
 
 /**
  * React Native native module for Meta Quest / OpenXR-specific operations.
@@ -27,12 +31,20 @@ import com.viro.core.ARScene;
  * JS usage (via NativeModules.VRModuleOpenXR):
  *   recenterTracking(viewTag)
  *   setPassthroughEnabled(viewTag, enabled)  // Week 4
+ *   takeScreenshot(viewTag, fileName, saveToCameraRoll) → {success, url, errorCode}
+ *   startVideoRecording(viewTag, fileName, saveToCameraRoll, onError(errorCode))
+ *   stopVideoRecording(viewTag) → {success, url, errorCode}
  */
 @ReactModule(name = "VRModuleOpenXR")
 public class VRModuleOpenXR extends ReactContextBaseJavaModule {
 
+    // Watermark, file, gallery and permission handling, shared with the AR
+    // navigator's capture methods (ARSceneNavigatorModule).
+    private final MediaCapture mCapture;
+
     public VRModuleOpenXR(ReactApplicationContext context) {
         super(context);
+        mCapture = new MediaCapture(context);
     }
 
     @Override
@@ -180,5 +192,112 @@ public class VRModuleOpenXR extends ReactContextBaseJavaModule {
                 }
             }
         });
+    }
+
+    // ------------------------------------------------------------------------
+    // Screen capture
+    //
+    // The same three calls, arguments and results as VRTARSceneNavigatorModule,
+    // which cannot serve them here: it resolves its view as a VRTARSceneNavigator,
+    // and VRActivity hosts a VRTVRSceneNavigator. The frame comes from the
+    // renderer's ViroMediaRecorder, which ViroViewOpenXR sizes to one eye's
+    // swapchain image, so a capture is the left eye rather than a stereo pair.
+    // Passthrough is composited by the OS beneath the projection layer, so a
+    // capture of a mixed-reality scene holds the virtual content only.
+    //
+    // Failures resolve (or reach onError) with a code rather than rejecting:
+    //   6 (UNSUPPORTED_PLATFORM_ERROR) — no such view, or not an OpenXR view.
+    //   7 (NOT_READY_ERROR) — the XR session has no swapchains yet; retry once
+    //     the scene is rendering.
+    // Otherwise the codes are ViroMediaRecorder.Error's, as on AR.
+    // ------------------------------------------------------------------------
+
+    private interface RecorderTask {
+        void run(ViroMediaRecorder recorder);
+    }
+
+    private interface CaptureFailure {
+        void fail(int errorCode);
+    }
+
+    /** Resolves the Quest navigator's recorder on the UI thread, or reports why not. */
+    private void withRecorder(final int sceneNavTag, final RecorderTask task,
+                              final CaptureFailure failure) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            failure.fail(MediaCapture.UNSUPPORTED_PLATFORM_ERROR);
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                ViroMediaRecorder recorder;
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTVRSceneNavigator)) {
+                        failure.fail(MediaCapture.UNSUPPORTED_PLATFORM_ERROR);
+                        return;
+                    }
+                    ViroView viroView = ((VRTVRSceneNavigator) view).getViroView();
+                    if (!(viroView instanceof ViroViewOpenXR)) {
+                        failure.fail(MediaCapture.UNSUPPORTED_PLATFORM_ERROR);
+                        return;
+                    }
+                    // Null until the XR session has created its swapchains.
+                    recorder = viroView.getRecorder();
+                } catch (Exception e) {
+                    failure.fail(MediaCapture.UNSUPPORTED_PLATFORM_ERROR);
+                    return;
+                }
+                if (recorder == null) {
+                    failure.fail(MediaCapture.NOT_READY_ERROR);
+                    return;
+                }
+                task.run(recorder);
+            }
+        });
+    }
+
+    /**
+     * Captures the next rendered frame (left eye) to {@code fileName}.jpg in
+     * app-specific storage, and to the gallery as well when
+     * {@code saveToCameraRoll}. Resolves {@code {success, url, errorCode}}.
+     */
+    @ReactMethod
+    public void takeScreenshot(final int sceneNavTag, final String fileName,
+                               final boolean saveToCameraRoll, final Promise promise) {
+        withRecorder(sceneNavTag, recorder -> recorder.takeScreenShotAsync(
+                new ViroMediaRecorder.ScreenshotFinishListener() {
+                    @Override
+                    public void onSuccess(android.graphics.Bitmap bitmap, String filePath) {
+                        mCapture.resolveScreenshot(bitmap, fileName, saveToCameraRoll, promise);
+                    }
+
+                    @Override
+                    public void onError(ViroMediaRecorder.Error error) {
+                        promise.resolve(MediaCapture.failure(error.toInt()));
+                    }
+                }),
+                errorCode -> promise.resolve(MediaCapture.failure(errorCode)));
+    }
+
+    /**
+     * Starts recording the rendered frames (left eye) and the microphone. A
+     * failure, at start or later, reaches {@code reactErrorDelegate} with a code.
+     */
+    @ReactMethod
+    public void startVideoRecording(final int sceneNavTag, final String fileName,
+                                    final boolean saveToCameraRoll, final Callback reactErrorDelegate) {
+        withRecorder(sceneNavTag,
+                recorder -> mCapture.startVideoRecording(recorder, fileName, saveToCameraRoll, reactErrorDelegate),
+                errorCode -> reactErrorDelegate.invoke(errorCode));
+    }
+
+    /** Stops the recording and resolves {@code {success, url, errorCode}}. */
+    @ReactMethod
+    public void stopVideoRecording(final int sceneNavTag, final Promise promise) {
+        withRecorder(sceneNavTag,
+                recorder -> mCapture.stopVideoRecording(recorder, promise),
+                errorCode -> promise.resolve(MediaCapture.failure(errorCode)));
     }
 }

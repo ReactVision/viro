@@ -39,7 +39,59 @@ function asset(partial: Partial<StudioAsset> & Pick<StudioAsset, "id" | "asset_t
   };
 }
 
-export function makeStudioScene(opts: { modelUrl: string; imageUrl: string }): StudioSceneResponse {
+export function makeStudioScene(opts: {
+  modelUrl: string;
+  imageUrl: string;
+  /** PNG with transparent borders, placed in front of the model (W7). */
+  alphaImageUrl?: string;
+  /** A URL that 404s, so a 3D-MODEL asset fails and fires onAssetError. */
+  missingModelUrl?: string;
+  /** Extra GLB from ?glb=, rendered as its own asset. */
+  extraModelUrl?: string;
+}): StudioSceneResponse {
+  const extra: StudioAsset[] = [];
+  if (opts.alphaImageUrl) {
+    extra.push(
+      asset({
+        id: "a-alpha-image",
+        asset_type_name: "IMAGE",
+        name: "Alpha borders",
+        file_url: opts.alphaImageUrl,
+        // Between the camera and the helmet, so the border has to show it.
+        // Positions keep both on a portrait phone screen.
+        position_x: 0.45,
+        position_y: 0,
+        position_z: -2,
+        scale: 0.8,
+      }),
+    );
+  }
+  if (opts.missingModelUrl) {
+    extra.push(
+      asset({
+        id: "a-missing-model",
+        asset_type_name: "3D-MODEL",
+        name: "Missing model (404)",
+        file_url: opts.missingModelUrl,
+        position_x: -0.9,
+        position_y: -1.2,
+        position_z: -3,
+      }),
+    );
+  }
+  if (opts.extraModelUrl) {
+    extra.push(
+      asset({
+        id: "a-url-model",
+        asset_type_name: "3D-MODEL",
+        name: "?glb model",
+        file_url: opts.extraModelUrl,
+        position_x: 0,
+        position_y: -0.6,
+        position_z: -4,
+      }),
+    );
+  }
   return {
     scene: {
       id: "scene-fixture-1",
@@ -68,7 +120,7 @@ export function makeStudioScene(opts: { modelUrl: string; imageUrl: string }): S
         asset_type_name: "IMAGE",
         name: "Picture",
         file_url: opts.imageUrl,
-        position_x: -1.6,
+        position_x: -0.9,
         position_y: 0,
         position_z: -3,
       }),
@@ -77,11 +129,12 @@ export function makeStudioScene(opts: { modelUrl: string; imageUrl: string }): S
         asset_type_name: "3D-MODEL",
         name: "Helmet",
         file_url: opts.modelUrl,
-        position_x: 1.4,
+        position_x: 0.7,
         position_y: 0,
         position_z: -3,
         scale: 0.8,
       }),
+      ...extra,
     ],
     collision_bindings: [],
     animations: [],

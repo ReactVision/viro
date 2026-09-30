@@ -13,6 +13,10 @@ const rootDir = fileURLToPath(new URL(".", import.meta.url));
  */
 export default defineConfig({
   root: "web-harness",
+  // Two real pages and no client routes, so no SPA fallback: an unknown path
+  // is a 404, which the harness's missing-asset fixture relies on (a fallback
+  // answers 200 with index.html, and the asset fails for the wrong reason).
+  appType: "mpa",
   resolve: {
     extensions: [
       ".web.tsx",

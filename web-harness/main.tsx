@@ -44,7 +44,7 @@ import { ViroAmbientLight } from "../components/ViroAmbientLight";
 import { ViroDirectionalLight } from "../components/ViroDirectionalLight";
 import { ViroMaterials } from "../components/Material/ViroMaterials";
 import { ViroAnimations } from "../components/Animation/ViroAnimations";
-import { HarnessPanels, clearStatus, hlog } from "./harnessLog";
+import { HarnessPanels, clearStatus, herr, hlog, setStatus } from "./harnessLog";
 
 import helmetUrl from "./models/DamagedHelmet.glb?url";
 
@@ -87,13 +87,71 @@ ViroAnimations.registerAnimations({
   },
 });
 
+// URL params (see README.md): ?mode= picks the initial mode; the rest feed the
+// individual modes.
+const params = new URLSearchParams(window.location.search);
+/** ?glb=<url>: a model to load in 3D mode (replacing the helmet) and Studio mode. */
+const glbParam = params.get("glb");
+/** ?glbScale=<n>: uniform scale for the ?glb model in 3D mode. */
+const glbScale = Number(params.get("glbScale")) || 1.6;
+
+function shortUrl(url: string): string {
+  if (url.startsWith("data:")) return url.slice(0, 24) + "…";
+  return url.length > 60 ? "…" + url.slice(-57) : url;
+}
+
+/** Bytes of a fetched model: resource timing first, a HEAD request second. */
+async function modelSizeBytes(url: string): Promise<number | null> {
+  if (url.startsWith("data:") || url.startsWith("blob:")) return null;
+  const abs = new URL(url, window.location.href).href;
+  const entry = performance.getEntriesByName(abs).pop() as PerformanceResourceTiming | undefined;
+  const timed = entry ? entry.decodedBodySize || entry.encodedBodySize : 0;
+  if (timed > 0) return timed;
+  try {
+    const r = await fetch(abs, { method: "HEAD" });
+    const n = Number(r.headers.get("content-length"));
+    return n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * onLoadStart/onLoadEnd/onError for a Viro3DObject that log elapsed time and
+ * the model size. Built once per model so a re-rendering scene hands the
+ * component the same functions.
+ */
+function modelLoadHandlers(tag: string, url: string) {
+  let start = performance.now();
+  const elapsed = () => Math.round(performance.now() - start);
+  return {
+    onLoadStart: () => {
+      start = performance.now();
+      hlog(tag, "load start", shortUrl(url));
+    },
+    onLoadEnd: () => {
+      const ms = elapsed();
+      void modelSizeBytes(url).then((b) =>
+        hlog(tag, `loaded in ${ms} ms`, b ? `(${(b / 1048576).toFixed(2)} MB)` : "(size unknown)"),
+      );
+    },
+    onError: (e: unknown) => herr(tag, `error after ${elapsed()} ms:`, e),
+  };
+}
+
+const mainModelUrl = glbParam ?? helmetUrl;
+const mainModelHandlers = modelLoadHandlers(glbParam ? "glb" : "helmet", mainModelUrl);
+
 function DemoScene() {
   const [angle, setAngle] = useState(0);
   const [tapped, setTapped] = useState(false);
+  const [taps, setTaps] = useState(0);
+  const tapsRef = useRef(0);
   useEffect(() => {
     const id = setInterval(() => setAngle((a) => a + 2), 16);
     return () => clearInterval(id);
   }, []);
+  useEffect(() => setStatus("3D taps", `${taps} (box upper-right)`), [taps]);
 
   return (
     <ViroScene>
@@ -106,15 +164,33 @@ function DemoScene() {
         direction={[0, -1, -0.6]}
         castsShadow
       />
+      {/* Tap target (W2): fixed, off both screen centres and in front of the
+          spinning content, so a tap mirrored in x or y lands on nothing. */}
+      <ViroBox
+        position={[0.9, 0.7, -2.5]}
+        scale={[0.35, 0.35, 0.35]}
+        materials={[taps % 2 ? "redBox" : "blueBox"]}
+        onClick={() => {
+          tapsRef.current += 1;
+          hlog("3D", `tap #${tapsRef.current} on upper-right box`);
+          setTaps(tapsRef.current);
+        }}
+      />
+      <ViroText
+        position={[0.9, 1.05, -2.5]}
+        width={1.2}
+        height={0.3}
+        text={`taps: ${taps}`}
+        style={{ fontSize: 18, color: "#ffffff", textAlign: "Center" }}
+      />
       <ViroNode position={[0, 0, -5]} rotation={[0, angle * 0.4, 0]}>
-        {/* Loaded GLB model (PBR, self-contained) at the center. */}
+        {/* Loaded GLB model (PBR, self-contained) at the center — or ?glb=. */}
         <Viro3DObject
-          source={{ uri: helmetUrl }}
+          source={{ uri: mainModelUrl }}
           type="GLB"
-          scale={[1.6, 1.6, 1.6]}
+          scale={glbParam ? [glbScale, glbScale, glbScale] : [1.6, 1.6, 1.6]}
           rotation={[0, angle, 0]}
-          onLoadEnd={() => console.log("[harness] helmet loaded")}
-          onError={(e) => console.error("[harness] helmet error", e)}
+          {...mainModelHandlers}
         />
         {/* VRX model (FBX/protobuf/gzip path) to the side. */}
         <Viro3DObject
@@ -366,9 +442,6 @@ function CameraScene(props: { cameraRef?: React.Ref<CameraHandle> }) {
 const MODES = ["3d", "ar", "studio", "input", "camera"] as const;
 type Mode = (typeof MODES)[number];
 
-// URL params (see README.md): ?mode= picks the initial mode; the rest feed the
-// individual modes.
-const params = new URLSearchParams(window.location.search);
 const paramMode = params.get("mode")?.toLowerCase();
 const initialMode: Mode = MODES.includes(paramMode as Mode) ? (paramMode as Mode) : "3d";
 const MODE_LABEL: Record<Mode, string> = {

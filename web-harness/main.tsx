@@ -319,27 +319,107 @@ function DemoScene() {
   );
 }
 
+// ─── AR diagnostics (shared by AR mode and Studio scenes that open in AR) ───
+
+const TRACKING_NAMES: Record<number, string> = { 1: "UNAVAILABLE", 2: "LIMITED", 3: "NORMAL" };
+let lastTracking: { name: string; at: number } | null = null;
+
+/** Tracking state on screen, plus each transition and how long the previous state held (W3). */
+function reportTracking(state: number) {
+  const name = TRACKING_NAMES[state] ?? `state ${state}`;
+  const now = performance.now();
+  if (lastTracking?.name === name) return;
+  const held = lastTracking ? ` after ${((now - lastTracking.at) / 1000).toFixed(1)}s` : "";
+  hlog("AR", `tracking ${lastTracking?.name ?? "—"} → ${name}${held}`);
+  lastTracking = { name, at: now };
+  setStatus("tracking", `${name} (since ${(now / 1000).toFixed(1)}s)`);
+}
+
+/**
+ * The <video> an AR session reads the camera from. ViroArSession keeps it in a
+ * private field and also attaches it, hidden, to <body>; the field is tried
+ * first so a second video on the page can't be picked by mistake.
+ */
+function arVideoOf(session: any): HTMLVideoElement | null {
+  const own = session?.video;
+  if (own instanceof HTMLVideoElement) return own;
+  return (
+    document.querySelector<HTMLVideoElement>('body > video[aria-hidden="true"]') ??
+    document.querySelector<HTMLVideoElement>("video")
+  );
+}
+
+let stopFeedWatch: (() => void) | null = null;
+
+/** Shows the camera feed size (videoWidth x videoHeight) once the session runs (W5). */
+function watchFeedSize(session: any) {
+  stopFeedWatch?.();
+  let last = "";
+  const tick = () => {
+    const v = arVideoOf(session);
+    const size = v && v.videoWidth ? `${v.videoWidth}x${v.videoHeight}` : "(no video yet)";
+    if (size === last) return;
+    last = size;
+    setStatus("feed", size);
+    const settings = session?.stream?.getVideoTracks?.()[0]?.getSettings?.();
+    hlog(
+      "AR",
+      `camera feed ${size}`,
+      settings ? `track ${settings.width}x${settings.height}@${settings.frameRate ?? "?"}fps` : "",
+    );
+  };
+  tick();
+  const id = setInterval(tick, 1000);
+  stopFeedWatch = () => {
+    clearInterval(id);
+    stopFeedWatch = null;
+  };
+}
+
+function onARSessionReady(session: any) {
+  hlog("AR", "session ready");
+  watchFeedSize(session);
+}
+
+function onMotionUnavailable(reason: string) {
+  herr("AR", `motion unavailable: ${reason}`);
+  setStatus("motion", reason);
+}
+
 // AR demo: a cube fixed 1m ahead (proves pose tracking) + a ViroARPlane that
 // binds to the first detected plane and drops a red box on it (proves the
-// declarative plane API: slam planes → anchors → matched node transform).
+// declarative plane API: slam planes → anchors → matched node transform), and
+// a tap target off to the upper right so a mirrored tap would miss it (W2).
 function ARDemoScene() {
+  const [taps, setTaps] = useState(0);
+  const tapsRef = useRef(0);
+  useEffect(() => setStatus("AR taps", `${taps} (box upper-right)`), [taps]);
   return (
     <ViroARScene
-      onTrackingUpdated={(state, reason) =>
-        console.log("[harness AR] tracking", state, reason)
-      }
-      onAnchorFound={(a) => console.log("[harness AR] anchor found", a.anchorId, a.alignment)}
-      onAnchorRemoved={(a) => console.log("[harness AR] anchor removed", a.anchorId)}
+      onTrackingUpdated={(state: number) => reportTracking(state)}
+      onAnchorFound={(a: any) => hlog("AR", "anchor found", a.anchorId, a.alignment)}
+      onAnchorRemoved={(a: any) => hlog("AR", "anchor removed", a.anchorId)}
     >
       <ViroAmbientLight color="#ffffff" intensity={400} />
       <ViroDirectionalLight color="#ffffff" intensity={1000} direction={[0, -1, -0.6]} />
       {/* World-fixed cube for pose validation. */}
       <ViroBox position={[0, 0, -1]} scale={[0.2, 0.2, 0.2]} materials={["blueBox"]} />
+      {/* Tap target: up and to the right of the pose cube. */}
+      <ViroBox
+        position={[0.3, 0.2, -1]}
+        scale={[0.12, 0.12, 0.12]}
+        materials={[taps % 2 ? "blueBox" : "redBox"]}
+        onClick={() => {
+          tapsRef.current += 1;
+          hlog("AR", `tap #${tapsRef.current} on upper-right box`);
+          setTaps(tapsRef.current);
+        }}
+      />
       {/* Auto-bound plane: a box sits at the plane origin once detected. */}
       <ViroARPlane
         minWidth={0.1}
         minHeight={0.1}
-        onAnchorFound={(a) => console.log("[harness AR] plane bound", a.anchorId, a.width, a.height)}
+        onAnchorFound={(a: any) => hlog("AR", "plane bound", a.anchorId, a.width, a.height)}
       >
         <ViroBox position={[0, 0.05, 0]} scale={[0.1, 0.1, 0.1]} materials={["redBox"]} />
       </ViroARPlane>
@@ -461,6 +541,8 @@ function App() {
   const [mode, setMode] = useState<Mode>(initialMode);
   useEffect(() => {
     clearStatus();
+    stopFeedWatch?.();
+    lastTracking = null;
     hlog("mode", mode);
     // Keep the URL in step so a reload (or a copied link) lands on this mode.
     const url = new URL(window.location.href);
@@ -527,6 +609,8 @@ function App() {
           webRendererOptions={webRendererOptions}
           slamScriptUrl="/tinyvio-slam.js"
           arOptions={{ detectPlanes: true }}
+          onSessionReady={onARSessionReady}
+          onMotionUnavailable={onMotionUnavailable}
         />
       )}
       {mode === "studio" && (

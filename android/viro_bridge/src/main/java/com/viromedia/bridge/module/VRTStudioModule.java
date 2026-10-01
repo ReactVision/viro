@@ -15,6 +15,8 @@ import com.viro.core.ReactVisionAuth;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * VRTStudioModule
@@ -35,6 +37,10 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
 
     private static final String MODULE_NAME       = "VRTStudio";
     private static final String BASE_URL          = "https://platform.reactvision.xyz";
+    // BASE_URL's database region, sent as x-region so its edge functions run
+    // beside the database instead of nearest the device. A session on another
+    // base URL is pinned only when it brings its own functionRegion.
+    private static final String FUNCTION_REGION   = "eu-west-2";
     private static final String API_KEY_META      = "com.reactvision.RVApiKey";
     private static final String PROJECT_ID_META   = "com.reactvision.RVProjectId";
     private static final int    TIMEOUT_SEC       = 30;
@@ -50,10 +56,12 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
         final String baseUrl;
         final String accessToken;
         final String clientTag; // nullable
-        StudioSession(String baseUrl, String accessToken, String clientTag) {
+        final String functionRegion; // nullable
+        StudioSession(String baseUrl, String accessToken, String clientTag, String functionRegion) {
             this.baseUrl = baseUrl;
             this.accessToken = accessToken;
             this.clientTag = clientTag;
+            this.functionRegion = functionRegion;
         }
     }
 
@@ -61,7 +69,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     private static final class RequestAuth {
         final String baseUrl;
         final String apiKey;         // null in session mode
-        final String[] headerNames;  // null in api-key mode
+        final String[] headerNames;  // the credential in session mode, plus x-region when one resolves
         final String[] headerValues;
         RequestAuth(String baseUrl, String apiKey, String[] headerNames, String[] headerValues) {
             this.baseUrl = baseUrl;
@@ -120,7 +128,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     }
 
     // @internal — sets/clears the first-party session auth (see studioSession).
-    // A map { baseUrl, accessToken, clientTag? } enables session mode; null /
+    // A map { baseUrl, accessToken, clientTag?, functionRegion? } enables session mode; null /
     // malformed reverts to manifest RVApiKey mode. The renderer keeps its own
     // copy, which cloud anchors and the co-location channel read.
     @ReactMethod
@@ -137,7 +145,9 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
         }
         while (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         String clientTag = config.hasKey("clientTag") ? config.getString("clientTag") : null;
-        StudioSession session = new StudioSession(baseUrl, accessToken, clientTag);
+        String functionRegion = config.hasKey("functionRegion") && !config.isNull("functionRegion")
+                ? config.getString("functionRegion") : null;
+        StudioSession session = new StudioSession(baseUrl, accessToken, clientTag, functionRegion);
         studioSession = session;
         pushSessionToRenderer(session);
         promise.resolve(null);
@@ -154,13 +164,10 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
         if (auth == null) {
             r.putString("mode", "none");
             r.putNull("baseUrl");
-        } else if (auth.apiKey != null) {
-            r.putString("mode", "api_key");
-            r.putString("baseUrl", auth.baseUrl);
-            headers.putString("x-api-key", auth.apiKey);
         } else {
-            r.putString("mode", "session");
+            r.putString("mode", auth.apiKey != null ? "api_key" : "session");
             r.putString("baseUrl", auth.baseUrl);
+            if (auth.apiKey != null) headers.putString("x-api-key", auth.apiKey);
             for (int i = 0; i < auth.headerNames.length; i++) {
                 headers.putString(auth.headerNames[i], auth.headerValues[i]);
             }
@@ -244,20 +251,29 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     private RequestAuth resolveAuth() {
         StudioSession session = studioSession;
         if (session != null) {
-            String[] names;
-            String[] values;
+            List<String> names  = new ArrayList<>();
+            List<String> values = new ArrayList<>();
+            names.add("Authorization");
+            values.add("Bearer " + session.accessToken);
             if (session.clientTag != null && !session.clientTag.isEmpty()) {
-                names  = new String[]{"Authorization", "x-rv-client"};
-                values = new String[]{"Bearer " + session.accessToken, session.clientTag};
-            } else {
-                names  = new String[]{"Authorization"};
-                values = new String[]{"Bearer " + session.accessToken};
+                names.add("x-rv-client");
+                values.add(session.clientTag);
             }
-            return new RequestAuth(session.baseUrl, null, names, values);
+            String region = session.functionRegion;
+            if ((region == null || region.isEmpty()) && BASE_URL.equals(session.baseUrl)) {
+                region = FUNCTION_REGION;
+            }
+            if (region != null && !region.isEmpty()) {
+                names.add("x-region");
+                values.add(region);
+            }
+            return new RequestAuth(session.baseUrl, null,
+                    names.toArray(new String[0]), values.toArray(new String[0]));
         }
         String apiKey = readApiKey();
         if (apiKey == null) return null;
-        return new RequestAuth(BASE_URL, apiKey, null, null);
+        return new RequestAuth(BASE_URL, apiKey,
+                new String[]{"x-region"}, new String[]{FUNCTION_REGION});
     }
 
     // Throwable, not Exception: a missing renderer library surfaces as
@@ -268,7 +284,8 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
             if (session == null) {
                 ReactVisionAuth.clearSession();
             } else {
-                ReactVisionAuth.setSession(session.baseUrl, session.accessToken, session.clientTag);
+                ReactVisionAuth.setSession(session.baseUrl, session.accessToken, session.clientTag,
+                        session.functionRegion);
             }
         } catch (Throwable ignored) {
         }

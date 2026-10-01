@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Changed
+
+- **Studio and co-location requests run in the platform database's region (`VRTStudioModule`, `ViroColocationRooms`).** Edge functions run in the region nearest the caller unless told otherwise, so a device far from London paid the distance on every query a function made: a scene load took 1.75 s run from us-east-1 against 0.6 s pinned. Scene, project and Studio API requests now send `x-region: eu-west-2` with an API key, and with a session on the default platform URL. `rvSetStudioSession` takes an optional `functionRegion` for a session on another URL and passes it to the renderer, whose cloud-anchor requests send it too. Co-location room calls to the default endpoint add the `forceFunctionRegion` query parameter instead, since in a browser the header would need a CORS preflight the platform does not allow. Cloud-anchor pinning needs the matching virocore and ReactVisionCCA builds.
+
 ## v3.0.2 — 29 September 2026
 
 ### Added

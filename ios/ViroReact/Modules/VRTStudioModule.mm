@@ -4,6 +4,10 @@
 #import <ViroKit/VROColocationBridge.h>
 
 static NSString *const kBaseUrl      = @"https://platform.reactvision.xyz";
+// kBaseUrl's database region, sent as x-region so its edge functions run beside
+// the database instead of nearest the device. A session on another base URL is
+// pinned only when it brings its own functionRegion.
+static NSString *const kFunctionRegion = @"eu-west-2";
 static NSString *const kApiKeyKey    = @"RVApiKey";
 static NSString *const kProjectIdKey = @"RVProjectId";
 static const NSTimeInterval kTimeout = 30.0;
@@ -45,11 +49,15 @@ RCT_EXPORT_MODULE(VRTStudio);
         headers[@"Authorization"] = [NSString stringWithFormat:@"Bearer %@", session[@"accessToken"]];
         NSString *clientTag = session[@"clientTag"];
         if (clientTag.length > 0) headers[@"x-rv-client"] = clientTag;
+        NSString *region = session[@"functionRegion"];
+        if (region.length == 0 && [session[@"baseUrl"] isEqualToString:kBaseUrl]) region = kFunctionRegion;
+        if (region.length > 0) headers[@"x-region"] = region;
         return @{@"mode": @"session", @"baseUrl": session[@"baseUrl"], @"headers": headers};
     }
     NSString *apiKey = [self readApiKey];
     if (!apiKey) return nil;
-    return @{@"mode": @"api_key", @"baseUrl": kBaseUrl, @"headers": @{@"x-api-key": apiKey}};
+    return @{@"mode": @"api_key", @"baseUrl": kBaseUrl,
+             @"headers": @{@"x-api-key": apiKey, @"x-region": kFunctionRegion}};
 }
 
 - (void)runGet:(NSString *)url headers:(NSDictionary *)headers resolve:(RCTPromiseResolveBlock)resolve {
@@ -191,7 +199,7 @@ RCT_EXPORT_METHOD(rvGetProjectId:(RCTPromiseResolveBlock)resolve
 }
 
 // @internal — sets/clears the first-party session auth (see gStudioSession).
-// A dict { baseUrl, accessToken, clientTag? } enables session mode; null /
+// A dict { baseUrl, accessToken, clientTag?, functionRegion? } enables session mode; null /
 // NSNull / malformed reverts to manifest RVApiKey mode. The renderer keeps its
 // own copy, which cloud anchors and the co-location channel read.
 RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
@@ -212,10 +220,15 @@ RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
         [@{ @"baseUrl": baseUrl, @"accessToken": accessToken } mutableCopy];
     NSString *clientTag = config[@"clientTag"];
     if (clientTag.length > 0) snapshot[@"clientTag"] = clientTag;
+    NSString *functionRegion = config[@"functionRegion"];
+    if ([functionRegion isKindOfClass:[NSString class]] && functionRegion.length > 0) {
+        snapshot[@"functionRegion"] = functionRegion;
+    }
     gStudioSession = [snapshot copy];
     [VROColocationBridge setStudioSessionBaseUrl:baseUrl
                                      accessToken:accessToken
-                                       clientTag:snapshot[@"clientTag"]];
+                                       clientTag:snapshot[@"clientTag"]
+                                  functionRegion:snapshot[@"functionRegion"]];
     resolve([NSNull null]);
 }
 

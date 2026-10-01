@@ -75,6 +75,13 @@ export type ViroColocationRoomResult =
     };
 
 const DEFAULT_ENDPOINT = "https://platform.reactvision.xyz";
+/**
+ * DEFAULT_ENDPOINT's database region, so its edge function runs beside the
+ * database. The query parameter rather than an `x-region` header, which a
+ * browser would have to clear through a CORS preflight the platform does not
+ * allow it in.
+ */
+const DEFAULT_FUNCTION_REGION = "eu-west-2";
 
 /**
  * The 30 characters a code can hold. O and 0, I and 1 and L, and U against V
@@ -141,7 +148,11 @@ async function request(
   body?: Record<string, unknown>
 ): Promise<ViroColocationRoomResult> {
   const base = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
-  const url = `${base}/functions/v1/colocation${path}`;
+  const url =
+    `${base}/functions/v1/colocation${path}` +
+    (base === DEFAULT_ENDPOINT
+      ? `?forceFunctionRegion=${DEFAULT_FUNCTION_REGION}`
+      : "");
 
   let headers: Record<string, string>;
   if (config.headers) {

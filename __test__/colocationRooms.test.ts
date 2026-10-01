@@ -91,6 +91,22 @@ describe("createColocationRoom", () => {
     });
   });
 
+  it("pins the default platform's function to its database region", async () => {
+    const fetchMock = ok({ room: ROOM_ROW });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const { endpoint: _local, ...defaultEndpoint } = CONFIG;
+    await createColocationRoom(defaultEndpoint, {
+      frameKind: "cloud_anchor",
+      cloudAnchorId: ROOM_ROW.cloud_anchor_id,
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://platform.reactvision.xyz/functions/v1/colocation/rooms?forceFunctionRegion=eu-west-2"
+    );
+  });
+
   it("sends frame_ref for a Meta group and no anchor", async () => {
     const fetchMock = ok({ room: { ...ROOM_ROW, frame_kind: "meta_group" } });
     // @ts-expect-error installing the stub

@@ -1,6 +1,8 @@
 # Installation instructions
 
-If you are starting a new project, please consider using our [Starter Kit](https://github.com/ViroCommunity/starter-kit) as a basis for your app.
+Requires React Native 0.86 with the New Architecture (Fabric). The recommended path is Expo (Dev Client) with the `@reactvision/react-viro` config plugin, which does the native wiring below for you.
+
+If you are starting a new project, please consider using our [Expo + TypeScript starter kit](https://github.com/ReactVision/expo-starter-kit-typescript) as a basis for your app.
 
 The steps below are for manually installing and linking the library to an existing React Native project. We do not yet support auto-linking.
 
@@ -22,7 +24,7 @@ $ yarn add @reactvision/react-viro
 
 ## OS Linking (You _must_ do this - we do not support auto-linking)
 
-If you're unsure about which file to edit or where to put specified the lines, we have added links to how this is done in our [starter-kit](https://github.com/ViroCommunity/starter-kit) repo.
+If you're unsure about which file to edit or where to put specified the lines, see how this is done in our [Expo + TypeScript starter kit](https://github.com/ReactVision/expo-starter-kit-typescript).
 
 ## » [iOS linking](https://viro-community.readme.io/docs/installation-instructions#ios-linking-you-must-do-this---we-do-not-yet-support-auto-linking)
 
@@ -40,7 +42,7 @@ If you're unsure about which file to edit or where to put specified the lines, w
 
 ## Examples
 
-Please note that these examples are a bit old, the code targets an older version of viro before the ReactVision took over the project. They will be updated soon!
+Please note that these examples are a bit old, the code targets an older version of viro before ReactVision took over the project. They will be updated soon!
 
 ## » [AR](https://viro-community.readme.io/docs/examples#ar-examples)
 

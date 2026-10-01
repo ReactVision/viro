@@ -6,7 +6,7 @@
 
 - **A `ViroCamera` mounted between its siblings now becomes the scene's camera (iOS and Android).** On React Native 0.86 the legacy interop holds back a child inserted anywhere but at the end of its parent until that parent next updates, and `ViroScene` asked `VRTCameraModule` for the camera as soon as it mounted. The module's lookup found no view, gave up after a second, and the scene stayed on its default camera until something else updated the camera: a remount through a new `key`, or a conditional camera mid-scene, drew with the wrong projection and `orthographicScale`. `ViroScene` and `ViroARScene` now pass the active camera's tag to the native scene as the `activeCameraTag` prop. The prop change is the parent update the interop was waiting for, so the camera's view is in the tree by the time the scene reads the tag, and a scene keeps the tag and attaches a camera that arrives later still, however deep it sits. A camera's position in its parent no longer matters. `VRTCameraModule.setSceneCamera` and `removeSceneCamera` remain and set the same tag, but `ViroScene` no longer calls them; a camera that stops being active, or unmounts, clears the tag and the scene returns to its default camera. The iOS change is in the bridge source and needs `libViroReact.a` rebuilt.
 
-## v3.0.2 — 29 September 2026
+## v3.0.2 — 30 September 2026
 
 ### Added
 
@@ -39,13 +39,12 @@
 - **A co-location host's Done stays disabled until the scan has 30 keyframes (`StudioSceneNavigator`).** Native's other gates open about 5 s into a scan (12 keyframes on a Pixel 6 Pro), and Pixel maps of 96 and 211 features resolved on no device. When the renderer reports `triangulatedPoints` and `minTriangulatedPoints` in its scan status (new optional `ViroScanStatus` fields), Done also waits for that many points, and the `scanning` state carries them as `points: { count, needed }` for the indicator to show. A renderer that sends neither gates on keyframes as before. `finishColocationScan()` holds to the same gate: it returns `true` when it ended the scan, and `false`, changing nothing, before `canFinish` or outside a scan.
 - **A joiner's `resolving` state carries `seen: { matches, needed }` once the space has matched (`StudioColocationState`),** and the built-in indicator shows it, so a joiner can tell a spot that never matches from one that is almost there.
 - **Android: the vendored ReactVisionCCA Java (`RVHttpClient`, `RVWebSocket`) is re-synced with ReactVisionCCA.** The frame channel no longer retries a handshake refused with 400 or 403, or a socket closed with `auth-revoked`. A 401 on the first connect is final, but a 401 on a reconnect gets one more attempt, so a token that expired while the app was in the background doesn't end the session. Each reconnect asks native for fresh handshake headers, so a refreshed session token is sent. `RVHttpClient.sendMultipart` gains an overload that carries extra request headers.
-
-- **Leaving a co-location session cancels the native work in progress (`StudioSceneNavigator`, `cancelCloudAnchorOperations`).** `cancelCloudAnchorOperations()` was a no-op on both platforms, so leaving during a scan left it collecting and leaving mid-host let the upload finish. It now cancels the ReactVision provider's pending hosts and resolves, which report the new `ErrorCancelled` state, and closes the scan window. An upload already in flight can still leave an anchor, which expires with its TTL.
 - **The `@reactvision/viro-web-renderer` peer range is `^1.0.1`.** The heap, tap and dropout fixes live in its renderer build, not in this package.
 - **Native renderer binaries rebuilt on virocore 3.0.2** (`ViroKit`, `viro_renderer-release.aar`): glTF loads no longer copy the parsed model or its images.
 
 ### Fixed
 
+- **Leaving a co-location session cancels the native work in progress (`StudioSceneNavigator`, `cancelCloudAnchorOperations`).** `cancelCloudAnchorOperations()` was a no-op on both platforms, so leaving during a scan left it collecting and leaving mid-host let the upload finish. It now cancels the ReactVision provider's pending hosts and resolves, which report the new `ErrorCancelled` state, and closes the scan window. An upload already in flight can still leave an anchor, which expires with its TTL.
 - **`performARHitTestWithWorldPoints` works (`ViroARScene`).** The wrapper called the native `performARHitTestWithRay` with an origin and a destination, which takes a single ray, so the call failed on its argument count on every platform. It now calls `performARHitTestWithWorldPoints`, which Android and Quest implement. On iOS the method had the wrong signature and never settled its promise; it now takes the same arguments and resolves with no results, since ViroKit has no origin-to-destination hit test there.
 - **`ViroGameLoopUtils` works on iOS.** `setPosition`, `setRotation` and `setScale` sent their vector flattened, as Android expects, but the iOS commands took a single array, so every call failed on iOS: a redbox in debug builds and a likely crash in release. The iOS commands now take the same flattened arguments. This also fixes pan, orbit and fly-to in `useViroMapCamera` on iOS.
 - **Web: the Studio scene no longer remounts on every navigator render (`StudioSceneNavigator.web`).** The scene component was a closure built in the render body, so each render handed React a new component type and the whole subtree — every node in the renderer — was torn down and rebuilt. A three-image scene rendered three times on first load and a 29 MB model was fetched twice. It is a module-level component now, fed through `viroAppProps`.
@@ -57,13 +56,14 @@
 - **Remounting a navigator no longer crashes with physics or garbles text (ViroKit, `viro_renderer-release.aar`).** Rebuilt on virocore's teardown fixes: a physics body hidden and removed in the same frame was freed while still in the Bullet world, which crashed on teardown, and on iOS the old view's GL cleanup ran in the new view's context and deleted its glyph atlas.
 - **Android: remounting a navigator no longer crashes (`viro_renderer-release.aar`).** Rebuilt on virocore's fix: destroying the old renderer released the process-wide asset manager under the new one, which crashed loading its first shader.
 - **Quest: hit tests, screenshots and recordings work, and the laser follows a drag (ViroKit, `viro_renderer-release.aar`).** Rebuilt on virocore's Quest fixes: a hit test from JS crashed on the OpenXR thread, a screenshot aborted on an assertion, every recording after the first came out black, the laser stayed where a drag began, and a drag whose node left the scene crashed.
+- **Quest gaze, click haptics and the left-palm menu pinch; iOS AR teardown (ViroKit, `viro_renderer-release.aar`).** Rebuilt on virocore 3.0.2: gaze falls back to the head pose on every Quest without an eye tracker, controllers pulse on click, and the left-palm menu pinch with hand tracking reaches the app as the Menu button does. On iOS a gesture in flight while `ViroARSceneNavigator` unmounts no longer crashes.
 - **Web: `StudioSceneNavigator` forwards `onMotionUnavailable` to its AR navigator.** The prop was not on the Studio navigator, so a Studio web host never heard that AR could not start, though the message still showed on screen. It is on both prop types now; on native it is accepted and never called.
 - **Web: alpha-blended images no longer write depth (`ViroImage.web`, `ViroAnimatedImage.web`),** so a fully transparent border stops punching a hole in what is drawn behind it.
 
 ### Migration
 
 - **No breaking changes.** An existing `ViroColocationRooms` or `ViroReplicationClient` caller that passes `apiKey` and `projectId` behaves as before.
-- **The native renderer binaries (`ViroKit`, `viro_renderer-release.aar`) must be rebuilt for this release** on a `@reactvision/virocore` with `VROReactVisionAuth`, and on ReactVisionCCA libraries with `RVCCACloudAnchorProvider::Config::authProvider` and `RVCCAColocationSession::Config::headersProvider`. The session path in the bridge and the re-synced Java both depend on them.
+- **The bundled native renderer binaries (`ViroKit`, `viro_renderer-release.aar`) were rebuilt for this release** on virocore 3.0.2 (with `VROReactVisionAuth`) and ReactVisionCCA 1.3.0 (with `RVCCACloudAnchorProvider::Config::authProvider` and `RVCCAColocationSession::Config::headersProvider`). The session path in the bridge and the re-synced Java both depend on them, so a source build must use those versions or newer.
 
 ## v3.0.1 — 21 September 2026
 
@@ -71,15 +71,15 @@
 
 - **`onCloudAnchorStateChange` on `ViroARSceneNavigator`.** The prop was declared and documented as firing "when a cloud anchor state changes, including progress updates during hosting/resolving operations", and was never wired to anything: no handler on the component, no native event constant on Android or iOS. An app that set it heard nothing, with no error to explain the silence. Found by auditing every declared `on*` callback against what the native side actually emits.
 
-  Nothing is lost. `hostCloudAnchor()` and `resolveCloudAnchor()` already resolve with `state` on the result; `getCloudAnchorStatus()` reports progress while a resolve is in flight, which is what the callback was reaching for and reports considerably more than a state change would; and `rvGetCloudAnchor(anchorId)` returns the current state of an anchor you did not just touch. See `docs/VPS_LITE.md`.
+  Nothing is lost. `hostCloudAnchor()` and `resolveCloudAnchor()` already resolve with `state` on the result; `getCloudAnchorStatus()` reports progress while a resolve is in flight, which is what the callback was reaching for and reports considerably more than a state change would; and `rvGetCloudAnchor(anchorId)` returns the current state of an anchor you did not just touch. See the VPS guide.
 
   `ViroCloudAnchorStateChangeEvent` stays exported and is marked deprecated, so an existing import still compiles. It will go in the next major.
 
 ### Fixed
 
-- **Co-location now works on Meta Quest.** `metaSpatialAnchorFrameSource` reported itself supported on a headset and then failed at the last step with *"This navigator does not expose shared frames"*. Everything beneath was finished — the OpenXR session has driven Meta's group sharing since it learned the extension — and nothing forwarded to it. `ViroXRSceneNavigator`'s Quest branch builds its own navigator object, and that object carried `push`, `pop`, `project` and `unproject` and no `rv*` methods at all. The two calls now go through `VRModuleOpenXR` rather than `ARSceneNavigatorModule`, which resolves its view as a `VRTARSceneNavigator` and rejects anything else — VRActivity hosts the VR navigator instead. Verified on a Quest 3: `create` publishes an anchor and `join` recovers the frame. Four renderer fixes land alongside this one; see `@reactvision/virocore` 3.0.1.
+- **Co-location now works on Meta Quest.** `metaSpatialAnchorFrameSource` reported itself supported on a headset and then failed at the last step with *"This navigator does not expose shared frames"*. Everything beneath was finished — the OpenXR session has driven Meta's group sharing since it learned the extension — and nothing forwarded to it. `ViroXRSceneNavigator`'s Quest branch builds its own navigator object, and that object carried `push`, `pop`, `project` and `unproject` and no `rv*` methods at all. The two calls now go through `VRModuleOpenXR` rather than `ARSceneNavigatorModule`, which resolves its view as a `VRTARSceneNavigator` and rejects anything else — VRActivity hosts the VR navigator instead. Verified on a Quest 3: `create` publishes an anchor and `join` recovers the frame. Four renderer fixes land alongside this one; see virocore 3.0.1.
 
-  Co-location on Quest requires a scene rooted in `ViroARScene`. A VR scene has no AR session and therefore no anchor to share, and the call says so rather than failing quietly. See `docs/QUEST_SETUP.md` §7d.
+  Co-location on Quest requires a scene rooted in `ViroARScene`. A VR scene has no AR session and therefore no anchor to share, and the call says so rather than failing quietly. See the Quest setup guide (§7d, co-location).
 
 - **The Expo config plugin declares `horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA`.** Without it the Meta runtime does not refuse the co-location calls — it hides `XR_META_spatial_entity_group_sharing` from `xrEnumerateInstanceExtensionProperties` entirely, so an app sees a headset that appears not to support shared anchors at all. Nothing in the logs points at a permission unless you are reading the runtime's own extension enumeration.
 
@@ -89,7 +89,7 @@
 
 - **Replicated room state**: `useViroReplicatedState` and `ViroReplicationClient`. Ordered, conflict-resolved, authoritative application state for co-located sessions — what moved, who is holding it — on a separate socket from the pose channel and the same room id. Entities are claimed before they are changed, so two people grabbing the same object resolves instead of racing: the first `claim` wins and the second is refused with the current owner attached. `expectVersion` opts a write into optimistic concurrency; unowned entities are last-writer-wins; a peer that disconnects releases whatever it held. A delta whose sequence skips ahead triggers a resync rather than leaving a hole in local state, and a reconnect resumes from the last applied sequence. Optimistic writes are opt-in per call and roll back to the server's value if refused, and a write's own echo never undoes a newer one: the relay broadcasts to the sender too, so at 30 writes a second over a 60 ms round trip a client always has two of its own outstanding when the first comes back. The version and owner the server assigned are adopted, the fields already shown are kept. Without that the object lands where the hand was two writes ago and is pulled forward by the next, which is what makes a fast drag rubber-band on the device doing the dragging.
 
-  Two things worth reading before building on it. **Replicated state is saved, but only by the hosted relay** — it writes a room back to the platform when its last peer leaves and reads that copy back when the room is next opened, so objects left in a work zone are there tomorrow and a deploy mid-session costs a reconnect rather than the room. Entities come back unowned. The LAN reference server saves nothing and keeps rooms in memory for the life of the process. **And rooms are per-instance**: two instances holding the same room would diverge, so replication must not run behind anything that autoscales until room homing exists. Both are in `reactvisioncca/server/README.md`, and the co-location guide has the details (https://viro-community.readme.io/docs/overview).
+  Two things worth reading before building on it. **Replicated state is saved, but only by the hosted relay** — it writes a room back to the platform when its last peer leaves and reads that copy back when the room is next opened, so objects left in a work zone are there tomorrow and a deploy mid-session costs a reconnect rather than the room. Entities come back unowned. The LAN reference server saves nothing and keeps rooms in memory for the life of the process. **And rooms are per-instance**: two instances holding the same room would diverge, so replication must not run behind anything that autoscales until room homing exists. Both are covered in the ReactVisionCCA server documentation, and the co-location guide has the details.
 - **`<ViroARCloudAnchor>` — co-located AR.** Renders its children in a resolved cloud anchor's *location frame*, which is the shared coordinate frame two devices in the same space can agree on. Mount it with the same `cloudAnchorId` on both devices and a child at `[0, 0, -1]` is the same physical metre on each, with no coordinate maths in app code — previously `resolveCloudAnchor()` returned position/rotation/scale and no scene node, leaving every app to redo the frame arithmetic itself. Fires `onLocalized` once the frame exists, and `onLocalizeError` when localisation fails or times out.
 - **Interpolation for co-located motion**: `useViroSmoothedPeers` and `useViroSmoothedEntities`, with the primitives `approachFactor`, `approachVec3` and `approachQuat` underneath. A marker driven straight from `peers` steps once per pose and a replicated object steps once per write; both hooks blend toward the latest value on a frame loop instead. Smoothing is a half-life rather than a per-frame fraction, so it behaves the same on a 90 Hz headset and a 45 Hz phone, and a frame long enough to cover several half-lives snaps rather than gliding in from wherever the room was before the app was backgrounded. Timing comes from the frame callback and never from `timestampMs`, which is the sender's clock. `useViroSmoothedEntities` touches only the fields you name, and only where the value matches the shape you declared, so a score or a step index is never averaged on its way to the screen. A settled list hands back the same references every frame and stops re-rendering. Pass `localPeerId` to `useViroSmoothedEntities` wherever things are dragged: entities this device owns are then passed straight through, since the renderer is already moving that node under the finger every frame and blending it only puts the rendered object behind the hand.
 - **Rate-limiting for replicated writes**: `useViroThrottledWrite`, `viroVec3Settled` and `VIRO_REPLICATION_WRITE_INTERVAL_MS`. Drag callbacks arrive at frame rate, far above what the relay accepts, and plain throttling drops the last one so an object settles a frame short of where the hand let go on every other device. This sends on the leading edge, holds anything that arrives inside the interval and sends it on the trailing edge, and flushes on unmount so a scene torn down mid-drag still leaves the object where it was left. The optional deadband compares against the last value actually sent rather than the previous sample, so a slow drag cannot creep any distance at all in sub-threshold steps.
@@ -104,14 +104,14 @@
 
 - **`finishScan()` hosted whatever was in the buffer when no scan had been started, and `snapshotWorldMeshToFile()` failed with one message for six different reasons.** `finishScan()` without a preceding `startScan()` now fails with *"No scan in progress"* rather than silently hosting an unrelated buffer. A failed snapshot names which precondition broke — the AR view is not ready, no scene is mounted, the scene is not a `ViroARScene`, world mesh capture is off, the mesh is still empty, or the cache write failed — instead of "No world mesh available to snapshot" for all six. "Capture is off" and "the mesh has not accumulated yet" call for opposite responses from the caller, and the old message could not tell them apart.
 
-- **Android: a cloud anchor resolve or host issued on a scene's first frame hung forever.** A join flow mounts `<ViroSharedFrame>` or `<ViroARCloudAnchor>` with the id already known, so it resolves on mount, and on Android that reaches the native side before the AR session exists. The renderer dropped the request without answering: the promise never settled, the progress poll had nothing to report, and a second resolve of the same id was refused as already in progress. Fixed in `@reactvision/virocore`, where requests made before the session exists are queued and run the moment it attaches. On the bridge, a resolve that lands before Fabric has mounted the navigator now says "AR navigator is not mounted yet" instead of "Invalid view type", and `<ViroSharedFrame>` waits one second between attempts instead of spending all three within the same millisecond.
+- **Android: a cloud anchor resolve or host issued on a scene's first frame hung forever.** A join flow mounts `<ViroSharedFrame>` or `<ViroARCloudAnchor>` with the id already known, so it resolves on mount, and on Android that reaches the native side before the AR session exists. The renderer dropped the request without answering: the promise never settled, the progress poll had nothing to report, and a second resolve of the same id was refused as already in progress. Fixed in virocore, where requests made before the session exists are queued and run the moment it attaches. On the bridge, a resolve that lands before Fabric has mounted the navigator now says "AR navigator is not mounted yet" instead of "Invalid view type", and `<ViroSharedFrame>` waits one second between attempts instead of spending all three within the same millisecond.
 - **Quest builds failed Meta Horizon Store validation on Expo projects.** Two checks the plugin meant to handle never did. The `targetSdkVersion` cap rewrote `app/build.gradle`, but Expo's template resolves targetSdk from `gradle.properties` through `rootProject.ext`, so nothing matched and the APK shipped with targetSdk 36. The GLES `uses-feature` was declared `required="false"`, which the store validator does not count as a graphics API. When `xRMode` includes `"QUEST"`, the plugin now writes `android.targetSdkVersion=34` to `gradle.properties` (only ever lowering it; `android.questTargetSdkVersion` overrides the ceiling) and declares GLES 3.0 as required. Phone-only builds are unchanged.
 - **visionOS: the app failed to link on ReactVisionCCA symbols it never referenced.** `VROColocationSession.o` lives in the visionOS renderer archive and `-ObjC` pulls it into every link, so the missing xros slices of ReactVisionCCA broke any visionOS build — co-location or not, and excluding the module did not help. Both slices are built and merged now, so co-location works on visionOS instead of being left out. `VROColocationBridge.h` ships with them; its class was in the binary while the header was not.
 - **Viro's `removeFromSuperview` swizzle stripped gesture recognizers and interactions from Apple's own views.** The fix for a Fabric teardown crash was installed on `UIView` and so ran for every view in the host app, clearing `interactions` and recognizers on any view being re-parented — not just Viro's. Apple's frameworks re-parent their own controls and need those to survive it, so an app that used AVKit alongside Viro lost the tap that toggles fullscreen video controls, and `UIImagePickerController` lost its shutter button. Both swizzles now skip classes whose bundle identifier begins with `com.apple.` (cached per class, so the bundle lookup happens once).
 
 - **`ViroController` crashed the app on the first button event (`TypeError: Cannot read property 'props' of undefined`).** Its event handlers were prototype methods handed to the native view unbound; React Native dispatches them detached, so `this` was undefined once a click-type prop was set. They are now arrow class fields like `ViroBase`'s.
-- **Quest: `onDrag` followed the idle hand and objects jumped on grab / release when both hands were tracked.** Fixed in `@reactvision/virocore` (drag ownership per aim ray; grip / A / X / Y / thumbstick sources resolve against their own hand's ray).
-- **Quest: clicks on a highlighted button were dropped, and `onClick` (state `Clicked`) rarely fired.** Fixed in `@reactvision/virocore` (aim lasers no longer hit-testable, click grace and press capture, `Clicked` compared on handler nodes, button edges resolved against the current frame's hit).
+- **Quest: `onDrag` followed the idle hand and objects jumped on grab / release when both hands were tracked.** Fixed in virocore (drag ownership per aim ray; grip / A / X / Y / thumbstick sources resolve against their own hand's ray).
+- **Quest: clicks on a highlighted button were dropped, and `onClick` (state `Clicked`) rarely fired.** Fixed in virocore (aim lasers no longer hit-testable, click grace and press capture, `Clicked` compared on handler nodes, button edges resolved against the current frame's hit).
 
 
 - **visionOS in an Expo app.** `withViroVisionOS` now follows the name React Native is installed under: an app that installs `@reactvision/react-native-visionos` through the `react-native` alias — which is what keeps iOS and Android on one copy and one set of pods — gets the visionOS Podfile's `require`, its `config[:reactNativePath]` and the Xcode bundling phase pointed at `react-native` rather than at a scoped directory that does not exist. The one-time setup command is also corrected: the template generates a whole React Native project, and only its `visionos/` folder belongs in an Expo app.
@@ -181,7 +181,7 @@
 
 - Stability improvements
 
-## v2.57.3 — 2 July 2026
+## v2.57.3 — 7 July 2026
 
 ### Added
 
@@ -197,7 +197,7 @@
 - **`ViroARImageMarker` no longer crashes the app when its `target` is registered after the marker mounts.** Registering targets from a React `useEffect` (the common pattern) runs *after* the marker's native view is committed, so `VRTARImageMarker` looked up a target that did not exist yet and threw an `IllegalArgumentException` from inside a Fabric prop update — which is fatal under the New Architecture (bridgeless) and tore down the entire `ReactHost`, terminating the app. The marker no longer throws (matching iOS, which only `RCTLogError`s); instead it registers interest by target name with `ARTrackingTargetsModule`, which now queues waiters for not-yet-registered targets and flushes them when `createTargets(...)` runs. The marker therefore attaches automatically regardless of whether `createTargets` runs before or after it mounts.
 - **Removed the non-compliant `libvrapi.so` (viro#491).** v2.57.2 aligned every `PT_LOAD` segment to ≥ 16 KB, but the prebuilt `libvrapi.so` (Meta VrApi / Oculus Mobile SDK) still had a `PT_GNU_RELRO` segment ending on a 4 KB boundary, which the Android 15+ linker rejects (`dlopen … "libvrapi.so" program alignment (4096) cannot be smaller than system page size (16384)`). Because `libviro_renderer.so` listed `libvrapi.so` as a `NEEDED` dependency, it was force-loaded on **every** launch — so the crash affected all Android apps, not just VR. A prebuilt binary's RELRO padding cannot be re-aligned by a field patch, so the fix removes the dependency entirely.
 
-### Removed
+### Deprecated
 
 - **Deprecated the Oculus Mobile SDK (VrApi) path — `ViroPlatform.OVR_MOBILE` / `ViroViewOVR`.** VrApi targets EOL hardware (GearVR / Oculus Go) and was superseded by the OpenXR path (`ViroPlatform.QUEST` / `ViroViewOpenXR`), which covers all current Meta headsets (Quest 1/2/3/Pro). `OVR_MOBILE` and `ViroViewOVR` are now `@Deprecated` and no longer create a native renderer; selecting `OVR_MOBILE` logs a warning. Companion to `@reactvision/virocore` 2.57.3, which drops `libvrapi.so` and the VrApi renderer from the native build.
 
@@ -212,6 +212,8 @@
 ---
 
 ## v2.57.1 — 27 June 2026
+
+_Not published to npm; these changes shipped in 2.57.2._
 
 ### Added
 
@@ -231,7 +233,7 @@
 
 ---
 
-## v2.57.0 — 19 June 2026
+## v2.57.0 — 23 June 2026
 
 ### Added
 
@@ -291,7 +293,7 @@
 
 ---
 
-## v2.55.0 — 27 April 2026
+## v2.55.0 — 10 May 2026
 
 > **Install path.** Bare React Native is not tested for this release. It
 > should work but will require a substantial amount of manual wiring (the
@@ -440,7 +442,7 @@
 
 ---
 
-## v2.54.0 — 31 March 2026
+## v2.54.0 — 01 April 2026
 
 ### Added
 
@@ -626,7 +628,7 @@
 
 ---
 
-## v2.53.0 — 06 March 2026
+## v2.53.0 — 10 March 2026
 
 ### Breaking Changes
 
@@ -1142,7 +1144,7 @@ This release integrates the ReactVision native backend into ViroCore:
 
 ---
 
-## v2.52.0 - 08 February 2026
+## v2.52.0 - 09 February 2026
 
 ### Added
 - **Full Shader Support**: Complete implementation of shader modifiers for iOS and Android platforms

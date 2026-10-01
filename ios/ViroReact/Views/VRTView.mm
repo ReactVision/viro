@@ -82,6 +82,15 @@
     if ([self shouldAppear]) {
         [view parentDidAppear];
     }
+
+    /*
+     Last, once the subclass has put the child's node in the renderer and the child is wired up:
+     if this view is already under a scene, the child and everything below it just joined it.
+     */
+    VRTScene *scene = [self viroScene];
+    if (scene) {
+        [view didJoinViroScene:scene];
+    }
 }
 
 - (void)removeReactSubview:(UIView *)subview {
@@ -200,6 +209,17 @@
     for (id childView in _childViews) {
         VRTView *view = (VRTView *)childView;
         view.scene = _scene;
+    }
+}
+
+- (VRTScene *)viroScene {
+    return [self.viroSuperview viroScene];
+}
+
+- (void)didJoinViroScene:(VRTScene *)scene {
+    for (id childView in _childViews) {
+        VRTView *view = (VRTView *)childView;
+        [view didJoinViroScene:scene];
     }
 }
 @end

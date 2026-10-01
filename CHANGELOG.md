@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **A `ViroCamera` mounted between its siblings now becomes the scene's camera (iOS and Android).** On React Native 0.86 the legacy interop holds back a child inserted anywhere but at the end of its parent until that parent next updates, and `ViroScene` asked `VRTCameraModule` for the camera as soon as it mounted. The module's lookup found no view, gave up after a second, and the scene stayed on its default camera until something else updated the camera: a remount through a new `key`, or a conditional camera mid-scene, drew with the wrong projection and `orthographicScale`. `ViroScene` and `ViroARScene` now pass the active camera's tag to the native scene as the `activeCameraTag` prop. The prop change is the parent update the interop was waiting for, so the camera's view is in the tree by the time the scene reads the tag, and a scene keeps the tag and attaches a camera that arrives later still, however deep it sits. A camera's position in its parent no longer matters. `VRTCameraModule.setSceneCamera` and `removeSceneCamera` remain and set the same tag, but `ViroScene` no longer calls them; a camera that stops being active, or unmounts, clears the tag and the scene returns to its default camera. The iOS change is in the bridge source and needs `libViroReact.a` rebuilt.
+
 ## v3.0.2 — 30 September 2026
 
 ### Added

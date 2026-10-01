@@ -25,6 +25,9 @@
 ### Native
 
 - **Meta Quest gets gaze on every headset, screen capture, AR hit test from JS (`performARHitTestWithRay` / `WithWorldPoints`), click haptics and the left-palm menu pinch.** Capture is `sceneNavigator.takeScreenshot`, `startVideoRecording` and `stopVideoRecording`, as on AR. It records the left eye and not the passthrough room, and reports `RECORD_ERROR_NOT_READY` until the headset is rendering.
+- **Quest: hit tests, screenshots and recordings no longer crash or come out black,** the laser follows a dragged object, and a drag whose node leaves the scene ends instead of crashing.
+- **Remounting a navigator works on every platform.** With physics it crashed on teardown; on iOS the new scene's text came back garbled; on Android the new renderer crashed on its first frame.
+- **iOS on React Native 0.86:** native module calls (`applyImpulse`, `getTransformAsync`, hit tests, `project`, camera capture and others) wait for their view to mount instead of failing with "Invalid view returned", so an active `ViroCamera` takes over its scene and `useViroMapCamera` works. A conditional child unmounted before it mounted no longer crashes.
 - **iOS: a gesture during AR teardown no longer crashes.**
 - **`cancelCloudAnchorOperations()` cancels** ReactVision hosts, resolves and scans (`ErrorCancelled`). It used to be a no-op.
-- **The renderer binaries are rebuilt on virocore 3.0.2**, which also raises the scan-host floor to 300 points.
+- **The renderer binaries are rebuilt on virocore 3.0.2 and ReactVisionCCA 1.3.0**, which also raises the scan-host floor to 300 points.

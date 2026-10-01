@@ -11,7 +11,7 @@
   <a href="https://www.npmjs.com/package/@reactvision/react-viro">
     <img src="https://img.shields.io/npm/dm/@reactvision/react-viro?colour=purple" alt="downloads">
   </a>
-  <a href="https://discord.gg/yqqEGUjK">
+  <a href="https://discord.gg/A6TaFNqwVc">
     <img src="https://img.shields.io/discord/774471080713781259?label=Discord" alt="Discord">
   </a>
 </p>
@@ -28,8 +28,8 @@ ViroReact is MIT licensed and free forever.
 | -------------------- | ------------ | ----- |
 | iOS (ARKit)          | ✅ | Deployment target 15.1 |
 | Android (ARCore)     | ✅ | |
-| Meta Horizon OS      | ✅ | Quest 3 / 3S mixed reality through OpenXR |
-| Apple visionOS       | ✅ | |
+| Meta Horizon OS      | ✅ | Quest 2 / Pro / 3 / 3S through OpenXR; mixed reality on Quest 3 / 3S |
+| Apple visionOS       | ✅ | Needs the optional `@reactvision/react-native-visionos` peer; deployment target 26.0 |
 | Web (WebGL2 / WASM)  | ✅ | Needs the optional `@reactvision/viro-web-renderer` peer |
 
 ViroReact works with both **React Native CLI** and **Expo** projects.
@@ -43,7 +43,6 @@ npm install @reactvision/react-viro
 For Expo projects, the easiest way to start is to clone the official starter kit:
 
 - **Expo + TypeScript starter kit:** <https://github.com/ReactVision/expo-starter-kit-typescript>
-- **React Native CLI starter kit:** <https://github.com/ReactVision/starter-kit>
 
 For step-by-step setup instructions, including platform-specific permissions and build configuration, see the full installation guide in the docs: <https://viro-community.readme.io/docs/installation-instructions>
 
@@ -65,7 +64,7 @@ ViroReact ships with a complete spatial computing toolkit out of the box — no 
 - Image and object recognition triggers
 - Cloud Anchors for persistent, multi-user shared AR content _(Platform feature)_
 - Geospatial Anchors that pin content to real-world latitude, longitude, and altitude _(Platform feature)_
-- Co-location: two devices in the same room agreeing on where the scene is, with replicated state on top
+- Co-location: two devices in the same room agreeing on where the scene is, with replicated state on top _(Platform feature)_
 - VPS: scan a whole room to define its own persistent coordinate frame, then localise back into it later or from another device, with an optional world mesh for occlusion and physics _(Platform feature)_
 
 **Rendering**
@@ -73,7 +72,7 @@ ViroReact ships with a complete spatial computing toolkit out of the box — no 
 - PBR lighting, HDR environment maps, and real-time shadow casting
 - 360° photo and video environments
 - Portal rendering for immersive pass-through experiences
-- OBJ, FBX, and GLTF/GLB model loading with embedded animations
+- OBJ, GLTF/GLB and VRX (FBX converted to VRX offline) model loading with embedded animations
 - Custom procedural geometry and custom GPU shaders
 
 **Interaction and motion**
@@ -94,7 +93,7 @@ Cloud Anchors, Geospatial Anchors, and AI-powered 3D asset creation are powered 
 You can get a Studio account, which includes Platform access, for free at <https://studio.reactvision.xyz>.
 
 - Cloud Anchors guide: <https://viro-community.readme.io/docs/cloud-anchors>
-- Geospatial Anchors guide: <https://viro-community.readme.io/docs/geospatial-anchors>
+- Geospatial Anchors guide: <https://viro-community.readme.io/docs/geospatial>
 
 ## Optional Packages
 

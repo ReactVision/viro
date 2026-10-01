@@ -148,11 +148,7 @@ async function request(
   body?: Record<string, unknown>
 ): Promise<ViroColocationRoomResult> {
   const base = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
-  const url =
-    `${base}/functions/v1/colocation${path}` +
-    (base === DEFAULT_ENDPOINT
-      ? `?forceFunctionRegion=${DEFAULT_FUNCTION_REGION}`
-      : "");
+  const url = `${base}/functions/v1/colocation${path}`;
 
   let headers: Record<string, string>;
   if (config.headers) {
@@ -182,7 +178,7 @@ async function request(
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchInRegion(base, url, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -208,6 +204,69 @@ async function request(
   }
 
   return { success: true, room: toRoom(parsed.room) };
+}
+
+// What the gateway answers when it never reached a function. With a non-JSON
+// body (every platform function answers JSON) nothing ran, so a resend cannot
+// run a request twice. 500, 504, 520, 524 and 546 are left out: a function may
+// have run before any of them.
+const UNDELIVERED_STATUSES = new Set([502, 503, 521, 522, 523, 525, 526, 530]);
+
+function undelivered(response: Response): boolean {
+  return (
+    UNDELIVERED_STATUSES.has(response.status) &&
+    !/json/i.test(response.headers.get("content-type") ?? "")
+  );
+}
+
+/**
+ * Pins by the query parameter on the default platform and by any `x-region`
+ * the caller's headers carry. The platform does not fail a pinned region over,
+ * so a call the region could not take is sent once more unpinned: an
+ * undelivered answer, or a network error (how a browser sees a gateway page
+ * without CORS headers) while the region also fails a probe.
+ */
+async function fetchInRegion(
+  base: string,
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string }
+): Promise<Response> {
+  const regionHeader = Object.keys(init.headers).find(
+    (name) => name.toLowerCase() === "x-region"
+  );
+  const region = regionHeader
+    ? init.headers[regionHeader]
+    : base === DEFAULT_ENDPOINT
+      ? DEFAULT_FUNCTION_REGION
+      : undefined;
+  if (!region) return fetch(url, init);
+
+  const pinned =
+    base === DEFAULT_ENDPOINT
+      ? `${url}?forceFunctionRegion=${DEFAULT_FUNCTION_REGION}`
+      : url;
+  try {
+    const response = await fetch(pinned, init);
+    if (!undelivered(response)) return response;
+  } catch (e) {
+    if (!(e instanceof TypeError) || (await regionAnswers(base, region)))
+      throw e;
+  }
+  const headers = { ...init.headers };
+  if (regionHeader) delete headers[regionHeader];
+  return fetch(url, { ...init, headers });
+}
+
+// The region's runtime answers the bare path itself, with CORS headers and
+// without starting a function.
+async function regionAnswers(base: string, region: string): Promise<boolean> {
+  try {
+    return !undelivered(
+      await fetch(`${base}/functions/v1/?forceFunctionRegion=${region}`)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function toRoom(raw: any): ViroColocationRoom {

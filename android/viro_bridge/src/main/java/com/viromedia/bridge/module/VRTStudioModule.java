@@ -16,6 +16,7 @@ import com.viro.core.ReactVisionAuth;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -206,11 +207,11 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
         String url = auth.baseUrl + "/functions/v1/scene-api-request";
         new Thread(() -> {
             try {
-                String[] result = RVHttpClient.send(
-                        "POST", url, auth.apiKey,
+                String[] result = send(
+                        "POST", url, auth,
                         "application/json",
                         bodyJson.getBytes(StandardCharsets.UTF_8),
-                        API_REQUEST_TIMEOUT_SEC, auth.headerNames, auth.headerValues);
+                        API_REQUEST_TIMEOUT_SEC);
                 int status = Integer.parseInt(result[0]);
                 boolean ok = status >= 200 && status < 300;
                 resolve(promise, ok, ok ? result[1] : null,
@@ -228,10 +229,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     private void runGet(String url, RequestAuth auth, Promise promise, boolean parseWatermark) {
         new Thread(() -> {
             try {
-                String[] result = RVHttpClient.send(
-                        "GET", url, auth.apiKey,
-                        null, null,
-                        TIMEOUT_SEC, auth.headerNames, auth.headerValues);
+                String[] result = send("GET", url, auth, null, null, TIMEOUT_SEC);
                 int status = Integer.parseInt(result[0]);
                 boolean ok = status >= 200 && status < 300;
                 if (parseWatermark && ok) {
@@ -243,6 +241,35 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
                 resolve(promise, false, null, e.getMessage());
             }
         }).start();
+    }
+
+    // What the gateway answers when it never reached a function. With a non-JSON
+    // body (every platform function answers JSON) nothing ran, so a resend cannot
+    // run a request twice. 500, 504, 520, 524 and 546 are left out: a function may
+    // have run before any of them.
+    private static boolean undelivered(String status, String body) {
+        switch (status) {
+            case "502": case "503": case "521": case "522": case "523": case "525": case "526": case "530":
+                return body == null || !body.trim().startsWith("{");
+            default:
+                return false;
+        }
+    }
+
+    // The platform does not fail a pinned region over, so an undelivered pinned
+    // request is sent once more without x-region.
+    private static String[] send(String method, String url, RequestAuth auth,
+                                 String contentType, byte[] body, int timeoutSec) {
+        String[] result = RVHttpClient.send(method, url, auth.apiKey, contentType, body,
+                timeoutSec, auth.headerNames, auth.headerValues);
+        int region = Arrays.asList(auth.headerNames).indexOf("x-region");
+        if (region < 0 || !undelivered(result[0], result[1])) return result;
+        List<String> names  = new ArrayList<>(Arrays.asList(auth.headerNames));
+        List<String> values = new ArrayList<>(Arrays.asList(auth.headerValues));
+        names.remove(region);
+        values.remove(region);
+        return RVHttpClient.send(method, url, auth.apiKey, contentType, body, timeoutSec,
+                names.toArray(new String[0]), values.toArray(new String[0]));
     }
 
     // Session (if set) wins over the manifest key: sends Bearer + optional marker

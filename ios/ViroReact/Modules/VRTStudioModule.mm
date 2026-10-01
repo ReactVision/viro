@@ -27,6 +27,27 @@ BOOL VRTStudioHasSession(void) {
     return gStudioSession != nil;
 }
 
+// What the gateway answers when it never reached a function. With a non-JSON
+// body (every platform function answers JSON) nothing ran, so a resend cannot
+// run a request twice. 500, 504, 520, 524 and 546 are left out: a function may
+// have run before any of them.
+static BOOL VRTUndelivered(NSHTTPURLResponse *http) {
+    switch (http.statusCode) {
+        case 502: case 503: case 521: case 522: case 523: case 525: case 526: case 530:
+            return ![http.MIMEType containsString:@"json"];
+        default:
+            return NO;
+    }
+}
+
+// The platform does not fail a pinned region over, so an undelivered pinned
+// request is sent once more without x-region.
+static NSDictionary *VRTUnpinned(NSDictionary *headers) {
+    NSMutableDictionary *unpinned = [headers mutableCopy];
+    [unpinned removeObjectForKey:@"x-region"];
+    return unpinned;
+}
+
 @implementation VRTStudioModule
 
 RCT_EXPORT_MODULE(VRTStudio);
@@ -80,6 +101,10 @@ RCT_EXPORT_MODULE(VRTStudio);
             return;
         }
         NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
+        if (headers[@"x-region"] && VRTUndelivered(http)) {
+            [self runGet:url headers:VRTUnpinned(headers) resolve:resolve];
+            return;
+        }
         BOOL ok = http.statusCode >= 200 && http.statusCode < 300;
         [r setObject:@(ok) forKey:@"success"];
         if (ok && data) {
@@ -119,6 +144,10 @@ RCT_EXPORT_MODULE(VRTStudio);
             return;
         }
         NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
+        if (headers[@"x-region"] && VRTUndelivered(http)) {
+            [self runPost:url body:bodyJson headers:VRTUnpinned(headers) resolve:resolve];
+            return;
+        }
         BOOL ok = http.statusCode >= 200 && http.statusCode < 300;
         [r setObject:@(ok) forKey:@"success"];
         if (ok && data) {

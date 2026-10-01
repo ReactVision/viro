@@ -190,6 +190,7 @@ static NSArray<NSNumber *> *const kDefaultSize = @[@(0), @(0), @(0)];
 
 - (void)setCamera:(VRTCamera *)camera {
     _camera = camera;
+    _activeCameraTag = [camera.reactTag copy];
     [self setCameraIfAvailable];
 }
 
@@ -201,6 +202,54 @@ static NSArray<NSNumber *> *const kDefaultSize = @[@(0), @(0), @(0)];
         [_vroView setPointOfView:nullptr];
     }
     _camera = nil;
+    if ([_activeCameraTag isEqual:camera.reactTag]) {
+        _activeCameraTag = nil;
+    }
+}
+
+- (void)setActiveCameraTag:(NSNumber *)activeCameraTag {
+    // A cleared prop reaches us as nil or 0; both mean the default camera.
+    NSNumber *tag = [activeCameraTag integerValue] != 0 ? [activeCameraTag copy] : nil;
+    _activeCameraTag = tag;
+    if (!tag) {
+        if (_camera) {
+            [self removeCamera:_camera];
+        }
+        return;
+    }
+    if (_camera && [_camera.reactTag isEqual:tag]) {
+        return;
+    }
+    VRTCamera *camera = [self findCameraWithTag:tag under:self];
+    if (camera) {
+        [self setCamera:camera];
+    }
+    // Otherwise the camera has not been inserted yet and -cameraDidJoinScene: attaches it when
+    // it is. Meanwhile the scene keeps the camera it has: on a remount that is the one React just
+    // removed, which still beats a jump to the default camera for the gap.
+}
+
+- (void)cameraDidJoinScene:(VRTCamera *)camera {
+    if (_activeCameraTag && camera != _camera && [camera.reactTag isEqual:_activeCameraTag]) {
+        [self setCamera:camera];
+    }
+}
+
+- (VRTCamera *)findCameraWithTag:(NSNumber *)tag under:(VRTView *)view {
+    if ([view isKindOfClass:[VRTCamera class]] && [view.reactTag isEqual:tag]) {
+        return (VRTCamera *)view;
+    }
+    for (VRTView *child in [view reactSubviews]) {
+        VRTCamera *camera = [self findCameraWithTag:tag under:child];
+        if (camera) {
+            return camera;
+        }
+    }
+    return nil;
+}
+
+- (VRTScene *)viroScene {
+    return self;
 }
 
 #pragma mark - Scene-specific subviews

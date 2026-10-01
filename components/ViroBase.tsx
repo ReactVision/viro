@@ -34,7 +34,10 @@ import {
 
 export type ViroBaseProps = ViroCommonProps & ViroObjectProps;
 
-export class ViroBase<T> extends React.Component<ViroBaseProps & T> {
+export class ViroBase<T, S = {}> extends React.Component<
+  ViroBaseProps & T,
+  S
+> {
   _component: ViroNativeRef = null;
 
   _onHover = (event: NativeSyntheticEvent<ViroHoverEvent>) => {

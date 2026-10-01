@@ -76,6 +76,11 @@ public abstract class VRTSceneManager<T extends VRTScene> extends VRTViroViewGro
         scene.setToneMappingEnabled(toneMappingEnabled);
     }
 
+    @ReactProp(name = "activeCameraTag", defaultInt = 0)
+    public void setActiveCameraTag(VRTScene scene, int activeCameraTag) {
+        scene.setActiveCameraTag(activeCameraTag);
+    }
+
     @ReactProp(name = "canCameraTransformUpdate", defaultBoolean = VRTNode.DEFAULT_CAN_CAMERA_TRANSFORM_UPDATE)
     public void setCanCameraTransformUpdate(VRTScene scene, boolean canCameraTransformUpdate) {
         scene.setCanCameraTransformUpdate(canCameraTransformUpdate);

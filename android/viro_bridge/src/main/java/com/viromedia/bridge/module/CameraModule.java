@@ -34,7 +34,6 @@ import com.facebook.react.fabric.FabricUIManager;
 import com.facebook.react.uimanager.UIManagerHelper;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.internal.CameraCallback;
-import com.viromedia.bridge.component.node.VRTCamera;
 import com.viromedia.bridge.component.node.VRTScene;
 
 @ReactModule(name = "VRTCameraModule")
@@ -98,6 +97,11 @@ public class CameraModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /*
+     Only the scene is looked up here. The camera is named by tag and the scene attaches it
+     itself, now if it is in the tree and otherwise as it joins (see VRTScene.setActiveCameraTag).
+     ViroScene sends the same tag as a prop; these methods remain for callers of the module.
+     */
     @ReactMethod
     public void setSceneCamera(final int sceneTag, final int cameraTag) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneTag);
@@ -108,19 +112,8 @@ public class CameraModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View sceneView = viewResolver.resolveView(sceneTag);
-                View cameraView = viewResolver.resolveView(cameraTag);
-
-                if (!(cameraView instanceof VRTCamera)) {
-                    //RCTLogError(@"Invalid view returned when setting camera: expected VRTCamera, got [%@]", cameraView);
-                }
-                else if (!(sceneView instanceof VRTScene)) {
-                    //RCTLogError(@"Invalid view returned when setting camera: expected VRTScene, got [%@]", sceneView);
-                }
-                else {
-                    VRTCamera camera = (VRTCamera) cameraView;
-                    VRTScene scene = (VRTScene) sceneView;
-
-                    scene.setCamera(camera);
+                if (sceneView instanceof VRTScene) {
+                    ((VRTScene) sceneView).setActiveCameraTag(cameraTag);
                 }
             }
         });
@@ -136,19 +129,9 @@ public class CameraModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View sceneView = viewResolver.resolveView(sceneTag);
-                View cameraView = viewResolver.resolveView(cameraTag);
-
-                if (!(cameraView instanceof VRTCamera)) {
-                    //RCTLogError(@"Invalid view returned when removing camera: expected VRTCamera, got [%@]", cameraView);
-                }
-                else if (!(sceneView instanceof VRTScene)) {
-                    //RCTLogError(@"Invalid view returned when removing camera: expected VRTScene, got [%@]", sceneView);
-                }
-                else {
-                    VRTCamera camera = (VRTCamera) cameraView;
-                    VRTScene scene = (VRTScene) sceneView;
-
-                    scene.removeCamera(camera);
+                // Only the camera the scene was last asked for can take it back to the default camera.
+                if (sceneView instanceof VRTScene && ((VRTScene) sceneView).getActiveCameraTag() == cameraTag) {
+                    ((VRTScene) sceneView).setActiveCameraTag(0);
                 }
             }
         });

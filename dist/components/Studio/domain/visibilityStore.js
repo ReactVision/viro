@@ -15,6 +15,7 @@ const utils_1 = require("./utils");
 class StudioVisibilityStore {
     visible = new Map();
     listeners = new utils_1.KeyedListeners();
+    changes = new utils_1.ChangeListeners();
     /** Current visibility; defaults to visible for assets never seeded/set. */
     isVisible(assetId) {
         return this.visible.get(assetId) ?? true;
@@ -22,6 +23,10 @@ class StudioVisibilityStore {
     /** Subscribe to changes for one asset; returns an unsubscribe fn. */
     subscribe(assetId, listener) {
         return this.listeners.subscribe(assetId, listener);
+    }
+    /** Each change with its asset id (null after a reseed) and its origin. */
+    subscribeChanges(listener) {
+        return this.changes.subscribe(listener);
     }
     /** Initialise-if-absent from author-time defaults (idempotent, strict-mode safe). */
     seed(assets) {
@@ -37,7 +42,7 @@ class StudioVisibilityStore {
      * Apply a Set Visibility action. TOGGLE flips the live value; VISIBLE/HIDDEN
      * set it absolutely. No-op writes don't wake subscribers.
      */
-    apply(assetId, state) {
+    apply(assetId, state, origin = "local") {
         const next = state === "TOGGLE" ? !this.isVisible(assetId) : state === "VISIBLE";
         if (this.visible.get(assetId) === next)
             return;
@@ -46,6 +51,7 @@ class StudioVisibilityStore {
             console.log(`[Studio] Visibility "${assetId}" =`, next);
         }
         this.listeners.notify(assetId);
+        this.changes.notify(assetId, origin);
     }
     /**
      * Re-initialise for a new scene: replace all values from author-time
@@ -61,6 +67,7 @@ class StudioVisibilityStore {
             this.visible.set(asset.id, !asset.hidden_on_load);
         }
         this.listeners.notifyAll();
+        this.changes.notify(null, "local");
     }
 }
 exports.StudioVisibilityStore = StudioVisibilityStore;

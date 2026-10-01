@@ -44,6 +44,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     if(![subview isKindOfClass:[VRT3DObject class]]) {
            RCTLogError(@"Only a Viro3DObject can be a child of ViroPortal.");
     }

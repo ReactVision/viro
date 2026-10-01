@@ -109,7 +109,7 @@ const StudioARScene = (props) => {
 };
 exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
-    const { sceneData, mode = "ar", apiRequestExecutor, navigate, onReady, onSceneChange, onPlaneDetected, onUnsupported, noAssetsMessage, variableStore, placementApiRef, placementStore, } = props;
+    const { sceneData, mode = "ar", apiRequestExecutor, navigate, onReady, onSceneChange, onPlaneDetected, onUnsupported, noAssetsMessage, variableStore, placementApiRef, placementStore, onAssetError, } = props;
     const { scene, assets, animations, functions } = sceneData;
     // ─── Runtime singletons (per scene) ───────────────────────────────────────
     const schedulerRef = (0, react_1.useRef)(null);
@@ -210,6 +210,11 @@ const StudioARSceneInner = (props) => {
     // ─── Animation runtime state ──────────────────────────────────────────────
     const [animOverrides, setAnimOverrides] = (0, react_1.useState)({});
     const [loadedAssetIds, setLoadedAssetIds] = (0, react_1.useState)({});
+    // Through a ref, so a host passing a fresh arrow each render does not rebuild
+    // every node.
+    const onAssetErrorRef = (0, react_1.useRef)(onAssetError);
+    onAssetErrorRef.current = onAssetError;
+    const onAssetErrorStable = (0, react_1.useCallback)((asset, error) => onAssetErrorRef.current?.(asset, error), []);
     const handleAssetLoaded = (0, react_1.useCallback)((assetId) => {
         setLoadedAssetIds((prev) => (prev[assetId] ? prev : { ...prev, [assetId]: true }));
     }, []);
@@ -454,7 +459,7 @@ const StudioARSceneInner = (props) => {
     null, // dragSurface
     proximityTargetIds.has(asset.id)
         ? registerProximityNode
-        : undefined))
+        : undefined, onAssetErrorStable))
         .filter(Boolean), [
         animations,
         scene,
@@ -464,6 +469,7 @@ const StudioARSceneInner = (props) => {
         runtimeCtx,
         proximityTargetIds,
         registerProximityNode,
+        onAssetErrorStable,
     ]);
     const renderedAssets = (0, react_1.useMemo)(() => buildNodes(planeAssets), [buildNodes, planeAssets]);
     const renderedPlacements = (0, react_1.useMemo)(() => buildNodes(tapToPlaceAssets), [buildNodes, tapToPlaceAssets]);

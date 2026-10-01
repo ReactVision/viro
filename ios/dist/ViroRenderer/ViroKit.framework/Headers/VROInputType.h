@@ -59,7 +59,7 @@ namespace ViroOculus{
     enum InputSource{
         Controller      = 1,  // right controller primary ray (legacy alias for RightController)
         TouchPad        = 2,
-        BackButton      = 3,  // menu (left) and B (right) buttons — navigation / back
+        BackButton      = 3,  // menu (left) and B (right) buttons, left-palm menu pinch (hands) — navigation / back
         LeftController  = 4,  // left controller primary ray
         AButton         = 5,  // right-hand A button
         XButton         = 6,  // left-hand X button

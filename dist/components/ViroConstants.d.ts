@@ -17,7 +17,18 @@ export declare enum ViroRecordingErrorConstants {
     RECORD_ERROR_INITIALIZATION = 2,
     RECORD_ERROR_WRITE_TO_FILE = 3,
     RECORD_ERROR_ALREADY_RUNNING = 4,
-    RECORD_ERROR_ALREADY_STOPPED = 5
+    RECORD_ERROR_ALREADY_STOPPED = 5,
+    /**
+     * The navigator cannot capture on this platform: the VR navigator anywhere
+     * but Meta Quest, or a view that is gone. Android's AR navigator already
+     * reported this value.
+     */
+    RECORD_ERROR_UNSUPPORTED_PLATFORM = 6,
+    /**
+     * Meta Quest only: the XR session has not created its swapchains yet, so
+     * there is no frame to capture. Retry once the scene is rendering.
+     */
+    RECORD_ERROR_NOT_READY = 7
 }
 export declare enum ViroTrackingStateConstants {
     TRACKING_UNAVAILABLE = 1,

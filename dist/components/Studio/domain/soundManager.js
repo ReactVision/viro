@@ -27,12 +27,23 @@ class StudioSoundManager {
     // Backstop timer per waited playId; cleared whenever its callback fires so a
     // sound whose native finish/error event never arrives can't stall the walk.
     finishTimers = new Map();
+    commandListeners = new Set();
     /** Subscribe to any add/remove; returns an unsubscribe fn. */
     subscribe(listener) {
         return this.listeners.subscribe(listener);
     }
     getActive() {
         return [...this.sounds.values()];
+    }
+    /** Each PLAY and STOP with its origin; a clip ending or a reset is not one. */
+    subscribeCommands(listener) {
+        this.commandListeners.add(listener);
+        return () => {
+            this.commandListeners.delete(listener);
+        };
+    }
+    command(command, origin) {
+        [...this.commandListeners].forEach((fn) => fn(command, origin));
     }
     /** Pull and invoke the stored completion callback (if any) for a playId. */
     fire(playId) {
@@ -51,7 +62,7 @@ class StudioSoundManager {
      * Adds a sound and returns its playId. onFinish (when given) resolves a step
      * waiting on a non-looping PLAY; it fires on natural finish or early stop.
      */
-    play(entry, onFinish) {
+    play(entry, onFinish, origin = "local") {
         // stopOthers clears the live list; fire any pending waiters for the cleared
         // entries so a displaced waited-on sound resolves instead of stalling.
         if (entry.stopOthers) {
@@ -81,10 +92,11 @@ class StudioSoundManager {
             console.log(`[Studio] Sound play "${entry.audioAssetId}" (#${playId})`);
         }
         this.listeners.notify();
+        this.command({ action: "play", ...entry }, origin);
         return playId;
     }
     /** null = stop all sounds; otherwise stop every entry for this audio asset. */
-    stop(audioAssetId) {
+    stop(audioAssetId, origin = "local") {
         const removed = [];
         for (const [id, e] of this.sounds) {
             if (audioAssetId === null || e.audioAssetId === audioAssetId) {
@@ -96,6 +108,7 @@ class StudioSoundManager {
         // Resolve any waiters cut short by the stop.
         for (const id of removed)
             this.fire(id);
+        this.command({ action: "stop", audioAssetId }, origin);
     }
     /** Drop one entry; onFinish calls this for non-looping sounds. */
     remove(playId) {

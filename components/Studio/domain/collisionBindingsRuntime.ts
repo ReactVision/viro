@@ -27,6 +27,8 @@ export function dispatchCollisionBindingActions(params: {
   cooldownMs?: number;
   lastFiredRef: MutableRefObject<Map<string, number>>;
   runtimeCtx?: SequenceRuntimeContext;
+  /** Read per contact; false drops it before the cooldown sees it. */
+  canDispatch?: () => boolean;
 }): void {
   const {
     selfPlacementId,
@@ -39,9 +41,11 @@ export function dispatchCollisionBindingActions(params: {
     cooldownMs = DEFAULT_COOLDOWN_MS,
     lastFiredRef,
     runtimeCtx,
+    canDispatch,
   } = params;
 
   if (!otherTag) return;
+  if (canDispatch && !canDispatch()) return;
 
   const { asset_x_id, asset_y_id } = canonicalizeCollisionAssetIds(
     selfPlacementId,
@@ -87,6 +91,7 @@ export function createPlacementCollisionHandler(
   onAnimationTrigger?: (targetAssetId: string, animationKey: string) => void,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
   runtimeCtx?: SequenceRuntimeContext,
+  canDispatch?: () => boolean,
 ): (
   viroTag: string,
   collidedPoint: [number, number, number],
@@ -103,6 +108,7 @@ export function createPlacementCollisionHandler(
       onAnimationTrigger,
       lastFiredRef,
       runtimeCtx,
+      canDispatch,
     });
   };
 }

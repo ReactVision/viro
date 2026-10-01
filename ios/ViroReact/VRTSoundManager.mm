@@ -28,8 +28,11 @@
 #import <React/RCTUIManager.h>
 #import "VRTSound.h"
 #import "VRTSoundManager.h"
+#import "VRTViewLookup.h"
 
 @implementation VRTSoundManager
+
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 RCT_EXPORT_VIEW_PROPERTY(source, NSDictionary)
@@ -47,15 +50,15 @@ RCT_EXPORT_VIEW_PROPERTY(onErrorViro, RCTDirectEventBlock)
 
 RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(NSInteger)time)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSound class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRTSound class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTSound, got: %@", view);
         } else {
             VRTSound *component = (VRTSound *)view;
             [component seekToTime:time];
         }
-    }];
+    });
 }
 
 @end
@@ -79,15 +82,15 @@ RCT_EXPORT_VIEW_PROPERTY(onErrorViro, RCTDirectEventBlock)
 
 RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(NSInteger)time)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSoundField class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRTSoundField class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTSoundField, got: %@", view);
         } else {
             VRTSoundField *component = (VRTSoundField *)view;
             [component seekToTime:time];
         }
-    }];
+    });
 }
 
 @end
@@ -114,15 +117,15 @@ RCT_EXPORT_VIEW_PROPERTY(onErrorViro, RCTDirectEventBlock)
 
 RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(NSInteger)time)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSpatialSound class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRTSpatialSound class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTSpatialSound, got: %@", view);
         } else {
             VRTSpatialSound *component = (VRTSpatialSound *)view;
             [component seekToTime:time];
         }
-    }];
+    });
 }
 
 @end

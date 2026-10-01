@@ -3,7 +3,13 @@ import {
   StudioVariableValue,
   valueMatchesType,
 } from "./expressionEvaluator";
-import { GlobalListeners, isDev } from "./utils";
+import {
+  ChangeListeners,
+  GlobalListeners,
+  isDev,
+  type StudioChangeOrigin,
+  type StudioStoreChangeListener,
+} from "./utils";
 
 /**
  * Per-session variable store. One instance is owned by the navigator and
@@ -16,6 +22,7 @@ import { GlobalListeners, isDev } from "./utils";
 export class StudioVariableStore {
   private values = new Map<string, StudioVariableValue>();
   private listeners = new GlobalListeners();
+  private changes = new ChangeListeners();
 
   get(name: string): StudioVariableValue | undefined {
     return this.values.get(name);
@@ -26,7 +33,16 @@ export class StudioVariableStore {
     return this.listeners.subscribe(listener);
   }
 
-  set(name: string, value: StudioVariableValue): void {
+  /** Each change with the variable's name (null after reset) and its origin. */
+  subscribeChanges(listener: StudioStoreChangeListener): () => void {
+    return this.changes.subscribe(listener);
+  }
+
+  set(
+    name: string,
+    value: StudioVariableValue,
+    origin: StudioChangeOrigin = "local"
+  ): void {
     // Values are primitives; skip the no-op write so unchanged values don't
     // log or wake subscribers.
     if (Object.is(this.values.get(name), value)) return;
@@ -35,6 +51,7 @@ export class StudioVariableStore {
       console.log(`[Studio] Variable "${name}" =`, value);
     }
     this.listeners.notify();
+    this.changes.notify(name, origin);
   }
 
   seed(declarations: StudioSceneVariable[]): void {
@@ -62,6 +79,7 @@ export class StudioVariableStore {
   reset(): void {
     this.values.clear();
     this.listeners.notify();
+    this.changes.notify(null, "local");
   }
 
   snapshot(): Record<string, StudioVariableValue> {

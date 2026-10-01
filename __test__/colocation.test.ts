@@ -42,6 +42,12 @@ describe("join", () => {
     expect(mockModule.join).toHaveBeenCalledWith("room-1", "k", "p", "");
   });
 
+  it("passes an empty key through, which native reads as the session", async () => {
+    mockModule.join.mockResolvedValue({ success: true });
+    await joinColocation({ roomId: "room-1", apiKey: "", projectId: "p" });
+    expect(mockModule.join).toHaveBeenCalledWith("room-1", "", "p", "");
+  });
+
   it("carries a failure through instead of throwing", async () => {
     mockModule.join.mockResolvedValue({ success: false, error: "room full" });
     expect(await joinColocation({ roomId: "r", apiKey: "k", projectId: "p" }))

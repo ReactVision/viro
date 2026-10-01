@@ -135,7 +135,7 @@ std::string VROPlatformGetCacheDirectory();
 
 // Returns empty shared_ptr on failure
 std::shared_ptr<VROImage> VROPlatformLoadImageFromFile(std::string filename, VROTextureInternalFormat format);
-std::shared_ptr<VROImage> VROPlatformLoadImageWithBufferedData(std::vector<unsigned char> rawData,
+std::shared_ptr<VROImage> VROPlatformLoadImageWithBufferedData(const std::vector<unsigned char> &rawData,
                                                                VROTextureInternalFormat format);
 
 #if VRO_PLATFORM_ANDROID
@@ -253,6 +253,15 @@ jobject VROPlatformGetClassLoader(JNIEnv *jni, jobject jcontext);
 // This is safe to call from any thread, even those not spawned in Java
 // (i.e. threads created using pthread_create).
 jclass VROPlatformFindClass(JNIEnv *jni, jobject javaObject, const char *className);
+
+/*
+ FindClass for a class of the app or of Viro ("com/viro/core/ARHitTestResult"), from any thread.
+ JNI FindClass resolves through the calling thread's class loader, and a native thread attached
+ to the VM (the OpenXR render thread) only has the system one, so app classes are not found
+ there. This falls back to the app context's class loader. Returns null, with no exception
+ pending, if neither finds it.
+ */
+jclass VROPlatformFindHostClass(JNIEnv *env, const char *className);
 
 #pragma mark - Android Image Tracking Debugging
 
@@ -507,7 +516,11 @@ VRO_OBJECT VROPlatformConstructHostObject(std::string className,
     JNIEnv *env = VROPlatformGetJNIEnv();
     env->ExceptionClear();
 
-    jclass cls = env->FindClass(className.c_str());
+    jclass cls = VROPlatformFindHostClass(env, className.c_str());
+    if (cls == nullptr) {
+        std::string errorString = "Could not find class " + className;
+        throw std::runtime_error(errorString.c_str());
+    }
     jmethodID constructor = env->GetMethodID(cls, "<init>", constructorSig.c_str());
 
     jobject object = env->NewObject(cls, constructor, std::forward<Args>(args)...);

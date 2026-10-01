@@ -41,6 +41,7 @@
 }
 
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     if([subview conformsToProtocol:@protocol(VRTHUDComponent)]) {
         VRTHUDLabel<VRTHUDComponent> *hudcomp = (VRTHUDLabel<VRTHUDComponent> *)subview;
         [_hudChildren addObject:[hudcomp getUIView]];

@@ -49,6 +49,7 @@ import com.viro.core.ViroView;
 import com.viromedia.bridge.ReactViroPackage;
 import com.viromedia.bridge.component.node.VRTARScene;
 import com.viromedia.bridge.module.ARSceneNavigatorModule;
+import com.viromedia.bridge.module.VRTStudioModule;
 import com.viromedia.bridge.utility.ARUtils;
 import com.viromedia.bridge.utility.DisplayRotationListener;
 
@@ -492,7 +493,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 Log.w(TAG, "Could not load libreactvisioncca.so: " + e.getMessage());
             }
 
-            // Read ReactVision credentials from AndroidManifest meta-data
+            // Read ReactVision credentials from AndroidManifest meta-data. A Studio
+            // session stands in for them, so their absence is only worth a warning
+            // without one.
+            boolean hasSession = VRTStudioModule.hasStudioSession();
             try {
                 android.content.pm.ApplicationInfo ai = getContext().getPackageManager()
                     .getApplicationInfo(getContext().getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
@@ -502,10 +506,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                     mRvEndpoint = ai.metaData.getString("com.reactvision.RVEndpoint");
                     if (mRvApiKey != null && !mRvApiKey.isEmpty()) {
                         Log.i(TAG, "ReactVision API key found in AndroidManifest.xml");
-                    } else {
+                    } else if (!hasSession) {
                         Log.w(TAG, "WARNING: com.reactvision.RVApiKey not found in AndroidManifest.xml. ReactVision cloud anchors will not work!");
                     }
-                } else {
+                } else if (!hasSession) {
                     Log.w(TAG, "WARNING: No meta-data found in AndroidManifest.xml. ReactVision cloud anchors may not work!");
                 }
             } catch (Exception e) {
@@ -543,11 +547,15 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     // config until the AR session exists, but a latch once masked a dropped call
     // and left the session without credentials for the navigator's life. The
     // C++ setter is idempotent, so re-sending is cheap.
+    // Sent without a key while a Studio session exists: the renderer then
+    // creates the provider on the session, and one set after the first call is
+    // picked up by the next. With neither, the renderer would warn per call.
     private void ensureRvConfigApplied(ARScene arScene) {
         if (!"reactvision".equals(mCloudAnchorProvider)) return;
         if (arScene == null) return;
-        if (mRvApiKey == null || mRvApiKey.isEmpty()) return;
-        arScene.setReactVisionConfig(mRvApiKey, mRvProjectId != null ? mRvProjectId : "",
+        if ((mRvApiKey == null || mRvApiKey.isEmpty()) && !VRTStudioModule.hasStudioSession()) return;
+        arScene.setReactVisionConfig(mRvApiKey != null ? mRvApiKey : "",
+                mRvProjectId != null ? mRvProjectId : "",
                 mRvEndpoint != null ? mRvEndpoint : "");
     }
 
@@ -708,8 +716,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     public void cancelCloudAnchorOperations() {
-        // ARCore doesn't have explicit cancel - operations will just time out
-        // This is a placeholder for future implementation if needed
+        // Cancels ReactVision hosts, resolves and an open scan window; each pending one reports
+        // ErrorCancelled. ARCore's own cloud anchor tasks have no cancel and run to their end.
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return;
+        arScene.rvCancelOperations();
     }
 
     // ========================================================================

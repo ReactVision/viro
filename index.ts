@@ -9,8 +9,10 @@ import {
   StudioARScene,
   StudioRecordingIndicator,
   StudioPlacementIndicator,
+  StudioColocationIndicator,
   useStudioRecording,
   useStudioPlacement,
+  useStudioColocation,
 } from "./components/Studio";
 import {
   ViroVisionOSModule,
@@ -337,6 +339,7 @@ import {
 } from "./components/Utilities/VRModuleOpenXR";
 import type {
   VRModuleOpenXRType,
+  ViroCaptureResult,
   ViroPassthroughStyle,
 } from "./components/Utilities/VRModuleOpenXR";
 import { StreamingAudioManager } from "./components/Utilities/StreamingAudioManager";
@@ -576,8 +579,10 @@ export {
   StudioARScene,
   StudioRecordingIndicator,
   StudioPlacementIndicator,
+  StudioColocationIndicator,
   useStudioRecording,
   useStudioPlacement,
+  useStudioColocation,
   // VisionOS
   ViroVisionOSModule,
   isVisionOS,
@@ -589,7 +594,7 @@ export {
   setInputTuning,
 };
 
-export type { VRModuleOpenXRType, ViroPassthroughStyle };
+export type { VRModuleOpenXRType, ViroCaptureResult, ViroPassthroughStyle };
 export type {
   ImmersiveSpaceStyle,
   ViroInputTuning,
@@ -608,6 +613,10 @@ export type {
   StudioSceneNavigatorProps,
   StudioApiError,
   StudioApiErrorFields,
+  StudioColocationErrorCode,
+  StudioColocationOptions,
+  StudioColocationRoom,
+  StudioColocationState,
 } from "./components/Studio";
 
 export { isStudioApiError } from "./components/Studio";

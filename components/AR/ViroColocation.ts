@@ -70,6 +70,11 @@ export type ViroColocationConfig = {
    * covers the space, the frame and the channel.
    */
   roomId: string;
+  /**
+   * An empty string is reserved for first-party apps: native then joins with
+   * the internal Studio session (`VRTStudioModule.rvSetStudioSession`), and
+   * fails the join when none is set.
+   */
   apiKey: string;
   projectId: string;
   /** Defaults to the production platform endpoint. */

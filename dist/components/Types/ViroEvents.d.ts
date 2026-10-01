@@ -354,7 +354,7 @@ export type ViroSoundFinishEvent = any;
  * State of a cloud anchor operation.
  * Maps to GARCloudAnchorState (iOS) and Anchor.CloudAnchorState (Android)
  */
-export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable" | "ErrorNetworkFailure" | "ErrorAuthenticationFailed" | "ErrorHostingInsufficientVisualFeatures" | "ErrorResolvingLocalizationNoMatch" | "ErrorAnchorExpired"
+export type ViroCloudAnchorState = "None" | "Success" | "ErrorInternal" | "TaskInProgress" | "ErrorNotAuthorized" | "ErrorResourceExhausted" | "ErrorHostingDatasetProcessingFailed" | "ErrorCloudIdNotFound" | "ErrorResolvingSdkVersionTooOld" | "ErrorResolvingSdkVersionTooNew" | "ErrorHostingServiceUnavailable" | "ErrorCancelled" | "ErrorNetworkFailure" | "ErrorAuthenticationFailed" | "ErrorHostingInsufficientVisualFeatures" | "ErrorResolvingLocalizationNoMatch" | "ErrorAnchorExpired"
 /**
  * Emitted by JS platform guards, never by native: the running platform has no
  * cloud anchor path at all (Quest, visionOS). Distinct from a failure — there
@@ -460,6 +460,12 @@ export type ViroScanStatus = {
     meetsKeyframes?: boolean;
     meetsViewpointPairs?: boolean;
     meetsSpread?: boolean;
+    /**
+     * Points triangulated from the scan so far, and the count hosting needs.
+     * Sent by renderers that triangulate while scanning; absent from older ones.
+     */
+    triangulatedPoints?: number;
+    minTriangulatedPoints?: number;
     error?: string;
 };
 /** The measurements behind the last scan-based host, pass or fail. */

@@ -8,6 +8,12 @@ import {
   computeHeadLockedTransform,
   CameraPose,
 } from "./domain/questHeadLockedTransform";
+import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
+import { studioColocationStore } from "./domain/colocationStore";
+import { useStudioColocation } from "./useStudioColocation";
+
+const subscribeToColocation = (onChange: () => void) =>
+  studioColocationStore.subscribe(onChange);
 
 type Props = {
   /** Latest cached camera pose (throttled — see StudioARScene). Null before
@@ -32,7 +38,9 @@ function handleExitClick() {
  * in MainActivity, out of view once VRActivity takes the display (see
  * ViroXRSceneNavigator, which renders null on Quest). This is the in-scene
  * replacement: a small persistent head-locked HUD with the scene name, plane
- * status, and an in-scene "Exit" the hardware back button already covers,
+ * status (or a shared session's status and join code, unless the navigator's
+ * colocationIndicator is false), and an in-scene "Exit" the hardware back button
+ * already covers,
  * but this makes it discoverable and provides a scene name / plane status
  * that has no other Quest-visible equivalent.
  *
@@ -45,18 +53,31 @@ export function StudioQuestSceneHudOverlay({
   planeDetectionMode,
   hasFoundPlane,
 }: Props) {
+  const session = studioColocationIndicatorContent(
+    useStudioColocation(),
+    null,
+    "headset"
+  );
+  const showSession = React.useSyncExternalStore(
+    subscribeToColocation,
+    () => studioColocationStore.isBuiltInIndicatorShown(),
+    () => true
+  );
+  const colocation = showSession ? session : null;
   if (!cameraPose) return null;
 
+  const height = colocation ? (colocation.detail ? 0.9 : 0.55) : 0.5;
   const { position, rotation } = computeHeadLockedTransform(cameraPose, {
     distanceM: 1.2,
-    verticalOffsetM: -0.4,
+    // Grows downwards, so its top edge stays where an alert expects it.
+    verticalOffsetM: -0.4 - (height - 0.5) / 2,
   });
 
   return (
     <ViroNode position={position} rotation={rotation}>
       <ViroFlexView
         width={1.6}
-        height={0.5}
+        height={height}
         style={{
           backgroundColor: "rgba(0,0,0,0.6)",
           justifyContent: "center",
@@ -75,7 +96,40 @@ export function StudioQuestSceneHudOverlay({
             textAlign: "center",
           }}
         />
-        {planeDetectionMode !== "NONE" && (
+        {colocation && (
+          <ViroText
+            text={
+              colocation.code
+                ? `${colocation.title}   ${colocation.code}`
+                : colocation.title
+            }
+            width={1.5}
+            height={0.15}
+            style={{
+              fontFamily: "Arial",
+              fontSize: 13,
+              color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
+              textAlign: "center",
+            }}
+          />
+        )}
+        {colocation?.detail && (
+          <ViroText
+            text={colocation.detail}
+            width={1.5}
+            // Three lines: a failure's reason runs long, and ViroText drops
+            // what does not fit without a sign.
+            height={0.36}
+            style={{
+              fontFamily: "Arial",
+              fontSize: 11,
+              color: "#CCCCCC",
+              textAlign: "center",
+            }}
+          />
+        )}
+        {/* A shared scene sits on the shared frame, not on a plane. */}
+        {!session && planeDetectionMode !== "NONE" && (
           <ViroText
             text={hasFoundPlane ? "Plane found" : "Scanning for planes…"}
             width={1.5}

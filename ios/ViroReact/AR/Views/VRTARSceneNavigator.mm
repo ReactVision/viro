@@ -29,6 +29,7 @@
 #import <ViroKit/VROARSessioniOS.h>
 #import "VRTARSceneNavigator.h"
 #import "RVStudioWatermarkState.h"
+#import "VRTStudioModule.h"
 #import <React/RCTAssert.h>
 #import <React/RCTLog.h>
 #import "VRTARScene.h"
@@ -320,6 +321,7 @@ static NSString * const kRVWatermarkURL =
 
 //VROComponent overrides...
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex {
+    VRT_RETURN_IF_NIL_SUBVIEW(subview, atIndex);
     RCTAssert([subview isKindOfClass:[VRTARScene class]], @"VRTARNavigator only accepts VRTARScene subviews");
     [super insertReactSubview:subview atIndex:atIndex];
     
@@ -871,14 +873,17 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::ReactVision);
                 RCTLogInfo(@"[ViroAR] ReactVision Cloud Anchors provider enabled");
 
-                // Check if ReactVision credentials are configured
-                NSString *rvApiKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVApiKey"];
-                NSString *rvProjectId = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVProjectId"];
-                if (!rvApiKey || rvApiKey.length == 0) {
-                    RCTLogWarn(@"[ViroAR] WARNING: RVApiKey not found in Info.plist. ReactVision cloud anchors will not work!");
-                }
-                if (!rvProjectId || rvProjectId.length == 0) {
-                    RCTLogWarn(@"[ViroAR] WARNING: RVProjectId not found in Info.plist. ReactVision cloud anchors will not work!");
+                // A Studio session stands in for both manifest keys; the project
+                // then comes from rvSetCloudAnchorProject.
+                if (!VRTStudioHasSession()) {
+                    NSString *rvApiKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVApiKey"];
+                    NSString *rvProjectId = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RVProjectId"];
+                    if (!rvApiKey || rvApiKey.length == 0) {
+                        RCTLogWarn(@"[ViroAR] WARNING: RVApiKey not found in Info.plist. ReactVision cloud anchors will not work!");
+                    }
+                    if (!rvProjectId || rvProjectId.length == 0) {
+                        RCTLogWarn(@"[ViroAR] WARNING: RVProjectId not found in Info.plist. ReactVision cloud anchors will not work!");
+                    }
                 }
             } else {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::None);
@@ -1098,8 +1103,13 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
 }
 
 - (void)cancelCloudAnchorOperations {
-    // Currently a no-op - cloud operations are fire-and-forget
-    // Future implementation could track and cancel pending operations
+    // Cancels ReactVision hosts, resolves and an open scan window; each pending one reports
+    // ErrorCancelled. ARCore's own cloud anchor tasks have no cancel and run to their end.
+    if (!_vroView) return;
+    VROViewAR *viewAR = (VROViewAR *) _vroView;
+    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+    if (!arSession) return;
+    arSession->rvCancelOperations();
 }
 
 #pragma mark - Geospatial API Methods

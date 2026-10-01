@@ -22,6 +22,26 @@ export function makeCheckerDataUrl(): string {
 }
 
 /**
+ * A PNG whose outer quarter on every side is fully transparent, around an
+ * opaque orange disc on a translucent square. Placed in front of a model it
+ * shows whether alpha is honoured: the border must reveal what is behind it,
+ * not paint a black or white frame.
+ */
+export function makeTransparentBorderPngDataUrl(): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+  ctx.clearRect(0, 0, 256, 256);
+  ctx.fillStyle = "rgba(40, 200, 120, 0.45)";
+  ctx.fillRect(64, 64, 128, 128);
+  ctx.fillStyle = "#ff8800";
+  ctx.beginPath();
+  ctx.arc(128, 128, 44, 0, Math.PI * 2);
+  ctx.fill();
+  return canvas.toDataURL("image/png");
+}
+
+/**
  * A tiny procedural animated GIF (2 frames, loops forever) as a data URL, to
  * exercise ViroAnimatedImage without shipping an asset. A yellow dot jumps
  * between the top and bottom halves of a blue field. Uses the "uncompressed"

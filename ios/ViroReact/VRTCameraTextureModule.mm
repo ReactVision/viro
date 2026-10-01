@@ -27,6 +27,7 @@
 #import <React/RCTUIManagerUtils.h>
 #import "VRTCameraTextureModule.h"
 #import "VRTCameraTexture.h"
+#import "VRTViewLookup.h"
 
 // Response map keys — mirror the Android VRTCameraTextureModule conventions.
 static NSString *const kKeySuccess = @"success";
@@ -36,6 +37,7 @@ static NSString *const kKeyError   = @"error";
 @implementation VRTCameraTextureModule
 
 @synthesize bridge = _bridge;
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 
@@ -60,12 +62,11 @@ static inline void resolveError(RCTPromiseResolveBlock resolve, NSString *msg) {
     resolve(@{ kKeySuccess: @NO, kKeyError: msg ?: @"Unknown error" });
 }
 
-/// Look up the VRTCameraTexture view from the uiManager's view registry.
+/// Check the view VRTWithViewForTag resolved for a VRTCameraTexture tag.
 /// Returns nil and resolves the error promise if the view is missing or wrong type.
 - (nullable VRTCameraTexture *)cameraTextureForTag:(nonnull NSNumber *)reactTag
-                                        uiManager:(RCTUIManager *)uiManager
+                                             view:(UIView *)view
                                           resolve:(RCTPromiseResolveBlock)resolve {
-    UIView *view = [uiManager viewForReactTag:reactTag];
     if (![view isKindOfClass:[VRTCameraTexture class]]) {
         NSString *msg = [NSString stringWithFormat:
             @"Expected VRTCameraTexture for tag %@, got %@", reactTag, NSStringFromClass([view class])];
@@ -90,10 +91,9 @@ RCT_EXPORT_METHOD(capturePhoto:(nonnull NSNumber *)reactTag
                     outputPath:(nullable NSString *)outputPath
                        resolve:(RCTPromiseResolveBlock)resolve
                         reject:(RCTPromiseRejectBlock)__unused reject) {
-    [self.bridge.uiManager addUIBlock:^(RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *__unused viewRegistry) {
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTCameraTexture class], ^(UIView *view) {
         VRTCameraTexture *component = [self cameraTextureForTag:reactTag
-                                                      uiManager:uiManager
+                                                           view:view
                                                         resolve:resolve];
         if (!component) return;
 
@@ -104,7 +104,7 @@ RCT_EXPORT_METHOD(capturePhoto:(nonnull NSNumber *)reactTag
                 resolveError(resolve, error);
             }
         }];
-    }];
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -125,10 +125,9 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                       outputPath:(nullable NSString *)outputPath
                          resolve:(RCTPromiseResolveBlock)resolve
                           reject:(RCTPromiseRejectBlock)__unused reject) {
-    [self.bridge.uiManager addUIBlock:^(RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *__unused viewRegistry) {
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTCameraTexture class], ^(UIView *view) {
         VRTCameraTexture *component = [self cameraTextureForTag:reactTag
-                                                      uiManager:uiManager
+                                                           view:view
                                                         resolve:resolve];
         if (!component) return;
 
@@ -139,7 +138,7 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                 resolveError(resolve, error);
             }
         }];
-    }];
+    });
 }
 
 /**
@@ -150,10 +149,9 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
 RCT_EXPORT_METHOD(stopRecording:(nonnull NSNumber *)reactTag
                          resolve:(RCTPromiseResolveBlock)resolve
                           reject:(RCTPromiseRejectBlock)__unused reject) {
-    [self.bridge.uiManager addUIBlock:^(RCTUIManager *uiManager,
-                                        NSDictionary<NSNumber *, UIView *> *__unused viewRegistry) {
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTCameraTexture class], ^(UIView *view) {
         VRTCameraTexture *component = [self cameraTextureForTag:reactTag
-                                                      uiManager:uiManager
+                                                           view:view
                                                         resolve:resolve];
         if (!component) return;
 
@@ -164,7 +162,7 @@ RCT_EXPORT_METHOD(stopRecording:(nonnull NSNumber *)reactTag
                 resolveError(resolve, error);
             }
         }];
-    }];
+    });
 }
 
 @end

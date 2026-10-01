@@ -18,6 +18,7 @@
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 import * as React from "react";
+import { type StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import { type SequenceRuntimeContext } from "./domain/sceneNavigationHandler";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore } from "./domain/placementStore";
@@ -55,6 +56,8 @@ interface Props {
     placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
     /** Injected so the navigator can drive its own prompt off the same queue. */
     placementStore?: StudioPlacementStore;
+    /** Told when an asset's model, image or video fails to load. */
+    onAssetError?: StudioAssetErrorHandler;
 }
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 export declare const StudioARScene: React.FC<Props>;

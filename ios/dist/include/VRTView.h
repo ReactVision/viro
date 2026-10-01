@@ -36,6 +36,20 @@ typedef NS_ENUM(NSInteger, ViroConstraintType) {
   ViroConstraintTypeBillboard,
 };
 
+
+/*
+ RN 0.86's legacy interop can hand a view manager a nil subview. A child inserted in the
+ middle of a legacy parent waits in the parent's queue until the parent's next update. If
+ the child is unmounted first, its recycled view is nil by the time the queue runs, and
+ -[NSMutableArray insertObject:atIndex:] throws "object cannot be nil". Skip it instead:
+ the child is already gone.
+ */
+#define VRT_RETURN_IF_NIL_SUBVIEW(subview, index) \
+    if ((subview) == nil) { \
+        NSLog(@"[Viro] %@ ignored a nil subview inserted at index %ld", NSStringFromClass([self class]), (long)(index)); \
+        return; \
+    }
+
 @interface VRTView : UIView {
     @protected NSMutableArray *_childViews;
 }

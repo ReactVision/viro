@@ -24,7 +24,7 @@ import {
   ImmersiveSpaceStyle,
 } from "./VisionOS/ViroVisionOSModule";
 import { VRQuestNavigatorBridge } from "./Utilities/VRQuestNavigatorBridge";
-import { VRModuleOpenXR } from "./Utilities/VRModuleOpenXR";
+import { VRCapture, VRModuleOpenXR } from "./Utilities/VRModuleOpenXR";
 import type { Viro3DPoint } from "./Types/ViroUtils";
 
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
@@ -167,6 +167,15 @@ type Props = ViewProps & {
  * When only `initialScene` is provided it is used for both modes.
  *
  * Renderer flags (`hdrEnabled`, `pbrEnabled`, `bloomEnabled`, `shadowsEnabled`,
+ * Screen capture is on the same `sceneNavigator` everywhere:
+ * `takeScreenshot(fileName, saveToCameraRoll)` and `stopVideoRecording()`
+ * resolve `{ success, url, errorCode }`, and `startVideoRecording(fileName,
+ * saveToCameraRoll, onError)` reports failures to `onError`. On Quest the
+ * ref's `sceneNavigator` and the scene's own forward to VRModuleOpenXR, which
+ * captures the left eye without the passthrough room and reports
+ * `RECORD_ERROR_NOT_READY` until the XR session is rendering. visionOS has
+ * no capture, and reports `RECORD_ERROR_UNSUPPORTED_PLATFORM`.
+ *
  * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
  * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
  * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`
@@ -242,6 +251,25 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
             ViroSceneNavigatorModule?.project(requireViewTag(), point),
           unproject: async (point: Viro3DPoint) =>
             ViroSceneNavigatorModule?.unproject(requireViewTag(), point),
+          // Screen capture, with ViroARSceneNavigator's signatures and results.
+          // VRModuleOpenXR again, for the reason given for the shared frame
+          // below. They resolve (or call onError) with RECORD_ERROR_NOT_READY
+          // before the VR scene has mounted, rather than throwing.
+          takeScreenshot: (fileName: string, saveToCameraRoll: boolean) =>
+            VRCapture.takeScreenshot(VRQuestNavigatorBridge.getViewTag(), fileName, saveToCameraRoll),
+          startVideoRecording: (
+            fileName: string,
+            saveToCameraRoll: boolean,
+            onError: (errorCode: number) => void
+          ) =>
+            VRCapture.startVideoRecording(
+              VRQuestNavigatorBridge.getViewTag(),
+              fileName,
+              saveToCameraRoll,
+              onError
+            ),
+          stopVideoRecording: () =>
+            VRCapture.stopVideoRecording(VRQuestNavigatorBridge.getViewTag()),
           // CL-H. These are the two names `metaSpatialAnchorFrameSource` looks for,
           // and their absence here is the whole of why co-location did not work on
           // Quest: the native side has driven Meta's group sharing since the OpenXR

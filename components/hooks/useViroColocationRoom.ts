@@ -25,9 +25,10 @@ import {
 export type UseViroColocationRoomOptions = ViroColocationRoomsConfig & {
   /**
    * Create a room for a frame this device has established. The host path.
-   * Mutually exclusive with `joinCode`.
+   * Mutually exclusive with `joinCode`. `name` and `sceneId` are sent once,
+   * with the frame, so set them before the frame or `enabled`.
    */
-  host?: ViroRoomFrame & { name?: string };
+  host?: ViroRoomFrame & { name?: string; sceneId?: string };
   /** Join a room someone read out. The guest path. */
   joinCode?: string;
   /** Set false to hold off, for instance until an anchor has finished hosting. */
@@ -76,6 +77,7 @@ export function useViroColocationRoom(
     apiKey,
     projectId,
     endpoint,
+    headers,
     host,
     joinCode,
     enabled = true,
@@ -91,6 +93,13 @@ export function useViroColocationRoom(
   // one. This is what an effect that can run twice needs instead of a guard on
   // the request itself.
   const inFlight = useRef<string | null>(null);
+
+  // Read when the request goes out, not a dependency: a token refresh would
+  // restart the effect and drop an in-flight create's result, which the guard
+  // above then never requests again. Headers first arriving do restart it.
+  const headersRef = useRef(headers);
+  headersRef.current = headers;
+  const hasHeaders = headers !== undefined;
 
   const hostKey = host
     ? [
@@ -115,7 +124,12 @@ export function useViroColocationRoom(
     setError(undefined);
 
     const run = async () => {
-      const config = { apiKey, projectId, endpoint };
+      const config = {
+        apiKey,
+        projectId,
+        endpoint,
+        headers: headersRef.current,
+      };
       const result = joinCode
         ? await lookupColocationRoom(config, joinCode)
         : await createColocationRoom(config, host!);
@@ -137,7 +151,7 @@ export function useViroColocationRoom(
     // `status` is deliberately absent: it changes inside the effect, and the
     // retry path goes through `attempt` instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, projectId, endpoint, target, enabled, attempt]);
+  }, [apiKey, projectId, endpoint, hasHeaders, target, enabled, attempt]);
 
   const frameSource = useMemo(() => {
     if (!room) return null;

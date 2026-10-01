@@ -1,4 +1,4 @@
-import { GlobalListeners, isDev } from "./utils";
+import { GlobalListeners, isDev, type StudioEffectOrigin } from "./utils";
 
 /**
  * Last-resort cap on how long a step waits for a non-looping PLAY to finish. A
@@ -20,6 +20,24 @@ export type StudioSoundEntry = {
   loop: boolean;
 };
 
+/** A PLAY or STOP as it reached the manager, which a shared session repeats elsewhere. */
+export type StudioSoundCommand =
+  | {
+      action: "play";
+      audioAssetId: string;
+      url: string;
+      position?: [number, number, number];
+      volume: number;
+      loop: boolean;
+      stopOthers: boolean;
+    }
+  | { action: "stop"; audioAssetId: string | null };
+
+export type StudioSoundCommandListener = (
+  command: StudioSoundCommand,
+  origin: StudioEffectOrigin
+) => void;
+
 /**
  * Per-scene sound store. PLAY adds an entry under a fresh playId; STOP removes
  * by audio asset id (null = all). The whole <StudioSounds> list re-renders on
@@ -36,6 +54,7 @@ export class StudioSoundManager {
   // Backstop timer per waited playId; cleared whenever its callback fires so a
   // sound whose native finish/error event never arrives can't stall the walk.
   private finishTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private commandListeners = new Set<StudioSoundCommandListener>();
 
   /** Subscribe to any add/remove; returns an unsubscribe fn. */
   subscribe(listener: () => void): () => void {
@@ -44,6 +63,18 @@ export class StudioSoundManager {
 
   getActive(): StudioSoundEntry[] {
     return [...this.sounds.values()];
+  }
+
+  /** Each PLAY and STOP with its origin; a clip ending or a reset is not one. */
+  subscribeCommands(listener: StudioSoundCommandListener): () => void {
+    this.commandListeners.add(listener);
+    return () => {
+      this.commandListeners.delete(listener);
+    };
+  }
+
+  private command(command: StudioSoundCommand, origin: StudioEffectOrigin) {
+    [...this.commandListeners].forEach((fn) => fn(command, origin));
   }
 
   /** Pull and invoke the stored completion callback (if any) for a playId. */
@@ -72,7 +103,8 @@ export class StudioSoundManager {
       loop: boolean;
       stopOthers: boolean;
     },
-    onFinish?: () => void
+    onFinish?: () => void,
+    origin: StudioEffectOrigin = "local"
   ): number {
     // stopOthers clears the live list; fire any pending waiters for the cleared
     // entries so a displaced waited-on sound resolves instead of stalling.
@@ -105,11 +137,15 @@ export class StudioSoundManager {
       console.log(`[Studio] Sound play "${entry.audioAssetId}" (#${playId})`);
     }
     this.listeners.notify();
+    this.command({ action: "play", ...entry }, origin);
     return playId;
   }
 
   /** null = stop all sounds; otherwise stop every entry for this audio asset. */
-  stop(audioAssetId: string | null): void {
+  stop(
+    audioAssetId: string | null,
+    origin: StudioEffectOrigin = "local"
+  ): void {
     const removed: number[] = [];
     for (const [id, e] of this.sounds) {
       if (audioAssetId === null || e.audioAssetId === audioAssetId) {
@@ -120,6 +156,7 @@ export class StudioSoundManager {
     this.listeners.notify();
     // Resolve any waiters cut short by the stop.
     for (const id of removed) this.fire(id);
+    this.command({ action: "stop", audioAssetId }, origin);
   }
 
   /** Drop one entry; onFinish calls this for non-looping sounds. */

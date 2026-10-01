@@ -28,8 +28,11 @@
 #import <React/RCTUIManager.h>
 #import "VRTMaterialVideoManager.h"
 #import "VRTMaterialVideo.h"
+#import "VRTViewLookup.h"
 
 @implementation VRTMaterialVideoManager
+
+@synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
 RCT_EXPORT_MODULE()
 RCT_EXPORT_VIEW_PROPERTY(material, NSString)
@@ -49,27 +52,27 @@ RCT_EXPORT_VIEW_PROPERTY(onUpdateTimeViro, RCTDirectEventBlock)
 
 RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
 {
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTMaterialVideo class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if (![view isKindOfClass:[VRTMaterialVideo class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting VRTVideoSurface, got: %@", view);
         } else {
             VRTMaterialVideo *component = (VRTMaterialVideo *)view;
             [component seekToTime:time];
         }
-    }];
+    });
 }
 
 RCT_EXPORT_METHOD(pause:(nonnull NSNumber *)reactTag)
 {
     // This method is called from componentWillUnmount to ensure proper cleanup
     // of video resources before the native view is deallocated.
-    [self.bridge.uiManager addUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        VRTView *view = (VRTView *)viewRegistry[reactTag];
+    VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTMaterialVideo class], ^(UIView *resolvedView) {
+        VRTView *view = (VRTView *)resolvedView;
         if ([view isKindOfClass:[VRTMaterialVideo class]]) {
             VRTMaterialVideo *component = (VRTMaterialVideo *)view;
             [component setPaused:YES];
         }
-    }];
+    });
 }
 @end

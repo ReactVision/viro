@@ -49,6 +49,7 @@ const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("./Utilities/ViroPlatform");
 const ViroUnsupported_1 = require("./Utilities/ViroUnsupported");
+const VRModuleOpenXR_1 = require("./Utilities/VRModuleOpenXR");
 const ViroSceneNavigatorModule = react_native_1.NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = react_native_1.NativeModules.VRModuleOpenXR;
 var mathRandomOffset = 0;
@@ -349,6 +350,32 @@ class ViroVRSceneNavigator extends React.Component {
     _unproject = async (point) => {
         return await ViroSceneNavigatorModule.unproject((0, react_native_1.findNodeHandle)(this), point);
     };
+    /**
+     * Takes a screenshot of the rendered scene, as ViroARSceneNavigator does.
+     *
+     * Meta Quest only: the left eye of the next frame, saved as `fileName`.jpg in
+     * app storage and also to the gallery when `saveToCameraRoll`. Resolves
+     * `{ success, url, errorCode }` and never rejects. Elsewhere it resolves with
+     * `RECORD_ERROR_UNSUPPORTED_PLATFORM`, and on Quest with
+     * `RECORD_ERROR_NOT_READY` until the XR session is rendering. A capture of a
+     * passthrough scene holds the virtual content only.
+     */
+    _takeScreenshot = async (fileName, saveToCameraRoll) => {
+        return await VRModuleOpenXR_1.VRCapture.takeScreenshot((0, react_native_1.findNodeHandle)(this), fileName, saveToCameraRoll);
+    };
+    /**
+     * Starts recording the rendered scene (left eye) and the microphone, as
+     * ViroARSceneNavigator does. Meta Quest only; `onError` receives a
+     * ViroRecordingErrorConstants code, `RECORD_ERROR_UNSUPPORTED_PLATFORM`
+     * elsewhere.
+     */
+    _startVideoRecording = (fileName, saveToCameraRoll, onError) => {
+        VRModuleOpenXR_1.VRCapture.startVideoRecording((0, react_native_1.findNodeHandle)(this), fileName, saveToCameraRoll, onError);
+    };
+    /** Stops the recording. Resolves `{ success, url, errorCode }`. */
+    _stopVideoRecording = async () => {
+        return await VRModuleOpenXR_1.VRCapture.stopVideoRecording((0, react_native_1.findNodeHandle)(this));
+    };
     _renderSceneStackItems() {
         let views = [];
         var i = 0;
@@ -371,6 +398,12 @@ class ViroVRSceneNavigator extends React.Component {
         project: this._project,
         unproject: this._unproject,
         recenterTracking: this._recenterTracking,
+        // Screen capture, with ViroARSceneNavigator's signatures and results, so a
+        // scene captures through `sceneNavigator` on any platform. Meta Quest only;
+        // elsewhere they report RECORD_ERROR_UNSUPPORTED_PLATFORM.
+        takeScreenshot: this._takeScreenshot,
+        startVideoRecording: this._startVideoRecording,
+        stopVideoRecording: this._stopVideoRecording,
         viroAppProps: {},
     };
     render() {

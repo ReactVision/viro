@@ -21,7 +21,7 @@ import * as React from "react";
 import { ViroArSession, type ViroWebRendererOptions, type ViroArSessionOptions } from "@reactvision/viro-web-renderer";
 import { type ViroRendererEffectProps } from "../Web/useViroRendererEffects";
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
-type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "facingMode" | "intrinsics" | "intrinsicsSize" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
+type ArOptions = Partial<Pick<ViroArSessionOptions, "captureWidth" | "captureHeight" | "feedWidth" | "feedHeight" | "poseSmoothing" | "facingMode" | "intrinsics" | "intrinsicsSize" | "tuning" | "showCameraBackground" | "detectPlanes" | "maxPlanes" | "renderWhileLimited" | "playback">>;
 type Props = {
     initialScene: {
         scene: React.ComponentType<any>;
@@ -51,6 +51,13 @@ type Props = {
     onSessionReady?: (session: ViroArSession) => void;
     /** Overlay label for the start button. */
     startLabel?: string;
+    /**
+     * Called when AR cannot track for want of motion data: the viewer denied
+     * motion access (the session is then not started), or it was granted and no
+     * events arrive. The tracker needs gravity from the IMU before it can start,
+     * so without motion it never leaves "initializing".
+     */
+    onMotionUnavailable?: (reason: "denied" | "no-events") => void;
     [key: string]: any;
 } & ViroRendererEffectProps;
 export declare function ViroARSceneNavigator(props: Props): React.JSX.Element;

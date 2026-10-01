@@ -1,7 +1,9 @@
 module.exports = {
   presets: [
     ['@babel/preset-env', {targets: {node: 'current'}}],
-    '@babel/preset-typescript',
+    // `declare` fields (ViroCamera's `declare context`) are erased, as tsc erases
+    // them for the build; without this the preset refuses the file.
+    ['@babel/preset-typescript', {allowDeclareFields: true}],
   ],
   overrides: [
     {

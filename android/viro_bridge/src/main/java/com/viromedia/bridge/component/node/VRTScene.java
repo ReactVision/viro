@@ -22,6 +22,7 @@
 package com.viromedia.bridge.component.node;
 
 import android.view.View;
+import android.view.ViewGroup;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.JSApplicationCausedNativeException;
@@ -56,6 +57,8 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
     private boolean mToneMappingEnabled = true;
     private Renderer mNativeRenderer;
     private VRTCamera mCamera;
+    // The React tag of the camera JS asked for, or 0 for the default camera. See setActiveCameraTag.
+    private int mActiveCameraTag = 0;
     private float[] mSoundRoomSize = DEFAULT_SIZE;
     private String mWallMaterial;
     private String mCeilingMaterial;
@@ -183,6 +186,7 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
 
     public void setCamera(VRTCamera camera) {
         mCamera = camera;
+        mActiveCameraTag = camera != null ? camera.getId() : 0;
         setCameraIfPossible();
     }
 
@@ -195,6 +199,67 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
             mNativeRenderer.setPointOfView(null);
         }
         mCamera = null;
+        if (camera != null && mActiveCameraTag == camera.getId()) {
+            mActiveCameraTag = 0;
+        }
+    }
+
+    /**
+     * The React tag of the camera this scene has been asked to draw from, or 0 for the scene's
+     * default camera. JS sets it through the {@code activeCameraTag} prop (CameraModule sets it
+     * too).
+     *
+     * The camera's view may not be in the tree when the tag arrives: on iOS React Native's
+     * legacy interop holds back a child inserted anywhere but at the end of its parent until
+     * that parent next updates, and the prop is what makes the scene update. So the tag is
+     * kept, and a camera that is not here yet is attached by {@link #cameraDidJoinScene} as it
+     * joins the tree. Until then the scene keeps drawing from the camera it has.
+     */
+    public void setActiveCameraTag(int tag) {
+        mActiveCameraTag = tag;
+        if (tag == 0) {
+            if (mCamera != null) {
+                removeCamera(mCamera);
+            }
+            return;
+        }
+        if (mCamera != null && mCamera.getId() == tag) {
+            return;
+        }
+        VRTCamera camera = findCameraWithTag(this, tag);
+        if (camera != null) {
+            setCamera(camera);
+        }
+    }
+
+    public int getActiveCameraTag() {
+        return mActiveCameraTag;
+    }
+
+    /**
+     * Called by a VRTCamera as it joins this scene's tree (its scene is set). Attaches it if it
+     * is the requested camera.
+     */
+    public void cameraDidJoinScene(VRTCamera camera) {
+        if (mActiveCameraTag != 0 && camera != mCamera && camera.getId() == mActiveCameraTag) {
+            setCamera(camera);
+        }
+    }
+
+    private static VRTCamera findCameraWithTag(ViewGroup root, int tag) {
+        for (int i = 0; i < root.getChildCount(); i++) {
+            View child = root.getChildAt(i);
+            if (child instanceof VRTCamera && child.getId() == tag) {
+                return (VRTCamera) child;
+            }
+            if (child instanceof ViewGroup) {
+                VRTCamera camera = findCameraWithTag((ViewGroup) child, tag);
+                if (camera != null) {
+                    return camera;
+                }
+            }
+        }
+        return null;
     }
 
     public void getCameraPositionAsync(CameraCallback callback) {

@@ -77,6 +77,7 @@ RCT_EXPORT_VIEW_PROPERTY(dragType, NSString)
 RCT_EXPORT_VIEW_PROPERTY(dragPlane, NSDictionary)
 RCT_EXPORT_VIEW_PROPERTY(canCameraTransformUpdate, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(onCameraTransformUpdateViro, RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(activeCameraTag, NSNumber)
 
 - (VRTView *)view
 {

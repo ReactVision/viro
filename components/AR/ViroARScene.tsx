@@ -48,10 +48,9 @@ import {
   ViroSource,
 } from "../Types/ViroUtils";
 import { ViroBase } from "../ViroBase";
-import { ViroCamera } from "../ViroCamera";
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import { ViroCommonProps } from "./ViroCommonProps";
-import { ViroOrbitCamera } from "components/ViroOrbitCamera";
+import { ViroActiveCameraTracker } from "../Utilities/ViroActiveCameraTracker";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { markARSceneRoot } from "../VisionOS/ViroImmersiveSpaceGate";
@@ -113,8 +112,32 @@ type Props = ViroCommonProps & {
   onTrackingInitialized?: () => void;
 };
 
-export class ViroARScene extends ViroBase<Props> {
+type State = {
+  /**
+   * The React tag of the camera the scene draws from, or null for its default camera. It
+   * reaches the native scene as a prop rather than through `VRTCameraModule` so that a camera
+   * mounted between its siblings attaches: see `ViroActiveCameraTracker`.
+   */
+  activeCameraTag: number | null;
+};
+
+export class ViroARScene extends ViroBase<Props, State> {
+  state: State = { activeCameraTag: null };
   onTrackingFirstInitialized = false;
+  _unmounting = false;
+
+  // One tracker for the component's life, so the context value is stable and the cameras do
+  // not re-render on every render of the scene.
+  _cameras = new ViroActiveCameraTracker((activeCameraTag) => {
+    // A camera unmounting with the whole scene still reports in; the scene is past rendering.
+    if (!this._unmounting) {
+      this.setState({ activeCameraTag });
+    }
+  });
+
+  componentWillUnmount() {
+    this._unmounting = true;
+  }
 
   _onCameraARHitTest = (
     event: NativeSyntheticEvent<ViroCameraARHitTestEvent>
@@ -501,44 +524,10 @@ export class ViroARScene extends ViroBase<Props> {
     }
 
     return (
-      <ViroSceneContext.Provider
-        value={{
-          cameraDidMount: (camera: ViroCamera | ViroOrbitCamera) => {
-            if (camera.props.active) {
-              NativeModules.VRTCameraModule.setSceneCamera(
-                findNodeHandle(this),
-                findNodeHandle(camera)
-              );
-            }
-          },
-          cameraWillUnmount: (camera: ViroCamera | ViroOrbitCamera) => {
-            if (camera.props.active) {
-              NativeModules.VRTCameraModule.removeSceneCamera(
-                findNodeHandle(this),
-                findNodeHandle(camera)
-              );
-            }
-          },
-          cameraDidUpdate: (
-            camera: ViroCamera | ViroOrbitCamera,
-            active: boolean
-          ) => {
-            if (active) {
-              NativeModules.VRTCameraModule.setSceneCamera(
-                findNodeHandle(this),
-                findNodeHandle(camera)
-              );
-            } else {
-              NativeModules.VRTCameraModule.removeSceneCamera(
-                findNodeHandle(this),
-                findNodeHandle(camera)
-              );
-            }
-          },
-        }}
-      >
+      <ViroSceneContext.Provider value={this._cameras}>
         <VRTARScene
           {...this.props}
+          activeCameraTag={this.state.activeCameraTag}
           canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
           canClick={
             this.props.onClick != undefined ||
@@ -630,6 +619,7 @@ var VRTARScene = requireNativeComponent<any>(
       pointCloudImage: true,
       pointCloudScale: true,
       pointCloudMaxPoints: true,
+      activeCameraTag: true,
     },
   }
 );

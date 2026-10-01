@@ -28,6 +28,7 @@
 #import "VRTCamera.h"
 #import <ViroKit/ViroKit.h>
 #import "VRTMaterialManager.h"
+#import "VRTScene.h"
 #import "VRTUtils.h"
 
 static NSArray *const kDefaultCameraPosition  = @[@0, @0, @0];
@@ -93,6 +94,13 @@ static NSArray *const kDefaultCameraPosition  = @[@0, @0, @0];
 
 - (VROCameraRotationType)rotationType {
     return VROCameraRotationType::Standard;
+}
+
+// The scene may have been asked for this camera before it was inserted (see
+// -[VRTScene activeCameraTag]); it attaches us now if so.
+- (void)didJoinViroScene:(VRTScene *)scene {
+    [super didJoinViroScene:scene];
+    [scene cameraDidJoinScene:self];
 }
 
 @end

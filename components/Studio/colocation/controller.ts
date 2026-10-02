@@ -168,18 +168,22 @@ export const STUDIO_COLOCATION_OFF_FRAME: StudioColocationFrame = {
 };
 
 /**
- * Quest roots a scene in ViroScene (StudioARScene says why), except the scene
- * on screen while a session is set up or shared. The OpenXR session, where a
- * Meta shared anchor lives, is attached only to the selected scene, and the
- * Quest navigator sends shared-frame calls to its first ViroARScene child, so
- * a scene under a push must stay ViroScene.
+ * Quest and visionOS root a scene in ViroScene (StudioARScene says why), except
+ * the scene on screen while a session is set up or shared. The OpenXR session,
+ * where a Meta shared anchor lives, is attached only to the selected scene, and
+ * the Quest navigator sends shared-frame calls to its first ViroARScene child,
+ * so a scene under a push must stay ViroScene.
+ *
+ * `rootsOutsideAR` is the caller's answer to "does this platform host the scene
+ * outside a ViroARScene?" — true on Quest and on visionOS, whose ImmersiveSpace
+ * cannot host one either (ViroARScene renders null there).
  */
 export function studioSceneRootsInAR(
   frame: Pick<StudioColocationFrame, "phase" | "sceneMount">,
   mount: number,
-  quest: boolean
+  rootsOutsideAR: boolean
 ): boolean {
-  if (!quest) return true;
+  if (!rootsOutsideAR) return true;
   if (frame.phase === "off") return false;
   // A scene renders before it attaches, and only the one being pushed can be
   // newer than the attached scene.

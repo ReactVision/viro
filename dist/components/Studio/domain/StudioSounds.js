@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioSounds = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroSound_1 = require("../../ViroSound");
 const ViroSpatialSound_1 = require("../../ViroSpatialSound");
@@ -46,8 +47,7 @@ const ViroSpatialSound_1 = require("../../ViroSpatialSound");
 const StudioSounds = ({ manager, }) => {
     const [, force] = React.useReducer((n) => n + 1, 0);
     React.useEffect(() => manager.subscribe(force), [manager]);
-    return (<>
-      {manager.getActive().map((s) => {
+    return ((0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: manager.getActive().map((s) => {
             const shared = {
                 source: { uri: s.url },
                 volume: s.volume,
@@ -62,8 +62,7 @@ const StudioSounds = ({ manager, }) => {
                     manager.remove(s.playId);
                 },
             };
-            return s.position ? (<ViroSpatialSound_1.ViroSpatialSound key={s.playId} position={s.position} {...shared}/>) : (<ViroSound_1.ViroSound key={s.playId} {...shared}/>);
-        })}
-    </>);
+            return s.position ? ((0, jsx_runtime_1.jsx)(ViroSpatialSound_1.ViroSpatialSound, { position: s.position, ...shared }, s.playId)) : ((0, jsx_runtime_1.jsx)(ViroSound_1.ViroSound, { ...shared }, s.playId));
+        }) }));
 };
 exports.StudioSounds = StudioSounds;

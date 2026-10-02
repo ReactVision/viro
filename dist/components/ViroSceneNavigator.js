@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSceneNavigator = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("./Utilities/ViroPlatform");
@@ -373,7 +374,7 @@ class ViroSceneNavigator extends React.Component {
         for (var scene in sceneDictionary) {
             var Component = sceneDictionary[scene].sceneClass.scene;
             var props = sceneDictionary[scene].sceneClass.passProps;
-            views.push(<Component key={"scene" + i} sceneNavigator={this.sceneNavigator} {...props}/>);
+            views.push((0, jsx_runtime_1.jsx)(Component, { sceneNavigator: this.sceneNavigator, ...props }, "scene" + i));
             i++;
         }
         return views;
@@ -401,11 +402,9 @@ class ViroSceneNavigator extends React.Component {
         const { vrModeEnabled = true, // default to true
         viroAppProps = {}, // Make sure viroAppProps aren't null to save us having to always check
          } = this.props;
-        return (<VRTSceneNavigator ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(VRTSceneNavigator, { ref: (component) => {
                 this._component = component;
-            }} {...this.props} vrModeEnabled={vrModeEnabled} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} hasOnExitViroCallback={this.props.onExitViro != undefined} onExitViro={this._onExitViro}>
-        {items}
-      </VRTSceneNavigator>);
+            }, ...this.props, vrModeEnabled: vrModeEnabled, viroAppProps: viroAppProps, currentSceneIndex: this.state.currentSceneIndex, style: (this.props.style, styles.container), hasOnExitViroCallback: this.props.onExitViro != undefined, onExitViro: this._onExitViro, children: items }));
     }
 }
 exports.ViroSceneNavigator = ViroSceneNavigator;

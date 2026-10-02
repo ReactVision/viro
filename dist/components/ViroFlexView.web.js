@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroFlexView = ViroFlexView;
+const jsx_runtime_1 = require("react/jsx-runtime");
 /**
  * Web implementation of ViroFlexView — a rectangular container in 3D space with
  * an optional background (color or materials), sized by `style.width`/`height`,
@@ -165,15 +166,7 @@ function ViroFlexView(props) {
     // children keep the transforms they were written with rather than all
     // stacking at the container's origin.
     if (slots.length !== childArray.length) {
-        return (<ViroWebContext_1.ViroParentNodeContext.Provider value={container}>
-        {props.children}
-      </ViroWebContext_1.ViroParentNodeContext.Provider>);
+        return ((0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroParentNodeContext.Provider, { value: container, children: props.children }));
     }
-    return (<>
-      {childArray.map((child, i) => (<ViroWebContext_1.ViroParentNodeContext.Provider key={i} value={slots[i].node}>
-          <ViroFlexSlotContext_1.ViroFlexSlotContext.Provider value={slots[i].slot}>
-            {child}
-          </ViroFlexSlotContext_1.ViroFlexSlotContext.Provider>
-        </ViroWebContext_1.ViroParentNodeContext.Provider>))}
-    </>);
+    return ((0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: childArray.map((child, i) => ((0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroParentNodeContext.Provider, { value: slots[i].node, children: (0, jsx_runtime_1.jsx)(ViroFlexSlotContext_1.ViroFlexSlotContext.Provider, { value: slots[i].slot, children: child }) }, i))) }));
 }

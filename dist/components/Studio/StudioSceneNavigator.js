@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioSceneNavigator = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_1 = require("react");
 const react_native_1 = require("react-native");
@@ -59,10 +60,10 @@ const VRTStudioModule_1 = require("./VRTStudioModule");
 // Tone mapping off here too, or the camera feed takes the default Hable curve for
 // the moment a scene is loading and then snaps when the authored scene mounts.
 function LoadingARScene() {
-    return <ViroARScene_1.ViroARScene toneMappingEnabled={false}/>;
+    return (0, jsx_runtime_1.jsx)(ViroARScene_1.ViroARScene, { toneMappingEnabled: false });
 }
 function LoadingVRScene() {
-    return <ViroScene_1.ViroScene toneMappingEnabled={false}/>;
+    return (0, jsx_runtime_1.jsx)(ViroScene_1.ViroScene, { toneMappingEnabled: false });
 }
 function mapOcclusionMode(dbValue) {
     switch (dbValue) {
@@ -161,7 +162,7 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
     }, [apiRef]);
     if (!activeId)
         return null;
-    return (<react_native_1.View style={react_native_1.StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={handleRelease}/>);
+    return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: react_native_1.StyleSheet.absoluteFill, onStartShouldSetResponder: () => true, onResponderRelease: handleRelease }));
 };
 /**
  * Cross-reality Studio scene navigator. Renders a Studio-authored scene on
@@ -462,56 +463,35 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)(function StudioSceneNavig
     // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
     // while the scene loads.
     if ((ViroPlatform_1.isQuest || ViroPlatform_1.isVisionOS) && !vrSceneEntry) {
-        return (<react_native_1.View style={styles.loader}>
-        {overlay ?? <react_native_1.ActivityIndicator size="large" color="#ffffff"/>}
-      </react_native_1.View>);
+        return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.loader, children: overlay ?? (0, jsx_runtime_1.jsx)(react_native_1.ActivityIndicator, { size: "large", color: "#ffffff" }) }));
     }
-    return (<StudioSceneErrorBoundary_1.StudioSceneErrorBoundary sceneId={sceneId} onError={onError} renderError={renderError}>
-      <react_native_1.View style={style ?? react_native_1.StyleSheet.absoluteFill}>
-        <ViroXRSceneNavigator_1.ViroXRSceneNavigator ref={navigatorRef} arInitialScene={{ scene: LoadingARScene }} vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }} worldAlignment={worldAlignment} autofocus={autofocus} numberOfTrackedImages={numberOfTrackedImages} occlusionMode={occlusionMode} 
-    // Bloom defaults on natively and the editor does not preview it, so a
-    // bright material glows on the phone and nowhere else.
-    //
-    // HDR stays ON even though its default tone curve is the other half of
-    // that problem, because PBR rides on it: VROChoreographer::isPBREnabled
-    // is `_hdrEnabled && _pbrEnabled`, and the whole PBR branch of
-    // VROShaderFactory goes with it, so roughness, metalness and the ambient
-    // occlusion map are read by nothing and a PBR material falls back to
-    // Blinn. The tone curve is switched off per scene instead, which is what
-    // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
-    // than left to the native default, so this cannot be switched off again
-    // without meeting the reason it is on.
-    //
-    // Off on Quest, and only there: the HDR composite occludes the
-    // passthrough layer on that OpenXR compositor, so the room disappears
-    // behind the scene. PBR on Quest goes with it, which is the trade — a
-    // headset that shows nothing of the room is the worse of the two.
-    hdrEnabled={!ViroPlatform_1.isQuest} bloomEnabled={false} onExitViro={onExitViro} 
-    // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
-    // than ViroARScene outside a shared session (see StudioARScene for
-    // why), and a virtual root turns none of this on by itself, so both
-    // are asked for outright.
-    // They reach VRActivity through the navigator bridge and do not depend
-    // on which root the scene uses.
-    passthroughEnabled={ViroPlatform_1.isQuest ? true : undefined} handTrackingEnabled={ViroPlatform_1.isQuest ? true : undefined} style={react_native_1.StyleSheet.absoluteFill}/>
-        {/* Absolutely filled so the overlay covers the navigator instead of
-            taking flow space beneath it. Swapping the overlay's content, rather
-            than replacing this subtree, keeps the AR session and its camera
-            alive while the error shows, so a retry costs no session restart. */}
-        {overlay && <react_native_1.View style={react_native_1.StyleSheet.absoluteFill}>{overlay}</react_native_1.View>}
-        {recordingIndicator && (<react_native_1.View pointerEvents="box-none" style={[styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }]}>
-            <StudioRecordingIndicator_1.StudioRecordingIndicator />
-          </react_native_1.View>)}
-        {!ViroPlatform_1.isQuest && placementStoreRef.current && !colocationPending && (<StudioPlacementOverlay store={placementStoreRef.current} apiRef={placementApiRef} getName={getPlacementName}/>)}
-        {placementIndicator && (<react_native_1.View pointerEvents="none" style={[styles.placementBanner, { top: PLACEMENT_BANNER_TOP }]}>
-            <StudioPlacementIndicator_1.StudioPlacementIndicator />
-          </react_native_1.View>)}
-        {colocationIndicator && (<react_native_1.View pointerEvents="box-none" style={[
-                styles.colocationOverlay,
-                { bottom: COLOCATION_INDICATOR_BOTTOM },
-            ]}>
-            <StudioColocationIndicator_1.StudioColocationIndicator />
-          </react_native_1.View>)}
-      </react_native_1.View>
-    </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);
+    return ((0, jsx_runtime_1.jsx)(StudioSceneErrorBoundary_1.StudioSceneErrorBoundary, { sceneId: sceneId, onError: onError, renderError: renderError, children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: style ?? react_native_1.StyleSheet.absoluteFill, children: [(0, jsx_runtime_1.jsx)(ViroXRSceneNavigator_1.ViroXRSceneNavigator, { ref: navigatorRef, arInitialScene: { scene: LoadingARScene }, vrInitialScene: vrSceneEntry ?? { scene: LoadingVRScene }, worldAlignment: worldAlignment, autofocus: autofocus, numberOfTrackedImages: numberOfTrackedImages, occlusionMode: occlusionMode, 
+                    // Bloom defaults on natively and the editor does not preview it, so a
+                    // bright material glows on the phone and nowhere else.
+                    //
+                    // HDR stays ON even though its default tone curve is the other half of
+                    // that problem, because PBR rides on it: VROChoreographer::isPBREnabled
+                    // is `_hdrEnabled && _pbrEnabled`, and the whole PBR branch of
+                    // VROShaderFactory goes with it, so roughness, metalness and the ambient
+                    // occlusion map are read by nothing and a PBR material falls back to
+                    // Blinn. The tone curve is switched off per scene instead, which is what
+                    // `toneMappingEnabled` on StudioARScene does. Passed explicitly rather
+                    // than left to the native default, so this cannot be switched off again
+                    // without meeting the reason it is on.
+                    //
+                    // Off on Quest, and only there: the HDR composite occludes the
+                    // passthrough layer on that OpenXR compositor, so the room disappears
+                    // behind the scene. PBR on Quest goes with it, which is the trade — a
+                    // headset that shows nothing of the room is the worse of the two.
+                    hdrEnabled: !ViroPlatform_1.isQuest, bloomEnabled: false, onExitViro: onExitViro, 
+                    // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
+                    // than ViroARScene outside a shared session (see StudioARScene for
+                    // why), and a virtual root turns none of this on by itself, so both
+                    // are asked for outright.
+                    // They reach VRActivity through the navigator bridge and do not depend
+                    // on which root the scene uses.
+                    passthroughEnabled: ViroPlatform_1.isQuest ? true : undefined, handTrackingEnabled: ViroPlatform_1.isQuest ? true : undefined, style: react_native_1.StyleSheet.absoluteFill }), overlay && (0, jsx_runtime_1.jsx)(react_native_1.View, { style: react_native_1.StyleSheet.absoluteFill, children: overlay }), recordingIndicator && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: [styles.recordingOverlay, { top: DEFAULT_RECORDING_TOP }], children: (0, jsx_runtime_1.jsx)(StudioRecordingIndicator_1.StudioRecordingIndicator, {}) })), !ViroPlatform_1.isQuest && placementStoreRef.current && !colocationPending && ((0, jsx_runtime_1.jsx)(StudioPlacementOverlay, { store: placementStoreRef.current, apiRef: placementApiRef, getName: getPlacementName })), placementIndicator && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: [styles.placementBanner, { top: PLACEMENT_BANNER_TOP }], children: (0, jsx_runtime_1.jsx)(StudioPlacementIndicator_1.StudioPlacementIndicator, {}) })), colocationIndicator && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: [
+                        styles.colocationOverlay,
+                        { bottom: COLOCATION_INDICATOR_BOTTOM },
+                    ], children: (0, jsx_runtime_1.jsx)(StudioColocationIndicator_1.StudioColocationIndicator, {}) }))] }) }));
 });

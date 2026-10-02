@@ -1,59 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioARScene = void 0;
-/**
- * Web host for Studio scenes. Mirrors StudioARScene (native) but adapted to the
- * web renderer: it reuses the entire shared runtime (domain/ — scheduler, stores,
- * sound manager, sceneNavigationHandler, viroNodeFactory) and mounts the nodes
- * with the `.web` Viro components.
- *
- * Web adaptations vs native:
- *  - Root is ViroARScene (AR via slam) in `mode="ar"`, else ViroScene (3D).
- *  - AUTOMATIC/MANUAL plane detection → wrap plane assets in ViroARPlane (slam).
- *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
- *  - Tap-to-place runs off the AR session's hit test rather than a native one,
- *    and the navigator supplies the tap surface.
- *  - Physics and collision triggers run here: Bullet is compiled into the web
- *    binary and this host drives it, honouring the scene's own switch.
- *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
- *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
- *    reports them through `onUnsupported` so the caller can warn.
- *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
- */
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const ViroAmbientLight_web_1 = require("../ViroAmbientLight.web");
 const ViroDirectionalLight_web_1 = require("../ViroDirectionalLight.web");
@@ -103,9 +51,9 @@ function pickBestHit(results) {
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 const StudioARScene = (props) => {
     if (!props.sceneData) {
-        return props.mode === "3d" ? (<ViroScene_web_1.ViroScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}/>) : (<ViroARScene_web_1.ViroARScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}/>);
+        return props.mode === "3d" ? ((0, jsx_runtime_1.jsx)(ViroScene_web_1.ViroScene, { toneMappingEnabled: studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED })) : ((0, jsx_runtime_1.jsx)(ViroARScene_web_1.ViroARScene, { toneMappingEnabled: studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED }));
     }
-    return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
+    return (0, jsx_runtime_1.jsx)(StudioARSceneInner, { ...props, sceneData: props.sceneData });
 };
 exports.StudioARScene = StudioARScene;
 const StudioARSceneInner = (props) => {
@@ -476,25 +424,12 @@ const StudioARSceneInner = (props) => {
     // ─── Plane wrapping (AR mode only) ────────────────────────────────────────
     const planeAlignment = (scene.plane_direction ?? "Horizontal");
     const usePlane = (0, webCapabilities_1.usesPlaneWrapper)(scene.plane_detection, mode);
-    const body = usePlane ? (<ViroARPlane_web_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={() => onPlaneDetected?.()}>
-      {renderedAssets}
-    </ViroARPlane_web_1.ViroARPlane>) : (<>{renderedAssets}</>);
-    const children = (<>
-      <ViroAmbientLight_web_1.ViroAmbientLight color="#ffffff" intensity={studioLighting_1.STUDIO_AMBIENT_INTENSITY}/>
-      <ViroDirectionalLight_web_1.ViroDirectionalLight color="#ffffff" intensity={studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY} direction={studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION}/>
-      {body}
-      {/* At scene root: a placed asset is in world space, and the plane wrapper
-            would re-parent it to the plane it happened to be tapped on. */}
-      {renderedPlacements}
-      <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
-      {assets.length === 0 && (<ViroText_web_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{ fontFamily: "Arial", fontSize: 16, color: "#CCCCCC", textAlign: "center" }}/>)}
-    </>);
+    const body = usePlane ? ((0, jsx_runtime_1.jsx)(ViroARPlane_web_1.ViroARPlane, { minHeight: 0.1, minWidth: 0.1, alignment: planeAlignment, onAnchorFound: () => onPlaneDetected?.(), children: renderedAssets })) : ((0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: renderedAssets }));
+    const children = ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(ViroAmbientLight_web_1.ViroAmbientLight, { color: "#ffffff", intensity: studioLighting_1.STUDIO_AMBIENT_INTENSITY }), (0, jsx_runtime_1.jsx)(ViroDirectionalLight_web_1.ViroDirectionalLight, { color: "#ffffff", intensity: studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY, direction: studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION }), body, renderedPlacements, (0, jsx_runtime_1.jsx)(StudioSounds_1.StudioSounds, { manager: soundManagerRef.current }), assets.length === 0 && ((0, jsx_runtime_1.jsx)(ViroText_web_1.ViroText, { text: noAssetsMessage ?? "No assets to display", position: [0, 0, -2], style: { fontFamily: "Arial", fontSize: 16, color: "#CCCCCC", textAlign: "center" } }))] }));
     return mode === "3d" ? (
     // The editor previews no tone curve, and virocore's default Hable
     // luminance-only pass renders pure white at about 0.77. Off here rather than
     // via the navigator's `hdrEnabled`, which would take PBR with it — the same
     // line StudioARScene draws natively.
-    <ViroScene_web_1.ViroScene toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}>{children}</ViroScene_web_1.ViroScene>) : (<ViroARScene_web_1.ViroARScene ref={arSceneRef} toneMappingEnabled={studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED}>
-      {children}
-    </ViroARScene_web_1.ViroARScene>);
+    (0, jsx_runtime_1.jsx)(ViroScene_web_1.ViroScene, { toneMappingEnabled: studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED, children: children })) : ((0, jsx_runtime_1.jsx)(ViroARScene_web_1.ViroARScene, { ref: arSceneRef, toneMappingEnabled: studioRendererEffects_1.STUDIO_TONE_MAPPING_ENABLED, children: children }));
 };

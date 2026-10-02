@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroXRSceneNavigator = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroARSceneNavigator_1 = require("./AR/ViroARSceneNavigator");
@@ -337,16 +338,14 @@ exports.ViroXRSceneNavigator = React.forwardRef(function ViroXRSceneNavigator(pr
         // window is black. The scene tree still mounts, which is what matters: that is how the
         // native VRTScene reaches the renderer.
         const { style: _ignoredStyle, ...visionRest } = rest;
-        return (<react_native_1.View style={styles.visionOSHost} pointerEvents="none">
-          <ViroSceneNavigator_1.ViroSceneNavigator ref={visionRef} initialScene={visionScene} {...visionRest}/>
-        </react_native_1.View>);
+        return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.visionOSHost, pointerEvents: "none", children: (0, jsx_runtime_1.jsx)(ViroSceneNavigator_1.ViroSceneNavigator, { ref: visionRef, initialScene: visionScene, ...visionRest }) }));
     }
     const scene = arInitialScene ?? initialScene;
     if (!scene) {
         console.warn("[Viro] ViroXRSceneNavigator requires `arInitialScene` or `initialScene`.");
         return null;
     }
-    return (<ViroARSceneNavigator_1.ViroARSceneNavigator ref={arRef} initialScene={scene} hdrEnabled={hdrEnabled} pbrEnabled={pbrEnabled} bloomEnabled={bloomEnabled} shadowsEnabled={shadowsEnabled} multisamplingEnabled={multisamplingEnabled} {...rest}/>);
+    return ((0, jsx_runtime_1.jsx)(ViroARSceneNavigator_1.ViroARSceneNavigator, { ref: arRef, initialScene: scene, hdrEnabled: hdrEnabled, pbrEnabled: pbrEnabled, bloomEnabled: bloomEnabled, shadowsEnabled: shadowsEnabled, multisamplingEnabled: multisamplingEnabled, ...rest }));
 });
 const styles = react_native_1.StyleSheet.create({
     /** See the visionOS branch above: present in the tree, absent from the layout. */

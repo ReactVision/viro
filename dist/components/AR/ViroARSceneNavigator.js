@@ -45,6 +45,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARSceneNavigator = void 0;
+const react_1 = require("react");
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
@@ -1048,7 +1050,7 @@ class ViroARSceneNavigator extends React.Component {
         for (const scene in sceneDictionary) {
             const Component = sceneDictionary[scene].sceneClass.scene;
             const props = sceneDictionary[scene].sceneClass.passProps;
-            views.push(<Component key={"scene" + i} sceneNavigator={this.sceneNavigator} {...props} arSceneNavigator={this.arSceneNavigator} {...props}/>);
+            views.push((0, jsx_runtime_1.jsx)(Component, { sceneNavigator: this.sceneNavigator, ...props, arSceneNavigator: this.arSceneNavigator, ...props }, "scene" + i));
             i++;
         }
         return views;
@@ -1216,13 +1218,9 @@ class ViroARSceneNavigator extends React.Component {
                 ViroARSceneNavigator._visionOSWarningLogged = true;
             }
             if ("visionOSFallback" in this.props) {
-                return <>{this.props.visionOSFallback}</>;
+                return (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: this.props.visionOSFallback });
             }
-            return (<react_native_1.View style={[styles.container, styles.questFallback]}>
-          <react_native_1.Text style={styles.questFallbackText}>
-            AR is not supported on Apple Vision Pro.
-          </react_native_1.Text>
-        </react_native_1.View>);
+            return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: [styles.container, styles.questFallback], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.questFallbackText, children: "AR is not supported on Apple Vision Pro." }) }));
         }
         if (ViroPlatform_1.isQuest) {
             if (!ViroARSceneNavigator._questWarningLogged) {
@@ -1231,13 +1229,9 @@ class ViroARSceneNavigator extends React.Component {
                 ViroARSceneNavigator._questWarningLogged = true;
             }
             if ("questFallback" in this.props) {
-                return <>{this.props.questFallback}</>;
+                return (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: this.props.questFallback });
             }
-            return (<react_native_1.View style={[styles.container, styles.questFallback]}>
-          <react_native_1.Text style={styles.questFallbackText}>
-            AR is not supported on Meta Quest.
-          </react_native_1.Text>
-        </react_native_1.View>);
+            return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: [styles.container, styles.questFallback], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.questFallbackText, children: "AR is not supported on Meta Quest." }) }));
         }
         const items = this._renderSceneStackItems();
         // update the arSceneNavigator with the latest given props on every render
@@ -1253,11 +1247,9 @@ class ViroARSceneNavigator extends React.Component {
             delete this.sceneNavigator.viroAppProps?.rootTag;
         }
         const { viroAppProps = {}, provider = "reactvision", ...restProps } = this.props;
-        return (<VRTARSceneNavigator ref={(component) => {
+        return ((0, react_1.createElement)(VRTARSceneNavigator, { ref: (component) => {
                 this._component = component;
-            }} {...restProps} cloudAnchorProvider={provider} geospatialAnchorProvider={provider} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} key={this.state.internalRemountKey} onTabSwitch={this._onTabSwitch}>
-        {items}
-      </VRTARSceneNavigator>);
+            }, ...restProps, cloudAnchorProvider: provider, geospatialAnchorProvider: provider, viroAppProps: viroAppProps, currentSceneIndex: this.state.currentSceneIndex, style: (this.props.style, styles.container), key: this.state.internalRemountKey, onTabSwitch: this._onTabSwitch }, items));
     }
 }
 exports.ViroARSceneNavigator = ViroARSceneNavigator;

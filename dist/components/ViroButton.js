@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroButton = exports.ViroButtonStateTypes = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroAnimations_1 = require("./Animation/ViroAnimations");
 const ViroProps_1 = require("./Utilities/ViroProps");
@@ -123,23 +124,17 @@ class ViroButton extends React.Component {
         }
         // TODO: rather than manually expanding/setting props, we should do
         // {...this.props} which will save us time when adding new properties
-        return (<ViroNode_1.ViroNode ref={(component) => {
+        return ((0, jsx_runtime_1.jsxs)(ViroNode_1.ViroNode, { ref: (component) => {
                 this._component = component;
-            }} visible={visible} physicsBody={this.props.physicsBody} position={this.props.position} onTransformUpdate={this.props.onTransformUpdate} onClickState={this.props.onClickState} onTouch={this.props.onTouch} onScroll={this.props.onScroll} onSwipe={this.props.onSwipe} onHover={this._onButtonHover} onClick={this._onButtonClicked} onDrag={this.props.onDrag} onPinch={this.props.onPinch} onRotate={this.props.onRotate} onCollision={this.props.onCollision} viroTag={this.props.viroTag} onFuse={this.props.onFuse} animation={this.props.animation} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} ignoreEventHandling={this.props.ignoreEventHandling} dragType={this.props.dragType}>
-        <ViroImage_1.ViroImage source={this.props.source} rotation={this.props.rotation} rotationPivot={this.props.rotationPivot} scale={buttonScale} scalePivot={this.props.scalePivot} opacity={this.props.opacity} transformBehaviors={this.props.transformBehaviors} visible={normalSrcVisible} renderingOrder={this.props.renderingOrder} height={this.props.height} width={this.props.width} materials={this.props.materials}/>
-
-        <ViroImage_1.ViroImage source={hoverSource ? hoverSource : this.props.source} rotation={this.props.rotation} rotationPivot={this.props.rotationPivot} scale={buttonScale} scalePivot={this.props.scalePivot} opacity={this.props.opacity} transformBehaviors={this.props.transformBehaviors} visible={hoverSrcVisible} renderingOrder={this.props.renderingOrder} height={this.props.height} width={this.props.width} materials={this.props.materials}/>
-
-        <ViroImage_1.ViroImage source={clickSource
-                ? clickSource
-                : hoverSource
-                    ? hoverSource
-                    : this.props.source} rotation={this.props.rotation} scale={buttonScale} opacity={this.props.opacity} transformBehaviors={this.props.transformBehaviors} visible={clickSrcVisible} renderingOrder={this.props.renderingOrder} height={this.props.height} width={this.props.width} materials={this.props.materials} animation={{
-                name: "clickAnimation",
-                run: clickSrcVisible,
-                onFinish: this._onAnimationFinished,
-            }}/>
-      </ViroNode_1.ViroNode>);
+            }, visible: visible, physicsBody: this.props.physicsBody, position: this.props.position, onTransformUpdate: this.props.onTransformUpdate, onClickState: this.props.onClickState, onTouch: this.props.onTouch, onScroll: this.props.onScroll, onSwipe: this.props.onSwipe, onHover: this._onButtonHover, onClick: this._onButtonClicked, onDrag: this.props.onDrag, onPinch: this.props.onPinch, onRotate: this.props.onRotate, onCollision: this.props.onCollision, viroTag: this.props.viroTag, onFuse: this.props.onFuse, animation: this.props.animation, onAnimationStartViro: this._onAnimationStart, onAnimationFinishViro: this._onAnimationFinish, ignoreEventHandling: this.props.ignoreEventHandling, dragType: this.props.dragType, children: [(0, jsx_runtime_1.jsx)(ViroImage_1.ViroImage, { source: this.props.source, rotation: this.props.rotation, rotationPivot: this.props.rotationPivot, scale: buttonScale, scalePivot: this.props.scalePivot, opacity: this.props.opacity, transformBehaviors: this.props.transformBehaviors, visible: normalSrcVisible, renderingOrder: this.props.renderingOrder, height: this.props.height, width: this.props.width, materials: this.props.materials }), (0, jsx_runtime_1.jsx)(ViroImage_1.ViroImage, { source: hoverSource ? hoverSource : this.props.source, rotation: this.props.rotation, rotationPivot: this.props.rotationPivot, scale: buttonScale, scalePivot: this.props.scalePivot, opacity: this.props.opacity, transformBehaviors: this.props.transformBehaviors, visible: hoverSrcVisible, renderingOrder: this.props.renderingOrder, height: this.props.height, width: this.props.width, materials: this.props.materials }), (0, jsx_runtime_1.jsx)(ViroImage_1.ViroImage, { source: clickSource
+                        ? clickSource
+                        : hoverSource
+                            ? hoverSource
+                            : this.props.source, rotation: this.props.rotation, scale: buttonScale, opacity: this.props.opacity, transformBehaviors: this.props.transformBehaviors, visible: clickSrcVisible, renderingOrder: this.props.renderingOrder, height: this.props.height, width: this.props.width, materials: this.props.materials, animation: {
+                        name: "clickAnimation",
+                        run: clickSrcVisible,
+                        onFinish: this._onAnimationFinished,
+                    } })] }));
     }
     _onButtonHover = (isHovering, position, source) => {
         if (isHovering) {

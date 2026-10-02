@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroMaterialVideo = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 /**
  * Copyright (c) 2018-present, Viro Media, Inc.
  * All rights reserved.
@@ -100,7 +101,7 @@ class ViroMaterialVideo extends React.Component {
         nativeProps.ref = (component) => {
             this._component = component;
         };
-        return <VRTMaterialVideo {...nativeProps}/>;
+        return (0, jsx_runtime_1.jsx)(VRTMaterialVideo, { ...nativeProps });
     }
     seekToTime = (timeInSeconds) => {
         switch (react_native_1.Platform.OS) {

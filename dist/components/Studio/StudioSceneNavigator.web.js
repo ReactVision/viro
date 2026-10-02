@@ -1,52 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioSceneNavigator = void 0;
-/**
- * Web host/navigator for Studio scenes. Web counterpart of StudioSceneNavigator
- * (native): instead of pushing StudioARScene onto ViroXRSceneNavigator via the
- * native VRTStudioModule, it holds the scene data in state and renders
- * StudioARScene.web inside a web navigator — ViroARSceneNavigator (AR via slam)
- * or Viro3DSceneNavigator (non-AR 3D), chosen from the scene's plane detection.
- *
- * Data source is injected (out of the renderer's scope): pass `sceneData`
- * directly, or a `loadScene(id)` fetcher (also used for NAVIGATION between
- * scenes via the runtime's injectable `navigate` seam). `apiRequestExecutor`
- * (for API_REQUEST functions) is likewise injected.
- */
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const Viro3DSceneNavigator_web_1 = require("../Viro3DSceneNavigator.web");
 const ViroARSceneNavigator_web_1 = require("../AR/ViroARSceneNavigator.web");
@@ -68,7 +23,7 @@ const colocationStore_1 = require("./domain/colocationStore");
  * props now travel through `viroAppProps`, which both navigators spread onto it.
  */
 function StudioSceneRoot({ sceneNavigator: _sceneNavigator, ...props }) {
-    return <StudioARScene_web_1.StudioARScene key={props.sceneData?.scene.id} {...props}/>;
+    return (0, jsx_runtime_1.jsx)(StudioARScene_web_1.StudioARScene, { ...props }, props.sceneData?.scene.id);
 }
 const STUDIO_SCENE = { scene: StudioSceneRoot };
 function isARScene(sceneData) {
@@ -127,13 +82,13 @@ const StudioPlacementOverlay = ({ store, apiRef, getName }) => {
     }, [apiRef]);
     if (!activeId)
         return null;
-    return (<div onPointerUp={handlePointerUp} style={{
+    return ((0, jsx_runtime_1.jsx)("div", { onPointerUp: handlePointerUp, style: {
             position: "absolute",
             inset: 0,
             // Above the canvas and below the pills, which set pointerEvents none.
             zIndex: 1,
             touchAction: "none",
-        }}/>);
+        } }));
 };
 exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
     const { recordingIndicator = true, placementIndicator = true, colocation, colocationIndicator = true, onColocationStateChange, arOptions, onSessionReady, onMotionUnavailable, sceneData: injectedSceneData, loadScene, sceneId, apiRequestExecutor, mode, webRendererOptions, slamScriptUrl, onSceneReady, onError, onAssetError, onRendererAbort, onSceneChange, onSceneLoaded, onPlaneDetected, onUnsupported, noAssetsMessage, loadingView, renderError, } = props;
@@ -243,9 +198,9 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
         .map((a) => [a.id, a.name ?? ""]));
     const getPlacementName = (assetId) => placementNames.get(assetId) ?? null;
     if (error && renderError)
-        return <>{renderError(error)}</>;
+        return (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: renderError(error) });
     if (!sceneData)
-        return <>{loadingView ?? null}</>;
+        return (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: loadingView ?? null });
     const resolvedMode = mode ?? (isARScene(sceneData) ? "ar" : "3d");
     const sceneProps = {
         placementApiRef,
@@ -274,18 +229,6 @@ exports.StudioSceneNavigator = (0, react_1.forwardRef)((props, ref) => {
         justifyContent: "center",
         pointerEvents: "none",
     };
-    return (<div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {resolvedMode === "ar" ? (<ViroARSceneNavigator_web_1.ViroARSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} slamScriptUrl={slamScriptUrl} arOptions={{ detectPlanes: true, ...arOptions }} onSessionReady={onSessionReady} onMotionUnavailable={onMotionUnavailable} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>) : (<Viro3DSceneNavigator_web_1.Viro3DSceneNavigator initialScene={STUDIO_SCENE} viroAppProps={sceneProps} webRendererOptions={rendererOptions} {...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS}/>)}
-      {recordingIndicator && (<div style={{ ...overlay, top: 52 }}>
-          <StudioRecordingIndicator_web_1.StudioRecordingIndicator />
-        </div>)}
-      {resolvedMode === "ar" && (<StudioPlacementOverlay store={placementStore} apiRef={placementApiRef} getName={getPlacementName}/>)}
-      {placementIndicator && (<div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
-          <StudioPlacementIndicator_web_1.StudioPlacementIndicator />
-        </div>)}
-      {colocationIndicator && (<div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
-          <StudioColocationIndicator_web_1.StudioColocationIndicator />
-        </div>)}
-    </div>);
+    return ((0, jsx_runtime_1.jsxs)("div", { ref: containerRef, style: { width: "100%", height: "100%", position: "relative" }, children: [resolvedMode === "ar" ? ((0, jsx_runtime_1.jsx)(ViroARSceneNavigator_web_1.ViroARSceneNavigator, { initialScene: STUDIO_SCENE, viroAppProps: sceneProps, webRendererOptions: rendererOptions, slamScriptUrl: slamScriptUrl, arOptions: { detectPlanes: true, ...arOptions }, onSessionReady: onSessionReady, onMotionUnavailable: onMotionUnavailable, ...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS })) : ((0, jsx_runtime_1.jsx)(Viro3DSceneNavigator_web_1.Viro3DSceneNavigator, { initialScene: STUDIO_SCENE, viroAppProps: sceneProps, webRendererOptions: rendererOptions, ...studioRendererEffects_1.STUDIO_RENDERER_EFFECTS })), recordingIndicator && ((0, jsx_runtime_1.jsx)("div", { style: { ...overlay, top: 52 }, children: (0, jsx_runtime_1.jsx)(StudioRecordingIndicator_web_1.StudioRecordingIndicator, {}) })), resolvedMode === "ar" && ((0, jsx_runtime_1.jsx)(StudioPlacementOverlay, { store: placementStore, apiRef: placementApiRef, getName: getPlacementName })), placementIndicator && ((0, jsx_runtime_1.jsx)("div", { style: { ...overlay, top: 64, padding: "0 24px", zIndex: 2 }, children: (0, jsx_runtime_1.jsx)(StudioPlacementIndicator_web_1.StudioPlacementIndicator, {}) })), colocationIndicator && ((0, jsx_runtime_1.jsx)("div", { style: { ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }, children: (0, jsx_runtime_1.jsx)(StudioColocationIndicator_web_1.StudioColocationIndicator, {}) }))] }));
 });
 exports.StudioSceneNavigator.displayName = "StudioSceneNavigator";

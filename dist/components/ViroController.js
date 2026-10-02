@@ -42,6 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroController = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const react_native_2 = require("react-native");
@@ -108,10 +109,10 @@ class ViroController extends React.Component {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroController", this.props);
-        return (<VRTController {...this.props} ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(VRTController, { ...this.props, ref: (component) => {
                 this._component = component;
-            }} canClick={this.props.onClick != undefined ||
-                this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canGetControllerStatus={this.props.onControllerStatus != undefined} canDrag={this.props.onDrag != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} canFuse={this.props.onFuse != undefined} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onFuseViro={this._onFuse} onControllerStatusViro={this._onControllerStatus}/>);
+            }, canClick: this.props.onClick != undefined ||
+                this.props.onClickState != undefined, canTouch: this.props.onTouch != undefined, canScroll: this.props.onScroll != undefined, canSwipe: this.props.onSwipe != undefined, canGetControllerStatus: this.props.onControllerStatus != undefined, canDrag: this.props.onDrag != undefined, canPinch: this.props.onPinch != undefined, canRotate: this.props.onRotate != undefined, canFuse: this.props.onFuse != undefined, onClickViro: this._onClickState, onClick: undefined, onTouchViro: this._onTouch, onScrollViro: this._onScroll, onSwipeViro: this._onSwipe, onDragViro: this._onDrag, onPinchViro: this._onPinch, onRotateViro: this._onRotate, onFuseViro: this._onFuse, onControllerStatusViro: this._onControllerStatus }));
     }
 }
 exports.ViroController = ViroController;

@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioQuestSceneHudOverlay = StudioQuestSceneHudOverlay;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroNode_1 = require("../ViroNode");
 const ViroFlexView_1 = require("../ViroFlexView");
@@ -78,49 +79,40 @@ function StudioQuestSceneHudOverlay({ cameraPose, sceneName, planeDetectionMode,
         // Grows downwards, so its top edge stays where an alert expects it.
         verticalOffsetM: -0.4 - (height - 0.5) / 2,
     });
-    return (<ViroNode_1.ViroNode position={position} rotation={rotation}>
-      <ViroFlexView_1.ViroFlexView width={1.6} height={height} style={{
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 0.04,
-        }}>
-        <ViroText_1.ViroText text={sceneName ?? "Untitled scene"} width={1.5} height={0.15} style={{
-            fontFamily: "Arial",
-            fontSize: 14,
-            color: "#FFFFFF",
-            textAlign: "center",
-        }}/>
-        {colocation && (<ViroText_1.ViroText text={colocation.code
-                ? `${colocation.title}   ${colocation.code}`
-                : colocation.title} width={1.5} height={0.15} style={{
-                fontFamily: "Arial",
-                fontSize: 13,
-                color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
-                textAlign: "center",
-            }}/>)}
-        {colocation?.detail && (<ViroText_1.ViroText text={colocation.detail} width={1.5} 
-        // Three lines: a failure's reason runs long, and ViroText drops
-        // what does not fit without a sign.
-        height={0.36} style={{
-                fontFamily: "Arial",
-                fontSize: 11,
-                color: "#CCCCCC",
-                textAlign: "center",
-            }}/>)}
-        {/* A shared scene sits on the shared frame, not on a plane. */}
-        {!session && planeDetectionMode !== "NONE" && (<ViroText_1.ViroText text={hasFoundPlane ? "Plane found" : "Scanning for planes…"} width={1.5} height={0.12} style={{
-                fontFamily: "Arial",
-                fontSize: 11,
-                color: "#CCCCCC",
-                textAlign: "center",
-            }}/>)}
-        <ViroText_1.ViroText text="[ Exit ]" width={1.5} height={0.15} onClick={handleExitClick} style={{
-            fontFamily: "Arial",
-            fontSize: 13,
-            color: "#7FCBFF",
-            textAlign: "center",
-        }}/>
-      </ViroFlexView_1.ViroFlexView>
-    </ViroNode_1.ViroNode>);
+    return ((0, jsx_runtime_1.jsx)(ViroNode_1.ViroNode, { position: position, rotation: rotation, children: (0, jsx_runtime_1.jsxs)(ViroFlexView_1.ViroFlexView, { width: 1.6, height: height, style: {
+                backgroundColor: "rgba(0,0,0,0.6)",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: 0.04,
+            }, children: [(0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: sceneName ?? "Untitled scene", width: 1.5, height: 0.15, style: {
+                        fontFamily: "Arial",
+                        fontSize: 14,
+                        color: "#FFFFFF",
+                        textAlign: "center",
+                    } }), colocation && ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: colocation.code
+                        ? `${colocation.title}   ${colocation.code}`
+                        : colocation.title, width: 1.5, height: 0.15, style: {
+                        fontFamily: "Arial",
+                        fontSize: 13,
+                        color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
+                        textAlign: "center",
+                    } })), colocation?.detail && ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: colocation.detail, width: 1.5, 
+                    // Three lines: a failure's reason runs long, and ViroText drops
+                    // what does not fit without a sign.
+                    height: 0.36, style: {
+                        fontFamily: "Arial",
+                        fontSize: 11,
+                        color: "#CCCCCC",
+                        textAlign: "center",
+                    } })), !session && planeDetectionMode !== "NONE" && ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: hasFoundPlane ? "Plane found" : "Scanning for planes…", width: 1.5, height: 0.12, style: {
+                        fontFamily: "Arial",
+                        fontSize: 11,
+                        color: "#CCCCCC",
+                        textAlign: "center",
+                    } })), (0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: "[ Exit ]", width: 1.5, height: 0.15, onClick: handleExitClick, style: {
+                        fontFamily: "Arial",
+                        fontSize: 13,
+                        color: "#7FCBFF",
+                        textAlign: "center",
+                    } })] }) }));
 }

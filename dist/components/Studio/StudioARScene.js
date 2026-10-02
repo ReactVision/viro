@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioARScene = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_1 = require("react");
 const ViroAmbientLight_1 = require("../ViroAmbientLight");
@@ -172,19 +173,16 @@ const StudioARScene = (props) => {
     if (!props.sceneData) {
         // Quest keeps its own root here for the reason spelled out at the main
         // return below.
-        return ViroPlatform_1.isQuest ? (<ViroScene_1.ViroScene toneMappingEnabled={false}/>) : (<ViroARScene_1.ViroARScene toneMappingEnabled={false}/>);
+        return ViroPlatform_1.isQuest ? ((0, jsx_runtime_1.jsx)(ViroScene_1.ViroScene, { toneMappingEnabled: false })) : ((0, jsx_runtime_1.jsx)(ViroARScene_1.ViroARScene, { toneMappingEnabled: false }));
     }
-    return <StudioARSceneInner {...props} sceneData={props.sceneData}/>;
+    return (0, jsx_runtime_1.jsx)(StudioARSceneInner, { ...props, sceneData: props.sceneData });
 };
 exports.StudioARScene = StudioARScene;
 /** Owns the rig's estimate scale so a light change re-renders these two alone. */
 const StudioLightRig = React.forwardRef(function StudioLightRig(_props, ref) {
     const [scale, setScale] = (0, react_1.useState)(1);
     (0, react_1.useImperativeHandle)(ref, () => ({ setScale }), []);
-    return (<>
-        <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={studioLighting_1.STUDIO_AMBIENT_INTENSITY * scale}/>
-        <ViroDirectionalLight_1.ViroDirectionalLight color="#ffffff" intensity={studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY * scale} direction={studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION}/>
-      </>);
+    return ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(ViroAmbientLight_1.ViroAmbientLight, { color: "#ffffff", intensity: studioLighting_1.STUDIO_AMBIENT_INTENSITY * scale }), (0, jsx_runtime_1.jsx)(ViroDirectionalLight_1.ViroDirectionalLight, { color: "#ffffff", intensity: studioLighting_1.STUDIO_DIRECTIONAL_INTENSITY * scale, direction: studioLighting_1.STUDIO_DIRECTIONAL_DIRECTION })] }));
 });
 const StudioARSceneInner = (props) => {
     const { sceneNavigator, sceneData, onReady, onSceneChange, onPlaneDetected, onPlaneSelected, noAssetsMessage, variableStore, placementStore, placementApiRef, colocation, skipOnLoadFunction, } = props;
@@ -1008,15 +1006,13 @@ const StudioARSceneInner = (props) => {
             else
                 nodesByTarget.set(targetName, [node]);
         }
-        return [...nodesByTarget].map(([targetName, nodes]) => (<ViroARImageMarker_1.ViroARImageMarker key={targetName} target={targetName} 
-        // Whether the tracker ever recognised the picture is otherwise
-        // invisible, and it is the first thing to establish when content does
-        // not appear on a marker. The native side emits this event either way.
-        onAnchorFound={(0, utils_1.isDev)()
+        return [...nodesByTarget].map(([targetName, nodes]) => ((0, jsx_runtime_1.jsx)(ViroARImageMarker_1.ViroARImageMarker, { target: targetName, 
+            // Whether the tracker ever recognised the picture is otherwise
+            // invisible, and it is the first thing to establish when content does
+            // not appear on a marker. The native side emits this event either way.
+            onAnchorFound: (0, utils_1.isDev)()
                 ? () => console.log(`[Studio] Trigger image "${targetName}" found, ${nodes.length} placement(s) on it`)
-                : undefined}>
-        {nodes}
-      </ViroARImageMarker_1.ViroARImageMarker>));
+                : undefined, children: nodes }, targetName)));
     }, [
         targetNameByAssetId,
         imageTriggeredAssets,
@@ -1147,10 +1143,10 @@ const StudioARSceneInner = (props) => {
     // (transformed) nodes.
     const renderOriginPicker = () => {
         if (planeDetectionMode === "AUTOMATIC") {
-            return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={proposePlaneOrigin}/>);
+            return ((0, jsx_runtime_1.jsx)(ViroARPlane_1.ViroARPlane, { minHeight: 0.1, minWidth: 0.1, alignment: planeAlignment, onAnchorFound: proposePlaneOrigin }));
         }
         if (planeDetectionMode === "MANUAL") {
-            return (<ViroARPlaneSelector_1.ViroARPlaneSelector ref={planeSelectorRef} minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onPlaneDetected={handlePlaneDetectedForSelector} onPlaneSelected={handleOriginPlaneSelected}/>);
+            return ((0, jsx_runtime_1.jsx)(ViroARPlaneSelector_1.ViroARPlaneSelector, { ref: planeSelectorRef, minHeight: 0.1, minWidth: 0.1, alignment: planeAlignment, onPlaneDetected: handlePlaneDetectedForSelector, onPlaneSelected: handleOriginPlaneSelected }));
         }
         return null;
     };
@@ -1166,14 +1162,7 @@ const StudioARSceneInner = (props) => {
     const renderSharedContent = () => {
         if (!sharedNodes || !colocation)
             return null;
-        return (<ViroNode_1.ViroNode position={sharedNodes.location.position} rotation={sharedNodes.location.rotation} scale={sharedNodes.location.scale}>
-        {/* Scenes under a push stay mounted; only the one on screen polls. */}
-        {colocationFrame.sceneId === scene.id && (<StudioColocationPeers_1.StudioColocationPeers readPeers={colocation.readPeers}/>)}
-        <ViroNode_1.ViroNode position={sharedNodes.origin.position} rotation={sharedNodes.origin.rotation}>
-          {trackingReady && renderedPlaneAssets}
-          {renderedTapToPlaceAssets}
-        </ViroNode_1.ViroNode>
-      </ViroNode_1.ViroNode>);
+        return ((0, jsx_runtime_1.jsxs)(ViroNode_1.ViroNode, { position: sharedNodes.location.position, rotation: sharedNodes.location.rotation, scale: sharedNodes.location.scale, children: [colocationFrame.sceneId === scene.id && ((0, jsx_runtime_1.jsx)(StudioColocationPeers_1.StudioColocationPeers, { readPeers: colocation.readPeers })), (0, jsx_runtime_1.jsxs)(ViroNode_1.ViroNode, { position: sharedNodes.origin.position, rotation: sharedNodes.origin.rotation, children: [trackingReady && renderedPlaneAssets, renderedTapToPlaceAssets] })] }));
     };
     // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
     // the OpenXR renderer feeds Quest plane anchors through the same
@@ -1181,16 +1170,12 @@ const StudioARSceneInner = (props) => {
     // VROARSessionOpenXR.cpp in virocore. No Quest-specific branch needed.
     const renderAssets = () => {
         if (planeDetectionMode === "AUTOMATIC") {
-            return (<ViroARPlane_1.ViroARPlane minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onAnchorFound={trackDragSurface} onAnchorUpdated={trackDragSurface}>
-          {renderedPlaneAssets}
-        </ViroARPlane_1.ViroARPlane>);
+            return ((0, jsx_runtime_1.jsx)(ViroARPlane_1.ViroARPlane, { minHeight: 0.1, minWidth: 0.1, alignment: planeAlignment, onAnchorFound: trackDragSurface, onAnchorUpdated: trackDragSurface, children: renderedPlaneAssets }));
         }
         if (planeDetectionMode === "MANUAL") {
-            return (<ViroARPlaneSelector_1.ViroARPlaneSelector ref={planeSelectorRef} minHeight={0.1} minWidth={0.1} alignment={planeAlignment} onPlaneDetected={handlePlaneDetectedForSelector} onPlaneSelected={handlePlaneSelected}>
-          {renderedPlaneAssets}
-        </ViroARPlaneSelector_1.ViroARPlaneSelector>);
+            return ((0, jsx_runtime_1.jsx)(ViroARPlaneSelector_1.ViroARPlaneSelector, { ref: planeSelectorRef, minHeight: 0.1, minWidth: 0.1, alignment: planeAlignment, onPlaneDetected: handlePlaneDetectedForSelector, onPlaneSelected: handlePlaneSelected, children: renderedPlaneAssets }));
         }
-        return <>{renderedPlaneAssets}</>;
+        return (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: renderedPlaneAssets });
     };
     // ─── Physics world ────────────────────────────────────────────────────────
     const physicsWorldConfig = (0, physicsConfig_1.parsePhysicsWorldConfig)(scene.physics_world_config);
@@ -1201,34 +1186,21 @@ const StudioARSceneInner = (props) => {
         ? { physicsWorld: physicsWorld }
         : {};
     // ─── Render ───────────────────────────────────────────────────────────────
-    const children = (<>
-      {ViroPlatform_1.isQuest && (<ViroController_1.ViroController controllerVisibility reticleVisibility {...(activePlacementId
-            ? {
-                onClick: (position) => handleHeadsetPlaceTrigger(position),
-            }
-            : {})}/>)}
-      <StudioLightRig ref={lightRigRef}/>
-      {colocationPhase === "off" && trackingReady && renderAssets()}
-      {colocationPhase === "off" && renderedTapToPlaceAssets}
-      {needsOrigin && renderOriginPicker()}
-      {renderSharedContent()}
-      {renderedImageTriggeredAssets}
-      {ViroPlatform_1.isQuest && activePlacementId && (<ViroText_1.ViroText text={`Point and pull the trigger to place: ${activePlacementName ?? "object"}`} position={[0, 0.2, -2]} width={3} height={1} style={{
-                fontFamily: "Arial",
-                fontSize: 14,
-                color: "#FFFFFF",
-                textAlign: "center",
-            }}/>)}
-      {ViroPlatform_1.isQuest && <StudioQuestAlertOverlay_1.StudioQuestAlertOverlay cameraPose={questHeadLockedPose}/>}
-      {ViroPlatform_1.isQuest && (<StudioQuestSceneHudOverlay_1.StudioQuestSceneHudOverlay cameraPose={questHeadLockedPose} sceneName={scene.name} planeDetectionMode={planeDetectionMode} hasFoundPlane={hasFoundPlane}/>)}
-      <StudioSounds_1.StudioSounds manager={soundManagerRef.current}/>
-      {assets.length === 0 && (<ViroText_1.ViroText text={noAssetsMessage ?? "No assets to display"} position={[0, 0, -2]} style={{
-                fontFamily: "Arial",
-                fontSize: 16,
-                color: "#CCCCCC",
-                textAlign: "center",
-            }}/>)}
-    </>);
+    const children = ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [ViroPlatform_1.isQuest && ((0, jsx_runtime_1.jsx)(ViroController_1.ViroController, { controllerVisibility: true, reticleVisibility: true, ...(activePlacementId
+                    ? {
+                        onClick: (position) => handleHeadsetPlaceTrigger(position),
+                    }
+                    : {}) })), (0, jsx_runtime_1.jsx)(StudioLightRig, { ref: lightRigRef }), colocationPhase === "off" && trackingReady && renderAssets(), colocationPhase === "off" && renderedTapToPlaceAssets, needsOrigin && renderOriginPicker(), renderSharedContent(), renderedImageTriggeredAssets, ViroPlatform_1.isQuest && activePlacementId && ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: `Point and pull the trigger to place: ${activePlacementName ?? "object"}`, position: [0, 0.2, -2], width: 3, height: 1, style: {
+                    fontFamily: "Arial",
+                    fontSize: 14,
+                    color: "#FFFFFF",
+                    textAlign: "center",
+                } })), ViroPlatform_1.isQuest && (0, jsx_runtime_1.jsx)(StudioQuestAlertOverlay_1.StudioQuestAlertOverlay, { cameraPose: questHeadLockedPose }), ViroPlatform_1.isQuest && ((0, jsx_runtime_1.jsx)(StudioQuestSceneHudOverlay_1.StudioQuestSceneHudOverlay, { cameraPose: questHeadLockedPose, sceneName: scene.name, planeDetectionMode: planeDetectionMode, hasFoundPlane: hasFoundPlane })), (0, jsx_runtime_1.jsx)(StudioSounds_1.StudioSounds, { manager: soundManagerRef.current }), assets.length === 0 && ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: noAssetsMessage ?? "No assets to display", position: [0, 0, -2], style: {
+                    fontFamily: "Arial",
+                    fontSize: 16,
+                    color: "#CCCCCC",
+                    textAlign: "center",
+                } }))] }));
     // Wire the camera event when a proximity trigger needs it, tap-to-place needs
     // the cached camera pose for headset placement, or we're on Quest (head-locked
     // UI — alert overlay, exit/scene-name HUD — needs a live pose to track) —
@@ -1264,15 +1236,11 @@ const StudioARSceneInner = (props) => {
     // ViroScene when the session ends. Changing the root remounts everything
     // below it, which is the cost the `colocation` prop doc states.
     if (!(0, controller_1.studioSceneRootsInAR)(colocationFrame, sceneMount, ViroPlatform_1.isQuest)) {
-        return (<ViroScene_1.ViroScene {...physicsProps} {...cameraTransformProp} toneMappingEnabled={false}>
-        {children}
-      </ViroScene_1.ViroScene>);
+        return ((0, jsx_runtime_1.jsx)(ViroScene_1.ViroScene, { ...physicsProps, ...cameraTransformProp, toneMappingEnabled: false, children: children }));
     }
-    return (<ViroARScene_1.ViroARScene ref={arSceneRef} 
-    // The editor previews no tone curve, and virocore's default Hable
-    // luminance-only pass renders pure white at about 0.77. Off here rather
-    // than via the navigator's `hdrEnabled`, which would take PBR with it.
-    toneMappingEnabled={false} {...physicsProps} {...cameraTransformProp} anchorDetectionTypes={anchorDetectionTypes} onTrackingUpdated={handleTrackingUpdated} onAmbientLightUpdate={handleAmbientLightUpdate} onAnchorFound={handleAnchorFound} onAnchorUpdated={handleAnchorUpdated} onAnchorRemoved={handleAnchorRemoved}>
-      {children}
-    </ViroARScene_1.ViroARScene>);
+    return ((0, jsx_runtime_1.jsx)(ViroARScene_1.ViroARScene, { ref: arSceneRef, 
+        // The editor previews no tone curve, and virocore's default Hable
+        // luminance-only pass renders pure white at about 0.77. Off here rather
+        // than via the navigator's `hdrEnabled`, which would take PBR with it.
+        toneMappingEnabled: false, ...physicsProps, ...cameraTransformProp, anchorDetectionTypes: anchorDetectionTypes, onTrackingUpdated: handleTrackingUpdated, onAmbientLightUpdate: handleAmbientLightUpdate, onAnchorFound: handleAnchorFound, onAnchorUpdated: handleAnchorUpdated, onAnchorRemoved: handleAnchorRemoved, children: children }));
 };

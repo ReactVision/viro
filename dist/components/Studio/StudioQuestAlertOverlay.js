@@ -1,40 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioQuestAlertOverlay = StudioQuestAlertOverlay;
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const ViroNode_1 = require("../ViroNode");
 const ViroFlexView_1 = require("../ViroFlexView");
@@ -55,26 +22,21 @@ function StudioQuestAlertOverlay({ cameraPose }) {
     const { position, rotation } = (0, questHeadLockedTransform_1.computeHeadLockedTransform)(cameraPose);
     const title = questAlertStore_1.questAlertStore.title();
     const message = questAlertStore_1.questAlertStore.message();
-    return (<ViroNode_1.ViroNode position={position} rotation={rotation}>
-      <ViroFlexView_1.ViroFlexView width={2} height={1} onClick={() => questAlertStore_1.questAlertStore.dismiss()} style={{
-            backgroundColor: "rgba(0,0,0,0.85)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 0.06,
-        }}>
-        {title && (<ViroText_1.ViroText text={title} width={1.8} height={0.3} style={{
-                fontFamily: "Arial",
-                fontSize: 22,
-                fontWeight: "bold",
-                color: "#FFFFFF",
-                textAlign: "center",
-            }}/>)}
-        <ViroText_1.ViroText text={message ?? ""} width={1.8} height={0.5} style={{
-            fontFamily: "Arial",
-            fontSize: 16,
-            color: "#FFFFFF",
-            textAlign: "center",
-        }}/>
-      </ViroFlexView_1.ViroFlexView>
-    </ViroNode_1.ViroNode>);
+    return ((0, jsx_runtime_1.jsx)(ViroNode_1.ViroNode, { position: position, rotation: rotation, children: (0, jsx_runtime_1.jsxs)(ViroFlexView_1.ViroFlexView, { width: 2, height: 1, onClick: () => questAlertStore_1.questAlertStore.dismiss(), style: {
+                backgroundColor: "rgba(0,0,0,0.85)",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: 0.06,
+            }, children: [title && ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: title, width: 1.8, height: 0.3, style: {
+                        fontFamily: "Arial",
+                        fontSize: 22,
+                        fontWeight: "bold",
+                        color: "#FFFFFF",
+                        textAlign: "center",
+                    } })), (0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: message ?? "", width: 1.8, height: 0.5, style: {
+                        fontFamily: "Arial",
+                        fontSize: 16,
+                        color: "#FFFFFF",
+                        textAlign: "center",
+                    } })] }) }));
 }

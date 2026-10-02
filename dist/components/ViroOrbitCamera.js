@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroOrbitCamera = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroSceneContext_1 = require("./ViroSceneContext");
@@ -68,9 +69,9 @@ class ViroOrbitCamera extends React.Component {
     render() {
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("ViroOrbitCamera", this.props);
-        return (<VRTOrbitCamera ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(VRTOrbitCamera, { ref: (component) => {
                 this._component = component;
-            }} {...this.props}/>);
+            }, ...this.props }));
     }
 }
 exports.ViroOrbitCamera = ViroOrbitCamera;

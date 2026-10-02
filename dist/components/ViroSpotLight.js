@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSpotLight = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 /**
@@ -64,7 +65,7 @@ class ViroSpotLight extends React.Component {
         nativeProps.ref = (component) => {
             this._component = component;
         };
-        return <VRTSpotLight {...nativeProps}/>;
+        return (0, jsx_runtime_1.jsx)(VRTSpotLight, { ...nativeProps });
     }
 }
 exports.ViroSpotLight = ViroSpotLight;

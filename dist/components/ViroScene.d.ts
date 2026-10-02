@@ -12,6 +12,7 @@ import { ViroCommonProps } from "./AR/ViroCommonProps";
 import { ViroCameraTransform, ViroCameraTransformEvent, ViroPlatformEvent, ViroPlatformInfo, ViroTrackingReason, ViroTrackingState } from "./Types/ViroEvents";
 import { Viro3DPoint, ViroPhysicsWorld, ViroSoundRoom } from "./Types/ViroUtils";
 import { ViroBase } from "./ViroBase";
+import { ViroActiveCameraTracker } from "./Utilities/ViroActiveCameraTracker";
 type Props = ViroCommonProps & {
     onPlatformUpdate?: (platformInfo: ViroPlatformInfo) => void;
     onCameraTransformUpdate?: (cameraTransform: ViroCameraTransform) => void;
@@ -34,7 +35,19 @@ type Props = ViroCommonProps & {
      */
     toneMappingEnabled?: boolean;
 };
-export declare class ViroScene extends ViroBase<Props> {
+type State = {
+    /**
+     * The React tag of the camera the scene draws from, or null for its default camera. It
+     * reaches the native scene as a prop rather than through `VRTCameraModule` so that a camera
+     * mounted between its siblings attaches: see `ViroActiveCameraTracker`.
+     */
+    activeCameraTag: number | null;
+};
+export declare class ViroScene extends ViroBase<Props, State> {
+    state: State;
+    _unmounting: boolean;
+    _cameras: ViroActiveCameraTracker;
+    componentWillUnmount(): void;
     _onPlatformUpdate: (event: NativeSyntheticEvent<ViroPlatformEvent>) => void;
     _onCameraTransformUpdate: (event: NativeSyntheticEvent<ViroCameraTransformEvent>) => void;
     findCollisionsWithRayAsync: (from: Viro3DPoint, to: Viro3DPoint, closest: any, viroTag: string) => Promise<any>;

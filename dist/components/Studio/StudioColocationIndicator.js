@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioColocationIndicator = StudioColocationIndicator;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
@@ -59,19 +60,10 @@ function StudioColocationIndicator() {
     const content = (0, indicatorContent_1.studioColocationIndicatorContent)(state, originPrompt, ViroPlatform_1.isQuest ? "headset" : "phone");
     if (!content)
         return null;
-    return (<react_native_1.View style={styles.pill} pointerEvents="box-none">
-      <react_native_1.Text style={[styles.title, content.tone === "error" && styles.error]}>
-        {content.title}
-      </react_native_1.Text>
-      {content.code && <react_native_1.Text style={styles.code}>{content.code}</react_native_1.Text>}
-      {content.detail && <react_native_1.Text style={styles.detail}>{content.detail}</react_native_1.Text>}
-      {content.done && (<react_native_1.Pressable accessibilityRole="button" accessibilityState={{ disabled: !content.done.enabled }} disabled={!content.done.enabled} onPress={() => colocationStore_1.studioColocationStore.finishScan()} style={[
-                styles.button,
-                !content.done.enabled && styles.buttonDisabled,
-            ]}>
-          <react_native_1.Text style={styles.buttonLabel}>Done</react_native_1.Text>
-        </react_native_1.Pressable>)}
-    </react_native_1.View>);
+    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.pill, pointerEvents: "box-none", children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: [styles.title, content.tone === "error" && styles.error], children: content.title }), content.code && (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.code, children: content.code }), content.detail && (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.detail, children: content.detail }), content.done && ((0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityRole: "button", accessibilityState: { disabled: !content.done.enabled }, disabled: !content.done.enabled, onPress: () => colocationStore_1.studioColocationStore.finishScan(), style: [
+                    styles.button,
+                    !content.done.enabled && styles.buttonDisabled,
+                ], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.buttonLabel, children: "Done" }) }))] }));
 }
 const styles = react_native_1.StyleSheet.create({
     pill: {

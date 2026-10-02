@@ -1,56 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSceneNavigator = ViroSceneNavigator;
-/**
- * ViroSceneNavigator.web.tsx
- *
- * Web implementation of ViroSceneNavigator — the non-AR, multi-scene navigator.
- * Owns the <canvas> and the ViroWebRenderer (WASM host) exactly like
- * Viro3DSceneNavigator.web, and adds a real scene stack (push/pop/popN/jump/
- * replace) on top. Only the top-of-stack scene is mounted against the single
- * WASM scene root; navigating swaps which scene's children build C-API nodes.
- *
- * VR-specific surface has no web counterpart and is a graceful no-op:
- * `vrModeEnabled`, `onExitViro`, and `recenterTracking` do nothing on web
- * (there is no headset target). `project`/`unproject` are provided by the
- * renderer where available.
- *
- * Copyright © 2026 ReactVision. All rights reserved.
- */
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("./Web/ViroWebContext");
@@ -198,12 +149,5 @@ function ViroSceneNavigator(props) {
     const topKey = stack.history[stack.history.length - 1];
     const descriptor = stack.dict[topKey];
     const SceneComponent = descriptor?.scene;
-    return (<div style={containerStyle}>
-      <canvas ref={canvasRef} style={canvasStyle}/>
-      {renderer && rootNode && SceneComponent ? (<ViroWebContext_1.ViroRendererContext.Provider value={renderer}>
-          <ViroWebContext_1.ViroParentNodeContext.Provider value={rootNode}>
-            <SceneComponent key={topKey} sceneNavigator={sceneNavigatorRef.current} {...(descriptor?.passProps ?? {})} {...(props.viroAppProps ?? {})}/>
-          </ViroWebContext_1.ViroParentNodeContext.Provider>
-        </ViroWebContext_1.ViroRendererContext.Provider>) : null}
-    </div>);
+    return ((0, jsx_runtime_1.jsxs)("div", { style: containerStyle, children: [(0, jsx_runtime_1.jsx)("canvas", { ref: canvasRef, style: canvasStyle }), renderer && rootNode && SceneComponent ? ((0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroRendererContext.Provider, { value: renderer, children: (0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroParentNodeContext.Provider, { value: rootNode, children: (0, jsx_runtime_1.jsx)(SceneComponent, { sceneNavigator: sceneNavigatorRef.current, ...(descriptor?.passProps ?? {}), ...(props.viroAppProps ?? {}) }, topKey) }) })) : null] }));
 }

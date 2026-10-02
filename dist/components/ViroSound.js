@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSound = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 // @ts-ignore
@@ -116,7 +117,7 @@ class ViroSound extends React.Component {
         nativeProps.ref = (component) => {
             this._component = component;
         };
-        return <VRTSound {...nativeProps}/>;
+        return (0, jsx_runtime_1.jsx)(VRTSound, { ...nativeProps });
     }
     seekToTime = (timeInSeconds) => {
         switch (react_native_1.Platform.OS) {

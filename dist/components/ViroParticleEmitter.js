@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroParticleEmitter = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroAssetSource_1 = require("./Utilities/ViroAssetSource");
@@ -176,7 +177,7 @@ class ViroParticleEmitter extends React.Component {
         nativeProps.ref = (component) => {
             this._component = component;
         };
-        return <VRTParticleEmitter {...nativeProps}/>;
+        return (0, jsx_runtime_1.jsx)(VRTParticleEmitter, { ...nativeProps });
     }
     // Set the propsPositionState on the native control if the
     // nextProps.position state differs from the nativePositionState that

@@ -1,40 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioColocationPeers = StudioColocationPeers;
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const useViroSmoothing_1 = require("../../hooks/useViroSmoothing");
 const ViroMaterials_1 = require("../../Material/ViroMaterials");
@@ -88,10 +55,5 @@ function StudioColocationPeers({ readPeers, }) {
         };
     }, [readPeers]);
     const smoothed = (0, useViroSmoothing_1.useViroSmoothedPeers)(peers);
-    return (<>
-      {smoothed.map((peer) => (<ViroNode_1.ViroNode key={peer.peerId} position={peer.position} rotation={(0, frameMath_1.quatToEuler)(peer.rotation)}>
-          <ViroBox_1.ViroBox width={0.07} height={0.14} length={0.01} materials={["StudioColocationPeer"]}/>
-          <ViroSphere_1.ViroSphere radius={0.025} position={[0, 0.11, 0]} materials={["StudioColocationPeer"]}/>
-        </ViroNode_1.ViroNode>))}
-    </>);
+    return ((0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: smoothed.map((peer) => ((0, jsx_runtime_1.jsxs)(ViroNode_1.ViroNode, { position: peer.position, rotation: (0, frameMath_1.quatToEuler)(peer.rotation), children: [(0, jsx_runtime_1.jsx)(ViroBox_1.ViroBox, { width: 0.07, height: 0.14, length: 0.01, materials: ["StudioColocationPeer"] }), (0, jsx_runtime_1.jsx)(ViroSphere_1.ViroSphere, { radius: 0.025, position: [0, 0.11, 0], materials: ["StudioColocationPeer"] })] }, peer.peerId))) }));
 }

@@ -4,6 +4,7 @@ import { ViroAmbientLightInfo, ViroAmbientLightUpdateEvent, ViroARAnchorFoundEve
 import { Viro3DPoint, ViroPhysicsWorld, ViroRay, ViroScale, ViroSoundRoom, ViroSource } from "../Types/ViroUtils";
 import { ViroBase } from "../ViroBase";
 import { ViroCommonProps } from "./ViroCommonProps";
+import { ViroActiveCameraTracker } from "../Utilities/ViroActiveCameraTracker";
 type Props = ViroCommonProps & {
     displayPointCloud?: {
         imageSource?: ViroSource;
@@ -48,8 +49,20 @@ type Props = ViroCommonProps & {
      */
     onTrackingInitialized?: () => void;
 };
-export declare class ViroARScene extends ViroBase<Props> {
+type State = {
+    /**
+     * The React tag of the camera the scene draws from, or null for its default camera. It
+     * reaches the native scene as a prop rather than through `VRTCameraModule` so that a camera
+     * mounted between its siblings attaches: see `ViroActiveCameraTracker`.
+     */
+    activeCameraTag: number | null;
+};
+export declare class ViroARScene extends ViroBase<Props, State> {
+    state: State;
     onTrackingFirstInitialized: boolean;
+    _unmounting: boolean;
+    _cameras: ViroActiveCameraTracker;
+    componentWillUnmount(): void;
     _onCameraARHitTest: (event: NativeSyntheticEvent<ViroCameraARHitTestEvent>) => void;
     _onARPointCloudUpdate: (event: NativeSyntheticEvent<ViroARPointCloudUpdateEvent>) => void;
     _onCameraTransformUpdate: (event: NativeSyntheticEvent<ViroCameraTransformEvent>) => void;

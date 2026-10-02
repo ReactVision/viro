@@ -1,45 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudioColocationIndicator = StudioColocationIndicator;
-/**
- * Web host for StudioColocationIndicator: DOM instead of react-native, for the
- * reason in StudioPlacementIndicator.web.tsx. On web a `colocation` prop only
- * ever reports that the frame kind is unsupported, which this shows.
- */
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const indicatorContent_1 = require("./colocation/indicatorContent");
 const colocationStore_1 = require("./domain/colocationStore");
 const useStudioColocation_1 = require("./useStudioColocation");
@@ -89,16 +51,7 @@ function StudioColocationIndicator() {
     const content = (0, indicatorContent_1.studioColocationIndicatorContent)(state);
     if (!content)
         return null;
-    return (<div style={pill}>
-      <span style={content.tone === "error" ? { ...title, color: "#FF8A80" } : title}>
-        {content.title}
-      </span>
-      {content.code && <span style={code}>{content.code}</span>}
-      {content.detail && <span style={detail}>{content.detail}</span>}
-      {content.done && (<button type="button" disabled={!content.done.enabled} onClick={() => colocationStore_1.studioColocationStore.finishScan()} style={content.done.enabled
-                ? button
-                : { ...button, opacity: 0.4, cursor: "default" }}>
-          Done
-        </button>)}
-    </div>);
+    return ((0, jsx_runtime_1.jsxs)("div", { style: pill, children: [(0, jsx_runtime_1.jsx)("span", { style: content.tone === "error" ? { ...title, color: "#FF8A80" } : title, children: content.title }), content.code && (0, jsx_runtime_1.jsx)("span", { style: code, children: content.code }), content.detail && (0, jsx_runtime_1.jsx)("span", { style: detail, children: content.detail }), content.done && ((0, jsx_runtime_1.jsx)("button", { type: "button", disabled: !content.done.enabled, onClick: () => colocationStore_1.studioColocationStore.finishScan(), style: content.done.enabled
+                    ? button
+                    : { ...button, opacity: 0.4, cursor: "default" }, children: "Done" }))] }));
 }

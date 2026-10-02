@@ -4,7 +4,7 @@ import { ViroCommonProps, ViroObjectProps } from "./AR/ViroCommonProps";
 import { ViroHoverEvent, ViroClickEvent, ViroClickStateEvent, ViroTouchEvent, ViroScrollEvent, ViroSwipeEvent, ViroPinchEvent, ViroRotateEvent, ViroDragEvent, ViroFuseEvent, ViroAnimationStartEvent, ViroAnimationFinishEvent, ViroCollisionEvent, ViroNativeTransformUpdateEvent, ViroErrorEvent } from "./Types/ViroEvents";
 import { ViroNativeRef, ViroForce, Viro3DPoint, ViroTorque, ViroVelocity } from "./Types/ViroUtils";
 export type ViroBaseProps = ViroCommonProps & ViroObjectProps;
-export declare class ViroBase<T> extends React.Component<ViroBaseProps & T> {
+export declare class ViroBase<T, S = {}> extends React.Component<ViroBaseProps & T, S> {
     _component: ViroNativeRef;
     _onHover: (event: NativeSyntheticEvent<ViroHoverEvent>) => void;
     _onClick: (event: NativeSyntheticEvent<ViroClickEvent>) => void;

@@ -1,59 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARSceneNavigator = ViroARSceneNavigator;
-/**
- * Web implementation of ViroARSceneNavigator. Owns the <canvas> + ViroWebRenderer
- * (WASM host, virocore) and drives a ViroArSession which runs slam-wasm to track
- * the device and inject poses into the renderer. Scenes render their children as
- * C-API-backed nodes via context, exactly like Viro3DSceneNavigator.web.
- *
- * Web AR needs a user gesture: getUserMedia and (on iOS Safari) DeviceMotion
- * permission can only be requested from a tap. So we render a "Start AR" overlay
- * and begin tracking on tap.
- *
- * The tracking engine is loaded as a classic <script> exposing a global
- * `SlamModule` factory (MODULARIZE + EXPORT_NAME='SlamModule'). That engine is
- * tinyvio, built through its platforms/slam drop-in C API — the name is the
- * interface's, not the implementation's, and keeping it is why this file did
- * not change when the engine did. Override via `loadSlam` for ESM setups.
- *
- * MVP scope: single scene; camera + 6-DoF pose tracking. Planes/hit-test are a
- * follow-up.
- */
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const viro_web_renderer_1 = require("@reactvision/viro-web-renderer");
 const ViroWebContext_1 = require("../Web/ViroWebContext");
@@ -323,27 +271,7 @@ function ViroARSceneNavigator(props) {
         replace: () => { },
         viroAppProps: props.viroAppProps ?? {},
     };
-    return (<div style={containerStyle}>
-      <canvas ref={canvasRef} style={canvasStyle}/>
-
-      {renderer && rootNode && SceneComponent ? (<ViroWebContext_1.ViroRendererContext.Provider value={renderer}>
-          <ViroWebContext_1.ViroARContext.Provider value={{ session: sessionRef.current, anchors, trackingState: tracking }}>
-            <ViroWebContext_1.ViroParentNodeContext.Provider value={rootNode}>
-              <SceneComponent sceneNavigator={sceneNavigator} {...props.viroAppProps}/>
-            </ViroWebContext_1.ViroParentNodeContext.Provider>
-          </ViroWebContext_1.ViroARContext.Provider>
-        </ViroWebContext_1.ViroRendererContext.Provider>) : null}
-
-      {started ? (<div style={statusStyle}>
-          {motionMissing && !props.arOptions?.renderWhileLimited
-                ? MOTION_MISSING
-                : trackingLabel(tracking)}
-        </div>) : (<div style={overlayStyle}>
-          {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
-          <div>{props.startLabel ?? "AR needs access to your camera."}</div>
-          <button type="button" style={buttonStyle} disabled={!renderer || starting} onClick={startAR}>
-            {starting ? "Starting…" : "Start AR"}
-          </button>
-        </div>)}
-    </div>);
+    return ((0, jsx_runtime_1.jsxs)("div", { style: containerStyle, children: [(0, jsx_runtime_1.jsx)("canvas", { ref: canvasRef, style: canvasStyle }), renderer && rootNode && SceneComponent ? ((0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroRendererContext.Provider, { value: renderer, children: (0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroARContext.Provider, { value: { session: sessionRef.current, anchors, trackingState: tracking }, children: (0, jsx_runtime_1.jsx)(ViroWebContext_1.ViroParentNodeContext.Provider, { value: rootNode, children: (0, jsx_runtime_1.jsx)(SceneComponent, { sceneNavigator: sceneNavigator, ...props.viroAppProps }) }) }) })) : null, started ? ((0, jsx_runtime_1.jsx)("div", { style: statusStyle, children: motionMissing && !props.arOptions?.renderWhileLimited
+                    ? MOTION_MISSING
+                    : trackingLabel(tracking) })) : ((0, jsx_runtime_1.jsxs)("div", { style: overlayStyle, children: [error ? (0, jsx_runtime_1.jsx)("div", { style: { color: "#ff8080" }, children: error }) : null, (0, jsx_runtime_1.jsx)("div", { children: props.startLabel ?? "AR needs access to your camera." }), (0, jsx_runtime_1.jsx)("button", { type: "button", style: buttonStyle, disabled: !renderer || starting, onClick: startAR, children: starting ? "Starting…" : "Start AR" })] }))] }));
 }

@@ -1,15 +1,4 @@
 "use strict";
-/**
- * Copyright (c) 2015-present, Viro, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule ViroCamera
- * @flow
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -45,6 +34,18 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroCamera = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
+/**
+ * Copyright (c) 2015-present, Viro, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ViroCamera
+ * @flow
+ */
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroSceneContext_1 = require("./ViroSceneContext");
@@ -78,9 +79,9 @@ class ViroCamera extends React.Component {
     render() {
         // Uncomment this to check props
         //checkMisnamedProps("ViroCamera", this.props);
-        return (<VRTCamera ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(VRTCamera, { ref: (component) => {
                 this._component = component;
-            }} {...this.props} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish}/>);
+            }, ...this.props, onAnimationStartViro: this._onAnimationStart, onAnimationFinishViro: this._onAnimationFinish }));
     }
 }
 exports.ViroCamera = ViroCamera;

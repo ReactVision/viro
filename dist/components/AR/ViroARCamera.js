@@ -45,6 +45,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARCamera = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroCamera_1 = require("../ViroCamera");
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
@@ -56,9 +57,9 @@ class ViroARCamera extends React.Component {
             return null;
         }
         // Uncomment this to check props
-        return (<ViroCamera_1.ViroCamera ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(ViroCamera_1.ViroCamera, { ref: (component) => {
                 this._component = component;
-            }} {...this.props} active={true}/>);
+            }, ...this.props, active: true }));
     }
 }
 exports.ViroARCamera = ViroARCamera;

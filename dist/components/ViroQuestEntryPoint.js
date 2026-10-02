@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroQuestEntryPoint = ViroQuestEntryPoint;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const VRQuestNavigatorBridge_1 = require("./Utilities/VRQuestNavigatorBridge");
@@ -47,10 +48,7 @@ const ViroText_1 = require("./ViroText");
 // (not a plain RN <View>) — VRActivity's display is exclusively driven by the
 // OpenXR compositor, so a bare 2D view would never appear.
 function QuestCrashFallbackScene() {
-    return (<ViroScene_1.ViroScene>
-      <ViroAmbientLight_1.ViroAmbientLight color="#ffffff" intensity={1000}/>
-      <ViroText_1.ViroText text="Something went wrong loading this scene." position={[0, 0, -2]} width={3} height={1} style={{ fontFamily: "Arial", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}/>
-    </ViroScene_1.ViroScene>);
+    return ((0, jsx_runtime_1.jsxs)(ViroScene_1.ViroScene, { children: [(0, jsx_runtime_1.jsx)(ViroAmbientLight_1.ViroAmbientLight, { color: "#ffffff", intensity: 1000 }), (0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { text: "Something went wrong loading this scene.", position: [0, 0, -2], width: 3, height: 1, style: { fontFamily: "Arial", fontSize: 20, color: "#FFFFFF", textAlign: "center" } })] }));
 }
 /**
  * Drop-in root component for VRActivity on Meta Quest.
@@ -120,7 +118,5 @@ function ViroQuestEntryPoint() {
     if (!intent)
         return null;
     const { initialScene, rendererConfig } = intent;
-    return (<StudioSceneErrorBoundary_1.StudioSceneErrorBoundary onError={(error) => VRQuestNavigatorBridge_1.VRQuestNavigatorBridge.reportQuestError(error)} renderError={() => (<ViroVRSceneNavigator_1.ViroVRSceneNavigator initialScene={{ scene: QuestCrashFallbackScene }} style={react_native_1.StyleSheet.absoluteFill}/>)}>
-      <ViroVRSceneNavigator_1.ViroVRSceneNavigator ref={navRef} key={intent.intentKey} initialScene={initialScene} {...rendererConfig} style={react_native_1.StyleSheet.absoluteFill}/>
-    </StudioSceneErrorBoundary_1.StudioSceneErrorBoundary>);
+    return ((0, jsx_runtime_1.jsx)(StudioSceneErrorBoundary_1.StudioSceneErrorBoundary, { onError: (error) => VRQuestNavigatorBridge_1.VRQuestNavigatorBridge.reportQuestError(error), renderError: () => ((0, jsx_runtime_1.jsx)(ViroVRSceneNavigator_1.ViroVRSceneNavigator, { initialScene: { scene: QuestCrashFallbackScene }, style: react_native_1.StyleSheet.absoluteFill })), children: (0, jsx_runtime_1.jsx)(ViroVRSceneNavigator_1.ViroVRSceneNavigator, { ref: navRef, initialScene: initialScene, ...rendererConfig, style: react_native_1.StyleSheet.absoluteFill }, intent.intentKey) }));
 }

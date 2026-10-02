@@ -39,6 +39,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARCloudAnchor = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroFrameSource_1 = require("./ViroFrameSource");
 const ViroSharedFrame_1 = require("./ViroSharedFrame");
@@ -79,9 +80,7 @@ class ViroARCloudAnchor extends React.Component {
         return this._source;
     }
     render() {
-        return (<ViroSharedFrame_1.ViroSharedFrame source={this.source} arSceneNavigator={this.props.arSceneNavigator} onLocalized={this.props.onLocalized} onLocalizeError={this.props.onLocalizeError} placeholder={this.props.placeholder}>
-        {this.props.children}
-      </ViroSharedFrame_1.ViroSharedFrame>);
+        return ((0, jsx_runtime_1.jsx)(ViroSharedFrame_1.ViroSharedFrame, { source: this.source, arSceneNavigator: this.props.arSceneNavigator, onLocalized: this.props.onLocalized, onLocalizeError: this.props.onLocalizeError, placeholder: this.props.placeholder, children: this.props.children }));
     }
 }
 exports.ViroARCloudAnchor = ViroARCloudAnchor;

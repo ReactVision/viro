@@ -1,52 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroVirtualJoystick = void 0;
-/**
- * ViroVirtualJoystick.web.tsx
- *
- * Web implementation of ViroVirtualJoystick — an on-screen analog stick rendered
- * as a DOM overlay. Pointer drags are clamped to `radius` and normalised to
- * [-1, 1], then written to the JS controller registry under `controllerId`
- * (read via `useVirtualController`). This is the web equivalent of the native
- * view that writes into VROVirtualControllerRegistry; the read-path there is
- * C++, here it's the registry hook.
- *
- * Copyright © 2026 ReactVision. All rights reserved.
- */
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const viroVirtualController_1 = require("./Web/viroVirtualController");
 const ViroVirtualJoystick = (props) => {
@@ -120,11 +75,7 @@ const ViroVirtualJoystick = (props) => {
         transform: `translate(${knob.x}px, ${knob.y}px)`,
         pointerEvents: "none",
     };
-    return (<div style={style}>
-      <div ref={ringRef} style={ringStyle} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}>
-        <div style={knobStyle}/>
-      </div>
-    </div>);
+    return ((0, jsx_runtime_1.jsx)("div", { style: style, children: (0, jsx_runtime_1.jsx)("div", { ref: ringRef, style: ringStyle, onPointerDown: onPointerDown, onPointerMove: onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd, children: (0, jsx_runtime_1.jsx)("div", { style: knobStyle }) }) }));
 };
 exports.ViroVirtualJoystick = ViroVirtualJoystick;
 exports.default = exports.ViroVirtualJoystick;

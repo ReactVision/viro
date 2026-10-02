@@ -39,6 +39,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroSharedFrame = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroNode_1 = require("../ViroNode");
 /** How often the source is asked what it is doing. */
@@ -188,12 +189,10 @@ class ViroSharedFrame extends React.Component {
         const { frame } = this.state;
         if (!frame) {
             return this.props.placeholder
-                ? <ViroNode_1.ViroNode>{this.props.placeholder}</ViroNode_1.ViroNode>
+                ? (0, jsx_runtime_1.jsx)(ViroNode_1.ViroNode, { children: this.props.placeholder })
                 : null;
         }
-        return (<ViroNode_1.ViroNode position={frame.position} rotation={frame.rotation} scale={frame.scale}>
-        {this.props.children}
-      </ViroNode_1.ViroNode>);
+        return ((0, jsx_runtime_1.jsx)(ViroNode_1.ViroNode, { position: frame.position, rotation: frame.rotation, scale: frame.scale, children: this.props.children }));
     }
 }
 exports.ViroSharedFrame = ViroSharedFrame;

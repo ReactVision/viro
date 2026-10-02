@@ -44,6 +44,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViroARPlaneSelector = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const ViroPlatform_1 = require("../Utilities/ViroPlatform");
 const ViroMaterials_1 = require("../Material/ViroMaterials");
@@ -290,7 +291,7 @@ class ViroARPlaneSelector extends React.Component {
     // ---------------------------------------------------------------------------
     render() {
         // Supported on Quest via XR_FB_scene plane anchors (room model). No longer gated.
-        return <ViroNode_1.ViroNode>{this._renderPlanes()}</ViroNode_1.ViroNode>;
+        return (0, jsx_runtime_1.jsx)(ViroNode_1.ViroNode, { children: this._renderPlanes() });
     }
     _renderPlanes() {
         const { selectedPlaneId, planes } = this.state;
@@ -334,13 +335,8 @@ class ViroARPlaneSelector extends React.Component {
                         }
                     },
                 };
-            const visual = useActualShape ? (<ViroPolygon_1.ViroPolygon key={`poly-${anchorId}`} vertices={vertices2D} holes={[]} materials={[materialName]} {...clickHandlerProps} position={[0, 0, 0]} rotation={polygonRotation} opacity={surfaceOpacity}/>) : (<ViroQuad_1.ViroQuad key={`quad-${anchorId}`} materials={[materialName]} {...clickHandlerProps} position={[0, 0, 0]} width={anchor.width ?? 0.5} height={anchor.height ?? 0.5} rotation={polygonRotation} opacity={surfaceOpacity}/>);
-            elements.push(<ViroARPlane_1.ViroARPlane key={anchorId} anchorId={anchorId} minWidth={this.props.minWidth ?? 0} minHeight={this.props.minHeight ?? 0} onAnchorUpdated={(a) => this.handleAnchorUpdated(a)}>
-          {visual}
-          {isSelected && this.props.children != null && (<ViroNode_1.ViroNode position={this.state.tapLocalPosition ?? [0, 0, 0]}>
-              {this.props.children}
-            </ViroNode_1.ViroNode>)}
-        </ViroARPlane_1.ViroARPlane>);
+            const visual = useActualShape ? ((0, jsx_runtime_1.jsx)(ViroPolygon_1.ViroPolygon, { vertices: vertices2D, holes: [], materials: [materialName], ...clickHandlerProps, position: [0, 0, 0], rotation: polygonRotation, opacity: surfaceOpacity }, `poly-${anchorId}`)) : ((0, jsx_runtime_1.jsx)(ViroQuad_1.ViroQuad, { materials: [materialName], ...clickHandlerProps, position: [0, 0, 0], width: anchor.width ?? 0.5, height: anchor.height ?? 0.5, rotation: polygonRotation, opacity: surfaceOpacity }, `quad-${anchorId}`));
+            elements.push((0, jsx_runtime_1.jsxs)(ViroARPlane_1.ViroARPlane, { anchorId: anchorId, minWidth: this.props.minWidth ?? 0, minHeight: this.props.minHeight ?? 0, onAnchorUpdated: (a) => this.handleAnchorUpdated(a), children: [visual, isSelected && this.props.children != null && ((0, jsx_runtime_1.jsx)(ViroNode_1.ViroNode, { position: this.state.tapLocalPosition ?? [0, 0, 0], children: this.props.children }))] }, anchorId));
         });
         return elements;
     }

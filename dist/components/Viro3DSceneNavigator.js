@@ -1,15 +1,4 @@
 "use strict";
-/**
- * Copyright (c) 2018-present, Viro Media, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule Viro3DSceneNavigator
- * @flow
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -45,6 +34,18 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro3DSceneNavigator = void 0;
+const jsx_runtime_1 = require("react/jsx-runtime");
+/**
+ * Copyright (c) 2018-present, Viro Media, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule Viro3DSceneNavigator
+ * @flow
+ */
 const React = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const ViroPlatform_1 = require("./Utilities/ViroPlatform");
@@ -346,7 +347,7 @@ class Viro3DSceneNavigator extends React.Component {
         for (var scene in sceneDictionary) {
             var Component = sceneDictionary[scene].sceneClass.scene;
             var props = sceneDictionary[scene].sceneClass.passProps;
-            views.push(<Component key={"scene" + i} sceneNavigator={this.sceneNavigator} {...props}/>);
+            views.push((0, jsx_runtime_1.jsx)(Component, { sceneNavigator: this.sceneNavigator, ...props }, "scene" + i));
             i++;
         }
         return views;
@@ -375,11 +376,7 @@ class Viro3DSceneNavigator extends React.Component {
         // null: this is the root of a screen, and a blank one says nothing about why.
         if (ViroPlatform_1.isVisionOS) {
             (0, ViroUnsupported_1.warnUnsupported)("Viro3DSceneNavigator", "Apple Vision Pro", "Use ViroXRSceneNavigator: on visionOS the ImmersiveSpace is the presentation path, not an OpenGL view.");
-            return (<react_native_1.View style={styles.viroVisionOSFallback}>
-          <react_native_1.Text style={styles.viroVisionOSFallbackText}>
-            Viro3DSceneNavigator is not supported on Apple Vision Pro.
-          </react_native_1.Text>
-        </react_native_1.View>);
+            return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.viroVisionOSFallback, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.viroVisionOSFallbackText, children: "Viro3DSceneNavigator is not supported on Apple Vision Pro." }) }));
         }
         // Uncomment this line to check for misnamed props
         //checkMisnamedProps("Viro3DSceneNavigator", this.props);
@@ -394,11 +391,9 @@ class Viro3DSceneNavigator extends React.Component {
         }
         const { viroAppProps = {}, // Make sure viroAppProps aren't null to save us having to always check
          } = this.props;
-        return (<VRT3DSceneNavigator ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(VRT3DSceneNavigator, { ref: (component) => {
                 this._component = component;
-            }} {...this.props} viroAppProps={viroAppProps} currentSceneIndex={this.state.currentSceneIndex} style={(this.props.style, styles.container)} hasOnExitViroCallback={!!this.props.onExitViro} onExitViro={this._onExitViro}>
-        {items}
-      </VRT3DSceneNavigator>);
+            }, ...this.props, viroAppProps: viroAppProps, currentSceneIndex: this.state.currentSceneIndex, style: (this.props.style, styles.container), hasOnExitViroCallback: !!this.props.onExitViro, onExitViro: this._onExitViro, children: items }));
     }
 }
 exports.Viro3DSceneNavigator = Viro3DSceneNavigator;

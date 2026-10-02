@@ -1,40 +1,7 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Viro3DObject = void 0;
-const React = __importStar(require("react"));
+const jsx_runtime_1 = require("react/jsx-runtime");
 const react_native_1 = require("react-native");
 const ViroProps_1 = require("./Utilities/ViroProps");
 const ViroBase_1 = require("./ViroBase");
@@ -74,10 +41,10 @@ class Viro3DObject extends ViroBase_1.ViroBase {
         const transformDelegate = this.props.onTransformUpdate != undefined
             ? this._onNativeTransformUpdate
             : undefined;
-        return (<VRT3DObject {...this.props} ref={(component) => {
+        return ((0, jsx_runtime_1.jsx)(VRT3DObject, { ...this.props, ref: (component) => {
                 this._component = component;
-            }} highAccuracyEvents={highAccuracyEvents} onNativeTransformDelegateViro={transformDelegate} hasTransformDelegate={this.props.onTransformUpdate != undefined} physicsBody={newPhysicsBody} source={modelsrc} resources={resources} materials={materials} transformBehaviors={transformBehaviors} canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)} canClick={this.props.onClick != undefined ||
-                this.props.onClickState != undefined} canTouch={this.props.onTouch != undefined} canScroll={this.props.onScroll != undefined} canSwipe={this.props.onSwipe != undefined} canDrag={this.props.onDrag != undefined} canFuse={this.props.onFuse != undefined} canPinch={this.props.onPinch != undefined} canRotate={this.props.onRotate != undefined} onHoverViro={this._onHover} onClickViro={this._onClickState} onClick={undefined} onTouchViro={this._onTouch} onScrollViro={this._onScroll} onSwipeViro={this._onSwipe} onDragViro={this._onDrag} onFuseViro={this._onFuse} onPinchViro={this._onPinch} onRotateViro={this._onRotate} onLoadStartViro={this._onLoadStart} onLoadEndViro={this._onLoadEnd} onErrorViro={this._onError} onAnimationStartViro={this._onAnimationStart} onAnimationFinishViro={this._onAnimationFinish} timeToFuse={timeToFuse} canCollide={this.props.onCollision != undefined} onCollisionViro={this._onCollision}/>);
+            }, highAccuracyEvents: highAccuracyEvents, onNativeTransformDelegateViro: transformDelegate, hasTransformDelegate: this.props.onTransformUpdate != undefined, physicsBody: newPhysicsBody, source: modelsrc, resources: resources, materials: materials, transformBehaviors: transformBehaviors, canHover: (this.props.onHover != undefined || this.props.onGaze != undefined), canClick: this.props.onClick != undefined ||
+                this.props.onClickState != undefined, canTouch: this.props.onTouch != undefined, canScroll: this.props.onScroll != undefined, canSwipe: this.props.onSwipe != undefined, canDrag: this.props.onDrag != undefined, canFuse: this.props.onFuse != undefined, canPinch: this.props.onPinch != undefined, canRotate: this.props.onRotate != undefined, onHoverViro: this._onHover, onClickViro: this._onClickState, onClick: undefined, onTouchViro: this._onTouch, onScrollViro: this._onScroll, onSwipeViro: this._onSwipe, onDragViro: this._onDrag, onFuseViro: this._onFuse, onPinchViro: this._onPinch, onRotateViro: this._onRotate, onLoadStartViro: this._onLoadStart, onLoadEndViro: this._onLoadEnd, onErrorViro: this._onError, onAnimationStartViro: this._onAnimationStart, onAnimationFinishViro: this._onAnimationFinish, timeToFuse: timeToFuse, canCollide: this.props.onCollision != undefined, onCollisionViro: this._onCollision }));
     }
     _onLoadStart = (event) => {
         this.props.onLoadStart && this.props.onLoadStart(event);

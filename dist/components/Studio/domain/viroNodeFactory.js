@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createNodeConfig = createNodeConfig;
 exports.dragNodeProps = dragNodeProps;
 exports.createNode = createNode;
+const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const Viro3DObject_1 = require("../../Viro3DObject");
 const ViroImage_1 = require("../../ViroImage");
@@ -181,31 +182,28 @@ function create3DObject(asset, config, onAssetLoaded, notifyPhysicsDrag, onColli
     const shaderOverrides = hasMaterialConfig
         ? [(0, materialConfig_1.studioMaterialName)(asset.id)]
         : undefined;
-    return (<Viro3DObject_1.Viro3DObject key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} type={modelType} dragType={config.dragType} dragPlane={config.dragPlane} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={assetErrorHandler(asset, config, "3D model")} 
-    // Viro derives native canDrag from `onDrag != undefined`; without this prop
-    // the drag recognizer is never attached, even when dragType is set.
-    {...(config.dragType
-        ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
-        : {})} {...(shaderOverrides ? { shaderOverrides } : {})} {...(config.physicsBody
-        ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
-        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+    return ((0, jsx_runtime_1.jsx)(Viro3DObject_1.Viro3DObject, { ...(nodeRef ? { ref: nodeRef } : {}), source: { uri: asset.file_url }, position: config.position, rotation: config.rotation, scale: config.scale, type: modelType, dragType: config.dragType, dragPlane: config.dragPlane, animation: config.animation, onClick: config.onClick, ...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {}), onLoadEnd: () => onAssetLoaded?.(asset.id), onError: assetErrorHandler(asset, config, "3D model"), ...(config.dragType
+            ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
+            : {}), ...(shaderOverrides ? { shaderOverrides } : {}), ...(config.physicsBody
+            ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
+            : {}), ...(onCollision ? { onCollision: onCollision } : {}), ...(config.onGaze ? { onGaze: config.onGaze } : {}) }, asset.id));
 }
 function createImage(asset, config, onAssetLoaded, notifyPhysicsDrag, onCollision, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] Image "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroImage_1.ViroImage key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} 
-    // No width or height props, so the bridges derive the height from the
-    // image's own aspect on load, but only build the quad from it under
-    // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
-    // the picture. The crop this mode also selects needs explicit size props,
-    // so the UVs stay 0 to 1.
-    resizeMode="ScaleToFill" position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} onLoadEnd={() => onAssetLoaded?.(asset.id)} onError={assetErrorHandler(asset, config, "Image")} {...(config.dragType
-        ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
-        : {})} {...(config.physicsBody
-        ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
-        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+    return ((0, jsx_runtime_1.jsx)(ViroImage_1.ViroImage, { ...(nodeRef ? { ref: nodeRef } : {}), source: { uri: asset.file_url }, 
+        // No width or height props, so the bridges derive the height from the
+        // image's own aspect on load, but only build the quad from it under
+        // ScaleToFill; the default StretchToFill keeps the 1x1 quad and squashes
+        // the picture. The crop this mode also selects needs explicit size props,
+        // so the UVs stay 0 to 1.
+        resizeMode: "ScaleToFill", position: config.position, rotation: config.rotation, scale: config.scale, dragType: config.dragType, animation: config.animation, onClick: config.onClick, ...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {}), onLoadEnd: () => onAssetLoaded?.(asset.id), onError: assetErrorHandler(asset, config, "Image"), ...(config.dragType
+            ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
+            : {}), ...(config.physicsBody
+            ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
+            : {}), ...(onCollision ? { onCollision: onCollision } : {}), ...(config.onGaze ? { onGaze: config.onGaze } : {}) }, asset.id));
 }
 /**
  * TEXT node whose content is a {{variable}} template (the asset name). It
@@ -228,7 +226,7 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, onCollision, no
         return store.subscribe(() => setText(compute()));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store, template]);
-    return (<ViroText_1.ViroText {...(nodeRef ? { ref: nodeRef } : {})} text={text} position={position ?? config.position} rotation={rotation ?? config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} {...(visible === undefined ? {} : { visible })} style={{
+    return ((0, jsx_runtime_1.jsx)(ViroText_1.ViroText, { ...(nodeRef ? { ref: nodeRef } : {}), text: text, position: position ?? config.position, rotation: rotation ?? config.rotation, scale: config.scale, dragType: config.dragType, animation: config.animation, onClick: config.onClick, ...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {}), ...(visible === undefined ? {} : { visible }), style: {
             fontFamily: "Arial",
             fontSize: 20,
             color: "#FFFFFF",
@@ -236,9 +234,9 @@ const VariableText = ({ asset, config, store, notifyPhysicsDrag, onCollision, no
             // Centred on the node rather than hung from the top of its box, so the
             // authored position is where the text is at any scale.
             textAlignVertical: "center",
-        }} {...(config.dragType && !dragLocked
-        ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
-        : {})} {...(body ? { physicsBody: body, viroTag: config.viroTag } : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+        }, ...(config.dragType && !dragLocked
+            ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
+            : {}), ...(body ? { physicsBody: body, viroTag: config.viroTag } : {}), ...(onCollision ? { onCollision: onCollision } : {}), ...(config.onGaze ? { onGaze: config.onGaze } : {}) }));
 };
 /**
  * Wraps a created node and drives its `visible` prop from the per-scene
@@ -277,9 +275,7 @@ const PlaceableNode = ({ assetId, store, authorPosition, authorRotation, visibil
         return null;
     const position = store.resolvePlacedPosition(assetId, authorPosition) ?? authorPosition;
     const rotation = store.resolvePlacedRotation(assetId, authorRotation) ?? authorRotation;
-    return (<VisibleNode assetId={assetId} store={visibilityStore}>
-      {React.cloneElement(children, { position, rotation })}
-    </VisibleNode>);
+    return ((0, jsx_runtime_1.jsx)(VisibleNode, { assetId: assetId, store: visibilityStore, children: React.cloneElement(children, { position, rotation }) }));
 };
 /** Far below what can be seen, and enough to make a prop a change. */
 const DRAG_REPAINT_NUDGE_M = 1e-6;
@@ -333,18 +329,18 @@ const DragNode = ({ assetId, store, lockedPhysicsBody, children, ...injected }) 
     return React.cloneElement(children, dragNodeProps(drag, injected, children.props.position ?? children.props.config?.position, children.type === VariableText, lockedPhysicsBody));
 };
 function createText(asset, config, notifyPhysicsDrag, store, onCollision, nodeRef) {
-    return (<VariableText key={asset.id} asset={asset} config={config} store={store} notifyPhysicsDrag={notifyPhysicsDrag} onCollision={onCollision} nodeRef={nodeRef}/>);
+    return ((0, jsx_runtime_1.jsx)(VariableText, { asset: asset, config: config, store: store, notifyPhysicsDrag: notifyPhysicsDrag, onCollision: onCollision, nodeRef: nodeRef }, asset.id));
 }
 function createVideo(asset, config, notifyPhysicsDrag, onCollision, nodeRef) {
     if (!asset.file_url) {
         console.warn(`[Studio] Video "${asset.name}" has no file_url`);
         return null;
     }
-    return (<ViroVideo_1.ViroVideo key={asset.id} {...(nodeRef ? { ref: nodeRef } : {})} source={{ uri: asset.file_url }} position={config.position} rotation={config.rotation} scale={config.scale} dragType={config.dragType} animation={config.animation} onClick={config.onClick} {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})} loop={true} muted={false} onError={assetErrorHandler(asset, config, "Video")} {...(config.dragType
-        ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
-        : {})} {...(config.physicsBody
-        ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
-        : {})} {...(onCollision ? { onCollision: onCollision } : {})} {...(config.onGaze ? { onGaze: config.onGaze } : {})}/>);
+    return ((0, jsx_runtime_1.jsx)(ViroVideo_1.ViroVideo, { ...(nodeRef ? { ref: nodeRef } : {}), source: { uri: asset.file_url }, position: config.position, rotation: config.rotation, scale: config.scale, dragType: config.dragType, animation: config.animation, onClick: config.onClick, ...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {}), loop: true, muted: false, onError: assetErrorHandler(asset, config, "Video"), ...(config.dragType
+            ? { onDrag: (to) => notifyPhysicsDrag?.(asset.id, to) }
+            : {}), ...(config.physicsBody
+            ? { physicsBody: config.physicsBody, viroTag: config.viroTag }
+            : {}), ...(onCollision ? { onCollision: onCollision } : {}), ...(config.onGaze ? { onGaze: config.onGaze } : {}) }, asset.id));
 }
 function createNode(asset, sceneNavigator, animations, scene, onAnimationTrigger, animationStates, onAssetLoaded, onCollision, isDragActive, notifyPhysicsDrag, onSceneChange, runtimeCtx, 
 // When set (proximity-target assets), captures the live Viro node so the host
@@ -391,21 +387,15 @@ registerProximityNode, onAssetError) {
         return null;
     // Marker content sits on each device's own image, so its drags stay local.
     const dragStore = runtimeCtx?.dragStore;
-    const node = dragStore && config.dragType && !asset.trigger_image_url ? (<DragNode assetId={asset.id} store={dragStore} lockedPhysicsBody={config.lockedPhysicsBody}>
-        {built}
-      </DragNode>) : (built);
+    const node = dragStore && config.dragType && !asset.trigger_image_url ? ((0, jsx_runtime_1.jsx)(DragNode, { assetId: asset.id, store: dragStore, lockedPhysicsBody: config.lockedPhysicsBody, children: built })) : (built);
     // Tap-to-place assets are withheld until placed; PlaceableNode then mounts the
     // node at the tap point with the author position and rotation applied relative
     // to the user's facing, and wraps it in VisibleNode itself. A marker asset is
     // never gated this way, whatever the flag says (isTapToPlaceAsset).
     if ((0, placementStore_1.isTapToPlaceAsset)(asset) && runtimeCtx?.placementStore) {
-        return (<PlaceableNode key={asset.id} assetId={asset.id} store={runtimeCtx.placementStore} authorPosition={config.position} authorRotation={config.rotation} visibilityStore={runtimeCtx?.visibilityStore}>
-        {node}
-      </PlaceableNode>);
+        return ((0, jsx_runtime_1.jsx)(PlaceableNode, { assetId: asset.id, store: runtimeCtx.placementStore, authorPosition: config.position, authorRotation: config.rotation, visibilityStore: runtimeCtx?.visibilityStore, children: node }, asset.id));
     }
     // Drive show/hide/toggle from the visibility store (Set Visibility actions);
     // seeded from the asset's author-time hidden_on_load default.
-    return (<VisibleNode key={asset.id} assetId={asset.id} store={runtimeCtx?.visibilityStore}>
-      {node}
-    </VisibleNode>);
+    return ((0, jsx_runtime_1.jsx)(VisibleNode, { assetId: asset.id, store: runtimeCtx?.visibilityStore, children: node }, asset.id));
 }

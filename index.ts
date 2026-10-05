@@ -191,6 +191,7 @@ export type {
   ViroDetectorReadyEvent,
   ViroDetectorErrorEvent,
 } from "./components/ViroObjectDetector";
+export { VIRO_OBJECT_DETECTOR_UNAVAILABLE_ERROR } from "./components/ViroObjectDetector";
 import { ViroNode } from "./components/ViroNode";
 import { ViroOmniLight } from "./components/ViroOmniLight";
 import { ViroOrbitCamera } from "./components/ViroOrbitCamera";

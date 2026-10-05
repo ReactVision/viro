@@ -201,13 +201,22 @@ export function StudioQuestSceneHudOverlay({
   if (colocation) {
     lines.push({
       key: "status",
-      text: colocation.code
-        ? `${colocation.title}   ${colocation.code}`
-        : colocation.title,
+      text: colocation.title,
       height: LINE_HEIGHT_M,
       fontSize: 13,
       color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
     });
+    // Beside the title the code wrapped onto a second line, which a one-line
+    // box draws over the line above.
+    if (colocation.code) {
+      lines.push({
+        key: "code",
+        text: colocation.code,
+        height: LINE_HEIGHT_M,
+        fontSize: 13,
+        color: "#FFFFFF",
+      });
+    }
     if (colocation.detail) {
       lines.push({
         key: "detail",

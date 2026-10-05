@@ -37,7 +37,12 @@ import {
   GazeRuntimeState,
   resetGazeStates,
 } from "./domain/gazeBindingsRuntime";
-import { ViroCameraTransform } from "../Types/ViroEvents";
+import {
+  ViroCameraTransform,
+  ViroClickStateTypes,
+  type ViroClickState,
+} from "../Types/ViroEvents";
+import { ViroEventSource, type ViroSource } from "../Types/ViroUtils";
 import {
   cleanupTriggerImageTargets,
   registerTriggerImageTargets,
@@ -1000,6 +1005,22 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     useState<CameraPose | null>(null);
   const lastHeadLockedEvalRef = useRef(0);
 
+  // The controller reports every button to its one delegate, and a second
+  // ViroController would replace this one's, so Y is read here.
+  const [questMenuOpen, setQuestMenuOpen] = useState(false);
+  const closeQuestMenu = useCallback(() => setQuestMenuOpen(false), []);
+  const handleQuestControllerClickState = useCallback(
+    (state: ViroClickState, _position: unknown, source: ViroSource) => {
+      if (
+        state === ViroClickStateTypes.CLICK_DOWN &&
+        (source as unknown as number) === ViroEventSource.Y_BUTTON
+      ) {
+        setQuestMenuOpen((open) => !open);
+      }
+    },
+    []
+  );
+
   // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
   const [activePlacementId, setActivePlacementId] = useState<string | null>(
     () => placementStoreRef.current?.activeAssetId() ?? null
@@ -1476,11 +1497,6 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     typeof ViroARPlaneSelector
   > | null>(null);
 
-  // Quest HUD status ("Scanning for planes…" vs "Plane found") — a coarse
-  // found/not-found flag, not a count; the HUD only needs to tell the user
-  // scanning is working, not exactly how many planes exist.
-  const [hasFoundPlane, setHasFoundPlane] = useState(false);
-
   const handleAnchorFound = useCallback(
     (anchor: ViroAnchor) => {
       try {
@@ -1489,9 +1505,6 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         }
         if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
           onPlaneDetected?.();
-        }
-        if (anchor?.type === "plane") {
-          setHasFoundPlane(true);
         }
         // Anchoring places content in world space — refresh cached target
         // positions so proximity metres stay correct once the anchor lands.
@@ -1693,6 +1706,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         <ViroController
           controllerVisibility
           reticleVisibility
+          onClickState={handleQuestControllerClickState}
           {...(activePlacementId
             ? {
                 onClick: (position: [number, number, number]) =>
@@ -1728,8 +1742,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         <StudioQuestSceneHudOverlay
           cameraPose={questHeadLockedPose}
           sceneName={scene.name}
-          planeDetectionMode={planeDetectionMode}
-          hasFoundPlane={hasFoundPlane}
+          menuOpen={questMenuOpen}
+          onCloseMenu={closeQuestMenu}
         />
       )}
       <StudioSounds manager={soundManagerRef.current!} />

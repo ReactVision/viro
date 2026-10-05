@@ -27,6 +27,10 @@ import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 import { StudioColocationIndicator } from "./StudioColocationIndicator";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
 import { studioColocationStore } from "./domain/colocationStore";
+import {
+  questMenuStore,
+  type StudioQuestMenuItem,
+} from "./domain/questMenuStore";
 import { StudioColocationController } from "./colocation/controller";
 import type {
   StudioColocationOptions,
@@ -232,6 +236,13 @@ export interface StudioSceneNavigatorProps {
   onExitViro?: () => void;
   /** Meta Quest only. Passed to `ViroXRSceneNavigator`, which documents it. */
   renderQuestPanel?: (enter: () => void) => React.ReactNode;
+  /**
+   * Meta Quest only. Buttons for the in-scene menu, listed above its Exit
+   * button. The wearer opens and closes the menu with the left controller's Y
+   * button, and pressing a button closes it. Nothing 2D can be seen from
+   * inside the headset, so this is where the host's scene actions go.
+   */
+  questMenuItems?: readonly StudioQuestMenuItem[];
   /** Fired after the scene is fetched and parsed, before it is pushed. */
   onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
   /** Threaded to the initial scene's StudioARScene (initial scene only). */
@@ -365,6 +376,7 @@ export const StudioSceneNavigator = forwardRef<
     onSceneChange,
     onExitViro,
     renderQuestPanel,
+    questMenuItems,
     onSceneLoaded,
     onPlaneDetected,
     onPlaneSelected,
@@ -482,6 +494,11 @@ export const StudioSceneNavigator = forwardRef<
       colocationStoreOwner
     );
   }, [colocationIndicator, colocationStoreOwner]);
+  useEffect(() => {
+    if (!isQuest) return;
+    questMenuStore.set(questMenuItems, colocationStoreOwner);
+    return () => questMenuStore.clear(colocationStoreOwner);
+  }, [questMenuItems, colocationStoreOwner]);
   useEffect(() => {
     colocationRef.current?.request(colocation ?? null, {
       restartFailed: false,

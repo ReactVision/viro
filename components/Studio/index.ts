@@ -16,6 +16,7 @@ export type {
   StudioSceneNavigatorHandle,
   StudioSceneNavigatorProps,
 } from "./StudioSceneNavigator";
+export type { StudioQuestMenuItem } from "./domain/questMenuStore";
 export { isStudioApiError } from "./domain/studioApiError";
 export type {
   StudioApiError,

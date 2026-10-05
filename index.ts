@@ -617,6 +617,7 @@ export type {
   StudioColocationOptions,
   StudioColocationRoom,
   StudioColocationState,
+  StudioQuestMenuItem,
 } from "./components/Studio";
 
 export { isStudioApiError } from "./components/Studio";

@@ -99,8 +99,9 @@ const textStyle = {
  * - the menu, which Y opens and closes: the same lines, the host's
  *   questMenuItems, and Exit. B and the left menu button exit as well.
  *
- * Sits below StudioQuestAlertOverlay's position (verticalOffsetM) so an
- * ALERT firing at the same time doesn't render on top of it.
+ * Closed, it sits below StudioQuestAlertOverlay's position (verticalOffsetM)
+ * so an ALERT firing at the same time doesn't render on top of it; the open
+ * menu is centred in view.
  */
 export function StudioQuestSceneHudOverlay({
   cameraPose,
@@ -157,9 +158,13 @@ export function StudioQuestSceneHudOverlay({
     return () => clearTimeout(timer);
   }, [hasPose, place]);
 
-  React.useEffect(() => {
-    if (menuOpen) place();
-  }, [menuOpen, place]);
+  // Placed while rendering, not in an effect: an effect lets the opened menu
+  // draw one frame at the previous placement, and the wearer sees it jump.
+  const [menuWasOpen, setMenuWasOpen] = React.useState(menuOpen);
+  if (menuOpen !== menuWasOpen) {
+    setMenuWasOpen(menuOpen);
+    if (menuOpen && cameraPose) setPlacedAt(cameraPose);
+  }
 
   const statusKey = colocation
     ? `${colocation.title}\n${colocation.code ?? ""}`
@@ -249,8 +254,9 @@ export function StudioQuestSceneHudOverlay({
     2 * PADDING_M + lines.reduce((sum, line) => sum + line.height, 0);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
-    // Grows downwards, so its top edge stays where an alert expects it.
-    verticalOffsetM: -0.4 - (height - 0.5) / 2,
+    // The menu is centred where the wearer looked when opening it. Otherwise
+    // the panel grows downwards, so its top edge stays where an alert expects it.
+    verticalOffsetM: menuOpen ? 0 : -0.4 - (height - 0.5) / 2,
   });
 
   // Each line is positioned explicitly: inside a ViroFlexView on Quest every

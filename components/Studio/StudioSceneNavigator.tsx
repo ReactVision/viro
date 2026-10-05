@@ -230,6 +230,8 @@ export interface StudioSceneNavigatorProps {
   onError?: (err: Error) => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onExitViro?: () => void;
+  /** Meta Quest only. Passed to `ViroXRSceneNavigator`, which documents it. */
+  renderQuestPanel?: (enter: () => void) => React.ReactNode;
   /** Fired after the scene is fetched and parsed, before it is pushed. */
   onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
   /** Threaded to the initial scene's StudioARScene (initial scene only). */
@@ -362,6 +364,7 @@ export const StudioSceneNavigator = forwardRef<
     onError,
     onSceneChange,
     onExitViro,
+    renderQuestPanel,
     onSceneLoaded,
     onPlaneDetected,
     onPlaneSelected,
@@ -784,6 +787,7 @@ export const StudioSceneNavigator = forwardRef<
           hdrEnabled={!isQuest}
           bloomEnabled={false}
           onExitViro={onExitViro}
+          renderQuestPanel={renderQuestPanel}
           // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
           // than ViroARScene outside a shared session (see StudioARScene for
           // why), and a virtual root turns none of this on by itself, so both

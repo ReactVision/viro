@@ -23,7 +23,7 @@ function QuestCrashFallbackScene() {
         position={[0, 0, -2]}
         width={3}
         height={1}
-        style={{ fontFamily: "Arial", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}
+        style={{ fontFamily: "sans-serif", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}
       />
     </ViroScene>
   );

@@ -47,7 +47,10 @@ import {
   dragSurfaceFromAnchor,
   isSameDragSurface,
 } from "./domain/dragConfiguration";
-import { createNode } from "./domain/viroNodeFactory";
+import {
+  createNode,
+  STUDIO_TEXT_FONT_FAMILY,
+} from "./domain/viroNodeFactory";
 import { studioAssetPosition } from "./domain/assetPosition";
 import { defaultApiRequestExecutor } from "./domain/defaultApiRequestExecutor";
 import {
@@ -1713,7 +1716,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           width={3}
           height={1}
           style={{
-            fontFamily: "Arial",
+            fontFamily: STUDIO_TEXT_FONT_FAMILY,
             fontSize: 14,
             color: "#FFFFFF",
             textAlign: "center",
@@ -1735,7 +1738,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           text={noAssetsMessage ?? "No assets to display"}
           position={[0, 0, -2]}
           style={{
-            fontFamily: "Arial",
+            fontFamily: STUDIO_TEXT_FONT_FAMILY,
             fontSize: 16,
             color: "#CCCCCC",
             textAlign: "center",

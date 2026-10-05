@@ -1437,6 +1437,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     (scene.plane_detection as string) ?? "NONE"
   ).toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
+  // ViroARPlane and ViroARPlaneSelector need an AR root: under the ViroScene
+  // root Quest uses outside a shared session, the Android bridge casts the
+  // plane's scene to VRTARScene and the app crashes as the plane mounts.
+  const rootsInAR = studioSceneRootsInAR(colocationFrame, sceneMount, isQuest);
 
   // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
   // (empty disables plane finding): omitting the prop keeps the native default
@@ -1575,6 +1579,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // into its node's local transform, so it can never sit inside the shared
   // (transformed) nodes.
   const renderOriginPicker = () => {
+    if (!rootsInAR) return null;
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
@@ -1632,11 +1637,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     );
   };
 
-  // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
-  // the OpenXR renderer feeds Quest plane anchors through the same
-  // onAnchorFound path ARCore/ARKit use (XR_FB_scene room model), see
-  // VROARSessionOpenXR.cpp in virocore. No Quest-specific branch needed.
+  // A plane-mode scene under the ViroScene root renders its assets the way a
+  // NONE scene does, at the scene root.
   const renderAssets = () => {
+    if (!rootsInAR) return <>{renderedPlaneAssets}</>;
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
@@ -1777,7 +1781,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // planes, so the AR root changes nothing it renders, and the scene returns to
   // ViroScene when the session ends. Changing the root remounts everything
   // below it, which is the cost the `colocation` prop doc states.
-  if (!studioSceneRootsInAR(colocationFrame, sceneMount, isQuest)) {
+  if (!rootsInAR) {
     return (
       <ViroScene
         {...physicsProps}

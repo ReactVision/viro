@@ -84,9 +84,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: "#000000",
+  },
+  spinner: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000000",
   },
   recordingOverlay: {
     position: "absolute",
@@ -763,9 +766,15 @@ export const StudioSceneNavigator = forwardRef<
   // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
   // while the scene loads.
   if ((isQuest || isVisionOS) && !vrSceneEntry) {
+    // The host's view fills the window, as it does over the phone camera;
+    // centring it here shrank it to its content's width.
     return (
       <View style={styles.loader}>
-        {overlay ?? <ActivityIndicator size="large" color="#ffffff" />}
+        {overlay ?? (
+          <View style={styles.spinner}>
+            <ActivityIndicator size="large" color="#ffffff" />
+          </View>
+        )}
       </View>
     );
   }

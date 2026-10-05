@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Expo plugin options for Meta Quest builds.** `android.questFeatures` turns off the capabilities an app does not use, each of which store review checks against the app: `colocation: false` drops `horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA`, `eyeTracking: false` removes `com.oculus.permission.EYE_TRACKING` and the `oculus.software.eye_tracking` feature from the merged manifest (the renderer AAR declares both), and `passthroughCamera: false` drops `android.permission.CAMERA` and `horizonos.permission.HEADSET_CAMERA`. All three default to true. `android.questHorizonOsSdk` sets the `<horizonos:uses-horizonos-sdk>` element the plugin now writes (minimum 69, the first version with hybrid apps; target defaults to the minimum). Without it Horizon OS logs that the app must declare a minimum version "to continue to access this SDK in the future".
+
 ### Changed
 
 - **Meta Quest builds no longer declare location permissions, and do not require `android.hardware.camera` (Expo plugin).** A Quest has no GPS, so the `reactvision` and `arcore` providers no longer add `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` to a build whose `xRMode` includes `QUEST`. The camera feature is declared with `required="false"` there. `android.permission.CAMERA` is no longer added a second time when another plugin already declared it, on any build.

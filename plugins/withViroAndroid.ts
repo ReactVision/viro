@@ -500,9 +500,11 @@ const withViroManifest = (config: ExpoConfig) =>
         });
         const existingPermissions: string[] = (contents.manifest["uses-permission"] || [])
           .map((p: any) => p.$?.["android:name"]);
-        if (!existingPermissions.includes("com.oculus.permission.HAND_TRACKING")) {
+        // Horizon OS logs com.oculus.permission.HAND_TRACKING as deprecated and
+        // asks for this name instead.
+        if (!existingPermissions.includes("horizonos.permission.HAND_TRACKING")) {
           contents.manifest["uses-permission"].push({
-            $: { "android:name": "com.oculus.permission.HAND_TRACKING" },
+            $: { "android:name": "horizonos.permission.HAND_TRACKING" },
           });
         }
         if (!existingPermissions.includes("com.oculus.permission.EYE_TRACKING")) {

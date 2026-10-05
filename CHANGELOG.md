@@ -8,6 +8,7 @@
 
 ### Changed
 
+- **Meta Quest builds declare `horizonos.permission.HAND_TRACKING` in place of `com.oculus.permission.HAND_TRACKING` (Expo plugin).** Horizon OS logs the old name as deprecated and asks for the new one.
 - **Meta Quest builds no longer declare location permissions, and do not require `android.hardware.camera` (Expo plugin).** A Quest has no GPS, so the `reactvision` and `arcore` providers no longer add `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` to a build whose `xRMode` includes `QUEST`. The camera feature is declared with `required="false"` there. `android.permission.CAMERA` is no longer added a second time when another plugin already declared it, on any build.
 
 ### Fixed

@@ -2,7 +2,6 @@ import * as React from "react";
 import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
 import { ViroQuad } from "../ViroQuad";
-import { ViroText } from "../ViroText";
 import { ViroEventSource, type ViroSource } from "../Types/ViroUtils";
 import { exitVRScene } from "../Utilities/VRModuleOpenXR";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
@@ -13,14 +12,14 @@ import {
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
+import { StudioQuestText } from "./StudioQuestText";
 import { useStudioColocation } from "./useStudioColocation";
 
 // How long the scene name, a live session's status, or the reason the last
 // session ended stays up on its own.
 const PEEK_MS = 5000;
 
-// On Quest a 13 pt line shows in 0.15 m and a 14 pt one did not, so each box
-// allows at least 0.0115 m per point of font size.
+// A line takes about 0.0115 m per point of font size.
 const LINE_HEIGHT_M = 0.15;
 const NAME_HEIGHT_M = 0.17;
 const HINT_HEIGHT_M = 0.13;
@@ -259,8 +258,7 @@ export function StudioQuestSceneHudOverlay({
   // background never appeared. Clicks go to the nearest bounding box, and once
   // the panel is turned the background's wider box is nearer than the lines',
   // so the background ignores events. It is drawn first so the lines' boxes
-  // cannot hide it, and textClipMode="None" keeps a line whose font is taller
-  // than its box instead of dropping it.
+  // cannot hide it.
   let lineTop = height / 2 - PADDING_M;
   return (
     <ViroNode position={position} rotation={rotation}>
@@ -276,15 +274,15 @@ export function StudioQuestSceneHudOverlay({
         const y = lineTop - line.height / 2;
         lineTop -= line.height;
         return (
-          <ViroText
+          <StudioQuestText
             key={line.key}
             text={line.text}
             position={[0, y, 0]}
             width={TEXT_WIDTH_M}
             height={line.height}
-            textClipMode="None"
+            fontSize={line.fontSize}
             onClick={line.onClick}
-            style={{ ...textStyle, fontSize: line.fontSize, color: line.color }}
+            style={{ ...textStyle, color: line.color }}
           />
         );
       })}

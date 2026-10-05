@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
 import { ViroQuad } from "../ViroQuad";
-import { ViroText } from "../ViroText";
 import { questAlertStore } from "./domain/questAlertStore";
 import {
   computeHeadLockedTransform,
   CameraPose,
 } from "./domain/questHeadLockedTransform";
+import { StudioQuestText } from "./StudioQuestText";
 
 const TITLE_HEIGHT_M = 0.3;
 const MESSAGE_HEIGHT_M = 0.5;
@@ -65,16 +65,15 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
         onClick={dismiss}
       />
       {title && (
-        <ViroText
+        <StudioQuestText
           text={title}
           position={[0, titleY, 0]}
           width={1.8}
           height={TITLE_HEIGHT_M}
-          textClipMode="None"
+          fontSize={22}
           onClick={dismiss}
           style={{
             fontFamily: "sans-serif",
-            fontSize: 22,
             fontWeight: "bold",
             color: "#FFFFFF",
             textAlign: "center",
@@ -82,16 +81,15 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
           }}
         />
       )}
-      <ViroText
+      <StudioQuestText
         text={message ?? ""}
         position={[0, messageY, 0]}
         width={1.8}
         height={MESSAGE_HEIGHT_M}
-        textClipMode="None"
+        fontSize={16}
         onClick={dismiss}
         style={{
           fontFamily: "sans-serif",
-          fontSize: 16,
           color: "#FFFFFF",
           textAlign: "center",
           textAlignVertical: "center",

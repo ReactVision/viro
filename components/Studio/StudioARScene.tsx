@@ -76,6 +76,7 @@ import { questAlertStore } from "./domain/questAlertStore";
 import type { CameraPose } from "./domain/questHeadLockedTransform";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
+import { StudioQuestText } from "./StudioQuestText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import {
   STUDIO_AMBIENT_INTENSITY,
@@ -1722,16 +1723,16 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       {renderSharedContent()}
       {renderedImageTriggeredAssets}
       {isQuest && activePlacementId && (
-        <ViroText
+        <StudioQuestText
           text={`Point and pull the trigger to place: ${
             activePlacementName ?? "object"
           }`}
           position={[0, 0.2, -2]}
           width={3}
           height={1}
+          fontSize={14}
           style={{
             fontFamily: STUDIO_TEXT_FONT_FAMILY,
-            fontSize: 14,
             color: "#FFFFFF",
             textAlign: "center",
           }}

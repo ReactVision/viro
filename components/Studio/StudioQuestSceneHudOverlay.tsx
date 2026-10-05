@@ -36,7 +36,7 @@ function handleExitClick() {
 /**
  * Quest has no 2D chrome (header, back, plane banner) — StudioGo's is stuck
  * in MainActivity, out of view once VRActivity takes the display (see
- * ViroXRSceneNavigator, which renders null on Quest). This is the in-scene
+ * ViroXRSceneNavigator, which renders only the 2D panel on Quest). This is the in-scene
  * replacement: a small persistent head-locked HUD with the scene name, plane
  * status (or a shared session's status and join code, unless the navigator's
  * colocationIndicator is false), and an in-scene "Exit" the hardware back button

@@ -36,7 +36,7 @@ jest.mock("react-native", () => ({
   Text: "Text",
 }));
 // ViroXRSceneNavigator is a function component whose Quest branch builds its
-// handle in useImperativeHandle and renders null. There is no DOM renderer in
+// handle in useImperativeHandle and renders the 2D panel. There is no DOM renderer in
 // this suite, so its render function is called directly with the three hooks it
 // uses stood in for; nothing else here uses hooks.
 let mockCapturedHandle: any;
@@ -193,8 +193,7 @@ describe("the Quest branch of ViroXRSceneNavigator's ref", () => {
   function questHandle() {
     const loaded = load({ VRModuleOpenXR: mockModule });
     mockCapturedHandle = undefined;
-    const out = loaded.ViroXRSceneNavigator.render({ initialScene: SCENE }, null);
-    expect(out).toBeNull(); // VRActivity owns the display on Quest
+    loaded.ViroXRSceneNavigator.render({ initialScene: SCENE }, null);
     return { handle: mockCapturedHandle, bridge: loaded.VRQuestNavigatorBridge };
   }
 

@@ -64,10 +64,9 @@ const _opQueue: VRNavigatorOp[] = [];
 let _opCounter = 0;
 
 // ── VR active flag ────────────────────────────────────────────────────────────
-// True while VRActivity is running. Set to true just before launchVRScene(),
-// set to false by exitVRScene(). The AppState-based relaunch in
-// ViroXRSceneNavigator checks this so it only fires for system-level
-// backgrounding (Quest menu / home), not for explicit exits.
+// True from launchVRScene() until the headset view closes, whether through
+// exitVRScene() or the OS ending VRActivity (ViroQuestEntryPoint clears it when
+// its surface unmounts). Nothing relaunches VR when it goes false.
 
 let _vrActive = false;
 

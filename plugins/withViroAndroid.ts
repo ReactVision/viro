@@ -650,8 +650,7 @@ class VRActivity : ReactActivity() {
     // single MainActivity.onPause that the NEW_TASK ordering schedules late.
     // Without one-shot semantics, every subsequent foreign pause would re-fire
     // ReactHostImpl.onHostResume, which re-fires every LifecycleEventListener
-    // (AppState → "active" → ViroXRSceneNavigator's AppState handler calls
-    // launchVRScene() again → visible scene flicker).
+    // and sends JS a spurious AppState "active".
     private var expectingForeignPause = false
 
     override fun getMainComponentName(): String = "VRQuestScene"

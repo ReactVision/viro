@@ -280,6 +280,23 @@ const withViroManifest = (config: ExpoConfig) =>
           Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
       );
 
+      // Derive active XR modes from the config at apply-time.
+      // `viroPluginConfig` (module-level) is updated by withBranchAndroid's
+      // withDangerousMod callback, which runs *after* withAndroidManifest
+      // callbacks — so it is still ["AR","GVR"] here. Read from config.plugins
+      // directly instead.
+      const activeXrModes = (() => {
+        const p = (newConfig.plugins ?? []).find(
+          (plugin: any) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
+        );
+        if (Array.isArray(p) && p[1]?.android?.xRMode) {
+          const xrMode = p[1].android.xRMode;
+          return Array.isArray(xrMode) ? (xrMode as string[]) : [xrMode as string];
+        }
+        return viroPluginConfig;
+      })();
+      const questBuild = activeXrModes.includes("QUEST");
+
       if (Array.isArray(viroPlugin) && viroPlugin.length > 1) {
         const pluginOptions = viroPlugin[1] as ViroConfigurationOptions;
 
@@ -324,8 +341,13 @@ const withViroManifest = (config: ExpoConfig) =>
           });
         }
 
-        // Add location permissions when geospatial provider is active
-        if (geospatialAnchorProvider === "arcore" || geospatialAnchorProvider === "reactvision") {
+        // Add location permissions when geospatial provider is active. A Quest
+        // has no GPS, so a Quest build (headset-only, see android.hardware.vr.headtracking
+        // below) would declare location it can never use.
+        if (
+          (geospatialAnchorProvider === "arcore" || geospatialAnchorProvider === "reactvision") &&
+          !questBuild
+        ) {
           const existingPermissions: string[] = (contents.manifest["uses-permission"] || [])
             .map((p: any) => p.$?.["android:name"]);
           if (!existingPermissions.includes("android.permission.ACCESS_FINE_LOCATION")) {
@@ -340,22 +362,6 @@ const withViroManifest = (config: ExpoConfig) =>
           }
         }
       }
-
-      // Derive active XR modes from the config at apply-time.
-      // `viroPluginConfig` (module-level) is updated by withBranchAndroid's
-      // withDangerousMod callback, which runs *after* withAndroidManifest
-      // callbacks — so it is still ["AR","GVR"] here. Read from config.plugins
-      // directly instead.
-      const activeXrModes = (() => {
-        const p = (newConfig.plugins ?? []).find(
-          (plugin: any) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
-        );
-        if (Array.isArray(p) && p[1]?.android?.xRMode) {
-          const xrMode = p[1].android.xRMode;
-          return Array.isArray(xrMode) ? (xrMode as string[]) : [xrMode as string];
-        }
-        return viroPluginConfig;
-      })();
 
       if (
         activeXrModes.includes("GVR") ||
@@ -399,15 +405,28 @@ const withViroManifest = (config: ExpoConfig) =>
 
       contents.manifest["uses-feature"] = [];
 
-      contents.manifest["uses-permission"].push({
-        $: {
-          "android:name": "android.permission.CAMERA",
-        },
-      });
+      // On a Quest build the camera is only the passthrough Camera2 feed, and
+      // not every Quest has one, so the feature is never required there.
+      const hasCameraPermission = contents.manifest["uses-permission"].some(
+        (p: any) => p.$?.["android:name"] === "android.permission.CAMERA"
+      );
+      if (!hasCameraPermission) {
+        contents.manifest["uses-permission"].push({
+          $: {
+            "android:name": "android.permission.CAMERA",
+          },
+        });
+      }
       contents.manifest["uses-feature"].push({
-        $: {
-          "android:name": "android.hardware.camera",
-        },
+        $: questBuild
+          ? {
+              "android:name": "android.hardware.camera",
+              "android:required": "false",
+              "tools:replace": "required",
+            }
+          : {
+              "android:name": "android.hardware.camera",
+            },
       });
       contents.manifest["uses-feature"].push({
         $: {

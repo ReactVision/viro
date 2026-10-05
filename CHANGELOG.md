@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Meta Quest builds no longer declare location permissions, and do not require `android.hardware.camera` (Expo plugin).** A Quest has no GPS, so the `reactvision` and `arcore` providers no longer add `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` to a build whose `xRMode` includes `QUEST`. The camera feature is declared with `required="false"` there. `android.permission.CAMERA` is no longer added a second time when another plugin already declared it, on any build.
+
 ### Fixed
 
 - **Leaving the Meta Quest headset view goes back to the app's panel through Home (`exitVRScene`).** Finishing VRActivity on its own let Horizon OS place the panel again, often about a metre from where the wearer left it. `exitVRScene` now starts Home with the panel as its `extra_launch_in_home_pending_intent` before finishing VRActivity, which is how Meta's hybrid-app sample returns to its panel. This is in the bridge source and needs `react_viro-release.aar` rebuilt.

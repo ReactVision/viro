@@ -536,6 +536,9 @@ const withViroManifest = (config: ExpoConfig) =>
           ...(questFeatures?.colocation !== false
             ? ["horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA"]
             : []),
+          // Hidden the same way without this: XR_META_boundary_visibility, which
+          // the renderer uses to hide the boundary while passthrough is on.
+          "com.oculus.permission.BOUNDARY_VISIBILITY",
         ];
         for (const perm of sceneAnchorPerms) {
           if (!existingPermissions.includes(perm)) {

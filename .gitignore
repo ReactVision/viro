@@ -89,3 +89,9 @@ web-harness/dist/
 
 web-harness/models/
 web-harness/public/
+
+# Build output. Not tracked: `prepare` runs `build`, so npm pack, npm publish and an install
+# straight from the repo all generate it, and `files` in package.json still ships it. Tracking it
+# only produced drift — a stale dist, plus orphans tsc never cleans (a renamed component and
+# dist/shims/ both survived there for months, shipping untranspiled JSX).
+/dist/

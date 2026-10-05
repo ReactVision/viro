@@ -500,10 +500,11 @@ export const StudioSceneNavigator = forwardRef<
     return () => questMenuStore.clear(colocationStoreOwner);
   }, [questMenuItems, colocationStoreOwner]);
   useEffect(() => {
+    if (colocation) studioColocationStore.clearFailure(colocationStoreOwner);
     colocationRef.current?.request(colocation ?? null, {
       restartFailed: false,
     });
-  }, [colocation]);
+  }, [colocation, colocationStoreOwner]);
 
   // The tap-to-place overlay would catch taps for content that is withheld
   // while a shared session is set up.

@@ -15,7 +15,8 @@ import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
 import { useStudioColocation } from "./useStudioColocation";
 
-// How long the scene name, or a live session's status, stays up on its own.
+// How long the scene name, a live session's status, or the reason the last
+// session ended stays up on its own.
 const PEEK_MS = 5000;
 
 // On Quest a 13 pt line shows in 0.15 m and a 14 pt one did not, so each box
@@ -48,6 +49,7 @@ type HudLine = {
 
 const subscribeToColocation = (onChange: () => void) =>
   studioColocationStore.subscribe(onChange);
+const getFailure = () => studioColocationStore.getFailure();
 const subscribeToMenu = (onChange: () => void) =>
   questMenuStore.subscribe(onChange);
 const getMenuItems = () => questMenuStore.getItems();
@@ -92,7 +94,9 @@ const textStyle = {
  * - a shared session's status and join code (unless the navigator's
  *   colocationIndicator is false), placed again whenever the status changes.
  *   It stays up while the session is being set up or has failed, and for a
- *   few seconds once it is live;
+ *   few seconds once it is live. When the host clears its colocation prop on
+ *   failure, the reason shows for a few seconds and stays in the menu until
+ *   the next session;
  * - the menu, which Y opens and closes: the same lines, the host's
  *   questMenuItems, and Exit. B and the left menu button exit as well.
  *
@@ -105,8 +109,15 @@ export function StudioQuestSceneHudOverlay({
   menuOpen,
   onCloseMenu,
 }: Props) {
+  const live = useStudioColocation();
+  const failure = React.useSyncExternalStore(
+    subscribeToColocation,
+    getFailure,
+    getFailure
+  );
+  const ended = live.status === "idle" && failure !== null;
   const session = studioColocationIndicatorContent(
-    useStudioColocation(),
+    ended ? failure : live,
     null,
     "headset"
   );
@@ -154,7 +165,8 @@ export function StudioQuestSceneHudOverlay({
   const statusKey = colocation
     ? `${colocation.title}\n${colocation.code ?? ""}`
     : null;
-  const statusStays = colocation !== null && colocation.tone !== "live";
+  const statusStays =
+    colocation !== null && colocation.tone !== "live" && !ended;
   React.useEffect(() => {
     if (statusKey === null) {
       setPeek((p) => (p === "status" ? null : p));

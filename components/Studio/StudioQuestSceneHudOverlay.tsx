@@ -34,6 +34,11 @@ ViroMaterials.createMaterials({
     diffuseColor: "#111827CC",
     writesToDepthBuffer: true,
   },
+  StudioQuestHudHover: {
+    lightingModel: "Constant",
+    diffuseColor: "#1F3B57",
+    writesToDepthBuffer: true,
+  },
 });
 
 type HudLine = {
@@ -164,8 +169,14 @@ export function StudioQuestSceneHudOverlay({
   // Placed while rendering, not in an effect: an effect lets the opened menu
   // draw one frame at the previous placement, and the wearer sees it jump.
   const [menuWasOpen, setMenuWasOpen] = React.useState(menuOpen);
+  // The item each controller or hand points at. An item that unmounts while
+  // pointed at never reports the ray leaving, so this resets with the menu.
+  const [hoveredBySource, setHoveredBySource] = React.useState<
+    Record<number, string>
+  >({});
   if (menuOpen !== menuWasOpen) {
     setMenuWasOpen(menuOpen);
+    setHoveredBySource({});
     if (menuOpen && cameraPose) setPlacedAt(cameraPose);
   }
 
@@ -281,6 +292,24 @@ export function StudioQuestSceneHudOverlay({
   // the panel is turned the background's wider box is nearer than the lines',
   // so the background ignores events. It is drawn first so the lines' boxes
   // cannot hide it.
+  const hoveredKeys = new Set(Object.values(hoveredBySource));
+  const hoverItem =
+    (key: string) =>
+    (isHovering: boolean, _position: unknown, source: ViroSource) => {
+      // Eye gaze (Quest Pro) hovers too, and cannot click.
+      if (!isSelectClick(source)) return;
+      const id = source as unknown as number;
+      setHoveredBySource((current) => {
+        if (isHovering) {
+          return current[id] === key ? current : { ...current, [id]: key };
+        }
+        if (current[id] !== key) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    };
+
   let lineTop = height / 2 - PADDING_M;
   return (
     <ViroNode
@@ -299,17 +328,30 @@ export function StudioQuestSceneHudOverlay({
       {lines.map((line, index) => {
         const y = lineTop - lineHeights[index] / 2;
         lineTop -= lineHeights[index];
+        const hovered = line.onClick !== undefined && hoveredKeys.has(line.key);
         return (
-          <StudioQuestText
-            key={line.key}
-            text={line.text}
-            position={[0, y, 0]}
-            width={TEXT_WIDTH_M}
-            height={lineHeights[index]}
-            fontSize={line.fontSize}
-            onClick={line.onClick}
-            style={{ ...textStyle, color: line.color }}
-          />
+          <React.Fragment key={line.key}>
+            {hovered && (
+              <ViroQuad
+                position={[0, y, -0.005]}
+                width={TEXT_WIDTH_M}
+                height={lineHeights[index]}
+                materials={["StudioQuestHudHover"]}
+                renderingOrder={-1}
+                ignoreEventHandling
+              />
+            )}
+            <StudioQuestText
+              text={line.text}
+              position={[0, y, 0]}
+              width={TEXT_WIDTH_M}
+              height={lineHeights[index]}
+              fontSize={line.fontSize}
+              onClick={line.onClick}
+              onHover={line.onClick ? hoverItem(line.key) : undefined}
+              style={{ ...textStyle, color: hovered ? "#FFFFFF" : line.color }}
+            />
+          </React.Fragment>
         );
       })}
     </ViroNode>

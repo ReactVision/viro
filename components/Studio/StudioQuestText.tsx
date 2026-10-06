@@ -60,6 +60,7 @@ type Props = {
   fontSize: number;
   style?: Omit<ViroTextStyle, "fontSize">;
   onClick?: React.ComponentProps<typeof ViroText>["onClick"];
+  onHover?: React.ComponentProps<typeof ViroText>["onHover"];
 };
 
 /**
@@ -75,6 +76,7 @@ export function StudioQuestText({
   fontSize,
   style,
   onClick,
+  onHover,
 }: Props) {
   return (
     <ViroNode position={position} scale={[INVERSE, INVERSE, INVERSE]}>
@@ -84,6 +86,7 @@ export function StudioQuestText({
         height={height * SUPERSAMPLE}
         textClipMode="None"
         onClick={onClick}
+        onHover={onHover}
         // The native side reads the size as an integer.
         style={{ ...style, fontSize: Math.round(fontSize * SUPERSAMPLE) }}
       />

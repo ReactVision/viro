@@ -220,7 +220,7 @@ export interface ViroConfigurationOptions {
     };
     /**
      * The Horizon OS SDK versions written to the manifest as
-     * <horizonos:uses-horizonos-sdk> when xRMode includes "QUEST". Horizon OS
+     * <metavr:uses-metavr-sdk> when xRMode includes "QUEST". Horizon OS
      * warns that an app without it will lose access to its SDK managers.
      *
      * DEFAULTS TO: minSdkVersion 69, and targetSdkVersion equal to minSdkVersion

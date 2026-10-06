@@ -891,19 +891,21 @@ class VRActivity : ReactActivity() {
     }
 
     // Horizon OS logs that an app without this "must fix this to continue to
-    // access this SDK" when it first reads a Horizon SDK manager. Meta now
-    // documents <metavr:uses-metavr-sdk> and still accepts this older element,
-    // which headsets on an OS from before the rename also read. 69 is the
-    // first version with hybrid (panel + immersive) apps.
+    // access this SDK" when it first reads a Horizon SDK manager, and that the
+    // older <horizonos:uses-horizonos-sdk> is deprecated, so a manifest left by
+    // an earlier prebuild has that one removed. 69 is the first version with
+    // hybrid (panel + immersive) apps.
     const manifest = config.modResults.manifest as any;
-    manifest.$["xmlns:horizonos"] = "http://schemas.horizonos/sdk";
-    if (!manifest["horizonos:uses-horizonos-sdk"]) {
+    delete manifest.$["xmlns:horizonos"];
+    delete manifest["horizonos:uses-horizonos-sdk"];
+    manifest.$["xmlns:metavr"] = "http://schemas.meta.com/metavr-sdk";
+    if (!manifest["metavr:uses-metavr-sdk"]) {
       const minSdkVersion = props?.android?.questHorizonOsSdk?.minSdkVersion ?? 69;
-      manifest["horizonos:uses-horizonos-sdk"] = [
+      manifest["metavr:uses-metavr-sdk"] = [
         {
           $: {
-            "horizonos:minSdkVersion": String(minSdkVersion),
-            "horizonos:targetSdkVersion": String(
+            "metavr:minSdkVersion": String(minSdkVersion),
+            "metavr:targetSdkVersion": String(
               props?.android?.questHorizonOsSdk?.targetSdkVersion ?? minSdkVersion
             ),
           },

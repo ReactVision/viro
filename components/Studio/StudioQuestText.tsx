@@ -11,6 +11,46 @@ import { ViroText } from "../ViroText";
 const SUPERSAMPLE = 8;
 const INVERSE = 1 / SUPERSAMPLE;
 
+// Roboto's advance widths in ems, by rough class and rounded up, so an estimate
+// errs towards one line too many rather than an overlap.
+function advanceEm(char: string): number {
+  if (" .,:;'|!ijlI".includes(char)) return 0.25;
+  if ("frt()[]-".includes(char)) return 0.35;
+  if ("mwMW".includes(char)) return 0.89;
+  if (char !== char.toLowerCase()) return 0.72;
+  return 0.58;
+}
+
+/**
+ * How many lines ViroText wraps text into. An em is fontSize centimetres, and
+ * ViroText breaks between words, or inside a word wider than the line.
+ */
+export function estimateQuestTextLines(
+  text: string,
+  widthM: number,
+  fontSize: number
+): number {
+  const lineEm = widthM / (fontSize * 0.01);
+  let lines = 0;
+  for (const paragraph of text.split("\n")) {
+    lines += 1;
+    let usedEm = 0;
+    for (const word of paragraph.split(" ")) {
+      let wordEm = 0;
+      for (const char of word) wordEm += advanceEm(char);
+      const joinedEm = usedEm === 0 ? wordEm : usedEm + advanceEm(" ") + wordEm;
+      if (joinedEm <= lineEm) {
+        usedEm = joinedEm;
+        continue;
+      }
+      const pieces = Math.max(1, Math.ceil(wordEm / lineEm));
+      lines += (usedEm > 0 ? 1 : 0) + pieces - 1;
+      usedEm = wordEm - (pieces - 1) * lineEm;
+    }
+  }
+  return lines;
+}
+
 type Props = {
   text: string;
   position: Viro3DPoint;

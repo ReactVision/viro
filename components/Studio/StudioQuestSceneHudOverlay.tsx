@@ -12,7 +12,7 @@ import {
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
-import { StudioQuestText } from "./StudioQuestText";
+import { estimateQuestTextLines, StudioQuestText } from "./StudioQuestText";
 import { useStudioColocation } from "./useStudioColocation";
 
 // How long the scene name, a live session's status, or the reason the last
@@ -20,11 +20,7 @@ import { useStudioColocation } from "./useStudioColocation";
 const PEEK_MS = 5000;
 
 // A line takes about 0.0115 m per point of font size.
-const LINE_HEIGHT_M = 0.15;
-const NAME_HEIGHT_M = 0.17;
-const HINT_HEIGHT_M = 0.13;
-// Three lines: a failure's reason runs long.
-const DETAIL_HEIGHT_M = 0.39;
+const LINE_M_PER_POINT = 0.0115;
 const PADDING_M = 0.04;
 const PANEL_WIDTH_M = 1.6;
 const TEXT_WIDTH_M = 1.5;
@@ -40,7 +36,6 @@ ViroMaterials.createMaterials({
 type HudLine = {
   key: string;
   text: string;
-  height: number;
   fontSize: number;
   color: string;
   onClick?: (position: unknown, source: ViroSource) => void;
@@ -193,7 +188,6 @@ export function StudioQuestSceneHudOverlay({
     {
       key: "name",
       text: sceneName ?? "Untitled scene",
-      height: NAME_HEIGHT_M,
       fontSize: 14,
       color: "#FFFFFF",
     },
@@ -202,17 +196,14 @@ export function StudioQuestSceneHudOverlay({
     lines.push({
       key: "status",
       text: colocation.title,
-      height: LINE_HEIGHT_M,
       fontSize: 13,
       color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
     });
-    // Beside the title the code wrapped onto a second line, which a one-line
-    // box draws over the line above.
+    // Beside the title the code wrapped, split across two lines.
     if (colocation.code) {
       lines.push({
         key: "code",
         text: colocation.code,
-        height: LINE_HEIGHT_M,
         fontSize: 13,
         color: "#FFFFFF",
       });
@@ -221,7 +212,6 @@ export function StudioQuestSceneHudOverlay({
       lines.push({
         key: "detail",
         text: colocation.detail,
-        height: DETAIL_HEIGHT_M,
         fontSize: 11,
         color: "#CCCCCC",
       });
@@ -232,7 +222,6 @@ export function StudioQuestSceneHudOverlay({
       lines.push({
         key: `item:${index}:${item.label}`,
         text: `[ ${item.label} ]`,
-        height: LINE_HEIGHT_M,
         fontSize: 13,
         color: "#7FCBFF",
         onClick: (_position, source) => {
@@ -245,7 +234,6 @@ export function StudioQuestSceneHudOverlay({
     lines.push({
       key: "exit",
       text: "[ Exit ]",
-      height: LINE_HEIGHT_M,
       fontSize: 13,
       color: "#7FCBFF",
       onClick: handleExitClick,
@@ -254,13 +242,21 @@ export function StudioQuestSceneHudOverlay({
   lines.push({
     key: "hint",
     text: menuOpen ? "Press Y to close" : "Press Y for the menu",
-    height: HINT_HEIGHT_M,
     fontSize: 11,
     color: "#CCCCCC",
   });
 
+  // Sized to the wrapped text: a box one line tall draws a wrapped line over
+  // its neighbours.
+  const lineHeights = lines.map(
+    (line) =>
+      estimateQuestTextLines(line.text, TEXT_WIDTH_M, line.fontSize) *
+      line.fontSize *
+      LINE_M_PER_POINT
+  );
   const height =
-    2 * PADDING_M + lines.reduce((sum, line) => sum + line.height, 0);
+    2 * PADDING_M +
+    lineHeights.reduce((sum, lineHeight) => sum + lineHeight, 0);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
     // The menu is centred where the wearer looked when opening it. Otherwise
@@ -285,16 +281,16 @@ export function StudioQuestSceneHudOverlay({
         renderingOrder={-1}
         ignoreEventHandling
       />
-      {lines.map((line) => {
-        const y = lineTop - line.height / 2;
-        lineTop -= line.height;
+      {lines.map((line, index) => {
+        const y = lineTop - lineHeights[index] / 2;
+        lineTop -= lineHeights[index];
         return (
           <StudioQuestText
             key={line.key}
             text={line.text}
             position={[0, y, 0]}
             width={TEXT_WIDTH_M}
-            height={line.height}
+            height={lineHeights[index]}
             fontSize={line.fontSize}
             onClick={line.onClick}
             style={{ ...textStyle, color: line.color }}

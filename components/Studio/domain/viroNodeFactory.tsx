@@ -32,6 +32,8 @@ import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
 import { studioAssetPosition } from "./assetPosition";
 import type { StudioDragStore } from "./dragStore";
 import type { Vec3 } from "../colocation/frameMath";
+import type { ViroSource } from "../../Types/ViroUtils";
+import { isSelectClick } from "./questInput";
 
 // Android (phones and Quest) loads fonts from /system/fonts alone, which has no
 // Arial. Naming the system sans-serif renders what the failed Arial lookup fell
@@ -62,7 +64,7 @@ export type NodeConfig = {
   lockedPhysicsBody?: Record<string, unknown>;
   /** Authored velocity, sent once on mount rather than on the body. */
   viroTag?: string;
-  onClick?: () => void;
+  onClick?: (position: unknown, source: ViroSource) => void;
   // On Gaze (headset eye-gaze). Setting it enables the node's native canHover.
   onGaze?: (
     isHovering: boolean,
@@ -212,7 +214,7 @@ function createOnClickHandler(
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
   runtimeCtx?: SequenceRuntimeContext
-): (() => void) | undefined {
+): ((position: unknown, source: ViroSource) => void) | undefined {
   const fn = asset.scene_function;
   if (!fn) return undefined;
 
@@ -233,7 +235,8 @@ function createOnClickHandler(
     return undefined;
   }
 
-  return () =>
+  return (_position, source) => {
+    if (!isSelectClick(source)) return;
     executeFunctionWithRelations(
       fn,
       sceneNavigator,
@@ -243,6 +246,7 @@ function createOnClickHandler(
       onSceneChange,
       runtimeCtx
     );
+  };
 }
 
 function resolveType(

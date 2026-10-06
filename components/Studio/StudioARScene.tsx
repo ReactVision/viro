@@ -73,6 +73,7 @@ import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { questAlertStore } from "./domain/questAlertStore";
+import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   type CameraPose,
@@ -1740,8 +1741,20 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           onClickState={handleQuestControllerClickState}
           {...(activePlacementId
             ? {
-                onClick: (position: [number, number, number]) =>
-                  handleHeadsetPlaceTrigger(position),
+                // The controller also hears clicks on a panel's items, and
+                // reports them before the item does.
+                onClick: (
+                  position: [number, number, number],
+                  source: ViroSource
+                ) => {
+                  if (
+                    !isSelectClick(source) ||
+                    questMenuOpen ||
+                    questAlertStore.isActive()
+                  )
+                    return;
+                  handleHeadsetPlaceTrigger(position);
+                },
               }
             : {})}
         />

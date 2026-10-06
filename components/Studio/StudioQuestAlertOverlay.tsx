@@ -2,8 +2,10 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
+import type { ViroSource } from "../Types/ViroUtils";
 import { ViroQuad } from "../ViroQuad";
 import { questAlertStore } from "./domain/questAlertStore";
+import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
@@ -21,7 +23,9 @@ ViroMaterials.createMaterials({
   },
 });
 
-const dismiss = () => questAlertStore.dismiss();
+const dismiss = (_position: unknown, source: ViroSource) => {
+  if (isSelectClick(source)) questAlertStore.dismiss();
+};
 
 type Props = {
   /** Latest cached camera pose (throttled — see StudioARScene). Null before

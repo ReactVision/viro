@@ -2,10 +2,11 @@ import * as React from "react";
 import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
 import { ViroQuad } from "../ViroQuad";
-import { ViroEventSource, type ViroSource } from "../Types/ViroUtils";
+import type { ViroSource } from "../Types/ViroUtils";
 import { exitVRScene } from "../Utilities/VRModuleOpenXR";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
 import { questAlertStore } from "./domain/questAlertStore";
+import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
@@ -64,16 +65,11 @@ type Props = {
   placementPromptShown: boolean;
 };
 
-// Y also clicks whatever the left controller points at, so closing the menu
-// with Y would press the button under that ray.
-const isYButton = (source: ViroSource) =>
-  (source as unknown as number) === ViroEventSource.Y_BUTTON;
-
 // Same exit path as the hardware back button (ViroQuestEntryPoint's
 // BackHandler): invoke the current intent's onExitViro before finishing
 // VRActivity.
 function handleExitClick(_position: unknown, source: ViroSource) {
-  if (isYButton(source)) return;
+  if (!isSelectClick(source)) return;
   VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
   exitVRScene();
 }
@@ -236,7 +232,7 @@ export function StudioQuestSceneHudOverlay({
         fontSize: 13,
         color: "#7FCBFF",
         onClick: (_position, source) => {
-          if (isYButton(source)) return;
+          if (!isSelectClick(source)) return;
           onCloseMenu();
           item.onPress();
         },

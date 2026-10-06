@@ -13,10 +13,16 @@ import {
   QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
-import { StudioQuestText } from "./StudioQuestText";
+import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
 
+// The smallest boxes and panel, which a short alert keeps.
 const TITLE_HEIGHT_M = 0.3;
 const MESSAGE_HEIGHT_M = 0.5;
+const PANEL_HEIGHT_M = 1;
+const PADDING_M = 0.1;
+const TEXT_WIDTH_M = 1.8;
+const TITLE_FONT_SIZE = 22;
+const MESSAGE_FONT_SIZE = 16;
 
 ViroMaterials.createMaterials({
   StudioQuestAlertBackground: {
@@ -72,10 +78,24 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
   const message = questAlertStore.message();
 
   // Laid out the way StudioQuestSceneHudOverlay is, for the reasons given
-  // there. The background takes clicks here, since any click dismisses.
-  const contentHeight = (title ? TITLE_HEIGHT_M : 0) + MESSAGE_HEIGHT_M;
-  const titleY = contentHeight / 2 - TITLE_HEIGHT_M / 2;
-  const messageY = -contentHeight / 2 + MESSAGE_HEIGHT_M / 2;
+  // there. The background takes clicks here, since any click dismisses. Long
+  // text grows the panel upwards: the menu placed below an alert expects its
+  // bottom edge where a short alert has it.
+  const titleHeight = title
+    ? Math.max(
+        TITLE_HEIGHT_M,
+        estimateQuestTextHeight(title, TEXT_WIDTH_M, TITLE_FONT_SIZE)
+      )
+    : 0;
+  const messageHeight = Math.max(
+    MESSAGE_HEIGHT_M,
+    estimateQuestTextHeight(message ?? "", TEXT_WIDTH_M, MESSAGE_FONT_SIZE)
+  );
+  const contentHeight = titleHeight + messageHeight;
+  const panelHeight = Math.max(PANEL_HEIGHT_M, contentHeight + 2 * PADDING_M);
+  const panelY = (panelHeight - PANEL_HEIGHT_M) / 2;
+  const titleY = panelY + contentHeight / 2 - titleHeight / 2;
+  const messageY = panelY - contentHeight / 2 + messageHeight / 2;
 
   return (
     <ViroNode
@@ -84,9 +104,9 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
       scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
     >
       <ViroQuad
-        position={[0, 0, -0.01]}
+        position={[0, panelY, -0.01]}
         width={2}
-        height={1}
+        height={panelHeight}
         materials={["StudioQuestAlertBackground"]}
         renderingOrder={QUEST_PANEL_ORDER.alert}
         onClick={dismiss}
@@ -95,9 +115,9 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
         <StudioQuestText
           text={title}
           position={[0, titleY, 0]}
-          width={1.8}
-          height={TITLE_HEIGHT_M}
-          fontSize={22}
+          width={TEXT_WIDTH_M}
+          height={titleHeight}
+          fontSize={TITLE_FONT_SIZE}
           renderingOrder={QUEST_PANEL_ORDER.alert + 2}
           onClick={dismiss}
           style={{
@@ -112,9 +132,9 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
       <StudioQuestText
         text={message ?? ""}
         position={[0, messageY, 0]}
-        width={1.8}
-        height={MESSAGE_HEIGHT_M}
-        fontSize={16}
+        width={TEXT_WIDTH_M}
+        height={messageHeight}
+        fontSize={MESSAGE_FONT_SIZE}
         renderingOrder={QUEST_PANEL_ORDER.alert + 2}
         onClick={dismiss}
         style={{

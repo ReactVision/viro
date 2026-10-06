@@ -36,11 +36,14 @@ function advanceEm(char: string): number {
   return 0.58;
 }
 
+// A line takes about 0.0115 m per point of font size.
+const LINE_M_PER_POINT = 0.0115;
+
 /**
  * How many lines ViroText wraps text into. An em is fontSize centimetres, and
  * ViroText breaks between words, or inside a word wider than the line.
  */
-export function estimateQuestTextLines(
+function estimateQuestTextLines(
   text: string,
   widthM: number,
   fontSize: number
@@ -64,6 +67,17 @@ export function estimateQuestTextLines(
     }
   }
   return lines;
+}
+
+/** The height of the box text needs once ViroText has wrapped it, in metres. */
+export function estimateQuestTextHeight(
+  text: string,
+  widthM: number,
+  fontSize: number
+): number {
+  return (
+    estimateQuestTextLines(text, widthM, fontSize) * fontSize * LINE_M_PER_POINT
+  );
 }
 
 type Props = {

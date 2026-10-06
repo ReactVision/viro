@@ -16,15 +16,13 @@ import {
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
-import { estimateQuestTextLines, StudioQuestText } from "./StudioQuestText";
+import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
 import { useStudioColocation } from "./useStudioColocation";
 
 // How long the scene name, a live session's status, or the reason the last
 // session ended stays up on its own.
 const PEEK_MS = 5000;
 
-// A line takes about 0.0115 m per point of font size.
-const LINE_M_PER_POINT = 0.0115;
 const PADDING_M = 0.04;
 const PANEL_WIDTH_M = 1.6;
 const TEXT_WIDTH_M = 1.5;
@@ -275,11 +273,8 @@ export function StudioQuestSceneHudOverlay({
 
   // Sized to the wrapped text: a box one line tall draws a wrapped line over
   // its neighbours.
-  const lineHeights = lines.map(
-    (line) =>
-      estimateQuestTextLines(line.text, TEXT_WIDTH_M, line.fontSize) *
-      line.fontSize *
-      LINE_M_PER_POINT
+  const lineHeights = lines.map((line) =>
+    estimateQuestTextHeight(line.text, TEXT_WIDTH_M, line.fontSize)
   );
   const height =
     2 * PADDING_M +

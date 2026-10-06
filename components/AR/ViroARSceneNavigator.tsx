@@ -236,13 +236,15 @@ type Props = ViewProps & {
   /**
    * Use the front (selfie) camera as the AR session background.
    *
-   * Requires the optional `@reactvision/react-viro-face-tracking` package to be
-   * installed — it provides the native front-camera AR configuration and, on
-   * iOS, declares TrueDepth usage. Without it, this prop has no effect.
+   * **iOS** requires the optional `@reactvision/react-viro-face-tracking` package: it holds the
+   * only reference to ARKit's TrueDepth face-tracking API, which is kept out of core ViroKit so
+   * that apps without a front-camera feature pass App Store review 2.5.1. Without the package,
+   * this prop has no effect on iOS.
    *
-   * On iOS the package uses the front TrueDepth camera; on Android it uses
-   * ARCore Augmented Faces mode. World tracking, plane detection, and LiDAR are
-   * unavailable in this mode.
+   * **Android needs no extra package.** ARCore Augmented Faces is wired into core — there is no
+   * store restriction to work around — so this prop works with `@reactvision/react-viro` alone.
+   *
+   * World tracking, plane detection, and LiDAR are unavailable in this mode on both platforms.
    *
    * For a plain selfie feed without face tracking (no TrueDepth), use
    * `ViroCameraTexture` with `cameraPosition="front"` instead.

@@ -663,12 +663,30 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    /**
+     * The recording state, in the vocabulary JS declares.
+     *
+     * This used to return the Java enum's own name — NONE/RECORDING/IO_ERROR/UNSUPPORTED —
+     * while iOS returned None/Recording/IOError/Unsupported, so the same call answered
+     * differently per platform and no JS code could switch on it. Mapped by hand here,
+     * the way getEarthTrackingState() below already does.
+     */
     public String getRecordingStatus() {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
-            return ARScene.RecordingStatus.UNSUPPORTED.name();
+            return "Unsupported";
         }
-        return arScene.getRecordingStatus().name();
+        switch (arScene.getRecordingStatus()) {
+            case RECORDING:
+                return "Recording";
+            case IO_ERROR:
+                return "IOError";
+            case UNSUPPORTED:
+                return "Unsupported";
+            case NONE:
+            default:
+                return "None";
+        }
     }
 
     /** "progress|message" for a resolve in flight, empty when none is. */

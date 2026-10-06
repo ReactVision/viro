@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { BackHandler } from "react-native";
+import { BackHandler, PermissionsAndroid } from "react-native";
 import { ViroAmbientLight } from "../ViroAmbientLight";
 import { ViroDirectionalLight } from "../ViroDirectionalLight";
 import { ViroARImageMarker } from "../AR/ViroARImageMarker";
@@ -229,6 +229,10 @@ function projectAlongCameraForward(
 // camera), reveal content anyway after this window so it is never withheld
 // indefinitely. Tunable; most sessions reach NORMAL within ~1-3s.
 const TRACKING_GATE_FALLBACK_MS = 6000;
+// How long a Quest plane scene waits for a plane before placing its assets as
+// a NONE scene does. Granted, the room model's planes arrive within a second.
+const QUEST_PLANE_WAIT_MS = 3000;
+const QUEST_SPATIAL_DATA_PERMISSION = "com.oculus.permission.USE_SCENE";
 
 type AnimOverride = {
   key: string;
@@ -1511,11 +1515,64 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const planeDetectionMode = (
     (scene.plane_detection as string) ?? "NONE"
   ).toUpperCase();
-  const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
+  // The Quest room model reports a ceiling as a downward-facing horizontal
+  // plane, which "Horizontal" matches too.
+  const planeDirection = scene.plane_direction ?? "Horizontal";
+  const planeAlignment = (
+    isQuest && planeDirection === "Horizontal"
+      ? "HorizontalUpward"
+      : planeDirection
+  ) as any;
+
+  // On Quest the planes are the room model from Space Setup, which needs the
+  // spatial data permission. Without it there are none, so the scene keeps the
+  // ViroScene root and places its assets as a NONE scene does. Null until the
+  // check answers.
+  const wantsQuestPlanes =
+    isQuest &&
+    (planeDetectionMode === "AUTOMATIC" || planeDetectionMode === "MANUAL");
+  const [questSpatialData, setQuestSpatialData] = useState<boolean | null>(
+    wantsQuestPlanes ? null : false
+  );
+  useEffect(() => {
+    if (!wantsQuestPlanes) return;
+    let live = true;
+    PermissionsAndroid.check(QUEST_SPATIAL_DATA_PERMISSION as any).then(
+      (granted) => {
+        if (live) setQuestSpatialData(granted);
+      },
+      () => {
+        if (live) setQuestSpatialData(false);
+      }
+    );
+    return () => {
+      live = false;
+    };
+  }, [wantsQuestPlanes]);
+
   // ViroARPlane and ViroARPlaneSelector need an AR root: under the ViroScene
   // root Quest uses outside a shared session, the Android bridge casts the
   // plane's scene to VRTARScene and the app crashes as the plane mounts.
-  const rootsInAR = studioSceneRootsInAR(colocationFrame, sceneMount, isQuest);
+  const rootsInAR = studioSceneRootsInAR(
+    colocationFrame,
+    sceneMount,
+    isQuest,
+    questSpatialData === true
+  );
+
+  // A room without Space Setup has no planes, so on Quest assets still waiting
+  // for one are placed as a NONE scene's are after QUEST_PLANE_WAIT_MS. Kept
+  // once it fires, so a late plane does not move them.
+  const [questPlaneFound, setQuestPlaneFound] = useState(false);
+  const [questPlaneFallback, setQuestPlaneFallback] = useState(false);
+  useEffect(() => {
+    if (questSpatialData !== true || questPlaneFound) return;
+    const timer = setTimeout(
+      () => setQuestPlaneFallback(true),
+      QUEST_PLANE_WAIT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [questSpatialData, questPlaneFound]);
 
   // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
   // (empty disables plane finding): omitting the prop keeps the native default
@@ -1608,9 +1665,20 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
 
   // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
   const handlePlaneDetectedForSelector = useCallback(() => {
+    if (isQuest) setQuestPlaneFound(true);
     onPlaneDetected?.();
     return true;
   }, [onPlaneDetected]);
+
+  // Only a plane the wrapper accepts counts: the scene's own onAnchorFound
+  // also hears walls and ceilings the alignment rules out.
+  const handleWrapperAnchorFound = useCallback(
+    (anchor: ViroAnchor) => {
+      if (isQuest) setQuestPlaneFound(true);
+      trackDragSurface(anchor);
+    },
+    [trackDragSurface]
+  );
 
   // ─── Shared origin (host) ─────────────────────────────────────────────────
   // The host places the scene the way it was authored, and that pose becomes
@@ -1707,14 +1775,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // A plane-mode scene under the ViroScene root renders its assets the way a
   // NONE scene does, at the scene root.
   const renderAssets = () => {
-    if (!rootsInAR) return <>{renderedPlaneAssets}</>;
+    if (!rootsInAR || questPlaneFallback) return <>{renderedPlaneAssets}</>;
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
           minHeight={0.1}
           minWidth={0.1}
           alignment={planeAlignment}
-          onAnchorFound={trackDragSurface}
+          onAnchorFound={handleWrapperAnchorFound}
           onAnchorUpdated={trackDragSurface}
         >
           {renderedPlaneAssets}
@@ -1854,23 +1922,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   //
   // ViroXRSceneNavigator's contract is that a ViroScene root is fully-virtual VR
   // and a ViroARScene root is mixed reality, which turns passthrough on by itself
-  // and wires XR_EXT_plane_detection into onAnchorFound and ViroARPlane. Passthrough
-  // is not what is lost by keeping ViroScene: StudioSceneNavigator asks for it
-  // outright with `passthroughEnabled` on Quest, which reaches VRActivity through
-  // the navigator bridge and does not depend on the root at all.
+  // and hands the room's planes (Space Setup's room model, through XR_FB_scene)
+  // to onAnchorFound and ViroARPlane. Passthrough is not what is lost by keeping
+  // ViroScene: StudioSceneNavigator asks for it outright with
+  // `passthroughEnabled` on Quest, which reaches VRActivity through the
+  // navigator bridge and does not depend on the root at all.
   //
-  // Plane anchors are. With this root a Studio scene on Quest gets no detected
-  // surfaces, so an asset authored to sit on a floor or a wall has nothing to land
-  // on. Nothing regresses against what shipped — ViroScene is the root Quest has
-  // had since April, and the ref that drives tap-to-place hit testing is null on
-  // Quest either way — but unifying the two roots is a real change with a device
-  // test behind it, not something a conflict resolution should decide quietly.
+  // Plane anchors are, so a plane-mode scene takes the AR root when the wearer
+  // has granted spatial data, and falls back to the scene root as a NONE scene
+  // does when no plane arrives (QUEST_PLANE_WAIT_MS). The ref that drives
+  // tap-to-place hit testing is null on Quest either way.
   //
-  // The scene on screen during a shared session is the one exception
+  // The scene on screen during a shared session is the other exception
   // (studioSceneRootsInAR). Its content sits in the shared frame rather than on
   // planes, so the AR root changes nothing it renders, and the scene returns to
   // ViroScene when the session ends. Changing the root remounts everything
   // below it, which is the cost the `colocation` prop doc states.
+  // Briefly, until the spatial data check answers, so the assets mount once
+  // under the root they keep.
+  if (questSpatialData === null) {
+    return <ViroScene toneMappingEnabled={false} />;
+  }
   if (!rootsInAR) {
     return (
       <ViroScene

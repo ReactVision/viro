@@ -34,6 +34,8 @@ import type { StudioDragStore } from "./dragStore";
 import type { Vec3 } from "../colocation/frameMath";
 import type { ViroSource } from "../../Types/ViroUtils";
 import { isSelectClick } from "./questInput";
+import { isQuest } from "../../Utilities/ViroPlatform";
+import { QUEST_TEXT_SUPERSAMPLE, STUDIO_TEXT_FONT_SIZE } from "./questText";
 
 // Android (phones and Quest) loads fonts from /system/fonts alone, which has no
 // Arial. Naming the system sans-serif renders what the failed Arial lookup fell
@@ -422,13 +424,24 @@ const VariableText: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, template]);
 
+  // Drawn larger under a smaller scale on Quest (questText.ts). The default
+  // box is 1 m, and the clip mode stays the default so a long text keeps the
+  // same line budget as on phones and in the editor.
+  const supersample = isQuest ? QUEST_TEXT_SUPERSAMPLE : 1;
+  const [scaleX, scaleY, scaleZ] = config.scale;
+
   return (
     <ViroText
       {...(nodeRef ? { ref: nodeRef as any } : {})}
       text={text}
       position={position ?? config.position}
       rotation={rotation ?? config.rotation}
-      scale={config.scale}
+      scale={
+        supersample === 1
+          ? config.scale
+          : [scaleX / supersample, scaleY / supersample, scaleZ / supersample]
+      }
+      {...(supersample === 1 ? {} : { width: supersample, height: supersample })}
       dragType={config.dragType}
       animation={config.animation as any}
       onClick={config.onClick}
@@ -436,7 +449,7 @@ const VariableText: React.FC<{
       {...(visible === undefined ? {} : { visible })}
       style={{
         fontFamily: STUDIO_TEXT_FONT_FAMILY,
-        fontSize: 20,
+        fontSize: STUDIO_TEXT_FONT_SIZE * supersample,
         color: "#FFFFFF",
         textAlign: "center",
         // Centred on the node rather than hung from the top of its box, so the

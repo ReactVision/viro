@@ -41,6 +41,7 @@ import type {
   StudioColocationState,
 } from "./colocation/types";
 import { registerSceneAnimations } from "./domain/animationRegistry";
+import { studioTextAssetIds } from "./domain/questText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
@@ -717,7 +718,10 @@ export const StudioSceneNavigator = forwardRef<
       // commit that creates those components. visionOS is the same shape of
       // problem: the ImmersiveSpace renderer starts outside this commit.
       if (isQuest || isVisionOS) {
-        registerSceneAnimations(sceneData.animations);
+        registerSceneAnimations(
+          sceneData.animations,
+          isQuest ? studioTextAssetIds(sceneData.assets) : undefined
+        );
         registerStudioMaterialsForAssets(sceneData.assets);
       }
 

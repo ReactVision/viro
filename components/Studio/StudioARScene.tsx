@@ -81,6 +81,7 @@ import {
   QUEST_PANEL_SCALE,
   type CameraPose,
 } from "./domain/questHeadLockedTransform";
+import { studioTextAssetIds } from "./domain/questText";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
 import { StudioQuestText } from "./StudioQuestText";
@@ -507,7 +508,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const animationsKey = animations.map((a) => a.animation_key).join(",");
   if (animations.length > 0 && registeredKeyRef.current !== animationsKey) {
     registeredKeyRef.current = animationsKey;
-    registerSceneAnimations(animations);
+    registerSceneAnimations(
+      animations,
+      isQuest ? studioTextAssetIds(assets) : undefined
+    );
   }
 
   // ─── Animation runtime state ──────────────────────────────────────────────

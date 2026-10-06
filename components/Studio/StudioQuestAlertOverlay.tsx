@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
+import { BackHandler } from "react-native";
 import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
 import type { ViroSource } from "../Types/ViroUtils";
@@ -37,8 +38,8 @@ type Props = {
 /**
  * Quest-only in-scene replacement for Alert.alert (invisible in the VR
  * compositor). Renders questAlertStore's active message as a head-locked
- * panel; dismiss is a controller click anywhere on the panel, mirroring how
- * tapping "OK" dismisses the native dialog on phones.
+ * panel. A controller click anywhere on the panel dismisses it, mirroring how
+ * tapping "OK" dismisses the native dialog on phones, and so does B.
  */
 export function StudioQuestAlertOverlay({ cameraPose }: Props) {
   const [, forceUpdate] = useState(0);
@@ -47,7 +48,22 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
     []
   );
 
-  if (!questAlertStore.isActive() || !cameraPose) return null;
+  // Added only while the alert shows, for the reason given at the menu's
+  // back listener in StudioARScene.
+  const active = questAlertStore.isActive();
+  useEffect(() => {
+    if (!active) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        questAlertStore.dismiss();
+        return true;
+      }
+    );
+    return () => subscription.remove();
+  }, [active]);
+
+  if (!active || !cameraPose) return null;
 
   const { position, rotation } = computeHeadLockedTransform(cameraPose);
   const title = questAlertStore.title();

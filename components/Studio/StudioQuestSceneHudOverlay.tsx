@@ -146,10 +146,8 @@ export function StudioQuestSceneHudOverlay({
   );
 
   const poseRef = React.useRef(cameraPose);
-  const menuOpenRef = React.useRef(menuOpen);
   React.useEffect(() => {
     poseRef.current = cameraPose;
-    menuOpenRef.current = menuOpen;
   });
 
   // The pose the panel was placed from. Never follows the camera after that.
@@ -189,13 +187,18 @@ export function StudioQuestSceneHudOverlay({
     : null;
   const statusStays =
     colocation !== null && colocation.tone !== "live" && !ended;
+  // Placed while rendering too, for the menu's reason. An open menu stays
+  // where the wearer opened it.
+  const [statusWas, setStatusWas] = React.useState(statusKey);
+  if (statusKey !== statusWas) {
+    setStatusWas(statusKey);
+    if (statusKey !== null && !menuOpen && cameraPose) setPlacedAt(cameraPose);
+  }
   React.useEffect(() => {
     if (statusKey === null) {
       setPeek((p) => (p === "status" ? null : p));
       return;
     }
-    // An open menu stays where the wearer opened it.
-    if (!menuOpenRef.current) place();
     setPeek("status");
     if (statusStays) return;
     const timer = setTimeout(
@@ -203,7 +206,7 @@ export function StudioQuestSceneHudOverlay({
       PEEK_MS
     );
     return () => clearTimeout(timer);
-  }, [statusKey, statusStays, place]);
+  }, [statusKey, statusStays]);
 
   if ((!menuOpen && peek === null) || !placedAt) return null;
 

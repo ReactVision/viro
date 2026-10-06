@@ -91,8 +91,6 @@ export type StudioAssetErrorHandler = (asset: StudioAsset, error: Error) => void
  */
 function assetErrorHandler(asset: StudioAsset, config: NodeConfig, kind: string) {
   return (e: unknown) => {
-    console.error(`[Studio] ${kind} "${asset.name}" error:`, e);
-    if (!config.onAssetError) return;
     const error =
       e instanceof Error
         ? e
@@ -101,7 +99,11 @@ function assetErrorHandler(asset: StudioAsset, config: NodeConfig, kind: string)
               ? JSON.stringify((e as { nativeEvent: unknown }).nativeEvent)
               : String(e)
           );
-    config.onAssetError(asset, error);
+    // Never the event itself: it holds React's fiber tree, and an error
+    // reporter that records console arguments (Sentry's breadcrumbs) walks all
+    // of it, which blocks the JS thread until the heap runs out.
+    console.error(`[Studio] ${kind} "${asset.name}" error:`, error.message);
+    config.onAssetError?.(asset, error);
   };
 }
 

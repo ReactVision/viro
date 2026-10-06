@@ -102,7 +102,8 @@ const textStyle = {
  *   the next session;
  * - the menu, which the left controller's menu button or, with hands, a pinch
  *   with the palm facing the wearer opens and closes: the same lines, the
- *   host's questMenuItems, and Exit. B exits as well.
+ *   host's questMenuItems, and Exit. B closes it, and exits while it is
+ *   closed.
  *
  * It is centred where the wearer looked when it was placed. While an ALERT or
  * the placement prompt holds the centre, the closed panel moves below it.

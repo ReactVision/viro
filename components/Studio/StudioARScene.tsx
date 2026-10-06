@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { BackHandler } from "react-native";
 import { ViroAmbientLight } from "../ViroAmbientLight";
 import { ViroDirectionalLight } from "../ViroDirectionalLight";
 import { ViroARImageMarker } from "../AR/ViroARImageMarker";
@@ -1026,6 +1027,22 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     },
     []
   );
+
+  // B closes the menu before it exits. The listener exists only while the
+  // menu is open because the newest one is called first, and React runs a
+  // child's effects before its parent's: added as the scene mounts, it could
+  // be older than ViroQuestEntryPoint's, which exits.
+  useEffect(() => {
+    if (!questMenuOpen) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        setQuestMenuOpen(false);
+        return true;
+      }
+    );
+    return () => subscription.remove();
+  }, [questMenuOpen]);
 
   // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
   const [activePlacementId, setActivePlacementId] = useState<string | null>(

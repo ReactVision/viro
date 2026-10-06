@@ -29,7 +29,8 @@
     "prepare": "npm run build",
     "harness:assets": "bash scripts/sync-harness-assets.sh",
     "preharness": "npm run harness:assets",
-    "audit:events": "node scripts/audit-events.cjs"
+    "audit:events": "node scripts/audit-events.cjs",
+    "check:ios-bridge": "bash scripts/check-ios-bridge.sh"
   },
   "peerDependencies": {
     "@reactvision/react-native-visionos": ">=0.86.0 <0.87.0",

@@ -5,6 +5,7 @@ import { ViroQuad } from "../ViroQuad";
 import { ViroEventSource, type ViroSource } from "../Types/ViroUtils";
 import { exitVRScene } from "../Utilities/VRModuleOpenXR";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
+import { questAlertStore } from "./domain/questAlertStore";
 import {
   computeHeadLockedTransform,
   CameraPose,
@@ -47,6 +48,9 @@ const getFailure = () => studioColocationStore.getFailure();
 const subscribeToMenu = (onChange: () => void) =>
   questMenuStore.subscribe(onChange);
 const getMenuItems = () => questMenuStore.getItems();
+const subscribeToAlert = (onChange: () => void) =>
+  questAlertStore.subscribe(onChange);
+const isAlertShown = () => questAlertStore.isActive();
 
 type Props = {
   /** Latest cached camera pose (throttled — see StudioARScene). Null before
@@ -56,6 +60,8 @@ type Props = {
   /** Toggled by the Y button (StudioARScene's controller). */
   menuOpen: boolean;
   onCloseMenu: () => void;
+  /** The tap-to-place prompt is in view. */
+  placementPromptShown: boolean;
 };
 
 // Y also clicks whatever the left controller points at, so closing the menu
@@ -94,15 +100,15 @@ const textStyle = {
  * - the menu, which Y opens and closes: the same lines, the host's
  *   questMenuItems, and Exit. B and the left menu button exit as well.
  *
- * Closed, it sits below StudioQuestAlertOverlay's position (verticalOffsetM)
- * so an ALERT firing at the same time doesn't render on top of it; the open
- * menu is centred in view.
+ * It is centred where the wearer looked when it was placed. While an ALERT or
+ * the placement prompt holds the centre, the closed panel moves below it.
  */
 export function StudioQuestSceneHudOverlay({
   cameraPose,
   sceneName,
   menuOpen,
   onCloseMenu,
+  placementPromptShown,
 }: Props) {
   const live = useStudioColocation();
   const failure = React.useSyncExternalStore(
@@ -126,6 +132,11 @@ export function StudioQuestSceneHudOverlay({
     subscribeToMenu,
     getMenuItems,
     getMenuItems
+  );
+  const alertShown = React.useSyncExternalStore(
+    subscribeToAlert,
+    isAlertShown,
+    isAlertShown
   );
 
   const poseRef = React.useRef(cameraPose);
@@ -257,11 +268,12 @@ export function StudioQuestSceneHudOverlay({
   const height =
     2 * PADDING_M +
     lineHeights.reduce((sum, lineHeight) => sum + lineHeight, 0);
+  const centred = menuOpen || (!alertShown && !placementPromptShown);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
-    // The menu is centred where the wearer looked when opening it. Otherwise
-    // the panel grows downwards, so its top edge stays where an alert expects it.
-    verticalOffsetM: menuOpen ? 0 : -0.4 - (height - 0.5) / 2,
+    // Below the centre, the panel grows downwards, so its top edge stays where
+    // an alert expects it.
+    verticalOffsetM: centred ? 0 : -0.4 - (height - 0.5) / 2,
   });
 
   // Each line is positioned explicitly: inside a ViroFlexView on Quest every

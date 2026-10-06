@@ -73,7 +73,10 @@ import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { questAlertStore } from "./domain/questAlertStore";
-import type { CameraPose } from "./domain/questHeadLockedTransform";
+import {
+  computeHeadLockedTransform,
+  type CameraPose,
+} from "./domain/questHeadLockedTransform";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
 import { StudioQuestText } from "./StudioQuestText";
@@ -1041,6 +1044,33 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     return assets.find((a) => a.id === activePlacementId)?.name ?? null;
   }, [activePlacementId, assets]);
 
+  // Quest: each asset's prompt is placed in front of the wearer when it
+  // appears, and stays there. Placed while rendering, as the HUD is, so it
+  // never draws a frame at the previous asset's spot.
+  const [questPromptPlacement, setQuestPromptPlacement] = useState<{
+    assetId: string;
+    pose: CameraPose;
+  } | null>(null);
+  if (
+    isQuest &&
+    activePlacementId &&
+    questHeadLockedPose &&
+    questPromptPlacement?.assetId !== activePlacementId
+  ) {
+    setQuestPromptPlacement({
+      assetId: activePlacementId,
+      pose: questHeadLockedPose,
+    });
+  }
+  const questPromptTransform =
+    isQuest &&
+    activePlacementId &&
+    questPromptPlacement?.assetId === activePlacementId
+      ? computeHeadLockedTransform(questPromptPlacement.pose, {
+          distanceM: 2,
+        })
+      : null;
+
   const lastProximityEvalRef = useRef(0);
   const handleCameraTransformUpdate = useCallback(
     (t: ViroCameraTransform) => {
@@ -1722,21 +1752,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       {needsOrigin && renderOriginPicker()}
       {renderSharedContent()}
       {renderedImageTriggeredAssets}
-      {isQuest && activePlacementId && (
-        <StudioQuestText
-          text={`Point and pull the trigger to place: ${
-            activePlacementName ?? "object"
-          }`}
-          position={[0, 0.2, -2]}
-          width={3}
-          height={1}
-          fontSize={14}
-          style={{
-            fontFamily: STUDIO_TEXT_FONT_FAMILY,
-            color: "#FFFFFF",
-            textAlign: "center",
-          }}
-        />
+      {questPromptTransform && (
+        <ViroNode
+          position={questPromptTransform.position}
+          rotation={questPromptTransform.rotation}
+        >
+          <StudioQuestText
+            text={`Point and pull the trigger to place: ${
+              activePlacementName ?? "object"
+            }`}
+            position={[0, 0, 0]}
+            width={3}
+            height={1}
+            fontSize={14}
+            style={{
+              fontFamily: STUDIO_TEXT_FONT_FAMILY,
+              color: "#FFFFFF",
+              textAlign: "center",
+              textAlignVertical: "center",
+            }}
+          />
+        </ViroNode>
       )}
       {isQuest && <StudioQuestAlertOverlay cameraPose={questHeadLockedPose} />}
       {isQuest && (
@@ -1745,6 +1781,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           sceneName={scene.name}
           menuOpen={questMenuOpen}
           onCloseMenu={closeQuestMenu}
+          placementPromptShown={questPromptTransform !== null}
         />
       )}
       <StudioSounds manager={soundManagerRef.current!} />

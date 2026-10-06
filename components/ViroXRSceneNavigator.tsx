@@ -55,12 +55,20 @@ const MIN_RN_FOR_VR = { major: 0, minor: 83 };
 // them. USE_ANCHOR_API/USE_SCENE gate plane & anchor data (needed now that the
 // ViroARScene root mounts on Quest too); HEADSET_CAMERA gates the passthrough
 // Camera2 feed ViroObjectDetector reads. Requested once before the first VR
-// launch; denial degrades gracefully elsewhere (no planes / no passthrough
-// feed, see QuestPassthroughCamera) rather than blocking VR.
-const QUEST_RUNTIME_PERMISSIONS = [
-  "horizonos.permission.USE_ANCHOR_API",
-  "com.oculus.permission.USE_SCENE",
-  "horizonos.permission.HEADSET_CAMERA",
+// launch, as questPermissions picks; denial degrades gracefully elsewhere (no
+// planes / no passthrough feed, see QuestPassthroughCamera) rather than
+// blocking VR.
+export type QuestRuntimePermission = "spatialData" | "headsetCamera";
+const QUEST_RUNTIME_PERMISSIONS: Record<QuestRuntimePermission, string[]> = {
+  spatialData: [
+    "horizonos.permission.USE_ANCHOR_API",
+    "com.oculus.permission.USE_SCENE",
+  ],
+  headsetCamera: ["horizonos.permission.HEADSET_CAMERA"],
+};
+const DEFAULT_QUEST_PERMISSIONS: QuestRuntimePermission[] = [
+  "spatialData",
+  "headsetCamera",
 ];
 
 function checkRNVersionForVR(): void {
@@ -169,6 +177,14 @@ type Props = ViewProps & {
    * immersive view" button.
    */
   renderQuestPanel?: (enter: () => void) => React.ReactNode;
+  /**
+   * The Meta Quest runtime permissions asked for before the headset view first
+   * opens: "spatialData" for the room's planes and anchors, "headsetCamera" for
+   * the passthrough feed ViroObjectDetector reads. Horizon OS skips a permission
+   * the manifest does not declare, so ask only for what the app declares and
+   * uses; [] asks for nothing. Defaults to both.
+   */
+  questPermissions?: QuestRuntimePermission[];
 
   // ── visionOS ───────────────────────────────────────────────────────────────
   /**
@@ -250,6 +266,7 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       onExitViro,
       debug,
       renderQuestPanel,
+      questPermissions = DEFAULT_QUEST_PERMISSIONS,
       visionOSImmersionStyle = "mixed",
       ...rest
     } = props;
@@ -436,7 +453,13 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       // Request the runtime grants once before the first launch. Caught and
       // ignored on failure — a denied/unavailable permission should degrade
       // (no planes, no passthrough camera), not block VR from opening at all.
-      PermissionsAndroid.requestMultiple(QUEST_RUNTIME_PERMISSIONS as any)
+      const permissions = questPermissions.flatMap(
+        (permission) => QUEST_RUNTIME_PERMISSIONS[permission]
+      );
+      (permissions.length > 0
+        ? PermissionsAndroid.requestMultiple(permissions as any)
+        : Promise.resolve()
+      )
         .catch(() => undefined)
         .then(registerIntentAndLaunch);
     }, []);

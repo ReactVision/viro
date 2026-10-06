@@ -19,7 +19,10 @@ import {
 } from "react-native";
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
-import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
+import {
+  QuestRuntimePermission,
+  ViroXRSceneNavigator,
+} from "../ViroXRSceneNavigator";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
@@ -606,6 +609,11 @@ export const StudioSceneNavigator = forwardRef<
     scene: any;
     passProps?: any;
   } | null>(null);
+  // Spatial data is asked for only when the opening scene detects planes: the
+  // headset camera is never read here, and sharing needs neither.
+  const [questPermissions, setQuestPermissions] = useState<
+    QuestRuntimePermission[]
+  >([]);
 
   // Host config derived from the loaded scene; native setters apply post-mount,
   // so setting these after the navigator mounts is fine.
@@ -720,6 +728,10 @@ export const StudioSceneNavigator = forwardRef<
         // vrInitialScene, so VRActivity launches straight into content. visionOS reads the
         // same prop — its ImmersiveSpace cannot host a ViroARScene either — so it takes this
         // path rather than pushing onto a navigator that starts on the loading scene.
+        const planeDetection = (
+          (sceneData.scene.plane_detection as string) ?? "NONE"
+        ).toUpperCase();
+        setQuestPermissions(planeDetection === "NONE" ? [] : ["spatialData"]);
         setVrSceneEntry(entry);
       } else {
         navigatorRef.current?.arSceneNavigator?.push(entry);
@@ -815,6 +827,7 @@ export const StudioSceneNavigator = forwardRef<
           bloomEnabled={false}
           onExitViro={onExitViro}
           renderQuestPanel={renderQuestPanel}
+          questPermissions={questPermissions}
           // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
           // than ViroARScene outside a shared session (see StudioARScene for
           // why), and a virtual root turns none of this on by itself, so both

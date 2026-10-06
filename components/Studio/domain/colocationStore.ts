@@ -4,6 +4,11 @@ import { GlobalListeners } from "./utils";
 
 const IDLE: StudioColocationState = { status: "idle" };
 
+type StudioColocationFailure = Extract<
+  StudioColocationState,
+  { status: "failed" }
+>;
+
 /** Who writes to the store: each navigator passes a token of its own. */
 export type StudioColocationStoreOwner = object;
 
@@ -25,6 +30,7 @@ const UNOWNED: StudioColocationStoreOwner = {};
  */
 class StudioColocationStore {
   private state: StudioColocationState = IDLE;
+  private failure: StudioColocationFailure | null = null;
   private originPrompt: StudioColocationOriginPrompt | null = null;
   private owner: StudioColocationStoreOwner | null = null;
   private finishScanHandlers = new Map<
@@ -42,6 +48,16 @@ class StudioColocationStore {
     return this.listeners.subscribe(listener);
   }
 
+  /**
+   * The last session's failure, kept through the idle that follows it: a host
+   * that clears its `colocation` prop on failure makes the state idle at once,
+   * and the Quest HUD still has to say why. The next session's first state,
+   * or clearFailure(), drops it.
+   */
+  getFailure(): StudioColocationFailure | null {
+    return this.failure;
+  }
+
   /** Ignored while another owner's session is reported. */
   set(
     state: StudioColocationState,
@@ -51,6 +67,15 @@ class StudioColocationStore {
     this.owner = state.status === "idle" ? null : owner;
     if (this.state === state) return;
     this.state = state;
+    if (state.status === "failed") this.failure = state;
+    else if (state.status !== "idle") this.failure = null;
+    this.listeners.notify();
+  }
+
+  /** A new session was asked for, whose first state comes only once the relay answers. */
+  clearFailure(owner: StudioColocationStoreOwner = UNOWNED): void {
+    if (!this.writable(owner) || this.failure === null) return;
+    this.failure = null;
     this.listeners.notify();
   }
 
@@ -109,9 +134,12 @@ class StudioColocationStore {
       if (!this.writable(owner)) return;
     }
     this.owner = null;
-    if (this.state.status === "idle" && !this.originPrompt) return;
+    if (this.state.status === "idle" && !this.originPrompt && !this.failure) {
+      return;
+    }
     this.state = IDLE;
     this.originPrompt = null;
+    this.failure = null;
     this.listeners.notify();
   }
 

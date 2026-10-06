@@ -574,8 +574,30 @@ describe("the scene root", () => {
     );
     expect(source).toMatch(/colocation\.attachScene\([^;]*sceneMount\s*\);/);
     expect(source).toMatch(
-      /if \(!studioSceneRootsInAR\(colocationFrame, sceneMount, isQuest\)\) \{\s*return \(\s*<ViroScene/
+      /const rootsInAR = studioSceneRootsInAR\(colocationFrame, sceneMount, isQuest\);/
     );
+    expect(source).toMatch(/if \(!rootsInAR\) \{\s*return \(\s*<ViroScene/);
     expect(source).not.toMatch(/if \(isQuest\) \{\s*return \(\s*<ViroScene/);
+  });
+
+  it("keeps plane components out of a ViroScene root", () => {
+    // VRTARPlane casts its scene to VRTARScene, so a plane under ViroScene
+    // crashed the app on Quest.
+    const source = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "..",
+        "components",
+        "Studio",
+        "StudioARScene.tsx"
+      ),
+      "utf-8"
+    );
+    expect(source).toMatch(
+      /const renderAssets = \(\) => \{\s*if \(!rootsInAR\) return <>\{renderedPlaneAssets\}<\/>;/
+    );
+    expect(source).toMatch(
+      /const renderOriginPicker = \(\) => \{\s*if \(!rootsInAR\) return null;/
+    );
   });
 });

@@ -1,9 +1,11 @@
 package com.viromedia.bridge.module;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -85,8 +87,8 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
     }
 
     /**
-     * Finish any live VRActivity in this process, returning the user to whatever
-     * Activity is below it in the task (typically MainActivity, the panel app).
+     * Finish any live VRActivity in this process and return the user to the
+     * app's panel (MainActivity) through Home.
      *
      * Why we don't use {@code getReactApplicationContext().getCurrentActivity()}:
      *   In dual-Activity Quest setups the ReactHost lifecycle is binary-state.
@@ -107,6 +109,7 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void exitVRScene() {
         new Handler(Looper.getMainLooper()).post(() -> {
+            java.util.List<Activity> vrActivities = new java.util.ArrayList<>();
             try {
                 Class<?> threadCls = Class.forName("android.app.ActivityThread");
                 Object thread = threadCls.getMethod("currentActivityThread").invoke(null);
@@ -124,9 +127,41 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
                     Activity act = (Activity) a;
                     if (!"VRActivity".equals(act.getClass().getSimpleName())) continue;
                     if (act.isFinishing() || act.isDestroyed()) continue;
-                    act.finish();
+                    vrActivities.add(act);
                 }
             } catch (Throwable ignored) {}
+
+            if (vrActivities.isEmpty()) return;
+            launchPanelThroughHome(vrActivities.get(0));
+            for (Activity act : vrActivities) {
+                act.finish();
+            }
         });
+    }
+
+    /**
+     * Finishing VRActivity on its own lets Horizon OS place the app's panel
+     * again, often away from where the wearer left it. Meta's hybrid-app sample
+     * (HybridSample, launchPanelModeInHome) returns through Home instead, handing
+     * it the panel as a pending intent. A failure here leaves the plain finish.
+     */
+    private static void launchPanelThroughHome(Activity from) {
+        try {
+            Intent panel = from.getPackageManager()
+                .getLaunchIntentForPackage(from.getPackageName());
+            if (panel == null) return;
+            panel.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            PendingIntent pendingPanel = PendingIntent.getActivity(
+                from, 0, panel,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            Intent home = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra("extra_launch_in_home_pending_intent", pendingPanel);
+            from.startActivity(home);
+        } catch (Throwable t) {
+            Log.w(MODULE_NAME, "Could not return to the panel through Home", t);
+        }
     }
 }

@@ -3,7 +3,9 @@ import {
   AppState,
   NativeModules,
   PermissionsAndroid,
+  Pressable,
   StyleSheet,
+  Text,
   View,
   ViewProps,
 } from "react-native";
@@ -84,6 +86,35 @@ function checkRNVersionForVR(): void {
   );
 }
 
+function launchVR(): void {
+  VRQuestNavigatorBridge.setVRActive(true);
+  VRLauncher?.launchVRScene?.();
+}
+
+/** The default `renderQuestPanel`. */
+function QuestPanel({
+  onEnter,
+  style,
+}: {
+  onEnter: () => void;
+  style?: ViewProps["style"];
+}) {
+  return (
+    <View style={[styles.questPanel, style]}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onEnter}
+        style={({ pressed }) => [
+          styles.questEnterButton,
+          pressed && styles.questEnterButtonPressed,
+        ]}
+      >
+        <Text style={styles.questEnterLabel}>Enter immersive view</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 type SceneFactory = { scene: () => React.JSX.Element };
 
 type Props = ViewProps & {
@@ -127,6 +158,18 @@ type Props = ViewProps & {
   handTrackingEnabled?: boolean;
   onExitViro?: () => void;
 
+  // ── Meta Quest panel ───────────────────────────────────────────────────────
+  /**
+   * What the app's 2D panel shows on Meta Quest, where the scene runs in the
+   * headset view instead. Horizon OS brings the panel forward whenever the
+   * headset view closes: the Back button, quitting from the system menu, going
+   * Home or opening another app's panel. The headset view is not reopened on
+   * its own, because none of those can be told apart here from the wearer
+   * reopening the app. Call `enter` to reopen it. Defaults to an "Enter
+   * immersive view" button.
+   */
+  renderQuestPanel?: (enter: () => void) => React.ReactNode;
+
   // ── visionOS ───────────────────────────────────────────────────────────────
   /**
    * Immersion style used when the ImmersiveSpace is opened on visionOS.
@@ -161,7 +204,8 @@ type Props = ViewProps & {
  *  - **Meta Quest** → launches VRActivity via `VRLauncher.launchVRScene()` and
  *    forwards all navigator operations (push/pop/etc.) to the
  *    `ViroVRSceneNavigator` running there via `VRQuestNavigatorBridge`.
- *    Render output is null — VRActivity owns the display.
+ *    VRActivity owns the display; what renders here is the app's 2D panel
+ *    (`renderQuestPanel`).
  *
  * Pass `arInitialScene` / `vrInitialScene` when the AR and VR scenes differ.
  * When only `initialScene` is provided it is used for both modes.
@@ -205,6 +249,7 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       handTrackingEnabled,
       onExitViro,
       debug,
+      renderQuestPanel,
       visionOSImmersionStyle = "mixed",
       ...rest
     } = props;
@@ -299,26 +344,17 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       return arRef.current as any;
     }, []);
 
-    // Track AppState so we can detect background → active transitions.
-    const appStateRef = React.useRef(AppState.currentState);
     // Identity of this navigator for ImmersiveSpace ownership. A symbol rather than a
     // counter: it cannot collide, and it means nothing outside this comparison.
     const visionOSOwnerRef = React.useRef<symbol>(Symbol("ViroXRSceneNavigator"));
-    // Timestamp at which AppState last left "active". Lets us distinguish a
-    // genuine Quest-menu return (background lasts seconds) from racy
-    // background→active bounces caused by the dual-Activity ReactHost
-    // transitioning state (background lasts <500ms). Only the former should
-    // re-launch VR; the latter would trigger a no-op startActivity that can
-    // contribute to the lifecycle storm in some configurations.
-    const leftActiveAtRef = React.useRef(0);
 
     // On visionOS: open the ImmersiveSpace on mount and close it on unmount.
     //
     // This mirrors what the Quest branch does with VRActivity — in both cases something other
     // than the React view hierarchy owns the display. The difference is that VRActivity runs its
-    // own React host, so Quest forwards the scene across a bridge and renders null here, whereas
-    // the visionOS ImmersiveSpace shares this runtime: the scene tree below stays mounted, and
-    // the native side hands its VRTScene to the CompositorServices render loop.
+    // own React host, so Quest forwards the scene across a bridge and renders only its panel
+    // here, whereas the visionOS ImmersiveSpace shares this runtime: the scene tree below stays
+    // mounted, and the native side hands its VRTScene to the CompositorServices render loop.
     React.useEffect(() => {
       if (!isVisionOS) return;
       // An AR-rooted scene has nothing to put in the space — ViroARScene cannot mount on visionOS
@@ -350,10 +386,9 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
         });
       open();
 
-      // Quest re-launches VRActivity when the app comes back from the system menu, because the
-      // Activity finishes on the way out. visionOS closes the ImmersiveSpace on the same
-      // transition, so it is reopened for the same reason — and only by whoever owns it, or two
-      // mounted navigators would both reopen and fight over the one surface.
+      // visionOS closes the ImmersiveSpace when the app leaves the foreground, so it is reopened
+      // when the app is active again. Only by whoever owns it, or two mounted navigators would
+      // both reopen and fight over the one surface.
       const appStateSub = AppState.addEventListener("change", (nextState) => {
         if (nextState === "active" && ownsImmersiveSpace(owner)) {
           open();
@@ -374,8 +409,7 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     }, []);
 
     // On Quest: register the intent (scene + renderer config) then launch VRActivity.
-    // Also re-launch when the app returns from background (e.g. Quest system menu),
-    // because VRActivity auto-finishes when MainActivity resumes.
+    // Only on mount; renderQuestPanel says why it is not relaunched.
     React.useEffect(() => {
       if (!isQuest) return;
       checkRNVersionForVR();
@@ -396,8 +430,7 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
             debug,
           });
         }
-        VRQuestNavigatorBridge.setVRActive(true);
-        VRLauncher?.launchVRScene?.();
+        launchVR();
       };
 
       // Request the runtime grants once before the first launch. Caught and
@@ -406,31 +439,17 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       PermissionsAndroid.requestMultiple(QUEST_RUNTIME_PERMISSIONS as any)
         .catch(() => undefined)
         .then(registerIntentAndLaunch);
-
-      const sub = AppState.addEventListener("change", (nextState) => {
-        const prev = appStateRef.current;
-        appStateRef.current = nextState;
-        if (prev === "active" && nextState !== "active") {
-          leftActiveAtRef.current = Date.now();
-        }
-        // Re-launch VR when the app returns from being backgrounded by the system
-        // (Quest menu, home, recents). Explicit exitVRScene() clears isVRActive()
-        // before finishing VRActivity, so Activity-transition-driven background→active
-        // cycles are ignored here.
-        if (prev !== "active" && nextState === "active" && VRQuestNavigatorBridge.isVRActive()) {
-          // Skip if we were only briefly out of "active" — that's a racy
-          // dual-Activity ReactHost bounce, not a genuine menu return.
-          const backgroundedFor = Date.now() - leftActiveAtRef.current;
-          if (leftActiveAtRef.current > 0 && backgroundedFor < 1500) return;
-          VRQuestNavigatorBridge.setVRActive(true);
-          VRLauncher?.launchVRScene?.();
-        }
-      });
-      return () => sub.remove();
     }, []);
 
-    // Quest renders nothing here — VRActivity owns the display.
-    if (isQuest) return null;
+    // The panel is only seen while the headset view is closed. Re-entry keeps the
+    // intent registered on mount.
+    if (isQuest) {
+      return renderQuestPanel ? (
+        renderQuestPanel(launchVR)
+      ) : (
+        <QuestPanel onEnter={launchVR} style={rest.style} />
+      );
+    }
 
     if (isVisionOS) {
       // The visionOS renderer has no AR subsystem — every VROAR* class is excluded from the
@@ -493,5 +512,25 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     opacity: 0,
+  },
+  questPanel: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000000",
+  },
+  questEnterButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+  },
+  questEnterButtonPressed: {
+    opacity: 0.7,
+  },
+  questEnterLabel: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
   },
 });

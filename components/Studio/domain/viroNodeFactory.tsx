@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Platform } from "react-native";
 import { Viro3DObject } from "../../Viro3DObject";
 import { ViroImage } from "../../ViroImage";
 import { ViroText } from "../../ViroText";
@@ -31,6 +32,12 @@ import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
 import { studioAssetPosition } from "./assetPosition";
 import type { StudioDragStore } from "./dragStore";
 import type { Vec3 } from "../colocation/frameMath";
+
+// Android (phones and Quest) loads fonts from /system/fonts alone, which has no
+// Arial. Naming the system sans-serif renders what the failed Arial lookup fell
+// back to anyway, without the lookup and its warning on every text.
+export const STUDIO_TEXT_FONT_FAMILY =
+  Platform.OS === "android" ? "sans-serif" : "Arial";
 
 type SceneNavigator = any;
 /** A drag reports its world position; the scene tracks and shares it. */
@@ -424,7 +431,7 @@ const VariableText: React.FC<{
       {...(config.onNodeHandle ? { onNodeHandle: config.onNodeHandle } : {})}
       {...(visible === undefined ? {} : { visible })}
       style={{
-        fontFamily: "Arial",
+        fontFamily: STUDIO_TEXT_FONT_FAMILY,
         fontSize: 20,
         color: "#FFFFFF",
         textAlign: "center",

@@ -77,24 +77,26 @@ public class VRTARPlane extends VRTARNode {
         mNeedsUpdate = true;
     }
 
+    // A plane mounted under a VR scene root (a ViroScene, as on Meta Quest) has
+    // no AR session to find it, so it stays empty instead of failing the cast.
     @Override
     public void setScene(VRTScene scene) {
         super.setScene(scene);
-        if (scene != null) {
+        if (scene instanceof VRTARScene) {
             ((VRTARScene) scene).addARNode((ARDeclarativeNode) getNodeJni());
         }
     }
 
     @Override
     public void parentDidDisappear() {
-        if (mScene != null && getNodeJni() != null) {
+        if (mScene instanceof VRTARScene && getNodeJni() != null) {
             ((VRTARScene) mScene).removeARNode((ARDeclarativeNode) getNodeJni());
         }
     }
 
     @Override
     protected void onPropsSet() {
-        if (mNeedsUpdate && mScene != null) {
+        if (mNeedsUpdate && mScene instanceof VRTARScene) {
             ((VRTARScene) mScene).updateARNode((ARDeclarativeNode) getNodeJni());
             mNeedsUpdate = false;
         }

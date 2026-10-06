@@ -15,6 +15,12 @@ export interface StudioSessionConfig {
   baseUrl: string;
   accessToken: string;
   clientTag?: string;
+  /**
+   * The session project's database region (e.g. `eu-west-2`), sent as
+   * `x-region` so its edge functions run beside the database. Omitted, only
+   * the default platform URL is pinned.
+   */
+  functionRegion?: string;
 }
 
 /** @internal */

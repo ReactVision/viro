@@ -69,8 +69,8 @@ type Props = {
    * controller). */
   menuOpen: boolean;
   onCloseMenu: () => void;
-  /** The tap-to-place prompt is in view. */
-  placementPromptShown: boolean;
+  /** The tap-to-place prompt or the empty-scene message is in view. */
+  promptShown: boolean;
 };
 
 // Same exit path as the hardware back button (ViroQuestEntryPoint's
@@ -106,15 +106,16 @@ const textStyle = {
  *   host's questMenuItems, and Exit. B closes it, and exits while it is
  *   closed.
  *
- * It is centred where the wearer looked when it was placed. While an ALERT or
- * the placement prompt holds the centre, the closed panel moves below it.
+ * It is centred where the wearer looked when it was placed. While an ALERT, the
+ * placement prompt or the empty-scene message holds the centre, the closed
+ * panel moves below it.
  */
 export function StudioQuestSceneHudOverlay({
   cameraPose,
   sceneName,
   menuOpen,
   onCloseMenu,
-  placementPromptShown,
+  promptShown,
 }: Props) {
   const live = useStudioColocation();
   const failure = React.useSyncExternalStore(
@@ -282,7 +283,7 @@ export function StudioQuestSceneHudOverlay({
   const height =
     2 * PADDING_M +
     lineHeights.reduce((sum, lineHeight) => sum + lineHeight, 0);
-  const centred = menuOpen || (!alertShown && !placementPromptShown);
+  const centred = menuOpen || (!alertShown && !promptShown);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
     // Below the centre, the panel grows downwards, so its top edge stays where

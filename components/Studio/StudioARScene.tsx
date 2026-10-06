@@ -1573,6 +1573,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     );
     return () => clearTimeout(timer);
   }, [questSpatialData, questPlaneFound]);
+  const [questPlaneSelected, setQuestPlaneSelected] = useState(false);
 
   // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
   // (empty disables plane finding): omitting the prop keeps the native default
@@ -1657,6 +1658,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const handlePlaneSelected = useCallback(
     (plane: ViroAnchor) => {
       selectedAnchorIdRef.current = plane?.anchorId ?? null;
+      if (isQuest) setQuestPlaneSelected(true);
       trackDragSurface(plane);
       onPlaneSelected?.();
     },
@@ -1679,6 +1681,39 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     },
     [trackDragSurface]
   );
+
+  // The scene origin is fixed in the room and can be out of view, and the
+  // host's 2D guidance cannot be seen in the headset, so on Quest these are
+  // placed in front of the wearer when they appear, as the placement prompt is.
+  const questNotice = !isQuest
+    ? null
+    : assets.length === 0
+      ? noAssetsMessage ?? "No assets to display"
+      : rootsInAR &&
+          colocationPhase === "off" &&
+          planeDetectionMode === "MANUAL" &&
+          questPlaneFound &&
+          !questPlaneSelected &&
+          !questPlaneFallback
+        ? "Point at a surface and pull the trigger to place the scene"
+        : null;
+  const [questNoticePlacement, setQuestNoticePlacement] = useState<{
+    text: string;
+    pose: CameraPose;
+  } | null>(null);
+  if (
+    questNotice &&
+    questHeadLockedPose &&
+    questNoticePlacement?.text !== questNotice
+  ) {
+    setQuestNoticePlacement({ text: questNotice, pose: questHeadLockedPose });
+  } else if (!questNotice && questNoticePlacement) {
+    setQuestNoticePlacement(null);
+  }
+  const questNoticeTransform =
+    questNotice && questNoticePlacement?.text === questNotice
+      ? computeHeadLockedTransform(questNoticePlacement.pose, { distanceM: 2 })
+      : null;
 
   // ─── Shared origin (host) ─────────────────────────────────────────────────
   // The host places the scene the way it was authored, and that pose becomes
@@ -1884,11 +1919,36 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           sceneName={scene.name}
           menuOpen={questMenuOpen}
           onCloseMenu={closeQuestMenu}
-          placementPromptShown={questPromptTransform !== null}
+          promptShown={
+            questPromptTransform !== null || questNoticeTransform !== null
+          }
         />
       )}
       <StudioSounds manager={soundManagerRef.current!} />
-      {assets.length === 0 && (
+      {questNoticeTransform && questNotice && (
+        <ViroNode
+          position={questNoticeTransform.position}
+          rotation={questNoticeTransform.rotation}
+          scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
+        >
+          <StudioQuestText
+            text={questNotice}
+            position={[0, 0, 0]}
+            width={3}
+            height={1}
+            fontSize={16}
+            renderingOrder={QUEST_PANEL_ORDER.prompt + 2}
+            depthPlate
+            style={{
+              fontFamily: STUDIO_TEXT_FONT_FAMILY,
+              color: "#CCCCCC",
+              textAlign: "center",
+              textAlignVertical: "center",
+            }}
+          />
+        </ViroNode>
+      )}
+      {assets.length === 0 && !isQuest && (
         <ViroText
           text={noAssetsMessage ?? "No assets to display"}
           position={[0, 0, -2]}

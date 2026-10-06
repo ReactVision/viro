@@ -40,6 +40,7 @@
 - **`onCollision` fires against the AR world mesh, and camera recording settles every promise and records audio on iOS.** Both are in virocore 3.0.3 and ship in the rebuilt renderer binaries.
 - **A top-level node in a `ViroARScene` on Meta Quest no longer asks for a world anchor (`VRTNode`).** On Android each node at the root of an AR scene asks for an anchor, up to three attempts a second apart, and only ARCore can make one, so on Quest every attempt failed and logged "Failed to create an anchored node". A scene in an OpenXR view now leaves the node at its position without asking, which is where the failed attempts left it.
 - **Switching from one AR scene to another on Meta Quest no longer logs a passthrough error (`viro_renderer-release.aar`).** The renderer started passthrough again while it was running, which the runtime refuses.
+- **Android no longer logs an error for each Viro view a scene drops (`VRTViroViewGroupManager`).** A Viro view's context is the Activity, and React Native's drop logged "has a context that is not a ThemedReactContext" for every one, about 20 lines each time a scene closed. The manager now clears the view's focus and hierarchy listeners itself, which is all React Native's drop did for such a view.
 
 ## v3.0.2 — 30 September 2026
 

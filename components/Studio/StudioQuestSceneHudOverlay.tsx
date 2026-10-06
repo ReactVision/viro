@@ -10,6 +10,7 @@ import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
+  QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
@@ -32,11 +33,13 @@ ViroMaterials.createMaterials({
   StudioQuestHudBackground: {
     lightingModel: "Constant",
     diffuseColor: "#111827CC",
+    readsFromDepthBuffer: false,
     writesToDepthBuffer: true,
   },
   StudioQuestHudHover: {
     lightingModel: "Constant",
     diffuseColor: "#1F3B57",
+    readsFromDepthBuffer: false,
     writesToDepthBuffer: true,
   },
 });
@@ -327,7 +330,7 @@ export function StudioQuestSceneHudOverlay({
         width={PANEL_WIDTH_M}
         height={height}
         materials={["StudioQuestHudBackground"]}
-        renderingOrder={-1}
+        renderingOrder={QUEST_PANEL_ORDER.hud}
         ignoreEventHandling
       />
       {lines.map((line, index) => {
@@ -342,7 +345,7 @@ export function StudioQuestSceneHudOverlay({
                 width={TEXT_WIDTH_M}
                 height={lineHeights[index]}
                 materials={["StudioQuestHudHover"]}
-                renderingOrder={-1}
+                renderingOrder={QUEST_PANEL_ORDER.hud + 1}
                 ignoreEventHandling
               />
             )}
@@ -352,6 +355,7 @@ export function StudioQuestSceneHudOverlay({
               width={TEXT_WIDTH_M}
               height={lineHeights[index]}
               fontSize={line.fontSize}
+              renderingOrder={QUEST_PANEL_ORDER.hud + 2}
               onClick={line.onClick}
               onHover={line.onClick ? hoverItem(line.key) : undefined}
               style={{ ...textStyle, color: hovered ? "#FFFFFF" : line.color }}

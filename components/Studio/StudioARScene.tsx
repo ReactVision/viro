@@ -77,6 +77,7 @@ import { questAlertStore } from "./domain/questAlertStore";
 import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
+  QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
   type CameraPose,
 } from "./domain/questHeadLockedTransform";
@@ -1797,6 +1798,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
             width={3}
             height={1}
             fontSize={14}
+            renderingOrder={QUEST_PANEL_ORDER.prompt + 2}
+            depthPlate
             style={{
               fontFamily: STUDIO_TEXT_FONT_FAMILY,
               color: "#FFFFFF",

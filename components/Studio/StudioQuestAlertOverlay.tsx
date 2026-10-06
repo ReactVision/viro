@@ -10,6 +10,7 @@ import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
+  QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { StudioQuestText } from "./StudioQuestText";
@@ -21,6 +22,7 @@ ViroMaterials.createMaterials({
   StudioQuestAlertBackground: {
     lightingModel: "Constant",
     diffuseColor: "#111827DD",
+    readsFromDepthBuffer: false,
     writesToDepthBuffer: true,
   },
 });
@@ -86,7 +88,7 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
         width={2}
         height={1}
         materials={["StudioQuestAlertBackground"]}
-        renderingOrder={-1}
+        renderingOrder={QUEST_PANEL_ORDER.alert}
         onClick={dismiss}
       />
       {title && (
@@ -96,6 +98,7 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
           width={1.8}
           height={TITLE_HEIGHT_M}
           fontSize={22}
+          renderingOrder={QUEST_PANEL_ORDER.alert + 2}
           onClick={dismiss}
           style={{
             fontFamily: "sans-serif",
@@ -112,6 +115,7 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
         width={1.8}
         height={MESSAGE_HEIGHT_M}
         fontSize={16}
+        renderingOrder={QUEST_PANEL_ORDER.alert + 2}
         onClick={dismiss}
         style={{
           fontFamily: "sans-serif",

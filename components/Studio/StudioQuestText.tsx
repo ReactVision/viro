@@ -1,7 +1,9 @@
 import * as React from "react";
+import { ViroMaterial, ViroMaterials } from "../Material/ViroMaterials";
 import type { ViroTextStyle } from "../Styles/ViroTextStyle";
 import type { Viro3DPoint } from "../Types/ViroUtils";
 import { ViroNode } from "../ViroNode";
+import { ViroQuad } from "../ViroQuad";
 import { ViroText } from "../ViroText";
 
 // ViroText rasterises a glyph at fontSize pixels and stretches it over fontSize
@@ -10,6 +12,19 @@ import { ViroText } from "../ViroText";
 // and multiplies the texels: 8 gives about 17 per degree there.
 const SUPERSAMPLE = 8;
 const INVERSE = 1 / SUPERSAMPLE;
+
+// 2D ViroText takes no material from JS and always reads depth, so on a panel
+// with no background a nearer object still hides it. This plate draws no
+// colour but writes the panel's depth behind the glyphs. The bridges read the
+// mask as colorWriteMask, an array, where ViroMaterial types colorWritesMask.
+ViroMaterials.createMaterials({
+  StudioQuestTextDepthPlate: {
+    lightingModel: "Constant",
+    readsFromDepthBuffer: false,
+    writesToDepthBuffer: true,
+    colorWriteMask: ["None"],
+  } as ViroMaterial,
+});
 
 // Roboto's advance widths in ems, by rough class and rounded up, so an estimate
 // errs towards one line too many rather than an overlap.
@@ -58,6 +73,10 @@ type Props = {
   width: number;
   height: number;
   fontSize: number;
+  /** The panel's text value from QUEST_PANEL_ORDER. */
+  renderingOrder: number;
+  /** For a panel with no background of its own. */
+  depthPlate?: boolean;
   style?: Omit<ViroTextStyle, "fontSize">;
   onClick?: React.ComponentProps<typeof ViroText>["onClick"];
   onHover?: React.ComponentProps<typeof ViroText>["onHover"];
@@ -74,22 +93,39 @@ export function StudioQuestText({
   width,
   height,
   fontSize,
+  renderingOrder,
+  depthPlate,
   style,
   onClick,
   onHover,
 }: Props) {
   return (
-    <ViroNode position={position} scale={[INVERSE, INVERSE, INVERSE]}>
-      <ViroText
-        text={text}
-        width={width * SUPERSAMPLE}
-        height={height * SUPERSAMPLE}
-        textClipMode="None"
-        onClick={onClick}
-        onHover={onHover}
-        // The native side reads the size as an integer.
-        style={{ ...style, fontSize: Math.round(fontSize * SUPERSAMPLE) }}
-      />
-    </ViroNode>
+    <>
+      {depthPlate && (
+        <ViroQuad
+          position={[position[0], position[1], position[2] - 0.002]}
+          width={width}
+          height={height}
+          materials={["StudioQuestTextDepthPlate"]}
+          renderingOrder={renderingOrder - 1}
+          ignoreEventHandling
+        />
+      )}
+      <ViroNode position={position} scale={[INVERSE, INVERSE, INVERSE]}>
+        <ViroText
+          text={text}
+          width={width * SUPERSAMPLE}
+          height={height * SUPERSAMPLE}
+          textClipMode="None"
+          // On the text itself: the renderer reads the order off the node
+          // that holds the geometry.
+          renderingOrder={renderingOrder}
+          onClick={onClick}
+          onHover={onHover}
+          // The native side reads the size as an integer.
+          style={{ ...style, fontSize: Math.round(fontSize * SUPERSAMPLE) }}
+        />
+      </ViroNode>
+    </>
   );
 }

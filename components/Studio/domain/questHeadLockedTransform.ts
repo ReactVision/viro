@@ -8,6 +8,14 @@ const RAD_TO_DEG = 180 / Math.PI;
  */
 export const QUEST_PANEL_SCALE = 0.5;
 
+/**
+ * Scene content is at renderingOrder 0, and the renderer sorts on it before
+ * depth or transparency, so a panel drawn at these with depth reads off is
+ * never hidden by a nearer object. A panel takes three consecutive values:
+ * background, highlight, text. An alert's band is above the menu's.
+ */
+export const QUEST_PANEL_ORDER = { hud: 1000, alert: 1010, prompt: 1020 } as const;
+
 export type CameraPose = {
   position: Viro3DPoint;
   forward: Viro3DPoint;

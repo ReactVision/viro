@@ -30,3 +30,4 @@
 - **On Android, `startRecording` without `RECORD_AUDIO` rejects** instead of hanging.
 - **A `ViroCamera` mounted between its siblings becomes the scene's camera.**
 - **visionOS:** `ViroSpatialSound`, `ViroSoundField` and `ViroObjectDetector` render nothing instead of crashing.
+- **visionOS Expo plugin:** it no longer copies stale patches next to an app's own, which made `patch-package` fail and, through an old `expo-modules-core` patch, broke assets and icon fonts on iOS.

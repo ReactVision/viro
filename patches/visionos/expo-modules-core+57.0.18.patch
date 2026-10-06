@@ -39,15 +39,27 @@ index 2a7e8bd..ab9ca02 100644
 -export const SharedRef: typeof ExpoGlobal.SharedRef = globalThis.expo.SharedRef;
 +export const SharedRef: typeof ExpoGlobal.SharedRef = globalThis.expo?.SharedRef;
 diff --git a/node_modules/expo-modules-core/src/requireNativeModule.ts b/node_modules/expo-modules-core/src/requireNativeModule.ts
-index 22fc31e..96d8cfd 100644
+index 22fc31e..98ba7b7 100644
 --- a/node_modules/expo-modules-core/src/requireNativeModule.ts
 +++ b/node_modules/expo-modules-core/src/requireNativeModule.ts
-@@ -17,7 +17,25 @@ export function requireNativeModule<ModuleType = any>(moduleName: string): Modul
+@@ -17,7 +17,37 @@ export function requireNativeModule<ModuleType = any>(moduleName: string): Modul
    const nativeModule = requireOptionalNativeModule<ModuleType>(moduleName);
  
    if (!nativeModule) {
 -    throw new Error(`Cannot find native module '${moduleName}'`);
-+    // ExpoModulesCore is not linked on this platform (e.g. visionOS without expo pods).
++    // Only when the Expo module system itself is absent, which on this project means visionOS:
++    // that platform's Podfile installs React Native and Viro and no Expo pods at all, so a
++    // module-level `requireNativeModule` would take the whole JS runtime down at import.
++    //
++    // When Expo *is* linked and one module is missing, this still throws, because that is the
++    // contract callers depend on. `expo-asset` asks for 'ExpoGo' inside a try/catch to find out
++    // whether it is running in Expo Go; answering with a stub told it yes, which put every asset
++    // on the Expo Go path — `Asset.fromModule` then returned `uri: ''`, images warned
++    // "source.uri should not be an empty string", and every icon font failed to register with
++    // CTFontManagerError 104 because expo-font had nothing to download.
++    if ((globalThis as any).expo != null) {
++      throw new Error(`Cannot find native module '${moduleName}'`);
++    }
 +    // Return an empty stub so module-level requires don't crash the JS runtime.
 +    // Functions on the stub will throw only when actually called.
 +    if (__DEV__) {

@@ -64,7 +64,8 @@ type Props = {
    * the first onCameraTransformUpdate fires. */
   cameraPose: CameraPose | null;
   sceneName: string | null;
-  /** Toggled by the Y button (StudioARScene's controller). */
+  /** Toggled by the menu button or the palm menu pinch (StudioARScene's
+   * controller). */
   menuOpen: boolean;
   onCloseMenu: () => void;
   /** The tap-to-place prompt is in view. */
@@ -99,8 +100,9 @@ const textStyle = {
  *   few seconds once it is live. When the host clears its colocation prop on
  *   failure, the reason shows for a few seconds and stays in the menu until
  *   the next session;
- * - the menu, which Y opens and closes: the same lines, the host's
- *   questMenuItems, and Exit. B and the left menu button exit as well.
+ * - the menu, which the left controller's menu button or, with hands, a pinch
+ *   with the palm facing the wearer opens and closes: the same lines, the
+ *   host's questMenuItems, and Exit. B exits as well.
  *
  * It is centred where the wearer looked when it was placed. While an ALERT or
  * the placement prompt holds the centre, the closed panel moves below it.
@@ -260,7 +262,9 @@ export function StudioQuestSceneHudOverlay({
   }
   lines.push({
     key: "hint",
-    text: menuOpen ? "Press Y to close" : "Press Y for the menu",
+    text: menuOpen
+      ? "Menu button or palm pinch to close"
+      : "Menu button or palm pinch for the menu",
     fontSize: 11,
     color: "#CCCCCC",
   });

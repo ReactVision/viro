@@ -1012,14 +1012,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const lastHeadLockedEvalRef = useRef(0);
 
   // The controller reports every button to its one delegate, and a second
-  // ViroController would replace this one's, so Y is read here.
+  // ViroController would replace this one's, so the menu button is read here.
   const [questMenuOpen, setQuestMenuOpen] = useState(false);
   const closeQuestMenu = useCallback(() => setQuestMenuOpen(false), []);
   const handleQuestControllerClickState = useCallback(
     (state: ViroClickState, _position: unknown, source: ViroSource) => {
       if (
         state === ViroClickStateTypes.CLICK_DOWN &&
-        (source as unknown as number) === ViroEventSource.Y_BUTTON
+        (source as unknown as number) === ViroEventSource.MENU_BUTTON
       ) {
         setQuestMenuOpen((open) => !open);
       }

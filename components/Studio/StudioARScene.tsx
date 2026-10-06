@@ -76,6 +76,7 @@ import { questAlertStore } from "./domain/questAlertStore";
 import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
+  QUEST_PANEL_SCALE,
   type CameraPose,
 } from "./domain/questHeadLockedTransform";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
@@ -1769,6 +1770,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         <ViroNode
           position={questPromptTransform.position}
           rotation={questPromptTransform.rotation}
+          scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
         >
           <StudioQuestText
             text={`Point and pull the trigger to place: ${

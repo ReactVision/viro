@@ -9,6 +9,7 @@ import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
+  QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { StudioQuestText } from "./StudioQuestText";
 
@@ -59,7 +60,11 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
   const messageY = -contentHeight / 2 + MESSAGE_HEIGHT_M / 2;
 
   return (
-    <ViroNode position={position} rotation={rotation}>
+    <ViroNode
+      position={position}
+      rotation={rotation}
+      scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
+    >
       <ViroQuad
         position={[0, 0, -0.01]}
         width={2}

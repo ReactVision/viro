@@ -10,6 +10,7 @@ import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
+  QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
@@ -269,7 +270,9 @@ export function StudioQuestSceneHudOverlay({
     distanceM: 1.2,
     // Below the centre, the panel grows downwards, so its top edge stays where
     // an alert expects it.
-    verticalOffsetM: centred ? 0 : -0.4 - (height - 0.5) / 2,
+    verticalOffsetM: centred
+      ? 0
+      : QUEST_PANEL_SCALE * (-0.4 - (height - 0.5) / 2),
   });
 
   // Each line is positioned explicitly: inside a ViroFlexView on Quest every
@@ -280,7 +283,11 @@ export function StudioQuestSceneHudOverlay({
   // cannot hide it.
   let lineTop = height / 2 - PADDING_M;
   return (
-    <ViroNode position={position} rotation={rotation}>
+    <ViroNode
+      position={position}
+      rotation={rotation}
+      scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
+    >
       <ViroQuad
         position={[0, 0, -0.01]}
         width={PANEL_WIDTH_M}

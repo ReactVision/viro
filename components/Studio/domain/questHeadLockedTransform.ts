@@ -2,6 +2,12 @@ import type { Viro3DPoint, ViroRotation } from "../../Types/ViroUtils";
 
 const RAD_TO_DEG = 180 / Math.PI;
 
+/**
+ * Every Studio panel on Quest is drawn at this scale. Their layouts are in
+ * unscaled metres, so an offset they ask for here is scaled by it too.
+ */
+export const QUEST_PANEL_SCALE = 0.5;
+
 export type CameraPose = {
   position: Viro3DPoint;
   forward: Viro3DPoint;

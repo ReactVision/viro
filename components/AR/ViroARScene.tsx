@@ -527,6 +527,12 @@ export class ViroARScene extends ViroBase<Props, State> {
       <ViroSceneContext.Provider value={this._cameras}>
         <VRTARScene
           {...this.props}
+          // Also makes React create this view's public instance as it mounts.
+          // Created later, by the first findNodeHandle(this), React DevTools
+          // (debug builds) keeps the unmounted scene's whole node tree.
+          ref={(component) => {
+            this._component = component;
+          }}
           activeCameraTag={this.state.activeCameraTag}
           canHover={(this.props.onHover != undefined || this.props.onGaze != undefined)}
           canClick={

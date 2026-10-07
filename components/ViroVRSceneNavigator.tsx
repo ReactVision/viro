@@ -95,7 +95,7 @@ type Props = ViewProps & {
   passthroughEnabled?: boolean;
 
   /**
-   * Enable skeletal hand tracking (Quest — requires com.oculus.permission.HAND_TRACKING in manifest).
+   * Enable skeletal hand tracking (Quest only; needs horizonos.permission.HAND_TRACKING in the manifest, which the Expo plugin declares for Quest builds).
    * Pinch and grab gestures fire the same onClick/onDrag events as controller buttons.
    */
   handTrackingEnabled?: boolean;

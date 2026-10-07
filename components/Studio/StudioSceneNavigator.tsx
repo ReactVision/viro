@@ -41,6 +41,7 @@ import type {
   StudioColocationState,
 } from "./colocation/types";
 import { registerSceneAnimations } from "./domain/animationRegistry";
+import { startQuestSpatialDataSession } from "./domain/questSpatialData";
 import { studioTextAssetIds } from "./domain/questText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
@@ -610,8 +611,9 @@ export const StudioSceneNavigator = forwardRef<
     scene: any;
     passProps?: any;
   } | null>(null);
-  // Spatial data is asked for only when the opening scene detects planes: the
-  // headset camera is never read here, and sharing needs neither.
+  // Spatial data is asked for when the opening scene detects planes, or else by
+  // the first plane scene a NAVIGATE reaches (questSpatialData): the headset
+  // camera is never read here, and sharing needs neither.
   const [questPermissions, setQuestPermissions] = useState<
     QuestRuntimePermission[]
   >([]);
@@ -736,6 +738,7 @@ export const StudioSceneNavigator = forwardRef<
           (sceneData.scene.plane_detection as string) ?? "NONE"
         ).toUpperCase();
         setQuestPermissions(planeDetection === "NONE" ? [] : ["spatialData"]);
+        startQuestSpatialDataSession(planeDetection !== "NONE");
         setVrSceneEntry(entry);
       } else {
         navigatorRef.current?.arSceneNavigator?.push(entry);

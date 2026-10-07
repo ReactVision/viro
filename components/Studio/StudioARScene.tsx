@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { BackHandler, PermissionsAndroid } from "react-native";
+import { BackHandler } from "react-native";
 import { ViroAmbientLight } from "../ViroAmbientLight";
 import { ViroDirectionalLight } from "../ViroDirectionalLight";
 import { ViroARImageMarker } from "../AR/ViroARImageMarker";
@@ -81,6 +81,7 @@ import {
   QUEST_PANEL_SCALE,
   type CameraPose,
 } from "./domain/questHeadLockedTransform";
+import { questSpatialDataGranted } from "./domain/questSpatialData";
 import { studioTextAssetIds } from "./domain/questText";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
@@ -233,7 +234,6 @@ const TRACKING_GATE_FALLBACK_MS = 6000;
 // How long a Quest plane scene waits for a plane before placing its assets as
 // a NONE scene does. Granted, the room model's planes arrive within a second.
 const QUEST_PLANE_WAIT_MS = 3000;
-const QUEST_SPATIAL_DATA_PERMISSION = "com.oculus.permission.USE_SCENE";
 
 type AnimOverride = {
   key: string;
@@ -1531,7 +1531,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // On Quest the planes are the room model from Space Setup, which needs the
   // spatial data permission. Without it there are none, so the scene keeps the
   // ViroScene root and places its assets as a NONE scene does. Null until the
-  // check answers.
+  // check answers, or the prompt when this scene is the session's first to ask.
   const wantsQuestPlanes =
     isQuest &&
     (planeDetectionMode === "AUTOMATIC" || planeDetectionMode === "MANUAL");
@@ -1541,7 +1541,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   useEffect(() => {
     if (!wantsQuestPlanes) return;
     let live = true;
-    PermissionsAndroid.check(QUEST_SPATIAL_DATA_PERMISSION as any).then(
+    // A shared session roots in AR whatever the answer, so only a scene on its
+    // own asks.
+    questSpatialDataGranted(colocationFrameRef.current.phase === "off").then(
       (granted) => {
         if (live) setQuestSpatialData(granted);
       },
@@ -2002,7 +2004,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // planes, so the AR root changes nothing it renders, and the scene returns to
   // ViroScene when the session ends. Changing the root remounts everything
   // below it, which is the cost the `colocation` prop doc states.
-  // Briefly, until the spatial data check answers, so the assets mount once
+  // Until the spatial data check (or prompt) answers, so the assets mount once
   // under the root they keep.
   if (questSpatialData === null) {
     return <ViroScene toneMappingEnabled={false} />;

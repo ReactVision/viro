@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v3.0.3 — 5 October 2026
+## v3.0.3 — 6 October 2026
 
 ### Added
 

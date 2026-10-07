@@ -2,9 +2,10 @@
  * A Quest plane scene's spatial data prompt.
  *
  * The headset view opens before the opening scene is fetched, so the session's
- * first plane scene asks from inside it, whether it opened the session or a
- * NAVIGATE reached it. What is tested here: such a scene asks once per session,
- * and never when it may not ask.
+ * first plane scene asks from inside it, whether it opened the session, a
+ * NAVIGATE reached it or a shared session left it. What is tested here: such a
+ * scene asks once per session, never when it may not ask, and every scene
+ * waiting on the prompt gets its answer.
  */
 const mockCheck = jest.fn();
 const mockRequest = jest.fn();
@@ -59,6 +60,15 @@ test("a scene that may not ask only checks", async () => {
   expect(mockRequest).not.toHaveBeenCalled();
   // The session can still ask later, from a scene that may.
   await questSpatialDataGranted(true);
+  expect(mockRequest).toHaveBeenCalledTimes(1);
+});
+
+test("plane scenes asking at once share one prompt", async () => {
+  mockRequest.mockResolvedValue({ [USE_SCENE]: "granted" });
+  startQuestSpatialDataSession();
+  await expect(
+    Promise.all([questSpatialDataGranted(true), questSpatialDataGranted(true)])
+  ).resolves.toEqual([true, true]);
   expect(mockRequest).toHaveBeenCalledTimes(1);
 });
 

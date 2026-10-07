@@ -1567,12 +1567,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const [questSpatialData, setQuestSpatialData] = useState<boolean | null>(
     wantsQuestPlanes ? null : false
   );
+  // A shared session roots in AR whatever the answer, so only a scene on its
+  // own asks, which includes one a session has just left.
+  const questSceneAlone = colocationPhase === "off";
   useEffect(() => {
     if (!wantsQuestPlanes) return;
     let live = true;
-    // A shared session roots in AR whatever the answer, so only a scene on its
-    // own asks.
-    questSpatialDataGranted(colocationFrameRef.current.phase === "off").then(
+    questSpatialDataGranted(questSceneAlone).then(
       (granted) => {
         if (live) setQuestSpatialData(granted);
       },
@@ -1583,7 +1584,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     return () => {
       live = false;
     };
-  }, [wantsQuestPlanes]);
+  }, [wantsQuestPlanes, questSceneAlone]);
 
   // ViroARPlane and ViroARPlaneSelector need an AR root: under the ViroScene
   // root Quest uses outside a shared session, the Android bridge casts the

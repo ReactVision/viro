@@ -28,6 +28,7 @@
 
 #include <btBulletDynamicsCommon.h>
 #include "VROPhysicsBody.h"
+#include "VROPhysicsWorld.h"
 
 /*
  VROPhysicsContactResultCallback is used by Bullet to return a list of collision hit results that are
@@ -54,7 +55,9 @@ struct VROPhysicsContactResultCallback : public btCollisionWorld::ContactResultC
 
         // Sanity check ensuring Bullet / VROPhysics bodies are properly constructed
         const btCollisionObject* obB = colObj1Wrap->m_collisionObject;
-        if (obB->getUserPointer() == nullptr) {
+        // A world mesh body's user pointer is its collision tag, not a VROPhysicsBody.
+        if (obB->getUserPointer() == nullptr ||
+            obB->getUserIndex() == kVROPhysicsUserIndexWorldMesh) {
             perror("Incorrectly constructed bullet rigid body for a VROPhysics body!");
             return 1.f;
         }

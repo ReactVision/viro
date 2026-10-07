@@ -190,6 +190,27 @@ describe("studioColocationStore", () => {
     expect(finish).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a failure through the idle after it, until the next session", () => {
+    const failed = {
+      status: "failed" as const,
+      code: "NOT_AUTHORIZED" as const,
+      message: "Invalid or expired session",
+    };
+    studioColocationStore.set(failed);
+    studioColocationStore.set({ status: "idle" });
+    expect(studioColocationStore.getFailure()).toBe(failed);
+    studioColocationStore.clearFailure();
+    expect(studioColocationStore.getFailure()).toBeNull();
+
+    studioColocationStore.set(failed);
+    studioColocationStore.set({ status: "creating_room" });
+    expect(studioColocationStore.getFailure()).toBeNull();
+
+    studioColocationStore.set(failed);
+    studioColocationStore.reset();
+    expect(studioColocationStore.getFailure()).toBeNull();
+  });
+
   it("clears the origin prompt on reset", () => {
     const listener = jest.fn();
     const unsubscribe = studioColocationStore.subscribe(listener);

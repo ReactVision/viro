@@ -49,6 +49,17 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
                     accessToken:(nullable NSString *)accessToken
                       clientTag:(nullable NSString *)clientTag;
 
+/**
+ * As above, plus the session project's database region, which cloud anchors
+ * send as x-region so its edge functions run beside the database. nil or empty
+ * adds none here; ReactVisionCCA still pins a session on the default platform
+ * URL to that platform's region.
+ */
++ (void)setStudioSessionBaseUrl:(nullable NSString *)baseUrl
+                    accessToken:(nullable NSString *)accessToken
+                      clientTag:(nullable NSString *)clientTag
+                 functionRegion:(nullable NSString *)functionRegion;
+
 /** Overrides RVProjectId for cloud anchors. nil or empty clears the override. */
 + (void)setCloudAnchorProjectId:(nullable NSString *)projectId;
 

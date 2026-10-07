@@ -190,6 +190,45 @@ export interface ViroConfigurationOptions {
      * DEFAULTS TO: true
      */
     questArm64Only?: boolean;
+    /**
+     * Optional Meta Quest capabilities, declared when xRMode includes "QUEST".
+     * Store review checks every declared permission against what the app does
+     * with it, so turn off the ones the app does not use.
+     */
+    questFeatures?: {
+      /**
+       * Shared spatial anchors for co-location:
+       * horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA.
+       *
+       * DEFAULTS TO: true
+       */
+      colocation?: boolean;
+      /**
+       * Quest Pro eye gaze as a hover source: com.oculus.permission.EYE_TRACKING
+       * and the oculus.software.eye_tracking feature.
+       *
+       * DEFAULTS TO: true
+       */
+      eyeTracking?: boolean;
+      /**
+       * The headset cameras through Camera2, which ViroObjectDetector reads:
+       * android.permission.CAMERA and horizonos.permission.HEADSET_CAMERA.
+       *
+       * DEFAULTS TO: true
+       */
+      passthroughCamera?: boolean;
+    };
+    /**
+     * The Horizon OS SDK versions written to the manifest as
+     * <horizonos:uses-horizonos-sdk> when xRMode includes "QUEST". Horizon OS
+     * warns that an app without it will lose access to its SDK managers.
+     *
+     * DEFAULTS TO: minSdkVersion 69, and targetSdkVersion equal to minSdkVersion
+     */
+    questHorizonOsSdk?: {
+      minSdkVersion?: number;
+      targetSdkVersion?: number;
+    };
   };
 }
 

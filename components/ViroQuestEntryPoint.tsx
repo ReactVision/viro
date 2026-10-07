@@ -23,11 +23,15 @@ function QuestCrashFallbackScene() {
         position={[0, 0, -2]}
         width={3}
         height={1}
-        style={{ fontFamily: "Arial", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}
+        style={{ fontFamily: "sans-serif", fontSize: 20, color: "#FFFFFF", textAlign: "center" }}
       />
     </ViroScene>
   );
 }
+
+// Counted because a re-entry can mount the next VRActivity's surface before the
+// finishing one has unmounted.
+let mountedEntryPoints = 0;
 
 /**
  * Drop-in root component for VRActivity on Meta Quest.
@@ -47,6 +51,17 @@ export function ViroQuestEntryPoint() {
   const navRef = React.useRef<ViroVRSceneNavigator>(null);
 
   React.useEffect(() => VRQuestNavigatorBridge.onIntent(setIntent), []);
+
+  // VRActivity also ends without exitVRScene(), when the wearer quits from the
+  // system menu or Horizon OS brings the panel forward, and its surface unmounts
+  // either way.
+  React.useEffect(() => {
+    mountedEntryPoints++;
+    VRQuestNavigatorBridge.setVRActive(true);
+    return () => {
+      if (--mountedEntryPoints === 0) VRQuestNavigatorBridge.setVRActive(false);
+    };
+  }, []);
 
   // Wire hardware back button to exit VR. Apps that need custom back behaviour
   // can call AppRegistry.registerComponent('VRQuestScene', ...) to override.

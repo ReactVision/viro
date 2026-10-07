@@ -42,6 +42,19 @@
 @property (nonatomic, copy, nullable) RCTDirectEventBlock onCameraTransformUpdateViro;
 @property (nonatomic, assign) BOOL canCameraTransformUpdate;
 
+/*
+ The React tag of the camera this scene has been asked to draw from, or nil for the scene's
+ default camera. JS sets it through the `activeCameraTag` prop (VRTCameraModule sets it too).
+
+ The camera's view may not be in the tree when the tag arrives. React Native's legacy interop
+ holds back a child inserted anywhere but at the end of its parent until that parent next
+ updates, and a tag that is a prop of the scene makes the scene update, so by the time the
+ setter runs a camera queued on the scene has been inserted. A camera queued deeper, or one
+ that arrives for any other reason later, is attached by -cameraDidJoinScene: when it joins
+ the tree. Until the requested camera arrives the scene keeps drawing from the camera it has.
+ */
+@property (nonatomic, copy, nullable) NSNumber *activeCameraTag;
+
 - (instancetype)initWithBridge:(RCTBridge *)bridge;
 - (void) initSceneController;
 
@@ -52,6 +65,8 @@
 - (id<VROView>)getVROView;
 - (void)setCamera:(VRTCamera *)camera;
 - (void)removeCamera:(VRTCamera *)camera;
+// Called by a VRTCamera as it joins this scene's tree. Attaches it if it is the requested camera.
+- (void)cameraDidJoinScene:(VRTCamera *)camera;
 - (void)setSoundRoom:(NSDictionary *)soundRoom;
 
 @end

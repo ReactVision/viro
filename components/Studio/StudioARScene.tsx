@@ -37,7 +37,12 @@ import {
   GazeRuntimeState,
   resetGazeStates,
 } from "./domain/gazeBindingsRuntime";
-import { ViroCameraTransform } from "../Types/ViroEvents";
+import {
+  ViroCameraTransform,
+  ViroClickStateTypes,
+  type ViroClickState,
+} from "../Types/ViroEvents";
+import { ViroEventSource, type ViroSource } from "../Types/ViroUtils";
 import {
   cleanupTriggerImageTargets,
   registerTriggerImageTargets,
@@ -47,7 +52,10 @@ import {
   dragSurfaceFromAnchor,
   isSameDragSurface,
 } from "./domain/dragConfiguration";
-import { createNode } from "./domain/viroNodeFactory";
+import {
+  createNode,
+  STUDIO_TEXT_FONT_FAMILY,
+} from "./domain/viroNodeFactory";
 import { studioAssetPosition } from "./domain/assetPosition";
 import { defaultApiRequestExecutor } from "./domain/defaultApiRequestExecutor";
 import {
@@ -68,6 +76,7 @@ import { questAlertStore } from "./domain/questAlertStore";
 import type { CameraPose } from "./domain/questHeadLockedTransform";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
+import { StudioQuestText } from "./StudioQuestText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import {
   STUDIO_AMBIENT_INTENSITY,
@@ -997,6 +1006,22 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     useState<CameraPose | null>(null);
   const lastHeadLockedEvalRef = useRef(0);
 
+  // The controller reports every button to its one delegate, and a second
+  // ViroController would replace this one's, so Y is read here.
+  const [questMenuOpen, setQuestMenuOpen] = useState(false);
+  const closeQuestMenu = useCallback(() => setQuestMenuOpen(false), []);
+  const handleQuestControllerClickState = useCallback(
+    (state: ViroClickState, _position: unknown, source: ViroSource) => {
+      if (
+        state === ViroClickStateTypes.CLICK_DOWN &&
+        (source as unknown as number) === ViroEventSource.Y_BUTTON
+      ) {
+        setQuestMenuOpen((open) => !open);
+      }
+    },
+    []
+  );
+
   // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
   const [activePlacementId, setActivePlacementId] = useState<string | null>(
     () => placementStoreRef.current?.activeAssetId() ?? null
@@ -1437,6 +1462,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     (scene.plane_detection as string) ?? "NONE"
   ).toUpperCase();
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
+  // ViroARPlane and ViroARPlaneSelector need an AR root: under the ViroScene
+  // root Quest uses outside a shared session, the Android bridge casts the
+  // plane's scene to VRTARScene and the app crashes as the plane mounts.
+  const rootsInAR = studioSceneRootsInAR(colocationFrame, sceneMount, isQuest);
 
   // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
   // (empty disables plane finding): omitting the prop keeps the native default
@@ -1469,11 +1498,6 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     typeof ViroARPlaneSelector
   > | null>(null);
 
-  // Quest HUD status ("Scanning for planes…" vs "Plane found") — a coarse
-  // found/not-found flag, not a count; the HUD only needs to tell the user
-  // scanning is working, not exactly how many planes exist.
-  const [hasFoundPlane, setHasFoundPlane] = useState(false);
-
   const handleAnchorFound = useCallback(
     (anchor: ViroAnchor) => {
       try {
@@ -1482,9 +1506,6 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         }
         if (planeDetectionMode === "AUTOMATIC" && anchor?.type === "plane") {
           onPlaneDetected?.();
-        }
-        if (anchor?.type === "plane") {
-          setHasFoundPlane(true);
         }
         // Anchoring places content in world space — refresh cached target
         // positions so proximity metres stay correct once the anchor lands.
@@ -1575,6 +1596,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // into its node's local transform, so it can never sit inside the shared
   // (transformed) nodes.
   const renderOriginPicker = () => {
+    if (!rootsInAR) return null;
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
@@ -1632,11 +1654,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     );
   };
 
-  // Quest goes through the same AUTOMATIC/MANUAL/NONE gating as phones now —
-  // the OpenXR renderer feeds Quest plane anchors through the same
-  // onAnchorFound path ARCore/ARKit use (XR_FB_scene room model), see
-  // VROARSessionOpenXR.cpp in virocore. No Quest-specific branch needed.
+  // A plane-mode scene under the ViroScene root renders its assets the way a
+  // NONE scene does, at the scene root.
   const renderAssets = () => {
+    if (!rootsInAR) return <>{renderedPlaneAssets}</>;
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
@@ -1686,6 +1707,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         <ViroController
           controllerVisibility
           reticleVisibility
+          onClickState={handleQuestControllerClickState}
           {...(activePlacementId
             ? {
                 onClick: (position: [number, number, number]) =>
@@ -1701,16 +1723,16 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       {renderSharedContent()}
       {renderedImageTriggeredAssets}
       {isQuest && activePlacementId && (
-        <ViroText
+        <StudioQuestText
           text={`Point and pull the trigger to place: ${
             activePlacementName ?? "object"
           }`}
           position={[0, 0.2, -2]}
           width={3}
           height={1}
+          fontSize={14}
           style={{
-            fontFamily: "Arial",
-            fontSize: 14,
+            fontFamily: STUDIO_TEXT_FONT_FAMILY,
             color: "#FFFFFF",
             textAlign: "center",
           }}
@@ -1721,8 +1743,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         <StudioQuestSceneHudOverlay
           cameraPose={questHeadLockedPose}
           sceneName={scene.name}
-          planeDetectionMode={planeDetectionMode}
-          hasFoundPlane={hasFoundPlane}
+          menuOpen={questMenuOpen}
+          onCloseMenu={closeQuestMenu}
         />
       )}
       <StudioSounds manager={soundManagerRef.current!} />
@@ -1731,7 +1753,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           text={noAssetsMessage ?? "No assets to display"}
           position={[0, 0, -2]}
           style={{
-            fontFamily: "Arial",
+            fontFamily: STUDIO_TEXT_FONT_FAMILY,
             fontSize: 16,
             color: "#CCCCCC",
             textAlign: "center",
@@ -1777,7 +1799,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // planes, so the AR root changes nothing it renders, and the scene returns to
   // ViroScene when the session ends. Changing the root remounts everything
   // below it, which is the cost the `colocation` prop doc states.
-  if (!studioSceneRootsInAR(colocationFrame, sceneMount, isQuest)) {
+  if (!rootsInAR) {
     return (
       <ViroScene
         {...physicsProps}

@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "license": "MIT",
   "publishConfig": {
     "access": "public",
@@ -29,7 +29,8 @@
     "prepare": "npm run build",
     "harness:assets": "bash scripts/sync-harness-assets.sh",
     "preharness": "npm run harness:assets",
-    "audit:events": "node scripts/audit-events.cjs"
+    "audit:events": "node scripts/audit-events.cjs",
+    "check:ios-bridge": "bash scripts/check-ios-bridge.sh"
   },
   "peerDependencies": {
     "@reactvision/react-native-visionos": ">=0.86.0 <0.87.0",

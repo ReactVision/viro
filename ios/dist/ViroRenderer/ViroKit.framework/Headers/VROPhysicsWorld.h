@@ -39,6 +39,17 @@ class VRODriver;
 class VRORenderContext;
 
 /*
+ Marks a btCollisionObject that belongs to the AR world mesh rather than to a VROPhysicsBody.
+ Those bodies are raw btRigidBodys with no VROPhysicsBody behind them, so collisions against them
+ used to be dropped before any delegate heard about them — onCollision never fired for the world
+ mesh, though collisionTag was configured and the physics itself worked.
+
+ A body carrying this user index puts its collision tag (a std::string owned by the mesh) in the
+ user pointer instead of a VROPhysicsBody, so the index must be checked before that cast.
+ */
+static const int kVROPhysicsUserIndexWorldMesh = 0x574D; // 'WM'
+
+/*
  VROPhysicsWorld is a simulated physics environment that contains and processes
  all acting forces and collisions on VROPhysicsBodies. It also contains both
  the physics properties of the simulated world (like gravity) and collision

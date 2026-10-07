@@ -65,6 +65,15 @@ const BUNDLED_SHIMS_DIR = path.join(PKG_ROOT, "shims");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function installedVersion(projectRoot: string, pkg: string): string | null {
+  try {
+    const manifest = path.join(projectRoot, "node_modules", pkg, "package.json");
+    return JSON.parse(fs.readFileSync(manifest, "utf8")).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function isPkgInstalled(projectRoot: string, pkg: string): boolean {
   try {
     const pkgJson = JSON.parse(
@@ -506,15 +515,28 @@ const withVisionOSPatches: ConfigPlugin = (config) =>
         return newConfig;
       }
 
-      // ── 5a. Copy each patch file (skip if user already has a newer version) ──
+      // ── 5a. Copy each bundled patch the project has no patch of its own for ──
+      // patch-package applies every file for a package, whatever version its name carries, so
+      // a bundled patch copied next to the project's own patch for the same package is applied
+      // on top of it and fails. A project that already patches the package keeps its patch.
+      // The copy is named after the installed version, so patch-package does not warn about a
+      // version mismatch on every install.
       if (!fs.existsSync(patchesDir)) fs.mkdirSync(patchesDir, { recursive: true });
 
+      const existing = fs.readdirSync(patchesDir);
       for (const file of fs.readdirSync(BUNDLED_PATCHES_DIR)) {
-        const dest = path.join(patchesDir, file);
-        if (!fs.existsSync(dest)) {
-          fs.copyFileSync(path.join(BUNDLED_PATCHES_DIR, file), dest);
-          console.log(`[withViroVisionOS] Copied patch: ${file}`);
-        }
+        const parsed = /^(.+)\+([0-9][^+]*)\.patch$/.exec(file);
+        if (!parsed) continue;
+        const [, pkg, bundledVersion] = parsed;
+        const patched = existing.some(
+          (f) => f.startsWith(`${pkg}+`) && /^[0-9]/.test(f.slice(pkg.length + 1))
+        );
+        if (patched) continue;
+        const version =
+          installedVersion(projectRoot, pkg.replace(/\+/g, "/")) ?? bundledVersion;
+        const name = `${pkg}+${version}.patch`;
+        fs.copyFileSync(path.join(BUNDLED_PATCHES_DIR, file), path.join(patchesDir, name));
+        console.log(`[withViroVisionOS] Copied patch: ${name}`);
       }
 
       // ── 5b. Ensure patch-package is wired as postinstall ──

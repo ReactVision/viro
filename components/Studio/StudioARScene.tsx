@@ -81,9 +81,11 @@ import {
   QUEST_PANEL_SCALE,
   type CameraPose,
 } from "./domain/questHeadLockedTransform";
+import { questSceneLoadStore } from "./domain/questSceneLoadStore";
 import { questSpatialDataGranted } from "./domain/questSpatialData";
 import { studioTextAssetIds } from "./domain/questText";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
+import { StudioQuestLoadScene } from "./StudioQuestLoadScene";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
 import { StudioQuestText } from "./StudioQuestText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
@@ -274,21 +276,34 @@ interface StudioARSceneProps {
   skipOnLoadFunction?: boolean;
 }
 
+const subscribeToSceneLoad = (onChange: () => void) =>
+  questSceneLoadStore.subscribe(onChange);
+const getSceneLoad = () => questSceneLoadStore.get();
+
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until
- * sceneData is available, avoiding a Rules of Hooks violation.
+ * sceneData is available, avoiding a Rules of Hooks violation. Quest's opening
+ * scene is given none and takes it from questSceneLoadStore.
  */
 export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
-  if (!props.sceneData) {
+  const load = React.useSyncExternalStore(
+    subscribeToSceneLoad,
+    getSceneLoad,
+    getSceneLoad
+  );
+  const sceneData =
+    props.sceneData ??
+    (isQuest && load.status === "ready" ? load.sceneData : null);
+  if (!sceneData) {
     // Quest keeps its own root here for the reason spelled out at the main
     // return below.
     return isQuest ? (
-      <ViroScene toneMappingEnabled={false} />
+      <StudioQuestLoadScene failed={load.status === "failed"} />
     ) : (
       <ViroARScene toneMappingEnabled={false} />
     );
   }
-  return <StudioARSceneInner {...props} sceneData={props.sceneData} />;
+  return <StudioARSceneInner {...props} sceneData={sceneData} />;
 };
 
 // ─── Inner component (all hooks live here) ────────────────────────────────────

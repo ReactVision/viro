@@ -6,12 +6,11 @@ const SPATIAL_DATA = ["horizonos.permission.USE_ANCHOR_API", USE_SCENE];
 let asked = false;
 
 /**
- * Called as a navigator opens its first scene on Meta Quest, with whether that
- * scene's launch asks for spatial data. When it does not, the first plane scene
- * a NAVIGATE reaches asks instead.
+ * Called as a navigator opens on Meta Quest. Its headset view opens before the
+ * scene is known, so the session's first plane scene asks.
  */
-export function startQuestSpatialDataSession(askedAtLaunch: boolean): void {
-  asked = askedAtLaunch;
+export function startQuestSpatialDataSession(): void {
+  asked = false;
 }
 
 /**

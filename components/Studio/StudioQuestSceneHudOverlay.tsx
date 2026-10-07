@@ -76,7 +76,7 @@ type Props = {
 // Same exit path as the hardware back button (ViroQuestEntryPoint's
 // BackHandler): invoke the current intent's onExitViro before finishing
 // VRActivity.
-function handleExitClick(_position: unknown, source: ViroSource) {
+export function handleQuestExitClick(_position: unknown, source: ViroSource) {
   if (!isSelectClick(source)) return;
   VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
   exitVRScene();
@@ -263,7 +263,7 @@ export function StudioQuestSceneHudOverlay({
       text: "[ Exit ]",
       fontSize: 13,
       color: "#7FCBFF",
-      onClick: handleExitClick,
+      onClick: handleQuestExitClick,
     });
   }
   lines.push({

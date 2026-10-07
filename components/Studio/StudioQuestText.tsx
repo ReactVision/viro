@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ViroMaterial, ViroMaterials } from "../Material/ViroMaterials";
+import { ViroMaterials } from "../Material/ViroMaterials";
 import type { ViroTextStyle } from "../Styles/ViroTextStyle";
 import type { Viro3DPoint } from "../Types/ViroUtils";
 import { ViroNode } from "../ViroNode";
@@ -15,15 +15,14 @@ const INVERSE = 1 / SUPERSAMPLE;
 
 // 2D ViroText takes no material from JS and always reads depth, so on a panel
 // with no background a nearer object still hides it. This plate draws no
-// colour but writes the panel's depth behind the glyphs. The bridges read the
-// mask as colorWriteMask, an array, where ViroMaterial types colorWritesMask.
+// colour but writes the panel's depth behind the glyphs.
 ViroMaterials.createMaterials({
   StudioQuestTextDepthPlate: {
     lightingModel: "Constant",
     readsFromDepthBuffer: false,
     writesToDepthBuffer: true,
     colorWriteMask: ["None"],
-  } as ViroMaterial,
+  },
 });
 
 // Roboto's advance widths in ems, by rough class and rounded up, so an estimate

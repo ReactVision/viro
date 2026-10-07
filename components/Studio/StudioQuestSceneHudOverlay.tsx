@@ -295,10 +295,10 @@ export function StudioQuestSceneHudOverlay({
 
   // Each line is positioned explicitly: inside a ViroFlexView on Quest every
   // line rendered at the view's centre, on top of each other, and the
-  // background never appeared. Clicks go to the nearest bounding box, and once
-  // the panel is turned the background's wider box is nearer than the lines',
-  // so the background ignores events. It is drawn first so the lines' boxes
-  // cannot hide it.
+  // background never appeared. The background is drawn first, so the lines'
+  // boxes cannot hide it and a click on a line goes to the line; a click
+  // between lines stops at the background rather than reaching what is behind
+  // the panel.
   const hoveredKeys = new Set(Object.values(hoveredBySource));
   const hoverItem =
     (key: string) =>
@@ -330,7 +330,6 @@ export function StudioQuestSceneHudOverlay({
         height={height}
         materials={["StudioQuestHudBackground"]}
         renderingOrder={QUEST_PANEL_ORDER.hud}
-        ignoreEventHandling
       />
       {lines.map((line, index) => {
         const y = lineTop - lineHeights[index] / 2;

@@ -214,12 +214,12 @@ function selectedPlanePose(plane: ViroAnchor, tapWorld?: Vec3) {
   return out;
 }
 
-/** Fixed-distance point along the cached camera-forward ray (headset fallback). */
-function projectAlongCameraForward(
-  pose: { position: Vec3; forward: Vec3 } | null
+/** Fixed-distance point along a ray (headset fallback). */
+function projectAlongRay(
+  ray: { position: Vec3; forward: Vec3 } | null
 ): Vec3 | null {
-  if (!pose) return null;
-  const { position, forward } = pose;
+  if (!ray) return null;
+  const { position, forward } = ray;
   return [
     position[0] + forward[0] * HEADSET_PLACEMENT_DISTANCE_M,
     position[1] + forward[1] * HEADSET_PLACEMENT_DISTANCE_M,
@@ -1192,26 +1192,40 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   }, [placementApiRef, placeAtScreenPoint]);
 
   // Headset: the controller trigger fires this. Prefer the ray's real hit point
-  // (room mesh); fall back to a fixed distance along the cached aim ray.
-  const handleHeadsetPlaceTrigger = useCallback((hitPosition?: Vec3) => {
-    const store = placementStoreRef.current;
-    const activeId = store?.activeAssetId();
-    if (!store || !activeId) return;
-    if (colocationFrameRef.current.phase === "pending") return;
-    const pos = isUsablePoint(hitPosition)
-      ? hitPosition
-      : projectAlongCameraForward(cameraPoseRef.current);
-    if (!pos) return;
-    store.place(
-      activeId,
-      ...placementInSceneFrame(
-        colocationFrameRef.current,
-        pos,
-        cameraPoseRef.current?.forward,
-        cameraPoseRef.current?.up
-      )
-    );
-  }, []);
+  // (room mesh). A click that hits nothing has no position, so the asset goes a
+  // fixed distance along the ray that clicked, or the head's if it has none.
+  const questControllerRef = useRef<ViroController | null>(null);
+  const handleHeadsetPlaceTrigger = useCallback(
+    async (hitPosition: number[], source: ViroSource) => {
+      const ray = isUsablePoint(hitPosition)
+        ? null
+        : await questControllerRef.current
+            ?.getControllerRayAsync(source)
+            .catch(() => null);
+      const store = placementStoreRef.current;
+      const activeId = store?.activeAssetId();
+      if (!store || !activeId) return;
+      if (colocationFrameRef.current.phase === "pending") return;
+      const pos = isUsablePoint(hitPosition)
+        ? hitPosition
+        : projectAlongRay(
+            ray
+              ? { position: ray.origin, forward: ray.forward }
+              : cameraPoseRef.current
+          );
+      if (!pos) return;
+      store.place(
+        activeId,
+        ...placementInSceneFrame(
+          colocationFrameRef.current,
+          pos,
+          cameraPoseRef.current?.forward,
+          cameraPoseRef.current?.up
+        )
+      );
+    },
+    []
+  );
 
   // ─── Trigger image targets ────────────────────────────────────────────────
   // Three groups: image-triggered (anchored to a tracked image), tap-to-place
@@ -1864,6 +1878,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     <>
       {isQuest && (
         <ViroController
+          ref={questControllerRef}
           controllerVisibility
           reticleVisibility
           onClickState={handleQuestControllerClickState}
@@ -1881,7 +1896,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
                     questAlertStore.isActive()
                   )
                     return;
-                  handleHeadsetPlaceTrigger(position);
+                  handleHeadsetPlaceTrigger(position, source);
                 },
               }
             : {})}

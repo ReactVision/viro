@@ -501,7 +501,9 @@ const withViroManifest = (config: ExpoConfig) =>
         const existingPermissions: string[] = (contents.manifest["uses-permission"] || [])
           .map((p: any) => p.$?.["android:name"]);
         // Horizon OS logs com.oculus.permission.HAND_TRACKING as deprecated and
-        // asks for this name instead.
+        // asks for this name instead. Its runtime logs that warning even when
+        // only this name is declared: its permission check treats the two names
+        // as one and tests the old name first.
         if (!existingPermissions.includes("horizonos.permission.HAND_TRACKING")) {
           contents.manifest["uses-permission"].push({
             $: { "android:name": "horizonos.permission.HAND_TRACKING" },

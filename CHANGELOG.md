@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **`ViroController.getControllerRayAsync(source)`.** Where the ray that carries a source last pointed, as `{ origin, forward }` in world space, or null when the source has no ray of its own, as with every iOS source. A click that hits nothing reports no position, so this is how to find where it was aimed. Needs the matching `viro_renderer-release.aar`.
+
 ### Changed
 
 - **The Meta Quest menu opens on the left controller's menu button, not Y (`StudioSceneNavigator`).** With hands, a pinch with the palm facing the wearer opens and closes it too, Meta's hand equivalent of that button. B closes the menu while it is open, and exits the scene otherwise.
@@ -19,6 +23,7 @@
 - **Meta Quest panels draw over scene objects in front of them (`StudioQuestSceneHudOverlay`, `StudioQuestAlertOverlay`, the Quest placement prompt).** An object nearer than a panel, 1.2 m for the menu and alerts, covered it. The panels now draw after the scene with depth reads off (`renderingOrder` from 1000 up), and a panel with no background gets an invisible depth plate behind its text. The renderer draws the aim laser after them (`viro_renderer-release.aar`).
 - **A click between the Meta Quest menu's lines no longer reaches what is behind the panel (`StudioQuestSceneHudOverlay`).** The panel's background let clicks through, so one that missed a line went to whatever was behind the panel, such as an asset that runs a function when clicked. The closed panel, which has nothing to click, still lets clicks through.
 - **A Meta Quest placement aimed through a panel's text lands where it points (`StudioQuestText`).** Text took a click even with nothing to do on one, so a placement aimed through the placement prompt, a notice, or the scene name and status put the asset on the panel. Text with no `onClick` now lets the click through.
+- **A Meta Quest placement aimed at nothing lands along the controller's ray (`StudioARScene`).** With nothing under the controller, a tap-to-place asset went 1.5 m along where the wearer was looking, wherever the controller pointed, though the prompt says to point. It now goes 1.5 m along the ray that clicked. In a scene without planes, that was every placement.
 - **A long Meta Quest ALERT fits its text (`StudioQuestAlertOverlay`).** The title and message had fixed boxes, so a long message overlapped the title. Both are sized to their wrapped text, and the panel grows upwards so the menu placed below it still clears it. A short alert is unchanged.
 - **A Meta Quest status change no longer shows for a frame at the old position (`StudioQuestSceneHudOverlay`).** The panel was placed in an effect after the new status had rendered. It is placed in the same render, as the menu is.
 - **"No assets to display" appears in front of the wearer on Meta Quest (`StudioARScene`).** It sat 2 m from the scene origin, which is fixed in the room and often out of view. It is now placed the way the placement prompt is, and drawn sharp.
@@ -27,6 +32,7 @@
 - **The right eye on Meta Quest clears its depth buffer (`viro_renderer-release.aar`).** It was not cleared when the left eye ended on a material that does not write depth, such as the aim laser, so the right eye drew against stale depth.
 - **A click goes to what is drawn on top, which is not always the nearest object (`viro_renderer-release.aar`).** An object between the user and a panel drawn over the scene (a higher `renderingOrder` with `readsFromDepthBuffer: false`) took clicks aimed at the panel, such as the Meta Quest menu's. Within one `renderingOrder` the nearest object still takes the click, so a scene that sets no `renderingOrder` is unaffected.
 - **Meta Quest makes each eye's framebuffer once (`viro_renderer-release.aar`).** Every eye of every frame deleted its framebuffer and made another, with a new full-size depth buffer.
+- **Meta Quest no longer writes each eye's depth buffer back to memory (`viro_renderer-release.aar`).** Nothing reads it after the eye is drawn, and writing it out cost up to about 1.7 GB/s of memory traffic at 72 fps.
 - **Meta Quest hand input releases and presses once (`viro_renderer-release.aar`).** A pinch or grab held when its hand stopped being tracked never released, so a drag it started stayed open; a fist made during a palm pinch was reported as a grip press; a hand and a controller active on one side could each press the same source; and a pinch read without Meta's hand data had no release margin.
 - **Closing a scene on Meta Quest no longer logs an OpenXR loader error (`viro_renderer-release.aar`).** The renderer destroyed its input action set after the OpenXR instance, which the loader refuses.
 - **Android no longer logs an error for each Viro view a scene drops (`VRTViroViewGroupManager`).** A Viro view's context is the Activity, and React Native's drop logged "has a context that is not a ThemedReactContext" for every one, about 20 lines each time a scene closed. The manager now clears the view's focus and hierarchy listeners itself, which is all React Native's drop did for such a view.

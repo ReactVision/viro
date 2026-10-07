@@ -255,9 +255,11 @@ export interface StudioSceneNavigatorProps {
   renderQuestPanel?: (enter: () => void) => React.ReactNode;
   /**
    * Meta Quest only. Buttons for the in-scene menu, listed above its Exit
-   * button. The wearer opens and closes the menu with the left controller's Y
-   * button, and pressing a button closes it. Nothing 2D can be seen from
-   * inside the headset, so this is where the host's scene actions go.
+   * button. The wearer opens and closes the menu with the left controller's
+   * menu button or, with hands, a pinch with the palm facing them, and
+   * pressing a button closes it. B closes it too while it is open. Nothing 2D
+   * can be seen from inside the headset, so this is where the host's scene
+   * actions go.
    */
   questMenuItems?: readonly StudioQuestMenuItem[];
   /** Fired after the scene is fetched and parsed, before it is pushed. */
@@ -348,10 +350,13 @@ export interface StudioSceneNavigatorProps {
    * with `FRAME_KIND_UNSUPPORTED`.
    *
    * On Quest the scene on screen roots in ViroARScene while a session is set
-   * up or shared, and in ViroScene otherwise. Changing the root remounts the
-   * whole scene, so a sound that is playing starts again from the beginning
-   * when a session starts after the scene mounted, and again when a session
-   * ends or fails. Set this before the scene mounts to avoid the first.
+   * up or shared. Outside a session it roots in ViroARScene only when it
+   * detects planes (AUTOMATIC or MANUAL) and the wearer has granted spatial
+   * data, and in ViroScene otherwise. Changing the root remounts the whole
+   * scene, so in a scene that roots in ViroScene on its own, a sound that is
+   * playing starts again from the beginning when a session starts after the
+   * scene mounted, and again when the session ends or fails. Set this before
+   * the scene mounts to avoid the first.
    */
   colocation?: StudioColocationOptions;
   /**
@@ -856,8 +861,9 @@ export const StudioSceneNavigator = forwardRef<
           renderQuestPanel={renderQuestPanel}
           questPermissions={QUEST_PERMISSIONS}
           // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
-          // than ViroARScene outside a shared session (see StudioARScene for
-          // why), and a virtual root turns none of this on by itself, so both
+          // than ViroARScene outside a shared session, except for a plane scene
+          // with spatial data granted (see StudioARScene for why), and a
+          // virtual root turns none of this on by itself, so both
           // are asked for outright.
           // They reach VRActivity through the navigator bridge and do not depend
           // on which root the scene uses.

@@ -24,8 +24,9 @@ Pod::Spec.new do |s|
   s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
 
   # iOS: frameworks required by source files compiled from the pod
-  # (VRTObjectDetectorView uses AVFoundation + Accelerate; CoreVideo for CVPixelBuffer)
-  s.ios.frameworks = ['AVFoundation', 'Accelerate', 'CoreVideo']
+  # (VRTObjectDetectorView uses AVFoundation + Accelerate; CoreVideo for CVPixelBuffer; ARKit for
+  # the ARSession and ARFrame it reads the camera through)
+  s.ios.frameworks = ['AVFoundation', 'Accelerate', 'CoreVideo', 'ARKit']
 
   # Base source files (always included)
   source_files_array = ['ViroReact/**/*.{h,m,mm,swift}']
@@ -78,8 +79,31 @@ Pod::Spec.new do |s|
   # xros at all. iOS still links the prebuilt one, so its implementation files must be kept out
   # of the compile or every symbol would be defined twice — once here, once in the archive.
   # Headers stay: 32 files import them, and public_header_files still needs them present.
-  if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
-    ios_exclude_files << 'ViroReact/**/*.{m,mm}'
+  #
+  # The archive is only as current as its last rebuild, and a file added to ViroReact/ is not in
+  # it until someone rebuilds. Each file below compiles from source on iOS for as long as the
+  # archive lacks its class, and goes back to being excluded the moment a rebuild carries it, so
+  # there is never a missing view and never a duplicate symbol. The check is the Objective-C
+  # class symbol in the archive's string table. A view manager must stay next to its view: the
+  # manager references the view's class directly and links only with it.
+  # scripts/check-ios-bridge.sh reads this list, so keep it one quoted path per line.
+  archive_fallback_sources = [
+    # Added 2026-08 but never added to the Xcode target, so the rebuilds since skipped it and
+    # 3.0.2 shipped without the view ("View config not found for component VRTObjectDetectorView").
+    'ViroReact/Views/VRTObjectDetectorView.mm',
+    'ViroReact/Views/VRTObjectDetectorViewManager.mm',
+  ]
+
+  archive_path = File.join(__dir__, 'dist/lib/libViroReact.a')
+  if File.exist?(archive_path)
+    archive = File.binread(archive_path)
+    compiled_from_source = archive_fallback_sources.reject do |file|
+      archive.include?("_OBJC_CLASS_$_#{File.basename(file, '.mm')}")
+    end
+    # exclude_files wins over source_files in CocoaPods, so the exemption has to be made here,
+    # by excluding every bridge implementation file except the ones compiled from source.
+    bridge_sources = Dir.chdir(__dir__) { Dir.glob('ViroReact/**/*.{m,mm}') }
+    ios_exclude_files.concat(bridge_sources - compiled_from_source)
   end
 
   s.ios.exclude_files = ios_exclude_files

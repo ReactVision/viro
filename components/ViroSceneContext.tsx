@@ -1,15 +1,17 @@
 import * as React from "react";
-import { ViroCamera } from "./ViroCamera";
-import { ViroOrbitCamera } from "./ViroOrbitCamera";
+import type {
+  ViroSceneCamera,
+  ViroSceneCameraCallbacks,
+} from "./Utilities/ViroActiveCameraTracker";
 
-export const ViroSceneContext = React.createContext({
-  cameraDidMount: (camera: ViroCamera | ViroOrbitCamera) => {
+export const ViroSceneContext = React.createContext<ViroSceneCameraCallbacks>({
+  cameraDidMount: (camera: ViroSceneCamera) => {
     console.log("ViroSceneContext.cameraDidMount: " + camera);
   },
-  cameraWillUnmount: (camera: ViroCamera | ViroOrbitCamera) => {
+  cameraWillUnmount: (camera: ViroSceneCamera) => {
     console.log("ViroSceneContext.cameraWillUnmount: " + camera);
   },
-  cameraDidUpdate: (camera: ViroCamera | ViroOrbitCamera, active: boolean) => {
+  cameraDidUpdate: (camera: ViroSceneCamera, active: boolean) => {
     console.log(
       "ViroSceneContext.cameraDidUpdate: " + camera + " active: " + active
     );

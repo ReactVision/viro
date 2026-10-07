@@ -34,7 +34,7 @@ The `iosLinkage` option controls how iOS frameworks are linked in your app.
 | `"dynamic"` | Dynamic frameworks. Required when using ARCore SDK. |
 | *(not set)* | Uses project default. |
 
-> **Note:** If ARCore is included (via `ios.includeARCore` or cloud/geospatial providers), `iosLinkage` is automatically set to `"dynamic"` regardless of your configuration.
+> **Note:** If ARCore is included (via `ios.includeARCore`, `ios.includeSemantics` or `provider: "arcore"`) and `iosLinkage` is not set, it defaults to `"dynamic"`. An explicit `"static"` is kept, with a warning in the Podfile, and may fail to build.
 
 ---
 
@@ -75,9 +75,11 @@ This allows you to:
 - All VR features
 
 **What's disabled:**
-- Cloud Anchors (shared AR experiences)
-- Geospatial API (location-based AR)
+- ARCore Cloud Anchors
+- ARCore Geospatial API
 - Scene Semantics (ML-based scene understanding)
+
+ReactVision cloud and geospatial anchors (`provider: "reactvision"` with `rvApiKey` / `rvProjectId`) do not need ARCore and keep working.
 
 **Benefits:**
 - ~15-20MB smaller app binary
@@ -115,15 +117,14 @@ To enable all ARCore features, set `ios.includeARCore` to `true`:
 
 ### With Specific ARCore Features
 
-Instead of using `ios.includeARCore`, you can enable specific providers which will automatically include the necessary ARCore pods:
+Instead of using `ios.includeARCore`, you can set the ARCore provider, which will automatically include the necessary ARCore pods:
 
 ```json
 {
   "expo": {
     "plugins": [
       ["@reactvision/react-viro", {
-        "cloudAnchorProvider": "arcore",
-        "geospatialAnchorProvider": "arcore",
+        "provider": "arcore",
         "googleCloudApiKey": "YOUR_GOOGLE_CLOUD_API_KEY"
       }]
     ]
@@ -159,7 +160,7 @@ Best for apps that only need basic AR features:
 
 ### Cloud Anchors Only
 
-For shared AR experiences without geospatial features:
+For shared AR experiences without geospatial features. `cloudAnchorProvider` is deprecated in favour of `provider`, but still overrides it for cloud anchors alone, which keeps the Geospatial pod out:
 
 ```json
 {
@@ -190,8 +191,7 @@ Complete setup with all ARCore capabilities:
           "cameraUsagePermission": "This app uses the camera for AR experiences",
           "locationUsagePermission": "This app uses your location for AR experiences"
         },
-        "cloudAnchorProvider": "arcore",
-        "geospatialAnchorProvider": "arcore",
+        "provider": "arcore",
         "googleCloudApiKey": "AIza..."
       }]
     ]
@@ -252,8 +252,11 @@ const handleCloudAnchor = async () => {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `iosLinkage` | `"static"` \| `"dynamic"` | *(project default)* | Framework linking type |
-| `cloudAnchorProvider` | `"none"` \| `"arcore"` | `"none"` | Cloud anchor provider (auto-enables ARCore) |
-| `geospatialAnchorProvider` | `"none"` \| `"arcore"` | `"none"` | Geospatial provider (auto-enables ARCore) |
+| `provider` | `"none"` \| `"arcore"` \| `"reactvision"` | `"reactvision"` when `rvApiKey` is set, otherwise unset | Cloud and geospatial anchor provider (`"arcore"` auto-enables ARCore) |
+| `rvApiKey` | `string` | — | ReactVision API key (for `provider: "reactvision"`) |
+| `rvProjectId` | `string` | — | ReactVision project ID (for `provider: "reactvision"`) |
+| `cloudAnchorProvider` | `"none"` \| `"arcore"` \| `"reactvision"` | — | Deprecated; overrides `provider` for cloud anchors |
+| `geospatialAnchorProvider` | `"none"` \| `"arcore"` \| `"reactvision"` | — | Deprecated; overrides `provider` for geospatial anchors |
 | `googleCloudApiKey` | `string` | — | Google Cloud API key (required for ARCore features) |
 
 ### iOS-Specific Options (`ios.*`)
@@ -261,6 +264,7 @@ const handleCloudAnchor = async () => {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `includeARCore` | `boolean` | `false` | Explicitly include ARCore SDK pods |
+| `includeSemantics` | `boolean` | `false` | Include only the ARCore/Semantics pod (with ARCore/CloudAnchors as its base), for semantic masking without cloud or geospatial anchors |
 | `cameraUsagePermission` | `string` | `"Allow $(PRODUCT_NAME) to use your camera"` | Camera permission message |
 | `microphoneUsagePermission` | `string` | `"Allow $(PRODUCT_NAME) to use your microphone"` | Microphone permission message |
 | `photosPermission` | `string` | `"Allow $(PRODUCT_NAME) to access your photos"` | Photo library read permission |
@@ -275,21 +279,19 @@ const handleCloudAnchor = async () => {
 
 This error occurs when ARCore features are used but the SDK is not included. Either:
 1. Set `ios.includeARCore: true`
-2. Or set `cloudAnchorProvider: "arcore"` or `geospatialAnchorProvider: "arcore"`
+2. Or set `provider: "arcore"`
 
 ### Verifying Weak Linking is Working
 
 After running `npx expo prebuild` or `npx pod-install`, you can verify weak linking is properly configured:
 
+The hook rewrites `OTHER_LDFLAGS` in `ios/Pods/Pods.xcodeproj` for the ViroKit target and the targets that depend on it — not the app's `.xcconfig` files. Open `Pods.xcodeproj`, select one of those targets and check **Other Linker Flags**, or:
+
 ```bash
-# Check your app target's xcconfig for weak framework flags
-cat ios/Pods/Target\ Support\ Files/Pods-YourApp/Pods-YourApp.debug.xcconfig | grep ARCore
+grep -n "weak_framework" ios/Pods/Pods.xcodeproj/project.pbxproj | head
 ```
 
-You should see `-weak_framework` instead of `-framework` for all ARCore frameworks:
-```
-OTHER_LDFLAGS = ... -weak_framework "ARCoreBase" -weak_framework "ARCoreCloudAnchors" ...
-```
+You should see `-weak_framework` followed by each ARCore framework (`ARCoreBase`, `ARCoreGARSession`, `ARCoreCloudAnchors`, `ARCoreGeospatial`, `ARCoreSemantics`, …) and its Firebase dependencies.
 
 If you see strong `-framework` flags instead, the post_install hook may not be executing properly.
 

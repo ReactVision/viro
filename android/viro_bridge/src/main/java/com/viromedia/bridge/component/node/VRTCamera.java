@@ -122,4 +122,15 @@ public class VRTCamera extends VRTNode {
     public VRTNode getNodeRootTransformCamera() {
         return mNodeRootTransformCamera;
     }
+
+    // The scene is set as this camera joins its tree, directly or through an ancestor. The scene
+    // may have been asked for this camera before then (see VRTScene.setActiveCameraTag); it
+    // attaches us now if so.
+    @Override
+    public void setScene(VRTScene scene) {
+        super.setScene(scene);
+        if (scene != null) {
+            scene.cameraDidJoinScene(this);
+        }
+    }
 }

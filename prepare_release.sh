@@ -113,6 +113,16 @@ else
 fi
 
 echo '========================================================================='
+echo 'Checking the iOS bridge archive against its sources'
+echo '========================================================================='
+
+# iOS links ios/dist/lib/libViroReact.a, rebuilt by hand from ViroReact.xcodeproj, and the
+# podspec drops every bridge .mm from the compile when that archive exists. A source that is
+# not in the Xcode target is therefore in the tarball but in no iOS build: 3.0.2 shipped
+# VRTObjectDetectorView that way and <ViroObjectDetector /> failed to mount on every iPhone.
+npm run check:ios-bridge
+
+echo '========================================================================='
 echo 'Packing Tarball for NPM'
 echo '========================================================================='
 npm pack

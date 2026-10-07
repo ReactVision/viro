@@ -50,6 +50,8 @@ typedef NS_ENUM(NSInteger, ViroConstraintType) {
         return; \
     }
 
+@class VRTScene;
+
 @interface VRTView : UIView {
     @protected NSMutableArray *_childViews;
 }
@@ -107,5 +109,15 @@ typedef NS_ENUM(NSInteger, ViroConstraintType) {
 
 // Fabric architecture compatibility - called before view recycling
 - (void)prepareForRecycle;
+
+// The VRTScene this view sits under, or nil until it, or an ancestor of it, has been inserted
+// beneath one. A VRTScene answers itself.
+- (nullable VRTScene *)viroScene;
+
+// Invoked on a view, and then on each of its children, the moment it joins a VRTScene's tree:
+// when it is inserted under a parent that already sits under a scene, or when such an ancestor
+// is. React Native inserts a subtree bottom-up, children before their parent, so a view's own
+// insertion is not always that moment; its parent's may be. Overrides must call super.
+- (void)didJoinViroScene:(VRTScene *)scene;
 
 @end

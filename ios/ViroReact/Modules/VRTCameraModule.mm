@@ -33,19 +33,26 @@
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
 
-typedef void (^VRTSceneCameraBlock)(VRTScene *scene, VRTCamera *camera);
+typedef void (^VRTSceneBlock)(VRTScene *scene);
 
 @implementation VRTCameraModule
 
 @synthesize bridge = _bridge;
 // Same lookup as VRTARSceneNavigatorModule: under the new architecture the
 // NSDictionary the legacy RCTUIManager block hands out never holds
-// interop-mounted views, and a camera's componentDidMount can run before
-// Fabric has mounted it. RCTViewRegistry returns the interop wrapper, hence
-// the paper-view unwrap.
+// interop-mounted views, and a scene's children can report their mount before
+// Fabric has mounted the scene. RCTViewRegistry returns the interop wrapper,
+// hence the paper-view unwrap.
+//
+// Only the scene is looked up here. The camera is named by tag and the scene
+// attaches it itself, now if it is in the tree and otherwise as it joins: a
+// camera inserted between its siblings is held back by React Native's legacy
+// interop until the scene next updates, which can be long after any lookup
+// here would have given up (see -[VRTScene activeCameraTag]). ViroScene sends
+// the same tag as a prop; these methods remain for callers of the module.
 @synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
 
-static const int kVRTCameraLookupMaxFrames = 60;
+static const int kVRTSceneLookupMaxFrames = 60;
 
 RCT_EXPORT_MODULE()
 
@@ -57,41 +64,38 @@ static UIView *VRTViewForTag(RCTViewRegistry *viewRegistry, NSNumber *tag) {
     return RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:tag]);
 }
 
-// Waits up to about a second of frames for both tags to resolve, since the
-// camera may not be mounted yet when JS asks for it. With retry off, a miss
-// is dropped at once: a camera that is being removed may already be gone.
+// Waits up to about a second of frames for the scene to resolve, since JS can
+// ask before Fabric has mounted it. With retry off, a miss is dropped at once:
+// a scene that is being removed may already be gone.
 - (void)withScene:(NSNumber *)sceneTag
-           camera:(NSNumber *)cameraTag
             retry:(BOOL)retry
           attempt:(int)attempt
            action:(NSString *)action
-            block:(VRTSceneCameraBlock)block {
+            block:(VRTSceneBlock)block {
     RCTViewRegistry *registry = self.viewRegistry_DEPRECATED;
     if (registry == nil) {
-        RCTLogWarn(@"[Viro] viewRegistry_DEPRECATED is nil, cannot %@ camera %@", action, cameraTag);
+        RCTLogWarn(@"[Viro] viewRegistry_DEPRECATED is nil, cannot %@ camera on scene %@", action, sceneTag);
         return;
     }
     __weak __typeof(self) weakSelf = self;
     [registry addUIBlock:^(RCTViewRegistry *viewRegistry) {
-        UIView *cameraView = VRTViewForTag(viewRegistry, cameraTag);
         UIView *sceneView = VRTViewForTag(viewRegistry, sceneTag);
-        BOOL resolved = [cameraView isKindOfClass:[VRTCamera class]] && [sceneView isKindOfClass:[VRTScene class]];
-        if (resolved) {
-            block((VRTScene *)sceneView, (VRTCamera *)cameraView);
+        if ([sceneView isKindOfClass:[VRTScene class]]) {
+            block((VRTScene *)sceneView);
             return;
         }
         if (!retry) {
             return;
         }
-        if (attempt < kVRTCameraLookupMaxFrames) {
+        if (attempt < kVRTSceneLookupMaxFrames) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(16 * NSEC_PER_MSEC)),
                            dispatch_get_main_queue(), ^{
-                [weakSelf withScene:sceneTag camera:cameraTag retry:retry attempt:attempt + 1 action:action block:block];
+                [weakSelf withScene:sceneTag retry:retry attempt:attempt + 1 action:action block:block];
             });
             return;
         }
-        RCTLogError(@"Invalid view returned when %@ camera after %d frames: expected VRTCamera and VRTScene, got [%@] and [%@]",
-                    action, attempt, cameraView, sceneView);
+        RCTLogError(@"Invalid view returned when %@ camera after %d frames: expected VRTScene, got [%@]",
+                    action, attempt, sceneView);
     }];
 }
 
@@ -115,14 +119,17 @@ RCT_EXPORT_METHOD(getCameraOrientation:(nonnull NSNumber *)reactTag
 }
 
 RCT_EXPORT_METHOD(setSceneCamera:(nonnull NSNumber *)sceneTag camera:(nonnull NSNumber *)cameraTag) {
-    [self withScene:sceneTag camera:cameraTag retry:YES attempt:0 action:@"setting" block:^(VRTScene *scene, VRTCamera *camera) {
-        [scene setCamera:camera];
+    [self withScene:sceneTag retry:YES attempt:0 action:@"setting" block:^(VRTScene *scene) {
+        scene.activeCameraTag = cameraTag;
     }];
 }
 
 RCT_EXPORT_METHOD(removeSceneCamera:(nonnull NSNumber *)sceneTag camera:(nonnull NSNumber *)cameraTag) {
-    [self withScene:sceneTag camera:cameraTag retry:NO attempt:0 action:@"removing" block:^(VRTScene *scene, VRTCamera *camera) {
-        [scene removeCamera:camera];
+    [self withScene:sceneTag retry:NO attempt:0 action:@"removing" block:^(VRTScene *scene) {
+        // Only the camera the scene was last asked for can take it back to the default camera.
+        if ([scene.activeCameraTag isEqual:cameraTag]) {
+            scene.activeCameraTag = nil;
+        }
     }];
 }
 

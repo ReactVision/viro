@@ -27,6 +27,10 @@ import { StudioPlacementIndicator } from "./StudioPlacementIndicator";
 import { StudioColocationIndicator } from "./StudioColocationIndicator";
 import { studioPlacementBannerStore } from "./domain/placementBannerStore";
 import { studioColocationStore } from "./domain/colocationStore";
+import {
+  questMenuStore,
+  type StudioQuestMenuItem,
+} from "./domain/questMenuStore";
 import { StudioColocationController } from "./colocation/controller";
 import type {
   StudioColocationOptions,
@@ -80,9 +84,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: "#000000",
+  },
+  spinner: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000000",
   },
   recordingOverlay: {
     position: "absolute",
@@ -230,6 +237,15 @@ export interface StudioSceneNavigatorProps {
   onError?: (err: Error) => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onExitViro?: () => void;
+  /** Meta Quest only. Passed to `ViroXRSceneNavigator`, which documents it. */
+  renderQuestPanel?: (enter: () => void) => React.ReactNode;
+  /**
+   * Meta Quest only. Buttons for the in-scene menu, listed above its Exit
+   * button. The wearer opens and closes the menu with the left controller's Y
+   * button, and pressing a button closes it. Nothing 2D can be seen from
+   * inside the headset, so this is where the host's scene actions go.
+   */
+  questMenuItems?: readonly StudioQuestMenuItem[];
   /** Fired after the scene is fetched and parsed, before it is pushed. */
   onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
   /** Threaded to the initial scene's StudioARScene (initial scene only). */
@@ -362,6 +378,8 @@ export const StudioSceneNavigator = forwardRef<
     onError,
     onSceneChange,
     onExitViro,
+    renderQuestPanel,
+    questMenuItems,
     onSceneLoaded,
     onPlaneDetected,
     onPlaneSelected,
@@ -480,10 +498,16 @@ export const StudioSceneNavigator = forwardRef<
     );
   }, [colocationIndicator, colocationStoreOwner]);
   useEffect(() => {
+    if (!isQuest) return;
+    questMenuStore.set(questMenuItems, colocationStoreOwner);
+    return () => questMenuStore.clear(colocationStoreOwner);
+  }, [questMenuItems, colocationStoreOwner]);
+  useEffect(() => {
+    if (colocation) studioColocationStore.clearFailure(colocationStoreOwner);
     colocationRef.current?.request(colocation ?? null, {
       restartFailed: false,
     });
-  }, [colocation]);
+  }, [colocation, colocationStoreOwner]);
 
   // The tap-to-place overlay would catch taps for content that is withheld
   // while a shared session is set up.
@@ -742,9 +766,15 @@ export const StudioSceneNavigator = forwardRef<
   // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
   // while the scene loads.
   if ((isQuest || isVisionOS) && !vrSceneEntry) {
+    // The host's view fills the window, as it does over the phone camera;
+    // centring it here shrank it to its content's width.
     return (
       <View style={styles.loader}>
-        {overlay ?? <ActivityIndicator size="large" color="#ffffff" />}
+        {overlay ?? (
+          <View style={styles.spinner}>
+            <ActivityIndicator size="large" color="#ffffff" />
+          </View>
+        )}
       </View>
     );
   }
@@ -784,6 +814,7 @@ export const StudioSceneNavigator = forwardRef<
           hdrEnabled={!isQuest}
           bloomEnabled={false}
           onExitViro={onExitViro}
+          renderQuestPanel={renderQuestPanel}
           // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
           // than ViroARScene outside a shared session (see StudioARScene for
           // why), and a virtual root turns none of this on by itself, so both

@@ -35,6 +35,16 @@ const ok = (body: unknown) =>
     json: async () => body,
   });
 
+const answer = (status: number, contentType: string, body: unknown = {}) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  headers: {
+    get: (name: string) =>
+      name.toLowerCase() === "content-type" ? contentType : null,
+  },
+  json: async () => body,
+});
+
 const failed = (status: number, code: string, message: string) =>
   jest.fn().mockResolvedValue({
     ok: false,
@@ -89,6 +99,22 @@ describe("createColocationRoom", () => {
       frame_kind: "cloud_anchor",
       cloud_anchor_id: ROOM_ROW.cloud_anchor_id,
     });
+  });
+
+  it("pins the default platform's function to its database region", async () => {
+    const fetchMock = ok({ room: ROOM_ROW });
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const { endpoint: _local, ...defaultEndpoint } = CONFIG;
+    await createColocationRoom(defaultEndpoint, {
+      frameKind: "cloud_anchor",
+      cloudAnchorId: ROOM_ROW.cloud_anchor_id,
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://platform.reactvision.xyz/functions/v1/colocation/rooms?forceFunctionRegion=eu-west-2"
+    );
   });
 
   it("sends frame_ref for a Meta group and no anchor", async () => {
@@ -265,6 +291,98 @@ describe("lookupColocationRoom", () => {
 
     expect(result.success && result.room.projectId).toBe(ROOM_ROW.project_id);
     expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      "content-type": "application/json",
+      ...SESSION_HEADERS,
+    });
+  });
+});
+
+describe("region failover", () => {
+  const { endpoint: _local, ...defaultEndpoint } = CONFIG;
+  const ROOMS = "https://platform.reactvision.xyz/functions/v1/colocation/rooms";
+  const PINNED = `${ROOMS}?forceFunctionRegion=eu-west-2`;
+  const PROBE =
+    "https://platform.reactvision.xyz/functions/v1/?forceFunctionRegion=eu-west-2";
+
+  it("sends a call the pinned region could not take once more unpinned", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(answer(502, "text/html"))
+      .mockResolvedValueOnce(answer(200, "application/json", { room: ROOM_ROW }));
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    const result = await createColocationRoom(defaultEndpoint, {
+      frameKind: "visionos_space",
+    });
+
+    expect(result.success).toBe(true);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([PINNED, ROOMS]);
+  });
+
+  it("never resends an answer a function may have given", async () => {
+    // A function's own 503 is JSON, and a 504 can follow a function that started.
+    for (const reply of [
+      answer(503, "application/json", { error: { code: "X", message: "m" } }),
+      answer(504, "text/html"),
+    ]) {
+      const fetchMock = jest.fn().mockResolvedValue(reply);
+      // @ts-expect-error installing the stub
+      global.fetch = fetchMock;
+
+      await createColocationRoom(defaultEndpoint, { frameKind: "visionos_space" });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("resends after a network error only when the region fails a probe too", async () => {
+    const down = jest
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(answer(200, "application/json", { room: ROOM_ROW }));
+    // @ts-expect-error installing the stub
+    global.fetch = down;
+
+    const recovered = await createColocationRoom(defaultEndpoint, {
+      frameKind: "visionos_space",
+    });
+    expect(recovered.success).toBe(true);
+    expect(down.mock.calls.map(([url]) => url)).toEqual([PINNED, PROBE, ROOMS]);
+
+    // The region answers, so the connection dropped instead and the call may have run.
+    const dropped = jest
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(answer(404, "application/json"));
+    // @ts-expect-error installing the stub
+    global.fetch = dropped;
+
+    const refused = await createColocationRoom(defaultEndpoint, {
+      frameKind: "visionos_space",
+    });
+    expect(refused.success).toBe(false);
+    expect(dropped).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops a caller's x-region header on the resend", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(answer(522, ""))
+      .mockResolvedValueOnce(answer(200, "application/json", { room: ROOM_ROW }));
+    // @ts-expect-error installing the stub
+    global.fetch = fetchMock;
+
+    await lookupColocationRoom(
+      {
+        headers: { ...SESSION_HEADERS, "x-region": "eu-west-1" },
+        endpoint: CONFIG.endpoint,
+      },
+      "K7M2QX"
+    );
+
+    expect(fetchMock.mock.calls[0][1].headers["x-region"]).toBe("eu-west-1");
+    expect(fetchMock.mock.calls[1][1].headers).toEqual({
       "content-type": "application/json",
       ...SESSION_HEADERS,
     });

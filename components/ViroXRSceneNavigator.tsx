@@ -145,10 +145,13 @@ type Props = ViewProps & {
    * The scene root may be either:
    *  - `ViroScene`   → fully-virtual VR.
    *  - `ViroARScene` → mixed reality: passthrough is enabled automatically and
-   *    real-time plane detection (XR_EXT_plane_detection, Quest 3 / 3S) drives
-   *    `onAnchorFound` and `ViroARPlane`, exactly as on phone AR. A single
-   *    AR-rooted `initialScene` therefore runs on phones (ARCore) and Quest (OpenXR)
-   *    with no per-platform changes. See docs/QUEST_SETUP.md §7b.
+   *    planes drive `onAnchorFound` and `ViroARPlane` as on phone AR. On Meta
+   *    Quest the planes are the room model the wearer made in Space Setup
+   *    (XR_FB_scene) rather than live detection, and arrive only with the
+   *    spatial data permission (`questPermissions`). A runtime with
+   *    XR_EXT_plane_detection detects them live instead. A single AR-rooted
+   *    `initialScene` therefore runs on phones (ARCore) and Quest (OpenXR)
+   *    with no per-platform changes.
    */
   vrInitialScene?: SceneFactory;
 

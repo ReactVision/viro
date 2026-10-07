@@ -136,6 +136,9 @@ export function StudioQuestText({
           renderingOrder={renderingOrder}
           onClick={onClick}
           onHover={onHover}
+          // A text with nothing to do on a click lets it reach what is behind,
+          // so a placement aimed past a panel lands where it points.
+          ignoreEventHandling={onClick === undefined}
           // The native side reads the size as an integer.
           style={{ ...style, fontSize: Math.round(fontSize * SUPERSAMPLE) }}
         />

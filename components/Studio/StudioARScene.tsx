@@ -1756,6 +1756,15 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     [trackDragSurface, questFacingYaw]
   );
 
+  // Image-triggered assets are never shown on Quest. The notice saying so
+  // stays up only when nothing else in the scene can be shown.
+  const [imageTriggerNoticeDone, setImageTriggerNoticeDone] = useState(false);
+  const imageTriggerNotice =
+    imageTriggeredAssets.length > 0 &&
+    (!imageTriggerNoticeDone || imageTriggeredAssets.length === assets.length)
+      ? "Content that appears on an image is not shown on Meta Quest"
+      : null;
+
   // The scene origin is fixed in the room and can be out of view, and the
   // host's 2D guidance cannot be seen in the headset, so on Quest these are
   // placed in front of the wearer when they appear, as the placement prompt is.
@@ -1770,7 +1779,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           !questPlaneSelected &&
           !questPlaneFallback
         ? "Point at a surface and pull the trigger to place the scene"
-        : null;
+        : imageTriggerNotice;
   const [questNoticePlacement, setQuestNoticePlacement] = useState<{
     text: string;
     pose: CameraPose;
@@ -1788,6 +1797,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     questNotice && questNoticePlacement?.text === questNotice
       ? computeHeadLockedTransform(questNoticePlacement.pose, { distanceM: 2 })
       : null;
+  const imageTriggerNoticeShown =
+    questNoticeTransform !== null && questNotice === imageTriggerNotice;
+  useEffect(() => {
+    if (!imageTriggerNoticeShown) return;
+    const timer = setTimeout(() => setImageTriggerNoticeDone(true), 8000);
+    return () => clearTimeout(timer);
+  }, [imageTriggerNoticeShown]);
 
   // ─── Shared origin (host) ─────────────────────────────────────────────────
   // The host places the scene the way it was authored, and that pose becomes

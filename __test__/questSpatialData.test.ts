@@ -9,8 +9,13 @@
  */
 const mockCheck = jest.fn();
 const mockRequest = jest.fn();
+const mockNativeModules: { VRLauncher?: { requestPermissions: jest.Mock } } =
+  {};
 
 jest.mock("react-native", () => ({
+  get NativeModules() {
+    return mockNativeModules;
+  },
   PermissionsAndroid: {
     check: (...args: unknown[]) => mockCheck(...args),
     requestMultiple: (...args: unknown[]) => mockRequest(...args),
@@ -28,6 +33,7 @@ const USE_SCENE = "com.oculus.permission.USE_SCENE";
 beforeEach(() => {
   mockCheck.mockReset().mockResolvedValue(false);
   mockRequest.mockReset().mockResolvedValue({ [USE_SCENE]: "denied" });
+  delete mockNativeModules.VRLauncher;
 });
 
 test("a granted permission is not asked for", async () => {
@@ -78,4 +84,26 @@ test("a new session may ask again", async () => {
   startQuestSpatialDataSession();
   await questSpatialDataGranted(true);
   expect(mockRequest).toHaveBeenCalledTimes(2);
+});
+
+test("the prompt opens through the headset view when one is open", async () => {
+  const inHeadset = jest.fn().mockResolvedValue({ [USE_SCENE]: "granted" });
+  mockNativeModules.VRLauncher = { requestPermissions: inHeadset };
+  startQuestSpatialDataSession();
+  await expect(questSpatialDataGranted(true)).resolves.toBe(true);
+  expect(inHeadset).toHaveBeenCalledWith([
+    "horizonos.permission.USE_ANCHOR_API",
+    USE_SCENE,
+  ]);
+  expect(mockRequest).not.toHaveBeenCalled();
+});
+
+test("with no headset view open, PermissionsAndroid asks", async () => {
+  mockNativeModules.VRLauncher = {
+    requestPermissions: jest.fn().mockResolvedValue(null),
+  };
+  mockRequest.mockResolvedValue({ [USE_SCENE]: "granted" });
+  startQuestSpatialDataSession();
+  await expect(questSpatialDataGranted(true)).resolves.toBe(true);
+  expect(mockRequest).toHaveBeenCalledTimes(1);
 });

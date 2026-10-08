@@ -1,4 +1,4 @@
-import { PermissionsAndroid } from "react-native";
+import { NativeModules, PermissionsAndroid } from "react-native";
 
 const USE_SCENE = "com.oculus.permission.USE_SCENE";
 const SPATIAL_DATA = ["horizonos.permission.USE_ANCHOR_API", USE_SCENE];
@@ -25,9 +25,17 @@ export async function questSpatialDataGranted(
   if (await PermissionsAndroid.check(USE_SCENE as any)) return true;
   if (prompt) return prompt;
   if (!mayAsk) return false;
-  prompt = PermissionsAndroid.requestMultiple(SPATIAL_DATA as any).then(
-    (results: Record<string, string>) =>
-      results[USE_SCENE] === PermissionsAndroid.RESULTS.GRANTED
+  prompt = requestSpatialData().then(
+    (results) => results[USE_SCENE] === PermissionsAndroid.RESULTS.GRANTED
   );
   return prompt;
+}
+
+// Through the headset view, which PermissionsAndroid would close
+// (VRLauncherModule.requestPermissions says why). A binary without the method,
+// or no headset view open, falls back to PermissionsAndroid.
+async function requestSpatialData(): Promise<Record<string, string>> {
+  const inHeadset: Record<string, string> | null | undefined =
+    await NativeModules.VRLauncher?.requestPermissions?.(SPATIAL_DATA);
+  return inHeadset ?? PermissionsAndroid.requestMultiple(SPATIAL_DATA as any);
 }

@@ -83,6 +83,20 @@ import { ViroARObjectMarker } from "./components/AR/ViroARObjectMarker";
 import { ViroARTrackingTargets } from "./components/AR/ViroARTrackingTargets";
 import { ViroARPlane } from "./components/AR/ViroARPlane";
 import { ViroARPlaneSelector } from "./components/AR/ViroARPlaneSelector";
+import { ViroVPS } from "./components/AR/ViroVPS";
+import {
+  findNearbyLocations,
+  getLocationMapDownload,
+  fetchMapBytes,
+  findNearestMap,
+  candidateLocationsForTracking,
+  bytesToBase64,
+} from "./components/AR/ViroVPSMapDownload";
+import {
+  uploadScanRecording,
+  getScan,
+  ViroVPSUploadError,
+} from "./components/AR/ViroVPSScanUpload";
 import { ViroARScene } from "./components/AR/ViroARScene";
 import { ViroARSceneNavigator } from "./components/AR/ViroARSceneNavigator";
 import { ViroBox } from "./components/ViroBox";
@@ -131,6 +145,22 @@ export type {
 } from "./components/useViroMapCamera";
 export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
 export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
+export type {
+  ViroVPSProps,
+  ViroVPSTrackingStateEvent,
+  ViroVPSLocalizedEvent,
+  ViroVPSStartTrackingResult,
+} from "./components/AR/ViroVPS";
+export type { ViroVPSTrackingState } from "./components/AR/ViroVPSTracking";
+export type {
+  ViroVPSNearbyLocation,
+  ViroVPSMapDownload,
+} from "./components/AR/ViroVPSMapDownload";
+export type {
+  ViroVPSCredentials,
+  ViroVPSScanTarget,
+  ViroVPSScan,
+} from "./components/AR/ViroVPSScanUpload";
 export type {
   ViroColocationState,
   ViroColocationPeer,
@@ -386,6 +416,16 @@ export {
   ViroARTrackingTargets,
   ViroARPlane,
   ViroARPlaneSelector,
+  ViroVPS,
+  findNearbyLocations,
+  getLocationMapDownload,
+  fetchMapBytes,
+  findNearestMap,
+  candidateLocationsForTracking,
+  bytesToBase64,
+  uploadScanRecording,
+  getScan,
+  ViroVPSUploadError,
   ViroARScene,
   ViroARSceneNavigator,
   ViroBox,

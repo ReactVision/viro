@@ -248,6 +248,14 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (void)rvFinishScan:(NSInteger)ttlDays
    completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId,
                                NSString *locationTransformCsv, NSString *error))completionHandler;
+
+// Continuous VPS map localisation against a downloaded .rvmap
+/** Parses rvmapData and loads it for matching. Returns NO if it doesn't parse as a supported map. */
+- (BOOL)rvLoadVPSMap:(NSData *)rvmapData;
+/** Drops whatever rvLoadVPSMap: loaded; per-frame matching becomes a no-op. */
+- (void)rvUnloadVPSMap;
+/** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
+- (NSString *)rvGetVPSLocalizationJson;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

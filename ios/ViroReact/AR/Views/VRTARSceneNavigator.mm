@@ -1853,6 +1853,28 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         });
 }
 
+- (BOOL)rvLoadVPSMap:(NSData *)rvmapData {
+    if (!_vroView || !rvmapData || rvmapData.length == 0) return NO;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return NO;
+    std::string rvmapBytes((const char *)rvmapData.bytes, rvmapData.length);
+    return arSession->rvLoadVPSMap(rvmapBytes);
+}
+
+- (void)rvUnloadVPSMap {
+    if (!_vroView) return;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return;
+    arSession->rvUnloadVPSMap();
+}
+
+- (NSString *)rvGetVPSLocalizationJson {
+    if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return @"{\"available\":false,\"error\":\"AR session not available\"}";
+    return [NSString stringWithUTF8String:arSession->rvGetVPSLocalizationJson().c_str()];
+}
+
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }

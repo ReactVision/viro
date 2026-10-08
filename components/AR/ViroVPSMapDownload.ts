@@ -148,6 +148,21 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * Nearby locations actually worth trying for a map, nearest first.
+ *
+ * Pure and native-free: a location with no active scan has no map to
+ * download at all, so it is never worth the round trip, and filtering that
+ * out is the one piece of "auto" mode's nearest-pick that doesn't need a
+ * network call to test. `findNearbyLocations()` already returns nearest
+ * first, so the order coming in is the order going out.
+ */
+export function candidateLocationsForTracking(
+  nearby: ViroVPSNearbyLocation[]
+): ViroVPSNearbyLocation[] {
+  return nearby.filter((location) => location.active_scan_id != null);
+}
+
+/**
  * Convenience: nearest location with an active map within range, or null.
  * Does not itself decide "GPS nearby enough to start localising" — that
  * threshold (how close, how fresh a fix) is a product decision this task
@@ -161,8 +176,7 @@ export async function findNearestMap(
   radiusMeters = 200
 ): Promise<{ location: ViroVPSNearbyLocation; map: ViroVPSMapDownload } | null> {
   const nearby = await findNearbyLocations(endpoint, credentials, lat, lon, radiusMeters);
-  for (const location of nearby) {
-    if (!location.active_scan_id) continue;
+  for (const location of candidateLocationsForTracking(nearby)) {
     try {
       const map = await getLocationMapDownload(endpoint, credentials, location.id);
       return { location, map };

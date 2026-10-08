@@ -1,24 +1,25 @@
 /**
  * Copyright © 2026 ReactVision
  *
- * The "GPS nearby -> download the active .rvmap" half of Phase 1 task 1
+ * The "GPS nearby -> download the active .rvmap" half of the VPS map flow
  * (spatial/vps-server/API.md: GET /vps/locations, then
  * GET /vps/locations/{id}/map). Pure TS/fetch, same reasoning as
  * ViroVPSScanUpload.ts: there is no existing native HTTP client for
  * vps-server to route through.
  *
- * ## What this does not cover
+ * ## What this does and does not cover
  *
- * This module stops at "map bytes in memory, in JS". Handing those bytes to
- * the native per-frame matching runtime —
+ * This module gets map bytes into memory, in JS, and encodes them for the
+ * bridge ({@link bytesToBase64}). Handing those bytes to the native
+ * per-frame matching runtime —
  * ReactVisionCCA::RVCCACloudAnchorProvider::loadVPSMap()/updateVPSMapFrame()
  * (spatial/include/ReactVisionCCA/RVCCACloudAnchorProvider.h) and the
  * VROVPSLocalizer fuser (spatial/include/ReactVisionCCA/VROVPSLocalizer.h) —
- * needs a bridge method (Obj-C++ on iOS, JNI on Android) that was not built
- * in this session, and a decision about which per-frame hook on
- * VROARSessioniOS/VROARSessionARCore drives updateVPSMapFrame(). Both are
- * flagged in this task's report as the remaining integration gap, not
- * guessed at here.
+ * is ViroARSceneNavigator's loadVPSMap()/unloadVPSMap()/getVPSLocalization(),
+ * which call this base64 encoder and the native rvLoadVPSMap/rvUnloadVPSMap/
+ * rvGetVPSLocalization bridge methods (see VROARSessioniOS.h/.cpp,
+ * VROARSessionARCore.h/.cpp and VRTARSceneNavigator on iOS,
+ * ARScene.java/VRTARSceneNavigator.java on Android).
  */
 
 "use strict";
@@ -113,6 +114,37 @@ export async function fetchMapBytes(mapDownload: ViroVPSMapDownload): Promise<Ui
   }
   const buffer = await response.arrayBuffer();
   return new Uint8Array(buffer);
+}
+
+const BASE64_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/**
+ * Encodes bytes as base64, for crossing the RN bridge as a plain string —
+ * the same transport StreamingAudioManager.pushSamples() and
+ * ViroVisionOSModule's shared-space alignment data already use for binary
+ * payloads (see components/Utilities/StreamingAudioManager.ts). Self
+ * contained rather than relying on a global `btoa`, which React Native's JS
+ * runtime doesn't reliably provide. Verified against the RFC 4648 test
+ * vectors in __test__/vpsMapDownload.test.ts.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let result = "";
+  const len = bytes.length;
+  for (let i = 0; i < len; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < len ? bytes[i + 1] : undefined;
+    const b2 = i + 2 < len ? bytes[i + 2] : undefined;
+
+    result += BASE64_CHARS[b0 >> 2];
+    result += BASE64_CHARS[((b0 & 0x03) << 4) | (b1 === undefined ? 0 : b1 >> 4)];
+    result +=
+      b1 === undefined
+        ? "="
+        : BASE64_CHARS[((b1 & 0x0f) << 2) | (b2 === undefined ? 0 : b2 >> 6)];
+    result += b2 === undefined ? "=" : BASE64_CHARS[b2 & 0x3f];
+  }
+  return result;
 }
 
 /**

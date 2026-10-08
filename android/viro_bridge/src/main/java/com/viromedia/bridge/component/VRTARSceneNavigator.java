@@ -1275,6 +1275,38 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.rvGetWorldMeshStats(callback);
     }
 
+    /**
+     * Loads a downloaded {@code .rvmap}'s raw bytes for continuous VPS
+     * localisation against the live camera. Resolves {@code {"success":...}}
+     * as JSON, same shape as {@link #rvGetScanJson}.
+     */
+    public void rvLoadVPSMap(byte[] rvmapBytes, ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"success\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        ensureRvConfigApplied(arScene);
+        arScene.rvLoadVPSMap(rvmapBytes, callback);
+    }
+
+    /** Drops whatever {@link #rvLoadVPSMap} loaded. No ensureRvConfigApplied — same reasoning as {@link #rvGetScanJson}. */
+    public void rvUnloadVPSMap() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return;
+        arScene.rvUnloadVPSMap();
+    }
+
+    /** The latest continuous VPS localisation result, as JSON. No ensureRvConfigApplied — a reader shouldn't configure the provider. */
+    public void rvGetVPSLocalization(ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"available\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        arScene.rvGetVPSLocalization(callback);
+    }
+
     // CL-H: platform-native shared frames (Quest). No ensureRvConfigApplied —
     // these never reach the ReactVision backend, so the API key and project id
     // that cloud anchors need are irrelevant here.

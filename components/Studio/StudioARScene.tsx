@@ -113,6 +113,7 @@ import {
   fromPositionEuler,
   IDENTITY,
   invert,
+  multiply,
   rotateDirection,
   toNodeTransform,
   transformPoint,
@@ -214,6 +215,26 @@ function selectedPlanePose(plane: ViroAnchor, tapWorld?: Vec3) {
   out[13] = onSurface[1];
   out[14] = onSurface[2];
   return out;
+}
+
+/**
+ * The turn about a horizontal plane's normal that points the plane's -Z where
+ * the camera faces. The editor views a plane scene from +Z, so content toward
+ * -Z is meant to be in front of the viewer, while a plane's own heading can
+ * point anywhere. Null for a wall, whose facing the editor leaves open.
+ */
+function planeFacingYaw(
+  planeRotation: Vec3,
+  camera: { forward: Vec3; up: Vec3 }
+): number | null {
+  const plane = fromPositionEuler([0, 0, 0], planeRotation);
+  if (Math.abs(rotateDirection(plane, [0, 1, 0])[1]) < 0.7) return null;
+  const toPlane = invert(plane);
+  if (!toPlane) return null;
+  let [x, , z] = rotateDirection(toPlane, camera.forward);
+  // Looking straight down, forward keeps no heading, but up does.
+  if (Math.hypot(x, z) < 0.1) [x, , z] = rotateDirection(toPlane, camera.up);
+  return (Math.atan2(-x, -z) * 180) / Math.PI;
 }
 
 /** Fixed-distance point along a ray (headset fallback). */
@@ -1611,6 +1632,17 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   }, [questSpatialData, questPlaneFound]);
   const [questPlaneSelected, setQuestPlaneSelected] = useState(false);
 
+  // On Quest the plane's heading comes from the room model, so plane content
+  // is turned to face the wearer (see planeFacingYaw). Null until the plane is
+  // found or picked, and the content stays hidden until then, so it never
+  // shows a frame along the plane's own heading.
+  const [questPlaneYaw, setQuestPlaneYaw] = useState<number | null>(null);
+  const questFacingYaw = useCallback((plane: ViroAnchor) => {
+    const camera = cameraPoseRef.current;
+    if (!camera || !plane?.rotation) return 0;
+    return planeFacingYaw(plane.rotation, camera) ?? 0;
+  }, []);
+
   // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
   // (empty disables plane finding): omitting the prop keeps the native default
   // of horizontal + vertical, scanning for planes the scene never uses.
@@ -1694,11 +1726,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const handlePlaneSelected = useCallback(
     (plane: ViroAnchor) => {
       selectedAnchorIdRef.current = plane?.anchorId ?? null;
-      if (isQuest) setQuestPlaneSelected(true);
+      if (isQuest) {
+        setQuestPlaneSelected(true);
+        setQuestPlaneYaw(questFacingYaw(plane));
+      }
       trackDragSurface(plane);
       onPlaneSelected?.();
     },
-    [onPlaneSelected, trackDragSurface]
+    [onPlaneSelected, trackDragSurface, questFacingYaw]
   );
 
   // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
@@ -1712,10 +1747,13 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // also hears walls and ceilings the alignment rules out.
   const handleWrapperAnchorFound = useCallback(
     (anchor: ViroAnchor) => {
-      if (isQuest) setQuestPlaneFound(true);
+      if (isQuest) {
+        setQuestPlaneFound(true);
+        setQuestPlaneYaw(questFacingYaw(anchor));
+      }
       trackDragSurface(anchor);
     },
-    [trackDragSurface]
+    [trackDragSurface, questFacingYaw]
   );
 
   // The scene origin is fixed in the room and can be out of view, and the
@@ -1762,23 +1800,40 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     }
   }, [needsOrigin, planeDetectionMode, colocation]);
 
+  // A Quest host turns the origin as its own plane content is turned.
+  const facingPlanePose = useCallback(
+    (pose: ReturnType<typeof fromPositionEuler>, plane: ViroAnchor) =>
+      isQuest
+        ? multiply(
+            pose,
+            fromPositionEuler([0, 0, 0], [0, questFacingYaw(plane), 0])
+          )
+        : pose,
+    [questFacingYaw]
+  );
+
   const proposePlaneOrigin = useCallback(
     (anchor: ViroAnchor) => {
       if (!anchor?.position || !anchor?.rotation) return;
       colocation?.proposeOrigin(
-        fromPositionEuler(anchor.position, anchor.rotation)
+        facingPlanePose(
+          fromPositionEuler(anchor.position, anchor.rotation),
+          anchor
+        )
       );
     },
-    [colocation]
+    [colocation, facingPlanePose]
   );
 
   const handleOriginPlaneSelected = useCallback(
     (plane: ViroAnchor, tapPosition?: Vec3) => {
       handlePlaneSelected(plane);
       if (!plane?.position || !plane?.rotation) return;
-      colocation?.proposeOrigin(selectedPlanePose(plane, tapPosition));
+      colocation?.proposeOrigin(
+        facingPlanePose(selectedPlanePose(plane, tapPosition), plane)
+      );
     },
-    [handlePlaneSelected, colocation]
+    [handlePlaneSelected, colocation, facingPlanePose]
   );
 
   // Detection only, at the scene root: a plane anchor writes its world pose
@@ -1847,6 +1902,16 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // NONE scene does, at the scene root.
   const renderAssets = () => {
     if (!rootsInAR || questPlaneFallback) return <>{renderedPlaneAssets}</>;
+    const onPlane = isQuest ? (
+      <ViroNode
+        rotation={[0, questPlaneYaw ?? 0, 0]}
+        visible={questPlaneYaw !== null}
+      >
+        {renderedPlaneAssets}
+      </ViroNode>
+    ) : (
+      renderedPlaneAssets
+    );
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
@@ -1856,7 +1921,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           onAnchorFound={handleWrapperAnchorFound}
           onAnchorUpdated={trackDragSurface}
         >
-          {renderedPlaneAssets}
+          {onPlane}
         </ViroARPlane>
       );
     }
@@ -1870,7 +1935,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           onPlaneDetected={handlePlaneDetectedForSelector}
           onPlaneSelected={handlePlaneSelected}
         >
-          {renderedPlaneAssets}
+          {onPlane}
         </ViroARPlaneSelector>
       );
     }

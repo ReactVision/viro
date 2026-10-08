@@ -30,6 +30,12 @@ import {
   parseWorldMeshStats,
   withScanDiagnostics,
 } from "./ViroScanStatus";
+import {
+  uploadScanRecording as vpsUploadScanRecording,
+  ViroVPSCredentials,
+  ViroVPSScan,
+  ViroVPSScanTarget,
+} from "./ViroVPSScanUpload";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
   ViroWorldOrigin,
@@ -1019,6 +1025,27 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * Zips and uploads a ViroReact AR recording (startRecording()/
+   * stopRecording()'s session.jsonl + video.mp4, not a SensorRecorder
+   * capture) to the VPS backend — POST /vps/scans then
+   * PUT /vps/scans/{id}/recording, per spatial/vps-server/API.md. Call this
+   * after stopRecording() has resolved, passing the same outputDir.
+   *
+   * Pure TS/fetch, no native bridge call — see ViroVPSScanUpload.ts for why,
+   * and for the memory caveat on very large recordings that comes with that.
+   * `endpoint` is vps-server's own base URL, unrelated to `RVEndpoint`
+   * (ReactVisionCCA's host/resolve backend).
+   */
+  _uploadScanRecording = async (
+    endpoint: string,
+    credentials: ViroVPSCredentials,
+    target: ViroVPSScanTarget,
+    outputDir: string
+  ): Promise<ViroVPSScan> => {
+    return await vpsUploadScanRecording(endpoint, credentials, target, outputDir);
+  };
+
+  /**
    * CL-H: establish a platform-native shared coordinate frame and publish it to
    * `groupId` for other devices in the room to join. Quest only.
    *
@@ -1733,6 +1760,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getScanStatus: this._getScanStatus,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
+    uploadScanRecording: this._uploadScanRecording,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
     rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,
@@ -1808,6 +1836,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getScanStatus: this._getScanStatus,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
+    uploadScanRecording: this._uploadScanRecording,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
     rvJoinSharedFrame: this._rvJoinSharedFrame,
     snapshotWorldMeshToFile: this._snapshotWorldMeshToFile,

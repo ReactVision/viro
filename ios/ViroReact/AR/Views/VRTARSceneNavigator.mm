@@ -1791,6 +1791,24 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     arSession->rvStartScan();
 }
 
+- (void)rvResetWorldMesh {
+    if (!_vroView || !_currentScene) {
+        return;
+    }
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return;
+    }
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return;
+    }
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (worldMesh) {
+        worldMesh->resetAccumulation();
+    }
+}
+
 - (NSDictionary *)rvGetWorldMeshStats {
     if (!_vroView || !_currentScene) {
         return @{@"available": @NO, @"reason": @"The AR view is not ready"};

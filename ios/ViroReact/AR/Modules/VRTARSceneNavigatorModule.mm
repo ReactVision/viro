@@ -1166,6 +1166,23 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
 //
 // Both resolve the renderer's own JSON string, parsed on the JS side. The shape is defined once,
 // in VROARSession, instead of being restated in each bridge and drifting between them.
+RCT_EXPORT_METHOD(rvResetWorldMesh:(nonnull NSNumber *)reactTag
+                           resolve:(RCTPromiseResolveBlock)resolve
+                            reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@NO); return;
+            }
+            [(VRTARSceneNavigator *)view rvResetWorldMesh];
+            resolve(@YES);
+        } @catch (NSException *ex) {
+            resolve(@NO);
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvGetWorldMeshStats:(nonnull NSNumber *)reactTag
                               resolve:(RCTPromiseResolveBlock)resolve
                                reject:(RCTPromiseRejectBlock)reject) {

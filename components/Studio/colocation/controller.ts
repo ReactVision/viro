@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import {
   getColocationPeers,
   getColocationState,
@@ -33,6 +32,7 @@ import {
 } from "../../AR/ViroReplication";
 import type { ViroScanStatus } from "../../Types/ViroEvents";
 import { isQuest } from "../../Utilities/ViroPlatform";
+import { showStudioAlert } from "../domain/questAlertStore";
 import { studioApiError } from "../domain/studioApiError";
 import type { StudioSceneResponse } from "../types";
 import { type StudioAuthContext, VRTStudioModule } from "../VRTStudioModule";
@@ -268,7 +268,7 @@ function outsideProjectError(sceneId: string): Error {
 /** As a NAVIGATE on its own reports a scene that failed to load. */
 function reportNavigationError(error: unknown): void {
   console.error("[Studio] Error navigating to scene:", error);
-  Alert.alert("Navigation Error", "Failed to load scene");
+  showStudioAlert("Navigation Error", "Failed to load scene");
 }
 
 const DEFAULT_DEPS: StudioColocationDeps = {

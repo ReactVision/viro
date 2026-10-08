@@ -1,11 +1,12 @@
+import { Alert } from "react-native";
+import { isQuest } from "../../Utilities/ViroPlatform";
 import { GlobalListeners } from "./utils";
 
 /**
- * Quest has no 2D overlay surface, so ALERT (and the TAKE_PHOTO failure
- * alert, which shares this path) can't show a native Alert.alert dialog the
- * way phones do. This module singleton is the single active message; the
- * ALERT dispatch arm in sceneNavigationHandler writes it, and
- * StudioQuestAlertOverlay subscribes to render it in-scene, head-locked.
+ * Quest has no 2D overlay surface, so a scene's alerts can't show a native
+ * Alert.alert dialog the way phones do. This module singleton is the single
+ * active message; showStudioAlert writes it, and StudioQuestAlertOverlay
+ * subscribes to render it in-scene, head-locked.
  */
 class QuestAlertStore {
   private activeTitle: string | null = null;
@@ -48,3 +49,17 @@ class QuestAlertStore {
 }
 
 export const questAlertStore = new QuestAlertStore();
+
+/**
+ * Shows a Studio scene's alert: the ALERT function's, or a failure the wearer
+ * has to know about. On Quest, Alert.alert would open over the 2D panel, out
+ * of sight in the headset, so the in-scene panel shows it instead, dismissed
+ * by a click as "OK" dismisses the dialog on phones.
+ */
+export function showStudioAlert(title: string, message: string): void {
+  if (isQuest) {
+    questAlertStore.show(title, message);
+    return;
+  }
+  Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);
+}

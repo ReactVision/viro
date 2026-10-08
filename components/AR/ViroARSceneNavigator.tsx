@@ -27,6 +27,8 @@ import {
   isLocationTransform,
   parseScanDiagnostics,
   parseScanStatus,
+  parseVPSLocalization,
+  parseVPSMapLoadResult,
   parseWorldMeshStats,
   withScanDiagnostics,
 } from "./ViroScanStatus";
@@ -36,6 +38,7 @@ import {
   ViroVPSScan,
   ViroVPSScanTarget,
 } from "./ViroVPSScanUpload";
+import { bytesToBase64 } from "./ViroVPSMapDownload";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
   ViroWorldOrigin,
@@ -66,6 +69,8 @@ import {
   ViroMonocularDepthPreferenceResult,
   ViroDepthOcclusionSupportResult,
   ViroGeospatialSetupStatusResult,
+  ViroVPSMapLoadResult,
+  ViroVPSLocalizationResult,
 } from "../Types/ViroEvents";
 import {
   Viro3DPoint,
@@ -996,6 +1001,54 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * Loads a `.rvmap` downloaded with ViroVPSMapDownload's fetchMapBytes()
+   * for continuous localisation against the live camera. Bytes cross the RN
+   * bridge base64-encoded (the same transport StreamingAudioManager.
+   * pushSamples() uses for binary payloads) — this encodes them, so callers
+   * pass the raw bytes fetchMapBytes() already returns.
+   *
+   * Only one map can be loaded at a time; loading a new one replaces
+   * whatever was loaded before. Call unloadVPSMap() to stop matching
+   * against it. See getVPSLocalization() for the per-frame result this
+   * feeds, polled rather than pushed — building the full `<ViroVPS>`
+   * component (startTracking()/onLocalized/onTrackingState) is separate,
+   * larger work this does not attempt.
+   */
+  _loadVPSMap = async (rvmapBytes: Uint8Array): Promise<ViroVPSMapLoadResult> => {
+    try {
+      return parseVPSMapLoadResult(
+        await ViroARSceneNavigatorModule.rvLoadVPSMap(
+          findNodeHandle(this),
+          bytesToBase64(rvmapBytes)
+        )
+      );
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  };
+
+  /** Drops whatever loadVPSMap() loaded. Per-frame matching against it becomes a no-op. */
+  _unloadVPSMap = () => {
+    ViroARSceneNavigatorModule.rvUnloadVPSMap(findNodeHandle(this));
+  };
+
+  /**
+   * The latest continuous VPS localisation result against the map loaded
+   * with loadVPSMap(), as of this call — poll it on a timer while a map is
+   * loaded. `renderPose` (once `converged` is true) is the smoothed
+   * map-relative pose to apply to content; see {@link ViroVPSLocalizationResult}.
+   */
+  _getVPSLocalization = async (): Promise<ViroVPSLocalizationResult> => {
+    try {
+      return parseVPSLocalization(
+        await ViroARSceneNavigatorModule.rvGetVPSLocalization(findNodeHandle(this))
+      );
+    } catch (error) {
+      return { available: false, error: String(error) };
+    }
+  };
+
+  /**
    * Whether a world mesh exists and how big it is.
    *
    * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
@@ -1758,6 +1811,9 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startScan: this._startScan,
     finishScan: this._finishScan,
     getScanStatus: this._getScanStatus,
+    loadVPSMap: this._loadVPSMap,
+    unloadVPSMap: this._unloadVPSMap,
+    getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
     uploadScanRecording: this._uploadScanRecording,
@@ -1834,6 +1890,9 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startScan: this._startScan,
     finishScan: this._finishScan,
     getScanStatus: this._getScanStatus,
+    loadVPSMap: this._loadVPSMap,
+    unloadVPSMap: this._unloadVPSMap,
+    getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
     uploadScanRecording: this._uploadScanRecording,

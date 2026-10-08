@@ -14,8 +14,8 @@
  * Building the zip and reading the two recording files both happen here, in
  * JS, deliberately: there is no existing native HTTP client for vps-server
  * (unlike the ReactVisionCCA/spatial backend, which every other REST call in
- * this file routes through natively) and this task's instructions call for
- * the upload to be wired "from the TS layer".
+ * this file routes through natively), so the upload is wired from the TS
+ * layer instead.
  *
  * That has a real cost the API doc calls out directly: "a recording of
  * several hundred MB streams to disk instead of travelling inside a form" —
@@ -23,16 +23,15 @@
  * never has to sit fully in memory. buildStoredZip()/readLocalFile() below
  * do exactly that anyway: they read session.jsonl and video.mp4 fully into
  * JS ArrayBuffers and hold the whole zip in memory before the PUT. For a
- * short scan this is fine; for a long one it is not, and is the interim
- * stand-in this task's report flags — the real fix is a native zip+stream
- * upload (the same shape rvUploadAsset already uses for CCA asset uploads),
- * which is out of this session's scope.
+ * short scan this is fine; for a long one it is not, and is an interim
+ * stand-in — the real fix is a native zip+stream upload (the same shape
+ * rvUploadAsset already uses for CCA asset uploads).
  *
  * Reading a local file via `fetch("file://…")` → `.blob()` → `.arrayBuffer()`
  * is React Native's own supported path for local files (no extra native
  * dependency), not something added here — but it has not been exercised
- * against a real recording on a device in this session; see this task's
- * report for what still needs that verification.
+ * against a real recording on a device, so that path still needs on-device
+ * verification.
  */
 
 "use strict";

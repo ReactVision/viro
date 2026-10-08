@@ -788,20 +788,33 @@ class VRActivity : ReactActivity() {
   // rootProject.ext from gradle.properties (`android.targetSdkVersion`), so a
   // rewrite of app/build.gradle never matched anything. Only ever lower it.
   // Quest hardware is arm64-only; the other ABIs roughly double the APK and the
-  // store warns on 32-bit libraries.
+  // store warns on 32-bit libraries. The store's upload check rejects a
+  // minSdkVersion outside 29-34, and React Native's default is 24; only ever
+  // raise it.
   const questTargetSdk = props?.android?.questTargetSdkVersion ?? 34;
+  const questMinSdk = props?.android?.questMinSdkVersion ?? 32;
   const questArm64Only = props?.android?.questArm64Only ?? true;
   config = withGradleProperties(config, (config) => {
-    const current = config.modResults.find(
-      (item) => item.type === "property" && item.key === "android.targetSdkVersion"
-    );
-    const currentSdk =
-      current?.type === "property" ? parseInt(current.value, 10) : NaN;
+    const readSdk = (key: string) => {
+      const item = config.modResults.find(
+        (item) => item.type === "property" && item.key === key
+      );
+      return item?.type === "property" ? parseInt(item.value, 10) : NaN;
+    };
+    const currentSdk = readSdk("android.targetSdkVersion");
     if (Number.isNaN(currentSdk) || currentSdk > questTargetSdk) {
       AndroidConfig.BuildProperties.updateAndroidBuildProperty(
         config.modResults,
         "android.targetSdkVersion",
         String(questTargetSdk)
+      );
+    }
+    const currentMinSdk = readSdk("android.minSdkVersion");
+    if (Number.isNaN(currentMinSdk) || currentMinSdk < questMinSdk) {
+      AndroidConfig.BuildProperties.updateAndroidBuildProperty(
+        config.modResults,
+        "android.minSdkVersion",
+        String(questMinSdk)
       );
     }
     if (questArm64Only) {
@@ -901,6 +914,10 @@ class VRActivity : ReactActivity() {
     // an earlier prebuild has that one removed. 69 is the first version with
     // hybrid (panel + immersive) apps.
     const manifest = config.modResults.manifest as any;
+    // Required by the store's manifest check, to allow installs to an SD card.
+    if (!manifest.$["android:installLocation"]) {
+      manifest.$["android:installLocation"] = "auto";
+    }
     delete manifest.$["xmlns:horizonos"];
     delete manifest["horizonos:uses-horizonos-sdk"];
     manifest.$["xmlns:metavr"] = "http://schemas.meta.com/metavr-sdk";

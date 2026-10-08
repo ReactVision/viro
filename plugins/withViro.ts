@@ -184,6 +184,14 @@ export interface ViroConfigurationOptions {
      */
     questTargetSdkVersion?: number;
     /**
+     * minSdkVersion floor applied when xRMode includes "QUEST". The Meta
+     * Quest Store accepts 29 to 34 and recommends 32; above 32 excludes
+     * headsets on Horizon OS before v76. Only ever raises the value.
+     *
+     * DEFAULTS TO: 32
+     */
+    questMinSdkVersion?: number;
+    /**
      * Build arm64-v8a only when xRMode includes "QUEST". Quest hardware is
      * 64-bit and the store warns on 32-bit libraries.
      *

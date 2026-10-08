@@ -908,16 +908,17 @@ class VRActivity : ReactActivity() {
       });
     }
 
-    // Horizon OS logs that an app without this "must fix this to continue to
-    // access this SDK" when it first reads a Horizon SDK manager, and that the
-    // older <horizonos:uses-horizonos-sdk> is deprecated, so a manifest left by
-    // an earlier prebuild has that one removed. 69 is the first version with
-    // hybrid (panel + immersive) apps.
     const manifest = config.modResults.manifest as any;
     // Required by the store's manifest check, to allow installs to an SD card.
     if (!manifest.$["android:installLocation"]) {
       manifest.$["android:installLocation"] = "auto";
     }
+
+    // Horizon OS logs that an app without this "must fix this to continue to
+    // access this SDK" when it first reads a Horizon SDK manager, and that the
+    // older <horizonos:uses-horizonos-sdk> is deprecated, so a manifest left by
+    // an earlier prebuild has that one removed. 69 is the first version with
+    // hybrid (panel + immersive) apps.
     delete manifest.$["xmlns:horizonos"];
     delete manifest["horizonos:uses-horizonos-sdk"];
     manifest.$["xmlns:metavr"] = "http://schemas.meta.com/metavr-sdk";

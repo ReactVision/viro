@@ -5,6 +5,7 @@ import {
   withAndroidManifest,
   withAppBuildGradle,
   withDangerousMod,
+  withFinalizedMod,
   withGradleProperties,
   withProjectBuildGradle,
   withSettingsGradle,
@@ -938,6 +939,55 @@ class VRActivity : ReactActivity() {
 
     return config;
   });
+
+  // 4. The store requires a network security config (VRC.Quest.Packaging.4).
+  // On API 24+ one overrides android:usesCleartextTraffic, so each source set
+  // gets a copy holding its own manifest's value: plain http stays allowed in
+  // the debug builds, which load the JS bundle over it, and blocked wherever it
+  // was. A finalized mod, so it sees that value whichever plugin set it.
+  config = withFinalizedMod(config, [
+    "android",
+    async (config) => {
+      const srcDir = path.join(config.modRequest.platformProjectRoot, "app", "src");
+      const mainManifestPath = path.join(srcDir, "main", "AndroidManifest.xml");
+      const mainManifest = await AndroidConfig.Manifest.readAndroidManifestAsync(mainManifestPath);
+      const mainApp = mainManifest.manifest.application?.[0] as any;
+      const resource = "@xml/viro_network_security_config";
+      const existing = mainApp?.$?.["android:networkSecurityConfig"];
+      // The app's own config is left alone.
+      if (!mainApp || (existing && existing !== resource)) return config;
+
+      for (const sourceSet of fs.readdirSync(srcDir)) {
+        const manifestPath = path.join(srcDir, sourceSet, "AndroidManifest.xml");
+        if (!fs.existsSync(manifestPath)) continue;
+        const manifest =
+          sourceSet === "main"
+            ? mainManifest
+            : await AndroidConfig.Manifest.readAndroidManifestAsync(manifestPath);
+        const cleartext = (manifest.manifest.application?.[0] as any)?.$?.[
+          "android:usesCleartextTraffic"
+        ];
+        if (sourceSet !== "main" && cleartext === undefined) continue;
+        const xmlDir = path.join(srcDir, sourceSet, "res", "xml");
+        fs.mkdirSync(xmlDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(xmlDir, "viro_network_security_config.xml"),
+          `<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <base-config cleartextTrafficPermitted="${cleartext === "true"}" />
+</network-security-config>
+`,
+          "utf-8"
+        );
+      }
+
+      if (!existing) {
+        mainApp.$["android:networkSecurityConfig"] = resource;
+        await AndroidConfig.Manifest.writeAndroidManifestAsync(mainManifestPath, mainManifest);
+      }
+      return config;
+    },
+  ]);
 
   return config;
 };

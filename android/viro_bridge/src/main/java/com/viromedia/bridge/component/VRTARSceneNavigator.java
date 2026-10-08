@@ -1264,6 +1264,20 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
      * Separate from {@link #rvGetScanJson} rather than a third flag on it: mesh capture is scene
      * state and answers even with no AR session, while the scan getters need one.
      */
+    /**
+     * Clears the fused world mesh so the next scan starts from an empty room.
+     *
+     * Only the depth-image and monocular paths accumulate. On a LiDAR device ARKit owns the
+     * accumulation and this does nothing.
+     */
+    public void rvResetWorldMesh() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            return;
+        }
+        arScene.resetWorldMesh();
+    }
+
     public void rvGetWorldMeshStatsJson(ARScene.RvScanJsonCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {

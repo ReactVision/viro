@@ -845,8 +845,10 @@ class VRActivity : ReactActivity() {
           "android:name": ".VRActivity",
           "android:screenOrientation": "landscape",
           "android:exported": "false",
+          // Meta's recommended set: a change missing from it recreates the
+          // activity, which tears down the running scene.
           "android:configChanges":
-            "keyboard|keyboardHidden|orientation|screenSize|uiMode",
+            "density|keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|uiMode",
           "android:launchMode": "singleTask",
         },
         "intent-filter": [
@@ -874,6 +876,26 @@ class VRActivity : ReactActivity() {
     const mainActivity = app.activity?.[0];
     if (questAppId && mainActivity?.$ && mainActivity.$["android:name"] !== ".VRActivity") {
       mainActivity.$["android:screenOrientation"] = "landscape";
+    }
+
+    // The store's manifest rules require excludeFromRecents on the activity
+    // that launches the app, and Horizon OS reads from each activity's intent
+    // filter whether it renders in a panel (2D) or an immersive view (VR).
+    const hasName = (items: any[] | undefined, name: string) =>
+      items?.some((item: any) => item.$?.["android:name"] === name) ?? false;
+    for (const activity of app.activity as any[]) {
+      const launcherFilter = activity["intent-filter"]?.find(
+        (filter: any) =>
+          hasName(filter.action, "android.intent.action.MAIN") &&
+          hasName(filter.category, "android.intent.category.LAUNCHER")
+      );
+      if (!launcherFilter) continue;
+      activity.$["android:excludeFromRecents"] = "true";
+      if (!hasName(launcherFilter.category, "com.oculus.intent.category.2D")) {
+        launcherFilter.category.push({
+          $: { "android:name": "com.oculus.intent.category.2D" },
+        });
+      }
     }
 
     // Inject com.oculus.app_id into <application> for Meta Quest App Name

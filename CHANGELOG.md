@@ -66,6 +66,7 @@
 - **The `vrInitialScene` docs say where Meta Quest's planes come from (`ViroXRSceneNavigator`).** They named live detection through XR_EXT_plane_detection, which Meta's runtime does not implement. On Quest the planes are the room model from Space Setup (XR_FB_scene), and need the spatial data permission.
 - **The Expo plugin adds ARCore to the app's `<queries>` instead of replacing them.** It dropped the template's https entry, so on an Android 11 or later phone `Linking.canOpenURL` could report no app for a web link. Horizon OS answers true without it.
 - **On Meta Quest, a failed photo, recording or scene change is reported in the headset (`sceneNavigationHandler`, the co-location controller).** TAKE_PHOTO, RECORD_VIDEO and NAVIGATION reported a failure with `Alert.alert`, which opens over the 2D panel, out of sight while the headset view runs. They now use the in-scene alert panel, as ALERT does.
+- **The microphone prompt for a recording opens over the headset view on Meta Quest (`MediaCapture`).** It was asked through the 2D panel, which closed the headset view, as the spatial data prompt did before `VRLauncher.requestPermissions`. It is now asked through the live VRActivity.
 
 ## v3.0.3 — 6 October 2026
 

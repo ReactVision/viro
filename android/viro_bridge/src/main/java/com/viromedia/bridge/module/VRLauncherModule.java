@@ -173,7 +173,7 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
      * Live VRActivities, found through {@code ActivityThread.mActivities} (the
      * React context's current activity cannot be trusted, see exitVRScene).
      */
-    private static java.util.List<Activity> liveVRActivities() {
+    static java.util.List<Activity> liveVRActivities() {
         java.util.List<Activity> vrActivities = new java.util.ArrayList<>();
         try {
             Class<?> threadCls = Class.forName("android.app.ActivityThread");

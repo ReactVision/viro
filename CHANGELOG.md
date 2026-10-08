@@ -60,6 +60,7 @@
 - **`ViroARScene` sets its view's ref, as `ViroScene` does (`ViroARScene`).** Without it `setNativeProps` on an AR scene did nothing. In debug builds React DevTools also kept a closed AR scene's whole node tree once one of the scene's methods, such as a hit test, had called `findNodeHandle`: that call made React create the view's public instance after DevTools had filed the view under another key, so DevTools never removed it. With the ref, React creates the public instance as the scene mounts.
 - **`ViroMaterial` types the colour write mask as the bridges read it: `colorWriteMask`, an array.** It was typed `colorWritesMask`, a single string, which neither bridge reads, so a material that set it wrote every channel. Set `colorWriteMask: ["None"]` (or the channels to write) instead.
 - **The `vrInitialScene` docs say where Meta Quest's planes come from (`ViroXRSceneNavigator`).** They named live detection through XR_EXT_plane_detection, which Meta's runtime does not implement. On Quest the planes are the room model from Space Setup (XR_FB_scene), and need the spatial data permission.
+- **The Expo plugin adds ARCore to the app's `<queries>` instead of replacing them.** It dropped the template's https entry, so on an Android 11 or later phone `Linking.canOpenURL` could report no app for a web link. Horizon OS answers true without it.
 
 ## v3.0.3 — 6 October 2026
 

@@ -395,17 +395,14 @@ const withViroManifest = (config: ExpoConfig) =>
         );
       }
 
-      contents.manifest.queries = [
-        {
-          package: [
-            {
-              $: {
-                "android:name": "com.google.ar.core",
-              },
-            },
-          ],
-        },
-      ];
+      // Added to the app's <queries>, not replacing it: the template's https
+      // intent there is what lets Linking.canOpenURL see a browser.
+      if (!contents.manifest.queries) contents.manifest.queries = [{}];
+      const queries = contents.manifest.queries[0];
+      if (!queries.package) queries.package = [];
+      if (!queries.package.some((p: any) => p.$?.["android:name"] === "com.google.ar.core")) {
+        queries.package.push({ $: { "android:name": "com.google.ar.core" } });
+      }
 
       contents.manifest["uses-feature"] = [];
 

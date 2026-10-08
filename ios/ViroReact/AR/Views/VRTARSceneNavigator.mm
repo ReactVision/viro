@@ -2369,6 +2369,17 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
         if (worldMeshConfig[@"debugDrawEnabled"]) {
             _worldMeshConfigCpp.debugDrawEnabled = [worldMeshConfig[@"debugDrawEnabled"] boolValue];
         }
+        // Fusion across frames. Only the depth-image and monocular paths use these; on a LiDAR
+        // device ARKit owns the accumulation and they are ignored.
+        if (worldMeshConfig[@"accumulate"]) {
+            _worldMeshConfigCpp.accumulate = [worldMeshConfig[@"accumulate"] boolValue];
+        }
+        if (worldMeshConfig[@"voxelSize"]) {
+            _worldMeshConfigCpp.voxelSize = [worldMeshConfig[@"voxelSize"] floatValue];
+        }
+        if (worldMeshConfig[@"maxMemoryMB"]) {
+            _worldMeshConfigCpp.maxMemoryMB = [worldMeshConfig[@"maxMemoryMB"] intValue];
+        }
     }
 
     // Apply to AR scene if ready

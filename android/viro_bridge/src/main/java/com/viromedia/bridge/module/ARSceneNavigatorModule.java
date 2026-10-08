@@ -36,6 +36,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import androidx.core.content.ContextCompat;
+import android.util.Base64;
 import android.util.Log;
 import android.view.PixelCopy;
 import android.view.View;
@@ -1648,6 +1649,80 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     ((VRTARSceneNavigator) view).rvGetWorldMeshStatsJson(json -> promise.resolve(json));
                 } catch (Exception e) {
                     promise.resolve("{\"available\":false,\"reason\":\"" + String.valueOf(e.getMessage()) + "\"}");
+                }
+            }
+        });
+    }
+
+    /**
+     * Loads a downloaded {@code .rvmap}'s raw bytes (base64, same transport as
+     * {@code StreamingAudioModule.pushSamples}) for continuous VPS localisation.
+     * Resolves the renderer's own JSON verbatim ({@code {"success":...}}),
+     * same reasoning as {@link #rvGetScanStatus}.
+     */
+    @ReactMethod
+    public void rvLoadVPSMap(final int sceneNavTag, final String rvmapBase64, final Promise promise) {
+        final byte[] rvmapBytes;
+        try {
+            rvmapBytes = Base64.decode(rvmapBase64, Base64.NO_WRAP);
+        } catch (Exception e) {
+            promise.resolve("{\"success\":false,\"error\":\"Malformed base64 map data\"}");
+            return;
+        }
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve("{\"success\":false,\"error\":\"UIManager not available\"}"); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve("{\"success\":false,\"error\":\"Invalid view type\"}");
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvLoadVPSMap(rvmapBytes, json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve("{\"success\":false,\"error\":\"" + String.valueOf(e.getMessage()) + "\"}");
+                }
+            }
+        });
+    }
+
+    /** Drops whatever {@link #rvLoadVPSMap} loaded. Fire-and-forget, same shape as {@link #rvStartScan}. */
+    @ReactMethod
+    public void rvUnloadVPSMap(final int sceneNavTag) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) return;
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) return;
+                    ((VRTARSceneNavigator) view).rvUnloadVPSMap();
+                } catch (Exception e) { /* no-op */ }
+            }
+        });
+    }
+
+    /**
+     * The latest continuous VPS localisation result, as JSON — a pollable
+     * stand-in for an onLocalized event. Resolves the renderer's own JSON
+     * verbatim, same reasoning as {@link #rvGetScanStatus}.
+     */
+    @ReactMethod
+    public void rvGetVPSLocalization(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve("{\"available\":false,\"error\":\"UIManager not available\"}"); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve("{\"available\":false,\"error\":\"AR navigator is not mounted yet\"}");
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvGetVPSLocalization(json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve("{\"available\":false,\"error\":\"" + String.valueOf(e.getMessage()) + "\"}");
                 }
             }
         });

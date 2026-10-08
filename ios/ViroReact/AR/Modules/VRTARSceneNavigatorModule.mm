@@ -1214,6 +1214,60 @@ RCT_EXPORT_METHOD(rvGetScanDiagnostics:(nonnull NSNumber *)reactTag
     }];
 }
 
+// Loads a downloaded .rvmap's raw bytes (base64, same transport
+// VRTStreamingAudioModule.pushSamples uses) for continuous VPS localisation.
+// Resolves the renderer's own JSON verbatim ({"success":...}), same reasoning
+// as rvGetScanStatus above.
+RCT_EXPORT_METHOD(rvLoadVPSMap:(nonnull NSNumber *)reactTag
+                    rvmapBase64:(NSString *)rvmapBase64
+                        resolve:(RCTPromiseResolveBlock)resolve
+                         reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@"{\"success\":false,\"error\":\"Invalid view type\"}"); return;
+            }
+            NSData *rvmapData = [[NSData alloc] initWithBase64EncodedString:rvmapBase64 options:0];
+            if (!rvmapData || rvmapData.length == 0) {
+                resolve(@"{\"success\":false,\"error\":\"Empty or malformed base64 map data\"}"); return;
+            }
+            BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMap:rvmapData];
+            resolve(ok ? @"{\"success\":true}" : @"{\"success\":false}");
+        } @catch (NSException *ex) {
+            resolve([NSString stringWithFormat:@"{\"success\":false,\"error\":\"%@\"}", ex.reason]);
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvUnloadVPSMap:(nonnull NSNumber *)reactTag) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
+            [(VRTARSceneNavigator *)view rvUnloadVPSMap];
+        } @catch (NSException *ex) { /* no-op — unload has no promise to reject */ }
+    }];
+}
+
+// A pollable stand-in for an onLocalized event — see rvGetScanStatus above
+// for the same "resolve the renderer's JSON verbatim" reasoning.
+RCT_EXPORT_METHOD(rvGetVPSLocalization:(nonnull NSNumber *)reactTag
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@"{\"available\":false,\"error\":\"AR navigator is not mounted yet\"}"); return;
+            }
+            resolve([(VRTARSceneNavigator *)view rvGetVPSLocalizationJson]);
+        } @catch (NSException *ex) {
+            resolve([NSString stringWithFormat:@"{\"available\":false,\"error\":\"%@\"}", ex.reason]);
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                            anchorId:(NSString *)anchorId
                             resolve:(RCTPromiseResolveBlock)resolve

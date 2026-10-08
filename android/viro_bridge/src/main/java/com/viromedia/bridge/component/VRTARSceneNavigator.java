@@ -1477,6 +1477,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private boolean mNeedsWorldMeshToggle = false;
     private int mWorldMeshStride = 4;
     private float mWorldMeshMinConfidence = 0.3f;
+    private boolean mWorldMeshAccumulate = true;
+    private float mWorldMeshVoxelSize = 0.0f;      // 0 = keep the renderer's default
+    private int mWorldMeshMaxMemoryMB = 0;         // 0 = keep the renderer's default
     private float mWorldMeshMaxDepth = 5.0f;
     private double mWorldMeshUpdateIntervalMs = 100.0;
     private double mWorldMeshPersistenceMs = 500.0;
@@ -1528,6 +1531,17 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (config.hasKey("debugDrawEnabled")) {
             mWorldMeshDebugDrawEnabled = config.getBoolean("debugDrawEnabled");
         }
+        // Fusion across frames. Sent separately from the positional setWorldMeshConfig below,
+        // whose signature is public API on ARScene.
+        if (config.hasKey("accumulate")) {
+            mWorldMeshAccumulate = config.getBoolean("accumulate");
+        }
+        if (config.hasKey("voxelSize")) {
+            mWorldMeshVoxelSize = (float) config.getDouble("voxelSize");
+        }
+        if (config.hasKey("maxMemoryMB")) {
+            mWorldMeshMaxMemoryMB = config.getInt("maxMemoryMB");
+        }
 
         // Apply to ARScene if available
         ARScene arScene = getCurrentARScene();
@@ -1543,6 +1557,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 mWorldMeshCollisionTag,
                 mWorldMeshDebugDrawEnabled
             );
+            arScene.setWorldMeshFusion(mWorldMeshAccumulate, mWorldMeshVoxelSize, mWorldMeshMaxMemoryMB);
         }
     }
 
@@ -1565,6 +1580,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             mWorldMeshCollisionTag,
             mWorldMeshDebugDrawEnabled
         );
+        arScene.setWorldMeshFusion(mWorldMeshAccumulate, mWorldMeshVoxelSize, mWorldMeshMaxMemoryMB);
 
         // Then enable/disable
         arScene.setWorldMeshEnabled(mWorldMeshEnabled);

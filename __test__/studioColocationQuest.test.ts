@@ -558,7 +558,7 @@ describe("the scene root", () => {
     expect(rootsInAR(h, [h.controller.claimSceneMount()])).toEqual([true]);
   });
 
-  it("is what StudioARScene decides its Quest root by", () => {
+  it("is what StudioARScene decides its Quest and visionOS root by", () => {
     const source = fs.readFileSync(
       path.resolve(
         __dirname,
@@ -574,10 +574,14 @@ describe("the scene root", () => {
     );
     expect(source).toMatch(/colocation\.attachScene\([^;]*sceneMount\s*\);/);
     expect(source).toMatch(
-      /const rootsInAR = studioSceneRootsInAR\(colocationFrame, sceneMount, isQuest\);/
+      /const rootsInAR = studioSceneRootsInAR\(\s*colocationFrame,\s*sceneMount,\s*rootsOutsideAR\s*\);/
     );
     expect(source).toMatch(/if \(!rootsInAR\) \{\s*return \(\s*<ViroScene/);
     expect(source).not.toMatch(/if \(isQuest\) \{\s*return \(\s*<ViroScene/);
+    // visionOS has to travel with Quest here: its ImmersiveSpace cannot host a
+    // ViroARScene either, and ViroARScene renders null there.
+    expect(source).toMatch(/const rootsOutsideAR = isQuest \|\| isVisionOS;/);
+    expect(source).not.toMatch(/return isQuest \? \(\s*<ViroScene/);
   });
 
   it("keeps plane components out of a ViroScene root", () => {

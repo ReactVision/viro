@@ -513,6 +513,12 @@ const withViroManifest = (config: ExpoConfig) =>
               : { "android:name": "com.oculus.permission.EYE_TRACKING", "tools:node": "remove" },
           });
         }
+        // The viro_renderer AAR declares NFC to detect a Cardboard viewer.
+        if (!existingPermissions.includes("android.permission.NFC")) {
+          contents.manifest["uses-permission"].push({
+            $: { "android:name": "android.permission.NFC", "tools:node": "remove" },
+          });
+        }
         // Spatial Data / Scene permissions — required for the Meta OpenXR runtime
         // to expose the scene & spatial-entity extensions (XR_FB_scene,
         // XR_FB_spatial_entity*, XR_FB_scene_capture). Without USE_ANCHOR_API the

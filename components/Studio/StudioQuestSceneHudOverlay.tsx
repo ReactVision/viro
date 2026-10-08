@@ -16,6 +16,7 @@ import {
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
+import { questAlertLayout } from "./StudioQuestAlertOverlay";
 import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
 import { useStudioColocation } from "./useStudioColocation";
 
@@ -144,6 +145,15 @@ export function StudioQuestSceneHudOverlay({
     subscribeToAlert,
     isAlertShown,
     isAlertShown
+  );
+  const alertTitle = alertShown ? questAlertStore.title() : null;
+  const alertMessage = alertShown ? questAlertStore.message() : null;
+  const alertPanelHeight = React.useMemo(
+    () =>
+      alertMessage === null
+        ? 0
+        : questAlertLayout(alertTitle, alertMessage).panelHeight,
+    [alertTitle, alertMessage]
   );
 
   const poseRef = React.useRef(cameraPose);
@@ -286,11 +296,12 @@ export function StudioQuestSceneHudOverlay({
   const centred = menuOpen || (!alertShown && !promptShown);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
-    // Below the centre, the panel grows downwards, so its top edge stays where
-    // an alert expects it.
+    // Below the centre, the panel hangs from just under the alert's bottom
+    // edge or the prompt's line, and grows downwards.
     verticalOffsetM: centred
       ? 0
-      : QUEST_PANEL_SCALE * (-0.4 - (height - 0.5) / 2),
+      : QUEST_PANEL_SCALE *
+        ((alertShown ? -alertPanelHeight / 2 - 0.05 : -0.15) - height / 2),
   });
 
   // Each line is positioned explicitly: inside a ViroFlexView on Quest every

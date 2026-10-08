@@ -14,6 +14,8 @@ import type {
   ViroFinishScanResult,
   ViroScanDiagnostics,
   ViroScanStatus,
+  ViroVPSLocalizationResult,
+  ViroVPSMapLoadResult,
 } from "../Types/ViroEvents";
 import type { ViroWorldMeshStatsResult } from "../Types/ViroWorldMesh";
 
@@ -94,6 +96,42 @@ export function isLocationTransform(value: unknown): value is string {
     const n = Number(p);
     return p.trim().length > 0 && Number.isFinite(n);
   });
+}
+
+/** Same contract as {@link parseScanStatus}: never throws. `success: false` with no `error` is malformed JSON. */
+export function parseVPSMapLoadResult(
+  json: string | null | undefined
+): ViroVPSMapLoadResult {
+  if (typeof json !== "string" || json.length === 0) {
+    return { success: false, error: "No response from the renderer" };
+  }
+  try {
+    const parsed = JSON.parse(json);
+    if (parsed == null || typeof parsed !== "object") {
+      return { success: false, error: "Malformed map load result" };
+    }
+    return parsed as ViroVPSMapLoadResult;
+  } catch {
+    return { success: false, error: "Malformed map load result" };
+  }
+}
+
+/** Same contract as {@link parseScanStatus}: never throws, absence is `available: false`. */
+export function parseVPSLocalization(
+  json: string | null | undefined
+): ViroVPSLocalizationResult {
+  if (typeof json !== "string" || json.length === 0) {
+    return { available: false, error: "No response from the renderer" };
+  }
+  try {
+    const parsed = JSON.parse(json);
+    if (parsed == null || typeof parsed !== "object") {
+      return { available: false, error: "Malformed localization result" };
+    }
+    return parsed as ViroVPSLocalizationResult;
+  } catch {
+    return { available: false, error: "Malformed localization result" };
+  }
 }
 
 /**

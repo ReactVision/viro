@@ -625,6 +625,44 @@ export type ViroScanDiagnostics = {
 };
 
 /**
+ * Result of loadVPSMap(). success is false when the bytes didn't parse as a
+ * supported map — truncated, empty, or an unsupported format/version.
+ */
+export type ViroVPSMapLoadResult = {
+  success: boolean;
+  error?: string;
+};
+
+/**
+ * The latest continuous VPS localisation result against a map loaded with
+ * loadVPSMap(), polled on a timer — a stand-in for an onLocalized event;
+ * see getVPSLocalization().
+ */
+export type ViroVPSLocalizationResult = {
+  /** False when no ReactVision provider is configured. */
+  available: boolean;
+  /** True while a map is loaded (between loadVPSMap() and unloadVPSMap()). */
+  loaded?: boolean;
+  /**
+   * True once the smoothed pose estimate has accepted at least one pair of
+   * agreeing localisation hits. renderPose is only present once this is true.
+   */
+  converged?: boolean;
+  /** Inlier count from the most recent raw localisation hit, whether or not it was accepted into the smoothed estimate. */
+  lastHitInliers?: number;
+  /** Reprojection RMS (pixels) from the most recent raw localisation hit. */
+  lastHitReprojRms?: number;
+  /**
+   * The smoothed T_map_world applied to the current camera pose, as 16
+   * comma-separated floats (column-major VROMatrix4f::getArray() order) —
+   * the same encoding resolveCloudAnchor()/finishScan() use elsewhere.
+   * Treat as opaque; only present when converged is true.
+   */
+  renderPose?: string;
+  error?: string;
+};
+
+/**
  * Result of snapshotWorldMeshToFile() (WS-C). filePath points at a local
  * cache file — pass it straight into rvUploadAsset() to persist it as a
  * cloud anchor asset.

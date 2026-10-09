@@ -145,6 +145,23 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    private static class InputFocusListenerOpenXR implements ViroViewOpenXR.InputFocusListener {
+
+        private WeakReference<VRTVRSceneNavigator> mNavigator;
+
+        public InputFocusListenerOpenXR(VRTVRSceneNavigator navigator) {
+            mNavigator = new WeakReference<VRTVRSceneNavigator>(navigator);
+        }
+
+        @Override
+        public void onInputFocusChanged(boolean focused) {
+            VRTVRSceneNavigator navigator = mNavigator.get();
+            if (navigator != null) {
+                navigator.onInputFocusChanged(focused);
+            }
+        }
+    }
+
     public VRTVRSceneNavigator(ReactContext reactContext,
                                ReactViroPackage.ViroPlatform platform) {
         super(reactContext, platform);
@@ -162,8 +179,10 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
                 return new ViroViewOVR(reactContext.getCurrentActivity(),
                         new StartupListenerOVR(this));
             case QUEST:
-                return new ViroViewOpenXR(reactContext.getCurrentActivity(),
+                ViroViewOpenXR view = new ViroViewOpenXR(reactContext.getCurrentActivity(),
                         new StartupListenerOpenXR(this));
+                view.setInputFocusListener(new InputFocusListenerOpenXR(this));
+                return view;
             case GVR:
                 // default case is to use GVR
             default:

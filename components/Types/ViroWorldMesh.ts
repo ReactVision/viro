@@ -19,7 +19,15 @@ export type ViroWorldMeshConfig = {
 
   /**
    * Minimum confidence threshold for depth samples (0.0-1.0).
-   * Samples below this threshold are excluded from the mesh.
+   *
+   * **iOS:** samples below this are excluded from the mesh.
+   *
+   * **Android: not a cutoff.** ARCore pairs its confidence image with the *raw* depth estimate,
+   * while the depth used for the mesh is the dense, smoothed one, which has no confidence image
+   * of its own — ARCore has already filled its gaps, so a pixel is either valid or zero. Applying
+   * the raw image's confidence as a cutoff discarded most of a well-lit wall at this default. The
+   * value is kept as a per-sample weight for fusion instead, where it still carries signal.
+   *
    * @default 0.3
    */
   minConfidence?: number;
@@ -124,16 +132,18 @@ export type ViroWorldMeshStats = {
   /**
    * Which path produced the mesh, so an app can tell a real surface from the fallback.
    *
-   * - `"lidar"` — ARKit mesh anchors. Accumulates across frames.
-   * - `"depth"` — ARCore's depth camera image. **Current frame only.**
-   * - `"monocular"` — estimated depth on a non-LiDAR iPhone. **Current frame only.**
+   * - `"lidar"` — ARKit mesh anchors. ARKit accumulates them.
+   * - `"depth"` — ARCore's depth camera image. Fused across frames unless
+   *   `worldMeshConfig.accumulate` is off.
+   * - `"monocular"` — estimated depth on a non-LiDAR iPhone. Fused the same way.
    * - `"plane"` — triangulated AR plane anchors. Flat polygons, not a scanned surface.
    */
   source?: ViroWorldMeshSource;
 
   /**
-   * Whether the mesh is fused across frames or a single view. `false` with a `"depth"` or
-   * `"monocular"` source means a snapshot taken now holds one frame, not the room walked.
+   * Whether the mesh covers more than the current view — fused here on the depth paths, or
+   * accumulated by ARKit on `"lidar"`. `false` with a `"depth"` or `"monocular"` source means a
+   * snapshot taken now holds one frame, not the room walked: check `worldMeshConfig.accumulate`.
    */
   accumulated?: boolean;
 

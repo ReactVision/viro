@@ -1791,6 +1791,24 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     arSession->rvStartScan();
 }
 
+- (void)rvResetWorldMesh {
+    if (!_vroView || !_currentScene) {
+        return;
+    }
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return;
+    }
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return;
+    }
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (worldMesh) {
+        worldMesh->resetAccumulation();
+    }
+}
+
 - (NSDictionary *)rvGetWorldMeshStats {
     if (!_vroView || !_currentScene) {
         return @{@"available": @NO, @"reason": @"The AR view is not ready"};
@@ -1817,6 +1835,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
              @"vertexCount": @(stats.vertexCount),
              @"triangleCount": @(stats.triangleCount),
              @"source": [NSString stringWithUTF8String:VROWorldMeshSourceToString(stats.source)],
+             @"accumulated": @(stats.accumulated),
              @"averageConfidence": @(stats.averageConfidence),
              @"lastUpdateTimeMs": @(stats.lastUpdateTimeMs),
              @"isStale": @(stats.isStale)};
@@ -2350,6 +2369,17 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
         }
         if (worldMeshConfig[@"debugDrawEnabled"]) {
             _worldMeshConfigCpp.debugDrawEnabled = [worldMeshConfig[@"debugDrawEnabled"] boolValue];
+        }
+        // Fusion across frames. Only the depth-image and monocular paths use these; on a LiDAR
+        // device ARKit owns the accumulation and they are ignored.
+        if (worldMeshConfig[@"accumulate"]) {
+            _worldMeshConfigCpp.accumulate = [worldMeshConfig[@"accumulate"] boolValue];
+        }
+        if (worldMeshConfig[@"voxelSize"]) {
+            _worldMeshConfigCpp.voxelSize = [worldMeshConfig[@"voxelSize"] floatValue];
+        }
+        if (worldMeshConfig[@"maxMemoryMB"]) {
+            _worldMeshConfigCpp.maxMemoryMB = [worldMeshConfig[@"maxMemoryMB"] intValue];
         }
     }
 

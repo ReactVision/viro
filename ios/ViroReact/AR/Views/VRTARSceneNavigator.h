@@ -241,6 +241,9 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 // VRTARScene forwards that call, so the chain to JS was never finished.
 - (NSDictionary *)rvGetWorldMeshStats;
 
+/* Clears the fused world mesh, so the next scan starts from an empty room. */
+- (void)rvResetWorldMesh;
+
 - (NSString *)rvGetScanStatusJson;
 /** Last scan-based host's measurements as the renderer's JSON. */
 - (NSString *)rvGetScanDiagnosticsJson;

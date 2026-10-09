@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- **`sceneNavigator.resetWorldMesh()` clears the fused world mesh.** The mesh now persists across frames on the depth-image and monocular paths, which is the point, but a second scan in the same session would otherwise start inside the first one's room. Resolves `false` rather than throwing when the navigator is not mounted. On a LiDAR device ARKit owns the accumulation and this does nothing.
+- **`worldMeshConfig` takes `accumulate`, `voxelSize` and `maxMemoryMB`.** They configure the renderer's fusion of depth frames: whether to fuse at all (default on), the fusion voxel edge in metres (default 0.04) and the budget for the fused volume (default 64 MB), past which the least recently seen blocks are dropped. `accumulate: false` reproduces the per-frame behaviour.
+- **`getWorldMeshStats()` reports `source` and `accumulated`.** `source` is `"lidar"`, `"depth"`, `"monocular"`, `"plane"` or `"unknown"`, so an app can tell a scanned surface from the triangulated plane-anchor fallback the renderer quietly fell back to. `accumulated` says whether the mesh covers more than the current view — fused by the renderer on the depth paths, accumulated by ARKit on `"lidar"` — which is what decides whether a snapshot holds the room or one camera position. The new `ViroWorldMeshSource` type documents what each source means for accumulation. Both need the matching renderer, which marshals them across each bridge.
+
+### Changed
+
+- **`minConfidence` is documented per platform (`ViroWorldMeshConfig`).** On iOS it excludes samples below the threshold. On Android it is not a cutoff: ARCore pairs its confidence image with the raw depth estimate while the mesh is built from the dense, smoothed one, which has no confidence of its own, so applying it as a cutoff discarded most of a well-lit wall at the default. The value is kept as a per-sample weight for fusion.
+
 ## v3.0.3 — 6 October 2026
 
 ### Added

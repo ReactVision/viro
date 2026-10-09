@@ -69,6 +69,7 @@
 - **The microphone prompt for a recording opens over the headset view on Meta Quest (`MediaCapture`).** It was asked through the 2D panel, which closed the headset view, as the spatial data prompt did before `VRLauncher.requestPermissions`. It is now asked through the live VRActivity.
 - **A Meta Quest scene says when it leaves out image-triggered assets (`StudioARScene`).** Quest cannot track images, so those assets were skipped with only a console warning. The wearer now sees "Content that appears on an image is not shown on Meta Quest" for 8 seconds, or for as long as the scene shows nothing else.
 - **A video on Meta Quest pauses when the headset sleeps (`viro_renderer-release.aar`).** A video's pause went through the renderer's task queue, which the Quest render loop stops running once the headset view pauses, and the view pauses before the pause is sent. A looping video therefore kept playing, with its sound, until the headset woke. The pause now also reaches the player at once.
+- **`ViroKit.framework` targets iOS 15.1, the minimum `ViroReact.podspec` already declared (`ViroKit.framework`, `ViroKit.podspec`).** It was built for iOS 17.6, which links Objective-C runtime functions that exist only from iOS 16, so an app targeting iOS 15 would fail to launch on an iOS 15 device. `ViroKit.podspec` said 13.0 and now says 15.1.
 
 ## v3.0.3 — 6 October 2026
 

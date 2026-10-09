@@ -26,4 +26,12 @@ describe("bytesToBase64", () => {
     const decoded = Buffer.from(bytesToBase64(bytes), "base64");
     expect(new Uint8Array(decoded)).toEqual(bytes);
   });
+
+  it("matches Buffer's encoding across chunk boundaries, for every padding length", () => {
+    for (const len of [3 * 16384 - 1, 3 * 16384, 3 * 16384 + 1, 3 * 16384 + 2, 200001]) {
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = (i * 2654435761) >>> 24;
+      expect(bytesToBase64(bytes)).toBe(Buffer.from(bytes).toString("base64"));
+    }
+  });
 });

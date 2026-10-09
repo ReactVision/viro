@@ -89,14 +89,9 @@ import {
   getLocationMapDownload,
   fetchMapBytes,
   findNearestMap,
-  candidateLocationsForTracking,
-  bytesToBase64,
 } from "./components/AR/ViroVPSMapDownload";
-import {
-  uploadScanRecording,
-  getScan,
-  ViroVPSUploadError,
-} from "./components/AR/ViroVPSScanUpload";
+import { uploadScanRecording, getScan } from "./components/AR/ViroVPSScanUpload";
+import { ViroVPSError } from "./components/AR/ViroVPSClient";
 import { ViroARScene } from "./components/AR/ViroARScene";
 import { ViroARSceneNavigator } from "./components/AR/ViroARSceneNavigator";
 import { ViroBox } from "./components/ViroBox";
@@ -150,17 +145,15 @@ export type {
   ViroVPSTrackingStateEvent,
   ViroVPSLocalizedEvent,
   ViroVPSStartTrackingResult,
+  ViroVPSNavigator,
 } from "./components/AR/ViroVPS";
 export type { ViroVPSTrackingState } from "./components/AR/ViroVPSTracking";
 export type {
   ViroVPSNearbyLocation,
   ViroVPSMapDownload,
 } from "./components/AR/ViroVPSMapDownload";
-export type {
-  ViroVPSCredentials,
-  ViroVPSScanTarget,
-  ViroVPSScan,
-} from "./components/AR/ViroVPSScanUpload";
+export type { ViroVPSScanTarget, ViroVPSScan } from "./components/AR/ViroVPSScanUpload";
+export type { ViroVPSCredentials } from "./components/AR/ViroVPSClient";
 export type {
   ViroColocationState,
   ViroColocationPeer,
@@ -421,11 +414,9 @@ export {
   getLocationMapDownload,
   fetchMapBytes,
   findNearestMap,
-  candidateLocationsForTracking,
-  bytesToBase64,
   uploadScanRecording,
   getScan,
-  ViroVPSUploadError,
+  ViroVPSError,
   ViroARScene,
   ViroARSceneNavigator,
   ViroBox,

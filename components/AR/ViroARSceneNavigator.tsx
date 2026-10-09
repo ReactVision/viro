@@ -34,10 +34,10 @@ import {
 } from "./ViroScanStatus";
 import {
   uploadScanRecording as vpsUploadScanRecording,
-  ViroVPSCredentials,
   ViroVPSScan,
   ViroVPSScanTarget,
 } from "./ViroVPSScanUpload";
+import type { ViroVPSCredentials } from "./ViroVPSClient";
 import { bytesToBase64 } from "./ViroVPSMapDownload";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
@@ -1004,15 +1004,15 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * Loads a `.rvmap` downloaded with ViroVPSMapDownload's fetchMapBytes()
    * for continuous localisation against the live camera. Bytes cross the RN
    * bridge base64-encoded (the same transport StreamingAudioManager.
-   * pushSamples() uses for binary payloads) — this encodes them, so callers
+   * pushSamples() uses for binary payloads); this encodes them, so callers
    * pass the raw bytes fetchMapBytes() already returns.
    *
    * Only one map can be loaded at a time; loading a new one replaces
    * whatever was loaded before. Call unloadVPSMap() to stop matching
    * against it. See getVPSLocalization() for the per-frame result this
-   * feeds, polled rather than pushed — building the full `<ViroVPS>`
-   * component (startTracking()/onLocalized/onTrackingState) is separate,
-   * larger work this does not attempt.
+   * feeds, polled rather than pushed. `<ViroVPS>` wraps this, the unload and
+   * the polling into startTracking()/stopTracking() with onLocalized and
+   * onTrackingState callbacks.
    */
   _loadVPSMap = async (rvmapBytes: Uint8Array): Promise<ViroVPSMapLoadResult> => {
     try {
@@ -1080,14 +1080,13 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   /**
    * Zips and uploads a ViroReact AR recording (startRecording()/
    * stopRecording()'s session.jsonl + video.mp4, not a SensorRecorder
-   * capture) to the VPS backend — POST /vps/scans then
+   * capture) to the VPS backend: POST /vps/scans then
    * PUT /vps/scans/{id}/recording, per spatial/vps-server/API.md. Call this
    * after stopRecording() has resolved, passing the same outputDir.
    *
-   * Pure TS/fetch, no native bridge call — see ViroVPSScanUpload.ts for why,
-   * and for the memory caveat on very large recordings that comes with that.
-   * `endpoint` is vps-server's own base URL, unrelated to `RVEndpoint`
-   * (ReactVisionCCA's host/resolve backend).
+   * Zipping and the upload run natively and stream from disk; see
+   * ViroVPSScanUpload.ts. `endpoint` is vps-server's own base URL, unrelated
+   * to `RVEndpoint` (ReactVisionCCA's host/resolve backend).
    */
   _uploadScanRecording = async (
     endpoint: string,

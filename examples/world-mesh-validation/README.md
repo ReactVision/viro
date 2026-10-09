@@ -43,9 +43,20 @@ means the JS half is not installed, not that the behaviour is fine.
 
 ## What it does not check
 
-Frame rate and memory. Watch those in Xcode Instruments or Android Studio's profiler while this
-runs: the criteria are 30 fps held on a mid-range phone and the fused volume under
-`worldMeshConfig.maxMemoryMB`.
+Frame rate. Watch it in Xcode Instruments or Android Studio's profiler while this runs; the
+criterion is 30 fps held on a mid-range phone.
+
+## What CI already answered
+
+Four of the acceptance criteria are properties of the fusion rather than of the hardware, and the
+host test in `virocore/ViroRenderer/test/worldmesh/` walks a synthetic 4x5x2.5 m room to settle
+them: the vertex count climbs instead of following the camera (0 drops over 20% in 60 steps,
+7,161 -> 35,151), the walk builds past 20,000 vertices, the snapshot carries the whole room, and a
+room larger than `maxMemoryMB` stays inside the budget.
+
+Running them again here is not redundant — these do it with a real sensor, real noise and real
+tracking, which is exactly what the synthetic room has none of. A failure here that CI passes is
+a sensor or tracking problem, not a fusion one, and that is a useful thing to be able to tell.
 
 ## Devices
 

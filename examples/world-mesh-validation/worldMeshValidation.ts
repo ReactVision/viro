@@ -183,10 +183,35 @@ export async function validateWorldMesh(
   // ── Reset ─────────────────────────────────────────────────────────────────
   if (typeof navigator.resetWorldMesh === "function") {
     await navigator.resetWorldMesh();
+
+    // Read before the next frame can land. Emptying the fused volume is not the whole reset: the
+    // mesh built out of it is what the stats report and what a snapshot uploads, so this window is
+    // where a scan used to hand VPS Lite the room the app had just cleared.
+    const immediately = (await navigator.getWorldMeshStats()).vertexCount ?? 0;
+    add(
+      "a reset empties the mesh at once, not just the volume",
+      immediately === 0,
+      `${beforeRevisit} -> ${immediately} with no frame in between`
+    );
+
+    try {
+      const staleSnap = await navigator.snapshotWorldMeshToFile(IDENTITY);
+      const wrote = Boolean(staleSnap && (staleSnap.filePath || staleSnap.path));
+      add(
+        "and leaves nothing for VPS Lite to upload",
+        !wrote,
+        wrote
+          ? `wrote ${JSON.stringify(staleSnap)} — that is the cleared room`
+          : "snapshot refused, as it should be"
+      );
+    } catch {
+      add("and leaves nothing for VPS Lite to upload", true, "snapshot refused");
+    }
+
     await sleep(2000);
     const afterReset = (await navigator.getWorldMeshStats()).vertexCount ?? 0;
     add(
-      "resetWorldMesh clears the room",
+      "and then starts building again",
       afterReset < beforeRevisit * 0.5,
       `${beforeRevisit} -> ${afterReset}`
     );

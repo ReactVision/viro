@@ -34,7 +34,9 @@ It tells you when to walk and when to hold still. Takes about 80 seconds.
 | the walk builds ≥20,000 vertices | The acceptance figure for a 4×5 m room |
 | revisiting a wall does not duplicate it | Fusion must converge, not concatenate |
 | `snapshotWorldMeshToFile` writes it | This is the mesh VPS Lite uploads |
-| `resetWorldMesh` clears the room | So a second scan does not start inside the first |
+| `resetWorldMesh` empties the mesh at once | A reset that only empties the volume leaves the old room in the stats |
+| and leaves nothing for VPS Lite to upload | A snapshot in that window used to attach the room just cleared |
+| and then starts building again | So a second scan does not start inside the first |
 
 A check it cannot reach a verdict on reports `?` rather than passing. An absent `resetWorldMesh`
 means the JS half is not installed, not that the behaviour is fine.

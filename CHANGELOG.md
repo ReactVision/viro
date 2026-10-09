@@ -68,6 +68,7 @@
 - **On Meta Quest, a failed photo, recording or scene change is reported in the headset (`sceneNavigationHandler`, the co-location controller).** TAKE_PHOTO, RECORD_VIDEO and NAVIGATION reported a failure with `Alert.alert`, which opens over the 2D panel, out of sight while the headset view runs. They now use the in-scene alert panel, as ALERT does.
 - **The microphone prompt for a recording opens over the headset view on Meta Quest (`MediaCapture`).** It was asked through the 2D panel, which closed the headset view, as the spatial data prompt did before `VRLauncher.requestPermissions`. It is now asked through the live VRActivity.
 - **A Meta Quest scene says when it leaves out image-triggered assets (`StudioARScene`).** Quest cannot track images, so those assets were skipped with only a console warning. The wearer now sees "Content that appears on an image is not shown on Meta Quest" for 8 seconds, or for as long as the scene shows nothing else.
+- **A video on Meta Quest pauses when the headset sleeps (`viro_renderer-release.aar`).** A video's pause went through the renderer's task queue, which the Quest render loop stops running once the headset view pauses, and the view pauses before the pause is sent. A looping video therefore kept playing, with its sound, until the headset woke. The pause now also reaches the player at once.
 
 ## v3.0.3 — 6 October 2026
 

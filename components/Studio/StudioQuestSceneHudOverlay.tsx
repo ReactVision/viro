@@ -1,50 +1,30 @@
 import * as React from "react";
-import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
-import { ViroQuad } from "../ViroQuad";
-import { ViroEventSource, type ViroSource } from "../Types/ViroUtils";
+import type { ViroSource } from "../Types/ViroUtils";
 import { exitVRScene } from "../Utilities/VRModuleOpenXR";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
+import { questAlertStore } from "./domain/questAlertStore";
+import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
+  QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
-import { StudioQuestText } from "./StudioQuestText";
+import { QUEST_PANEL_TEXT } from "./questPanelStyle";
+import { questAlertLayout } from "./StudioQuestAlertOverlay";
+import {
+  QuestPanelLine,
+  questPanelLayout,
+  StudioQuestPanelCard,
+} from "./StudioQuestPanelCard";
 import { useStudioColocation } from "./useStudioColocation";
 
 // How long the scene name, a live session's status, or the reason the last
 // session ended stays up on its own.
 const PEEK_MS = 5000;
-
-// A line takes about 0.0115 m per point of font size.
-const LINE_HEIGHT_M = 0.15;
-const NAME_HEIGHT_M = 0.17;
-const HINT_HEIGHT_M = 0.13;
-// Three lines: a failure's reason runs long.
-const DETAIL_HEIGHT_M = 0.39;
-const PADDING_M = 0.04;
-const PANEL_WIDTH_M = 1.6;
-const TEXT_WIDTH_M = 1.5;
-
-ViroMaterials.createMaterials({
-  StudioQuestHudBackground: {
-    lightingModel: "Constant",
-    diffuseColor: "#111827CC",
-    writesToDepthBuffer: true,
-  },
-});
-
-type HudLine = {
-  key: string;
-  text: string;
-  height: number;
-  fontSize: number;
-  color: string;
-  onClick?: (position: unknown, source: ViroSource) => void;
-};
 
 const subscribeToColocation = (onChange: () => void) =>
   studioColocationStore.subscribe(onChange);
@@ -52,36 +32,31 @@ const getFailure = () => studioColocationStore.getFailure();
 const subscribeToMenu = (onChange: () => void) =>
   questMenuStore.subscribe(onChange);
 const getMenuItems = () => questMenuStore.getItems();
+const subscribeToAlert = (onChange: () => void) =>
+  questAlertStore.subscribe(onChange);
+const isAlertShown = () => questAlertStore.isActive();
 
 type Props = {
   /** Latest cached camera pose (throttled — see StudioARScene). Null before
    * the first onCameraTransformUpdate fires. */
   cameraPose: CameraPose | null;
   sceneName: string | null;
-  /** Toggled by the Y button (StudioARScene's controller). */
+  /** Toggled by the menu button or the palm menu pinch (StudioARScene's
+   * controller). */
   menuOpen: boolean;
   onCloseMenu: () => void;
+  /** The tap-to-place prompt or the empty-scene message is in view. */
+  promptShown: boolean;
 };
-
-// Y also clicks whatever the left controller points at, so closing the menu
-// with Y would press the button under that ray.
-const isYButton = (source: ViroSource) =>
-  (source as unknown as number) === ViroEventSource.Y_BUTTON;
 
 // Same exit path as the hardware back button (ViroQuestEntryPoint's
 // BackHandler): invoke the current intent's onExitViro before finishing
 // VRActivity.
-function handleExitClick(_position: unknown, source: ViroSource) {
-  if (isYButton(source)) return;
+export function handleQuestExitClick(_position: unknown, source: ViroSource) {
+  if (!isSelectClick(source)) return;
   VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
   exitVRScene();
 }
-
-const textStyle = {
-  fontFamily: "sans-serif",
-  textAlign: "center",
-  textAlignVertical: "center",
-} as const;
 
 /**
  * Quest has no 2D chrome: the host's is stuck in MainActivity, out of view once
@@ -96,18 +71,21 @@ const textStyle = {
  *   few seconds once it is live. When the host clears its colocation prop on
  *   failure, the reason shows for a few seconds and stays in the menu until
  *   the next session;
- * - the menu, which Y opens and closes: the same lines, the host's
- *   questMenuItems, and Exit. B and the left menu button exit as well.
+ * - the menu, which the left controller's menu button or, with hands, a pinch
+ *   with the palm facing the wearer opens and closes: the same lines, the
+ *   host's questMenuItems, and Exit. B closes it, and exits while it is
+ *   closed.
  *
- * Closed, it sits below StudioQuestAlertOverlay's position (verticalOffsetM)
- * so an ALERT firing at the same time doesn't render on top of it; the open
- * menu is centred in view.
+ * It is centred where the wearer looked when it was placed. While an ALERT, the
+ * placement prompt or the empty-scene message holds the centre, the closed
+ * panel moves below it.
  */
 export function StudioQuestSceneHudOverlay({
   cameraPose,
   sceneName,
   menuOpen,
   onCloseMenu,
+  promptShown,
 }: Props) {
   const live = useStudioColocation();
   const failure = React.useSyncExternalStore(
@@ -132,12 +110,24 @@ export function StudioQuestSceneHudOverlay({
     getMenuItems,
     getMenuItems
   );
+  const alertShown = React.useSyncExternalStore(
+    subscribeToAlert,
+    isAlertShown,
+    isAlertShown
+  );
+  const alertTitle = alertShown ? questAlertStore.title() : null;
+  const alertMessage = alertShown ? questAlertStore.message() : null;
+  const alertPanelHeight = React.useMemo(
+    () =>
+      alertMessage === null
+        ? 0
+        : questAlertLayout(alertTitle, alertMessage).panelHeight,
+    [alertTitle, alertMessage]
+  );
 
   const poseRef = React.useRef(cameraPose);
-  const menuOpenRef = React.useRef(menuOpen);
   React.useEffect(() => {
     poseRef.current = cameraPose;
-    menuOpenRef.current = menuOpen;
   });
 
   // The pose the panel was placed from. Never follows the camera after that.
@@ -161,8 +151,14 @@ export function StudioQuestSceneHudOverlay({
   // Placed while rendering, not in an effect: an effect lets the opened menu
   // draw one frame at the previous placement, and the wearer sees it jump.
   const [menuWasOpen, setMenuWasOpen] = React.useState(menuOpen);
+  // The item each controller or hand points at. An item that unmounts while
+  // pointed at never reports the ray leaving, so this resets with the menu.
+  const [hoveredBySource, setHoveredBySource] = React.useState<
+    Record<number, string>
+  >({});
   if (menuOpen !== menuWasOpen) {
     setMenuWasOpen(menuOpen);
+    setHoveredBySource({});
     if (menuOpen && cameraPose) setPlacedAt(cameraPose);
   }
 
@@ -171,13 +167,18 @@ export function StudioQuestSceneHudOverlay({
     : null;
   const statusStays =
     colocation !== null && colocation.tone !== "live" && !ended;
+  // Placed while rendering too, for the menu's reason. An open menu stays
+  // where the wearer opened it.
+  const [statusWas, setStatusWas] = React.useState(statusKey);
+  if (statusKey !== statusWas) {
+    setStatusWas(statusKey);
+    if (statusKey !== null && !menuOpen && cameraPose) setPlacedAt(cameraPose);
+  }
   React.useEffect(() => {
     if (statusKey === null) {
       setPeek((p) => (p === "status" ? null : p));
       return;
     }
-    // An open menu stays where the wearer opened it.
-    if (!menuOpenRef.current) place();
     setPeek("status");
     if (statusStays) return;
     const timer = setTimeout(
@@ -185,45 +186,44 @@ export function StudioQuestSceneHudOverlay({
       PEEK_MS
     );
     return () => clearTimeout(timer);
-  }, [statusKey, statusStays, place]);
+  }, [statusKey, statusStays]);
 
   if ((!menuOpen && peek === null) || !placedAt) return null;
 
-  const lines: HudLine[] = [
+  const lines: QuestPanelLine[] = [
     {
       key: "name",
       text: sceneName ?? "Untitled scene",
-      height: NAME_HEIGHT_M,
       fontSize: 14,
-      color: "#FFFFFF",
+      color: QUEST_PANEL_TEXT.primary,
+      bold: true,
     },
   ];
   if (colocation) {
     lines.push({
       key: "status",
       text: colocation.title,
-      height: LINE_HEIGHT_M,
       fontSize: 13,
-      color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
+      color:
+        colocation.tone === "error"
+          ? QUEST_PANEL_TEXT.error
+          : QUEST_PANEL_TEXT.primary,
     });
-    // Beside the title the code wrapped onto a second line, which a one-line
-    // box draws over the line above.
+    // Beside the title the code wrapped, split across two lines.
     if (colocation.code) {
       lines.push({
         key: "code",
         text: colocation.code,
-        height: LINE_HEIGHT_M,
         fontSize: 13,
-        color: "#FFFFFF",
+        color: QUEST_PANEL_TEXT.primary,
       });
     }
     if (colocation.detail) {
       lines.push({
         key: "detail",
         text: colocation.detail,
-        height: DETAIL_HEIGHT_M,
         fontSize: 11,
-        color: "#CCCCCC",
+        color: QUEST_PANEL_TEXT.secondary,
       });
     }
   }
@@ -231,12 +231,11 @@ export function StudioQuestSceneHudOverlay({
     menuItems.forEach((item, index) =>
       lines.push({
         key: `item:${index}:${item.label}`,
-        text: `[ ${item.label} ]`,
-        height: LINE_HEIGHT_M,
+        text: item.label,
         fontSize: 13,
-        color: "#7FCBFF",
+        color: QUEST_PANEL_TEXT.primary,
         onClick: (_position, source) => {
-          if (isYButton(source)) return;
+          if (!isSelectClick(source)) return;
           onCloseMenu();
           item.onPress();
         },
@@ -244,63 +243,64 @@ export function StudioQuestSceneHudOverlay({
     );
     lines.push({
       key: "exit",
-      text: "[ Exit ]",
-      height: LINE_HEIGHT_M,
+      text: "Exit",
       fontSize: 13,
-      color: "#7FCBFF",
-      onClick: handleExitClick,
+      color: QUEST_PANEL_TEXT.primary,
+      onClick: handleQuestExitClick,
     });
   }
   lines.push({
     key: "hint",
-    text: menuOpen ? "Press Y to close" : "Press Y for the menu",
-    height: HINT_HEIGHT_M,
+    text: menuOpen
+      ? "Menu button or palm pinch to close"
+      : "Menu button or palm pinch for the menu",
     fontSize: 11,
-    color: "#CCCCCC",
+    color: QUEST_PANEL_TEXT.secondary,
   });
 
-  const height =
-    2 * PADDING_M + lines.reduce((sum, line) => sum + line.height, 0);
+  const layout = questPanelLayout(lines);
+  const { height } = layout;
+  const centred = menuOpen || (!alertShown && !promptShown);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
-    // The menu is centred where the wearer looked when opening it. Otherwise
-    // the panel grows downwards, so its top edge stays where an alert expects it.
-    verticalOffsetM: menuOpen ? 0 : -0.4 - (height - 0.5) / 2,
+    // Below the centre, the panel hangs from just under the alert's bottom
+    // edge or the prompt's line, and grows downwards.
+    verticalOffsetM: centred
+      ? 0
+      : QUEST_PANEL_SCALE *
+        ((alertShown ? -alertPanelHeight / 2 - 0.05 : -0.15) - height / 2),
   });
 
-  // Each line is positioned explicitly: inside a ViroFlexView on Quest every
-  // line rendered at the view's centre, on top of each other, and the
-  // background never appeared. Clicks go to the nearest bounding box, and once
-  // the panel is turned the background's wider box is nearer than the lines',
-  // so the background ignores events. It is drawn first so the lines' boxes
-  // cannot hide it.
-  let lineTop = height / 2 - PADDING_M;
+  const hoveredKeys = new Set(Object.values(hoveredBySource));
+  const hoverItem =
+    (key: string) =>
+    (isHovering: boolean, _position: unknown, source: ViroSource) => {
+      // Eye gaze (Quest Pro) hovers too, and cannot click.
+      if (!isSelectClick(source)) return;
+      const id = source as unknown as number;
+      setHoveredBySource((current) => {
+        if (isHovering) {
+          return current[id] === key ? current : { ...current, [id]: key };
+        }
+        if (current[id] !== key) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    };
+
   return (
-    <ViroNode position={position} rotation={rotation}>
-      <ViroQuad
-        position={[0, 0, -0.01]}
-        width={PANEL_WIDTH_M}
-        height={height}
-        materials={["StudioQuestHudBackground"]}
-        renderingOrder={-1}
-        ignoreEventHandling
+    <ViroNode
+      position={position}
+      rotation={rotation}
+      scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
+    >
+      <StudioQuestPanelCard
+        layout={layout}
+        interactive={menuOpen}
+        hoveredKeys={hoveredKeys}
+        onHoverItem={hoverItem}
       />
-      {lines.map((line) => {
-        const y = lineTop - line.height / 2;
-        lineTop -= line.height;
-        return (
-          <StudioQuestText
-            key={line.key}
-            text={line.text}
-            position={[0, y, 0]}
-            width={TEXT_WIDTH_M}
-            height={line.height}
-            fontSize={line.fontSize}
-            onClick={line.onClick}
-            style={{ ...textStyle, color: line.color }}
-          />
-        );
-      })}
     </ViroNode>
   );
 }

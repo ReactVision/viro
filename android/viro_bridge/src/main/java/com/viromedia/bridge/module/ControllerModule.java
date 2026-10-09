@@ -28,6 +28,7 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableArray;
+import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.UIManager;
 import com.facebook.react.fabric.FabricUIManager;
 import com.facebook.react.uimanager.UIManagerHelper;
@@ -75,6 +76,38 @@ public class ControllerModule extends ReactContextBaseJavaModule {
                         }
                     });
                 }
+            }
+        });
+    }
+
+    @ReactMethod
+    public void getRayAsync(final int viewTag, final int source, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), viewTag);
+        if (uiManager == null) {
+            promise.reject("ERROR", "UIManager not available");
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View controllerView = viewResolver.resolveView(viewTag);
+                if (!(controllerView instanceof VRTController)) {
+                    promise.resolve(null);
+                    return;
+                }
+                ((VRTController) controllerView).getRayAsync(source, new Controller.ControllerRayCallback() {
+                    @Override
+                    public void onGetRay(float[] origin, float[] forward) {
+                        if (origin == null || forward == null) {
+                            promise.resolve(null);
+                            return;
+                        }
+                        WritableMap ray = Arguments.createMap();
+                        ray.putArray("origin", Arguments.fromArray(origin));
+                        ray.putArray("forward", Arguments.fromArray(forward));
+                        promise.resolve(ray);
+                    }
+                });
             }
         });
     }

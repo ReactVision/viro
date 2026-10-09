@@ -1,5 +1,4 @@
-import { Alert, AppState } from "react-native";
-import { isQuest } from "../../Utilities/ViroPlatform";
+import { AppState } from "react-native";
 import {
   StudioAnimation,
   StudioApiRequestExecutor,
@@ -17,7 +16,7 @@ import {
   valueMatchesType,
 } from "./expressionEvaluator";
 import { studioRecordingStore } from "./recordingStore";
-import { questAlertStore } from "./questAlertStore";
+import { showStudioAlert } from "./questAlertStore";
 import { studioApiError } from "./studioApiError";
 import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
@@ -733,15 +732,7 @@ export function executeFunctionWithRelations(
       s ? interpolateDisplayTemplate(s, (name) => store?.get(name)) : "";
     const title = fill(alert.alert_title);
     const message = fill(alert.alert_message);
-    if (isQuest) {
-      // Alert.alert shows a 2D panel dialog — invisible in the VR compositor.
-      // questAlertStore drives an in-scene head-locked panel instead (see
-      // StudioQuestAlertOverlay), dismissed by a controller click, same as
-      // tapping "OK" dismisses the native dialog on phones.
-      questAlertStore.show(title, message);
-      return;
-    }
-    Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);
+    showStudioAlert(title, message);
   } else if (fn.function_type === "ANIMATION") {
     const anim = fn.scene_animation;
     if (!anim || !onAnimationTrigger) return;
@@ -867,7 +858,7 @@ export function executeFunctionWithRelations(
     // Captures the AR view via the navigator's native takeScreenshot, which
     // saves to the camera roll and burns in the free-tier watermark natively.
     // Fire-and-forget: as a sequence step the walk advances immediately
-    // Failure policy: warn + skip, and surface save/permission failure to the end user via Alert
+    // Failure policy: warn + skip, and surface save/permission failure to the end user via showStudioAlert
     if (typeof sceneNavigator?.takeScreenshot !== "function") {
       console.warn(
         `[Studio] TAKE_PHOTO function ${fn.id}: navigator has no takeScreenshot (Quest / unmounted); skipping.`
@@ -881,18 +872,16 @@ export function executeFunctionWithRelations(
         console.warn(
           `[Studio] TAKE_PHOTO function ${fn.id} failed (errorCode=${result?.errorCode}).`
         );
-        Alert.alert(
+        showStudioAlert(
           "Couldn't Save Photo",
-          "The photo could not be saved. Check that photo access is allowed and try again.",
-          [{ text: "OK" }]
+          "The photo could not be saved. Check that photo access is allowed and try again."
         );
       })
       .catch((err: unknown) => {
         console.warn(`[Studio] TAKE_PHOTO function ${fn.id} error:`, err);
-        Alert.alert(
+        showStudioAlert(
           "Couldn't Save Photo",
-          "The photo could not be saved. Check that photo access is allowed and try again.",
-          [{ text: "OK" }]
+          "The photo could not be saved. Check that photo access is allowed and try again."
         );
       });
   } else if (fn.function_type === "RECORD_VIDEO") {
@@ -923,20 +912,18 @@ export function executeFunctionWithRelations(
             console.warn(
               `[Studio] RECORD_VIDEO function ${fn.id} failed to start (errorCode=${errorCode}).`
             );
-            Alert.alert(
+            showStudioAlert(
               "Couldn't Record Video",
-              "Video recording could not start. Check that camera and microphone access are allowed and try again.",
-              [{ text: "OK" }]
+              "Video recording could not start. Check that camera and microphone access are allowed and try again."
             );
           }
         );
       } catch (err: unknown) {
         studioRecordingStore.stop();
         console.warn(`[Studio] RECORD_VIDEO function ${fn.id} start error:`, err);
-        Alert.alert(
+        showStudioAlert(
           "Couldn't Record Video",
-          "Video recording could not start. Check that camera and microphone access are allowed and try again.",
-          [{ text: "OK" }]
+          "Video recording could not start. Check that camera and microphone access are allowed and try again."
         );
       }
     } else {
@@ -947,18 +934,16 @@ export function executeFunctionWithRelations(
           console.warn(
             `[Studio] RECORD_VIDEO function ${fn.id} failed to save (errorCode=${result?.errorCode}).`
           );
-          Alert.alert(
+          showStudioAlert(
             "Couldn't Save Video",
-            "The video could not be saved. Check that photo access is allowed and try again.",
-            [{ text: "OK" }]
+            "The video could not be saved. Check that photo access is allowed and try again."
           );
         })
         .catch((err: unknown) => {
           console.warn(`[Studio] RECORD_VIDEO function ${fn.id} stop error:`, err);
-          Alert.alert(
+          showStudioAlert(
             "Couldn't Save Video",
-            "The video could not be saved. Check that photo access is allowed and try again.",
-            [{ text: "OK" }]
+            "The video could not be saved. Check that photo access is allowed and try again."
           );
         });
     }
@@ -1007,7 +992,7 @@ async function navigateToScene(
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");
-    Alert.alert("Navigation Error", "Unable to navigate to scene");
+    showStudioAlert("Navigation Error", "Unable to navigate to scene");
     return;
   }
 
@@ -1042,6 +1027,6 @@ async function navigateToScene(
     console.log(`[Studio] Navigated to scene: ${sceneData.scene.name}`);
   } catch (error) {
     console.error("[Studio] Error navigating to scene:", error);
-    Alert.alert("Navigation Error", "Failed to load scene");
+    showStudioAlert("Navigation Error", "Failed to load scene");
   }
 }

@@ -56,4 +56,27 @@ describe("buildViroAnimationRegistry", () => {
       ])
     ).toEqual({});
   });
+
+  test("divides the scale a supersampled text's animation sets or adds", () => {
+    const properties = {
+      scaleX: 2,
+      scaleY: "+=0.16",
+      scaleZ: "*=2",
+      positionX: 1,
+    };
+    const registry = (ids?: Set<string>) =>
+      (
+        buildViroAnimationRegistry([animation({ properties })], ids)[
+          "rise"
+        ] as Record<string, unknown>
+      ).properties;
+    expect(registry(new Set(["a1"]))).toEqual({
+      scaleX: 0.25,
+      scaleY: "+=0.02",
+      scaleZ: "*=2",
+      positionX: 1,
+    });
+    expect(registry(new Set(["other"]))).toEqual(properties);
+    expect(registry()).toEqual(properties);
+  });
 });

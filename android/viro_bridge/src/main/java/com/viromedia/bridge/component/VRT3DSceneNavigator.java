@@ -170,6 +170,8 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
     private boolean mViewAdded = false;
     protected boolean mGLInitialized = false;
+    // Waking from sleep resumes the host before the headset gives focus back.
+    private boolean mInputFocused = true;
 
     private boolean mHasOnExitViroCallback = false;
 
@@ -425,8 +427,25 @@ public class VRT3DSceneNavigator extends FrameLayout {
         }
     }
 
-    private void onHostResume() {
+    /**
+     * While a headset's system UI holds input focus (its menu, a dialog), the
+     * scene is paused as it is for a host pause, which pauses its video and
+     * sound, and resumed when focus returns.
+     */
+    protected void onInputFocusChanged(boolean focused) {
+        mInputFocused = focused;
         if (mViewAdded && mGLInitialized && mSelectedSceneIndex < mSceneArray.size()) {
+            VRTScene childScene = mSceneArray.get(mSelectedSceneIndex);
+            if (focused) {
+                childScene.onHostResume();
+            } else {
+                childScene.onHostPause();
+            }
+        }
+    }
+
+    private void onHostResume() {
+        if (mInputFocused && mViewAdded && mGLInitialized && mSelectedSceneIndex < mSceneArray.size()) {
             VRTScene childScene = mSceneArray.get(mSelectedSceneIndex);
             childScene.onHostResume();
         }

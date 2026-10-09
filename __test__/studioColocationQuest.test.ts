@@ -16,6 +16,7 @@ import {
   fromPositionEuler,
   IDENTITY,
   type Mat4,
+  multiply,
 } from "../components/Studio/colocation/frameMath";
 import { studioColocationIndicatorContent } from "../components/Studio/colocation/indicatorContent";
 import type {
@@ -264,6 +265,32 @@ describe("StudioColocationController on Quest: host", () => {
       peers: 0,
     });
     expectMatrix(h.controller.getFrame().sceneToWorld, HOST_ANCHOR);
+  });
+
+  it("keeps the shared frame in the room when the wearer recentres", async () => {
+    const listeners = new Set<(move: Mat4) => void>();
+    const h = harness({
+      onRoomMoved: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    });
+    h.controller.request({ mode: "host", name: "Lab" });
+    h.controller.attachScene(scene());
+    await flush();
+    h.replication.sync();
+    await flush();
+    await advance(500);
+    expect(h.controller.getState().status).toBe("live");
+
+    const move = fromPositionEuler([1, 0, -2], [0, 90, 0]);
+    listeners.forEach((fn) => fn(move));
+    const frame = h.controller.getFrame();
+    expectMatrix(frame.location, multiply(move, HOST_ANCHOR));
+    expectMatrix(frame.sceneToWorld, multiply(move, HOST_ANCHOR));
+
+    h.controller.leave();
+    expect(listeners.size).toBe(0);
   });
 
   it("tries again when the new anchor is not locatable yet", async () => {
@@ -552,6 +579,24 @@ describe("the scene root", () => {
     ]);
   });
 
+  it("roots a Quest plane scene in AR outside a session, and only the scene on screen in one", () => {
+    const h = harness();
+    const stack = ["scene-1", "scene-2"].map((id) => {
+      const mount = h.controller.claimSceneMount();
+      h.controller.attachScene(scene({ id }), undefined, undefined, mount);
+      return mount;
+    });
+    const withPlanes = () =>
+      stack.map((m) =>
+        studioSceneRootsInAR(h.controller.getFrame(), m, true, true)
+      );
+    expect(withPlanes()).toEqual([true, true]);
+    expect(rootsInAR(h, stack)).toEqual([false, false]);
+
+    h.controller.request({ mode: "host" });
+    expect(withPlanes()).toEqual([false, true]);
+  });
+
   it("roots the first scene in AR from its first render when the session was asked for before it mounted", () => {
     const h = harness();
     h.controller.request({ mode: "join", code: "K7M2QX" });
@@ -574,7 +619,7 @@ describe("the scene root", () => {
     );
     expect(source).toMatch(/colocation\.attachScene\([^;]*sceneMount\s*\);/);
     expect(source).toMatch(
-      /const rootsInAR = studioSceneRootsInAR\(colocationFrame, sceneMount, isQuest\);/
+      /const rootsInAR = studioSceneRootsInAR\(\s*colocationFrame,\s*sceneMount,\s*isQuest,\s*questSpatialData === true\s*\);/
     );
     expect(source).toMatch(/if \(!rootsInAR\) \{\s*return \(\s*<ViroScene/);
     expect(source).not.toMatch(/if \(isQuest\) \{\s*return \(\s*<ViroScene/);
@@ -594,7 +639,7 @@ describe("the scene root", () => {
       "utf-8"
     );
     expect(source).toMatch(
-      /const renderAssets = \(\) => \{\s*if \(!rootsInAR\) return <>\{renderedPlaneAssets\}<\/>;/
+      /const renderAssets = \(\) => \{\s*if \(!rootsInAR \|\| questPlaneFallback\) return <>\{renderedPlaneAssets\}<\/>;/
     );
     expect(source).toMatch(
       /const renderOriginPicker = \(\) => \{\s*if \(!rootsInAR\) return null;/

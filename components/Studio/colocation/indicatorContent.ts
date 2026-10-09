@@ -1,5 +1,5 @@
 import { formatJoinCode } from "../../AR/ViroColocationRooms";
-import type { StudioColocationState } from "./types";
+import type { StudioColocationErrorCode, StudioColocationState } from "./types";
 
 /** Host: the room exists and waits for the scene's origin to be picked. */
 export type StudioColocationOriginPrompt = {
@@ -135,10 +135,50 @@ export function studioColocationIndicatorContent(
     case "failed":
       return {
         title: "Co-location stopped",
-        detail: state.message,
+        detail: failureDetail(state.code, headset),
         code: null,
         done: null,
         tone: "error",
       };
+  }
+}
+
+// By code, not the failure's message, which can be a transport error or a
+// server's text and is meant for logs.
+function failureDetail(
+  code: StudioColocationErrorCode,
+  headset: boolean
+): string {
+  switch (code) {
+    case "PAID_PLAN_REQUIRED":
+      return "Co-location is available on paid plans.";
+    case "ROOM_NOT_FOUND":
+      return "The room was not found. Only members of the host's team can join its rooms.";
+    case "ROOM_FULL":
+      return "This room is full.";
+    case "RELAY_AT_CAPACITY":
+      return "Co-location is at capacity right now.";
+    case "FRAME_KIND_UNSUPPORTED":
+      return `This ${headset ? "headset" : "device"} cannot share or join this room.`;
+    case "RESOLVE_NO_MATCH":
+      return headset
+        ? "Failed to find the host's space. Stay in the room the host is in."
+        : "Failed to find the scanned area. Stand where the host scanned and move your device slowly.";
+    case "HOST_FAILED":
+      return headset
+        ? "Failed to share this space."
+        : "Failed to save the scan. Scan more of the area, moving your device slowly.";
+    case "NOT_AUTHORIZED":
+      return "Your access to this project could not be verified.";
+    case "SCENE_TOO_LARGE":
+      return "This scene has too many assets and variables to share.";
+    case "UNAVAILABLE":
+      return "Failed to reach the co-location service. Check your internet connection.";
+    case "CONNECT_TIMEOUT":
+      return "The room took too long to connect. Check your internet connection.";
+    case "HOST_TIMEOUT":
+      return "The host has not placed the scene in the room yet.";
+    case "UNKNOWN":
+      return "An unknown error occurred.";
   }
 }

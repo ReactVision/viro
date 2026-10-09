@@ -150,12 +150,14 @@ export type ViroSource = ImageSourcePropType;
 /**
  * Numeric input-source ids reported in event payloads (event.nativeEvent.source),
  * mirroring the native ViroOculus::InputSource enum. Only the sources JS acts
- * on are listed: eye gaze (to route onHover -> onGaze) and Y (the Studio
- * scene's Quest menu).
+ * on are listed: the triggers (the Studio scene's select), eye gaze (to route
+ * onHover -> onGaze) and the menu button (the Studio scene's Quest menu).
  */
 export const ViroEventSource = {
-  Y_BUTTON: 7, // ViroOculus::YButton (left controller)
+  CONTROLLER: 1, // ViroOculus::Controller (right trigger, or the right hand's pinch)
+  LEFT_CONTROLLER: 4, // ViroOculus::LeftController (left trigger, or the left hand's pinch)
   EYE_GAZE: 12, // ViroOculus::EyeGaze (Quest Pro, XR_EXT_eye_gaze_interaction)
+  MENU_BUTTON: 13, // ViroOculus::MenuButton (left menu button, or the palm menu pinch)
 } as const;
 
 export type ViroARPlaneType = any;

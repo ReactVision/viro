@@ -172,6 +172,14 @@ public:
      */
     void notifyCameraTransform(const VROCamera &camera);
 
+    /*
+     Where the ray that carries this source (see rayForSource) last pointed, in world
+     coordinates, as onMove reported it. False when that ray has never moved. A click
+     that hits nothing reports no position, so this is how a caller learns where it
+     was aimed. Render thread only.
+     */
+    bool getSourceRay(int source, VROVector3f *origin, VROVector3f *forward) const;
+
 protected:
     
     virtual std::shared_ptr<VROInputPresenter> createPresenter(std::shared_ptr<VRODriver> driver) {
@@ -376,7 +384,9 @@ protected:
     std::shared_ptr<VROScene> _scene;
 
     /*
-     Returns the hit test result for the closest node that was hit.
+     Returns the hit test result for the node drawn on top, which with renderingOrder is not
+     always the nearest (see the definition), or a hit on the scene background when nothing
+     takes it.
      */
     VROHitTestResult hitTest(const VROCamera &camera, VROVector3f origin, VROVector3f ray, bool boundsOnly);
 
@@ -411,6 +421,12 @@ private:
      multiple pointers are active simultaneously.
      */
     std::map<int, std::shared_ptr<VRONode>> _lastClickedNodesBySource;
+
+    /*
+     Sources whose ClickDown has not been released yet, including a press where
+     no node takes clicks, which the last clicked node cannot record.
+     */
+    std::set<int> _pressedSources;
 
     /*
      Last known that was successfully hovered upon.

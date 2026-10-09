@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { BackHandler } from "react-native";
 import { ViroAmbientLight } from "../ViroAmbientLight";
 import { ViroDirectionalLight } from "../ViroDirectionalLight";
 import { ViroARImageMarker } from "../AR/ViroARImageMarker";
@@ -19,6 +20,7 @@ import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
+import { onRoomMoved } from "../Utilities/VRModuleOpenXR";
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import type {
   ViroAmbientLightInfo,
@@ -73,8 +75,18 @@ import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { questAlertStore } from "./domain/questAlertStore";
-import type { CameraPose } from "./domain/questHeadLockedTransform";
+import { isSelectClick } from "./domain/questInput";
+import {
+  computeHeadLockedTransform,
+  QUEST_PANEL_ORDER,
+  QUEST_PANEL_SCALE,
+  type CameraPose,
+} from "./domain/questHeadLockedTransform";
+import { questSceneLoadStore } from "./domain/questSceneLoadStore";
+import { questSpatialDataGranted } from "./domain/questSpatialData";
+import { studioTextAssetIds } from "./domain/questText";
 import { StudioQuestAlertOverlay } from "./StudioQuestAlertOverlay";
+import { StudioQuestLoadScene } from "./StudioQuestLoadScene";
 import { StudioQuestSceneHudOverlay } from "./StudioQuestSceneHudOverlay";
 import { StudioQuestText } from "./StudioQuestText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
@@ -102,6 +114,8 @@ import {
   fromPositionEuler,
   IDENTITY,
   invert,
+  type Mat4,
+  multiply,
   rotateDirection,
   toNodeTransform,
   transformPoint,
@@ -171,15 +185,20 @@ const offFrame = () => STUDIO_COLOCATION_OFF_FRAME;
 
 /**
  * A world-space placement in the frame shared content renders in, which is the
- * scene origin while shared and world otherwise.
+ * scene origin while shared, the room when given the room's moves since the
+ * scene mounted, and world otherwise.
  */
 function placementInSceneFrame(
   frame: StudioColocationFrame,
   position: Vec3,
   forward?: Vec3,
-  up?: Vec3
+  up?: Vec3,
+  roomMoves: Mat4 | null = null
 ): [Vec3, Vec3 | undefined, Vec3 | undefined] {
-  const m = frame.phase === "shared" ? frame.worldToScene : null;
+  const m =
+    frame.phase === "shared"
+      ? frame.worldToScene
+      : roomMoves && invert(roomMoves);
   if (!m) return [position, forward, up];
   return [
     transformPoint(m, position),
@@ -205,12 +224,32 @@ function selectedPlanePose(plane: ViroAnchor, tapWorld?: Vec3) {
   return out;
 }
 
-/** Fixed-distance point along the cached camera-forward ray (headset fallback). */
-function projectAlongCameraForward(
-  pose: { position: Vec3; forward: Vec3 } | null
+/**
+ * The turn about a horizontal plane's normal that points the plane's -Z where
+ * the camera faces. The editor views a plane scene from +Z, so content toward
+ * -Z is meant to be in front of the viewer, while a plane's own heading can
+ * point anywhere. Null for a wall, whose facing the editor leaves open.
+ */
+function planeFacingYaw(
+  planeRotation: Vec3,
+  camera: { forward: Vec3; up: Vec3 }
+): number | null {
+  const plane = fromPositionEuler([0, 0, 0], planeRotation);
+  if (Math.abs(rotateDirection(plane, [0, 1, 0])[1]) < 0.7) return null;
+  const toPlane = invert(plane);
+  if (!toPlane) return null;
+  let [x, , z] = rotateDirection(toPlane, camera.forward);
+  // Looking straight down, forward keeps no heading, but up does.
+  if (Math.hypot(x, z) < 0.1) [x, , z] = rotateDirection(toPlane, camera.up);
+  return (Math.atan2(-x, -z) * 180) / Math.PI;
+}
+
+/** Fixed-distance point along a ray (headset fallback). */
+function projectAlongRay(
+  ray: { position: Vec3; forward: Vec3 } | null
 ): Vec3 | null {
-  if (!pose) return null;
-  const { position, forward } = pose;
+  if (!ray) return null;
+  const { position, forward } = ray;
   return [
     position[0] + forward[0] * HEADSET_PLACEMENT_DISTANCE_M,
     position[1] + forward[1] * HEADSET_PLACEMENT_DISTANCE_M,
@@ -222,6 +261,9 @@ function projectAlongCameraForward(
 // camera), reveal content anyway after this window so it is never withheld
 // indefinitely. Tunable; most sessions reach NORMAL within ~1-3s.
 const TRACKING_GATE_FALLBACK_MS = 6000;
+// How long a Quest plane scene waits for a plane before placing its assets as
+// a NONE scene does. Granted, the room model's planes arrive within a second.
+const QUEST_PLANE_WAIT_MS = 3000;
 
 type AnimOverride = {
   key: string;
@@ -262,21 +304,34 @@ interface StudioARSceneProps {
   skipOnLoadFunction?: boolean;
 }
 
+const subscribeToSceneLoad = (onChange: () => void) =>
+  questSceneLoadStore.subscribe(onChange);
+const getSceneLoad = () => questSceneLoadStore.get();
+
 /**
  * Outer gate: keeps the hooks-bearing inner component out of the tree until
- * sceneData is available, avoiding a Rules of Hooks violation.
+ * sceneData is available, avoiding a Rules of Hooks violation. Quest's opening
+ * scene is given none and takes it from questSceneLoadStore.
  */
 export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
-  if (!props.sceneData) {
+  const load = React.useSyncExternalStore(
+    subscribeToSceneLoad,
+    getSceneLoad,
+    getSceneLoad
+  );
+  const sceneData =
+    props.sceneData ??
+    (isQuest && load.status === "ready" ? load.sceneData : null);
+  if (!sceneData) {
     // Quest keeps its own root here for the reason spelled out at the main
     // return below.
     return isQuest ? (
-      <ViroScene toneMappingEnabled={false} />
+      <StudioQuestLoadScene failed={load.status === "failed"} />
     ) : (
       <ViroARScene toneMappingEnabled={false} />
     );
   }
-  return <StudioARSceneInner {...props} sceneData={props.sceneData} />;
+  return <StudioARSceneInner {...props} sceneData={sceneData} />;
 };
 
 // ─── Inner component (all hooks live here) ────────────────────────────────────
@@ -496,7 +551,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const animationsKey = animations.map((a) => a.animation_key).join(",");
   if (animations.length > 0 && registeredKeyRef.current !== animationsKey) {
     registeredKeyRef.current = animationsKey;
-    registerSceneAnimations(animations);
+    registerSceneAnimations(
+      animations,
+      isQuest ? studioTextAssetIds(assets) : undefined
+    );
   }
 
   // ─── Animation runtime state ──────────────────────────────────────────────
@@ -991,6 +1049,25 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
 
   // ─── Tap to place ─────────────────────────────────────────────────────────
   const arSceneRef = useRef<InstanceType<typeof ViroARScene> | null>(null);
+
+  // A recentre on Quest moves world coordinates against the room. Plane assets
+  // ride their anchors, which native moves, but tap-placed ones sit at the
+  // scene root, so in a scene on the room's planes they go under a node that
+  // carries the moves. Elsewhere everything follows the wearer, as Meta's
+  // store requires of a recentre (VRC.Quest.Functional.9).
+  const questRoomLockedRef = useRef(false);
+  const [roomMoves, setRoomMoves] = useState<Mat4>(IDENTITY);
+  const roomMovesRef = useRef(roomMoves);
+  roomMovesRef.current = roomMoves;
+  useEffect(() => {
+    if (!isQuest) return;
+    return onRoomMoved((move) => {
+      if (questRoomLockedRef.current) {
+        setRoomMoves((prev) => multiply(move, prev));
+      }
+    });
+  }, []);
+
   // Latest camera pose, cached from the transform stream so a headset trigger
   // can project the aim ray without an AR surface hit-test.
   const cameraPoseRef = useRef<{
@@ -1007,20 +1084,36 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const lastHeadLockedEvalRef = useRef(0);
 
   // The controller reports every button to its one delegate, and a second
-  // ViroController would replace this one's, so Y is read here.
+  // ViroController would replace this one's, so the menu button is read here.
   const [questMenuOpen, setQuestMenuOpen] = useState(false);
   const closeQuestMenu = useCallback(() => setQuestMenuOpen(false), []);
   const handleQuestControllerClickState = useCallback(
     (state: ViroClickState, _position: unknown, source: ViroSource) => {
       if (
         state === ViroClickStateTypes.CLICK_DOWN &&
-        (source as unknown as number) === ViroEventSource.Y_BUTTON
+        (source as unknown as number) === ViroEventSource.MENU_BUTTON
       ) {
         setQuestMenuOpen((open) => !open);
       }
     },
     []
   );
+
+  // B closes the menu before it exits. The listener exists only while the
+  // menu is open because the newest one is called first, and React runs a
+  // child's effects before its parent's: added as the scene mounts, it could
+  // be older than ViroQuestEntryPoint's, which exits.
+  useEffect(() => {
+    if (!questMenuOpen) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        setQuestMenuOpen(false);
+        return true;
+      }
+    );
+    return () => subscription.remove();
+  }, [questMenuOpen]);
 
   // Which tap-to-place asset the guided queue is waiting on (drives the prompt).
   const [activePlacementId, setActivePlacementId] = useState<string | null>(
@@ -1040,6 +1133,33 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     if (!activePlacementId) return null;
     return assets.find((a) => a.id === activePlacementId)?.name ?? null;
   }, [activePlacementId, assets]);
+
+  // Quest: each asset's prompt is placed in front of the wearer when it
+  // appears, and stays there. Placed while rendering, as the HUD is, so it
+  // never draws a frame at the previous asset's spot.
+  const [questPromptPlacement, setQuestPromptPlacement] = useState<{
+    assetId: string;
+    pose: CameraPose;
+  } | null>(null);
+  if (
+    isQuest &&
+    activePlacementId &&
+    questHeadLockedPose &&
+    questPromptPlacement?.assetId !== activePlacementId
+  ) {
+    setQuestPromptPlacement({
+      assetId: activePlacementId,
+      pose: questHeadLockedPose,
+    });
+  }
+  const questPromptTransform =
+    isQuest &&
+    activePlacementId &&
+    questPromptPlacement?.assetId === activePlacementId
+      ? computeHeadLockedTransform(questPromptPlacement.pose, {
+          distanceM: 2,
+        })
+      : null;
 
   const lastProximityEvalRef = useRef(0);
   const handleCameraTransformUpdate = useCallback(
@@ -1134,26 +1254,41 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   }, [placementApiRef, placeAtScreenPoint]);
 
   // Headset: the controller trigger fires this. Prefer the ray's real hit point
-  // (room mesh); fall back to a fixed distance along the cached aim ray.
-  const handleHeadsetPlaceTrigger = useCallback((hitPosition?: Vec3) => {
-    const store = placementStoreRef.current;
-    const activeId = store?.activeAssetId();
-    if (!store || !activeId) return;
-    if (colocationFrameRef.current.phase === "pending") return;
-    const pos = isUsablePoint(hitPosition)
-      ? hitPosition
-      : projectAlongCameraForward(cameraPoseRef.current);
-    if (!pos) return;
-    store.place(
-      activeId,
-      ...placementInSceneFrame(
-        colocationFrameRef.current,
-        pos,
-        cameraPoseRef.current?.forward,
-        cameraPoseRef.current?.up
-      )
-    );
-  }, []);
+  // (room mesh). A click that hits nothing has no position, so the asset goes a
+  // fixed distance along the ray that clicked, or the head's if it has none.
+  const questControllerRef = useRef<ViroController | null>(null);
+  const handleHeadsetPlaceTrigger = useCallback(
+    async (hitPosition: number[], source: ViroSource) => {
+      const ray = isUsablePoint(hitPosition)
+        ? null
+        : await questControllerRef.current
+            ?.getControllerRayAsync(source)
+            .catch(() => null);
+      const store = placementStoreRef.current;
+      const activeId = store?.activeAssetId();
+      if (!store || !activeId) return;
+      if (colocationFrameRef.current.phase === "pending") return;
+      const pos = isUsablePoint(hitPosition)
+        ? hitPosition
+        : projectAlongRay(
+            ray
+              ? { position: ray.origin, forward: ray.forward }
+              : cameraPoseRef.current
+          );
+      if (!pos) return;
+      store.place(
+        activeId,
+        ...placementInSceneFrame(
+          colocationFrameRef.current,
+          pos,
+          cameraPoseRef.current?.forward,
+          cameraPoseRef.current?.up,
+          questRoomLockedRef.current ? roomMovesRef.current : null
+        )
+      );
+    },
+    []
+  );
 
   // ─── Trigger image targets ────────────────────────────────────────────────
   // Three groups: image-triggered (anchored to a tracked image), tap-to-place
@@ -1461,11 +1596,92 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const planeDetectionMode = (
     (scene.plane_detection as string) ?? "NONE"
   ).toUpperCase();
-  const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
+  // The Quest room model reports a ceiling as a downward-facing horizontal
+  // plane, which "Horizontal" matches too.
+  const planeDirection = scene.plane_direction ?? "Horizontal";
+  const planeAlignment = (
+    isQuest && planeDirection === "Horizontal"
+      ? "HorizontalUpward"
+      : planeDirection
+  ) as any;
+
+  // On Quest the planes are the room model from Space Setup, which needs the
+  // spatial data permission. Without it there are none, so the scene keeps the
+  // ViroScene root and places its assets as a NONE scene does. Null until the
+  // check answers, or the prompt when this scene is the session's first to ask.
+  const wantsQuestPlanes =
+    isQuest &&
+    (planeDetectionMode === "AUTOMATIC" || planeDetectionMode === "MANUAL");
+  const [questSpatialData, setQuestSpatialData] = useState<boolean | null>(
+    wantsQuestPlanes ? null : false
+  );
+  // A shared session roots in AR whatever the answer, so only a scene on its
+  // own asks, which includes one a session has just left.
+  const questSceneAlone = colocationPhase === "off";
+  useEffect(() => {
+    if (!wantsQuestPlanes) return;
+    let live = true;
+    questSpatialDataGranted(questSceneAlone).then(
+      (granted) => {
+        if (live) setQuestSpatialData(granted);
+      },
+      () => {
+        if (live) setQuestSpatialData(false);
+      }
+    );
+    return () => {
+      live = false;
+    };
+  }, [wantsQuestPlanes, questSceneAlone]);
+
   // ViroARPlane and ViroARPlaneSelector need an AR root: under the ViroScene
   // root Quest uses outside a shared session, the Android bridge casts the
   // plane's scene to VRTARScene and the app crashes as the plane mounts.
-  const rootsInAR = studioSceneRootsInAR(colocationFrame, sceneMount, isQuest);
+  const rootsInAR = studioSceneRootsInAR(
+    colocationFrame,
+    sceneMount,
+    isQuest,
+    questSpatialData === true
+  );
+
+  // A room without Space Setup has no planes, so on Quest assets still waiting
+  // for one are placed as a NONE scene's are after QUEST_PLANE_WAIT_MS. Kept
+  // once it fires, so a late plane does not move them.
+  const [questPlaneFound, setQuestPlaneFound] = useState(false);
+  const [questPlaneFallback, setQuestPlaneFallback] = useState(false);
+  useEffect(() => {
+    if (questSpatialData !== true || questPlaneFound) return;
+    const timer = setTimeout(
+      () => setQuestPlaneFallback(true),
+      QUEST_PLANE_WAIT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [questSpatialData, questPlaneFound]);
+  const [questPlaneSelected, setQuestPlaneSelected] = useState(false);
+
+  // The scene's content is on the room's planes, so tap-placed content keeps
+  // to the room too (see roomMoves).
+  const questRoomLocked =
+    isQuest && rootsInAR && !questPlaneFallback && colocationPhase === "off";
+  questRoomLockedRef.current = questRoomLocked;
+  const roomNode = useMemo(
+    () => toNodeTransform(questRoomLocked ? roomMoves : IDENTITY),
+    [questRoomLocked, roomMoves]
+  );
+  useEffect(() => {
+    if (roomMoves !== IDENTITY) refreshAllTargetTransforms();
+  }, [roomMoves, refreshAllTargetTransforms]);
+
+  // On Quest the plane's heading comes from the room model, so plane content
+  // is turned to face the wearer (see planeFacingYaw). Null until the plane is
+  // found or picked, and the content stays hidden until then, so it never
+  // shows a frame along the plane's own heading.
+  const [questPlaneYaw, setQuestPlaneYaw] = useState<number | null>(null);
+  const questFacingYaw = useCallback((plane: ViroAnchor) => {
+    const camera = cameraPoseRef.current;
+    if (!camera || !plane?.rotation) return 0;
+    return planeFacingYaw(plane.rotation, camera) ?? 0;
+  }, []);
 
   // Native plane anchor types for ViroARScene. NONE must pass [] explicitly
   // (empty disables plane finding): omitting the prop keeps the native default
@@ -1550,17 +1766,84 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const handlePlaneSelected = useCallback(
     (plane: ViroAnchor) => {
       selectedAnchorIdRef.current = plane?.anchorId ?? null;
+      if (isQuest) {
+        setQuestPlaneSelected(true);
+        setQuestPlaneYaw(questFacingYaw(plane));
+      }
       trackDragSurface(plane);
       onPlaneSelected?.();
     },
-    [onPlaneSelected, trackDragSurface]
+    [onPlaneSelected, trackDragSurface, questFacingYaw]
   );
 
   // ViroARPlaneSelector.onPlaneDetected must return a boolean (accept the plane).
   const handlePlaneDetectedForSelector = useCallback(() => {
+    if (isQuest) setQuestPlaneFound(true);
     onPlaneDetected?.();
     return true;
   }, [onPlaneDetected]);
+
+  // Only a plane the wrapper accepts counts: the scene's own onAnchorFound
+  // also hears walls and ceilings the alignment rules out.
+  const handleWrapperAnchorFound = useCallback(
+    (anchor: ViroAnchor) => {
+      if (isQuest) {
+        setQuestPlaneFound(true);
+        setQuestPlaneYaw(questFacingYaw(anchor));
+      }
+      trackDragSurface(anchor);
+    },
+    [trackDragSurface, questFacingYaw]
+  );
+
+  // Image-triggered assets are never shown on Quest. The notice saying so
+  // stays up only when nothing else in the scene can be shown.
+  const [imageTriggerNoticeDone, setImageTriggerNoticeDone] = useState(false);
+  const imageTriggerNotice =
+    imageTriggeredAssets.length > 0 &&
+    (!imageTriggerNoticeDone || imageTriggeredAssets.length === assets.length)
+      ? "Content that appears on an image is not shown on Meta Quest"
+      : null;
+
+  // The scene origin is fixed in the room and can be out of view, and the
+  // host's 2D guidance cannot be seen in the headset, so on Quest these are
+  // placed in front of the wearer when they appear, as the placement prompt is.
+  const questNotice = !isQuest
+    ? null
+    : assets.length === 0
+      ? noAssetsMessage ?? "No assets to display"
+      : rootsInAR &&
+          colocationPhase === "off" &&
+          planeDetectionMode === "MANUAL" &&
+          questPlaneFound &&
+          !questPlaneSelected &&
+          !questPlaneFallback
+        ? "Point at a surface and pull the trigger to place the scene"
+        : imageTriggerNotice;
+  const [questNoticePlacement, setQuestNoticePlacement] = useState<{
+    text: string;
+    pose: CameraPose;
+  } | null>(null);
+  if (
+    questNotice &&
+    questHeadLockedPose &&
+    questNoticePlacement?.text !== questNotice
+  ) {
+    setQuestNoticePlacement({ text: questNotice, pose: questHeadLockedPose });
+  } else if (!questNotice && questNoticePlacement) {
+    setQuestNoticePlacement(null);
+  }
+  const questNoticeTransform =
+    questNotice && questNoticePlacement?.text === questNotice
+      ? computeHeadLockedTransform(questNoticePlacement.pose, { distanceM: 2 })
+      : null;
+  const imageTriggerNoticeShown =
+    questNoticeTransform !== null && questNotice === imageTriggerNotice;
+  useEffect(() => {
+    if (!imageTriggerNoticeShown) return;
+    const timer = setTimeout(() => setImageTriggerNoticeDone(true), 8000);
+    return () => clearTimeout(timer);
+  }, [imageTriggerNoticeShown]);
 
   // ─── Shared origin (host) ─────────────────────────────────────────────────
   // The host places the scene the way it was authored, and that pose becomes
@@ -1573,23 +1856,40 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     }
   }, [needsOrigin, planeDetectionMode, colocation]);
 
+  // A Quest host turns the origin as its own plane content is turned.
+  const facingPlanePose = useCallback(
+    (pose: ReturnType<typeof fromPositionEuler>, plane: ViroAnchor) =>
+      isQuest
+        ? multiply(
+            pose,
+            fromPositionEuler([0, 0, 0], [0, questFacingYaw(plane), 0])
+          )
+        : pose,
+    [questFacingYaw]
+  );
+
   const proposePlaneOrigin = useCallback(
     (anchor: ViroAnchor) => {
       if (!anchor?.position || !anchor?.rotation) return;
       colocation?.proposeOrigin(
-        fromPositionEuler(anchor.position, anchor.rotation)
+        facingPlanePose(
+          fromPositionEuler(anchor.position, anchor.rotation),
+          anchor
+        )
       );
     },
-    [colocation]
+    [colocation, facingPlanePose]
   );
 
   const handleOriginPlaneSelected = useCallback(
     (plane: ViroAnchor, tapPosition?: Vec3) => {
       handlePlaneSelected(plane);
       if (!plane?.position || !plane?.rotation) return;
-      colocation?.proposeOrigin(selectedPlanePose(plane, tapPosition));
+      colocation?.proposeOrigin(
+        facingPlanePose(selectedPlanePose(plane, tapPosition), plane)
+      );
     },
-    [handlePlaneSelected, colocation]
+    [handlePlaneSelected, colocation, facingPlanePose]
   );
 
   // Detection only, at the scene root: a plane anchor writes its world pose
@@ -1657,17 +1957,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // A plane-mode scene under the ViroScene root renders its assets the way a
   // NONE scene does, at the scene root.
   const renderAssets = () => {
-    if (!rootsInAR) return <>{renderedPlaneAssets}</>;
+    if (!rootsInAR || questPlaneFallback) return <>{renderedPlaneAssets}</>;
+    const onPlane = isQuest ? (
+      <ViroNode
+        rotation={[0, questPlaneYaw ?? 0, 0]}
+        visible={questPlaneYaw !== null}
+      >
+        {renderedPlaneAssets}
+      </ViroNode>
+    ) : (
+      renderedPlaneAssets
+    );
     if (planeDetectionMode === "AUTOMATIC") {
       return (
         <ViroARPlane
           minHeight={0.1}
           minWidth={0.1}
           alignment={planeAlignment}
-          onAnchorFound={trackDragSurface}
+          onAnchorFound={handleWrapperAnchorFound}
           onAnchorUpdated={trackDragSurface}
         >
-          {renderedPlaneAssets}
+          {onPlane}
         </ViroARPlane>
       );
     }
@@ -1681,7 +1991,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           onPlaneDetected={handlePlaneDetectedForSelector}
           onPlaneSelected={handlePlaneSelected}
         >
-          {renderedPlaneAssets}
+          {onPlane}
         </ViroARPlaneSelector>
       );
     }
@@ -1705,38 +2015,67 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     <>
       {isQuest && (
         <ViroController
+          ref={questControllerRef}
           controllerVisibility
           reticleVisibility
           onClickState={handleQuestControllerClickState}
           {...(activePlacementId
             ? {
-                onClick: (position: [number, number, number]) =>
-                  handleHeadsetPlaceTrigger(position),
+                // The controller also hears clicks on a panel's items, and
+                // reports them before the item does.
+                onClick: (
+                  position: [number, number, number],
+                  source: ViroSource
+                ) => {
+                  if (
+                    !isSelectClick(source) ||
+                    questMenuOpen ||
+                    questAlertStore.isActive()
+                  )
+                    return;
+                  handleHeadsetPlaceTrigger(position, source);
+                },
               }
             : {})}
         />
       )}
       <StudioLightRig ref={lightRigRef} />
       {colocationPhase === "off" && trackingReady && renderAssets()}
-      {colocationPhase === "off" && renderedTapToPlaceAssets}
+      {colocationPhase === "off" &&
+        (isQuest ? (
+          <ViroNode position={roomNode.position} rotation={roomNode.rotation}>
+            {renderedTapToPlaceAssets}
+          </ViroNode>
+        ) : (
+          renderedTapToPlaceAssets
+        ))}
       {needsOrigin && renderOriginPicker()}
       {renderSharedContent()}
       {renderedImageTriggeredAssets}
-      {isQuest && activePlacementId && (
-        <StudioQuestText
-          text={`Point and pull the trigger to place: ${
-            activePlacementName ?? "object"
-          }`}
-          position={[0, 0.2, -2]}
-          width={3}
-          height={1}
-          fontSize={14}
-          style={{
-            fontFamily: STUDIO_TEXT_FONT_FAMILY,
-            color: "#FFFFFF",
-            textAlign: "center",
-          }}
-        />
+      {questPromptTransform && (
+        <ViroNode
+          position={questPromptTransform.position}
+          rotation={questPromptTransform.rotation}
+          scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
+        >
+          <StudioQuestText
+            text={`Point and pull the trigger to place: ${
+              activePlacementName ?? "object"
+            }`}
+            position={[0, 0, 0]}
+            width={3}
+            height={1}
+            fontSize={14}
+            renderingOrder={QUEST_PANEL_ORDER.prompt + 2}
+            depthPlate
+            style={{
+              fontFamily: STUDIO_TEXT_FONT_FAMILY,
+              color: "#FFFFFF",
+              textAlign: "center",
+              textAlignVertical: "center",
+            }}
+          />
+        </ViroNode>
       )}
       {isQuest && <StudioQuestAlertOverlay cameraPose={questHeadLockedPose} />}
       {isQuest && (
@@ -1745,10 +2084,36 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           sceneName={scene.name}
           menuOpen={questMenuOpen}
           onCloseMenu={closeQuestMenu}
+          promptShown={
+            questPromptTransform !== null || questNoticeTransform !== null
+          }
         />
       )}
       <StudioSounds manager={soundManagerRef.current!} />
-      {assets.length === 0 && (
+      {questNoticeTransform && questNotice && (
+        <ViroNode
+          position={questNoticeTransform.position}
+          rotation={questNoticeTransform.rotation}
+          scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
+        >
+          <StudioQuestText
+            text={questNotice}
+            position={[0, 0, 0]}
+            width={3}
+            height={1}
+            fontSize={16}
+            renderingOrder={QUEST_PANEL_ORDER.prompt + 2}
+            depthPlate
+            style={{
+              fontFamily: STUDIO_TEXT_FONT_FAMILY,
+              color: "#CCCCCC",
+              textAlign: "center",
+              textAlignVertical: "center",
+            }}
+          />
+        </ViroNode>
+      )}
+      {assets.length === 0 && !isQuest && (
         <ViroText
           text={noAssetsMessage ?? "No assets to display"}
           position={[0, 0, -2]}
@@ -1782,23 +2147,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   //
   // ViroXRSceneNavigator's contract is that a ViroScene root is fully-virtual VR
   // and a ViroARScene root is mixed reality, which turns passthrough on by itself
-  // and wires XR_EXT_plane_detection into onAnchorFound and ViroARPlane. Passthrough
-  // is not what is lost by keeping ViroScene: StudioSceneNavigator asks for it
-  // outright with `passthroughEnabled` on Quest, which reaches VRActivity through
-  // the navigator bridge and does not depend on the root at all.
+  // and hands the room's planes (Space Setup's room model, through XR_FB_scene)
+  // to onAnchorFound and ViroARPlane. Passthrough is not what is lost by keeping
+  // ViroScene: StudioSceneNavigator asks for it outright with
+  // `passthroughEnabled` on Quest, which reaches VRActivity through the
+  // navigator bridge and does not depend on the root at all.
   //
-  // Plane anchors are. With this root a Studio scene on Quest gets no detected
-  // surfaces, so an asset authored to sit on a floor or a wall has nothing to land
-  // on. Nothing regresses against what shipped — ViroScene is the root Quest has
-  // had since April, and the ref that drives tap-to-place hit testing is null on
-  // Quest either way — but unifying the two roots is a real change with a device
-  // test behind it, not something a conflict resolution should decide quietly.
+  // Plane anchors are, so a plane-mode scene takes the AR root when the wearer
+  // has granted spatial data, and falls back to the scene root as a NONE scene
+  // does when no plane arrives (QUEST_PLANE_WAIT_MS). The ref that drives
+  // tap-to-place hit testing is null on Quest either way.
   //
-  // The scene on screen during a shared session is the one exception
+  // The scene on screen during a shared session is the other exception
   // (studioSceneRootsInAR). Its content sits in the shared frame rather than on
   // planes, so the AR root changes nothing it renders, and the scene returns to
   // ViroScene when the session ends. Changing the root remounts everything
   // below it, which is the cost the `colocation` prop doc states.
+  // Until the spatial data check (or prompt) answers, so the assets mount once
+  // under the root they keep.
+  if (questSpatialData === null) {
+    return <ViroScene toneMappingEnabled={false} />;
+  }
   if (!rootsInAR) {
     return (
       <ViroScene

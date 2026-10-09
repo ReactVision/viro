@@ -27,12 +27,10 @@ const TITLE_FONT_SIZE = 22;
 const MESSAGE_FONT_SIZE = 16;
 const BUTTON_FONT_SIZE = 16;
 const COUNTER_FONT_SIZE = 11;
-// The panel follows the head, so what it cannot fit in view can never be read.
-// At 1.2 m this height reaches about 27° above and below where the wearer
-// looks. Longer text shrinks to fit, down to the size of the menu's hint, and a
-// message still too long goes on further pages.
+// The panel follows the head, so a message too long for this height goes on
+// further pages rather than past the view. At QUEST_PANEL_SCALE and 1.2 m it
+// reaches about 14° above and below where the wearer looks.
 const MAX_PANEL_HEIGHT_M = 2.4;
-const MIN_MESSAGE_FONT_SIZE = 11;
 
 const BUTTON_OUTLINE = questRoundedRect(
   BUTTON_WIDTH_M,
@@ -41,9 +39,7 @@ const BUTTON_OUTLINE = questRoundedRect(
 );
 
 type QuestAlertLayout = {
-  titleFontSize: number;
   titleHeight: number;
-  messageFontSize: number;
   pages: string[];
   messageHeights: number[];
   /** Unscaled, and the same for every page, so nothing placed below the panel
@@ -55,36 +51,21 @@ export function questAlertLayout(
   title: string | null,
   message: string
 ): QuestAlertLayout {
-  const titleFontSizeFor = (messageFontSize: number) =>
-    Math.round((TITLE_FONT_SIZE * messageFontSize) / MESSAGE_FONT_SIZE);
-  const titleHeightAt = (fontSize: number) =>
-    title ? estimateQuestTextHeight(title, TEXT_WIDTH_M, fontSize) : 0;
-  const chromeAround = (titleHeight: number) =>
+  const titleHeight = title
+    ? estimateQuestTextHeight(title, TEXT_WIDTH_M, TITLE_FONT_SIZE)
+    : 0;
+  const chrome =
     2 * PADDING_M +
     (title ? titleHeight + TITLE_GAP_M : 0) +
     BUTTON_GAP_M +
     BUTTON_HEIGHT_M;
-  const fits = (fontSize: number) =>
-    chromeAround(titleHeightAt(titleFontSizeFor(fontSize))) +
-      estimateQuestTextHeight(message, TEXT_WIDTH_M, fontSize) <=
-    MAX_PANEL_HEIGHT_M;
-
-  let messageFontSize = MESSAGE_FONT_SIZE;
-  while (messageFontSize > MIN_MESSAGE_FONT_SIZE && !fits(messageFontSize)) {
-    messageFontSize -= 1;
-  }
-  const titleFontSize = titleFontSizeFor(messageFontSize);
-  const titleHeight = titleHeightAt(titleFontSize);
-  const chrome = chromeAround(titleHeight);
   const messageHeightOf = (text: string) =>
-    estimateQuestTextHeight(text, TEXT_WIDTH_M, messageFontSize);
+    estimateQuestTextHeight(text, TEXT_WIDTH_M, MESSAGE_FONT_SIZE);
 
   const messageHeight = messageHeightOf(message);
   if (chrome + messageHeight <= MAX_PANEL_HEIGHT_M) {
     return {
-      titleFontSize,
       titleHeight,
-      messageFontSize,
       pages: [message],
       messageHeights: [messageHeight],
       panelHeight: chrome + messageHeight,
@@ -105,9 +86,7 @@ export function questAlertLayout(
   }
   pages.push(page);
   return {
-    titleFontSize,
     titleHeight,
-    messageFontSize,
     pages,
     messageHeights: pages.map(messageHeightOf),
     panelHeight: MAX_PANEL_HEIGHT_M,
@@ -239,7 +218,7 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
           position={[0, titleY, 0]}
           width={TEXT_WIDTH_M}
           height={titleHeight}
-          fontSize={layout.titleFontSize}
+          fontSize={TITLE_FONT_SIZE}
           renderingOrder={QUEST_PANEL_ORDER.alert + 2}
           style={{
             ...textStyle,
@@ -254,7 +233,7 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
         position={[0, messageY, 0]}
         width={TEXT_WIDTH_M}
         height={messageHeight}
-        fontSize={layout.messageFontSize}
+        fontSize={MESSAGE_FONT_SIZE}
         renderingOrder={QUEST_PANEL_ORDER.alert + 2}
         style={{
           ...textStyle,

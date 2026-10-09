@@ -16,6 +16,7 @@ import {
   fromPositionEuler,
   IDENTITY,
   type Mat4,
+  multiply,
 } from "../components/Studio/colocation/frameMath";
 import { studioColocationIndicatorContent } from "../components/Studio/colocation/indicatorContent";
 import type {
@@ -264,6 +265,32 @@ describe("StudioColocationController on Quest: host", () => {
       peers: 0,
     });
     expectMatrix(h.controller.getFrame().sceneToWorld, HOST_ANCHOR);
+  });
+
+  it("keeps the shared frame in the room when the wearer recentres", async () => {
+    const listeners = new Set<(move: Mat4) => void>();
+    const h = harness({
+      onRoomMoved: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    });
+    h.controller.request({ mode: "host", name: "Lab" });
+    h.controller.attachScene(scene());
+    await flush();
+    h.replication.sync();
+    await flush();
+    await advance(500);
+    expect(h.controller.getState().status).toBe("live");
+
+    const move = fromPositionEuler([1, 0, -2], [0, 90, 0]);
+    listeners.forEach((fn) => fn(move));
+    const frame = h.controller.getFrame();
+    expectMatrix(frame.location, multiply(move, HOST_ANCHOR));
+    expectMatrix(frame.sceneToWorld, multiply(move, HOST_ANCHOR));
+
+    h.controller.leave();
+    expect(listeners.size).toBe(0);
   });
 
   it("tries again when the new anchor is not locatable yet", async () => {

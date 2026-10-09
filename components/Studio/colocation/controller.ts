@@ -32,6 +32,7 @@ import {
 } from "../../AR/ViroReplication";
 import type { ViroScanStatus } from "../../Types/ViroEvents";
 import { isQuest } from "../../Utilities/ViroPlatform";
+import { onRoomMoved } from "../../Utilities/VRModuleOpenXR";
 import { showStudioAlert } from "../domain/questAlertStore";
 import { studioApiError } from "../domain/studioApiError";
 import type { StudioSceneResponse } from "../types";
@@ -219,6 +220,8 @@ export type StudioColocationDeps = {
   now: () => number;
   loadScene: (sceneId: string) => Promise<StudioSceneResponse>;
   onNavigationError: (error: unknown) => void;
+  /** Quest: a recentre moved world coordinates against the room. */
+  onRoomMoved: (listener: (move: Mat4) => void) => () => void;
 };
 
 function defaultFrameSourceFor(
@@ -293,6 +296,7 @@ const DEFAULT_DEPS: StudioColocationDeps = {
   now: () => Date.now(),
   loadScene: loadStudioScene,
   onNavigationError: reportNavigationError,
+  onRoomMoved,
 };
 
 function optionsKey(options: StudioColocationOptions): string {
@@ -703,6 +707,12 @@ export class StudioColocationController {
     this.active = true;
     const run = this.run;
     this.relayUrl = options.relayUrl ?? STUDIO_COLOCATION_DEFAULT_RELAY_URL;
+    // The anchor stays in the room, so its world pose moves with a recentre.
+    this.cleanups.push(
+      this.deps.onRoomMoved((move) => {
+        if (this.location) this.setLocation(multiply(move, this.location));
+      })
+    );
     const flow =
       options.mode === "host"
         ? this.host(run, scene)

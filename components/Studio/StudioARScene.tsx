@@ -20,6 +20,7 @@ import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
 import { isQuest } from "../Utilities/ViroPlatform";
+import { onRoomMoved } from "../Utilities/VRModuleOpenXR";
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import type {
   ViroAmbientLightInfo,
@@ -113,6 +114,7 @@ import {
   fromPositionEuler,
   IDENTITY,
   invert,
+  type Mat4,
   multiply,
   rotateDirection,
   toNodeTransform,
@@ -183,15 +185,20 @@ const offFrame = () => STUDIO_COLOCATION_OFF_FRAME;
 
 /**
  * A world-space placement in the frame shared content renders in, which is the
- * scene origin while shared and world otherwise.
+ * scene origin while shared, the room when given the room's moves since the
+ * scene mounted, and world otherwise.
  */
 function placementInSceneFrame(
   frame: StudioColocationFrame,
   position: Vec3,
   forward?: Vec3,
-  up?: Vec3
+  up?: Vec3,
+  roomMoves: Mat4 | null = null
 ): [Vec3, Vec3 | undefined, Vec3 | undefined] {
-  const m = frame.phase === "shared" ? frame.worldToScene : null;
+  const m =
+    frame.phase === "shared"
+      ? frame.worldToScene
+      : roomMoves && invert(roomMoves);
   if (!m) return [position, forward, up];
   return [
     transformPoint(m, position),
@@ -1042,6 +1049,25 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
 
   // ─── Tap to place ─────────────────────────────────────────────────────────
   const arSceneRef = useRef<InstanceType<typeof ViroARScene> | null>(null);
+
+  // A recentre on Quest moves world coordinates against the room. Plane assets
+  // ride their anchors, which native moves, but tap-placed ones sit at the
+  // scene root, so in a scene on the room's planes they go under a node that
+  // carries the moves. Elsewhere everything follows the wearer, as Meta's
+  // store requires of a recentre (VRC.Quest.Functional.9).
+  const questRoomLockedRef = useRef(false);
+  const [roomMoves, setRoomMoves] = useState<Mat4>(IDENTITY);
+  const roomMovesRef = useRef(roomMoves);
+  roomMovesRef.current = roomMoves;
+  useEffect(() => {
+    if (!isQuest) return;
+    return onRoomMoved((move) => {
+      if (questRoomLockedRef.current) {
+        setRoomMoves((prev) => multiply(move, prev));
+      }
+    });
+  }, []);
+
   // Latest camera pose, cached from the transform stream so a headset trigger
   // can project the aim ray without an AR surface hit-test.
   const cameraPoseRef = useRef<{
@@ -1256,7 +1282,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           colocationFrameRef.current,
           pos,
           cameraPoseRef.current?.forward,
-          cameraPoseRef.current?.up
+          cameraPoseRef.current?.up,
+          questRoomLockedRef.current ? roomMovesRef.current : null
         )
       );
     },
@@ -1632,6 +1659,19 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   }, [questSpatialData, questPlaneFound]);
   const [questPlaneSelected, setQuestPlaneSelected] = useState(false);
 
+  // The scene's content is on the room's planes, so tap-placed content keeps
+  // to the room too (see roomMoves).
+  const questRoomLocked =
+    isQuest && rootsInAR && !questPlaneFallback && colocationPhase === "off";
+  questRoomLockedRef.current = questRoomLocked;
+  const roomNode = useMemo(
+    () => toNodeTransform(questRoomLocked ? roomMoves : IDENTITY),
+    [questRoomLocked, roomMoves]
+  );
+  useEffect(() => {
+    if (roomMoves !== IDENTITY) refreshAllTargetTransforms();
+  }, [roomMoves, refreshAllTargetTransforms]);
+
   // On Quest the plane's heading comes from the room model, so plane content
   // is turned to face the wearer (see planeFacingYaw). Null until the plane is
   // found or picked, and the content stays hidden until then, so it never
@@ -2001,7 +2041,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       )}
       <StudioLightRig ref={lightRigRef} />
       {colocationPhase === "off" && trackingReady && renderAssets()}
-      {colocationPhase === "off" && renderedTapToPlaceAssets}
+      {colocationPhase === "off" &&
+        (isQuest ? (
+          <ViroNode position={roomNode.position} rotation={roomNode.rotation}>
+            {renderedTapToPlaceAssets}
+          </ViroNode>
+        ) : (
+          renderedTapToPlaceAssets
+        ))}
       {needsOrigin && renderOriginPicker()}
       {renderSharedContent()}
       {renderedImageTriggeredAssets}

@@ -33,6 +33,9 @@
 #import <React/RCTUtils.h>
 #import "VRTUtils.h"
 #import <CoreLocation/CoreLocation.h>
+#import <zlib.h>
+#include <stdio.h>
+#include <vector>
 
 @implementation VRTARSceneNavigatorModule
 @synthesize bridge = _bridge;
@@ -1214,30 +1217,50 @@ RCT_EXPORT_METHOD(rvGetScanDiagnostics:(nonnull NSNumber *)reactTag
     }];
 }
 
+// JSON for a promise that resolves a JSON string. Built with
+// NSJSONSerialization so exception reasons and server bodies are escaped.
+static NSString *RVJsonString(NSDictionary *object) {
+    NSData *data = object ? [NSJSONSerialization dataWithJSONObject:object options:0 error:nil] : nil;
+    NSString *json = data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : nil;
+    return json ?: @"{\"success\":false,\"error\":\"Could not encode the result\"}";
+}
+
 // Loads a downloaded .rvmap's raw bytes (base64, same transport
 // VRTStreamingAudioModule.pushSamples uses) for continuous VPS localisation.
 // Resolves the renderer's own JSON verbatim ({"success":...}), same reasoning
 // as rvGetScanStatus above.
+//
+// The base64 decode (several MB) runs on a background queue. The map parse
+// itself still runs inside VROARSessioniOS::rvLoadVPSMap on the main thread.
+// The session state that call resets is locked, so the parse could move to a
+// background queue too; that has not been done or measured yet.
 RCT_EXPORT_METHOD(rvLoadVPSMap:(nonnull NSNumber *)reactTag
                     rvmapBase64:(NSString *)rvmapBase64
                         resolve:(RCTPromiseResolveBlock)resolve
                          reject:(RCTPromiseRejectBlock)reject) {
-    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
-        @try {
-            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
-            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@"{\"success\":false,\"error\":\"Invalid view type\"}"); return;
-            }
-            NSData *rvmapData = [[NSData alloc] initWithBase64EncodedString:rvmapBase64 options:0];
-            if (!rvmapData || rvmapData.length == 0) {
-                resolve(@"{\"success\":false,\"error\":\"Empty or malformed base64 map data\"}"); return;
-            }
-            BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMap:rvmapData];
-            resolve(ok ? @"{\"success\":true}" : @"{\"success\":false}");
-        } @catch (NSException *ex) {
-            resolve([NSString stringWithFormat:@"{\"success\":false,\"error\":\"%@\"}", ex.reason]);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *rvmapData = rvmapBase64
+            ? [[NSData alloc] initWithBase64EncodedString:rvmapBase64 options:0]
+            : nil;
+        if (!rvmapData || rvmapData.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": @"Empty or malformed base64 map data"}));
+            return;
         }
-    }];
+        dispatch_async(RCTGetUIManagerQueue(), ^{
+            [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+                @try {
+                    VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+                    if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+                    }
+                    BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMap:rvmapData];
+                    resolve(RVJsonString(@{@"success": @(ok)}));
+                } @catch (NSException *ex) {
+                    resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+                }
+            }];
+        });
+    });
 }
 
 RCT_EXPORT_METHOD(rvUnloadVPSMap:(nonnull NSNumber *)reactTag) {
@@ -1259,13 +1282,310 @@ RCT_EXPORT_METHOD(rvGetVPSLocalization:(nonnull NSNumber *)reactTag
         @try {
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
-                resolve(@"{\"available\":false,\"error\":\"AR navigator is not mounted yet\"}"); return;
+                resolve(RVJsonString(@{@"available": @NO, @"error": @"AR navigator is not mounted yet"})); return;
             }
             resolve([(VRTARSceneNavigator *)view rvGetVPSLocalizationJson]);
         } @catch (NSException *ex) {
-            resolve([NSString stringWithFormat:@"{\"available\":false,\"error\":\"%@\"}", ex.reason]);
+            resolve(RVJsonString(@{@"available": @NO, @"error": ex.reason ?: ex.name}));
         }
     }];
+}
+
+#pragma mark - VPS scan upload
+
+// The two files of a ViroReact AR recording, in the order they go in the zip.
+static NSArray<NSString *> *RVScanRecordingFiles(void) {
+    return @[@"session.jsonl", @"video.mp4"];
+}
+
+static void RVPutLE16(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v & 0xff);
+    p[1] = (uint8_t)((v >> 8) & 0xff);
+}
+
+static void RVPutLE32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v & 0xff);
+    p[1] = (uint8_t)((v >> 8) & 0xff);
+    p[2] = (uint8_t)((v >> 16) & 0xff);
+    p[3] = (uint8_t)((v >> 24) & 0xff);
+}
+
+// Writes a stored (uncompressed) zip of `names` from `dir` to `zipPath`,
+// streaming each file through a fixed buffer: local header, data, then the
+// central directory and end record. The CRC-32 is computed with zlib while
+// copying and patched into the local header afterwards; sizes are known up
+// front because stored entries are copied verbatim. No zip64, so the whole
+// archive must stay under 4 GiB (vps-server caps recordings at 2 GiB).
+// Returns nil on success, or why it failed; a partial zip is removed.
+static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSString *> *names) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    std::vector<uint64_t> sizes;
+    uint64_t total = 22;
+    for (NSString *name in names) {
+        NSString *path = [dir stringByAppendingPathComponent:name];
+        BOOL isDir = NO;
+        if (![fm fileExistsAtPath:path isDirectory:&isDir] || isDir) {
+            return [NSString stringWithFormat:@"%@ is missing from %@", name, dir];
+        }
+        if (![fm isReadableFileAtPath:path]) {
+            return [NSString stringWithFormat:@"%@ is not readable", name];
+        }
+        NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+        uint64_t size = [attrs[NSFileSize] unsignedLongLongValue];
+        sizes.push_back(size);
+        total += 30 + 46 + 2 * (uint64_t)[name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] + size;
+    }
+    if (total >= 0xFFFFFFFFull) {
+        return @"The recording is too large to upload (over 4 GiB)";
+    }
+
+    FILE *out = fopen(zipPath.fileSystemRepresentation, "wb");
+    if (!out) return [NSString stringWithFormat:@"Could not create %@", zipPath];
+
+    NSDate *now = [NSDate date];
+    NSDateComponents *c = [[NSCalendar currentCalendar]
+        components:NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay |
+                   NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond
+          fromDate:now];
+    uint32_t dosTime = (uint32_t)((c.hour << 11) | (c.minute << 5) | (c.second / 2));
+    uint32_t dosDate = (uint32_t)((MAX(0, (int)c.year - 1980) << 9) | (c.month << 5) | c.day);
+
+    std::vector<uint32_t> crcs;
+    std::vector<uint32_t> offsets;
+    const size_t kBufSize = 1 << 20;
+    std::vector<uint8_t> buf(kBufSize);
+    NSString *failure = nil;
+
+    for (NSUInteger i = 0; i < names.count && !failure; i++) {
+        NSString *name = names[i];
+        NSData *nameData = [name dataUsingEncoding:NSUTF8StringEncoding];
+        uint32_t size = (uint32_t)sizes[i];
+        uint32_t offset = (uint32_t)ftello(out);
+
+        uint8_t header[30];
+        RVPutLE32(header + 0, 0x04034b50);
+        RVPutLE16(header + 4, 20);        // version needed to extract
+        RVPutLE16(header + 6, 0);         // flags
+        RVPutLE16(header + 8, 0);         // method: stored
+        RVPutLE16(header + 10, dosTime);
+        RVPutLE16(header + 12, dosDate);
+        RVPutLE32(header + 14, 0);        // CRC-32, patched below
+        RVPutLE32(header + 18, size);     // compressed size
+        RVPutLE32(header + 22, size);     // uncompressed size
+        RVPutLE16(header + 26, (uint32_t)nameData.length);
+        RVPutLE16(header + 28, 0);        // extra length
+        if (fwrite(header, 1, sizeof(header), out) != sizeof(header) ||
+            fwrite(nameData.bytes, 1, nameData.length, out) != nameData.length) {
+            failure = @"Could not write the zip";
+            break;
+        }
+
+        NSString *path = [dir stringByAppendingPathComponent:name];
+        FILE *in = fopen(path.fileSystemRepresentation, "rb");
+        if (!in) { failure = [NSString stringWithFormat:@"Could not open %@", name]; break; }
+        uLong crc = crc32(0L, Z_NULL, 0);
+        uint64_t copied = 0;
+        size_t n;
+        while ((n = fread(buf.data(), 1, kBufSize, in)) > 0) {
+            crc = crc32(crc, buf.data(), (uInt)n);
+            if (fwrite(buf.data(), 1, n, out) != n) { failure = @"Could not write the zip"; break; }
+            copied += n;
+        }
+        if (!failure && ferror(in)) failure = [NSString stringWithFormat:@"Could not read %@", name];
+        fclose(in);
+        if (failure) break;
+        if (copied != sizes[i]) {
+            failure = [NSString stringWithFormat:@"%@ changed while it was being zipped", name];
+            break;
+        }
+
+        uint8_t crcBytes[4];
+        RVPutLE32(crcBytes, (uint32_t)crc);
+        if (fseeko(out, (off_t)offset + 14, SEEK_SET) != 0 ||
+            fwrite(crcBytes, 1, 4, out) != 4 ||
+            fseeko(out, 0, SEEK_END) != 0) {
+            failure = @"Could not write the zip";
+            break;
+        }
+        crcs.push_back((uint32_t)crc);
+        offsets.push_back(offset);
+    }
+
+    if (!failure) {
+        uint32_t cdOffset = (uint32_t)ftello(out);
+        for (NSUInteger i = 0; i < names.count && !failure; i++) {
+            NSData *nameData = [names[i] dataUsingEncoding:NSUTF8StringEncoding];
+            uint32_t size = (uint32_t)sizes[i];
+            uint8_t cd[46];
+            RVPutLE32(cd + 0, 0x02014b50);
+            RVPutLE16(cd + 4, 20);        // version made by
+            RVPutLE16(cd + 6, 20);        // version needed
+            RVPutLE16(cd + 8, 0);         // flags
+            RVPutLE16(cd + 10, 0);        // method: stored
+            RVPutLE16(cd + 12, dosTime);
+            RVPutLE16(cd + 14, dosDate);
+            RVPutLE32(cd + 16, crcs[i]);
+            RVPutLE32(cd + 20, size);
+            RVPutLE32(cd + 24, size);
+            RVPutLE16(cd + 28, (uint32_t)nameData.length);
+            RVPutLE16(cd + 30, 0);        // extra length
+            RVPutLE16(cd + 32, 0);        // comment length
+            RVPutLE16(cd + 34, 0);        // disk number start
+            RVPutLE16(cd + 36, 0);        // internal attributes
+            RVPutLE32(cd + 38, 0);        // external attributes
+            RVPutLE32(cd + 42, offsets[i]);
+            if (fwrite(cd, 1, sizeof(cd), out) != sizeof(cd) ||
+                fwrite(nameData.bytes, 1, nameData.length, out) != nameData.length) {
+                failure = @"Could not write the zip";
+            }
+        }
+        if (!failure) {
+            uint32_t cdSize = (uint32_t)ftello(out) - cdOffset;
+            uint8_t eocd[22];
+            RVPutLE32(eocd + 0, 0x06054b50);
+            RVPutLE16(eocd + 4, 0);
+            RVPutLE16(eocd + 6, 0);
+            RVPutLE16(eocd + 8, (uint32_t)names.count);
+            RVPutLE16(eocd + 10, (uint32_t)names.count);
+            RVPutLE32(eocd + 12, cdSize);
+            RVPutLE32(eocd + 16, cdOffset);
+            RVPutLE16(eocd + 20, 0);      // comment length
+            if (fwrite(eocd, 1, sizeof(eocd), out) != sizeof(eocd)) failure = @"Could not write the zip";
+        }
+    }
+
+    if (fclose(out) != 0 && !failure) failure = @"Could not write the zip";
+    if (failure) [fm removeItemAtPath:zipPath error:nil];
+    return failure;
+}
+
+static NSString *RVBodyString(NSData *data) {
+    if (!data) return @"";
+    return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
+}
+
+// Zips a ViroReact AR recording (session.jsonl + video.mp4 in recordingDir)
+// into a temp file and uploads it to vps-server: POST {endpoint}/vps/scans
+// with createBodyJson, then PUT the zip to the returned upload_path with
+// Content-Type application/zip, streamed from the file. The zip is written
+// before the POST so a recording that cannot be read never creates a scan.
+// headersJson is the credential headers as a JSON object. Resolves a JSON
+// string: {success, stage?: "zip"|"create"|"upload", status?, body?, error?}.
+// Not tied to a navigator view: it only reads files and talks HTTP.
+RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
+                            headersJson:(NSString *)headersJson
+                         createBodyJson:(NSString *)createBodyJson
+                           recordingDir:(NSString *)recordingDir
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSDictionary *headers = nil;
+        NSData *headerData = [headersJson dataUsingEncoding:NSUTF8StringEncoding];
+        if (headerData) {
+            id parsed = [NSJSONSerialization JSONObjectWithData:headerData options:0 error:nil];
+            if ([parsed isKindOfClass:[NSDictionary class]]) headers = parsed;
+        }
+        NSURL *createURL = [NSURL URLWithString:[endpoint stringByAppendingString:@"/vps/scans"]];
+        if (!headers || !createURL || createBodyJson.length == 0 || recordingDir.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip",
+                                   @"error": @"Invalid endpoint, headers, scan target or recording directory"}));
+            return;
+        }
+
+        NSString *zipPath = [NSTemporaryDirectory() stringByAppendingPathComponent:
+            [NSString stringWithFormat:@"vps-scan-%@.zip", [NSUUID UUID].UUIDString]];
+        NSString *zipError = RVWriteStoredZip(zipPath, recordingDir, RVScanRecordingFiles());
+        if (zipError) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": zipError}));
+            return;
+        }
+        void (^cleanup)(void) = ^{
+            [[NSFileManager defaultManager] removeItemAtPath:zipPath error:nil];
+        };
+
+        NSMutableURLRequest *create = [NSMutableURLRequest requestWithURL:createURL];
+        create.HTTPMethod = @"POST";
+        create.timeoutInterval = 60;
+        for (id key in headers) {
+            id value = headers[key];
+            if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+                [create setValue:value forHTTPHeaderField:key];
+            }
+        }
+        [create setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+        create.HTTPBody = [createBodyJson dataUsingEncoding:NSUTF8StringEncoding];
+
+        NSURLSession *session = [NSURLSession sharedSession];
+        [[session dataTaskWithRequest:create
+                    completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            if (error) {
+                cleanup();
+                resolve(RVJsonString(@{@"success": @NO, @"stage": @"create",
+                                       @"error": error.localizedDescription ?: @"POST /vps/scans failed"}));
+                return;
+            }
+            NSInteger status = [response isKindOfClass:[NSHTTPURLResponse class]]
+                ? ((NSHTTPURLResponse *)response).statusCode : 0;
+            NSString *body = RVBodyString(data);
+            if (status < 200 || status >= 300) {
+                cleanup();
+                resolve(RVJsonString(@{@"success": @NO, @"stage": @"create",
+                                       @"status": @(status), @"body": body}));
+                return;
+            }
+            id scan = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+            NSString *scanId = [scan isKindOfClass:[NSDictionary class]] ? scan[@"id"] : nil;
+            if (![scanId isKindOfClass:[NSString class]] || scanId.length == 0) {
+                cleanup();
+                resolve(RVJsonString(@{@"success": @NO, @"stage": @"create",
+                                       @"error": @"POST /vps/scans answered without a scan id"}));
+                return;
+            }
+            NSString *uploadPath = scan[@"upload_path"];
+            if (![uploadPath isKindOfClass:[NSString class]] || ![uploadPath hasPrefix:@"/"]) {
+                NSString *escapedId = [scanId stringByAddingPercentEncodingWithAllowedCharacters:
+                                       [NSCharacterSet URLPathAllowedCharacterSet]] ?: scanId;
+                uploadPath = [NSString stringWithFormat:@"/vps/scans/%@/recording", escapedId];
+            }
+            NSURL *uploadURL = [NSURL URLWithString:[endpoint stringByAppendingString:uploadPath]];
+            if (!uploadURL) {
+                cleanup();
+                resolve(RVJsonString(@{@"success": @NO, @"stage": @"upload",
+                                       @"error": @"Invalid upload URL"}));
+                return;
+            }
+
+            NSMutableURLRequest *put = [NSMutableURLRequest requestWithURL:uploadURL];
+            put.HTTPMethod = @"PUT";
+            // Idle timeout between packets, not a cap on the whole transfer.
+            put.timeoutInterval = 120;
+            for (id key in headers) {
+                id value = headers[key];
+                if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+                    [put setValue:value forHTTPHeaderField:key];
+                }
+            }
+            [put setValue:@"application/zip" forHTTPHeaderField:@"Content-Type"];
+
+            [[session uploadTaskWithRequest:put
+                                   fromFile:[NSURL fileURLWithPath:zipPath]
+                          completionHandler:^(NSData *putData, NSURLResponse *putResponse, NSError *putError) {
+                cleanup();
+                if (putError) {
+                    resolve(RVJsonString(@{@"success": @NO, @"stage": @"upload",
+                                           @"error": putError.localizedDescription ?: @"Upload failed"}));
+                    return;
+                }
+                NSInteger putStatus = [putResponse isKindOfClass:[NSHTTPURLResponse class]]
+                    ? ((NSHTTPURLResponse *)putResponse).statusCode : 0;
+                BOOL ok = putStatus >= 200 && putStatus < 300;
+                NSMutableDictionary *result = [@{@"success": @(ok), @"status": @(putStatus),
+                                                 @"body": RVBodyString(putData)} mutableCopy];
+                if (!ok) result[@"stage"] = @"upload";
+                resolve(RVJsonString(result));
+            }] resume];
+        }] resume];
+    });
 }
 
 RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag

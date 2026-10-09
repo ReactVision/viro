@@ -1,98 +1,130 @@
 /**
- * buildStoredZip()/crc32() are pure functions with no native/file-system
- * dependency, so — unlike the upload orchestration in the same module, which
- * needs a real recording on a device to exercise — their output can be
- * checked directly here: CRC32 against the textbook "123456789" check value,
- * and the zip's own structure (signatures, sizes, offsets) by hand-parsing
- * the bytes buildStoredZip() produced.
+ * Copyright © 2026 ReactVision
+ *
+ * uploadScanRecording() hands the whole zip-and-upload to the native module
+ * and turns its result into a scan or a ViroVPSError. The native side zips
+ * before it creates the scan; what is checked here is the JS half of that
+ * contract: the arguments it passes, that JS itself never issues the POST or
+ * the PUT, and that a failure while zipping surfaces as an error with no HTTP
+ * status (no scan was created).
  */
-import { buildStoredZip, crc32 } from "../components/AR/ViroVPSScanUpload";
+const mockUpload = jest.fn();
+let mockNativeModules: Record<string, unknown> = {};
 
-function asciiBytes(s: string): Uint8Array {
-  const out = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
-  return out;
-}
+jest.mock("react-native", () => ({
+  get NativeModules() {
+    return mockNativeModules;
+  },
+}));
 
-function readUint32LE(bytes: Uint8Array, offset: number): number {
-  return (
-    (bytes[offset] |
-      (bytes[offset + 1] << 8) |
-      (bytes[offset + 2] << 16) |
-      (bytes[offset + 3] << 24)) >>>
-    0
-  );
-}
+import { uploadScanRecording } from "../components/AR/ViroVPSScanUpload";
+import { ViroVPSError } from "../components/AR/ViroVPSClient";
 
-function readUint16LE(bytes: Uint8Array, offset: number): number {
-  return bytes[offset] | (bytes[offset + 1] << 8);
-}
+const scan = {
+  id: "s1",
+  location_id: "l1",
+  status: "queued",
+  stage: null,
+  error: null,
+  recording_bytes: 10,
+  assets: [],
+  quality: null,
+  map_accepted: null,
+  map_rejected_reason: null,
+  created_at: 1,
+  updated_at: 2,
+};
 
-describe("crc32", () => {
-  it("matches the standard CRC-32 check value", () => {
-    // The textbook check value for the CRC-32 (zip/gzip) polynomial.
-    expect(crc32(asciiBytes("123456789"))).toBe(0xcbf43926);
-  });
+const fetchSpy = jest.fn();
 
-  it("is 0 for empty input", () => {
-    expect(crc32(new Uint8Array(0))).toBe(0);
-  });
+beforeEach(() => {
+  mockUpload.mockReset();
+  fetchSpy.mockReset();
+  (globalThis as any).fetch = fetchSpy;
+  mockNativeModules = { VRTARSceneNavigatorModule: { rvUploadScanRecording: mockUpload } };
 });
 
-describe("buildStoredZip", () => {
-  it("writes a local file header, raw data and a central directory per entry", () => {
-    const a = { name: "session.jsonl", data: asciiBytes('{"type":"header"}\n') };
-    const b = { name: "video.mp4", data: new Uint8Array([1, 2, 3, 4, 5]) };
-    const zip = buildStoredZip([a, b], new Date(2026, 0, 15, 10, 30, 0));
-
-    // First local file header.
-    expect(readUint32LE(zip, 0)).toBe(0x04034b50);
-    expect(readUint16LE(zip, 8)).toBe(0); // stored, no compression
-    const crcA = readUint32LE(zip, 14);
-    expect(crcA).toBe(crc32(a.data));
-    const sizeA = readUint32LE(zip, 22);
-    expect(sizeA).toBe(a.data.length);
-    const nameLenA = readUint16LE(zip, 26);
-    expect(nameLenA).toBe(a.name.length);
-
-    const nameAStart = 30;
-    const nameA = Buffer.from(zip.slice(nameAStart, nameAStart + nameLenA)).toString("ascii");
-    expect(nameA).toBe(a.name);
-
-    const dataAStart = nameAStart + nameLenA;
-    expect(Array.from(zip.slice(dataAStart, dataAStart + a.data.length))).toEqual(
-      Array.from(a.data)
+describe("uploadScanRecording", () => {
+  it("passes the endpoint, auth headers, create body and recording dir to native", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: true, status: 202, body: JSON.stringify(scan) })
     );
 
-    // Second local file header starts right after the first entry's data.
-    const secondHeaderOffset = dataAStart + a.data.length;
-    expect(readUint32LE(zip, secondHeaderOffset)).toBe(0x04034b50);
-    const nameLenB = readUint16LE(zip, secondHeaderOffset + 26);
-    expect(nameLenB).toBe(b.name.length);
-    const nameBStart = secondHeaderOffset + 30;
-    const dataBStart = nameBStart + nameLenB;
-    expect(Array.from(zip.slice(dataBStart, dataBStart + b.data.length))).toEqual(
-      Array.from(b.data)
+    const result = await uploadScanRecording(
+      "https://vps.example.com/",
+      { projectId: "p", apiKey: "k" },
+      { location: { name: "Hall", lat: 1, lon: 2 } },
+      "file:///data/rec/"
     );
 
-    // End of central directory record is the last 22 bytes.
-    const eocdOffset = zip.length - 22;
-    expect(readUint32LE(zip, eocdOffset)).toBe(0x06054b50);
-    const totalEntries = readUint16LE(zip, eocdOffset + 10);
-    expect(totalEntries).toBe(2);
-    const cdSize = readUint32LE(zip, eocdOffset + 12);
-    const cdOffset = readUint32LE(zip, eocdOffset + 16);
-    expect(cdOffset + cdSize).toBe(eocdOffset);
-
-    // Central directory's first record points back at the first local header.
-    expect(readUint32LE(zip, cdOffset)).toBe(0x02014b50);
-    const firstLocalHeaderOffsetFromCd = readUint32LE(zip, cdOffset + 42);
-    expect(firstLocalHeaderOffsetFromCd).toBe(0);
+    expect(result).toEqual(scan);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+    const [endpoint, headersJson, createJson, dir] = mockUpload.mock.calls[0];
+    expect(endpoint).toBe("https://vps.example.com");
+    expect(JSON.parse(headersJson)).toEqual({ "x-project-id": "p", "x-api-key": "k" });
+    expect(JSON.parse(createJson)).toEqual({ location: { name: "Hall", lat: 1, lon: 2 } });
+    expect(dir).toBe("/data/rec");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("produces an empty-but-valid archive for no entries", () => {
-    const zip = buildStoredZip([]);
-    expect(zip.length).toBe(22); // just the EOCD record
-    expect(readUint32LE(zip, 0)).toBe(0x06054b50);
+  it("sends location_id for an existing location and a bearer token for a session", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: true, status: 202, body: JSON.stringify(scan) })
+    );
+    await uploadScanRecording(
+      "https://vps.example.com",
+      { projectId: "p", accessToken: "t" },
+      { locationId: "l1" },
+      "/data/rec"
+    );
+    const [, headersJson, createJson] = mockUpload.mock.calls[0];
+    expect(JSON.parse(headersJson)).toEqual({ "x-project-id": "p", Authorization: "Bearer t" });
+    expect(JSON.parse(createJson)).toEqual({ location_id: "l1" });
+  });
+
+  it("reports a zip failure without an HTTP status: no scan was created", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: false, stage: "zip", error: "video.mp4 is missing" })
+    );
+    const error = await uploadScanRecording(
+      "https://vps.example.com",
+      { projectId: "p", apiKey: "k" },
+      { locationId: "l1" },
+      "/data/rec"
+    ).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ViroVPSError);
+    expect(error.message).toBe("video.mp4 is missing");
+    expect(error.status).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("turns a server error from either request into a ViroVPSError with its code", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({
+        success: false,
+        stage: "upload",
+        status: 413,
+        body: JSON.stringify({ error: { code: "TOO_LARGE", message: "too big" } }),
+      })
+    );
+    const error = await uploadScanRecording(
+      "https://vps.example.com",
+      { projectId: "p", apiKey: "k" },
+      { locationId: "l1" },
+      "/data/rec"
+    ).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ViroVPSError);
+    expect(error.code).toBe("TOO_LARGE");
+    expect(error.status).toBe(413);
+    expect(error.message).toBe("too big");
+  });
+
+  it("fails clearly when the native module is not there", async () => {
+    mockNativeModules = {};
+    await expect(
+      uploadScanRecording("https://x", { projectId: "p", apiKey: "k" }, { locationId: "l" }, "/d")
+    ).rejects.toThrow(/not available/);
   });
 });

@@ -71,15 +71,27 @@ import android.content.ContentValues;
 import android.provider.MediaStore;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.zip.Deflater;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 @ReactModule(name = "VRTARSceneNavigatorModule")
@@ -1654,11 +1666,29 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /** A JSON object string from key/value pairs; values are escaped by JSONObject. */
+    private static String rvJson(Object... keyValues) {
+        JSONObject object = new JSONObject();
+        try {
+            for (int i = 0; i + 1 < keyValues.length; i += 2) {
+                object.put((String) keyValues[i], keyValues[i + 1]);
+            }
+        } catch (JSONException e) {
+            // Only thrown for non-finite doubles, which nothing here passes.
+        }
+        return object.toString();
+    }
+
     /**
      * Loads a downloaded {@code .rvmap}'s raw bytes (base64, same transport as
      * {@code StreamingAudioModule.pushSamples}) for continuous VPS localisation.
      * Resolves the renderer's own JSON verbatim ({@code {"success":...}}),
      * same reasoning as {@link #rvGetScanStatus}.
+     *
+     * The base64 decode runs here, on the native modules thread, not on the UI
+     * or renderer thread. The map parse runs on the renderer thread inside
+     * the session (see ARScene.rvLoadVPSMap), which is where the session state
+     * it replaces lives.
      */
     @ReactMethod
     public void rvLoadVPSMap(final int sceneNavTag, final String rvmapBase64, final Promise promise) {
@@ -1666,22 +1696,22 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         try {
             rvmapBytes = Base64.decode(rvmapBase64, Base64.NO_WRAP);
         } catch (Exception e) {
-            promise.resolve("{\"success\":false,\"error\":\"Malformed base64 map data\"}");
+            promise.resolve(rvJson("success", false, "error", "Malformed base64 map data"));
             return;
         }
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
-        if (uiManager == null) { promise.resolve("{\"success\":false,\"error\":\"UIManager not available\"}"); return; }
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 try {
                     View view = viewResolver.resolveView(sceneNavTag);
                     if (!(view instanceof VRTARSceneNavigator)) {
-                        promise.resolve("{\"success\":false,\"error\":\"Invalid view type\"}");
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
                         return;
                     }
                     ((VRTARSceneNavigator) view).rvLoadVPSMap(rvmapBytes, json -> promise.resolve(json));
                 } catch (Exception e) {
-                    promise.resolve("{\"success\":false,\"error\":\"" + String.valueOf(e.getMessage()) + "\"}");
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
                 }
             }
         });
@@ -1711,21 +1741,197 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void rvGetVPSLocalization(final int sceneNavTag, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
-        if (uiManager == null) { promise.resolve("{\"available\":false,\"error\":\"UIManager not available\"}"); return; }
+        if (uiManager == null) { promise.resolve(rvJson("available", false, "error", "UIManager not available")); return; }
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 try {
                     View view = viewResolver.resolveView(sceneNavTag);
                     if (!(view instanceof VRTARSceneNavigator)) {
-                        promise.resolve("{\"available\":false,\"error\":\"AR navigator is not mounted yet\"}");
+                        promise.resolve(rvJson("available", false, "error", "AR navigator is not mounted yet"));
                         return;
                     }
                     ((VRTARSceneNavigator) view).rvGetVPSLocalization(json -> promise.resolve(json));
                 } catch (Exception e) {
-                    promise.resolve("{\"available\":false,\"error\":\"" + String.valueOf(e.getMessage()) + "\"}");
+                    promise.resolve(rvJson("available", false, "error", String.valueOf(e.getMessage())));
                 }
             }
         });
+    }
+
+    // ── VPS scan upload ─────────────────────────────────────────────────────
+
+    /** The two files of a ViroReact AR recording, in the order they go in the zip. */
+    private static final String[] VPS_SCAN_FILES = {"session.jsonl", "video.mp4"};
+
+    /** One upload at a time, off the native modules thread: each one is disk and network bound. */
+    private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor();
+
+    /**
+     * Zips a ViroReact AR recording (session.jsonl + video.mp4 in
+     * {@code recordingDir}) into a temp file and uploads it to vps-server:
+     * POST {endpoint}/vps/scans with {@code createBodyJson}, then PUT the zip
+     * to the returned upload_path with Content-Type application/zip, streamed
+     * from the file. The zip is written before the POST so a recording that
+     * cannot be read never creates a scan. {@code headersJson} is the
+     * credential headers as a JSON object. Resolves a JSON string:
+     * {success, stage?: "zip"|"create"|"upload", status?, body?, error?}.
+     * Not tied to a navigator view: it only reads files and talks HTTP.
+     */
+    @ReactMethod
+    public void rvUploadScanRecording(final String endpoint, final String headersJson,
+                                      final String createBodyJson, final String recordingDir,
+                                      final Promise promise) {
+        sVpsUploadExecutor.execute(() ->
+            promise.resolve(uploadScanRecordingBlocking(endpoint, headersJson, createBodyJson, recordingDir)));
+    }
+
+    private String uploadScanRecordingBlocking(String endpoint, String headersJson,
+                                               String createBodyJson, String recordingDir) {
+        final JSONObject headers;
+        try {
+            headers = new JSONObject(headersJson);
+        } catch (Exception e) {
+            return rvJson("success", false, "stage", "zip", "error", "Invalid credential headers");
+        }
+        if (endpoint == null || createBodyJson == null || recordingDir == null) {
+            return rvJson("success", false, "stage", "zip", "error", "Missing endpoint, scan target or recording directory");
+        }
+
+        File dir = new File(recordingDir);
+        for (String name : VPS_SCAN_FILES) {
+            File f = new File(dir, name);
+            if (!f.isFile()) return rvJson("success", false, "stage", "zip", "error", name + " is missing from " + recordingDir);
+            if (!f.canRead()) return rvJson("success", false, "stage", "zip", "error", name + " is not readable");
+        }
+
+        File zip = null;
+        String stage = "zip";
+        try {
+            zip = File.createTempFile("vps-scan-", ".zip", mContext.getCacheDir());
+            writeScanZip(zip, dir);
+
+            stage = "create";
+            String uploadPath;
+            HttpURLConnection create = (HttpURLConnection) new URL(endpoint + "/vps/scans").openConnection();
+            try {
+                create.setRequestMethod("POST");
+                create.setConnectTimeout(30000);
+                create.setReadTimeout(60000);
+                create.setDoOutput(true);
+                applyHeaders(create, headers);
+                create.setRequestProperty("Content-Type", "application/json");
+                byte[] body = createBodyJson.getBytes(StandardCharsets.UTF_8);
+                create.setFixedLengthStreamingMode(body.length);
+                try (OutputStream os = create.getOutputStream()) {
+                    os.write(body);
+                }
+                int status = create.getResponseCode();
+                String response = readResponseBody(create, status);
+                if (status < 200 || status >= 300) {
+                    return rvJson("success", false, "stage", stage, "status", status, "body", response);
+                }
+                JSONObject scan;
+                try {
+                    scan = new JSONObject(response);
+                } catch (JSONException e) {
+                    return rvJson("success", false, "stage", stage, "error", "POST /vps/scans did not answer JSON");
+                }
+                String scanId = scan.optString("id", "");
+                if (scanId.isEmpty()) {
+                    return rvJson("success", false, "stage", stage, "error", "POST /vps/scans answered without a scan id");
+                }
+                uploadPath = scan.optString("upload_path", "");
+                if (!uploadPath.startsWith("/")) {
+                    uploadPath = "/vps/scans/" + URLEncoder.encode(scanId, "UTF-8") + "/recording";
+                }
+            } finally {
+                create.disconnect();
+            }
+
+            stage = "upload";
+            HttpURLConnection put = (HttpURLConnection) new URL(endpoint + uploadPath).openConnection();
+            try {
+                put.setRequestMethod("PUT");
+                put.setConnectTimeout(30000);
+                put.setReadTimeout(120000);
+                put.setDoOutput(true);
+                applyHeaders(put, headers);
+                put.setRequestProperty("Content-Type", "application/zip");
+                // Fixed length so HttpURLConnection streams the body instead of
+                // buffering all of it to compute Content-Length.
+                put.setFixedLengthStreamingMode(zip.length());
+                byte[] buf = new byte[64 * 1024];
+                try (InputStream in = new FileInputStream(zip);
+                     OutputStream os = put.getOutputStream()) {
+                    int n;
+                    while ((n = in.read(buf)) != -1) os.write(buf, 0, n);
+                }
+                int status = put.getResponseCode();
+                String response = readResponseBody(put, status);
+                if (status < 200 || status >= 300) {
+                    return rvJson("success", false, "stage", stage, "status", status, "body", response);
+                }
+                return rvJson("success", true, "status", status, "body", response);
+            } finally {
+                put.disconnect();
+            }
+        } catch (Exception e) {
+            return rvJson("success", false, "stage", stage, "error", String.valueOf(e.getMessage()));
+        } finally {
+            if (zip != null && !zip.delete()) zip.deleteOnExit();
+        }
+    }
+
+    /**
+     * Writes the recording's files into {@code zip}, streaming each through a
+     * fixed buffer. video.mp4 is already compressed, so it goes in with
+     * compression level 0; session.jsonl is text and deflates well.
+     */
+    private static void writeScanZip(File zip, File dir) throws IOException {
+        byte[] buf = new byte[64 * 1024];
+        try (ZipOutputStream zos = new ZipOutputStream(
+                new BufferedOutputStream(new FileOutputStream(zip), 64 * 1024))) {
+            for (String name : VPS_SCAN_FILES) {
+                File f = new File(dir, name);
+                zos.setLevel(name.endsWith(".mp4") ? Deflater.NO_COMPRESSION : Deflater.DEFAULT_COMPRESSION);
+                ZipEntry entry = new ZipEntry(name);
+                entry.setTime(f.lastModified());
+                zos.putNextEntry(entry);
+                try (InputStream in = new FileInputStream(f)) {
+                    int n;
+                    while ((n = in.read(buf)) != -1) zos.write(buf, 0, n);
+                }
+                zos.closeEntry();
+            }
+        }
+    }
+
+    private static void applyHeaders(HttpURLConnection connection, JSONObject headers) {
+        Iterator<String> keys = headers.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = headers.opt(key);
+            if (value instanceof String) connection.setRequestProperty(key, (String) value);
+        }
+    }
+
+    private static String readResponseBody(HttpURLConnection connection, int status) {
+        InputStream in = null;
+        try {
+            in = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            if (in == null) return "";
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "";
+        } finally {
+            if (in != null) {
+                try { in.close(); } catch (IOException ignored) { }
+            }
+        }
     }
 
     private void rvResolveScanJson(final int sceneNavTag, final boolean diagnostics,

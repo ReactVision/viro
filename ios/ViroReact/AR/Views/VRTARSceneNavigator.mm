@@ -1835,6 +1835,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
              @"vertexCount": @(stats.vertexCount),
              @"triangleCount": @(stats.triangleCount),
              @"source": [NSString stringWithUTF8String:VROWorldMeshSourceToString(stats.source)],
+             @"accumulated": @(stats.accumulated),
              @"averageConfidence": @(stats.averageConfidence),
              @"lastUpdateTimeMs": @(stats.lastUpdateTimeMs),
              @"isStale": @(stats.isStale)};

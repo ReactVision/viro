@@ -52,9 +52,9 @@ export const questAlertStore = new QuestAlertStore();
 
 /**
  * Shows a Studio scene's alert: the ALERT function's, or a failure the wearer
- * has to know about. On Quest, Alert.alert would open over the 2D panel, out
- * of sight in the headset, so the in-scene panel shows it instead, dismissed
- * by a click as "OK" dismisses the dialog on phones.
+ * has to know about. On Quest, Alert.alert's dialog is never drawn in the
+ * headset and takes no controller input, so the in-scene panel shows it
+ * instead, with an OK button like the dialog's on phones.
  */
 export function showStudioAlert(title: string, message: string): void {
   if (isQuest) {

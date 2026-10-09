@@ -3,53 +3,58 @@ import type { ViroCameraTransform } from "../Types/ViroEvents";
 import type { ViroSource } from "../Types/ViroUtils";
 import { ViroController } from "../ViroController";
 import { ViroNode } from "../ViroNode";
-import { ViroQuad } from "../ViroQuad";
 import { ViroScene } from "../ViroScene";
 import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
-  QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { questSceneLoadStore } from "./domain/questSceneLoadStore";
+import { QUEST_PANEL_TEXT } from "./questPanelStyle";
+import {
+  QuestPanelLine,
+  questPanelLayout,
+  StudioQuestPanelCard,
+} from "./StudioQuestPanelCard";
 import { handleQuestExitClick } from "./StudioQuestSceneHudOverlay";
-import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
 
-// The menu panel's, as are the materials below.
-const PADDING_M = 0.04;
-const PANEL_WIDTH_M = 1.6;
-const TEXT_WIDTH_M = 1.5;
 const POSE_INTERVAL_MS = 150;
+const FONT_SIZE = 14;
 
-type Line = {
-  key: string;
-  text: string;
-  color: string;
-  onClick?: (position: unknown, source: ViroSource) => void;
-};
-
-const LOADING_LINES: Line[] = [
-  { key: "loading", text: "Loading scene...", color: "#FFFFFF" },
-];
-const FAILED_LINES: Line[] = [
-  { key: "failed", text: "Failed to load scene", color: "#FF8A80" },
+const LOADING_LAYOUT = questPanelLayout([
+  {
+    key: "loading",
+    text: "Loading scene...",
+    fontSize: FONT_SIZE,
+    color: QUEST_PANEL_TEXT.primary,
+  },
+]);
+const FAILED_LINES: QuestPanelLine[] = [
+  {
+    key: "failed",
+    text: "Failed to load scene",
+    fontSize: FONT_SIZE,
+    color: QUEST_PANEL_TEXT.error,
+  },
   {
     key: "retry",
-    text: "[ Retry ]",
-    color: "#7FCBFF",
+    text: "Retry",
+    fontSize: FONT_SIZE,
+    color: QUEST_PANEL_TEXT.primary,
     onClick: (_position, source) => {
       if (isSelectClick(source)) questSceneLoadStore.retry();
     },
   },
   {
     key: "exit",
-    text: "[ Exit ]",
-    color: "#7FCBFF",
+    text: "Exit",
+    fontSize: FONT_SIZE,
+    color: QUEST_PANEL_TEXT.primary,
     onClick: handleQuestExitClick,
   },
 ];
-const FONT_SIZE = 14;
+const FAILED_LAYOUT = questPanelLayout(FAILED_LINES);
 
 /**
  * What Meta Quest's opening scene shows until its data arrives
@@ -82,13 +87,6 @@ export function StudioQuestLoadScene({ failed }: { failed: boolean }) {
   if (failed && !placedAt && pose) setPlacedAt(pose);
   const anchor = failed ? placedAt : pose;
 
-  const lines = failed ? FAILED_LINES : LOADING_LINES;
-  const lineHeights = lines.map((line) =>
-    estimateQuestTextHeight(line.text, TEXT_WIDTH_M, FONT_SIZE)
-  );
-  const height =
-    2 * PADDING_M +
-    lineHeights.reduce((sum, lineHeight) => sum + lineHeight, 0);
   const hoveredKeys = new Set(Object.values(hoveredBySource));
   const hoverItem =
     (key: string) =>
@@ -106,9 +104,7 @@ export function StudioQuestLoadScene({ failed }: { failed: boolean }) {
       });
     };
 
-  let lineTop = height / 2 - PADDING_M;
   const transform = anchor ? computeHeadLockedTransform(anchor) : null;
-  // Laid out the way StudioQuestSceneHudOverlay is, for the reasons given there.
   return (
     <ViroScene
       toneMappingEnabled={false}
@@ -121,50 +117,12 @@ export function StudioQuestLoadScene({ failed }: { failed: boolean }) {
           rotation={transform.rotation}
           scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
         >
-          <ViroQuad
-            position={[0, 0, -0.01]}
-            width={PANEL_WIDTH_M}
-            height={height}
-            materials={["StudioQuestHudBackground"]}
-            renderingOrder={QUEST_PANEL_ORDER.hud}
-            ignoreEventHandling={!failed}
+          <StudioQuestPanelCard
+            layout={failed ? FAILED_LAYOUT : LOADING_LAYOUT}
+            interactive={failed}
+            hoveredKeys={hoveredKeys}
+            onHoverItem={hoverItem}
           />
-          {lines.map((line, index) => {
-            const y = lineTop - lineHeights[index] / 2;
-            lineTop -= lineHeights[index];
-            const hovered =
-              line.onClick !== undefined && hoveredKeys.has(line.key);
-            return (
-              <React.Fragment key={line.key}>
-                {hovered && (
-                  <ViroQuad
-                    position={[0, y, -0.005]}
-                    width={TEXT_WIDTH_M}
-                    height={lineHeights[index]}
-                    materials={["StudioQuestHudHover"]}
-                    renderingOrder={QUEST_PANEL_ORDER.hud + 1}
-                    ignoreEventHandling
-                  />
-                )}
-                <StudioQuestText
-                  text={line.text}
-                  position={[0, y, 0]}
-                  width={TEXT_WIDTH_M}
-                  height={lineHeights[index]}
-                  fontSize={FONT_SIZE}
-                  renderingOrder={QUEST_PANEL_ORDER.hud + 2}
-                  onClick={line.onClick}
-                  onHover={line.onClick ? hoverItem(line.key) : undefined}
-                  style={{
-                    fontFamily: "sans-serif",
-                    textAlign: "center",
-                    textAlignVertical: "center",
-                    color: hovered ? "#FFFFFF" : line.color,
-                  }}
-                />
-              </React.Fragment>
-            );
-          })}
         </ViroNode>
       )}
     </ViroScene>

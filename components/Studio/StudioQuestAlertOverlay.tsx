@@ -1,10 +1,9 @@
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { BackHandler } from "react-native";
-import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
 import type { ViroSource } from "../Types/ViroUtils";
-import { ViroQuad } from "../ViroQuad";
+import { ViroPolygon } from "../ViroPolygon";
 import { questAlertStore } from "./domain/questAlertStore";
 import { isSelectClick } from "./domain/questInput";
 import {
@@ -13,35 +12,33 @@ import {
   QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
+import { QUEST_PANEL_TEXT, questRoundedRect } from "./questPanelStyle";
 import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
 
-// The smallest boxes and panel, which a short alert keeps.
-const TITLE_HEIGHT_M = 0.3;
-const MESSAGE_HEIGHT_M = 0.5;
-const PANEL_HEIGHT_M = 1;
-const PADDING_M = 0.1;
+const PANEL_WIDTH_M = 2;
 const TEXT_WIDTH_M = 1.8;
+const PADDING_M = 0.1;
+const TITLE_GAP_M = 0.04;
+const BUTTON_GAP_M = 0.1;
+const BUTTON_WIDTH_M = 0.5;
+const BUTTON_HEIGHT_M = 0.22;
+const CORNER_RADIUS_M = 0.1;
 const TITLE_FONT_SIZE = 22;
 const MESSAGE_FONT_SIZE = 16;
+const BUTTON_FONT_SIZE = 16;
+const COUNTER_FONT_SIZE = 11;
 // The panel follows the head, so what it cannot fit in view can never be read.
 // At 1.2 m this height reaches about 27° above and below where the wearer
 // looks. Longer text shrinks to fit, down to the size of the menu's hint, and a
 // message still too long goes on further pages.
 const MAX_PANEL_HEIGHT_M = 2.4;
 const MIN_MESSAGE_FONT_SIZE = 11;
-const HINT_FONT_SIZE = 11;
 
-const pageHint = (page: number, pages: number) =>
-  `Trigger or pinch ${page < pages ? "for more" : "to close"} (${page}/${pages})`;
-
-ViroMaterials.createMaterials({
-  StudioQuestAlertBackground: {
-    lightingModel: "Constant",
-    diffuseColor: "#111827DD",
-    readsFromDepthBuffer: false,
-    writesToDepthBuffer: true,
-  },
-});
+const BUTTON_OUTLINE = questRoundedRect(
+  BUTTON_WIDTH_M,
+  BUTTON_HEIGHT_M,
+  BUTTON_HEIGHT_M / 2
+);
 
 type QuestAlertLayout = {
   titleFontSize: number;
@@ -49,8 +46,8 @@ type QuestAlertLayout = {
   messageFontSize: number;
   pages: string[];
   messageHeights: number[];
-  hintHeight: number;
-  /** The same for every page, so nothing placed below the panel moves. */
+  /** Unscaled, and the same for every page, so nothing placed below the panel
+   * moves. */
   panelHeight: number;
 };
 
@@ -61,21 +58,15 @@ export function questAlertLayout(
   const titleFontSizeFor = (messageFontSize: number) =>
     Math.round((TITLE_FONT_SIZE * messageFontSize) / MESSAGE_FONT_SIZE);
   const titleHeightAt = (fontSize: number) =>
-    title
-      ? Math.max(
-          TITLE_HEIGHT_M,
-          estimateQuestTextHeight(title, TEXT_WIDTH_M, fontSize)
-        )
-      : 0;
-  const messageHeightAt = (text: string, fontSize: number) =>
-    Math.max(
-      MESSAGE_HEIGHT_M,
-      estimateQuestTextHeight(text, TEXT_WIDTH_M, fontSize)
-    );
+    title ? estimateQuestTextHeight(title, TEXT_WIDTH_M, fontSize) : 0;
+  const chromeAround = (titleHeight: number) =>
+    2 * PADDING_M +
+    (title ? titleHeight + TITLE_GAP_M : 0) +
+    BUTTON_GAP_M +
+    BUTTON_HEIGHT_M;
   const fits = (fontSize: number) =>
-    titleHeightAt(titleFontSizeFor(fontSize)) +
-      messageHeightAt(message, fontSize) +
-      2 * PADDING_M <=
+    chromeAround(titleHeightAt(titleFontSizeFor(fontSize))) +
+      estimateQuestTextHeight(message, TEXT_WIDTH_M, fontSize) <=
     MAX_PANEL_HEIGHT_M;
 
   let messageFontSize = MESSAGE_FONT_SIZE;
@@ -84,39 +75,28 @@ export function questAlertLayout(
   }
   const titleFontSize = titleFontSizeFor(messageFontSize);
   const titleHeight = titleHeightAt(titleFontSize);
+  const chrome = chromeAround(titleHeight);
+  const messageHeightOf = (text: string) =>
+    estimateQuestTextHeight(text, TEXT_WIDTH_M, messageFontSize);
 
-  if (fits(messageFontSize)) {
-    const messageHeight = messageHeightAt(message, messageFontSize);
+  const messageHeight = messageHeightOf(message);
+  if (chrome + messageHeight <= MAX_PANEL_HEIGHT_M) {
     return {
       titleFontSize,
       titleHeight,
       messageFontSize,
       pages: [message],
       messageHeights: [messageHeight],
-      hintHeight: 0,
-      panelHeight: Math.max(
-        PANEL_HEIGHT_M,
-        titleHeight + messageHeight + 2 * PADDING_M
-      ),
+      panelHeight: chrome + messageHeight,
     };
   }
 
-  const hintHeight = estimateQuestTextHeight(
-    pageHint(99, 99),
-    TEXT_WIDTH_M,
-    HINT_FONT_SIZE
-  );
-  const pageBudget =
-    MAX_PANEL_HEIGHT_M - 2 * PADDING_M - titleHeight - hintHeight;
+  const pageBudget = MAX_PANEL_HEIGHT_M - chrome;
   const pages: string[] = [];
   let page = "";
   for (const word of message.split(" ")) {
     const longer = page ? `${page} ${word}` : word;
-    if (
-      page &&
-      estimateQuestTextHeight(longer, TEXT_WIDTH_M, messageFontSize) >
-        pageBudget
-    ) {
+    if (page && messageHeightOf(longer) > pageBudget) {
       pages.push(page);
       page = word;
     } else {
@@ -129,8 +109,7 @@ export function questAlertLayout(
     titleHeight,
     messageFontSize,
     pages,
-    messageHeights: pages.map((text) => messageHeightAt(text, messageFontSize)),
-    hintHeight,
+    messageHeights: pages.map(messageHeightOf),
     panelHeight: MAX_PANEL_HEIGHT_M,
   };
 }
@@ -143,19 +122,24 @@ type Props = {
 
 /**
  * Quest-only in-scene replacement for Alert.alert (invisible in the VR
- * compositor). Renders questAlertStore's active message as a head-locked
- * panel. A controller click anywhere on the panel dismisses it, mirroring how
- * tapping "OK" dismisses the native dialog on phones, and so does B. A message
- * too long for one panel is shown a page at a time, and a click on any page but
- * the last shows the next.
+ * compositor), drawn as a Meta Horizon OS dialog: a rounded dark card and a
+ * blue OK button, which a trigger or pinch presses, as tapping "OK" dismisses
+ * the native dialog on phones. B closes it too. A message too long for one
+ * panel is shown a page at a time, and the button reads Next until the last.
  */
 export function StudioQuestAlertOverlay({ cameraPose }: Props) {
   const [, forceUpdate] = useState(0);
   const [page, setPage] = useState(0);
+  // Per source, as the menu's highlight is. A hover that ends as the alert
+  // closes never reports its end, so a new alert starts with none.
+  const [hoverSources, setHoverSources] = useState<ReadonlySet<number>>(
+    () => new Set()
+  );
   useEffect(
     () =>
       questAlertStore.subscribe(() => {
         setPage(0);
+        setHoverSources(new Set());
         forceUpdate((n) => n + 1);
       }),
     []
@@ -182,27 +166,59 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
     () => questAlertLayout(title, message),
     [title, message]
   );
+  const panelOutline = useMemo(
+    () => questRoundedRect(PANEL_WIDTH_M, layout.panelHeight, CORNER_RADIUS_M),
+    [layout.panelHeight]
+  );
 
   if (!active || !cameraPose) return null;
 
   const { position, rotation } = computeHeadLockedTransform(cameraPose);
   const pageCount = layout.pages.length;
   const shownPage = Math.min(page, pageCount - 1);
-  const click = (_position: unknown, source: ViroSource) => {
+  const lastPage = shownPage === pageCount - 1;
+  const press = (_position: unknown, source: ViroSource) => {
     if (!isSelectClick(source)) return;
-    if (shownPage < pageCount - 1) setPage(shownPage + 1);
-    else questAlertStore.dismiss();
+    if (lastPage) questAlertStore.dismiss();
+    else setPage(shownPage + 1);
+  };
+  const hover = (
+    isHovering: boolean,
+    _position: unknown,
+    source: ViroSource
+  ) => {
+    // Eye gaze (Quest Pro) hovers too, and cannot click.
+    if (!isSelectClick(source)) return;
+    const id = source as unknown as number;
+    setHoverSources((current) => {
+      if (current.has(id) === isHovering) return current;
+      const next = new Set(current);
+      if (isHovering) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   };
 
-  // Laid out the way StudioQuestSceneHudOverlay is, for the reasons given
-  // there, and centred where the wearer looks. The background takes clicks
-  // here, since any click dismisses or turns the page.
-  const { titleHeight, hintHeight } = layout;
+  // Laid out the way StudioQuestPanelCard is, for the reasons given there,
+  // and centred where the wearer looks. The text runs down from the top and
+  // the button row sits at the bottom, so on a fixed-height paged panel the
+  // button stays put. The card takes no click of its own but stops one from
+  // reaching what is behind it; its text lets clicks through to it.
+  const { titleHeight } = layout;
   const messageHeight = layout.messageHeights[shownPage];
-  const contentHeight = titleHeight + messageHeight + hintHeight;
-  const titleY = contentHeight / 2 - titleHeight / 2;
-  const messageY = contentHeight / 2 - titleHeight - messageHeight / 2;
-  const hintY = -contentHeight / 2 + hintHeight / 2;
+  const top = layout.panelHeight / 2 - PADDING_M;
+  const titleY = top - titleHeight / 2;
+  const messageTop = top - (title ? titleHeight + TITLE_GAP_M : 0);
+  const messageY = messageTop - messageHeight / 2;
+  const buttonY = -layout.panelHeight / 2 + PADDING_M + BUTTON_HEIGHT_M / 2;
+  const buttonX = TEXT_WIDTH_M / 2 - BUTTON_WIDTH_M / 2;
+  const buttonLabel = lastPage ? "OK" : "Next";
+  const counterWidth = TEXT_WIDTH_M - BUTTON_WIDTH_M - 0.1;
+  const counter = `${shownPage + 1} of ${pageCount}`;
+  const textStyle = {
+    fontFamily: "sans-serif",
+    textAlignVertical: "center" as const,
+  };
 
   return (
     <ViroNode
@@ -210,13 +226,12 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
       rotation={rotation}
       scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
     >
-      <ViroQuad
+      <ViroPolygon
         position={[0, 0, -0.01]}
-        width={2}
-        height={layout.panelHeight}
-        materials={["StudioQuestAlertBackground"]}
+        vertices={panelOutline}
+        holes={[]}
+        materials={["StudioQuestPanelCard"]}
         renderingOrder={QUEST_PANEL_ORDER.alert}
-        onClick={click}
       />
       {title && (
         <StudioQuestText
@@ -226,13 +241,11 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
           height={titleHeight}
           fontSize={layout.titleFontSize}
           renderingOrder={QUEST_PANEL_ORDER.alert + 2}
-          onClick={click}
           style={{
-            fontFamily: "sans-serif",
+            ...textStyle,
             fontWeight: "bold",
-            color: "#FFFFFF",
-            textAlign: "center",
-            textAlignVertical: "center",
+            color: QUEST_PANEL_TEXT.primary,
+            textAlign: "left",
           }}
         />
       )}
@@ -243,31 +256,62 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
         height={messageHeight}
         fontSize={layout.messageFontSize}
         renderingOrder={QUEST_PANEL_ORDER.alert + 2}
-        onClick={click}
         style={{
-          fontFamily: "sans-serif",
-          color: "#FFFFFF",
-          textAlign: "center",
-          textAlignVertical: "center",
+          ...textStyle,
+          color: QUEST_PANEL_TEXT.secondary,
+          textAlign: "left",
         }}
       />
       {pageCount > 1 && (
         <StudioQuestText
-          text={pageHint(shownPage + 1, pageCount)}
-          position={[0, hintY, 0]}
-          width={TEXT_WIDTH_M}
-          height={hintHeight}
-          fontSize={HINT_FONT_SIZE}
+          text={counter}
+          position={[-TEXT_WIDTH_M / 2 + counterWidth / 2, buttonY, 0]}
+          width={counterWidth}
+          height={estimateQuestTextHeight(
+            counter,
+            counterWidth,
+            COUNTER_FONT_SIZE
+          )}
+          fontSize={COUNTER_FONT_SIZE}
           renderingOrder={QUEST_PANEL_ORDER.alert + 2}
-          onClick={click}
           style={{
-            fontFamily: "sans-serif",
-            color: "#CCCCCC",
-            textAlign: "center",
-            textAlignVertical: "center",
+            ...textStyle,
+            color: QUEST_PANEL_TEXT.secondary,
+            textAlign: "left",
           }}
         />
       )}
+      <ViroPolygon
+        position={[buttonX, buttonY, -0.005]}
+        vertices={BUTTON_OUTLINE}
+        holes={[]}
+        materials={[
+          hoverSources.size > 0
+            ? "StudioQuestPanelButtonHover"
+            : "StudioQuestPanelButton",
+        ]}
+        renderingOrder={QUEST_PANEL_ORDER.alert + 1}
+        onClick={press}
+        onHover={hover}
+      />
+      <StudioQuestText
+        text={buttonLabel}
+        position={[buttonX, buttonY, 0]}
+        width={BUTTON_WIDTH_M}
+        height={estimateQuestTextHeight(
+          buttonLabel,
+          BUTTON_WIDTH_M,
+          BUTTON_FONT_SIZE
+        )}
+        fontSize={BUTTON_FONT_SIZE}
+        renderingOrder={QUEST_PANEL_ORDER.alert + 2}
+        style={{
+          ...textStyle,
+          fontWeight: "bold",
+          color: QUEST_PANEL_TEXT.primary,
+          textAlign: "center",
+        }}
+      />
     </ViroNode>
   );
 }

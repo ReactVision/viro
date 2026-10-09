@@ -1,7 +1,5 @@
 import * as React from "react";
-import { ViroMaterials } from "../Material/ViroMaterials";
 import { ViroNode } from "../ViroNode";
-import { ViroQuad } from "../ViroQuad";
 import type { ViroSource } from "../Types/ViroUtils";
 import { exitVRScene } from "../Utilities/VRModuleOpenXR";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
@@ -10,46 +8,23 @@ import { isSelectClick } from "./domain/questInput";
 import {
   computeHeadLockedTransform,
   CameraPose,
-  QUEST_PANEL_ORDER,
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { studioColocationIndicatorContent } from "./colocation/indicatorContent";
 import { studioColocationStore } from "./domain/colocationStore";
 import { questMenuStore } from "./domain/questMenuStore";
+import { QUEST_PANEL_TEXT } from "./questPanelStyle";
 import { questAlertLayout } from "./StudioQuestAlertOverlay";
-import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
+import {
+  QuestPanelLine,
+  questPanelLayout,
+  StudioQuestPanelCard,
+} from "./StudioQuestPanelCard";
 import { useStudioColocation } from "./useStudioColocation";
 
 // How long the scene name, a live session's status, or the reason the last
 // session ended stays up on its own.
 const PEEK_MS = 5000;
-
-const PADDING_M = 0.04;
-const PANEL_WIDTH_M = 1.6;
-const TEXT_WIDTH_M = 1.5;
-
-ViroMaterials.createMaterials({
-  StudioQuestHudBackground: {
-    lightingModel: "Constant",
-    diffuseColor: "#111827CC",
-    readsFromDepthBuffer: false,
-    writesToDepthBuffer: true,
-  },
-  StudioQuestHudHover: {
-    lightingModel: "Constant",
-    diffuseColor: "#1F3B57",
-    readsFromDepthBuffer: false,
-    writesToDepthBuffer: true,
-  },
-});
-
-type HudLine = {
-  key: string;
-  text: string;
-  fontSize: number;
-  color: string;
-  onClick?: (position: unknown, source: ViroSource) => void;
-};
 
 const subscribeToColocation = (onChange: () => void) =>
   studioColocationStore.subscribe(onChange);
@@ -82,12 +57,6 @@ export function handleQuestExitClick(_position: unknown, source: ViroSource) {
   VRQuestNavigatorBridge.getIntent()?.rendererConfig?.onExitViro?.();
   exitVRScene();
 }
-
-const textStyle = {
-  fontFamily: "sans-serif",
-  textAlign: "center",
-  textAlignVertical: "center",
-} as const;
 
 /**
  * Quest has no 2D chrome: the host's is stuck in MainActivity, out of view once
@@ -221,12 +190,13 @@ export function StudioQuestSceneHudOverlay({
 
   if ((!menuOpen && peek === null) || !placedAt) return null;
 
-  const lines: HudLine[] = [
+  const lines: QuestPanelLine[] = [
     {
       key: "name",
       text: sceneName ?? "Untitled scene",
       fontSize: 14,
-      color: "#FFFFFF",
+      color: QUEST_PANEL_TEXT.primary,
+      bold: true,
     },
   ];
   if (colocation) {
@@ -234,7 +204,10 @@ export function StudioQuestSceneHudOverlay({
       key: "status",
       text: colocation.title,
       fontSize: 13,
-      color: colocation.tone === "error" ? "#FF8A80" : "#FFFFFF",
+      color:
+        colocation.tone === "error"
+          ? QUEST_PANEL_TEXT.error
+          : QUEST_PANEL_TEXT.primary,
     });
     // Beside the title the code wrapped, split across two lines.
     if (colocation.code) {
@@ -242,7 +215,7 @@ export function StudioQuestSceneHudOverlay({
         key: "code",
         text: colocation.code,
         fontSize: 13,
-        color: "#FFFFFF",
+        color: QUEST_PANEL_TEXT.primary,
       });
     }
     if (colocation.detail) {
@@ -250,7 +223,7 @@ export function StudioQuestSceneHudOverlay({
         key: "detail",
         text: colocation.detail,
         fontSize: 11,
-        color: "#CCCCCC",
+        color: QUEST_PANEL_TEXT.secondary,
       });
     }
   }
@@ -258,9 +231,9 @@ export function StudioQuestSceneHudOverlay({
     menuItems.forEach((item, index) =>
       lines.push({
         key: `item:${index}:${item.label}`,
-        text: `[ ${item.label} ]`,
+        text: item.label,
         fontSize: 13,
-        color: "#7FCBFF",
+        color: QUEST_PANEL_TEXT.primary,
         onClick: (_position, source) => {
           if (!isSelectClick(source)) return;
           onCloseMenu();
@@ -270,9 +243,9 @@ export function StudioQuestSceneHudOverlay({
     );
     lines.push({
       key: "exit",
-      text: "[ Exit ]",
+      text: "Exit",
       fontSize: 13,
-      color: "#7FCBFF",
+      color: QUEST_PANEL_TEXT.primary,
       onClick: handleQuestExitClick,
     });
   }
@@ -282,17 +255,11 @@ export function StudioQuestSceneHudOverlay({
       ? "Menu button or palm pinch to close"
       : "Menu button or palm pinch for the menu",
     fontSize: 11,
-    color: "#CCCCCC",
+    color: QUEST_PANEL_TEXT.secondary,
   });
 
-  // Sized to the wrapped text: a box one line tall draws a wrapped line over
-  // its neighbours.
-  const lineHeights = lines.map((line) =>
-    estimateQuestTextHeight(line.text, TEXT_WIDTH_M, line.fontSize)
-  );
-  const height =
-    2 * PADDING_M +
-    lineHeights.reduce((sum, lineHeight) => sum + lineHeight, 0);
+  const layout = questPanelLayout(lines);
+  const { height } = layout;
   const centred = menuOpen || (!alertShown && !promptShown);
   const { position, rotation } = computeHeadLockedTransform(placedAt, {
     distanceM: 1.2,
@@ -304,13 +271,6 @@ export function StudioQuestSceneHudOverlay({
         ((alertShown ? -alertPanelHeight / 2 - 0.05 : -0.15) - height / 2),
   });
 
-  // Each line is positioned explicitly: inside a ViroFlexView on Quest every
-  // line rendered at the view's centre, on top of each other, and the
-  // background never appeared. The background is drawn first, so the lines'
-  // boxes cannot hide it and a click on a line goes to the line. In the menu, a
-  // click between lines stops at the background rather than reaching what is
-  // behind the panel; the closed panel has nothing to click and lets clicks
-  // through, as its lines do.
   const hoveredKeys = new Set(Object.values(hoveredBySource));
   const hoverItem =
     (key: string) =>
@@ -329,51 +289,18 @@ export function StudioQuestSceneHudOverlay({
       });
     };
 
-  let lineTop = height / 2 - PADDING_M;
   return (
     <ViroNode
       position={position}
       rotation={rotation}
       scale={[QUEST_PANEL_SCALE, QUEST_PANEL_SCALE, QUEST_PANEL_SCALE]}
     >
-      <ViroQuad
-        position={[0, 0, -0.01]}
-        width={PANEL_WIDTH_M}
-        height={height}
-        materials={["StudioQuestHudBackground"]}
-        renderingOrder={QUEST_PANEL_ORDER.hud}
-        ignoreEventHandling={!menuOpen}
+      <StudioQuestPanelCard
+        layout={layout}
+        interactive={menuOpen}
+        hoveredKeys={hoveredKeys}
+        onHoverItem={hoverItem}
       />
-      {lines.map((line, index) => {
-        const y = lineTop - lineHeights[index] / 2;
-        lineTop -= lineHeights[index];
-        const hovered = line.onClick !== undefined && hoveredKeys.has(line.key);
-        return (
-          <React.Fragment key={line.key}>
-            {hovered && (
-              <ViroQuad
-                position={[0, y, -0.005]}
-                width={TEXT_WIDTH_M}
-                height={lineHeights[index]}
-                materials={["StudioQuestHudHover"]}
-                renderingOrder={QUEST_PANEL_ORDER.hud + 1}
-                ignoreEventHandling
-              />
-            )}
-            <StudioQuestText
-              text={line.text}
-              position={[0, y, 0]}
-              width={TEXT_WIDTH_M}
-              height={lineHeights[index]}
-              fontSize={line.fontSize}
-              renderingOrder={QUEST_PANEL_ORDER.hud + 2}
-              onClick={line.onClick}
-              onHover={line.onClick ? hoverItem(line.key) : undefined}
-              style={{ ...textStyle, color: hovered ? "#FFFFFF" : line.color }}
-            />
-          </React.Fragment>
-        );
-      })}
     </ViroNode>
   );
 }

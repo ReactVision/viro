@@ -132,16 +132,18 @@ export type ViroWorldMeshStats = {
   /**
    * Which path produced the mesh, so an app can tell a real surface from the fallback.
    *
-   * - `"lidar"` — ARKit mesh anchors. Accumulates across frames.
-   * - `"depth"` — ARCore's depth camera image. **Current frame only.**
-   * - `"monocular"` — estimated depth on a non-LiDAR iPhone. **Current frame only.**
+   * - `"lidar"` — ARKit mesh anchors. ARKit accumulates them.
+   * - `"depth"` — ARCore's depth camera image. Fused across frames unless
+   *   `worldMeshConfig.accumulate` is off.
+   * - `"monocular"` — estimated depth on a non-LiDAR iPhone. Fused the same way.
    * - `"plane"` — triangulated AR plane anchors. Flat polygons, not a scanned surface.
    */
   source?: ViroWorldMeshSource;
 
   /**
-   * Whether the mesh is fused across frames or a single view. `false` with a `"depth"` or
-   * `"monocular"` source means a snapshot taken now holds one frame, not the room walked.
+   * Whether the mesh covers more than the current view — fused here on the depth paths, or
+   * accumulated by ARKit on `"lidar"`. `false` with a `"depth"` or `"monocular"` source means a
+   * snapshot taken now holds one frame, not the room walked: check `worldMeshConfig.accumulate`.
    */
   accumulated?: boolean;
 

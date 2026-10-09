@@ -445,7 +445,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private SensorManager mSensorManager = null;
     private SensorEventListener mSensorListener = null;
     private double mLastHeading = 0.0;
-    private double mLastHeadingAccuracy = 0.0;
+    // -1 until the first rotation-vector event: native treats a negative
+    // accuracy as "no valid heading" rather than a perfect one.
+    private double mLastHeadingAccuracy = -1.0;
     private double mLastLat = 0.0;
     private double mLastLng = 0.0;
     private double mLastAlt = 0.0;

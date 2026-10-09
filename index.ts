@@ -338,6 +338,7 @@ import {
   useVRViewTag,
   exitVRScene,
   setPassthroughStyle,
+  onRoomMoved,
 } from "./components/Utilities/VRModuleOpenXR";
 import type {
   VRModuleOpenXRType,
@@ -454,6 +455,7 @@ export {
   useVRViewTag,
   exitVRScene,
   setPassthroughStyle,
+  onRoomMoved,
   Viro3DSceneNavigator,
   // Streaming audio
   StreamingAudioManager,

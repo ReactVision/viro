@@ -19,7 +19,15 @@ export type ViroWorldMeshConfig = {
 
   /**
    * Minimum confidence threshold for depth samples (0.0-1.0).
-   * Samples below this threshold are excluded from the mesh.
+   *
+   * **iOS:** samples below this are excluded from the mesh.
+   *
+   * **Android: not a cutoff.** ARCore pairs its confidence image with the *raw* depth estimate,
+   * while the depth used for the mesh is the dense, smoothed one, which has no confidence image
+   * of its own — ARCore has already filled its gaps, so a pixel is either valid or zero. Applying
+   * the raw image's confidence as a cutoff discarded most of a well-lit wall at this default. The
+   * value is kept as a per-sample weight for fusion instead, where it still carries signal.
+   *
    * @default 0.3
    */
   minConfidence?: number;

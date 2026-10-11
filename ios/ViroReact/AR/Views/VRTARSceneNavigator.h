@@ -254,6 +254,14 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (BOOL)rvLoadVPSMap:(NSData *)rvmapData;
 /** Drops whatever rvLoadVPSMap: loaded; per-frame matching becomes a no-op. */
 - (void)rvUnloadVPSMap;
+/**
+ The VPS location's mesh (an RVWM snapshot in the map's frame), for occlusion
+ and physics. Hidden until VPS localisation converges, then follows the map.
+ NO for bytes that are not RVWM, or without a mounted AR scene.
+ */
+- (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics;
+/** Removes the mesh rvLoadVPSMapMesh: set. */
+- (void)rvUnloadVPSMapMesh;
 /** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
 - (NSString *)rvGetVPSLocalizationJson;
 - (void)rvGetCloudAnchor:(NSString *)anchorId

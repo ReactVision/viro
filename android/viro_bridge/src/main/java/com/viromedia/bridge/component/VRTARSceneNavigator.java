@@ -1323,6 +1323,17 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         arScene.rvUnloadVPSMap();
     }
 
+    /** The VPS location's mesh; see {@link ARScene#setVPSMapMesh}. False without a scene or for bytes that are not RVWM. */
+    public boolean rvLoadVPSMapMesh(byte[] rvwmBytes, boolean occlusion, boolean physics) {
+        ARScene arScene = getCurrentARScene();
+        return arScene != null && arScene.setVPSMapMesh(rvwmBytes, occlusion, physics);
+    }
+
+    public void rvUnloadVPSMapMesh() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene != null) arScene.clearVPSMapMesh();
+    }
+
     /** The latest continuous VPS localisation result, as JSON. No ensureRvConfigApplied — a reader shouldn't configure the provider. */
     public void rvGetVPSLocalization(ARScene.RvScanJsonCallback callback) {
         ARScene arScene = getCurrentARScene();

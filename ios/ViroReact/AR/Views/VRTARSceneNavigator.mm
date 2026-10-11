@@ -1868,6 +1868,26 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     arSession->rvUnloadVPSMap();
 }
 
+- (std::shared_ptr<VROARScene>)rv_currentARScene {
+    if (!_currentScene) return nullptr;
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) return nullptr;
+    return std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+}
+
+- (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (!arScene || !rvwmData || rvwmData.length == 0) return NO;
+    const uint8_t *bytes = (const uint8_t *)rvwmData.bytes;
+    std::vector<uint8_t> rvwm(bytes, bytes + rvwmData.length);
+    return arScene->setVPSMapMesh(rvwm, occlusion, physics);
+}
+
+- (void)rvUnloadVPSMapMesh {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (arScene) arScene->clearVPSMapMesh();
+}
+
 - (NSString *)rvGetVPSLocalizationJson {
     if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
     std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];

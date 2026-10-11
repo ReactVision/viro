@@ -1734,6 +1734,57 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     /**
+     * Sets the VPS location's mesh (an RVWM snapshot, base64 like
+     * {@link #rvLoadVPSMap}), for occlusion and physics. It appears once VPS
+     * localisation converges and follows the map from then on.
+     */
+    @ReactMethod
+    public void rvLoadVPSMapMesh(final int sceneNavTag, final String rvwmBase64,
+                                 final boolean occlusion, final boolean physics, final Promise promise) {
+        final byte[] rvwmBytes;
+        try {
+            rvwmBytes = Base64.decode(rvwmBase64, Base64.NO_WRAP);
+        } catch (Exception e) {
+            promise.resolve(rvJson("success", false, "error", "Malformed base64 mesh data"));
+            return;
+        }
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    boolean ok = ((VRTARSceneNavigator) view).rvLoadVPSMapMesh(rvwmBytes, occlusion, physics);
+                    promise.resolve(ok ? rvJson("success", true)
+                                       : rvJson("success", false, "error", "Not an RVWM mesh, or no AR scene"));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /** Removes the mesh {@link #rvLoadVPSMapMesh} set. Fire-and-forget. */
+    @ReactMethod
+    public void rvUnloadVPSMapMesh(final int sceneNavTag) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) return;
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) return;
+                    ((VRTARSceneNavigator) view).rvUnloadVPSMapMesh();
+                } catch (Exception e) { /* no-op */ }
+            }
+        });
+    }
+
+    /**
      * The latest continuous VPS localisation result, as JSON — a pollable
      * stand-in for an onLocalized event. Resolves the renderer's own JSON
      * verbatim, same reasoning as {@link #rvGetScanStatus}.

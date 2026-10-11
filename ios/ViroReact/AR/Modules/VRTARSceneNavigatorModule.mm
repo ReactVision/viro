@@ -1273,6 +1273,52 @@ RCT_EXPORT_METHOD(rvUnloadVPSMap:(nonnull NSNumber *)reactTag) {
     }];
 }
 
+// The VPS location's mesh, base64 like rvLoadVPSMap. Decoded off the main
+// thread; the scene installs it on the render thread.
+RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
+                        rvwmBase64:(NSString *)rvwmBase64
+                         occlusion:(BOOL)occlusion
+                           physics:(BOOL)physics
+                           resolve:(RCTPromiseResolveBlock)resolve
+                            reject:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *rvwmData = rvwmBase64
+            ? [[NSData alloc] initWithBase64EncodedString:rvwmBase64 options:0]
+            : nil;
+        if (!rvwmData || rvwmData.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": @"Empty or malformed base64 mesh data"}));
+            return;
+        }
+        dispatch_async(RCTGetUIManagerQueue(), ^{
+            [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+                @try {
+                    VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+                    if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+                    }
+                    BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMapMesh:rvwmData
+                                                                  occlusion:occlusion
+                                                                    physics:physics];
+                    resolve(ok ? RVJsonString(@{@"success": @YES})
+                               : RVJsonString(@{@"success": @NO, @"error": @"Not an RVWM mesh, or no AR scene"}));
+                } @catch (NSException *ex) {
+                    resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+                }
+            }];
+        });
+    });
+}
+
+RCT_EXPORT_METHOD(rvUnloadVPSMapMesh:(nonnull NSNumber *)reactTag) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
+            [(VRTARSceneNavigator *)view rvUnloadVPSMapMesh];
+        } @catch (NSException *ex) { /* no-op */ }
+    }];
+}
+
 // A pollable stand-in for an onLocalized event — see rvGetScanStatus above
 // for the same "resolve the renderer's JSON verbatim" reasoning.
 RCT_EXPORT_METHOD(rvGetVPSLocalization:(nonnull NSNumber *)reactTag

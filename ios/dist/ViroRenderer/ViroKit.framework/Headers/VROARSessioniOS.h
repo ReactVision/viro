@@ -244,6 +244,7 @@ public:
     void rvUnloadVPSMap() override;
     bool rvIsVPSMapLoaded() override;
     std::string rvGetVPSLocalizationJson() override;
+    bool rvGetVPSWorldFromMap(VROMatrix4f &T_world_map) const override;
 
     // Scene Semantics API
     bool isSemanticModeSupported() const override;

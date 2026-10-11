@@ -739,6 +739,16 @@ public:
         return "{\"available\":false}";
     }
 
+    /*
+     The map-to-world transform the VPS fuser has converged on (the inverse of
+     its smoothed T_map_world), for placing things authored in the map's frame,
+     such as the location's mesh (VROARScene::setVPSMapMesh()). False until it
+     has converged, or without a loaded map. Render thread.
+     */
+    virtual bool rvGetVPSWorldFromMap(VROMatrix4f &T_world_map) const {
+        return false;
+    }
+
     // ========================================================================
     // Shared coordinate frame — platform-native co-location (CL-H / CL-I)
     //

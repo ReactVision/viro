@@ -9,11 +9,14 @@
 import * as React from "react";
 import type { ViroVPSLocalizationResult, ViroVPSMapLoadResult } from "../Types/ViroEvents";
 import {
+  fetchAssetBytes,
   findNearestMap,
   getLocationMapDownload,
+  getLocationWorldMeshDownload,
   fetchMapBytes,
   ViroVPSMapDownload,
 } from "./ViroVPSMapDownload";
+import { ViroVPSError } from "./ViroVPSClient";
 import type { ViroVPSCredentials } from "./ViroVPSClient";
 import type { ViroARSceneNavigator } from "./ViroARSceneNavigator";
 import {
@@ -36,6 +39,15 @@ export type ViroVPSTrackingStateEvent = {
   state: ViroVPSTrackingState;
   locationId?: string;
   /** Present only when `state` is `"error"`. */
+  error?: string;
+};
+
+export type ViroVPSWorldMeshEvent = {
+  locationId: string;
+  /** True once the mesh is loaded; it appears when localisation converges. */
+  success: boolean;
+  /** True when the location's active scan has no mesh (a map-only scan). Not an error. */
+  missing?: boolean;
   error?: string;
 };
 
@@ -62,7 +74,12 @@ export type ViroVPSLocalizedEvent = {
 export type ViroVPSNavigator = Partial<
   Pick<
     ViroARSceneNavigator["arSceneNavigator"],
-    "loadVPSMap" | "unloadVPSMap" | "getVPSLocalization" | "getCameraGeospatialPose"
+    | "loadVPSMap"
+    | "unloadVPSMap"
+    | "loadVPSMapMesh"
+    | "unloadVPSMapMesh"
+    | "getVPSLocalization"
+    | "getCameraGeospatialPose"
   >
 >;
 
@@ -119,6 +136,21 @@ export type ViroVPSProps = {
 
   /** Fires once per state transition — not once per poll tick. */
   onTrackingState?: (event: ViroVPSTrackingStateEvent) => void;
+
+  /**
+   * Also load the location's mesh (the backend's `world_mesh`) once its map
+   * is loaded, for occlusion and/or physics against the real place: content
+   * hides behind real walls and furniture, and physics bodies collide with
+   * them, on any device, no depth sensor needed. The mesh appears when
+   * localisation converges and follows the map's corrections from then on.
+   * `true` means both; pass an object to choose. Off by default: it is a
+   * few MB more to download. A failure here never fails tracking; see
+   * `onWorldMesh`.
+   */
+  worldMesh?: boolean | { occlusion?: boolean; physics?: boolean };
+
+  /** How the `worldMesh` load went, once per tracked location. */
+  onWorldMesh?: (event: ViroVPSWorldMeshEvent) => void;
 
   /**
    * Rendered as-is. `<ViroVPS>` holds no transform of its own — it is a
@@ -192,6 +224,13 @@ function errorMessage(e: unknown): string {
  * the derived state actually changes (`nextTrackingPhase()` /
  * `isFreshLocalizedPose()` in `ViroVPSTracking.ts`).
  *
+ * ## The location's mesh
+ *
+ * With `worldMesh`, the location's mesh is loaded after its map, for
+ * occlusion and physics. It needs no `worldMeshEnabled` and no depth sensor,
+ * stays hidden until localisation converges, and moves with every
+ * correction of the map's placement. Reported through `onWorldMesh`.
+ *
  * ## Lifecycle
  *
  * Unmounting stops polling and unloads the map this component loaded. A map
@@ -259,8 +298,50 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private _unloadNative() {
     try {
       this.props.arSceneNavigator?.unloadVPSMap?.();
+      this.props.arSceneNavigator?.unloadVPSMapMesh?.();
     } catch {
       // The navigator may already be unmounted; nothing left to unload then.
+    }
+  }
+
+  /**
+   * Downloads and loads the location's mesh after its map, when the
+   * `worldMesh` prop asks for it. Best effort: tracking does not wait for it
+   * and does not fail with it.
+   */
+  private async _loadWorldMesh(session: number, locationId: string) {
+    const option = this.props.worldMesh;
+    const nav = this.props.arSceneNavigator;
+    if (!option || !nav?.loadVPSMapMesh) return;
+    const occlusion = option === true ? true : option.occlusion ?? true;
+    const physics = option === true ? true : option.physics ?? true;
+    if (!occlusion && !physics) return;
+
+    const report = (event: ViroVPSWorldMeshEvent) => {
+      if (this._mounted && session === this._session) this.props.onWorldMesh?.(event);
+    };
+    try {
+      const download = await getLocationWorldMeshDownload(
+        this.props.endpoint,
+        this.props.credentials,
+        locationId
+      );
+      if (session !== this._session) return;
+      const bytes = await fetchAssetBytes(download);
+      if (session !== this._session) return;
+      const result = await nav.loadVPSMapMesh(bytes, { occlusion, physics });
+      if (session !== this._session) {
+        // Superseded while loading: whatever is current owns the mesh slot.
+        if (result?.success && this._loadedSession === undefined) nav.unloadVPSMapMesh?.();
+        return;
+      }
+      report({ locationId, success: !!result?.success, error: result?.error });
+    } catch (e) {
+      if (e instanceof ViroVPSError && e.status === 404) {
+        report({ locationId, success: false, missing: true });
+      } else {
+        report({ locationId, success: false, error: errorMessage(e) });
+      }
     }
   }
 
@@ -491,6 +572,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     this._locationId = resolvedId;
     this._setPhase({ state: "mapLoaded", everConverged: false }, resolvedId);
     this._startPolling(session, resolvedId);
+    void this._loadWorldMesh(session, resolvedId);
     return { success: true, locationId: resolvedId };
   };
 

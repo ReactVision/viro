@@ -63,7 +63,9 @@ export async function findNearbyLocations(
   const url = `${vpsBaseUrl(endpoint)}/vps/locations?lat=${lat}&lon=${lon}&radius_m=${radiusMeters}&limit=${limit}`;
   const response = await fetch(url, { headers: vpsAuthHeaders(credentials) });
   await throwIfVPSError(response);
-  return (await response.json()) as ViroVPSNearbyLocation[];
+  // The backend wraps the list: { "locations": [...] } (vps-server/API.md).
+  const body = (await response.json()) as { locations?: ViroVPSNearbyLocation[] };
+  return body.locations ?? [];
 }
 
 /**
@@ -83,6 +85,43 @@ export async function getLocationMapDownload(
   );
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSMapDownload;
+}
+
+/** A signed link to one of a location's files, as `GET /vps/locations/{id}/{kind}` answers. */
+export type ViroVPSAssetDownload = {
+  kind: string;
+  scan_id: string;
+  url: string;
+  expires_at: number;
+  bytes: number | null;
+};
+
+/**
+ * `GET /vps/locations/{id}/world_mesh`: a signed link to the active scan's
+ * mesh as RVWM, the format `loadVPSMapMesh()` reads. In the same frame as
+ * the location's map. Throws a ViroVPSError with status 404 when the
+ * location's active scan has none (a map-only scan).
+ */
+export async function getLocationWorldMeshDownload(
+  endpoint: string,
+  credentials: ViroVPSCredentials,
+  locationId: string
+): Promise<ViroVPSAssetDownload> {
+  const response = await fetch(
+    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/world_mesh`,
+    { headers: vpsAuthHeaders(credentials) }
+  );
+  await throwIfVPSError(response);
+  return (await response.json()) as ViroVPSAssetDownload;
+}
+
+/** Fetches a signed link's bytes right away, like fetchMapBytes(). */
+export async function fetchAssetBytes(download: { url: string }): Promise<Uint8Array> {
+  const response = await fetch(download.url);
+  if (!response.ok) {
+    throw new ViroVPSError(`Could not fetch file: HTTP ${response.status}`, undefined, response.status);
+  }
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 /**

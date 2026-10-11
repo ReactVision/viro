@@ -40,7 +40,13 @@ export type ViroVPSScan = {
   error: string | null;
   recording_bytes: number | null;
   assets: string[];
-  quality: Record<string, number> | null;
+  quality: Record<string, number | null> | null;
+  /** Where the map sits on Earth (map origin, and the map -> East-North-Up rotation's rows); null without usable GPS. */
+  geo: { lat: number; lon: number; alt: number; r_enu_map: number[][] } | null;
+  /** The location's active scan when this one was submitted; this scan was built in that map's frame. */
+  aligned_to_scan_id: string | null;
+  /** How that alignment went: `aligned`, and `yaw_deg`/`translation_m`, or the `reason` it failed. */
+  alignment: Record<string, unknown> | null;
   map_accepted: boolean | null;
   map_rejected_reason: string | null;
   created_at: number;

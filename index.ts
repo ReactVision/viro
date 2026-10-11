@@ -89,6 +89,8 @@ import {
   getLocationMapDownload,
   fetchMapBytes,
   findNearestMap,
+  getLocationWorldMeshDownload,
+  fetchAssetBytes,
 } from "./components/AR/ViroVPSMapDownload";
 import { uploadScanRecording, getScan } from "./components/AR/ViroVPSScanUpload";
 import { ViroVPSError } from "./components/AR/ViroVPSClient";
@@ -144,6 +146,7 @@ export type {
   ViroVPSProps,
   ViroVPSTrackingStateEvent,
   ViroVPSLocalizedEvent,
+  ViroVPSWorldMeshEvent,
   ViroVPSStartTrackingResult,
   ViroVPSNavigator,
 } from "./components/AR/ViroVPS";
@@ -151,6 +154,7 @@ export type { ViroVPSTrackingState } from "./components/AR/ViroVPSTracking";
 export type {
   ViroVPSNearbyLocation,
   ViroVPSMapDownload,
+  ViroVPSAssetDownload,
 } from "./components/AR/ViroVPSMapDownload";
 export type { ViroVPSScanTarget, ViroVPSScan } from "./components/AR/ViroVPSScanUpload";
 export type { ViroVPSCredentials } from "./components/AR/ViroVPSClient";
@@ -414,6 +418,8 @@ export {
   getLocationMapDownload,
   fetchMapBytes,
   findNearestMap,
+  getLocationWorldMeshDownload,
+  fetchAssetBytes,
   uploadScanRecording,
   getScan,
   ViroVPSError,

@@ -18,6 +18,14 @@ jest.mock("../components/AR/ViroVPSMapDownload", () => ({
   })),
   fetchMapBytes: jest.fn(async () => new Uint8Array([1, 2, 3])),
   findNearestMap: jest.fn(),
+  getLocationWorldMeshDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
+    if (id === "loc_no_mesh") {
+      const { ViroVPSError } = jest.requireActual("../components/AR/ViroVPSClient");
+      throw new ViroVPSError("the location has no active world_mesh", "NO_ASSET", 404);
+    }
+    return { kind: "world_mesh", scan_id: `scan_${id}`, url: `https://vps.example.com/files/m_${id}`, expires_at: 0, bytes: 4 };
+  }),
+  fetchAssetBytes: jest.fn(async () => new Uint8Array([82, 86, 87, 77])),
 }));
 
 import * as React from "react";
@@ -325,5 +333,65 @@ describe("<ViroVPS> polling", () => {
 
     const errors = states.filter((s) => s.state === "error").map((s) => s.error);
     expect(errors).toEqual(["first", "second"]);
+  });
+});
+
+
+describe("<ViroVPS> worldMesh", () => {
+  function meshNav() {
+    const made = makeNav();
+    const nav = {
+      ...made.nav,
+      loadVPSMapMesh: jest.fn(async () => ({ success: true })),
+      unloadVPSMapMesh: jest.fn(),
+    };
+    return { ...made, nav };
+  }
+
+  async function track(ref: React.RefObject<ViroVPS | null>, loads: any[], id: string) {
+    await act(async () => {
+      const started = ref.current!.startTracking(id);
+      await flush();
+      loads[loads.length - 1].resolve({ success: true });
+      await started;
+      await flush();
+    });
+  }
+
+  it("loads the location's mesh after its map, and unloads it with the map", async () => {
+    const { nav, loads } = meshNav();
+    const events: unknown[] = [];
+    const { ref } = mount(nav, { worldMesh: { physics: false }, onWorldMesh: (e: unknown) => events.push(e) });
+    await track(ref, loads, "loc_a");
+    expect(nav.loadVPSMapMesh).toHaveBeenCalledWith(new Uint8Array([82, 86, 87, 77]), {
+      occlusion: true,
+      physics: false,
+    });
+    expect(events).toEqual([{ locationId: "loc_a", success: true, error: undefined }]);
+
+    act(() => ref.current!.stopTracking());
+    expect(nav.unloadVPSMapMesh).toHaveBeenCalled();
+  });
+
+  it("reports a location without a mesh as missing, not as an error", async () => {
+    const { nav, loads } = meshNav();
+    const events: unknown[] = [];
+    const states: string[] = [];
+    const { ref } = mount(nav, {
+      worldMesh: true,
+      onWorldMesh: (e: unknown) => events.push(e),
+      onTrackingState: (e: ViroVPSTrackingStateEvent) => states.push(e.state),
+    });
+    await track(ref, loads, "loc_no_mesh");
+    expect(events).toEqual([{ locationId: "loc_no_mesh", success: false, missing: true }]);
+    expect(nav.loadVPSMapMesh).not.toHaveBeenCalled();
+    expect(states).not.toContain("error"); // tracking carries on without it
+  });
+
+  it("does nothing without the prop", async () => {
+    const { nav, loads } = meshNav();
+    const { ref } = mount(nav);
+    await track(ref, loads, "loc_a");
+    expect(nav.loadVPSMapMesh).not.toHaveBeenCalled();
   });
 });

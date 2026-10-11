@@ -1033,6 +1033,38 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * Loads the VPS location's mesh (the backend's `world_mesh`, an RVWM file in
+   * the map's frame; ViroVPSMapDownload's fetchWorldMeshBytes()) for occlusion
+   * and/or physics against the real place. It stays hidden until VPS
+   * localisation converges, then follows the map's transform every frame, so
+   * it moves with each correction. Independent of `worldMeshEnabled` and of
+   * depth hardware. Replaces any mesh loaded before. `<ViroVPS worldMesh>`
+   * does this for you.
+   */
+  _loadVPSMapMesh = async (
+    rvwmBytes: Uint8Array,
+    options: { occlusion?: boolean; physics?: boolean } = {}
+  ): Promise<ViroVPSMapLoadResult> => {
+    try {
+      return parseVPSMapLoadResult(
+        await ViroARSceneNavigatorModule.rvLoadVPSMapMesh(
+          findNodeHandle(this),
+          bytesToBase64(rvwmBytes),
+          options.occlusion ?? true,
+          options.physics ?? true
+        )
+      );
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  };
+
+  /** Removes the mesh loadVPSMapMesh() loaded. */
+  _unloadVPSMapMesh = () => {
+    ViroARSceneNavigatorModule.rvUnloadVPSMapMesh(findNodeHandle(this));
+  };
+
+  /**
    * The latest continuous VPS localisation result against the map loaded
    * with loadVPSMap(), as of this call — poll it on a timer while a map is
    * loaded. `renderPose` (once `converged` is true) is the smoothed
@@ -1812,6 +1844,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getScanStatus: this._getScanStatus,
     loadVPSMap: this._loadVPSMap,
     unloadVPSMap: this._unloadVPSMap,
+    loadVPSMapMesh: this._loadVPSMapMesh,
+    unloadVPSMapMesh: this._unloadVPSMapMesh,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
@@ -1891,6 +1925,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getScanStatus: this._getScanStatus,
     loadVPSMap: this._loadVPSMap,
     unloadVPSMap: this._unloadVPSMap,
+    loadVPSMapMesh: this._loadVPSMapMesh,
+    unloadVPSMapMesh: this._unloadVPSMapMesh,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,

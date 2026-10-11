@@ -256,7 +256,6 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (void)rvUnloadVPSMap;
 /** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
 - (NSString *)rvGetVPSLocalizationJson;
-
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

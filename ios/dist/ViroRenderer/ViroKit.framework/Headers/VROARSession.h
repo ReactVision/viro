@@ -697,6 +697,48 @@ public:
         if (callback) callback(false, "", "", "Not supported");
     }
 
+    // ------------------------------------------------------------------
+    // Continuous VPS map localisation against a downloaded .rvmap
+    // (RVCCACloudAnchorProvider::loadVPSMap()/updateVPSMapFrame()). Separate
+    // from the cloud-anchor host/resolve API above: this matches the live
+    // camera against a whole map repeatedly, for as long as a map stays
+    // loaded, instead of resolving one anchor once.
+    // ------------------------------------------------------------------
+
+    /*
+     Parse rvmapBytes (a downloaded .rvmap's raw bytes) and load it for
+     matching. Returns false if the bytes don't parse as a supported map —
+     truncated, empty, or an unsupported format/version.
+     */
+    virtual bool rvLoadVPSMap(const std::string& rvmapBytes) {
+        return false;
+    }
+
+    /* Drop whatever rvLoadVPSMap() loaded; per-frame matching becomes a no-op. */
+    virtual void rvUnloadVPSMap() {
+        // Default implementation does nothing
+    }
+
+    virtual bool rvIsVPSMapLoaded() {
+        return false;
+    }
+
+    /**
+     * The latest continuous-localisation result, as JSON — a pollable
+     * stand-in for an event callback, same reasoning as rvGetScanStatusJson().
+     *
+     * Keys: available (false when no ReactVision provider is configured),
+     * loaded (a map is currently loaded), converged (the smoothed estimate
+     * has accepted at least one pair of agreeing hits — see
+     * VROVPSLocalizer::isConverged()), renderPose (16 comma-separated
+     * floats, column-major VROMatrix4f::getArray() order — the smoothed
+     * T_map_world applied to the session's own current camera pose; only
+     * present once converged is true).
+     */
+    virtual std::string rvGetVPSLocalizationJson() {
+        return "{\"available\":false}";
+    }
+
     // ========================================================================
     // Shared coordinate frame — platform-native co-location (CL-H / CL-I)
     //

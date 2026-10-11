@@ -438,6 +438,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mRvEndpoint = null;
     private boolean mGeoProviderApplied = false;
     private static final String TAG = "ViroAR";
+    // Below this horizontal component (about 80 degrees of pitch) the camera's
+    // forward axis has no useful compass bearing.
+    private static final double CAMERA_HEADING_MIN_HORIZONTAL = 0.17;
 
     // ReactVision GPS pose support
     private LocationManager mLocationManager = null;
@@ -448,6 +451,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     // -1 until the first rotation-vector event: native treats a negative
     // accuracy as "no valid heading" rather than a perfect one.
     private double mLastHeadingAccuracy = -1.0;
+    // Compass bearing of the back camera's forward axis, for AR recordings.
+    // Accuracy -1 while there is none, or the camera points too far up or down
+    // for a bearing to mean anything.
+    private double mLastCameraHeading = 0.0;
+    private double mLastCameraHeadingAccuracy = -1.0;
     private double mLastLat = 0.0;
     private double mLastLng = 0.0;
     private double mLastAlt = 0.0;
@@ -919,6 +927,21 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                             // Accuracy from sensor accuracy level (approximate degrees)
                             mLastHeadingAccuracy = event.accuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH ? 5.0
                                     : event.accuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM ? 15.0 : 45.0;
+                            // The camera looks along the device's -Z axis. rotMatrix maps
+                            // device axes into East-North-Up, so its third column is +Z
+                            // in ENU and the camera's forward is minus that.
+                            double east = -rotMatrix[2];
+                            double north = -rotMatrix[5];
+                            if (Math.hypot(east, north) < CAMERA_HEADING_MIN_HORIZONTAL) {
+                                mLastCameraHeadingAccuracy = -1.0;
+                            } else {
+                                double bearing = Math.toDegrees(Math.atan2(east, north));
+                                mLastCameraHeading = bearing < 0 ? bearing + 360.0 : bearing;
+                                // values[4] is the sensor's own heading accuracy in
+                                // radians, where the device reports one
+                                mLastCameraHeadingAccuracy = event.values.length > 4 && event.values[4] > 0
+                                        ? Math.toDegrees(event.values[4]) : mLastHeadingAccuracy;
+                            }
                             pushLocationToNative();
                         }
                         @Override public void onAccuracyChanged(Sensor s, int a) {}
@@ -951,6 +974,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             arScene.setLastKnownLocation(mLastLat, mLastLng, mLastAlt,
                                          mLastHorizAcc, mLastVertAcc,
                                          mLastHeading, mLastHeadingAccuracy);
+            arScene.setCameraHeading(mLastCameraHeading, mLastCameraHeadingAccuracy);
         }
     }
 

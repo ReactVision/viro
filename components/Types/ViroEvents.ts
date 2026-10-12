@@ -634,6 +634,25 @@ export type ViroVPSMapLoadResult = {
 };
 
 /**
+ * One camera image for a VPS visual query (captureVPSQueryFrame()): the latest
+ * AR frame's luma plane as a base64 JPEG, in the camera sensor's native
+ * orientation, with the pinhole intrinsics of that image (pixels).
+ */
+export type ViroVPSQueryFrame = {
+  image: string;
+  width: number;
+  height: number;
+  fx: number;
+  fy: number;
+  cx: number;
+  cy: number;
+};
+
+export type ViroVPSQueryFrameResult =
+  | ({ success: true } & ViroVPSQueryFrame)
+  | { success: false; error: string };
+
+/**
  * The latest continuous VPS localisation result against a map loaded with
  * loadVPSMap(), polled on a timer — a stand-in for an onLocalized event;
  * see getVPSLocalization().

@@ -87,9 +87,12 @@ export async function getLocationMapDownload(
   return (await response.json()) as ViroVPSMapDownload;
 }
 
+/** The files a location (or scan) can have; see vps-server/API.md. */
+export type ViroVPSAssetKind = "map" | "mesh" | "world_mesh" | "splat" | "poses" | "semantic";
+
 /** A signed link to one of a location's files, as `GET /vps/locations/{id}/{kind}` answers. */
 export type ViroVPSAssetDownload = {
-  kind: string;
+  kind: ViroVPSAssetKind | string;
   scan_id: string;
   url: string;
   expires_at: number;
@@ -113,6 +116,94 @@ export async function getLocationWorldMeshDownload(
   );
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSAssetDownload;
+}
+
+/**
+ * An object found in the location's scan (`semantic.json`), in the map's
+ * frame: the same coordinates as children of `<ViroVPSAnchor>`. Metres, Y up.
+ */
+export type ViroVPSSemanticObject = {
+  id: number;
+  /** A COCO class name, such as "chair" or "tv". */
+  label: string;
+  /** 0-1, from the detector's scores across the frames that saw it. */
+  confidence: number;
+  position: [number, number, number];
+  bounds: { min: [number, number, number]; max: [number, number, number] };
+  /** How many frames saw it. */
+  observations: number;
+};
+
+/**
+ * `GET /vps/locations/{id}/semantic`: a signed link to the active scan's
+ * `semantic.json`. Throws a ViroVPSError with status 404 when the scan has
+ * none.
+ */
+export async function getLocationSemanticDownload(
+  endpoint: string,
+  credentials: ViroVPSCredentials,
+  locationId: string
+): Promise<ViroVPSAssetDownload> {
+  const response = await fetch(
+    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/semantic`,
+    { headers: vpsAuthHeaders(credentials) }
+  );
+  await throwIfVPSError(response);
+  return (await response.json()) as ViroVPSAssetDownload;
+}
+
+function isVec3(v: unknown): v is [number, number, number] {
+  return Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === "number" && Number.isFinite(x));
+}
+
+/** The objects of a `semantic.json`, dropping any entry that is not well formed. */
+export function parseSemanticObjects(json: unknown): ViroVPSSemanticObject[] {
+  const objects = (json as { objects?: unknown })?.objects;
+  if (!Array.isArray(objects)) return [];
+  const out: ViroVPSSemanticObject[] = [];
+  for (const o of objects as any[]) {
+    if (
+      o &&
+      typeof o.label === "string" &&
+      isVec3(o.position) &&
+      o.bounds &&
+      isVec3(o.bounds.min) &&
+      isVec3(o.bounds.max)
+    ) {
+      out.push({
+        id: typeof o.id === "number" ? o.id : out.length,
+        label: o.label,
+        confidence: typeof o.confidence === "number" ? o.confidence : 0,
+        position: o.position,
+        bounds: { min: o.bounds.min, max: o.bounds.max },
+        observations: typeof o.observations === "number" ? o.observations : 0,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * The objects found in the location's active scan, in its map's frame.
+ * `[]` when the scan has none (404 `NO_ASSET`).
+ */
+export async function fetchLocationSemanticObjects(
+  endpoint: string,
+  credentials: ViroVPSCredentials,
+  locationId: string
+): Promise<ViroVPSSemanticObject[]> {
+  let download: ViroVPSAssetDownload;
+  try {
+    download = await getLocationSemanticDownload(endpoint, credentials, locationId);
+  } catch (e) {
+    if (e instanceof ViroVPSError && e.status === 404) return [];
+    throw e;
+  }
+  const response = await fetch(download.url);
+  if (!response.ok) {
+    throw new ViroVPSError(`Could not fetch semantic.json: HTTP ${response.status}`, undefined, response.status);
+  }
+  return parseSemanticObjects(await response.json());
 }
 
 /** Fetches a signed link's bytes right away, like fetchMapBytes(). */

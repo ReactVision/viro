@@ -29,6 +29,7 @@ import {
   parseScanStatus,
   parseVPSLocalization,
   parseVPSMapLoadResult,
+  parseVPSQueryFrame,
   parseWorldMeshStats,
   withScanDiagnostics,
 } from "./ViroScanStatus";
@@ -70,6 +71,7 @@ import {
   ViroDepthOcclusionSupportResult,
   ViroGeospatialSetupStatusResult,
   ViroVPSMapLoadResult,
+  ViroVPSQueryFrameResult,
   ViroVPSLocalizationResult,
 } from "../Types/ViroEvents";
 import {
@@ -1065,6 +1067,22 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * One camera image for a VPS visual query (`queryLocationsByImage()`): the
+   * latest AR frame's luma plane as a base64 JPEG, sensor-native orientation,
+   * longest side at most `maxSide` pixels, with the intrinsics of that image.
+   * `<ViroVPS>` uses it to find a location without GPS.
+   */
+  _captureVPSQueryFrame = async (maxSide: number = 1280): Promise<ViroVPSQueryFrameResult> => {
+    try {
+      return parseVPSQueryFrame(
+        await ViroARSceneNavigatorModule.rvCaptureVPSQueryFrame(findNodeHandle(this), maxSide)
+      );
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  };
+
+  /**
    * The latest continuous VPS localisation result against the map loaded
    * with loadVPSMap(), as of this call — poll it on a timer while a map is
    * loaded. `renderPose` (once `converged` is true) is the smoothed
@@ -1846,6 +1864,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     unloadVPSMap: this._unloadVPSMap,
     loadVPSMapMesh: this._loadVPSMapMesh,
     unloadVPSMapMesh: this._unloadVPSMapMesh,
+    captureVPSQueryFrame: this._captureVPSQueryFrame,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,
@@ -1927,6 +1946,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     unloadVPSMap: this._unloadVPSMap,
     loadVPSMapMesh: this._loadVPSMapMesh,
     unloadVPSMapMesh: this._unloadVPSMapMesh,
+    captureVPSQueryFrame: this._captureVPSQueryFrame,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
     getScanDiagnostics: this._getScanDiagnostics,

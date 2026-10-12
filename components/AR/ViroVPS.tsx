@@ -10,12 +10,15 @@ import * as React from "react";
 import type { ViroVPSLocalizationResult, ViroVPSMapLoadResult } from "../Types/ViroEvents";
 import {
   fetchAssetBytes,
+  fetchLocationSemanticObjects,
   findNearestMap,
   getLocationMapDownload,
   getLocationWorldMeshDownload,
   fetchMapBytes,
   ViroVPSMapDownload,
+  ViroVPSSemanticObject,
 } from "./ViroVPSMapDownload";
+import { pickVisualCandidate, queryLocationsByImage } from "./ViroVPSQuery";
 import { ViroVPSError } from "./ViroVPSClient";
 import type { ViroVPSCredentials } from "./ViroVPSClient";
 import type { ViroARSceneNavigator } from "./ViroARSceneNavigator";
@@ -78,6 +81,7 @@ export type ViroVPSNavigator = Partial<
     | "unloadVPSMap"
     | "loadVPSMapMesh"
     | "unloadVPSMapMesh"
+    | "captureVPSQueryFrame"
     | "getVPSLocalization"
     | "getCameraGeospatialPose"
   >
@@ -153,6 +157,23 @@ export type ViroVPSProps = {
   onWorldMesh?: (event: ViroVPSWorldMeshEvent) => void;
 
   /**
+   * Whether `startTracking("auto")` may find the location from the camera
+   * image when GPS cannot: no geospatial pose, or no location with a map
+   * nearby (indoors). Default true. `startTracking("visual")` always does.
+   */
+  visualSearch?: boolean;
+
+  /**
+   * How long the visual search keeps trying, in ms, before the state moves to
+   * `error`. Default 30000. Each attempt sends one camera image; a view the
+   * maps do not cover (a blank wall) simply fails and is retried.
+   */
+  visualSearchTimeoutMs?: number;
+
+  /** Pause between visual search attempts, in ms. Default 3000. */
+  visualSearchIntervalMs?: number;
+
+  /**
    * Rendered as-is. `<ViroVPS>` holds no transform of its own — it is a
    * data/event source, not a positioned node — so children are passed
    * through unchanged rather than wrapped in a `ViroNode`.
@@ -163,6 +184,9 @@ export type ViroVPSProps = {
 type State = { phase: ViroVPSTrackingPhase };
 
 const SUPERSEDED: ViroVPSStartTrackingResult = { success: false, error: "superseded" };
+const SUPERSEDED_SEARCH = Symbol("superseded");
+
+type FoundLocation = { locationId: string; map: ViroVPSMapDownload };
 
 type Timed<T> = { timedOut: false; value: T } | { timedOut: true };
 
@@ -199,8 +223,23 @@ function errorMessage(e: unknown): string {
  *   `arSceneNavigator.getCameraGeospatialPose()`, so geospatial tracking
  *   must be enabled on the navigator and producing a pose: ARCore
  *   Geospatial, or on iOS the ReactVision geospatial provider (ARKit plus
- *   the device's GPS fix). Without a geospatial pose, "auto" fails with
- *   state `error`; pass an explicit location id instead.
+ *   the device's GPS fix). Without a geospatial pose, or with no location
+ *   nearby, it falls back to the visual search below (`visualSearch`).
+ *
+ * ## Finding a place without GPS
+ *
+ * `startTracking("visual")`, and `"auto"` when GPS gives nothing, send camera
+ * images to the backend (`POST /vps/locations/query`), which finds the
+ * project's location whose map the image localises against. It retries
+ * every `visualSearchIntervalMs` for up to `visualSearchTimeoutMs`, so point
+ * the camera at the scanned place, not a blank wall.
+ *
+ * ## Placing content
+ *
+ * Put content in the map's frame inside `<ViroVPSAnchor>`: it follows the
+ * same correction as the location's mesh, every frame, and stays hidden
+ * until tracking converges. `getSemanticObjects()` gives the objects found
+ * in the scan, in that frame.
  *
  * ## What `renderPose` is
  *
@@ -455,11 +494,16 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
    * - `"auto"` reads the device's current geospatial position off
    *   `arSceneNavigator.getCameraGeospatialPose()` (see Requirements above)
    *   and tracks the nearest location that has a map (`findNearestMap()`).
+   *   Without a pose or a nearby location it falls back to `"visual"`,
+   *   unless `visualSearch` is false.
+   * - `"visual"` finds the location from camera images (no GPS needed).
    *
    * Calling this again (with the same or a different id) replaces whatever
    * was loaded before; it does not need `stopTracking()` first.
    */
-  startTracking = async (locationId: string | "auto"): Promise<ViroVPSStartTrackingResult> => {
+  startTracking = async (
+    locationId: string | "auto" | "visual"
+  ): Promise<ViroVPSStartTrackingResult> => {
     const session = ++this._session;
     this._lastRenderPose = undefined;
     this._locationId = undefined;
@@ -479,35 +523,11 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     let resolvedId: string;
     let mapDownload: ViroVPSMapDownload;
     try {
-      if (locationId === "auto") {
-        if (!nav.getCameraGeospatialPose) {
-          return this._fail(
-            session,
-            undefined,
-            "This navigator does not expose getCameraGeospatialPose, needed for \"auto\""
-          );
-        }
-        const poseResult = await nav.getCameraGeospatialPose();
-        if (session !== this._session) return SUPERSEDED;
-        if (!poseResult?.success || !poseResult.pose) {
-          return this._fail(
-            session,
-            undefined,
-            poseResult?.error ?? "Could not get the device's current geospatial position"
-          );
-        }
-        const found = await findNearestMap(
-          this.props.endpoint,
-          this.props.credentials,
-          poseResult.pose.latitude,
-          poseResult.pose.longitude,
-          this.props.autoRadiusMeters ?? 200
-        );
-        if (session !== this._session) return SUPERSEDED;
-        if (!found) {
-          return this._fail(session, undefined, "No nearby VPS location with an available map");
-        }
-        resolvedId = found.location.id;
+      if (locationId === "auto" || locationId === "visual") {
+        const found = await this._findLocation(session, locationId);
+        if (found === SUPERSEDED_SEARCH) return SUPERSEDED;
+        if ("error" in found) return this._fail(session, undefined, found.error);
+        resolvedId = found.locationId;
         mapDownload = found.map;
       } else {
         resolvedId = locationId;
@@ -574,6 +594,111 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     this._startPolling(session, resolvedId);
     void this._loadWorldMesh(session, resolvedId);
     return { success: true, locationId: resolvedId };
+  };
+
+  /**
+   * The location for `"auto"` / `"visual"`: GPS first (auto only), then the
+   * camera image when GPS gives nothing and the visual search is allowed.
+   */
+  private async _findLocation(
+    session: number,
+    mode: "auto" | "visual"
+  ): Promise<FoundLocation | { error: string } | typeof SUPERSEDED_SEARCH> {
+    const nav = this.props.arSceneNavigator;
+    const visualAllowed = mode === "visual" || this.props.visualSearch !== false;
+    const canSearchVisually = visualAllowed && !!nav.captureVPSQueryFrame;
+    let gpsError: string;
+    let position: { lat: number; lon: number } | undefined;
+
+    if (mode === "auto" && nav.getCameraGeospatialPose) {
+      const poseResult = await nav.getCameraGeospatialPose();
+      if (session !== this._session) return SUPERSEDED_SEARCH;
+      if (poseResult?.success && poseResult.pose) {
+        position = { lat: poseResult.pose.latitude, lon: poseResult.pose.longitude };
+        const found = await findNearestMap(
+          this.props.endpoint,
+          this.props.credentials,
+          position.lat,
+          position.lon,
+          this.props.autoRadiusMeters ?? 200
+        );
+        if (session !== this._session) return SUPERSEDED_SEARCH;
+        if (found) return { locationId: found.location.id, map: found.map };
+        gpsError = "No nearby VPS location with an available map";
+      } else {
+        gpsError = poseResult?.error ?? "Could not get the device's current geospatial position";
+      }
+    } else if (mode === "auto") {
+      gpsError = 'This navigator does not expose getCameraGeospatialPose, needed for "auto"';
+    } else {
+      gpsError = "This navigator does not expose captureVPSQueryFrame, needed for \"visual\"";
+    }
+
+    if (!canSearchVisually) return { error: gpsError };
+    return this._visualSearch(session, position);
+  }
+
+  /**
+   * Sends camera images to the backend until one localises against a
+   * location's map, or the visual search times out.
+   */
+  private async _visualSearch(
+    session: number,
+    position: { lat: number; lon: number } | undefined
+  ): Promise<FoundLocation | { error: string } | typeof SUPERSEDED_SEARCH> {
+    const nav = this.props.arSceneNavigator;
+    const timeoutMs = this.props.visualSearchTimeoutMs ?? 30000;
+    const intervalMs = this.props.visualSearchIntervalMs ?? 3000;
+    const deadline = Date.now() + timeoutMs;
+    let lastError = "No VPS location matched the camera view";
+
+    while (true) {
+      const frame = await nav.captureVPSQueryFrame!();
+      if (session !== this._session) return SUPERSEDED_SEARCH;
+      if (frame.success) {
+        try {
+          const candidates = await queryLocationsByImage(
+            this.props.endpoint,
+            this.props.credentials,
+            frame,
+            position ? { lat: position.lat, lon: position.lon, radiusM: 500 } : {}
+          );
+          if (session !== this._session) return SUPERSEDED_SEARCH;
+          const best = pickVisualCandidate(candidates);
+          if (best) {
+            const map = await getLocationMapDownload(
+              this.props.endpoint,
+              this.props.credentials,
+              best.location_id
+            );
+            if (session !== this._session) return SUPERSEDED_SEARCH;
+            return { locationId: best.location_id, map };
+          }
+          lastError = "No VPS location matched the camera view";
+        } catch (e) {
+          if (session !== this._session) return SUPERSEDED_SEARCH;
+          lastError = errorMessage(e);
+        }
+      } else {
+        lastError = frame.error;
+      }
+      if (Date.now() + intervalMs > deadline) {
+        return { error: lastError };
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      if (session !== this._session) return SUPERSEDED_SEARCH;
+    }
+  }
+
+  /**
+   * The objects found in the tracked location's scan (`semantic.json`), in
+   * its map's frame: place content at their positions inside a
+   * `<ViroVPSAnchor>`. `[]` when the scan has none, or nothing is tracked.
+   */
+  getSemanticObjects = async (): Promise<ViroVPSSemanticObject[]> => {
+    const locationId = this._locationId;
+    if (!locationId) return [];
+    return fetchLocationSemanticObjects(this.props.endpoint, this.props.credentials, locationId);
   };
 
   private _fail(

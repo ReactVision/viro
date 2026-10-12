@@ -40,6 +40,11 @@ export type ViroVPSScan = {
   error: string | null;
   recording_bytes: number | null;
   assets: string[];
+  /**
+   * The map's numbers; see vps-server/API.md. Includes `points`, `localised`,
+   * `check_frames`, `position_error_median_m`, ..., and for a merge
+   * `merged_scans` and `cross_scan_residual_px`.
+   */
   quality: Record<string, number | null> | null;
   /** Where the map sits on Earth (map origin, and the map -> East-North-Up rotation's rows); null without usable GPS. */
   geo: { lat: number; lon: number; alt: number; r_enu_map: number[][] } | null;
@@ -47,6 +52,14 @@ export type ViroVPSScan = {
   aligned_to_scan_id: string | null;
   /** How that alignment went: `aligned`, and `yaw_deg`/`translation_m`, or the `reason` it failed. */
   alignment: Record<string, unknown> | null;
+  /**
+   * `"scan"` for an uploaded recording; `"merge"` for a map the backend built
+   * from several accepted scans of the location (a global bundle adjustment).
+   * Absent from servers older than merging, which means `"scan"`.
+   */
+  kind?: "scan" | "merge";
+  /** For a merge, the scans whose recordings went into it; null for a scan. */
+  merged_scan_ids?: string[] | null;
   map_accepted: boolean | null;
   map_rejected_reason: string | null;
   created_at: number;

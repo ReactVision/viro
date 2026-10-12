@@ -84,6 +84,7 @@ import { ViroARTrackingTargets } from "./components/AR/ViroARTrackingTargets";
 import { ViroARPlane } from "./components/AR/ViroARPlane";
 import { ViroARPlaneSelector } from "./components/AR/ViroARPlaneSelector";
 import { ViroVPS } from "./components/AR/ViroVPS";
+import { ViroVPSAnchor } from "./components/AR/ViroVPSAnchor";
 import {
   findNearbyLocations,
   getLocationMapDownload,
@@ -91,7 +92,10 @@ import {
   findNearestMap,
   getLocationWorldMeshDownload,
   fetchAssetBytes,
+  getLocationSemanticDownload,
+  fetchLocationSemanticObjects,
 } from "./components/AR/ViroVPSMapDownload";
+import { queryLocationsByImage } from "./components/AR/ViroVPSQuery";
 import { uploadScanRecording, getScan } from "./components/AR/ViroVPSScanUpload";
 import { ViroVPSError } from "./components/AR/ViroVPSClient";
 import { ViroARScene } from "./components/AR/ViroARScene";
@@ -152,10 +156,19 @@ export type {
 } from "./components/AR/ViroVPS";
 export type { ViroVPSTrackingState } from "./components/AR/ViroVPSTracking";
 export type {
+  ViroVPSAnchorProps,
+  ViroVPSAnchorState,
+  ViroVPSAnchorStateEvent,
+} from "./components/AR/ViroVPSAnchor";
+export type {
   ViroVPSNearbyLocation,
   ViroVPSMapDownload,
   ViroVPSAssetDownload,
+  ViroVPSAssetKind,
+  ViroVPSSemanticObject,
 } from "./components/AR/ViroVPSMapDownload";
+export type { ViroVPSQueryCandidate, ViroVPSQueryOptions } from "./components/AR/ViroVPSQuery";
+export type { ViroVPSQueryFrame, ViroVPSQueryFrameResult } from "./components/Types/ViroEvents";
 export type { ViroVPSScanTarget, ViroVPSScan } from "./components/AR/ViroVPSScanUpload";
 export type { ViroVPSCredentials } from "./components/AR/ViroVPSClient";
 export type {
@@ -414,12 +427,16 @@ export {
   ViroARPlane,
   ViroARPlaneSelector,
   ViroVPS,
+  ViroVPSAnchor,
   findNearbyLocations,
   getLocationMapDownload,
   fetchMapBytes,
   findNearestMap,
   getLocationWorldMeshDownload,
   fetchAssetBytes,
+  getLocationSemanticDownload,
+  fetchLocationSemanticObjects,
+  queryLocationsByImage,
   uploadScanRecording,
   getScan,
   ViroVPSError,

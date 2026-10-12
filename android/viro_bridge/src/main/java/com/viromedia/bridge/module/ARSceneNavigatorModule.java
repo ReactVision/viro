@@ -1768,6 +1768,64 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /**
+     * One camera image for a VPS visual query: the latest AR frame's luma plane,
+     * sensor-native orientation, longest side at most maxSide, as base64 JPEG
+     * with intrinsics to match. Resolves JSON like the other rv* methods.
+     */
+    @ReactMethod
+    public void rvCaptureVPSQueryFrame(final int sceneNavTag, final int maxSide, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvCaptureVPSQueryFrame(maxSide,
+                            (ok, gray, width, height, fx, fy, cx, cy) -> {
+                        if (!ok || gray.length == 0) {
+                            promise.resolve(rvJson("success", false, "error", "No camera frame with intrinsics yet"));
+                            return;
+                        }
+                        // JPEG off the UI thread.
+                        new Thread(() -> {
+                            String jpeg = encodeGrayJpeg(gray, width, height);
+                            if (jpeg == null) {
+                                promise.resolve(rvJson("success", false, "error", "JPEG encoding failed"));
+                                return;
+                            }
+                            // NV21 needs even sides: a dropped last row or column leaves the intrinsics as they are.
+                            promise.resolve(rvJson("success", true, "image", jpeg,
+                                    "width", width & ~1, "height", height & ~1,
+                                    "fx", (double) fx, "fy", (double) fy, "cx", (double) cx, "cy", (double) cy));
+                        }, "ViroVPSQueryFrame").start();
+                    });
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /** A width x height luma plane as base64 JPEG, through NV21 with neutral chroma; null on failure. */
+    private static String encodeGrayJpeg(byte[] gray, int width, int height) {
+        int w = width & ~1, h = height & ~1;
+        if (w <= 0 || h <= 0) return null;
+        byte[] nv21 = new byte[w * h * 3 / 2];
+        for (int row = 0; row < h; row++) {
+            System.arraycopy(gray, row * width, nv21, row * w, w);
+        }
+        java.util.Arrays.fill(nv21, w * h, nv21.length, (byte) 128);
+        android.graphics.YuvImage image = new android.graphics.YuvImage(nv21, android.graphics.ImageFormat.NV21, w, h, null);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        if (!image.compressToJpeg(new android.graphics.Rect(0, 0, w, h), 85, out)) return null;
+        return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+    }
+
     /** Removes the mesh {@link #rvLoadVPSMapMesh} set. Fire-and-forget. */
     @ReactMethod
     public void rvUnloadVPSMapMesh(final int sceneNavTag) {

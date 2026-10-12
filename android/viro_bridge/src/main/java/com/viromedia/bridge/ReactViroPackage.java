@@ -49,6 +49,7 @@ import com.viromedia.bridge.component.VRTVRSceneNavigatorManager;
 import com.viromedia.bridge.component.node.VRTARImageMarkerManager;
 import com.viromedia.bridge.component.node.VRTARObjectMarkerManager;
 import com.viromedia.bridge.component.node.VRTARPlaneManager;
+import com.viromedia.bridge.component.node.VRTVPSAnchorManager;
 import com.viromedia.bridge.component.node.VRTARSceneManager;
 import com.viromedia.bridge.component.node.VRTSceneManagerImpl;
 import com.viromedia.bridge.component.node.control.VRT3DObjectManager;
@@ -243,6 +244,7 @@ public class ReactViroPackage implements ReactPackage {
                 new VRTARSceneNavigatorManager(reactContext),
                 new VRTARSceneManager(reactContext),
                 new VRTARPlaneManager(reactContext),
+                new VRTVPSAnchorManager(reactContext),
                 new VRTARImageMarkerManager(reactContext),
                 new VRTARObjectMarkerManager(reactContext),
                 new VRTVirtualJoystickViewManager(reactContext),

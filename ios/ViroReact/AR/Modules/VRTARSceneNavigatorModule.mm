@@ -1309,6 +1309,26 @@ RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
     });
 }
 
+// One camera image for a VPS visual query; JSON like the other rv* methods.
+RCT_EXPORT_METHOD(rvCaptureVPSQueryFrame:(nonnull NSNumber *)reactTag
+                                 maxSide:(nonnull NSNumber *)maxSide
+                                 resolve:(RCTPromiseResolveBlock)resolve
+                                  reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+            }
+            [(VRTARSceneNavigator *)view rvCaptureVPSQueryFrame:[maxSide intValue] completion:^(NSDictionary *result) {
+                resolve(RVJsonString(result));
+            }];
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvUnloadVPSMapMesh:(nonnull NSNumber *)reactTag) {
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {

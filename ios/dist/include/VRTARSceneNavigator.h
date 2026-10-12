@@ -262,6 +262,13 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics;
 /** Removes the mesh rvLoadVPSMapMesh: set. */
 - (void)rvUnloadVPSMapMesh;
+/**
+ One camera image for a VPS visual query: the latest AR frame's luma plane,
+ sensor-native orientation, longest side at most maxSide, as base64 JPEG with
+ intrinsics to match. The completion runs on a background queue with
+ { success, image, width, height, fx, fy, cx, cy } or { success: NO, error }.
+ */
+- (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion;
 /** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
 - (NSString *)rvGetVPSLocalizationJson;
 - (void)rvGetCloudAnchor:(NSString *)anchorId

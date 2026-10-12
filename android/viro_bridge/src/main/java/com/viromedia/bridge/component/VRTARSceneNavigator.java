@@ -1334,6 +1334,16 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (arScene != null) arScene.clearVPSMapMesh();
     }
 
+    /** One camera image for a VPS visual query; see {@link ARScene#captureVPSQueryFrame}. */
+    public void rvCaptureVPSQueryFrame(int maxSide, ARScene.VPSQueryFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            callback.onFrame(false, new byte[0], 0, 0, 0, 0, 0, 0);
+            return;
+        }
+        arScene.captureVPSQueryFrame(maxSide, callback);
+    }
+
     /** The latest continuous VPS localisation result, as JSON. No ensureRvConfigApplied — a reader shouldn't configure the provider. */
     public void rvGetVPSLocalization(ARScene.RvScanJsonCallback callback) {
         ARScene arScene = getCurrentARScene();

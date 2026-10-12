@@ -1888,6 +1888,41 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     if (arScene) arScene->clearVPSMapMesh();
 }
 
+- (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (!arScene) {
+        completion(@{@"success": @NO, @"error": @"No AR scene"});
+        return;
+    }
+    arScene->captureVPSQueryFrame(maxSide, [completion](bool ok, std::vector<uint8_t> gray, int w, int h,
+                                                        float fx, float fy, float cx, float cy) {
+        if (!ok || gray.empty()) {
+            completion(@{@"success": @NO, @"error": @"No camera frame with intrinsics yet"});
+            return;
+        }
+        NSData *pixels = [NSData dataWithBytes:gray.data() length:gray.size()];
+        CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)pixels);
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceGray();
+        CGImageRef cgImage = CGImageCreate(w, h, 8, 8, w, space, kCGBitmapByteOrderDefault | kCGImageAlphaNone,
+                                           provider, NULL, false, kCGRenderingIntentDefault);
+        CGColorSpaceRelease(space);
+        CGDataProviderRelease(provider);
+        NSData *jpeg = nil;
+        if (cgImage) {
+            jpeg = UIImageJPEGRepresentation([UIImage imageWithCGImage:cgImage], 0.85);
+            CGImageRelease(cgImage);
+        }
+        if (!jpeg) {
+            completion(@{@"success": @NO, @"error": @"JPEG encoding failed"});
+            return;
+        }
+        completion(@{@"success": @YES,
+                     @"image": [jpeg base64EncodedStringWithOptions:0],
+                     @"width": @(w), @"height": @(h),
+                     @"fx": @(fx), @"fy": @(fy), @"cx": @(cx), @"cy": @(cy)});
+    });
+}
+
 - (NSString *)rvGetVPSLocalizationJson {
     if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
     std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];

@@ -344,6 +344,25 @@ describe("studioColocationIndicatorContent", () => {
       })
     ).toMatchObject({ tone: "error", detail: "This room is full." });
   });
+
+  it("explains a failure by its code, not its message", () => {
+    const unreachable = {
+      status: "failed" as const,
+      code: "UNAVAILABLE" as const,
+      message:
+        "fetch failed: java.net.ConnectException: Failed to connect to /192.168.1.14:8787",
+    };
+    expect(studioColocationIndicatorContent(unreachable)?.detail).toBe(
+      "Failed to reach the co-location service. Check your internet connection."
+    );
+    expect(
+      studioColocationIndicatorContent(
+        { status: "failed", code: "HOST_FAILED", message: "XR_ERROR_X" },
+        null,
+        "headset"
+      )?.detail
+    ).toBe("Failed to share this space.");
+  });
 });
 
 describe("studioColocationStore.finishScan", () => {

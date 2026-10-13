@@ -1853,6 +1853,83 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         });
 }
 
+- (BOOL)rvLoadVPSMap:(NSData *)rvmapData {
+    if (!_vroView || !rvmapData || rvmapData.length == 0) return NO;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return NO;
+    std::string rvmapBytes((const char *)rvmapData.bytes, rvmapData.length);
+    return arSession->rvLoadVPSMap(rvmapBytes);
+}
+
+- (void)rvUnloadVPSMap {
+    if (!_vroView) return;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return;
+    arSession->rvUnloadVPSMap();
+}
+
+- (std::shared_ptr<VROARScene>)rv_currentARScene {
+    if (!_currentScene) return nullptr;
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) return nullptr;
+    return std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+}
+
+- (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (!arScene || !rvwmData || rvwmData.length == 0) return NO;
+    const uint8_t *bytes = (const uint8_t *)rvwmData.bytes;
+    std::vector<uint8_t> rvwm(bytes, bytes + rvwmData.length);
+    return arScene->setVPSMapMesh(rvwm, occlusion, physics);
+}
+
+- (void)rvUnloadVPSMapMesh {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (arScene) arScene->clearVPSMapMesh();
+}
+
+- (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (!arScene) {
+        completion(@{@"success": @NO, @"error": @"No AR scene"});
+        return;
+    }
+    arScene->captureVPSQueryFrame(maxSide, [completion](bool ok, std::vector<uint8_t> gray, int w, int h,
+                                                        float fx, float fy, float cx, float cy) {
+        if (!ok || gray.empty()) {
+            completion(@{@"success": @NO, @"error": @"No camera frame with intrinsics yet"});
+            return;
+        }
+        NSData *pixels = [NSData dataWithBytes:gray.data() length:gray.size()];
+        CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)pixels);
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceGray();
+        CGImageRef cgImage = CGImageCreate(w, h, 8, 8, w, space, kCGBitmapByteOrderDefault | kCGImageAlphaNone,
+                                           provider, NULL, false, kCGRenderingIntentDefault);
+        CGColorSpaceRelease(space);
+        CGDataProviderRelease(provider);
+        NSData *jpeg = nil;
+        if (cgImage) {
+            jpeg = UIImageJPEGRepresentation([UIImage imageWithCGImage:cgImage], 0.85);
+            CGImageRelease(cgImage);
+        }
+        if (!jpeg) {
+            completion(@{@"success": @NO, @"error": @"JPEG encoding failed"});
+            return;
+        }
+        completion(@{@"success": @YES,
+                     @"image": [jpeg base64EncodedStringWithOptions:0],
+                     @"width": @(w), @"height": @(h),
+                     @"fx": @(fx), @"fy": @(fy), @"cx": @(cx), @"cy": @(cy)});
+    });
+}
+
+- (NSString *)rvGetVPSLocalizationJson {
+    if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return @"{\"available\":false,\"error\":\"AR session not available\"}";
+    return [NSString stringWithUTF8String:arSession->rvGetVPSLocalizationJson().c_str()];
+}
+
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }

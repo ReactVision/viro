@@ -28,6 +28,9 @@ Pod::Spec.new do |s|
   # the ARSession and ARFrame it reads the camera through)
   s.ios.frameworks = ['AVFoundation', 'Accelerate', 'CoreVideo', 'ARKit']
 
+  # zlib: VRTARSceneNavigatorModule computes the CRC-32 of the VPS scan zip with crc32().
+  s.libraries = 'z'
+
   # Base source files (always included)
   source_files_array = ['ViroReact/**/*.{h,m,mm,swift}']
   header_files_array = ['ViroReact/**/*.h']

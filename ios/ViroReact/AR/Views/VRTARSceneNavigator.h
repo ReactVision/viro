@@ -248,6 +248,29 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (void)rvFinishScan:(NSInteger)ttlDays
    completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId,
                                NSString *locationTransformCsv, NSString *error))completionHandler;
+
+// Continuous VPS map localisation against a downloaded .rvmap
+/** Parses rvmapData and loads it for matching. Returns NO if it doesn't parse as a supported map. */
+- (BOOL)rvLoadVPSMap:(NSData *)rvmapData;
+/** Drops whatever rvLoadVPSMap: loaded; per-frame matching becomes a no-op. */
+- (void)rvUnloadVPSMap;
+/**
+ The VPS location's mesh (an RVWM snapshot in the map's frame), for occlusion
+ and physics. Hidden until VPS localisation converges, then follows the map.
+ NO for bytes that are not RVWM, or without a mounted AR scene.
+ */
+- (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics;
+/** Removes the mesh rvLoadVPSMapMesh: set. */
+- (void)rvUnloadVPSMapMesh;
+/**
+ One camera image for a VPS visual query: the latest AR frame's luma plane,
+ sensor-native orientation, longest side at most maxSide, as base64 JPEG with
+ intrinsics to match. The completion runs on a background queue with
+ { success, image, width, height, fx, fy, cx, cy } or { success: NO, error }.
+ */
+- (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion;
+/** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
+- (NSString *)rvGetVPSLocalizationJson;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

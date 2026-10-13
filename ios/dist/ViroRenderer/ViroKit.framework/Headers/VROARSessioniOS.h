@@ -33,6 +33,7 @@
 #include "VROViewport.h"
 #include <ARKit/ARKit.h>
 #include <map>
+#include <mutex>
 #include <vector>
 
 #include "VRORenderer.h"
@@ -45,6 +46,7 @@ class VROMonocularDepthEstimator;
 @class VROCloudAnchorProviderARCore;
 @class VROCloudAnchorProviderReactVision;
 namespace ReactVisionCCA { class RVCCAGeospatialProvider; }
+namespace ReactVisionCCA { class VROVPSLocalizer; }
 
 class API_AVAILABLE(ios(12.0)) VROARSessioniOS : public VROARSession, public std::enable_shared_from_this<VROARSessioniOS> {
 public:
@@ -237,6 +239,13 @@ public:
     void rvGetSceneAssets(const std::string& sceneId,
         std::function<void(bool, std::string, std::string)> callback) override;
 
+    // Continuous VPS map localisation against a downloaded .rvmap
+    bool rvLoadVPSMap(const std::string& rvmapBytes) override;
+    void rvUnloadVPSMap() override;
+    bool rvIsVPSMapLoaded() override;
+    std::string rvGetVPSLocalizationJson() override;
+    bool rvGetVPSWorldFromMap(VROMatrix4f &T_world_map) const override;
+
     // Scene Semantics API
     bool isSemanticModeSupported() const override;
     void setSemanticModeEnabled(bool enabled) override;
@@ -319,16 +328,65 @@ private:
     std::string _rvGeoProjectId;
 
     /*
+     Smooths the raw per-frame hits rvLoadVPSMap()'s loaded map produces into
+     a single pose correction. Created once and never reassigned, because the
+     render thread (per-frame hits) and the bridge (load, unload, polling)
+     both use it; it locks internally. Reset by rvLoadVPSMap() and
+     rvUnloadVPSMap().
+     */
+    const std::shared_ptr<ReactVisionCCA::VROVPSLocalizer> _vpsLocalizerRV =
+        std::make_shared<ReactVisionCCA::VROVPSLocalizer>();
+
+    /*
+     Guards the cached VPS state below, written on the render thread and read
+     from the bridge.
+     */
+    std::mutex _vpsStateMutex;
+
+    /*
+     The camera pose (T_world_cam) passed into the most recent
+     updateVPSMapFrame() call, cached so rvGetVPSLocalizationJson() can
+     report a render pose without needing a fresh frame at poll time.
+     */
+    VROMatrix4f _lastVPSCamToWorld;
+    bool        _lastVPSCamToWorldSet = false;
+
+    /* The most recent raw hit from updateVPSMapFrame()'s onHit, for diagnostics. */
+    bool  _lastVPSHitSet     = false;
+    int   _lastVPSInliers    = 0;
+    float _lastVPSReprojRms  = 0.f;
+
+    /*
      CLLocationManager delegate for ReactVision geospatial — provides GPS pose
      when ARCore VPS is not in use.
      */
     id _rvLocationDelegate;
 
     /*
+     True once _rvLocationDelegate has received at least one real
+     didUpdateHeading callback. VROGeospatialPose's own
+     headingAccuracy can't tell "never updated" apart from "updated with a
+     clamped-to-0 accuracy" — both read 0 — so this is tracked separately
+     instead. See VROLocationDelegate.headingValidOut.
+     */
+    BOOL _hasReceivedHeadingFix = NO;
+
+    /*
+     _lastKnownGPSPose.timestamp last pushed into _recorder's pending GPS/
+     heading reading. Lets updateFrame() push only when a
+     genuinely fresh fix has arrived, instead of re-tagging every frame with
+     a stale one. 0 means "never pushed".
+     */
+    double _lastGpsTimestampPushedToRecorder = 0.0;
+
+    /*
      Last GPS pose received from Core Location (ReactVision provider path).
      Updated on the main thread; read from any thread via getCameraGeospatialPose().
      */
     mutable VROGeospatialPose _lastKnownGPSPose;
+    // Guards _lastKnownGPSPose and _hasReceivedHeadingFix between the
+    // location delegate (main thread) and the AR recorder (render thread).
+    std::mutex _gpsPoseMutex;
 
     bool _needsGeospatialModeApply = false;
 

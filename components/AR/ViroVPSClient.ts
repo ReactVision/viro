@@ -18,7 +18,8 @@ export type ViroVPSCredentials = (
    * locations and scans are then that user's. 1 to 255 printable ASCII
    * characters (`!` to `~`, so no spaces or accented letters), and not `.` or
    * `..`; anything else is refused with `INVALID_APP_USER_ID` before any
-   * request. `<ViroVPS appUserId>` sets it.
+   * request. `<ViroVPS appUserId>` and uploadScanRecording()'s `appUserId`
+   * set it.
    */
   appUserId?: string;
 };
@@ -41,8 +42,9 @@ const APP_USER_ID = /^[\x21-\x7e]{1,255}$/;
  * A failed vps-server request, or a local step around one (reading the
  * recording, fetching a signed map URL). `code` and `status` are the
  * server's, when the failure came from a response. Codes this package sets,
- * with no status: `CREDENTIALS_UNAVAILABLE` and `INVALID_APP_USER_ID`.
- * vps-server answers the same mistake with the same code and status 400.
+ * with no status: `CREDENTIALS_UNAVAILABLE`, `INVALID_APP_USER_ID` and
+ * `BAD_REQUEST` (uploadScanRecording()'s options). vps-server answers the
+ * same mistakes with the same two codes and status 400.
  */
 export class ViroVPSError extends Error {
   constructor(

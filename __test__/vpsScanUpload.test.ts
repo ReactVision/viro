@@ -82,6 +82,61 @@ describe("uploadScanRecording", () => {
     expect(JSON.parse(createJson)).toEqual({ location_id: "l1" });
   });
 
+  it("sends appUserId as x-app-user-id, and outputs and keep_recording in the create body", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: true, status: 202, body: JSON.stringify(scan) })
+    );
+    const credentials = jest.fn(async () => ({ projectId: "p", accessToken: "fresh" }));
+    await uploadScanRecording(
+      "https://vps.example.com",
+      credentials,
+      { locationId: "l1" },
+      "/data/rec",
+      { appUserId: "user-1", outputs: ["mesh", "semantic"], keepRecording: false }
+    );
+    expect(credentials).toHaveBeenCalledTimes(1);
+    const [, headersJson, createJson] = mockUpload.mock.calls[0];
+    expect(JSON.parse(headersJson)).toEqual({
+      "x-project-id": "p",
+      Authorization: "Bearer fresh",
+      "x-app-user-id": "user-1",
+    });
+    expect(JSON.parse(createJson)).toEqual({
+      location_id: "l1",
+      outputs: ["mesh", "semantic"],
+      keep_recording: false,
+    });
+  });
+
+  it("refuses options and an appUserId vps-server would refuse, before the native zip", async () => {
+    const upload = (options: Record<string, unknown>) =>
+      uploadScanRecording(
+        "https://vps.example.com",
+        { projectId: "p", apiKey: "k" },
+        { locationId: "l1" },
+        "/data/rec",
+        options as any
+      ).catch((e) => e);
+
+    expect(await upload({ outputs: ["semantic"] })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "semantic needs mesh",
+      status: undefined,
+    });
+    for (const outputs of [["mesh", "map"], "mesh", [null]]) {
+      expect(await upload({ outputs })).toMatchObject({
+        code: "BAD_REQUEST",
+        message: "outputs is a list of mesh, splat, semantic",
+      });
+    }
+    expect(await upload({ keepRecording: "false" })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "keepRecording is a boolean",
+    });
+    expect(await upload({ appUserId: "josé" })).toMatchObject({ code: "INVALID_APP_USER_ID" });
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
   it("reports a zip failure without an HTTP status: no scan was created", async () => {
     mockUpload.mockResolvedValue(
       JSON.stringify({ success: false, stage: "zip", error: "video.mp4 is missing" })

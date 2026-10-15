@@ -169,7 +169,12 @@ export type {
 } from "./components/AR/ViroVPSMapDownload";
 export type { ViroVPSQueryCandidate, ViroVPSQueryOptions } from "./components/AR/ViroVPSQuery";
 export type { ViroVPSQueryFrame, ViroVPSQueryFrameResult } from "./components/Types/ViroEvents";
-export type { ViroVPSScanTarget, ViroVPSScan } from "./components/AR/ViroVPSScanUpload";
+export type {
+  ViroVPSScanTarget,
+  ViroVPSScan,
+  ViroVPSScanOutput,
+  ViroVPSScanUploadOptions,
+} from "./components/AR/ViroVPSScanUpload";
 export type {
   ViroVPSCredentials,
   ViroVPSCredentialsProvider,

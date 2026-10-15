@@ -32,6 +32,30 @@ export type ViroVPSScanTarget =
   | { locationId: string }
   | { location: { name: string; lat?: number; lon?: number } };
 
+/** What a scan can build besides its map, which is always built. */
+export type ViroVPSScanOutput = "mesh" | "splat" | "semantic";
+
+export type ViroVPSScanUploadOptions = {
+  /**
+   * The app's own id for its signed-in user, sent as `x-app-user-id`: the
+   * scan, and a location it creates, belong to that user. See
+   * `ViroVPSCredentials.appUserId` for what an id may contain.
+   */
+  appUserId?: string;
+  /**
+   * What to build besides the map. `semantic` needs `mesh`. Left out, the
+   * server builds its default, the map and the mesh.
+   */
+  outputs?: ViroVPSScanOutput[];
+  /**
+   * Whether vps-server keeps the recording once the scan is processed.
+   * Default true. With false the server never stores it. The recording's
+   * folder stays on the device either way: only the temporary zip made for
+   * the upload is deleted.
+   */
+  keepRecording?: boolean;
+};
+
 export type ViroVPSScan = {
   id: string;
   location_id: string;
@@ -86,6 +110,23 @@ type NativeScanUploadResult = {
   error?: string;
 };
 
+const SCAN_OUTPUTS: readonly ViroVPSScanOutput[] = ["mesh", "splat", "semantic"];
+
+/** vps-server's checks on the same fields, so a mistake costs no zip. */
+function checkUploadOptions({ outputs, keepRecording }: ViroVPSScanUploadOptions) {
+  if (outputs !== undefined) {
+    if (!Array.isArray(outputs) || !outputs.every((o) => SCAN_OUTPUTS.includes(o))) {
+      throw new ViroVPSError(`outputs is a list of ${SCAN_OUTPUTS.join(", ")}`, "BAD_REQUEST");
+    }
+    if (outputs.includes("semantic") && !outputs.includes("mesh")) {
+      throw new ViroVPSError("semantic needs mesh", "BAD_REQUEST");
+    }
+  }
+  if (keepRecording !== undefined && typeof keepRecording !== "boolean") {
+    throw new ViroVPSError("keepRecording is a boolean", "BAD_REQUEST");
+  }
+}
+
 function parseNativeResult(raw: unknown): NativeScanUploadResult {
   if (typeof raw !== "string" || raw.length === 0) {
     return { success: false, error: "No response from the native scan upload" };
@@ -116,26 +157,34 @@ function parseNativeResult(raw: unknown): NativeScanUploadResult {
  *        both requests carry what it answered.
  * @param outputDir the directory startRecording() wrote session.jsonl and
  *        video.mp4 into. Call this after stopRecording() has resolved.
+ * @param options the app user, what to build and whether the server keeps
+ *        the recording; see ViroVPSScanUploadOptions.
  * @returns the created scan, in `queued` status; poll getScan() for progress.
  * @throws ViroVPSError when the recording can't be read, a request fails, or
  *         the server answers with an error (its `code` and `status` are set).
+ *         Options or an `appUserId` the server would refuse throw
+ *         `BAD_REQUEST` or `INVALID_APP_USER_ID` before anything is zipped.
  */
 export async function uploadScanRecording(
   endpoint: string,
   credentials: ViroVPSCredentialsSource,
   target: ViroVPSScanTarget,
-  outputDir: string
+  outputDir: string,
+  options: ViroVPSScanUploadOptions = {}
 ): Promise<ViroVPSScan> {
+  checkUploadOptions(options);
   const nativeModule = NativeModules.VRTARSceneNavigatorModule;
   if (!nativeModule || typeof nativeModule.rvUploadScanRecording !== "function") {
     throw new ViroVPSError("Scan upload is not available on this platform");
   }
 
-  const createBody =
+  const createBody: Record<string, unknown> =
     "locationId" in target
       ? { location_id: target.locationId }
       : { location: target.location };
-  const headers = await vpsAuthHeaders(credentials);
+  if (options.outputs !== undefined) createBody.outputs = options.outputs;
+  if (options.keepRecording !== undefined) createBody.keep_recording = options.keepRecording;
+  const headers = await vpsAuthHeaders(credentials, options.appUserId);
 
   const dir = outputDir.startsWith("file://") ? outputDir.slice("file://".length) : outputDir;
 

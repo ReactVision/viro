@@ -37,6 +37,7 @@ import {
   uploadScanRecording as vpsUploadScanRecording,
   ViroVPSScan,
   ViroVPSScanTarget,
+  ViroVPSScanUploadOptions,
 } from "./ViroVPSScanUpload";
 import type { ViroVPSCredentialsSource } from "./ViroVPSClient";
 import { bytesToBase64 } from "./ViroVPSMapDownload";
@@ -1142,9 +1143,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     endpoint: string,
     credentials: ViroVPSCredentialsSource,
     target: ViroVPSScanTarget,
-    outputDir: string
+    outputDir: string,
+    options?: ViroVPSScanUploadOptions
   ): Promise<ViroVPSScan> => {
-    return await vpsUploadScanRecording(endpoint, credentials, target, outputDir);
+    return await vpsUploadScanRecording(endpoint, credentials, target, outputDir, options);
   };
 
   /**

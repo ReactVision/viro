@@ -39,6 +39,7 @@ import { act } from "react";
 import TestRenderer from "react-test-renderer";
 import { ViroVPS, ViroVPSTrackingStateEvent } from "../components/AR/ViroVPS";
 import { ViroVPSAnchor } from "../components/AR/ViroVPSAnchor";
+import { ViroVPSError } from "../components/AR/ViroVPSClient";
 import * as MapDownload from "../components/AR/ViroVPSMapDownload";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -172,8 +173,34 @@ describe("<ViroVPS> visual search", () => {
     const result = await started;
     expect(result.success).toBe(false);
     expect(result.error).toBe("No VPS location matched the camera view");
+    expect(result.errorDetail).toEqual({
+      code: "NO_LOCATION",
+      status: null,
+      message: "No VPS location matched the camera view",
+    });
     expect(states[states.length - 1].state).toBe("error");
     expect(nav.loadVPSMap).not.toHaveBeenCalled();
+  });
+
+  it("ends with the server's code and status when the last query was refused", async () => {
+    mockQuery.mockRejectedValue(new ViroVPSError("VPS needs a paid plan", "PAID_PLAN_REQUIRED", 403));
+    const nav = makeNav();
+    const { ref, states } = mount(nav);
+
+    let started!: Promise<any>;
+    await act(async () => {
+      started = ref.current!.startTracking("visual");
+      await flush();
+    });
+    for (let i = 0; i < 6; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+        await flush();
+      });
+    }
+    const errorDetail = { code: "PAID_PLAN_REQUIRED", status: 403, message: "VPS needs a paid plan" };
+    expect((await started).errorDetail).toEqual(errorDetail);
+    expect(states[states.length - 1].errorDetail).toEqual(errorDetail);
   });
 
   it("visualSearch={false} keeps \"auto\" GPS-only", async () => {
@@ -183,7 +210,12 @@ describe("<ViroVPS> visual search", () => {
     await act(async () => {
       result = await ref.current!.startTracking("auto");
     });
-    expect(result).toEqual({ success: false, locationId: undefined, error: "no geospatial pose" });
+    expect(result).toEqual({
+      success: false,
+      locationId: undefined,
+      error: "no geospatial pose",
+      errorDetail: { code: "NO_LOCATION", status: null, message: "no geospatial pose" },
+    });
     expect(nav.captureVPSQueryFrame).not.toHaveBeenCalled();
   });
 
@@ -201,7 +233,11 @@ describe("<ViroVPS> visual search", () => {
       jest.advanceTimersByTime(1000);
       await flush();
     });
-    expect(await started).toEqual({ success: false, error: "superseded" });
+    expect(await started).toEqual({
+      success: false,
+      error: "superseded",
+      errorDetail: { code: "SUPERSEDED", status: null, message: "superseded" },
+    });
     expect(nav.captureVPSQueryFrame).toHaveBeenCalledTimes(1);
   });
 

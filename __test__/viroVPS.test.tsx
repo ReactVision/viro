@@ -8,14 +8,20 @@
  * is mocked; only the component's own sequencing is under test.
  */
 jest.mock("../components/AR/ViroVPSMapDownload", () => ({
-  getLocationMapDownload: jest.fn(async (_e: string, _c: unknown, id: string) => ({
-    kind: "map",
-    scan_id: `scan_${id}`,
-    url: `https://vps.example.com/files/${id}`,
-    expires_at: 0,
-    bytes: 3,
-    quality: null,
-  })),
+  getLocationMapDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
+    const { ViroVPSError } = jest.requireActual("../components/AR/ViroVPSClient");
+    if (id === "loc_no_map") throw new ViroVPSError("the location has no active map", "NO_ASSET", 404);
+    if (id === "loc_unpaid") throw new ViroVPSError("VPS needs a paid plan", "PAID_PLAN_REQUIRED", 403);
+    if (id === "loc_offline") throw new ViroVPSError("Network request failed", "NETWORK_ERROR");
+    return {
+      kind: "map",
+      scan_id: `scan_${id}`,
+      url: `https://vps.example.com/files/${id}`,
+      expires_at: 0,
+      bytes: 3,
+      quality: null,
+    };
+  }),
   fetchMapBytes: jest.fn(async () => new Uint8Array([1, 2, 3])),
   findNearestMap: jest.fn(),
   getLocationWorldMeshDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
@@ -126,7 +132,11 @@ describe("<ViroVPS> unmount", () => {
       loads[0].resolve({ success: true });
       await flush();
     });
-    await expect(started).resolves.toEqual({ success: false, error: "superseded" });
+    await expect(started).resolves.toEqual({
+      success: false,
+      error: "superseded",
+      errorDetail: { code: "SUPERSEDED", status: null, message: "superseded" },
+    });
 
     expect(nav.unloadVPSMap).toHaveBeenCalledTimes(1);
     expect(states.length).toBe(statesBeforeUnmount);
@@ -334,10 +344,53 @@ describe("<ViroVPS> polling", () => {
 
     const errors = states.filter((s) => s.state === "error").map((s) => s.error);
     expect(errors).toEqual(["first", "second"]);
+    expect(states.filter((s) => s.state === "error").map((s) => s.errorDetail)).toEqual([
+      { code: "LOCALIZATION_UNAVAILABLE", status: null, message: "first" },
+      { code: "LOCALIZATION_UNAVAILABLE", status: null, message: "second" },
+    ]);
   });
 });
 
 describe("<ViroVPS> errors and credentials", () => {
+  it("reports vps-server's code and status, and a null status when there was no response", async () => {
+    const { nav } = makeNav();
+    const { ref, states } = mount(nav);
+
+    const results: any[] = [];
+    for (const id of ["loc_no_map", "loc_unpaid", "loc_offline"]) {
+      await act(async () => {
+        results.push(await ref.current!.startTracking(id));
+      });
+    }
+
+    const expected = [
+      { code: "NO_ASSET", status: 404, message: "the location has no active map" },
+      { code: "PAID_PLAN_REQUIRED", status: 403, message: "VPS needs a paid plan" },
+      { code: "NETWORK_ERROR", status: null, message: "Network request failed" },
+    ];
+    expect(results.map((r) => r.errorDetail)).toEqual(expected);
+    expect(results.map((r) => r.error)).toEqual(expected.map((e) => e.message));
+    expect(states.filter((s) => s.state === "error").map((s) => s.errorDetail)).toEqual(expected);
+    expect(nav.loadVPSMap).not.toHaveBeenCalled();
+  });
+
+  it("reports unsupported, without searching, for a navigator with no VPS (as on web)", async () => {
+    const { ref, states } = mount(undefined);
+    let result: any;
+    await act(async () => {
+      result = await ref.current!.startTracking("loc_a");
+    });
+    const errorDetail = {
+      code: "UNSUPPORTED",
+      status: null,
+      message: "This navigator does not expose loadVPSMap",
+    };
+    expect(result).toEqual({ success: false, error: errorDetail.message, errorDetail });
+    expect(states).toEqual([
+      { state: "unsupported", error: errorDetail.message, errorDetail },
+    ]);
+  });
+
   it("hands each request a credentials function that reads the host's again, with appUserId", async () => {
     const { nav, loads } = makeNav();
     let token = "t1";

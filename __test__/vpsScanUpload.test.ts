@@ -266,7 +266,7 @@ describe("uploadScanRecording", () => {
     mockNativeModules = {};
     await expect(
       uploadScanRecording("https://x", { projectId: "p", apiKey: "k" }, { locationId: "l" }, "/d")
-    ).rejects.toThrow(/not available/);
+    ).rejects.toMatchObject({ code: "UNSUPPORTED", message: expect.stringMatching(/not available/) });
   });
 });
 

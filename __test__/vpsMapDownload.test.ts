@@ -119,4 +119,15 @@ describe("vps-server requests", () => {
       "auth0|5f7c@example.com",
     ]);
   });
+
+  it("reports a request that got no response as NETWORK_ERROR, with no status", async () => {
+    global.fetch = jest.fn(async () => {
+      throw new TypeError("Network request failed");
+    }) as unknown as typeof fetch;
+    await expect(findNearbyLocations("https://vps.test", creds, 1, 2)).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
+      status: undefined,
+      message: "Network request failed",
+    });
+  });
 });

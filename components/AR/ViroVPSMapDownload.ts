@@ -30,6 +30,7 @@ import {
   throwIfVPSError,
   vpsAuthHeaders,
   vpsBaseUrl,
+  vpsFetch,
 } from "./ViroVPSClient";
 
 export type ViroVPSNearbyLocation = {
@@ -61,7 +62,7 @@ export async function findNearbyLocations(
   limit = 20
 ): Promise<ViroVPSNearbyLocation[]> {
   const url = `${vpsBaseUrl(endpoint)}/vps/locations?lat=${lat}&lon=${lon}&radius_m=${radiusMeters}&limit=${limit}`;
-  const response = await fetch(url, { headers: await vpsAuthHeaders(credentials) });
+  const response = await vpsFetch(url, { headers: await vpsAuthHeaders(credentials) });
   await throwIfVPSError(response);
   // The backend wraps the list: { "locations": [...] } (vps-server/API.md).
   const body = (await response.json()) as { locations?: ViroVPSNearbyLocation[] };
@@ -79,7 +80,7 @@ export async function getLocationMapDownload(
   credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSMapDownload> {
-  const response = await fetch(
+  const response = await vpsFetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/map`,
     { headers: await vpsAuthHeaders(credentials) }
   );
@@ -110,7 +111,7 @@ export async function getLocationWorldMeshDownload(
   credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSAssetDownload> {
-  const response = await fetch(
+  const response = await vpsFetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/world_mesh`,
     { headers: await vpsAuthHeaders(credentials) }
   );
@@ -144,7 +145,7 @@ export async function getLocationSemanticDownload(
   credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSAssetDownload> {
-  const response = await fetch(
+  const response = await vpsFetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/semantic`,
     { headers: await vpsAuthHeaders(credentials) }
   );
@@ -199,7 +200,7 @@ export async function fetchLocationSemanticObjects(
     if (e instanceof ViroVPSError && e.status === 404) return [];
     throw e;
   }
-  const response = await fetch(download.url);
+  const response = await vpsFetch(download.url);
   if (!response.ok) {
     throw new ViroVPSError(`Could not fetch semantic.json: HTTP ${response.status}`, undefined, response.status);
   }
@@ -208,7 +209,7 @@ export async function fetchLocationSemanticObjects(
 
 /** Fetches a signed link's bytes right away, like fetchMapBytes(). */
 export async function fetchAssetBytes(download: { url: string }): Promise<Uint8Array> {
-  const response = await fetch(download.url);
+  const response = await vpsFetch(download.url);
   if (!response.ok) {
     throw new ViroVPSError(`Could not fetch file: HTTP ${response.status}`, undefined, response.status);
   }
@@ -221,7 +222,7 @@ export async function fetchAssetBytes(download: { url: string }): Promise<Uint8A
  * in the URL is the grant.
  */
 export async function fetchMapBytes(mapDownload: ViroVPSMapDownload): Promise<Uint8Array> {
-  const response = await fetch(mapDownload.url);
+  const response = await vpsFetch(mapDownload.url);
   if (!response.ok) {
     throw new ViroVPSError(`Could not fetch map: HTTP ${response.status}`, undefined, response.status);
   }

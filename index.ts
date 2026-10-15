@@ -153,6 +153,7 @@ export type {
   ViroVPSWorldMeshEvent,
   ViroVPSStartTrackingResult,
   ViroVPSNavigator,
+  ViroVPSErrorDetail,
 } from "./components/AR/ViroVPS";
 export type { ViroVPSTrackingState } from "./components/AR/ViroVPSTracking";
 export type {

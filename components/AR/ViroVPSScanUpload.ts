@@ -27,6 +27,7 @@ import {
   vpsAuthHeaders,
   vpsBaseUrl,
   vpsErrorFromBody,
+  vpsFetch,
 } from "./ViroVPSClient";
 
 export type ViroVPSScanTarget =
@@ -192,7 +193,7 @@ export async function uploadScanRecording(
   checkUploadOptions(options);
   const nativeModule = NativeModules.VRTARSceneNavigatorModule;
   if (!nativeModule || typeof nativeModule.rvUploadScanRecording !== "function") {
-    throw new ViroVPSError("Scan upload is not available on this platform");
+    throw new ViroVPSError("Scan upload is not available on this platform", "UNSUPPORTED");
   }
 
   const resumeScanId = options.scanId ?? "";
@@ -241,9 +242,10 @@ export async function getScan(
   credentials: ViroVPSCredentialsSource,
   scanId: string
 ): Promise<ViroVPSScan> {
-  const response = await fetch(`${vpsBaseUrl(endpoint)}/vps/scans/${encodeURIComponent(scanId)}`, {
-    headers: await vpsAuthHeaders(credentials),
-  });
+  const response = await vpsFetch(
+    `${vpsBaseUrl(endpoint)}/vps/scans/${encodeURIComponent(scanId)}`,
+    { headers: await vpsAuthHeaders(credentials) }
+  );
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSScan;
 }

@@ -42,9 +42,10 @@ const APP_USER_ID = /^[\x21-\x7e]{1,255}$/;
  * A failed vps-server request, or a local step around one (reading the
  * recording, fetching a signed map URL). `code` and `status` are the
  * server's, when the failure came from a response. Codes this package sets,
- * with no status: `CREDENTIALS_UNAVAILABLE`, `INVALID_APP_USER_ID` and
- * `BAD_REQUEST` (uploadScanRecording()'s options). vps-server answers the
- * same mistakes with the same two codes and status 400.
+ * with no status: `NETWORK_ERROR` (no response), `CREDENTIALS_UNAVAILABLE`,
+ * `INVALID_APP_USER_ID`, `BAD_REQUEST` (uploadScanRecording()'s options) and
+ * `UNSUPPORTED`. vps-server answers the same mistakes with the same two
+ * codes and status 400.
  *
  * `scanId` is set by uploadScanRecording() when its scan exists on the
  * server but the recording did not arrive: pass it back as
@@ -107,6 +108,15 @@ export async function vpsAuthHeaders(
     headers["x-app-user-id"] = id;
   }
   return headers;
+}
+
+/** fetch(), with a request that got no response thrown as a `NETWORK_ERROR`. */
+export async function vpsFetch(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    throw new ViroVPSError(e instanceof Error ? e.message : String(e), "NETWORK_ERROR");
+  }
 }
 
 /** Builds the error for a non-2xx response from its status and raw body text. */

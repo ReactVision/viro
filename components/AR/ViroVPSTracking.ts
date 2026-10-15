@@ -28,6 +28,8 @@ import type { ViroVPSLocalizationResult } from "../Types/ViroEvents";
  *   lost it".
  * - `error`     — the map failed to load, no location/map was found, or the
  *   renderer reports no ReactVision provider configured.
+ * - `unsupported`: the navigator cannot do what was asked, having no VPS at
+ *   all (web, Apple Vision Pro) or not the method a mode needs.
  */
 export type ViroVPSTrackingState =
   | "idle"
@@ -35,7 +37,8 @@ export type ViroVPSTrackingState =
   | "mapLoaded"
   | "tracking"
   | "lost"
-  | "error";
+  | "error"
+  | "unsupported";
 
 export type ViroVPSTrackingPhase = {
   state: ViroVPSTrackingState;

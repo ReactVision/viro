@@ -1016,13 +1016,23 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * feeds, polled rather than pushed. `<ViroVPS>` wraps this, the unload and
    * the polling into startTracking()/stopTracking() with onLocalized and
    * onTrackingState callbacks.
+   *
+   * A load is not applied when loadVPSMap(), or an unloadVPSMap() that
+   * runs, was called after it, even when the native side finishes them out
+   * of order; it then resolves `success: false`. `load` is your number for
+   * this load, for unloadVPSMap(load). Leave it out (0) when you do not
+   * unload by number.
    */
-  _loadVPSMap = async (rvmapBytes: Uint8Array): Promise<ViroVPSMapLoadResult> => {
+  _loadVPSMap = async (
+    rvmapBytes: Uint8Array,
+    load: number = 0
+  ): Promise<ViroVPSMapLoadResult> => {
     try {
       return parseVPSMapLoadResult(
         await ViroARSceneNavigatorModule.rvLoadVPSMap(
           findNodeHandle(this),
-          bytesToBase64(rvmapBytes)
+          bytesToBase64(rvmapBytes),
+          load
         )
       );
     } catch (error) {
@@ -1030,9 +1040,13 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     }
   };
 
-  /** Drops whatever loadVPSMap() loaded. Per-frame matching against it becomes a no-op. */
-  _unloadVPSMap = () => {
-    ViroARSceneNavigatorModule.rvUnloadVPSMap(findNodeHandle(this));
+  /**
+   * Drops whatever loadVPSMap() loaded. Per-frame matching against it becomes a no-op.
+   * With `load`, only when that is the number of the newest loadVPSMap() call: an unload
+   * meant for a load that a newer one replaced does nothing. Without it, always.
+   */
+  _unloadVPSMap = (load: number = 0) => {
+    ViroARSceneNavigatorModule.rvUnloadVPSMap(findNodeHandle(this), load);
   };
 
   /**
@@ -1042,11 +1056,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * localisation converges, then follows the map's transform every frame, so
    * it moves with each correction. Independent of `worldMeshEnabled` and of
    * depth hardware. Replaces any mesh loaded before. `<ViroVPS worldMesh>`
-   * does this for you.
+   * does this for you. `load` works as for loadVPSMap(), counted separately.
    */
   _loadVPSMapMesh = async (
     rvwmBytes: Uint8Array,
-    options: { occlusion?: boolean; physics?: boolean } = {}
+    options: { occlusion?: boolean; physics?: boolean } = {},
+    load: number = 0
   ): Promise<ViroVPSMapLoadResult> => {
     try {
       return parseVPSMapLoadResult(
@@ -1054,7 +1069,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
           findNodeHandle(this),
           bytesToBase64(rvwmBytes),
           options.occlusion ?? true,
-          options.physics ?? true
+          options.physics ?? true,
+          load
         )
       );
     } catch (error) {
@@ -1062,9 +1078,9 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     }
   };
 
-  /** Removes the mesh loadVPSMapMesh() loaded. */
-  _unloadVPSMapMesh = () => {
-    ViroARSceneNavigatorModule.rvUnloadVPSMapMesh(findNodeHandle(this));
+  /** Removes the mesh loadVPSMapMesh() loaded; `load` works as for unloadVPSMap(). */
+  _unloadVPSMapMesh = (load: number = 0) => {
+    ViroARSceneNavigatorModule.rvUnloadVPSMapMesh(findNodeHandle(this), load);
   };
 
   /**

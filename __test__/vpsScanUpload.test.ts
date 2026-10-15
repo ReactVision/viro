@@ -7,7 +7,7 @@
  * contract: the arguments it passes, that JS itself never issues the POST or
  * the PUT, and that a failure while zipping surfaces as an error with no HTTP
  * status (no scan was created). Also that the navigator forwards the upload
- * to the native module unchanged.
+ * and the VPS map and mesh load numbers to the native module unchanged.
  */
 const mockUpload = jest.fn();
 let mockNativeModules: Record<string, unknown> = {};
@@ -294,5 +294,41 @@ describe("ViroARSceneNavigator forwarding", () => {
       { scanId: "s1" }
     );
     expect(mockUpload.mock.calls[0][4]).toBe("s1");
+  });
+
+  it("passes the map and mesh load numbers to native, and 0 when they are left out", async () => {
+    const nativeModule = {
+      rvLoadVPSMap: jest.fn(async () => JSON.stringify({ success: true })),
+      rvUnloadVPSMap: jest.fn(),
+      rvLoadVPSMapMesh: jest.fn(async () => JSON.stringify({ success: true })),
+      rvUnloadVPSMapMesh: jest.fn(),
+    };
+    const nav = navigatorWith(nativeModule);
+    const bytes = new Uint8Array([1, 2, 3]);
+    await nav.loadVPSMap(bytes, 3);
+    await nav.loadVPSMap(bytes);
+    nav.unloadVPSMap(3);
+    nav.unloadVPSMap();
+    await nav.loadVPSMapMesh(bytes, { physics: false }, 2);
+    await nav.loadVPSMapMesh(bytes);
+    nav.unloadVPSMapMesh(2);
+    nav.unloadVPSMapMesh();
+
+    expect(nativeModule.rvLoadVPSMap.mock.calls).toEqual([
+      [42, "AQID", 3],
+      [42, "AQID", 0],
+    ]);
+    expect(nativeModule.rvUnloadVPSMap.mock.calls).toEqual([
+      [42, 3],
+      [42, 0],
+    ]);
+    expect(nativeModule.rvLoadVPSMapMesh.mock.calls).toEqual([
+      [42, "AQID", true, false, 2],
+      [42, "AQID", true, true, 0],
+    ]);
+    expect(nativeModule.rvUnloadVPSMapMesh.mock.calls).toEqual([
+      [42, 2],
+      [42, 0],
+    ]);
   });
 });

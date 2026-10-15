@@ -54,6 +54,11 @@ export function relayErrorCode(
       return "RELAY_AT_CAPACITY";
     case "PAID_PLAN_REQUIRED":
       return "PAID_PLAN_REQUIRED";
+    case "COMPUTE_SPEND_LIMIT_REACHED":
+      return "COMPUTE_SPEND_LIMIT_REACHED";
+    case "COMPUTE_BILLING_NOT_SET_UP":
+    case "COMPUTE_PAYMENT_FAILED":
+      return "COMPUTE_BILLING_REFUSED";
     case "SCENE_BOUND_TO_VPS":
       return "SCENE_BOUND_TO_VPS";
   }

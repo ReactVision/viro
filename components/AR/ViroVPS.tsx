@@ -19,8 +19,8 @@ import {
   ViroVPSSemanticObject,
 } from "./ViroVPSMapDownload";
 import { pickVisualCandidate, queryLocationsByImage } from "./ViroVPSQuery";
-import { ViroVPSError } from "./ViroVPSClient";
-import type { ViroVPSCredentials } from "./ViroVPSClient";
+import { resolveVPSCredentials, ViroVPSError } from "./ViroVPSClient";
+import type { ViroVPSCredentials, ViroVPSCredentialsSource } from "./ViroVPSClient";
 import type { ViroARSceneNavigator } from "./ViroARSceneNavigator";
 import {
   nextTrackingPhase,
@@ -99,8 +99,20 @@ export type ViroVPSProps = {
   /** vps-server's base URL, e.g. `"https://vps.example.com"`. */
   endpoint: string;
 
-  /** Project credentials for vps-server — see `ViroVPSCredentials`. */
-  credentials: ViroVPSCredentials;
+  /**
+   * Project credentials for vps-server (see `ViroVPSCredentials`), or a
+   * function returning them. A function is called before every request (each
+   * location lookup, image query and map download), so a short-lived token
+   * the host refreshes is used without a re-render.
+   */
+  credentials: ViroVPSCredentialsSource;
+
+  /**
+   * The app's own id for its signed-in user, sent as `x-app-user-id` on every
+   * vps-server request; see `ViroVPSCredentials.appUserId`. Replaces one
+   * given in `credentials`.
+   */
+  appUserId?: string;
 
   /**
    * Search radius for `startTracking("auto")`, in meters. Default 200 —
@@ -320,6 +332,9 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private _phase: ViroVPSTrackingPhase = VPS_TRACKING_IDLE;
   private _lastError: string | undefined;
 
+  private _credentials = (): Promise<ViroVPSCredentials> =>
+    resolveVPSCredentials(this.props.credentials, this.props.appUserId);
+
   componentDidMount() {
     this._mounted = true;
   }
@@ -362,7 +377,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     try {
       const download = await getLocationWorldMeshDownload(
         this.props.endpoint,
-        this.props.credentials,
+        this._credentials,
         locationId
       );
       if (session !== this._session) return;
@@ -533,7 +548,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         resolvedId = locationId;
         mapDownload = await getLocationMapDownload(
           this.props.endpoint,
-          this.props.credentials,
+          this._credentials,
           locationId
         );
       }
@@ -617,7 +632,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         position = { lat: poseResult.pose.latitude, lon: poseResult.pose.longitude };
         const found = await findNearestMap(
           this.props.endpoint,
-          this.props.credentials,
+          this._credentials,
           position.lat,
           position.lon,
           this.props.autoRadiusMeters ?? 200
@@ -659,7 +674,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         try {
           const candidates = await queryLocationsByImage(
             this.props.endpoint,
-            this.props.credentials,
+            this._credentials,
             frame,
             position ? { lat: position.lat, lon: position.lon, radiusM: 500 } : {}
           );
@@ -668,7 +683,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
           if (best) {
             const map = await getLocationMapDownload(
               this.props.endpoint,
-              this.props.credentials,
+              this._credentials,
               best.location_id
             );
             if (session !== this._session) return SUPERSEDED_SEARCH;
@@ -698,7 +713,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   getSemanticObjects = async (): Promise<ViroVPSSemanticObject[]> => {
     const locationId = this._locationId;
     if (!locationId) return [];
-    return fetchLocationSemanticObjects(this.props.endpoint, this.props.credentials, locationId);
+    return fetchLocationSemanticObjects(this.props.endpoint, this._credentials, locationId);
   };
 
   private _fail(

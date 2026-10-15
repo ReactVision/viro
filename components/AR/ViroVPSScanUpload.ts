@@ -20,7 +20,7 @@
 
 import { NativeModules } from "react-native";
 import {
-  ViroVPSCredentials,
+  ViroVPSCredentialsSource,
   ViroVPSError,
   throwIfVPSError,
   vpsAuthHeaders,
@@ -112,6 +112,8 @@ function parseNativeResult(raw: unknown): NativeScanUploadResult {
  * @param endpoint  vps-server's base URL, e.g. "https://vps.example.com". No
  *        default is assumed; a wrong guess at a production hostname is worse
  *        than requiring the caller to supply it explicitly.
+ * @param credentials or a function returning them, called once per upload:
+ *        both requests carry what it answered.
  * @param outputDir the directory startRecording() wrote session.jsonl and
  *        video.mp4 into. Call this after stopRecording() has resolved.
  * @returns the created scan, in `queued` status; poll getScan() for progress.
@@ -120,7 +122,7 @@ function parseNativeResult(raw: unknown): NativeScanUploadResult {
  */
 export async function uploadScanRecording(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   target: ViroVPSScanTarget,
   outputDir: string
 ): Promise<ViroVPSScan> {
@@ -133,13 +135,14 @@ export async function uploadScanRecording(
     "locationId" in target
       ? { location_id: target.locationId }
       : { location: target.location };
+  const headers = await vpsAuthHeaders(credentials);
 
   const dir = outputDir.startsWith("file://") ? outputDir.slice("file://".length) : outputDir;
 
   const result = parseNativeResult(
     await nativeModule.rvUploadScanRecording(
       vpsBaseUrl(endpoint),
-      JSON.stringify(vpsAuthHeaders(credentials)),
+      JSON.stringify(headers),
       JSON.stringify(createBody),
       dir.endsWith("/") ? dir.slice(0, -1) : dir
     )
@@ -161,11 +164,11 @@ export async function uploadScanRecording(
 /** `GET /vps/scans/{id}`: poll while `status` is `queued` or `processing`. */
 export async function getScan(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   scanId: string
 ): Promise<ViroVPSScan> {
   const response = await fetch(`${vpsBaseUrl(endpoint)}/vps/scans/${encodeURIComponent(scanId)}`, {
-    headers: vpsAuthHeaders(credentials),
+    headers: await vpsAuthHeaders(credentials),
   });
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSScan;

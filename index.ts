@@ -170,7 +170,11 @@ export type {
 export type { ViroVPSQueryCandidate, ViroVPSQueryOptions } from "./components/AR/ViroVPSQuery";
 export type { ViroVPSQueryFrame, ViroVPSQueryFrameResult } from "./components/Types/ViroEvents";
 export type { ViroVPSScanTarget, ViroVPSScan } from "./components/AR/ViroVPSScanUpload";
-export type { ViroVPSCredentials } from "./components/AR/ViroVPSClient";
+export type {
+  ViroVPSCredentials,
+  ViroVPSCredentialsProvider,
+  ViroVPSCredentialsSource,
+} from "./components/AR/ViroVPSClient";
 export type {
   ViroColocationState,
   ViroColocationPeer,

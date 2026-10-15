@@ -32,6 +32,7 @@ import * as React from "react";
 import { act } from "react";
 import TestRenderer, { ReactTestRenderer } from "react-test-renderer";
 import { ViroVPS, ViroVPSTrackingStateEvent } from "../components/AR/ViroVPS";
+import * as MapDownload from "../components/AR/ViroVPSMapDownload";
 import type {
   ViroVPSLocalizationResult,
   ViroVPSMapLoadResult,
@@ -333,6 +334,29 @@ describe("<ViroVPS> polling", () => {
 
     const errors = states.filter((s) => s.state === "error").map((s) => s.error);
     expect(errors).toEqual(["first", "second"]);
+  });
+});
+
+describe("<ViroVPS> errors and credentials", () => {
+  it("hands each request a credentials function that reads the host's again, with appUserId", async () => {
+    const { nav, loads } = makeNav();
+    let token = "t1";
+    const credentials = jest.fn(async () => ({ projectId: "p", accessToken: token }));
+    const { ref } = mount(nav, { credentials, appUserId: "user-1" });
+    await act(async () => {
+      const started = ref.current!.startTracking("loc_a");
+      await flush();
+      loads[0].resolve({ success: true });
+      await started;
+    });
+
+    const calls = (MapDownload.getLocationMapDownload as jest.Mock).mock.calls;
+    const passed = calls[calls.length - 1][1];
+    expect(typeof passed).toBe("function");
+    await expect(passed()).resolves.toEqual({ projectId: "p", accessToken: "t1", appUserId: "user-1" });
+    token = "t2";
+    await expect(passed()).resolves.toEqual({ projectId: "p", accessToken: "t2", appUserId: "user-1" });
+    expect(credentials).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -5,6 +5,7 @@
 import {
   bytesToBase64,
   findNearbyLocations,
+  getLocationMapDownload,
   getLocationWorldMeshDownload,
 } from "../components/AR/ViroVPSMapDownload";
 import { ViroVPSError } from "../components/AR/ViroVPSClient";
@@ -76,5 +77,46 @@ describe("vps-server requests", () => {
     await expect(getLocationWorldMeshDownload("https://vps.test", creds, "x")).rejects.toBeInstanceOf(
       ViroVPSError
     );
+  });
+
+  it("calls a credentials function for every request, and sends appUserId as x-app-user-id", async () => {
+    const fetchMock = respond(200, { kind: "map", scan_id: "s", url: "u", expires_at: 0, bytes: 3, quality: null });
+    let n = 0;
+    const provider = jest.fn(async () => ({ projectId: "p", accessToken: `t${++n}`, appUserId: "user-1" }));
+    await getLocationMapDownload("https://vps.test", provider, "a");
+    await getLocationMapDownload("https://vps.test", provider, "a");
+    await getLocationMapDownload("https://vps.test", { ...creds, appUserId: "" }, "a");
+
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
+      { headers: { "x-project-id": "p", Authorization: "Bearer t1", "x-app-user-id": "user-1" } },
+      { headers: { "x-project-id": "p", Authorization: "Bearer t2", "x-app-user-id": "user-1" } },
+      { headers: { "x-project-id": creds.projectId, "x-api-key": "k" } },
+    ]);
+  });
+
+  it("refuses an appUserId vps-server would refuse, or a failing credentials function, before any request", async () => {
+    const fetchMock = respond(200, {});
+    // 600 header bytes once UTF-8 encoded, though only 200 UTF-16 units.
+    const cjk = "用".repeat(200);
+    for (const appUserId of ["u".repeat(256), "josé", cjk, "a b", "tab\there", ".", ".."]) {
+      await expect(
+        getLocationMapDownload("https://vps.test", { ...creds, appUserId }, "a")
+      ).rejects.toMatchObject({ code: "INVALID_APP_USER_ID", status: undefined });
+    }
+    await expect(
+      getLocationMapDownload("https://vps.test", async () => Promise.reject(new Error("signed out")), "a")
+    ).rejects.toMatchObject({ code: "CREDENTIALS_UNAVAILABLE", message: "Could not get VPS credentials: signed out" });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    for (const appUserId of ["~".repeat(255), "...", "auth0|5f7c@example.com"]) {
+      await findNearbyLocations("https://vps.test", { ...creds, appUserId }, 1, 2);
+    }
+    const headers = fetchMock.mock.calls.map((c) => ((c as unknown[])[1] as any).headers);
+    expect(headers.map((h) => h["x-app-user-id"])).toEqual([
+      "~".repeat(255),
+      "...",
+      "auth0|5f7c@example.com",
+    ]);
   });
 });

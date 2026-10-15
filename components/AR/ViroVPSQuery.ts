@@ -16,7 +16,7 @@
 
 import type { ViroVPSQueryFrame } from "../Types/ViroEvents";
 import {
-  ViroVPSCredentials,
+  ViroVPSCredentialsSource,
   throwIfVPSError,
   vpsAuthHeaders,
   vpsBaseUrl,
@@ -105,7 +105,7 @@ function asciiBytes(s: string): Uint8Array {
  */
 export async function queryLocationsByImage(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   frame: ViroVPSQueryFrame,
   options: ViroVPSQueryOptions = {}
 ): Promise<ViroVPSQueryCandidate[]> {
@@ -122,7 +122,7 @@ export async function queryLocationsByImage(
   const response = await fetch(`${vpsBaseUrl(endpoint)}/vps/locations/query`, {
     method: "POST",
     headers: {
-      ...vpsAuthHeaders(credentials),
+      ...(await vpsAuthHeaders(credentials)),
       "Content-Type": `multipart/form-data; boundary=${boundary}`,
     },
     body: body as unknown as BodyInit,

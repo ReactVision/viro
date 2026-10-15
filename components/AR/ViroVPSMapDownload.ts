@@ -25,7 +25,7 @@
 "use strict";
 
 import {
-  ViroVPSCredentials,
+  ViroVPSCredentialsSource,
   ViroVPSError,
   throwIfVPSError,
   vpsAuthHeaders,
@@ -54,14 +54,14 @@ export type ViroVPSMapDownload = {
 /** `GET /vps/locations?lat=&lon=&radius_m=&limit=` — nearest first. */
 export async function findNearbyLocations(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   lat: number,
   lon: number,
   radiusMeters = 200,
   limit = 20
 ): Promise<ViroVPSNearbyLocation[]> {
   const url = `${vpsBaseUrl(endpoint)}/vps/locations?lat=${lat}&lon=${lon}&radius_m=${radiusMeters}&limit=${limit}`;
-  const response = await fetch(url, { headers: vpsAuthHeaders(credentials) });
+  const response = await fetch(url, { headers: await vpsAuthHeaders(credentials) });
   await throwIfVPSError(response);
   // The backend wraps the list: { "locations": [...] } (vps-server/API.md).
   const body = (await response.json()) as { locations?: ViroVPSNearbyLocation[] };
@@ -76,12 +76,12 @@ export async function findNearbyLocations(
  */
 export async function getLocationMapDownload(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSMapDownload> {
   const response = await fetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/map`,
-    { headers: vpsAuthHeaders(credentials) }
+    { headers: await vpsAuthHeaders(credentials) }
   );
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSMapDownload;
@@ -107,12 +107,12 @@ export type ViroVPSAssetDownload = {
  */
 export async function getLocationWorldMeshDownload(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSAssetDownload> {
   const response = await fetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/world_mesh`,
-    { headers: vpsAuthHeaders(credentials) }
+    { headers: await vpsAuthHeaders(credentials) }
   );
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSAssetDownload;
@@ -141,12 +141,12 @@ export type ViroVPSSemanticObject = {
  */
 export async function getLocationSemanticDownload(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSAssetDownload> {
   const response = await fetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/semantic`,
-    { headers: vpsAuthHeaders(credentials) }
+    { headers: await vpsAuthHeaders(credentials) }
   );
   await throwIfVPSError(response);
   return (await response.json()) as ViroVPSAssetDownload;
@@ -189,7 +189,7 @@ export function parseSemanticObjects(json: unknown): ViroVPSSemanticObject[] {
  */
 export async function fetchLocationSemanticObjects(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   locationId: string
 ): Promise<ViroVPSSemanticObject[]> {
   let download: ViroVPSAssetDownload;
@@ -320,7 +320,7 @@ export function candidateLocationsForTracking(
  */
 export async function findNearestMap(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   lat: number,
   lon: number,
   radiusMeters = 200

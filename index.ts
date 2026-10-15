@@ -677,6 +677,8 @@ export type {
   StudioColocationRoom,
   StudioColocationState,
   StudioQuestMenuItem,
+  StudioVpsState,
+  StudioVpsStateEvent,
 } from "./components/Studio";
 
 export { isStudioApiError } from "./components/Studio";

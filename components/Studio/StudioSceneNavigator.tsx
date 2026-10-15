@@ -51,6 +51,7 @@ import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { studioApiError } from "./domain/studioApiError";
+import { StudioVpsCoordinator, type StudioVpsStateEvent } from "./domain/vps";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
@@ -236,6 +237,15 @@ export interface StudioSceneNavigatorHandle {
    * when the scan ended, false, changing nothing, before then or outside a scan.
    */
   finishColocationScan: () => boolean;
+  /**
+   * Start VPS tracking again for the scene on screen after it reported
+   * `error` or `idle`: at once, and whatever the error, where the automatic
+   * retry waits and takes only failures that may pass. False, changing
+   * nothing, when that scene is not bound to a VPS location, cannot track
+   * here (no endpoint it may use, Meta Quest, Apple Vision Pro), or is in
+   * another state.
+   */
+  retryVps: () => boolean;
 }
 
 export interface StudioSceneNavigatorProps {
@@ -371,6 +381,18 @@ export interface StudioSceneNavigatorProps {
   onColocationStateChange?: (state: StudioColocationState) => void;
   /** Once per room: when the host has its code, or when a joiner is in. */
   onColocationRoom?: (room: StudioColocationRoom) => void;
+  /**
+   * VPS tracking of the scene on screen, for a scene bound to a VPS location.
+   * Its plane assets show only while the state is `tracking`, and its on_load
+   * function waits for the first `tracking`, so a scene that never tracks
+   * shows none of them and does not run it. A failure that may pass (no
+   * network, a 5xx or 429, a failed map load) is retried with backoff while
+   * the scene is on screen, so `error` can be followed by `searching`, and
+   * the handle's `retryVps()` restarts it at once after any error. A bound
+   * scene that leaves the screen reports `idle`. Meta Quest and Apple Vision
+   * Pro report `unsupported`.
+   */
+  onVpsStateChange?: (event: StudioVpsStateEvent) => void;
 }
 
 /**
@@ -415,6 +437,7 @@ export const StudioSceneNavigator = forwardRef<
     colocationIndicator = true,
     onColocationStateChange,
     onColocationRoom,
+    onVpsStateChange,
   },
   ref
 ) {
@@ -538,6 +561,17 @@ export const StudioSceneNavigator = forwardRef<
     });
   }, [colocation, colocationStoreOwner]);
 
+  const onVpsStateChangeRef = useRef(onVpsStateChange);
+  onVpsStateChangeRef.current = onVpsStateChange;
+  // Handed to every scene like the colocation controller: the navigator holds
+  // one VPS map, which only the scene on screen tracks.
+  const vpsRef = useRef<StudioVpsCoordinator | null>(null);
+  if (vpsRef.current === null) {
+    const coordinator = new StudioVpsCoordinator();
+    coordinator.onStateChange = (event) => onVpsStateChangeRef.current?.(event);
+    vpsRef.current = coordinator;
+  }
+
   // The tap-to-place overlay would catch taps for content that is withheld
   // while a shared session is set up.
   const [colocationPending, setColocationPending] = useState(false);
@@ -606,6 +640,7 @@ export const StudioSceneNavigator = forwardRef<
         placementStore: placementStoreRef.current,
         placementApiRef,
         colocation: colocationRef.current,
+        vps: vpsRef.current,
         ...(skipOnLoadFunction ? { skipOnLoadFunction } : {}),
       },
     }),
@@ -665,6 +700,7 @@ export const StudioSceneNavigator = forwardRef<
       retryColocation: () => colocationRef.current?.retry() ?? false,
       getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
       finishColocationScan: () => colocationRef.current?.finishScan() ?? false,
+      retryVps: () => vpsRef.current?.retry() ?? false,
     }),
     []
   );

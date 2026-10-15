@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,11 +16,17 @@ import { ViroARImageMarker } from "../AR/ViroARImageMarker";
 import { ViroARPlane } from "../AR/ViroARPlane";
 import { ViroARPlaneSelector } from "../AR/ViroARPlaneSelector";
 import { ViroARScene } from "../AR/ViroARScene";
+import {
+  ViroVPS,
+  type ViroVPSNavigator,
+  type ViroVPSTrackingStateEvent,
+} from "../AR/ViroVPS";
+import { ViroVPSAnchor } from "../AR/ViroVPSAnchor";
 import { ViroNode } from "../ViroNode";
 import { ViroScene } from "../ViroScene";
 import { ViroText } from "../ViroText";
 import { ViroController } from "../ViroController";
-import { isQuest } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { onRoomMoved } from "../Utilities/VRModuleOpenXR";
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import type {
@@ -72,7 +79,10 @@ import { StudioDragStore } from "./domain/dragStore";
 import { StudioAnimationSlots } from "./domain/animationSlots";
 import { isDev, type StudioEffectOrigin } from "./domain/utils";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
-import { StudioSoundManager } from "./domain/soundManager";
+import {
+  StudioSoundManager,
+  type StudioSoundEntry,
+} from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { questAlertStore } from "./domain/questAlertStore";
 import { isSelectClick } from "./domain/questInput";
@@ -99,6 +109,17 @@ import {
 } from "./domain/studioLighting";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
+import {
+  STUDIO_VPS_UNSUPPORTED,
+  studioVpsBinding,
+  studioVpsErrorIsTransient,
+  studioVpsRetryDelayMs,
+  type StudioVpsCoordinator,
+  type StudioVpsHandle,
+  type StudioVpsState,
+  type StudioVpsStateEvent,
+} from "./domain/vps";
+import { studioVpsCredentials } from "./domain/vpsCredentials";
 import {
   buildViroPhysicsWorld,
   parsePhysicsWorldConfig,
@@ -131,6 +152,10 @@ import {
 // The native camera-transform event can fire per frame; throttle the proximity
 // distance sweep to this cadence.
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
+
+// While VPS tracks, its anchor keeps moving toward each new localisation, so
+// proximity targets under it are re-read at this cadence.
+const VPS_TARGET_REFRESH_INTERVAL_MS = 1000;
 
 // Cadence for updating the Quest head-locked UI's tracked position (alert
 // overlay, exit/scene-name HUD). A little slack behind actual head movement
@@ -277,8 +302,21 @@ type AnimOverride = {
   interrupting?: boolean;
 };
 
+type VpsRetry = {
+  locationId: string;
+  attempt: number;
+  timer?: ReturnType<typeof setTimeout>;
+  /** The last state `<ViroVPS>` reported, read without waiting for a render. */
+  state: StudioVpsState;
+};
+
 interface StudioARSceneProps {
   sceneNavigator?: any;
+  /**
+   * Given to every scene by the AR navigator; `<ViroVPS>` loads its map
+   * through it.
+   */
+  arSceneNavigator?: ViroVPSNavigator;
   sceneData: StudioSceneResponse | null;
   onReady?: () => void;
   onError?: (err: Error) => void;
@@ -297,6 +335,8 @@ interface StudioARSceneProps {
   placementApiRef?: React.MutableRefObject<StudioPlacementApi | null>;
   /** The navigator's shared-session controller; absent renders the scene alone. */
   colocation?: StudioColocationController;
+  /** The navigator's VPS map; absent, a bound scene tracks without reporting. */
+  vps?: StudioVpsCoordinator;
   /**
    * Set when a shared session followed another device here: that device ran
    * the scene's on_load function, and what it changed arrives as shared state.
@@ -376,6 +416,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     placementStore,
     placementApiRef,
     colocation,
+    vps,
+    arSceneNavigator,
     skipOnLoadFunction,
   } = props;
   const { scene, assets, animations, collision_bindings, functions } =
@@ -393,6 +435,132 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   colocationFrameRef.current = colocationFrame;
   const colocationPhase = colocationFrame.phase;
   const [sceneMount] = useState(() => colocation?.claimSceneMount() ?? 0);
+
+  // ─── Asset groups ─────────────────────────────────────────────────────────
+  // Three groups: image-triggered (anchored to a tracked image), tap-to-place
+  // (withheld until the user places them at scene root), and the rest (plane
+  // assets, rendered inside the plane wrapper). Image triggering wins over
+  // tap-to-place since a marker already dictates the anchor.
+  const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = useMemo(() => {
+    const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
+    const tapToPlace = assets.filter((a) => isTapToPlaceAsset(a));
+    const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
+    return {
+      planeAssets: plane,
+      imageTriggeredAssets: imgTriggered,
+      tapToPlaceAssets: tapToPlace,
+    };
+  }, [assets]);
+  const planeAssetIds = useMemo(
+    () => new Set(planeAssets.map((a) => a.id)),
+    [planeAssets]
+  );
+
+  // ─── VPS ──────────────────────────────────────────────────────────────────
+  // A bound scene's plane assets are in its location's map frame, so they
+  // render under ViroVPSAnchor alone and show only while tracking. Of the
+  // scenes the navigator has pushed, only the one on screen tracks.
+  const vpsBinding = useMemo(() => studioVpsBinding(sceneData), [sceneData]);
+  const vpsEndpoint =
+    isQuest || isVisionOS ? null : (vpsBinding?.endpoint ?? null);
+  // Where a bound scene renders no plane assets, nothing plays at them either.
+  const unrenderedAssetIds =
+    vpsBinding && !vpsEndpoint ? planeAssetIds : undefined;
+  const [vpsActive, setVpsActive] = useState(!vps);
+  const [vpsState, setVpsState] = useState<StudioVpsState>("idle");
+  const [vpsTrackedOnce, setVpsTrackedOnce] = useState(false);
+  const vpsHandleRef = useRef<StudioVpsHandle | null>(null);
+  const vpsRef = useRef<ViroVPS | null>(null);
+  const vpsRetryRef = useRef<VpsRetry | null>(null);
+
+  const reportVps = useCallback(
+    (state: StudioVpsState, error?: StudioVpsStateEvent["error"]) => {
+      setVpsState(state);
+      if (state === "tracking") setVpsTrackedOnce(true);
+      vpsHandleRef.current?.report(state, error);
+    },
+    []
+  );
+
+  // The host's Retry: at once, and after any error or idle, where the
+  // automatic retry below waits and takes only failures that may pass.
+  const retryVps = useCallback((): boolean => {
+    const retry = vpsRetryRef.current;
+    if (!retry || (retry.state !== "error" && retry.state !== "idle")) {
+      return false;
+    }
+    clearTimeout(retry.timer);
+    retry.timer = undefined;
+    retry.attempt = 0;
+    retry.state = "searching";
+    void vpsRef.current?.startTracking(retry.locationId);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    if (!vps) return;
+    const handle = vps.claim(vpsBinding, setVpsActive, retryVps);
+    vpsHandleRef.current = handle;
+    return () => {
+      vpsHandleRef.current = null;
+      handle.release();
+    };
+  }, [vps, vpsBinding, retryVps]);
+
+  useEffect(() => {
+    if (!vpsBinding) return;
+    if (!vpsActive) {
+      setVpsState("idle");
+    } else if (isQuest || isVisionOS) {
+      reportVps("unsupported", STUDIO_VPS_UNSUPPORTED);
+    } else if (vpsBinding.endpointError) {
+      reportVps("error", vpsBinding.endpointError);
+    }
+  }, [vpsBinding, vpsActive, reportVps]);
+
+  // <ViroVPS> mounts with vpsActive, so its ref is set by now.
+  useEffect(() => {
+    if (!vpsEndpoint || !vpsActive || !vpsBinding) return;
+    const retry: VpsRetry = {
+      locationId: vpsBinding.locationId,
+      attempt: 0,
+      state: "searching",
+    };
+    vpsRetryRef.current = retry;
+    void vpsRef.current?.startTracking(retry.locationId);
+    return () => {
+      clearTimeout(retry.timer);
+      if (vpsRetryRef.current === retry) vpsRetryRef.current = null;
+    };
+  }, [vpsEndpoint, vpsActive, vpsBinding]);
+
+  const vpsCredentials = useCallback(
+    () => studioVpsCredentials(scene.belongs_to_project),
+    [scene.belongs_to_project]
+  );
+  // A transient failure is retried with backoff while the scene is on screen,
+  // and so is an idle: nothing here stops tracking, so an idle means the
+  // native map went away.
+  const handleVpsTrackingState = useCallback(
+    (event: ViroVPSTrackingStateEvent) => {
+      reportVps(event.state, event.errorDetail);
+      const retry = vpsRetryRef.current;
+      if (!retry) return;
+      retry.state = event.state;
+      if (event.state === "tracking") retry.attempt = 0;
+      const transient =
+        event.state === "idle" ||
+        (event.state === "error" &&
+          !!event.errorDetail &&
+          studioVpsErrorIsTransient(event.errorDetail));
+      if (!transient || retry.timer !== undefined) return;
+      retry.timer = setTimeout(() => {
+        retry.timer = undefined;
+        void vpsRef.current?.startTracking(retry.locationId);
+      }, studioVpsRetryDelayMs(retry.attempt++));
+    },
+    [reportVps]
+  );
 
   // ─── Sequence scheduler ───────────────────────────────────────────────────
   // One per scene. Drives WAIT steps; cancelled on unmount and on navigation so
@@ -503,9 +671,9 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   const getAssetPosition = useCallback(
     (assetId: string): [number, number, number] | undefined => {
       const a = assets.find((x) => x.id === assetId);
-      return a ? studioAssetPosition(a) : undefined;
+      return a ? studioAssetPosition(a, scene) : undefined;
     },
-    [assets]
+    [assets, scene]
   );
 
   const runtimeCtx = useMemo(
@@ -518,9 +686,11 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       soundManager: soundManagerRef.current!,
       dragStore: dragStoreRef.current!,
       getAssetPosition,
+      unrenderedAssetIds,
       colocation,
+      vps,
     }),
-    [getAssetPosition, colocation]
+    [getAssetPosition, unrenderedAssetIds, colocation, vps]
   );
   const deviceRuntimeCtx = useMemo(
     () => ({ ...runtimeCtx, effectOrigin: "device" as const }),
@@ -841,6 +1011,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         playAnimation: (assetId, key) =>
           startAnimationRef.current(assetId, key, "remote"),
         leave: () => schedulerRef.current?.cancelAll(),
+        unrenderedAssetIds,
       },
       sceneMount
     );
@@ -849,12 +1020,15 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   }, [colocation, scene.id]);
 
   // ─── on_load_function ─────────────────────────────────────────────────────
+  // A bound scene's waits for its content to show, at the first `tracking`.
   const onLoadExecutedRef = useRef(false);
+  const onLoadReady = !vpsBinding || vpsTrackedOnce;
   useEffect(() => {
     if (
       scene.on_load_function &&
       !onLoadExecutedRef.current &&
-      !skipOnLoadFunction
+      !skipOnLoadFunction &&
+      onLoadReady
     ) {
       onLoadExecutedRef.current = true;
       executeOnLoadFunction(
@@ -867,7 +1041,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         runtimeCtx
       );
     }
-  }, [scene.id]);
+  }, [scene.id, onLoadReady]);
 
   // ─── Collision bindings ───────────────────────────────────────────────────
   const bindingsByPairKey = useMemo(() => {
@@ -1034,6 +1208,40 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     }
   }, [refreshTargetTransform]);
 
+  // A bound scene's plane assets are at their map position only while VPS
+  // tracks, so bindings on them wait for that.
+  const liveProximityBindings = useMemo(
+    () =>
+      vpsBinding && vpsState !== "tracking"
+        ? proximityBindings.filter((b) => !planeAssetIds.has(b.target_asset_id))
+        : proximityBindings,
+    [proximityBindings, vpsBinding, vpsState, planeAssetIds]
+  );
+
+  // Placing the VPS anchor moves everything under it. What was cached for its
+  // assets before is the map position read as a world one, so their bindings
+  // prime again once the refresh lands. A layout effect, so that no camera
+  // update runs the released bindings against the old cache first.
+  useLayoutEffect(() => {
+    if (vpsState !== "tracking") return;
+    for (const b of proximityBindings) {
+      if (!planeAssetIds.has(b.target_asset_id)) continue;
+      proximityTargetTransformsRef.current.delete(b.target_asset_id);
+      const state = proximityStateRef.current.get(b.id);
+      if (state) state.primed = false;
+    }
+    refreshAllTargetTransforms();
+  }, [vpsState, refreshAllTargetTransforms, proximityBindings, planeAssetIds]);
+
+  useEffect(() => {
+    if (vpsState !== "tracking" || !proximityTargetIds.size) return;
+    const timer = setInterval(
+      refreshAllTargetTransforms,
+      VPS_TARGET_REFRESH_INTERVAL_MS
+    );
+    return () => clearInterval(timer);
+  }, [vpsState, proximityTargetIds, refreshAllTargetTransforms]);
+
   const registerProximityTarget = useCallback(
     (assetId: string, ref: unknown) => {
       if (ref) {
@@ -1181,14 +1389,14 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           });
         }
       }
-      if (!proximityBindings.length) return;
+      if (!liveProximityBindings.length) return;
       const now = Date.now();
       if (now - lastProximityEvalRef.current < PROXIMITY_EVAL_INTERVAL_MS)
         return;
       lastProximityEvalRef.current = now;
       evaluateProximityBindings({
         cameraPosition: t.position,
-        bindings: proximityBindings,
+        bindings: liveProximityBindings,
         getTargetWorldPosition: (id) =>
           proximityTargetTransformsRef.current.get(id),
         stateRef: proximityStateRef,
@@ -1200,7 +1408,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       });
     },
     [
-      proximityBindings,
+      liveProximityBindings,
       sceneNavigator,
       animations,
       handleSceneChange,
@@ -1291,21 +1499,6 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   );
 
   // ─── Trigger image targets ────────────────────────────────────────────────
-  // Three groups: image-triggered (anchored to a tracked image), tap-to-place
-  // (withheld until the user places them at scene root), and the rest (plane
-  // assets, rendered inside the plane wrapper). Image triggering wins over
-  // tap-to-place since a marker already dictates the anchor.
-  const { planeAssets, imageTriggeredAssets, tapToPlaceAssets } = useMemo(() => {
-    const imgTriggered = assets.filter((a) => !!a.trigger_image_url);
-    const tapToPlace = assets.filter((a) => isTapToPlaceAsset(a));
-    const plane = assets.filter((a) => !a.trigger_image_url && !a.tap_to_place);
-    return {
-      planeAssets: plane,
-      imageTriggeredAssets: imgTriggered,
-      tapToPlaceAssets: tapToPlace,
-    };
-  }, [assets]);
-
   const [targetNameByAssetId, setTargetNameByAssetId] = useState<
     Map<string, string>
   >(() => new Map());
@@ -1947,7 +2140,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           position={sharedNodes.origin.position}
           rotation={sharedNodes.origin.rotation}
         >
-          {trackingReady && renderedPlaneAssets}
+          {trackingReady && !vpsBinding && renderedPlaneAssets}
           {renderedTapToPlaceAssets}
         </ViroNode>
       </ViroNode>
@@ -1998,6 +2191,19 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     return <>{renderedPlaneAssets}</>;
   };
 
+  // A sound at a plane asset of a bound scene is in the map frame too.
+  const soundInVpsMap = useCallback(
+    (sound: StudioSoundEntry) =>
+      !!sound.position &&
+      !!sound.targetAssetId &&
+      planeAssetIds.has(sound.targetAssetId),
+    [planeAssetIds]
+  );
+  const soundOutsideVpsMap = useCallback(
+    (sound: StudioSoundEntry) => !soundInVpsMap(sound),
+    [soundInVpsMap]
+  );
+
   // ─── Physics world ────────────────────────────────────────────────────────
   const physicsWorldConfig = parsePhysicsWorldConfig(
     scene.physics_world_config
@@ -2040,7 +2246,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         />
       )}
       <StudioLightRig ref={lightRigRef} />
-      {colocationPhase === "off" && trackingReady && renderAssets()}
+      {colocationPhase === "off" &&
+        trackingReady &&
+        !vpsBinding &&
+        renderAssets()}
       {colocationPhase === "off" &&
         (isQuest ? (
           <ViroNode position={roomNode.position} rotation={roomNode.rotation}>
@@ -2051,6 +2260,25 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         ))}
       {needsOrigin && renderOriginPicker()}
       {renderSharedContent()}
+      {vpsEndpoint && (
+        <ViroVPSAnchor visible={vpsState === "tracking"}>
+          {renderedPlaneAssets}
+          <StudioSounds
+            manager={soundManagerRef.current!}
+            filter={soundInVpsMap}
+          />
+        </ViroVPSAnchor>
+      )}
+      {vpsEndpoint && vpsActive && (
+        <ViroVPS
+          ref={vpsRef}
+          arSceneNavigator={arSceneNavigator ?? {}}
+          endpoint={vpsEndpoint}
+          credentials={vpsCredentials}
+          worldMesh
+          onTrackingState={handleVpsTrackingState}
+        />
+      )}
       {renderedImageTriggeredAssets}
       {questPromptTransform && (
         <ViroNode
@@ -2089,7 +2317,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           }
         />
       )}
-      <StudioSounds manager={soundManagerRef.current!} />
+      <StudioSounds
+        manager={soundManagerRef.current!}
+        filter={vpsEndpoint ? soundOutsideVpsMap : undefined}
+      />
       {questNoticeTransform && questNotice && (
         <ViroNode
           position={questNoticeTransform.position}

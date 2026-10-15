@@ -47,6 +47,17 @@ describe("studioAssetPosition", () => {
     ]);
   });
 
+  it("leaves a plane asset of a VPS-bound scene at its map-frame Z", () => {
+    const bound = { vps_location_id: "loc-1" };
+    expect(studioAssetPosition(asset({ position_z: 0.4 }), bound)).toEqual([
+      0, 0, 0.4,
+    ]);
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(
+      studioAssetPosition(asset({ position_z: 0.4 }), { vps_location_id: null })
+    ).toEqual([0, 0, -2]);
+  });
+
   it("offsets a tap-to-place asset from the tap point, not from the camera", () => {
     expect(studioAssetPosition(asset({ tap_to_place: true }))).toEqual([
       0, 0, 0,

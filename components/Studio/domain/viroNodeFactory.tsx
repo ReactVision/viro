@@ -121,7 +121,7 @@ export function createNodeConfig(
   // one. Only the assets under the plane wrapper have it.
   dragSurface?: DragSurface | null
 ): NodeConfig {
-  const position = studioAssetPosition(asset);
+  const position = studioAssetPosition(asset, scene);
 
   // A trigger image's orientation describes the uploaded FILE, not the surface
   // it is printed on and not a rotation for the content: it says where the top

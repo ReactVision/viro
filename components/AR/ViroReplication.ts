@@ -40,6 +40,7 @@
 import { Platform } from "react-native";
 import { isWeb } from "../Utilities/ViroPlatform";
 import { VIRO_VERSION } from "../Utilities/ViroVersion";
+import { colocationDeviceIdNow } from "./ViroColocation";
 
 /** React Native's constructor, which the DOM typing does not describe. */
 type HeaderWebSocket = new (
@@ -323,11 +324,17 @@ export class ViroReplicationClient {
     }
 
     const seq = ++this.openSeq;
-    const connectWith = (provided: Record<string, string> | undefined) => {
+    const connectWith = (
+      provided: Record<string, string> | undefined,
+      device: string | null
+    ) => {
       if (seq !== this.openSeq) return;
       const headers: Record<string, string> = { ...provided };
       if (cfg.apiKey) headers["x-api-key"] = cfg.apiKey;
       headers["x-project-id"] = cfg.projectId;
+      // The native pose channel's id, so the relay bills this device once
+      // while either socket is open.
+      if (device) headers["x-rv-device"] = device;
       // Logged by the relay, never used for a decision. It is what separates
       // one client build from another when a refusal shows up in the relay log
       // and every device otherwise looks alike. An app tag from the provider
@@ -344,6 +351,17 @@ export class ViroReplicationClient {
     const providerFailed = () => {
       if (seq === this.openSeq) this.retryOrFail();
     };
+    const withDevice = (provided: Record<string, string> | undefined) => {
+      const device = colocationDeviceIdNow();
+      if (isThenable(device)) {
+        device.then(
+          (id) => connectWith(provided, id),
+          () => connectWith(provided, null)
+        );
+      } else {
+        connectWith(provided, device);
+      }
+    };
 
     let provided: Record<string, string> | PromiseLike<Record<string, string>>;
     try {
@@ -353,8 +371,8 @@ export class ViroReplicationClient {
       return;
     }
     // Synchronous answers connect synchronously, as a bare apiKey always has.
-    if (isThenable(provided)) provided.then(connectWith, providerFailed);
-    else connectWith(provided);
+    if (isThenable(provided)) provided.then(withDevice, providerFailed);
+    else withDevice(provided);
   }
 
   private attach(ws: WebSocket): void {

@@ -39,6 +39,7 @@ import {
   setColocationLocalPose,
   getColocationState,
   getColocationPeers,
+  getColocationDeviceId,
   VIRO_POSE_INTERVAL_MS,
 } from "./components/AR/ViroColocation";
 import { useViroColocation } from "./components/hooks/useViroColocation";
@@ -405,6 +406,7 @@ export {
   setColocationLocalPose,
   getColocationState,
   getColocationPeers,
+  getColocationDeviceId,
   VIRO_POSE_INTERVAL_MS,
   useViroColocation,
   useViroColocationRoom,

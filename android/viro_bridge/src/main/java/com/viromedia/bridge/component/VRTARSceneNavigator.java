@@ -252,6 +252,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Normal attach (first time or after resume without disposal)
         super.onAttachedToWindow();
 
+        // An AR session runs without touches (walking a scan, say), and a
+        // screen timeout pauses the activity. A view's flag, unlike the
+        // window's, leaves a host's own keep-awake alone on detach.
+        setKeepScreenOn(true);
+
         // Re-enable rotation listener when view is reattached
         if (mRotationListener != null) {
             mRotationListener.enable();
@@ -268,6 +273,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
         // Mark that we were detached - used to detect tab switches
         mWasDetachedFromWindow = true;
+
+        setKeepScreenOn(false);
 
         // Disable rotation listener
         if (mRotationListener != null) {

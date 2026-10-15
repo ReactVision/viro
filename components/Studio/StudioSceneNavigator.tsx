@@ -341,7 +341,12 @@ export interface StudioSceneNavigatorProps {
    * NAVIGATE on any device takes every device to that scene, and the devices
    * that follow do not run its on_load function; a device that joins on
    * another scene moves to the room's. A scene outside the session's project
-   * is not entered, and is reported as one that failed to load.
+   * is not entered, and is reported as one that failed to load. Nor is a scene
+   * bound to a VPS location, whose content a shared frame cannot place: the
+   * device that navigates there, and each device the room would take there,
+   * stays on its scene and its session fails with `SCENE_BOUND_TO_VPS`. A
+   * session fails the same way when `sceneId` changes to such a scene, which
+   * then renders alone, and a host on one fails before it scans.
    * Collision bindings run on one device: the host while it is connected,
    * and otherwise the connected device with the lowest peer id, so they keep
    * running when the host leaves. The exception is image-triggered

@@ -50,6 +50,7 @@ import {
   resolveErrorCode,
   ROOM_PEER_LIMIT,
   roomErrorCode,
+  SCENE_BOUND_TO_VPS_FAILURE,
   type StudioColocationFailure,
 } from "./errors";
 import {
@@ -563,6 +564,15 @@ export class StudioColocationController {
     this.sceneMount = mount ?? null;
     this.sceneStores = stores ?? null;
     this.sceneHooks = hooks ?? null;
+    // The app changing `sceneId` mid-session, refused as a NAVIGATE there is.
+    // A remount of the same scene is not a change.
+    if (
+      this.active &&
+      sceneData.scene.vps_location_id &&
+      prev?.scene.id !== sceneData.scene.id
+    ) {
+      this.fail(this.run, SCENE_BOUND_TO_VPS_FAILURE);
+    }
     this.noteSceneShown(prev, sceneData);
     this.sharedState?.bindScene(sceneData, this.sceneStores, this.sceneHooks);
     if (this.pendingStart) this.begin();
@@ -580,7 +590,8 @@ export class StudioColocationController {
   /**
    * A NAVIGATE while a session is set up or shared goes through the navigator
    * and into the room, so every device follows. False when no session runs:
-   * the scene then navigates on its own.
+   * the scene then navigates on its own. A scene bound to a VPS location is
+   * not entered while a session runs, and the session fails instead.
    */
   navigate(targetSceneId: string): boolean {
     if (this.frame.phase === "off" || !this.pushScene) return false;
@@ -588,8 +599,16 @@ export class StudioColocationController {
     this.deps.loadScene(targetSceneId).then(
       (sceneData) => {
         if (seq !== this.navigationSeq) return;
-        if (this.inSessionProject(sceneData)) this.enterScene(sceneData, false);
-        else this.deps.onNavigationError(outsideProjectError(targetSceneId));
+        if (!this.inSessionProject(sceneData)) {
+          this.deps.onNavigationError(outsideProjectError(targetSceneId));
+        } else if (
+          sceneData.scene.vps_location_id &&
+          this.frame.phase !== "off"
+        ) {
+          this.fail(this.run, SCENE_BOUND_TO_VPS_FAILURE);
+        } else {
+          this.enterScene(sceneData, false);
+        }
       },
       (error) => {
         if (seq === this.navigationSeq) this.deps.onNavigationError(error);
@@ -724,6 +743,10 @@ export class StudioColocationController {
   }
 
   private async host(run: number, scene: StudioSceneResponse): Promise<void> {
+    // The rooms service refuses it too, but only at createRoom, after the scan.
+    if (scene.scene.vps_location_id) {
+      return this.fail(run, SCENE_BOUND_TO_VPS_FAILURE);
+    }
     if (!this.checkBudget(run, scene)) return;
     const frameKind = this.deps.hostFrameKind();
     const nav = this.getNavigator();
@@ -1429,8 +1452,13 @@ export class StudioColocationController {
         const sceneData = await this.deps.loadScene(sceneId);
         if (!current()) return;
         // Any peer with the room's credential can write the room's scene.
-        if (this.inSessionProject(sceneData)) this.enterScene(sceneData, true);
-        else this.deps.onNavigationError(outsideProjectError(sceneId));
+        if (!this.inSessionProject(sceneData)) {
+          this.deps.onNavigationError(outsideProjectError(sceneId));
+        } else if (sceneData.scene.vps_location_id) {
+          this.fail(run, SCENE_BOUND_TO_VPS_FAILURE);
+        } else {
+          this.enterScene(sceneData, true);
+        }
         return;
       } catch (e) {
         failure = e;

@@ -29,6 +29,7 @@ describe("roomErrorCode", () => {
     [undefined, "MISSING_PROJECT_ID", "UNKNOWN"],
     [400, "INVALID_SCENE_ID", "UNKNOWN"],
     [409, "TOO_MANY_ROOMS", "UNKNOWN"],
+    [409, "SCENE_BOUND_TO_VPS", "SCENE_BOUND_TO_VPS"],
   ])("maps %s %s to %s", (status, code, expected) => {
     expect(roomErrorCode(status, code)).toBe(expected);
   });
@@ -47,6 +48,7 @@ describe("relayErrorCode", () => {
     [404, "NOT_FOUND", "UNAVAILABLE"],
     [undefined, undefined, "UNAVAILABLE"],
     [400, "INVALID_ROOM_ID", "UNKNOWN"],
+    [409, "SCENE_BOUND_TO_VPS", "SCENE_BOUND_TO_VPS"],
   ])("maps %s %s to %s", (status, code, expected) => {
     expect(relayErrorCode(status, code)).toBe(expected);
   });

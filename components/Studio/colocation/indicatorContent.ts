@@ -172,6 +172,8 @@ function failureDetail(
       return "Your access to this project could not be verified.";
     case "SCENE_TOO_LARGE":
       return "This scene has too many assets and variables to share.";
+    case "SCENE_BOUND_TO_VPS":
+      return "This scene is placed in a scanned location, so it cannot be shared in a room.";
     case "UNAVAILABLE":
       return "Failed to reach the co-location service. Check your internet connection.";
     case "CONNECT_TIMEOUT":

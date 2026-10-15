@@ -34,6 +34,8 @@ export type StudioColocationErrorCode =
   | "HOST_FAILED"
   | "NOT_AUTHORIZED"
   | "SCENE_TOO_LARGE"
+  /** The scene is placed in an Advanced VPS map, which a co-location frame does not share. */
+  | "SCENE_BOUND_TO_VPS"
   | "UNAVAILABLE"
   /** The channel or the shared state did not connect within `connectTimeoutMs`. */
   | "CONNECT_TIMEOUT"

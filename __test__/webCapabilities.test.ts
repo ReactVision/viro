@@ -94,4 +94,18 @@ describe("webUnsupportedFeatures", () => {
       ),
     ).toEqual(["manual plane selection"]);
   });
+
+  test("reports a VPS-bound scene, whose plane assets are not rendered", () => {
+    expect(
+      webUnsupportedFeatures(
+        sceneData({
+          scene: {
+            id: "s1",
+            plane_detection: "NONE",
+            vps_location_id: "loc-1",
+          },
+        }),
+      ),
+    ).toEqual(["VPS location"]);
+  });
 });

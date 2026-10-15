@@ -39,6 +39,7 @@ import { act } from "react";
 import TestRenderer from "react-test-renderer";
 import { ViroVPS, ViroVPSTrackingStateEvent } from "../components/AR/ViroVPS";
 import { ViroVPSAnchor } from "../components/AR/ViroVPSAnchor";
+import { ViroVPSAnchor as ViroVPSAnchorWeb } from "../components/AR/ViroVPSAnchor.web";
 import { ViroVPSError } from "../components/AR/ViroVPSClient";
 import * as MapDownload from "../components/AR/ViroVPSMapDownload";
 
@@ -283,5 +284,23 @@ describe("<ViroVPSAnchor>", () => {
     host.props.onAnchorStateChangeViro({ nativeEvent: { state: "bogus" } });
     host.props.onAnchorStateChangeViro({ nativeEvent: { state: "hidden" } });
     expect(onAnchorStateChange.mock.calls).toEqual([[{ state: "tracking" }], [{ state: "hidden" }]]);
+  });
+
+  it("renders nothing on web, children included, and warns once", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <React.Fragment>
+          <ViroVPSAnchorWeb>
+            <ViroVPSAnchor />
+          </ViroVPSAnchorWeb>
+          <ViroVPSAnchorWeb />
+        </React.Fragment>
+      );
+    });
+    expect(renderer.toJSON()).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });

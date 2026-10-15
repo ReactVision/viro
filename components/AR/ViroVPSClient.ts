@@ -45,12 +45,17 @@ const APP_USER_ID = /^[\x21-\x7e]{1,255}$/;
  * with no status: `CREDENTIALS_UNAVAILABLE`, `INVALID_APP_USER_ID` and
  * `BAD_REQUEST` (uploadScanRecording()'s options). vps-server answers the
  * same mistakes with the same two codes and status 400.
+ *
+ * `scanId` is set by uploadScanRecording() when its scan exists on the
+ * server but the recording did not arrive: pass it back as
+ * `options.scanId` to upload into that scan instead of creating another.
  */
 export class ViroVPSError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
-    public readonly status?: number
+    public readonly status?: number,
+    public readonly scanId?: string
   ) {
     super(message);
     this.name = "ViroVPSError";
@@ -105,7 +110,11 @@ export async function vpsAuthHeaders(
 }
 
 /** Builds the error for a non-2xx response from its status and raw body text. */
-export function vpsErrorFromBody(status: number, bodyText: string | undefined): ViroVPSError {
+export function vpsErrorFromBody(
+  status: number,
+  bodyText: string | undefined,
+  scanId?: string
+): ViroVPSError {
   let code: string | undefined;
   let message = `HTTP ${status}`;
   if (bodyText) {
@@ -117,7 +126,7 @@ export function vpsErrorFromBody(status: number, bodyText: string | undefined): 
       // Non-JSON error body: keep the generic HTTP message.
     }
   }
-  return new ViroVPSError(message, code, status);
+  return new ViroVPSError(message, code, status, scanId);
 }
 
 export async function throwIfVPSError(response: Response): Promise<void> {

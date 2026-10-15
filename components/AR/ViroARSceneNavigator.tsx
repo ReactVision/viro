@@ -1137,7 +1137,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    *
    * Zipping and the upload run natively and stream from disk; see
    * ViroVPSScanUpload.ts. `endpoint` is vps-server's own base URL, unrelated
-   * to `RVEndpoint` (ReactVisionCCA's host/resolve backend).
+   * to `RVEndpoint` (ReactVisionCCA's host/resolve backend). `options.scanId`
+   * resumes a failed upload into the scan it created (the error's `scanId`).
    */
   _uploadScanRecording = async (
     endpoint: string,

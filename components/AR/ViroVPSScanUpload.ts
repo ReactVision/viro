@@ -5,7 +5,8 @@
  * startRecording()/stopRecording(); see VROARSessionRecorderIOS /
  * ARSessionRecorder) and uploads it to the VPS backend described in
  * spatial/vps-server/API.md: POST /vps/scans, then PUT the zip to the
- * returned `upload_path` (/vps/scans/{id}/recording).
+ * returned `upload_path` (/vps/scans/{id}/recording). A failed upload can be
+ * resumed into the scan it created, with only the PUT.
  *
  * This is the ViroReact AR recorder's format only, not SensorRecorder's.
  *
@@ -54,6 +55,13 @@ export type ViroVPSScanUploadOptions = {
    * the upload is deleted.
    */
   keepRecording?: boolean;
+  /**
+   * Upload into this scan, which must still be in `awaiting_upload`, instead
+   * of creating one: the `scanId` of the ViroVPSError an earlier attempt
+   * threw. The scan keeps the location, `outputs` and `keepRecording` it was
+   * created with, so `target`, `outputs` and `keepRecording` are not used.
+   */
+  scanId?: string;
 };
 
 export type ViroVPSScan = {
@@ -100,7 +108,9 @@ export type ViroVPSScan = {
  *   exists and stays in `awaiting_upload`.
  *
  * `status`/`body` are the HTTP status and raw response body of the failing
- * (or, on success, the final PUT) response, when there was one.
+ * (or, on success, the final PUT) response, when there was one. `scan_id` is
+ * set whenever the scan exists: at stage `upload`, on success, and on every
+ * result of a resumed upload.
  */
 type NativeScanUploadResult = {
   success: boolean;
@@ -108,12 +118,16 @@ type NativeScanUploadResult = {
   status?: number;
   body?: string;
   error?: string;
+  scan_id?: string;
 };
 
 const SCAN_OUTPUTS: readonly ViroVPSScanOutput[] = ["mesh", "splat", "semantic"];
 
-/** vps-server's checks on the same fields, so a mistake costs no zip. */
-function checkUploadOptions({ outputs, keepRecording }: ViroVPSScanUploadOptions) {
+/** vps-server's checks on the same fields, and scanId's type, so a mistake costs no zip. */
+function checkUploadOptions({ outputs, keepRecording, scanId }: ViroVPSScanUploadOptions) {
+  if (scanId !== undefined && typeof scanId !== "string") {
+    throw new ViroVPSError("scanId is a string", "BAD_REQUEST");
+  }
   if (outputs !== undefined) {
     if (!Array.isArray(outputs) || !outputs.every((o) => SCAN_OUTPUTS.includes(o))) {
       throw new ViroVPSError(`outputs is a list of ${SCAN_OUTPUTS.join(", ")}`, "BAD_REQUEST");
@@ -157,13 +171,16 @@ function parseNativeResult(raw: unknown): NativeScanUploadResult {
  *        both requests carry what it answered.
  * @param outputDir the directory startRecording() wrote session.jsonl and
  *        video.mp4 into. Call this after stopRecording() has resolved.
- * @param options the app user, what to build and whether the server keeps
- *        the recording; see ViroVPSScanUploadOptions.
- * @returns the created scan, in `queued` status; poll getScan() for progress.
+ * @param options the app user, what to build, whether the server keeps
+ *        the recording, and a scan to resume; see ViroVPSScanUploadOptions.
+ * @returns the created scan, still in `awaiting_upload` status while the
+ *          server stores and queues the recording; poll getScan() for progress.
  * @throws ViroVPSError when the recording can't be read, a request fails, or
  *         the server answers with an error (its `code` and `status` are set).
- *         Options or an `appUserId` the server would refuse throw
- *         `BAD_REQUEST` or `INVALID_APP_USER_ID` before anything is zipped.
+ *         When the scan exists but its recording did not arrive, `scanId` is
+ *         set, also on a failure with no HTTP status. Options or an
+ *         `appUserId` the server would refuse throw `BAD_REQUEST` or
+ *         `INVALID_APP_USER_ID` before anything is zipped.
  */
 export async function uploadScanRecording(
   endpoint: string,
@@ -178,12 +195,17 @@ export async function uploadScanRecording(
     throw new ViroVPSError("Scan upload is not available on this platform");
   }
 
-  const createBody: Record<string, unknown> =
-    "locationId" in target
-      ? { location_id: target.locationId }
-      : { location: target.location };
-  if (options.outputs !== undefined) createBody.outputs = options.outputs;
-  if (options.keepRecording !== undefined) createBody.keep_recording = options.keepRecording;
+  const resumeScanId = options.scanId ?? "";
+  let createBody = "";
+  if (!resumeScanId) {
+    const body: Record<string, unknown> =
+      "locationId" in target
+        ? { location_id: target.locationId }
+        : { location: target.location };
+    if (options.outputs !== undefined) body.outputs = options.outputs;
+    if (options.keepRecording !== undefined) body.keep_recording = options.keepRecording;
+    createBody = JSON.stringify(body);
+  }
   const headers = await vpsAuthHeaders(credentials, options.appUserId);
 
   const dir = outputDir.startsWith("file://") ? outputDir.slice("file://".length) : outputDir;
@@ -192,16 +214,19 @@ export async function uploadScanRecording(
     await nativeModule.rvUploadScanRecording(
       vpsBaseUrl(endpoint),
       JSON.stringify(headers),
-      JSON.stringify(createBody),
-      dir.endsWith("/") ? dir.slice(0, -1) : dir
+      createBody,
+      dir.endsWith("/") ? dir.slice(0, -1) : dir,
+      resumeScanId
     )
   );
 
   if (!result.success) {
+    const scanId =
+      (typeof result.scan_id === "string" && result.scan_id) || resumeScanId || undefined;
     if (typeof result.status === "number" && result.status > 0) {
-      throw vpsErrorFromBody(result.status, result.body);
+      throw vpsErrorFromBody(result.status, result.body, scanId);
     }
-    throw new ViroVPSError(result.error ?? "Scan upload failed");
+    throw new ViroVPSError(result.error ?? "Scan upload failed", undefined, undefined, scanId);
   }
   try {
     return JSON.parse(result.body ?? "") as ViroVPSScan;

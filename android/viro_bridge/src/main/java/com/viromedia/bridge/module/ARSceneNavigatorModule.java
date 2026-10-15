@@ -1880,37 +1880,48 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
      * {@code recordingDir}) into a temp file and uploads it to vps-server:
      * POST {endpoint}/vps/scans with {@code createBodyJson}, then PUT the zip
      * to the returned upload_path with Content-Type application/zip, streamed
-     * from the file. The zip is written before the POST so a recording that
-     * cannot be read never creates a scan. {@code headersJson} is the
-     * credential headers as a JSON object. Resolves a JSON string:
-     * {success, stage?: "zip"|"create"|"upload", status?, body?, error?}.
+     * from the file. A non-empty {@code scanId} resumes that scan instead: no
+     * POST, and the zip goes to /vps/scans/{scanId}/recording. The zip is
+     * written before the POST so a recording that cannot be read never
+     * creates a scan. {@code headersJson} is the credential headers as a JSON
+     * object. Resolves a JSON string:
+     * {success, stage?: "zip"|"create"|"upload", status?, body?, error?, scan_id?},
+     * with scan_id whenever the scan exists.
      * Not tied to a navigator view: it only reads files and talks HTTP.
      */
     @ReactMethod
     public void rvUploadScanRecording(final String endpoint, final String headersJson,
                                       final String createBodyJson, final String recordingDir,
-                                      final Promise promise) {
+                                      final String scanId, final Promise promise) {
         sVpsUploadExecutor.execute(() ->
-            promise.resolve(uploadScanRecordingBlocking(endpoint, headersJson, createBodyJson, recordingDir)));
+            promise.resolve(uploadScanRecordingBlocking(endpoint, headersJson, createBodyJson, recordingDir, scanId)));
     }
 
     private String uploadScanRecordingBlocking(String endpoint, String headersJson,
-                                               String createBodyJson, String recordingDir) {
+                                               String createBodyJson, String recordingDir,
+                                               String resumeScanId) {
+        // Set once the scan exists: from the start when resuming, else from the POST's answer.
+        String scanId = resumeScanId != null && !resumeScanId.isEmpty() ? resumeScanId : null;
         final JSONObject headers;
         try {
             headers = new JSONObject(headersJson);
         } catch (Exception e) {
-            return rvJson("success", false, "stage", "zip", "error", "Invalid credential headers");
+            return scanUploadResult(scanId, "success", false, "stage", "zip", "error", "Invalid credential headers");
         }
-        if (endpoint == null || createBodyJson == null || recordingDir == null) {
-            return rvJson("success", false, "stage", "zip", "error", "Missing endpoint, scan target or recording directory");
+        if (endpoint == null || (scanId == null && createBodyJson == null) || recordingDir == null) {
+            return scanUploadResult(scanId, "success", false, "stage", "zip",
+                    "error", "Missing endpoint, scan target or recording directory");
         }
 
         File dir = new File(recordingDir);
         for (String name : VPS_SCAN_FILES) {
             File f = new File(dir, name);
-            if (!f.isFile()) return rvJson("success", false, "stage", "zip", "error", name + " is missing from " + recordingDir);
-            if (!f.canRead()) return rvJson("success", false, "stage", "zip", "error", name + " is not readable");
+            if (!f.isFile()) {
+                return scanUploadResult(scanId, "success", false, "stage", "zip", "error", name + " is missing from " + recordingDir);
+            }
+            if (!f.canRead()) {
+                return scanUploadResult(scanId, "success", false, "stage", "zip", "error", name + " is not readable");
+            }
         }
 
         File zip = null;
@@ -1919,42 +1930,47 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
             zip = File.createTempFile("vps-scan-", ".zip", mContext.getCacheDir());
             writeScanZip(zip, dir);
 
-            stage = "create";
             String uploadPath;
-            HttpURLConnection create = (HttpURLConnection) new URL(endpoint + "/vps/scans").openConnection();
-            try {
-                create.setRequestMethod("POST");
-                create.setConnectTimeout(30000);
-                create.setReadTimeout(60000);
-                create.setDoOutput(true);
-                applyHeaders(create, headers);
-                create.setRequestProperty("Content-Type", "application/json");
-                byte[] body = createBodyJson.getBytes(StandardCharsets.UTF_8);
-                create.setFixedLengthStreamingMode(body.length);
-                try (OutputStream os = create.getOutputStream()) {
-                    os.write(body);
-                }
-                int status = create.getResponseCode();
-                String response = readResponseBody(create, status);
-                if (status < 200 || status >= 300) {
-                    return rvJson("success", false, "stage", stage, "status", status, "body", response);
-                }
-                JSONObject scan;
+            if (scanId != null) {
+                uploadPath = scanRecordingPath(scanId);
+            } else {
+                stage = "create";
+                HttpURLConnection create = (HttpURLConnection) new URL(endpoint + "/vps/scans").openConnection();
                 try {
-                    scan = new JSONObject(response);
-                } catch (JSONException e) {
-                    return rvJson("success", false, "stage", stage, "error", "POST /vps/scans did not answer JSON");
+                    create.setRequestMethod("POST");
+                    create.setConnectTimeout(30000);
+                    create.setReadTimeout(60000);
+                    create.setDoOutput(true);
+                    applyHeaders(create, headers);
+                    create.setRequestProperty("Content-Type", "application/json");
+                    byte[] body = createBodyJson.getBytes(StandardCharsets.UTF_8);
+                    create.setFixedLengthStreamingMode(body.length);
+                    try (OutputStream os = create.getOutputStream()) {
+                        os.write(body);
+                    }
+                    int status = create.getResponseCode();
+                    String response = readResponseBody(create, status);
+                    if (status < 200 || status >= 300) {
+                        return rvJson("success", false, "stage", stage, "status", status, "body", response);
+                    }
+                    JSONObject scan;
+                    try {
+                        scan = new JSONObject(response);
+                    } catch (JSONException e) {
+                        return rvJson("success", false, "stage", stage, "error", "POST /vps/scans did not answer JSON");
+                    }
+                    String createdId = scan.optString("id", "");
+                    if (createdId.isEmpty()) {
+                        return rvJson("success", false, "stage", stage, "error", "POST /vps/scans answered without a scan id");
+                    }
+                    uploadPath = scan.optString("upload_path", "");
+                    if (!uploadPath.startsWith("/")) {
+                        uploadPath = scanRecordingPath(createdId);
+                    }
+                    scanId = createdId;
+                } finally {
+                    create.disconnect();
                 }
-                String scanId = scan.optString("id", "");
-                if (scanId.isEmpty()) {
-                    return rvJson("success", false, "stage", stage, "error", "POST /vps/scans answered without a scan id");
-                }
-                uploadPath = scan.optString("upload_path", "");
-                if (!uploadPath.startsWith("/")) {
-                    uploadPath = "/vps/scans/" + URLEncoder.encode(scanId, "UTF-8") + "/recording";
-                }
-            } finally {
-                create.disconnect();
             }
 
             stage = "upload";
@@ -1978,17 +1994,31 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 int status = put.getResponseCode();
                 String response = readResponseBody(put, status);
                 if (status < 200 || status >= 300) {
-                    return rvJson("success", false, "stage", stage, "status", status, "body", response);
+                    return scanUploadResult(scanId, "success", false, "stage", stage, "status", status, "body", response);
                 }
-                return rvJson("success", true, "status", status, "body", response);
+                return scanUploadResult(scanId, "success", true, "status", status, "body", response);
             } finally {
                 put.disconnect();
             }
         } catch (Exception e) {
-            return rvJson("success", false, "stage", stage, "error", String.valueOf(e.getMessage()));
+            return scanUploadResult(scanId, "success", false, "stage", stage, "error", String.valueOf(e.getMessage()));
         } finally {
             if (zip != null && !zip.delete()) zip.deleteOnExit();
         }
+    }
+
+    /** /vps/scans/{scanId}/recording, the id escaped as one path segment. */
+    private static String scanRecordingPath(String scanId) throws IOException {
+        return "/vps/scans/" + URLEncoder.encode(scanId, "UTF-8") + "/recording";
+    }
+
+    /** {@link #rvJson} of an upload result, plus scan_id when the scan exists on the server. */
+    private static String scanUploadResult(String scanId, Object... keyValues) {
+        if (scanId == null) return rvJson(keyValues);
+        Object[] withId = java.util.Arrays.copyOf(keyValues, keyValues.length + 2);
+        withId[keyValues.length] = "scan_id";
+        withId[keyValues.length + 1] = scanId;
+        return rvJson(withId);
     }
 
     /**

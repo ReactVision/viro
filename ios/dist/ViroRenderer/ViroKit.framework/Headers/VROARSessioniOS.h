@@ -245,6 +245,10 @@ public:
     bool rvIsVPSMapLoaded() override;
     std::string rvGetVPSLocalizationJson() override;
     bool rvGetVPSWorldFromMap(VROMatrix4f &T_world_map) const override;
+    bool rvStartVPSServerSession() override;
+    void rvStopVPSServerSession() override;
+    bool rvReportVPSServerFix(const VROMatrix4f &T_world_cam, const VROMatrix4f &T_map_cam,
+                              int inliers) override;
 
     // Scene Semantics API
     bool isSemanticModeSupported() const override;
@@ -350,6 +354,13 @@ private:
      */
     VROMatrix4f _lastVPSCamToWorld;
     bool        _lastVPSCamToWorldSet = false;
+
+    /*
+     VPS server mode (rvStartVPSServerSession()): the fuser is fed by the
+     backend's fixes, with no map loaded, and the camera pose above is cached
+     every frame instead of only while a map is loaded.
+     */
+    bool  _vpsServerMode     = false;
 
     /* The most recent raw hit from updateVPSMapFrame()'s onHit, for diagnostics. */
     bool  _lastVPSHitSet     = false;

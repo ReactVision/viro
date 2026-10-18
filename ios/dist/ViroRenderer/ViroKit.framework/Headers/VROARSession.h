@@ -749,6 +749,47 @@ public:
         return false;
     }
 
+    /*
+     VPS server mode: the backend localises frames the device sends
+     (POST /vps/locations/{id}/localise) instead of the device matching a
+     downloaded map. The fuser then runs without a map, fed only by
+     rvReportVPSServerFix(), and everything that reads it (anchors, the map
+     mesh, rvGetVPSLocalizationJson()'s renderPose) works as with a map.
+     Starting unloads any map and resets the fuser; rvGetVPSLocalizationJson()
+     reports loaded true and mode "server" until rvStopVPSServerSession() or
+     rvLoadVPSMap().
+     */
+    virtual bool rvStartVPSServerSession() {
+        return false;
+    }
+    virtual void rvStopVPSServerSession() {
+        // Default implementation does nothing
+    }
+
+    /*
+     One fix from the backend: T_map_cam, the camera in the map (OpenCV camera
+     axes), solved from a frame captured with sensor pose T_world_cam
+     (VROARScene::VPSQueryFrameCallback's). Reported to the fuser as
+     vpsServerFixToWorldMap(). False when server mode is off.
+     */
+    virtual bool rvReportVPSServerFix(const VROMatrix4f &T_world_cam, const VROMatrix4f &T_map_cam,
+                                      int inliers) {
+        return false;
+    }
+
+    /*
+     The fuser's input for a server fix: the map-to-world transform, composed
+     the way IFeatureMatcher::localize() composes its own hits
+     (cam2world · diag(1,-1,-1,1) · T_cam_map): the flip takes OpenCV camera
+     axes (y down, z forward) to GL's (y up, z back).
+     */
+    static VROMatrix4f vpsServerFixToWorldMap(const VROMatrix4f &T_world_cam, const VROMatrix4f &T_map_cam) {
+        VROMatrix4f flip;
+        flip[5] = -1;
+        flip[10] = -1;
+        return T_world_cam.multiply(flip).multiply(T_map_cam.invert());
+    }
+
     // ========================================================================
     // Shared coordinate frame — platform-native co-location (CL-H / CL-I)
     //

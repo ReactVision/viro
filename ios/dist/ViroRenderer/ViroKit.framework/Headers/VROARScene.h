@@ -217,9 +217,15 @@ public:
      is copied on the render thread and the callback runs on a background
      thread. ok is false when no frame with intrinsics arrives within about a
      second.
+
+     T_world_cam is the camera's sensor pose for that same frame
+     (VROARCamera::getImageTransform(), GL camera axes): a pose solved from
+     the image on a server is turned into a VPS fix with it
+     (VROARSession::rvReportVPSServerFix()).
      */
     typedef std::function<void(bool ok, std::vector<uint8_t> gray, int width, int height,
-                               float fx, float fy, float cx, float cy)> VPSQueryFrameCallback;
+                               float fx, float fy, float cx, float cy,
+                               const VROMatrix4f &T_world_cam)> VPSQueryFrameCallback;
     void captureVPSQueryFrame(int maxSide, VPSQueryFrameCallback callback);
 
 private:

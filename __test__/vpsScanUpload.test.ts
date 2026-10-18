@@ -6,7 +6,8 @@
  * before it creates the scan; what is checked here is the JS half of that
  * contract: the arguments it passes, that JS itself never issues the POST or
  * the PUT, and that a failure while zipping surfaces as an error with no HTTP
- * status (no scan was created).
+ * status (no scan was created). Also that the navigator forwards the upload
+ * and the VPS map and mesh load numbers to the native module unchanged.
  */
 const mockUpload = jest.fn();
 let mockNativeModules: Record<string, unknown> = {};
@@ -15,6 +16,12 @@ jest.mock("react-native", () => ({
   get NativeModules() {
     return mockNativeModules;
   },
+  Platform: { OS: "ios", constants: {}, select: (o: any) => o.ios ?? o.default },
+  StyleSheet: { create: (s: any) => s },
+  findNodeHandle: () => 42,
+  requireNativeComponent: () => "VRTARSceneNavigator",
+  Text: "Text",
+  View: "View",
 }));
 
 import { uploadScanRecording } from "../components/AR/ViroVPSScanUpload";
@@ -59,12 +66,86 @@ describe("uploadScanRecording", () => {
 
     expect(result).toEqual(scan);
     expect(mockUpload).toHaveBeenCalledTimes(1);
-    const [endpoint, headersJson, createJson, dir] = mockUpload.mock.calls[0];
+    const [endpoint, headersJson, createJson, dir, scanId] = mockUpload.mock.calls[0];
     expect(endpoint).toBe("https://vps.example.com");
     expect(JSON.parse(headersJson)).toEqual({ "x-project-id": "p", "x-api-key": "k" });
     expect(JSON.parse(createJson)).toEqual({ location: { name: "Hall", lat: 1, lon: 2 } });
     expect(dir).toBe("/data/rec");
+    expect(scanId).toBe("");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("resumes an existing scan with options.scanId: no create body, the id goes to native", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: true, status: 202, body: JSON.stringify(scan), scan_id: "s1" })
+    );
+    const result = await uploadScanRecording(
+      "https://vps.example.com",
+      { projectId: "p", apiKey: "k" },
+      { location: { name: "Hall" } },
+      "/data/rec",
+      { scanId: "s1", outputs: ["mesh"], keepRecording: false }
+    );
+
+    expect(result).toEqual(scan);
+    const [, , createJson, dir, scanId] = mockUpload.mock.calls[0];
+    expect(createJson).toBe("");
+    expect(dir).toBe("/data/rec");
+    expect(scanId).toBe("s1");
+  });
+
+  it("names the scan on an upload failure, with or without an HTTP status", async () => {
+    const upload = (options: Record<string, unknown> = {}) =>
+      uploadScanRecording(
+        "https://vps.example.com",
+        { projectId: "p", apiKey: "k" },
+        { locationId: "l1" },
+        "/data/rec",
+        options
+      ).catch((e) => e);
+    const answer = (result: Record<string, unknown>) =>
+      mockUpload.mockResolvedValueOnce(JSON.stringify(result));
+
+    answer({
+      success: false,
+      stage: "upload",
+      status: 503,
+      body: JSON.stringify({ error: { code: "SERVER_STORAGE_FULL", message: "full" } }),
+      scan_id: "s9",
+    });
+    expect(await upload()).toMatchObject({
+      code: "SERVER_STORAGE_FULL",
+      status: 503,
+      scanId: "s9",
+    });
+
+    answer({
+      success: false,
+      stage: "upload",
+      error: "The network connection was lost.",
+      scan_id: "s9",
+    });
+    const lost = await upload();
+    expect(lost).toBeInstanceOf(ViroVPSError);
+    expect(lost.message).toBe("The network connection was lost.");
+    expect(lost.status).toBeUndefined();
+    expect(lost.code).toBeUndefined();
+    expect(lost.scanId).toBe("s9");
+
+    answer({
+      success: false,
+      stage: "create",
+      status: 429,
+      body: JSON.stringify({ error: { code: "VPS_USER_LIMIT_REACHED", message: "limit" } }),
+    });
+    expect((await upload()).scanId).toBeUndefined();
+
+    // A resumed upload names its scan whatever step failed.
+    answer({ success: false, stage: "zip", error: "video.mp4 is missing" });
+    expect(await upload({ scanId: "s5" })).toMatchObject({
+      message: "video.mp4 is missing",
+      scanId: "s5",
+    });
   });
 
   it("sends location_id for an existing location and a bearer token for a session", async () => {
@@ -82,6 +163,65 @@ describe("uploadScanRecording", () => {
     expect(JSON.parse(createJson)).toEqual({ location_id: "l1" });
   });
 
+  it("sends appUserId as x-app-user-id, and outputs and keep_recording in the create body", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: true, status: 202, body: JSON.stringify(scan) })
+    );
+    const credentials = jest.fn(async () => ({ projectId: "p", accessToken: "fresh" }));
+    await uploadScanRecording(
+      "https://vps.example.com",
+      credentials,
+      { locationId: "l1" },
+      "/data/rec",
+      { appUserId: "user-1", outputs: ["mesh", "semantic"], keepRecording: false }
+    );
+    expect(credentials).toHaveBeenCalledTimes(1);
+    const [, headersJson, createJson] = mockUpload.mock.calls[0];
+    expect(JSON.parse(headersJson)).toEqual({
+      "x-project-id": "p",
+      Authorization: "Bearer fresh",
+      "x-app-user-id": "user-1",
+    });
+    expect(JSON.parse(createJson)).toEqual({
+      location_id: "l1",
+      outputs: ["mesh", "semantic"],
+      keep_recording: false,
+    });
+  });
+
+  it("refuses options and an appUserId vps-server would refuse, before the native zip", async () => {
+    const upload = (options: Record<string, unknown>) =>
+      uploadScanRecording(
+        "https://vps.example.com",
+        { projectId: "p", apiKey: "k" },
+        { locationId: "l1" },
+        "/data/rec",
+        options as any
+      ).catch((e) => e);
+
+    expect(await upload({ outputs: ["semantic"] })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "semantic needs mesh",
+      status: undefined,
+    });
+    for (const outputs of [["mesh", "map"], "mesh", [null]]) {
+      expect(await upload({ outputs })).toMatchObject({
+        code: "BAD_REQUEST",
+        message: "outputs is a list of mesh, splat, semantic",
+      });
+    }
+    expect(await upload({ keepRecording: "false" })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "keepRecording is a boolean",
+    });
+    expect(await upload({ appUserId: "josé" })).toMatchObject({ code: "INVALID_APP_USER_ID" });
+    expect(await upload({ scanId: 7 })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "scanId is a string",
+    });
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
   it("reports a zip failure without an HTTP status: no scan was created", async () => {
     mockUpload.mockResolvedValue(
       JSON.stringify({ success: false, stage: "zip", error: "video.mp4 is missing" })
@@ -96,6 +236,7 @@ describe("uploadScanRecording", () => {
     expect(error).toBeInstanceOf(ViroVPSError);
     expect(error.message).toBe("video.mp4 is missing");
     expect(error.status).toBeUndefined();
+    expect(error.scanId).toBeUndefined();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -125,6 +266,69 @@ describe("uploadScanRecording", () => {
     mockNativeModules = {};
     await expect(
       uploadScanRecording("https://x", { projectId: "p", apiKey: "k" }, { locationId: "l" }, "/d")
-    ).rejects.toThrow(/not available/);
+    ).rejects.toMatchObject({ code: "UNSUPPORTED", message: expect.stringMatching(/not available/) });
+  });
+});
+
+describe("ViroARSceneNavigator forwarding", () => {
+  // Loaded after the native module is in place: the navigator reads it at import.
+  function navigatorWith(nativeModule: Record<string, unknown>) {
+    mockNativeModules = { VRTARSceneNavigatorModule: nativeModule };
+    let Navigator: any;
+    jest.isolateModules(() => {
+      Navigator = require("../components/AR/ViroARSceneNavigator").ViroARSceneNavigator;
+    });
+    return new Navigator({ initialScene: { scene: () => null } }).arSceneNavigator;
+  }
+
+  it("passes uploadScanRecording's scanId to the native upload", async () => {
+    mockUpload.mockResolvedValue(
+      JSON.stringify({ success: true, status: 202, body: JSON.stringify(scan), scan_id: "s1" })
+    );
+    const nav = navigatorWith({ rvUploadScanRecording: mockUpload });
+    await nav.uploadScanRecording(
+      "https://vps.example.com",
+      { projectId: "p", apiKey: "k" },
+      { locationId: "l1" },
+      "/data/rec",
+      { scanId: "s1" }
+    );
+    expect(mockUpload.mock.calls[0][4]).toBe("s1");
+  });
+
+  it("passes the map and mesh load numbers to native, and 0 when they are left out", async () => {
+    const nativeModule = {
+      rvLoadVPSMap: jest.fn(async () => JSON.stringify({ success: true })),
+      rvUnloadVPSMap: jest.fn(),
+      rvLoadVPSMapMesh: jest.fn(async () => JSON.stringify({ success: true })),
+      rvUnloadVPSMapMesh: jest.fn(),
+    };
+    const nav = navigatorWith(nativeModule);
+    const bytes = new Uint8Array([1, 2, 3]);
+    await nav.loadVPSMap(bytes, 3);
+    await nav.loadVPSMap(bytes);
+    nav.unloadVPSMap(3);
+    nav.unloadVPSMap();
+    await nav.loadVPSMapMesh(bytes, { physics: false }, 2);
+    await nav.loadVPSMapMesh(bytes);
+    nav.unloadVPSMapMesh(2);
+    nav.unloadVPSMapMesh();
+
+    expect(nativeModule.rvLoadVPSMap.mock.calls).toEqual([
+      [42, "AQID", 3],
+      [42, "AQID", 0],
+    ]);
+    expect(nativeModule.rvUnloadVPSMap.mock.calls).toEqual([
+      [42, 3],
+      [42, 0],
+    ]);
+    expect(nativeModule.rvLoadVPSMapMesh.mock.calls).toEqual([
+      [42, "AQID", true, false, 2],
+      [42, "AQID", true, true, 0],
+    ]);
+    expect(nativeModule.rvUnloadVPSMapMesh.mock.calls).toEqual([
+      [42, 2],
+      [42, 0],
+    ]);
   });
 });

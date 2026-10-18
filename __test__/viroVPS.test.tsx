@@ -2,20 +2,27 @@
  * Copyright © 2026 ReactVision
  *
  * <ViroVPS> lifecycle against a scripted navigator: what happens to a map
- * load that is still in flight when the component unmounts or tracking is
- * stopped or restarted, that polls never overlap, and that a native call that
+ * load that is still in flight when the component unmounts, tracking is
+ * stopped or restarted, or another <ViroVPS> on the same navigator loads its
+ * own map, that polls never overlap, and that a native call that
  * never answers ends in `error` instead of hanging. The map download itself
  * is mocked; only the component's own sequencing is under test.
  */
 jest.mock("../components/AR/ViroVPSMapDownload", () => ({
-  getLocationMapDownload: jest.fn(async (_e: string, _c: unknown, id: string) => ({
-    kind: "map",
-    scan_id: `scan_${id}`,
-    url: `https://vps.example.com/files/${id}`,
-    expires_at: 0,
-    bytes: 3,
-    quality: null,
-  })),
+  getLocationMapDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
+    const { ViroVPSError } = jest.requireActual("../components/AR/ViroVPSClient");
+    if (id === "loc_no_map") throw new ViroVPSError("the location has no active map", "NO_ASSET", 404);
+    if (id === "loc_unpaid") throw new ViroVPSError("VPS needs a paid plan", "PAID_PLAN_REQUIRED", 403);
+    if (id === "loc_offline") throw new ViroVPSError("Network request failed", "NETWORK_ERROR");
+    return {
+      kind: "map",
+      scan_id: `scan_${id}`,
+      url: `https://vps.example.com/files/${id}`,
+      expires_at: 0,
+      bytes: 3,
+      quality: null,
+    };
+  }),
   fetchMapBytes: jest.fn(async () => new Uint8Array([1, 2, 3])),
   findNearestMap: jest.fn(),
   getLocationWorldMeshDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
@@ -32,6 +39,7 @@ import * as React from "react";
 import { act } from "react";
 import TestRenderer, { ReactTestRenderer } from "react-test-renderer";
 import { ViroVPS, ViroVPSTrackingStateEvent } from "../components/AR/ViroVPS";
+import * as MapDownload from "../components/AR/ViroVPSMapDownload";
 import type {
   ViroVPSLocalizationResult,
   ViroVPSMapLoadResult,
@@ -125,7 +133,11 @@ describe("<ViroVPS> unmount", () => {
       loads[0].resolve({ success: true });
       await flush();
     });
-    await expect(started).resolves.toEqual({ success: false, error: "superseded" });
+    await expect(started).resolves.toEqual({
+      success: false,
+      error: "superseded",
+      errorDetail: { code: "SUPERSEDED", status: null, message: "superseded" },
+    });
 
     expect(nav.unloadVPSMap).toHaveBeenCalledTimes(1);
     expect(states.length).toBe(statesBeforeUnmount);
@@ -216,6 +228,36 @@ describe("<ViroVPS> superseded loads", () => {
     expect(nav.unloadVPSMap).not.toHaveBeenCalled();
   });
 
+  it("keeps a superseded load that lands first for the newer one, and drops it if that one fails", async () => {
+    const { nav, loads } = makeNav();
+    const { ref } = mount(nav);
+
+    await act(async () => {
+      ref.current!.startTracking("loc_a");
+      await flush();
+    });
+    let second!: Promise<unknown>;
+    await act(async () => {
+      second = ref.current!.startTracking("loc_b");
+      await flush();
+    });
+    nav.unloadVPSMap.mockClear();
+
+    // Native runs loads in order, so an unload now would land after loc_b's load.
+    await act(async () => {
+      loads[0].resolve({ success: true });
+      await flush();
+    });
+    expect(nav.unloadVPSMap).not.toHaveBeenCalled();
+
+    await act(async () => {
+      loads[1].resolve({ success: false, error: "bad map" });
+      await flush();
+    });
+    await expect(second).resolves.toMatchObject({ success: false, error: "bad map" });
+    expect(nav.unloadVPSMap).toHaveBeenCalledTimes(1);
+  });
+
   it("times out a load that never answers, and unloads it if it lands later", async () => {
     const { nav, loads } = makeNav();
     const { ref, states } = mount(nav, { loadTimeoutMs: 1000 });
@@ -240,6 +282,177 @@ describe("<ViroVPS> superseded loads", () => {
       await flush();
     });
     expect(nav.unloadVPSMap).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("<ViroVPS> two scenes on one navigator", () => {
+  // One map and one mesh slot, applied in call order as the native side does,
+  // so the covered scene's load lands before the newer scene's.
+  function slotNav() {
+    const slot: { map: string | null; mesh: string | null } = { map: null, mesh: null };
+    const pending: Record<"map" | "mesh", (() => void)[]> = { map: [], mesh: [] };
+    const load = (kind: "map" | "mesh") => () =>
+      new Promise<ViroVPSMapLoadResult>((resolve) => {
+        const name = `${kind}${pending[kind].length + 1}`;
+        pending[kind].push(() => {
+          slot[kind] = name;
+          resolve({ success: true });
+        });
+      });
+    const nav = {
+      loadVPSMap: jest.fn(load("map")),
+      unloadVPSMap: jest.fn(() => (slot.map = null)),
+      loadVPSMapMesh: jest.fn(load("mesh")),
+      unloadVPSMapMesh: jest.fn(() => (slot.mesh = null)),
+      getVPSLocalization: jest.fn(async () => ({
+        available: true,
+        loaded: slot.map !== null,
+        converged: false,
+      })),
+    };
+    return { nav, slot, pending };
+  }
+
+  it("leaves the new scene's map loaded when the covered scene's load lands late", async () => {
+    const { nav, slot, pending } = slotNav();
+    const covered = mount(nav);
+    await act(async () => {
+      covered.ref.current!.startTracking("loc_a");
+      await flush();
+    });
+    act(() => covered.renderer.unmount());
+    const shown = mount(nav);
+    await act(async () => {
+      shown.ref.current!.startTracking("loc_b");
+      await flush();
+    });
+
+    await act(async () => {
+      pending.map[0]();
+      pending.map[1]();
+      await flush();
+    });
+    expect(slot.map).toBe("map2");
+
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await flush();
+    });
+    expect(nav.getVPSLocalization).toHaveBeenCalled();
+    expect(shown.states.map((s) => s.state)).toEqual(["searching", "mapLoaded"]);
+  });
+
+  it("leaves the new scene's mesh loaded when the covered scene's mesh lands late", async () => {
+    const { nav, slot, pending } = slotNav();
+    const covered = mount(nav, { worldMesh: true });
+    await act(async () => {
+      covered.ref.current!.startTracking("loc_a");
+      await flush();
+      pending.map[0]();
+      await flush();
+    });
+    expect(pending.mesh.length).toBe(1);
+    act(() => covered.renderer.unmount());
+    const shown = mount(nav, { worldMesh: true });
+    await act(async () => {
+      shown.ref.current!.startTracking("loc_b");
+      await flush();
+      pending.map[1]();
+      await flush();
+    });
+    expect(pending.mesh.length).toBe(2);
+
+    await act(async () => {
+      pending.mesh[0]();
+      pending.mesh[1]();
+      await flush();
+    });
+    expect(slot).toEqual({ map: "map2", mesh: "mesh2" });
+  });
+
+  it("passes each load's number to the native load and to the unload that drops it", async () => {
+    const { nav, pending } = slotNav();
+    const covered = mount(nav, { worldMesh: true });
+    await act(async () => {
+      covered.ref.current!.startTracking("loc_a");
+      await flush();
+      pending.map[0]();
+      await flush();
+      pending.mesh[0]();
+      await flush();
+    });
+    act(() => covered.renderer.unmount());
+    const shown = mount(nav, { worldMesh: true });
+    await act(async () => {
+      shown.ref.current!.startTracking("loc_b");
+      await flush();
+      pending.map[1]();
+      await flush();
+      pending.mesh[1]();
+      await flush();
+    });
+    act(() => shown.ref.current!.stopTracking());
+
+    expect(nav.loadVPSMap.mock.calls.map((call: unknown[]) => call[1])).toEqual([1, 2]);
+    expect(nav.loadVPSMapMesh.mock.calls.map((call: unknown[]) => call[2])).toEqual([1, 2]);
+    expect(nav.unloadVPSMap.mock.calls).toEqual([[1], [2]]);
+    expect(nav.unloadVPSMapMesh.mock.calls).toEqual([[1], [2]]);
+  });
+
+  it("keeps the new scene's map when the native side applies the covered scene's load last", async () => {
+    // The native rule: a load is applied only while no newer load or unload
+    // has been called, and an unload naming a replaced load does nothing.
+    const slot = { map: null as string | null };
+    let requests = 0;
+    let newest = 0;
+    const finish: (() => void)[] = [];
+    const nav = {
+      loadVPSMap: jest.fn((_bytes: Uint8Array, load = 0) => {
+        newest = load;
+        const request = ++requests;
+        return new Promise<ViroVPSMapLoadResult>((resolve) => {
+          finish.push(() => {
+            if (request !== requests) return resolve({ success: false, error: "Superseded" });
+            slot.map = `map${load}`;
+            resolve({ success: true });
+          });
+        });
+      }),
+      unloadVPSMap: jest.fn((load = 0) => {
+        if (load !== 0 && load !== newest) return;
+        requests++;
+        slot.map = null;
+      }),
+      getVPSLocalization: jest.fn(async () => ({
+        available: true,
+        loaded: slot.map !== null,
+        converged: false,
+      })),
+    };
+
+    const covered = mount(nav);
+    await act(async () => {
+      covered.ref.current!.startTracking("loc_a");
+      await flush();
+    });
+    act(() => covered.renderer.unmount());
+    const shown = mount(nav);
+    await act(async () => {
+      shown.ref.current!.startTracking("loc_b");
+      await flush();
+    });
+
+    await act(async () => {
+      finish[1]();
+      await flush();
+      finish[0]();
+      await flush();
+      jest.advanceTimersByTime(100);
+      await flush();
+    });
+    expect(slot.map).toBe("map2");
+    expect(nav.getVPSLocalization).toHaveBeenCalled();
+    expect(shown.states.map((s) => s.state)).toEqual(["searching", "mapLoaded"]);
   });
 });
 
@@ -333,6 +546,72 @@ describe("<ViroVPS> polling", () => {
 
     const errors = states.filter((s) => s.state === "error").map((s) => s.error);
     expect(errors).toEqual(["first", "second"]);
+    expect(states.filter((s) => s.state === "error").map((s) => s.errorDetail)).toEqual([
+      { code: "LOCALIZATION_UNAVAILABLE", status: null, message: "first" },
+      { code: "LOCALIZATION_UNAVAILABLE", status: null, message: "second" },
+    ]);
+  });
+});
+
+describe("<ViroVPS> errors and credentials", () => {
+  it("reports vps-server's code and status, and a null status when there was no response", async () => {
+    const { nav } = makeNav();
+    const { ref, states } = mount(nav);
+
+    const results: any[] = [];
+    for (const id of ["loc_no_map", "loc_unpaid", "loc_offline"]) {
+      await act(async () => {
+        results.push(await ref.current!.startTracking(id));
+      });
+    }
+
+    const expected = [
+      { code: "NO_ASSET", status: 404, message: "the location has no active map" },
+      { code: "PAID_PLAN_REQUIRED", status: 403, message: "VPS needs a paid plan" },
+      { code: "NETWORK_ERROR", status: null, message: "Network request failed" },
+    ];
+    expect(results.map((r) => r.errorDetail)).toEqual(expected);
+    expect(results.map((r) => r.error)).toEqual(expected.map((e) => e.message));
+    expect(states.filter((s) => s.state === "error").map((s) => s.errorDetail)).toEqual(expected);
+    expect(nav.loadVPSMap).not.toHaveBeenCalled();
+  });
+
+  it("reports unsupported, without searching, for a navigator with no VPS (as on web)", async () => {
+    const { ref, states } = mount(undefined);
+    let result: any;
+    await act(async () => {
+      result = await ref.current!.startTracking("loc_a");
+    });
+    const errorDetail = {
+      code: "UNSUPPORTED",
+      status: null,
+      message: "This navigator does not expose loadVPSMap",
+    };
+    expect(result).toEqual({ success: false, error: errorDetail.message, errorDetail });
+    expect(states).toEqual([
+      { state: "unsupported", error: errorDetail.message, errorDetail },
+    ]);
+  });
+
+  it("hands each request a credentials function that reads the host's again, with appUserId", async () => {
+    const { nav, loads } = makeNav();
+    let token = "t1";
+    const credentials = jest.fn(async () => ({ projectId: "p", accessToken: token }));
+    const { ref } = mount(nav, { credentials, appUserId: "user-1" });
+    await act(async () => {
+      const started = ref.current!.startTracking("loc_a");
+      await flush();
+      loads[0].resolve({ success: true });
+      await started;
+    });
+
+    const calls = (MapDownload.getLocationMapDownload as jest.Mock).mock.calls;
+    const passed = calls[calls.length - 1][1];
+    expect(typeof passed).toBe("function");
+    await expect(passed()).resolves.toEqual({ projectId: "p", accessToken: "t1", appUserId: "user-1" });
+    token = "t2";
+    await expect(passed()).resolves.toEqual({ projectId: "p", accessToken: "t2", appUserId: "user-1" });
+    expect(credentials).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -363,10 +642,11 @@ describe("<ViroVPS> worldMesh", () => {
     const events: unknown[] = [];
     const { ref } = mount(nav, { worldMesh: { physics: false }, onWorldMesh: (e: unknown) => events.push(e) });
     await track(ref, loads, "loc_a");
-    expect(nav.loadVPSMapMesh).toHaveBeenCalledWith(new Uint8Array([82, 86, 87, 77]), {
-      occlusion: true,
-      physics: false,
-    });
+    expect(nav.loadVPSMapMesh).toHaveBeenCalledWith(
+      new Uint8Array([82, 86, 87, 77]),
+      { occlusion: true, physics: false },
+      1
+    );
     expect(events).toEqual([{ locationId: "loc_a", success: true, error: undefined }]);
 
     act(() => ref.current!.stopTracking());

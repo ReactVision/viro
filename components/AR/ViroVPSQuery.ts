@@ -16,10 +16,11 @@
 
 import type { ViroVPSQueryFrame } from "../Types/ViroEvents";
 import {
-  ViroVPSCredentials,
+  ViroVPSCredentialsSource,
   throwIfVPSError,
   vpsAuthHeaders,
   vpsBaseUrl,
+  vpsFetch,
 } from "./ViroVPSClient";
 
 /** One location the server matched the image to, best first. */
@@ -105,7 +106,7 @@ function asciiBytes(s: string): Uint8Array {
  */
 export async function queryLocationsByImage(
   endpoint: string,
-  credentials: ViroVPSCredentials,
+  credentials: ViroVPSCredentialsSource,
   frame: ViroVPSQueryFrame,
   options: ViroVPSQueryOptions = {}
 ): Promise<ViroVPSQueryCandidate[]> {
@@ -119,10 +120,10 @@ export async function queryLocationsByImage(
   }
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
-  const response = await fetch(`${vpsBaseUrl(endpoint)}/vps/locations/query`, {
+  const response = await vpsFetch(`${vpsBaseUrl(endpoint)}/vps/locations/query`, {
     method: "POST",
     headers: {
-      ...vpsAuthHeaders(credentials),
+      ...(await vpsAuthHeaders(credentials)),
       "Content-Type": `multipart/form-data; boundary=${boundary}`,
     },
     body: body as unknown as BodyInit,

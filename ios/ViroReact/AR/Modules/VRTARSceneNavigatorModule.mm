@@ -35,9 +35,22 @@
 #import <CoreLocation/CoreLocation.h>
 #import <zlib.h>
 #include <stdio.h>
+#include <map>
+#include <mutex>
+#include <string>
 #include <vector>
 
-@implementation VRTARSceneNavigatorModule
+// One navigator's VPS map or mesh slot; see rv_requestVPSLoad:.
+struct RVVPSSlot {
+    uint64_t requests = 0;   // load and unload requests counted so far
+    uint64_t applied = 0;    // the newest request that has changed the slot
+    double newestLoad = 0;   // the caller's number for the newest load request
+};
+
+@implementation VRTARSceneNavigatorModule {
+    std::mutex _vpsSlotsMutex;
+    std::map<std::string, RVVPSSlot> _vpsSlots;
+}
 @synthesize bridge = _bridge;
 // Views are looked up through RCTViewRegistry, not the NSDictionary the legacy
 // RCTUIManager block hands out: under the new architecture that dictionary
@@ -1225,6 +1238,55 @@ static NSString *RVJsonString(NSDictionary *object) {
     return json ?: @"{\"success\":false,\"error\":\"Could not encode the result\"}";
 }
 
+// A navigator holds one VPS map and one mesh. Each load and unload request is
+// counted when it arrives here, in call order, and a load is applied only
+// while it is still the newest request for its slot: the decodes run on a
+// concurrent queue, so an older load can finish after a newer one and must
+// not replace it. An unload is skipped once a load requested after it has
+// been applied, since rv_withViewForTag can retry its block past that load's.
+// `load` is the caller's number for a load (<ViroVPS> counts them per
+// navigator). An unload naming a load that a newer load request has replaced
+// does nothing; 0 names no load, and an unload of 0 always runs.
+static NSString *const kRVVPSSuperseded = @"Superseded by a newer load or unload";
+
+static std::string RVVPSSlotKey(const char *slot, NSNumber *reactTag) {
+    return std::string(slot) + ":" + std::to_string(reactTag.longLongValue);
+}
+
+- (uint64_t)rv_requestVPSLoad:(const char *)slot tag:(NSNumber *)reactTag load:(double)load {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    s.newestLoad = load;
+    return ++s.requests;
+}
+
+- (BOOL)rv_isNewestVPSRequest:(uint64_t)request slot:(const char *)slot tag:(NSNumber *)reactTag {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    return _vpsSlots[RVVPSSlotKey(slot, reactTag)].requests == request;
+}
+
+- (void)rv_noteVPSApplied:(uint64_t)request slot:(const char *)slot tag:(NSNumber *)reactTag {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    if (request > s.applied) s.applied = request;
+}
+
+// 0 when the unload does nothing; requests are numbered from 1.
+- (uint64_t)rv_requestVPSUnload:(const char *)slot tag:(NSNumber *)reactTag load:(double)load {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    if (load != 0 && load != s.newestLoad) return 0;
+    return ++s.requests;
+}
+
+- (BOOL)rv_claimVPSUnload:(uint64_t)request slot:(const char *)slot tag:(NSNumber *)reactTag {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    if (s.applied > request) return NO;
+    s.applied = request;
+    return YES;
+}
+
 // Loads a downloaded .rvmap's raw bytes (base64, same transport
 // VRTStreamingAudioModule.pushSamples uses) for continuous VPS localisation.
 // Resolves the renderer's own JSON verbatim ({"success":...}), same reasoning
@@ -1236,8 +1298,10 @@ static NSString *RVJsonString(NSDictionary *object) {
 // background queue too; that has not been done or measured yet.
 RCT_EXPORT_METHOD(rvLoadVPSMap:(nonnull NSNumber *)reactTag
                     rvmapBase64:(NSString *)rvmapBase64
+                           load:(double)load
                         resolve:(RCTPromiseResolveBlock)resolve
                          reject:(RCTPromiseRejectBlock)reject) {
+    uint64_t request = [self rv_requestVPSLoad:"map" tag:reactTag load:load];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSData *rvmapData = rvmapBase64
             ? [[NSData alloc] initWithBase64EncodedString:rvmapBase64 options:0]
@@ -1249,11 +1313,15 @@ RCT_EXPORT_METHOD(rvLoadVPSMap:(nonnull NSNumber *)reactTag
         dispatch_async(RCTGetUIManagerQueue(), ^{
             [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
                 @try {
+                    if (![self rv_isNewestVPSRequest:request slot:"map" tag:reactTag]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": kRVVPSSuperseded})); return;
+                    }
                     VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
                     if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                         resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
                     }
                     BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMap:rvmapData];
+                    if (ok) [self rv_noteVPSApplied:request slot:"map" tag:reactTag];
                     resolve(RVJsonString(@{@"success": @(ok)}));
                 } @catch (NSException *ex) {
                     resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
@@ -1263,9 +1331,12 @@ RCT_EXPORT_METHOD(rvLoadVPSMap:(nonnull NSNumber *)reactTag
     });
 }
 
-RCT_EXPORT_METHOD(rvUnloadVPSMap:(nonnull NSNumber *)reactTag) {
+RCT_EXPORT_METHOD(rvUnloadVPSMap:(nonnull NSNumber *)reactTag load:(double)load) {
+    uint64_t request = [self rv_requestVPSUnload:"map" tag:reactTag load:load];
+    if (request == 0) return;
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
+            if (![self rv_claimVPSUnload:request slot:"map" tag:reactTag]) return;
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
             [(VRTARSceneNavigator *)view rvUnloadVPSMap];
@@ -1279,8 +1350,10 @@ RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
                         rvwmBase64:(NSString *)rvwmBase64
                          occlusion:(BOOL)occlusion
                            physics:(BOOL)physics
+                              load:(double)load
                            resolve:(RCTPromiseResolveBlock)resolve
                             reject:(RCTPromiseRejectBlock)reject) {
+    uint64_t request = [self rv_requestVPSLoad:"mesh" tag:reactTag load:load];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSData *rvwmData = rvwmBase64
             ? [[NSData alloc] initWithBase64EncodedString:rvwmBase64 options:0]
@@ -1292,6 +1365,9 @@ RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
         dispatch_async(RCTGetUIManagerQueue(), ^{
             [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
                 @try {
+                    if (![self rv_isNewestVPSRequest:request slot:"mesh" tag:reactTag]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": kRVVPSSuperseded})); return;
+                    }
                     VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
                     if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
                         resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
@@ -1299,6 +1375,7 @@ RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
                     BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMapMesh:rvwmData
                                                                   occlusion:occlusion
                                                                     physics:physics];
+                    if (ok) [self rv_noteVPSApplied:request slot:"mesh" tag:reactTag];
                     resolve(ok ? RVJsonString(@{@"success": @YES})
                                : RVJsonString(@{@"success": @NO, @"error": @"Not an RVWM mesh, or no AR scene"}));
                 } @catch (NSException *ex) {
@@ -1329,9 +1406,12 @@ RCT_EXPORT_METHOD(rvCaptureVPSQueryFrame:(nonnull NSNumber *)reactTag
     }];
 }
 
-RCT_EXPORT_METHOD(rvUnloadVPSMapMesh:(nonnull NSNumber *)reactTag) {
+RCT_EXPORT_METHOD(rvUnloadVPSMapMesh:(nonnull NSNumber *)reactTag load:(double)load) {
+    uint64_t request = [self rv_requestVPSUnload:"mesh" tag:reactTag load:load];
+    if (request == 0) return;
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
+            if (![self rv_claimVPSUnload:request slot:"mesh" tag:reactTag]) return;
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
             if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
             [(VRTARSceneNavigator *)view rvUnloadVPSMapMesh];
@@ -1530,21 +1610,42 @@ static NSString *RVBodyString(NSData *data) {
     return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
 }
 
+// /vps/scans/{scanId}/recording, the id escaped as one path segment.
+static NSString *RVScanRecordingPath(NSString *scanId) {
+    NSMutableCharacterSet *allowed = [[NSCharacterSet URLPathAllowedCharacterSet] mutableCopy];
+    [allowed removeCharactersInString:@"/"];
+    NSString *escapedId = [scanId stringByAddingPercentEncodingWithAllowedCharacters:allowed] ?: scanId;
+    return [NSString stringWithFormat:@"/vps/scans/%@/recording", escapedId];
+}
+
+// An upload result as JSON, with scan_id when the scan exists on the server.
+static NSString *RVScanUploadResult(NSDictionary *result, NSString *scanId) {
+    if (scanId.length == 0) return RVJsonString(result);
+    NSMutableDictionary *withId = [result mutableCopy];
+    withId[@"scan_id"] = scanId;
+    return RVJsonString(withId);
+}
+
 // Zips a ViroReact AR recording (session.jsonl + video.mp4 in recordingDir)
 // into a temp file and uploads it to vps-server: POST {endpoint}/vps/scans
 // with createBodyJson, then PUT the zip to the returned upload_path with
-// Content-Type application/zip, streamed from the file. The zip is written
-// before the POST so a recording that cannot be read never creates a scan.
-// headersJson is the credential headers as a JSON object. Resolves a JSON
-// string: {success, stage?: "zip"|"create"|"upload", status?, body?, error?}.
-// Not tied to a navigator view: it only reads files and talks HTTP.
+// Content-Type application/zip, streamed from the file. A non-empty scanId
+// resumes that scan instead: no POST, and the zip goes to
+// /vps/scans/{scanId}/recording. The zip is written before the POST so a
+// recording that cannot be read never creates a scan. headersJson is the
+// credential headers as a JSON object. Resolves a JSON string:
+// {success, stage?: "zip"|"create"|"upload", status?, body?, error?, scan_id?},
+// with scan_id whenever the scan exists. Not tied to a navigator view: it
+// only reads files and talks HTTP.
 RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
                             headersJson:(NSString *)headersJson
                          createBodyJson:(NSString *)createBodyJson
                            recordingDir:(NSString *)recordingDir
+                                 scanId:(NSString *)resumeScanId
                                 resolve:(RCTPromiseResolveBlock)resolve
                                  reject:(RCTPromiseRejectBlock)reject) {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSString *existingScanId = resumeScanId.length > 0 ? resumeScanId : nil;
         NSDictionary *headers = nil;
         NSData *headerData = [headersJson dataUsingEncoding:NSUTF8StringEncoding];
         if (headerData) {
@@ -1552,9 +1653,11 @@ RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
             if ([parsed isKindOfClass:[NSDictionary class]]) headers = parsed;
         }
         NSURL *createURL = [NSURL URLWithString:[endpoint stringByAppendingString:@"/vps/scans"]];
-        if (!headers || !createURL || createBodyJson.length == 0 || recordingDir.length == 0) {
-            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip",
-                                   @"error": @"Invalid endpoint, headers, scan target or recording directory"}));
+        if (!headers || !createURL || (!existingScanId && createBodyJson.length == 0) ||
+            recordingDir.length == 0) {
+            resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"zip",
+                                         @"error": @"Invalid endpoint, headers, scan target or recording directory"},
+                                       existingScanId));
             return;
         }
 
@@ -1562,12 +1665,61 @@ RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
             [NSString stringWithFormat:@"vps-scan-%@.zip", [NSUUID UUID].UUIDString]];
         NSString *zipError = RVWriteStoredZip(zipPath, recordingDir, RVScanRecordingFiles());
         if (zipError) {
-            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": zipError}));
+            resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"zip", @"error": zipError},
+                                       existingScanId));
             return;
         }
         void (^cleanup)(void) = ^{
             [[NSFileManager defaultManager] removeItemAtPath:zipPath error:nil];
         };
+        NSURLSession *session = [NSURLSession sharedSession];
+
+        // PUTs the zip into a scan that exists, so every result names it.
+        void (^upload)(NSString *, NSString *) = ^(NSString *scanId, NSString *uploadPath) {
+            NSURL *uploadURL = [NSURL URLWithString:[endpoint stringByAppendingString:uploadPath]];
+            if (!uploadURL) {
+                cleanup();
+                resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"upload",
+                                             @"error": @"Invalid upload URL"}, scanId));
+                return;
+            }
+
+            NSMutableURLRequest *put = [NSMutableURLRequest requestWithURL:uploadURL];
+            put.HTTPMethod = @"PUT";
+            // Idle timeout between packets, not a cap on the whole transfer.
+            put.timeoutInterval = 120;
+            for (id key in headers) {
+                id value = headers[key];
+                if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+                    [put setValue:value forHTTPHeaderField:key];
+                }
+            }
+            [put setValue:@"application/zip" forHTTPHeaderField:@"Content-Type"];
+
+            [[session uploadTaskWithRequest:put
+                                   fromFile:[NSURL fileURLWithPath:zipPath]
+                          completionHandler:^(NSData *putData, NSURLResponse *putResponse, NSError *putError) {
+                cleanup();
+                if (putError) {
+                    resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"upload",
+                                                 @"error": putError.localizedDescription ?: @"Upload failed"},
+                                               scanId));
+                    return;
+                }
+                NSInteger putStatus = [putResponse isKindOfClass:[NSHTTPURLResponse class]]
+                    ? ((NSHTTPURLResponse *)putResponse).statusCode : 0;
+                BOOL ok = putStatus >= 200 && putStatus < 300;
+                NSMutableDictionary *result = [@{@"success": @(ok), @"status": @(putStatus),
+                                                 @"body": RVBodyString(putData)} mutableCopy];
+                if (!ok) result[@"stage"] = @"upload";
+                resolve(RVScanUploadResult(result, scanId));
+            }] resume];
+        };
+
+        if (existingScanId) {
+            upload(existingScanId, RVScanRecordingPath(existingScanId));
+            return;
+        }
 
         NSMutableURLRequest *create = [NSMutableURLRequest requestWithURL:createURL];
         create.HTTPMethod = @"POST";
@@ -1581,7 +1733,6 @@ RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
         [create setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
         create.HTTPBody = [createBodyJson dataUsingEncoding:NSUTF8StringEncoding];
 
-        NSURLSession *session = [NSURLSession sharedSession];
         [[session dataTaskWithRequest:create
                     completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
             if (error) {
@@ -1609,47 +1760,9 @@ RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
             }
             NSString *uploadPath = scan[@"upload_path"];
             if (![uploadPath isKindOfClass:[NSString class]] || ![uploadPath hasPrefix:@"/"]) {
-                NSString *escapedId = [scanId stringByAddingPercentEncodingWithAllowedCharacters:
-                                       [NSCharacterSet URLPathAllowedCharacterSet]] ?: scanId;
-                uploadPath = [NSString stringWithFormat:@"/vps/scans/%@/recording", escapedId];
+                uploadPath = RVScanRecordingPath(scanId);
             }
-            NSURL *uploadURL = [NSURL URLWithString:[endpoint stringByAppendingString:uploadPath]];
-            if (!uploadURL) {
-                cleanup();
-                resolve(RVJsonString(@{@"success": @NO, @"stage": @"upload",
-                                       @"error": @"Invalid upload URL"}));
-                return;
-            }
-
-            NSMutableURLRequest *put = [NSMutableURLRequest requestWithURL:uploadURL];
-            put.HTTPMethod = @"PUT";
-            // Idle timeout between packets, not a cap on the whole transfer.
-            put.timeoutInterval = 120;
-            for (id key in headers) {
-                id value = headers[key];
-                if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
-                    [put setValue:value forHTTPHeaderField:key];
-                }
-            }
-            [put setValue:@"application/zip" forHTTPHeaderField:@"Content-Type"];
-
-            [[session uploadTaskWithRequest:put
-                                   fromFile:[NSURL fileURLWithPath:zipPath]
-                          completionHandler:^(NSData *putData, NSURLResponse *putResponse, NSError *putError) {
-                cleanup();
-                if (putError) {
-                    resolve(RVJsonString(@{@"success": @NO, @"stage": @"upload",
-                                           @"error": putError.localizedDescription ?: @"Upload failed"}));
-                    return;
-                }
-                NSInteger putStatus = [putResponse isKindOfClass:[NSHTTPURLResponse class]]
-                    ? ((NSHTTPURLResponse *)putResponse).statusCode : 0;
-                BOOL ok = putStatus >= 200 && putStatus < 300;
-                NSMutableDictionary *result = [@{@"success": @(ok), @"status": @(putStatus),
-                                                 @"body": RVBodyString(putData)} mutableCopy];
-                if (!ok) result[@"stage"] = @"upload";
-                resolve(RVJsonString(result));
-            }] resume];
+            upload(scanId, uploadPath);
         }] resume];
     });
 }

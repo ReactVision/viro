@@ -19,8 +19,8 @@ import {
   ViroVPSSemanticObject,
 } from "./ViroVPSMapDownload";
 import { pickVisualCandidate, queryLocationsByImage } from "./ViroVPSQuery";
-import { ViroVPSError } from "./ViroVPSClient";
-import type { ViroVPSCredentials } from "./ViroVPSClient";
+import { resolveVPSCredentials, ViroVPSError } from "./ViroVPSClient";
+import type { ViroVPSCredentials, ViroVPSCredentialsSource } from "./ViroVPSClient";
 import type { ViroARSceneNavigator } from "./ViroARSceneNavigator";
 import {
   nextTrackingPhase,
@@ -30,19 +30,47 @@ import {
   ViroVPSTrackingState,
 } from "./ViroVPSTracking";
 
+/**
+ * Why a VPS step failed. `code` is vps-server's own `error.code` when the
+ * failure is its answer (such as `NO_ASSET` for a location with no map yet,
+ * `PAID_PLAN_REQUIRED` or `mfa_required`), `HTTP_ERROR` for an error answer
+ * without one, or one of these, set on the device:
+ *
+ * - `NETWORK_ERROR`: a request got no response.
+ * - `CREDENTIALS_UNAVAILABLE`: the `credentials` function threw or rejected.
+ * - `INVALID_APP_USER_ID`: `appUserId` breaks the rule in `ViroVPSCredentials.appUserId`.
+ * - `UNSUPPORTED`: the navigator cannot do it; the state is `unsupported`.
+ * - `NO_LOCATION`: `"auto"` or `"visual"` found no location with a map.
+ * - `MAP_LOAD_FAILED`: the native map load failed or did not answer.
+ * - `LOCALIZATION_UNAVAILABLE`: a localisation poll failed or did not answer.
+ * - `SUPERSEDED`: a newer `startTracking()`, `stopTracking()` or unmount took over.
+ * - `UNKNOWN`: anything else.
+ */
+export type ViroVPSErrorDetail = {
+  code: string;
+  /** The HTTP status of vps-server's answer; null when there was no answer. */
+  status: number | null;
+  /** The same text as the `error` string beside it. */
+  message: string;
+};
+
 /** Result of a `startTracking()` call — the same shape `loadVPSMap()` resolves with. */
 export type ViroVPSStartTrackingResult = {
   success: boolean;
   /** The location actually tracked — the resolved id in `"auto"` mode, or the id passed in. */
   locationId?: string;
   error?: string;
+  /** Present with `error`. */
+  errorDetail?: ViroVPSErrorDetail;
 };
 
 export type ViroVPSTrackingStateEvent = {
   state: ViroVPSTrackingState;
   locationId?: string;
-  /** Present only when `state` is `"error"`. */
+  /** Present only when `state` is `"error"` or `"unsupported"`. */
   error?: string;
+  /** Present with `error`. */
+  errorDetail?: ViroVPSErrorDetail;
 };
 
 export type ViroVPSWorldMeshEvent = {
@@ -99,8 +127,20 @@ export type ViroVPSProps = {
   /** vps-server's base URL, e.g. `"https://vps.example.com"`. */
   endpoint: string;
 
-  /** Project credentials for vps-server — see `ViroVPSCredentials`. */
-  credentials: ViroVPSCredentials;
+  /**
+   * Project credentials for vps-server (see `ViroVPSCredentials`), or a
+   * function returning them. A function is called before every request (each
+   * location lookup, image query and map download), so a short-lived token
+   * the host refreshes is used without a re-render.
+   */
+  credentials: ViroVPSCredentialsSource;
+
+  /**
+   * The app's own id for its signed-in user, sent as `x-app-user-id` on every
+   * vps-server request; see `ViroVPSCredentials.appUserId`. Replaces one
+   * given in `credentials`.
+   */
+  appUserId?: string;
 
   /**
    * Search radius for `startTracking("auto")`, in meters. Default 200 —
@@ -183,7 +223,11 @@ export type ViroVPSProps = {
 
 type State = { phase: ViroVPSTrackingPhase };
 
-const SUPERSEDED: ViroVPSStartTrackingResult = { success: false, error: "superseded" };
+const SUPERSEDED: ViroVPSStartTrackingResult = {
+  success: false,
+  error: "superseded",
+  errorDetail: { code: "SUPERSEDED", status: null, message: "superseded" },
+};
 const SUPERSEDED_SEARCH = Symbol("superseded");
 
 type FoundLocation = { locationId: string; map: ViroVPSMapDownload };
@@ -209,6 +253,42 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<Timed<T>> {
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
+}
+
+function localError(code: string, message: string): ViroVPSErrorDetail {
+  return { code, status: null, message };
+}
+
+function toErrorDetail(e: unknown): ViroVPSErrorDetail {
+  if (e instanceof ViroVPSError) {
+    return {
+      code: e.code ?? (e.status !== undefined ? "HTTP_ERROR" : "UNKNOWN"),
+      status: e.status ?? null,
+      message: e.message,
+    };
+  }
+  return localError("UNKNOWN", errorMessage(e));
+}
+
+// A navigator holds one map and one mesh, shared by every <ViroVPS> on it
+// (a covered scene's and the one on screen). Each load takes the next number
+// for its slot, and a slot is unloaded only on behalf of its newest load, so
+// a late load from a covered scene never unloads the newer scene's map. The
+// native load and unload take the same number. Natively, a load is not
+// applied when another load, or an unload that runs, was called after it, and
+// an unload naming a replaced load does nothing, whatever order the native
+// side finishes them in.
+type NavigatorLoads = { map: number; mesh: number };
+const navigatorLoads = new WeakMap<object, NavigatorLoads>();
+
+function newestLoad(nav: object, slot: keyof NavigatorLoads): number {
+  return navigatorLoads.get(nav)?.[slot] ?? 0;
+}
+
+function startLoad(nav: object, slot: keyof NavigatorLoads): number {
+  const loads = navigatorLoads.get(nav) ?? { map: 0, mesh: 0 };
+  navigatorLoads.set(nav, loads);
+  return ++loads[slot];
 }
 
 /**
@@ -274,8 +354,10 @@ function errorMessage(e: unknown): string {
  *
  * Unmounting stops polling and unloads the map this component loaded. A map
  * load still in flight when `stopTracking()`, a newer `startTracking()` or
- * unmount supersedes it is unloaded when it lands, unless a newer call has
- * loaded its own map by then. No callback fires after unmount.
+ * unmount supersedes it is unloaded when it lands, unless a newer load has
+ * started on the same navigator by then, from this `<ViroVPS>` or another
+ * one: the navigator holds one map, and the newest load owns it. The mesh
+ * works the same way. No callback fires after unmount.
  *
  * ```tsx
  * const vpsRef = useRef<ViroVPS>(null);
@@ -316,9 +398,14 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   // The session whose map is loaded natively, if this component loaded one
   // and has not unloaded it since.
   private _loadedSession: number | undefined;
+  // This component's newest map load on the navigator (see startLoad); 0 before its first.
+  private _mapLoad = 0;
   // Source of truth for transitions; this.state may lag behind a batched setState.
   private _phase: ViroVPSTrackingPhase = VPS_TRACKING_IDLE;
   private _lastError: string | undefined;
+
+  private _credentials = (): Promise<ViroVPSCredentials> =>
+    resolveVPSCredentials(this.props.credentials, this.props.appUserId);
 
   componentDidMount() {
     this._mounted = true;
@@ -334,10 +421,13 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     }
   }
 
-  private _unloadNative() {
+  /** Unloads the map and mesh, unless a load started after `mapLoad` owns them now. */
+  private _unloadNative(mapLoad = this._mapLoad) {
+    const nav = this.props.arSceneNavigator;
+    if (!nav || newestLoad(nav, "map") !== mapLoad) return;
     try {
-      this.props.arSceneNavigator?.unloadVPSMap?.();
-      this.props.arSceneNavigator?.unloadVPSMapMesh?.();
+      nav.unloadVPSMap?.(mapLoad);
+      nav.unloadVPSMapMesh?.(newestLoad(nav, "mesh"));
     } catch {
       // The navigator may already be unmounted; nothing left to unload then.
     }
@@ -362,16 +452,19 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     try {
       const download = await getLocationWorldMeshDownload(
         this.props.endpoint,
-        this.props.credentials,
+        this._credentials,
         locationId
       );
       if (session !== this._session) return;
       const bytes = await fetchAssetBytes(download);
       if (session !== this._session) return;
-      const result = await nav.loadVPSMapMesh(bytes, { occlusion, physics });
+      const meshLoad = startLoad(nav, "mesh");
+      const result = await nav.loadVPSMapMesh(bytes, { occlusion, physics }, meshLoad);
       if (session !== this._session) {
-        // Superseded while loading: whatever is current owns the mesh slot.
-        if (result?.success && this._loadedSession === undefined) nav.unloadVPSMapMesh?.();
+        // Superseded while loading: a mesh load started since owns the slot.
+        if (result?.success && newestLoad(nav, "mesh") === meshLoad) {
+          nav.unloadVPSMapMesh?.(meshLoad);
+        }
         return;
       }
       report({ locationId, success: !!result?.success, error: result?.error });
@@ -384,25 +477,20 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     }
   }
 
-  /**
-   * A load that resolved for a session that is no longer current (or after
-   * its timeout): drop it, unless a newer session has loaded its own map.
-   */
-  private _dropOrphanLoad() {
-    if (this._loadedSession === undefined) {
-      this._unloadNative();
-    }
-  }
-
-  private _setPhase(phase: ViroVPSTrackingPhase, locationId: string | undefined, error?: string) {
+  private _setPhase(
+    phase: ViroVPSTrackingPhase,
+    locationId: string | undefined,
+    errorDetail?: ViroVPSErrorDetail
+  ) {
     if (!this._mounted) return;
+    const error = errorDetail?.message;
     const changed =
       phase.state !== this._phase.state || (phase.state === "error" && error !== this._lastError);
     this._phase = phase;
     this._lastError = phase.state === "error" ? error : undefined;
     this.setState({ phase });
     if (changed) {
-      this.props.onTrackingState?.({ state: phase.state, locationId, error });
+      this.props.onTrackingState?.({ state: phase.state, locationId, error, errorDetail });
     }
   }
 
@@ -463,7 +551,12 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     this._setPhase(
       next,
       locationId,
-      next.state === "error" ? localization.error ?? "VPS localisation unavailable" : undefined
+      next.state === "error"
+        ? localError(
+            "LOCALIZATION_UNAVAILABLE",
+            localization.error ?? "VPS localisation unavailable"
+          )
+        : undefined
     );
 
     if (next.state === "idle") {
@@ -513,12 +606,15 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
       this._loadedSession = undefined;
       this._unloadNative();
     }
-    this._setPhase({ state: "searching", everConverged: false }, undefined);
-
     const nav = this.props.arSceneNavigator;
     if (!nav?.loadVPSMap) {
-      return this._fail(session, undefined, "This navigator does not expose loadVPSMap");
+      return this._fail(
+        session,
+        undefined,
+        localError("UNSUPPORTED", "This navigator does not expose loadVPSMap")
+      );
     }
+    this._setPhase({ state: "searching", everConverged: false }, undefined);
 
     let resolvedId: string;
     let mapDownload: ViroVPSMapDownload;
@@ -533,12 +629,12 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         resolvedId = locationId;
         mapDownload = await getLocationMapDownload(
           this.props.endpoint,
-          this.props.credentials,
+          this._credentials,
           locationId
         );
       }
     } catch (e) {
-      return this._fail(session, undefined, errorMessage(e));
+      return this._fail(session, undefined, toErrorDetail(e));
     }
     if (session !== this._session) return SUPERSEDED;
 
@@ -546,14 +642,20 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     try {
       bytes = await fetchMapBytes(mapDownload);
     } catch (e) {
-      return this._fail(session, resolvedId, errorMessage(e));
+      return this._fail(session, resolvedId, toErrorDetail(e));
     }
     if (session !== this._session) return SUPERSEDED;
 
     const loadTimeoutMs = this.props.loadTimeoutMs ?? 30000;
+    const mapLoad = startLoad(nav, "map");
+    this._mapLoad = mapLoad;
+    // For a load nothing wants any more: superseded, timed out or failed. A
+    // failed one counts because an older load that landed meanwhile was kept
+    // for it.
+    const dropLoad = () => this._unloadNative(mapLoad);
     let loadCall: Promise<ViroVPSMapLoadResult>;
     try {
-      loadCall = Promise.resolve(nav.loadVPSMap(bytes));
+      loadCall = Promise.resolve(nav.loadVPSMap(bytes, mapLoad));
     } catch (e) {
       loadCall = Promise.reject(e);
     }
@@ -562,30 +664,29 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     try {
       const timed = await withTimeout(loadCall, loadTimeoutMs);
       if (timed.timedOut) {
-        // The native load may still land later; drop it if it does.
-        loadCall.then(
-          (late) => {
-            if (late?.success) this._dropOrphanLoad();
-          },
-          () => {}
-        );
+        // The native load may still land later; drop it when it settles.
+        loadCall.then(dropLoad, dropLoad);
         return this._fail(
           session,
           resolvedId,
-          `loadVPSMap did not answer within ${loadTimeoutMs} ms`
+          localError("MAP_LOAD_FAILED", `loadVPSMap did not answer within ${loadTimeoutMs} ms`)
         );
       }
       loadResult = timed.value;
     } catch (e) {
-      return this._fail(session, resolvedId, errorMessage(e));
+      dropLoad();
+      return this._fail(session, resolvedId, localError("MAP_LOAD_FAILED", errorMessage(e)));
     }
 
-    if (!this._mounted || session !== this._session) {
-      if (loadResult?.success) this._dropOrphanLoad();
-      return SUPERSEDED;
-    }
+    const superseded = !this._mounted || session !== this._session;
+    if (superseded || !loadResult?.success) dropLoad();
+    if (superseded) return SUPERSEDED;
     if (!loadResult?.success) {
-      return this._fail(session, resolvedId, loadResult?.error ?? "loadVPSMap failed");
+      return this._fail(
+        session,
+        resolvedId,
+        localError("MAP_LOAD_FAILED", loadResult?.error ?? "loadVPSMap failed")
+      );
     }
 
     this._loadedSession = session;
@@ -603,11 +704,11 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private async _findLocation(
     session: number,
     mode: "auto" | "visual"
-  ): Promise<FoundLocation | { error: string } | typeof SUPERSEDED_SEARCH> {
+  ): Promise<FoundLocation | { error: ViroVPSErrorDetail } | typeof SUPERSEDED_SEARCH> {
     const nav = this.props.arSceneNavigator;
     const visualAllowed = mode === "visual" || this.props.visualSearch !== false;
     const canSearchVisually = visualAllowed && !!nav.captureVPSQueryFrame;
-    let gpsError: string;
+    let gpsError: ViroVPSErrorDetail;
     let position: { lat: number; lon: number } | undefined;
 
     if (mode === "auto" && nav.getCameraGeospatialPose) {
@@ -617,21 +718,30 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         position = { lat: poseResult.pose.latitude, lon: poseResult.pose.longitude };
         const found = await findNearestMap(
           this.props.endpoint,
-          this.props.credentials,
+          this._credentials,
           position.lat,
           position.lon,
           this.props.autoRadiusMeters ?? 200
         );
         if (session !== this._session) return SUPERSEDED_SEARCH;
         if (found) return { locationId: found.location.id, map: found.map };
-        gpsError = "No nearby VPS location with an available map";
+        gpsError = localError("NO_LOCATION", "No nearby VPS location with an available map");
       } else {
-        gpsError = poseResult?.error ?? "Could not get the device's current geospatial position";
+        gpsError = localError(
+          "NO_LOCATION",
+          poseResult?.error ?? "Could not get the device's current geospatial position"
+        );
       }
     } else if (mode === "auto") {
-      gpsError = 'This navigator does not expose getCameraGeospatialPose, needed for "auto"';
+      gpsError = localError(
+        "UNSUPPORTED",
+        'This navigator does not expose getCameraGeospatialPose, needed for "auto"'
+      );
     } else {
-      gpsError = "This navigator does not expose captureVPSQueryFrame, needed for \"visual\"";
+      gpsError = localError(
+        "UNSUPPORTED",
+        "This navigator does not expose captureVPSQueryFrame, needed for \"visual\""
+      );
     }
 
     if (!canSearchVisually) return { error: gpsError };
@@ -645,12 +755,13 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private async _visualSearch(
     session: number,
     position: { lat: number; lon: number } | undefined
-  ): Promise<FoundLocation | { error: string } | typeof SUPERSEDED_SEARCH> {
+  ): Promise<FoundLocation | { error: ViroVPSErrorDetail } | typeof SUPERSEDED_SEARCH> {
     const nav = this.props.arSceneNavigator;
     const timeoutMs = this.props.visualSearchTimeoutMs ?? 30000;
     const intervalMs = this.props.visualSearchIntervalMs ?? 3000;
     const deadline = Date.now() + timeoutMs;
-    let lastError = "No VPS location matched the camera view";
+    const noMatch = localError("NO_LOCATION", "No VPS location matched the camera view");
+    let lastError = noMatch;
 
     while (true) {
       const frame = await nav.captureVPSQueryFrame!();
@@ -659,7 +770,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         try {
           const candidates = await queryLocationsByImage(
             this.props.endpoint,
-            this.props.credentials,
+            this._credentials,
             frame,
             position ? { lat: position.lat, lon: position.lon, radiusM: 500 } : {}
           );
@@ -668,19 +779,19 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
           if (best) {
             const map = await getLocationMapDownload(
               this.props.endpoint,
-              this.props.credentials,
+              this._credentials,
               best.location_id
             );
             if (session !== this._session) return SUPERSEDED_SEARCH;
             return { locationId: best.location_id, map };
           }
-          lastError = "No VPS location matched the camera view";
+          lastError = noMatch;
         } catch (e) {
           if (session !== this._session) return SUPERSEDED_SEARCH;
-          lastError = errorMessage(e);
+          lastError = toErrorDetail(e);
         }
       } else {
-        lastError = frame.error;
+        lastError = localError("NO_LOCATION", frame.error);
       }
       if (Date.now() + intervalMs > deadline) {
         return { error: lastError };
@@ -698,18 +809,19 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   getSemanticObjects = async (): Promise<ViroVPSSemanticObject[]> => {
     const locationId = this._locationId;
     if (!locationId) return [];
-    return fetchLocationSemanticObjects(this.props.endpoint, this.props.credentials, locationId);
+    return fetchLocationSemanticObjects(this.props.endpoint, this._credentials, locationId);
   };
 
   private _fail(
     session: number,
     locationId: string | undefined,
-    error: string
+    errorDetail: ViroVPSErrorDetail
   ): ViroVPSStartTrackingResult {
     if (session === this._session) {
-      this._setPhase({ state: "error", everConverged: false }, locationId, error);
+      const state = errorDetail.code === "UNSUPPORTED" ? "unsupported" : "error";
+      this._setPhase({ state, everConverged: false }, locationId, errorDetail);
     }
-    return { success: false, locationId, error };
+    return { success: false, locationId, error: errorDetail.message, errorDetail };
   }
 
   /** Unloads the current map and stops polling. Safe to call when nothing is loaded. */

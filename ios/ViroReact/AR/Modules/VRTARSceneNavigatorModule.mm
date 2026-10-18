@@ -1386,6 +1386,54 @@ RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
     });
 }
 
+// VPS server mode. It takes the "map" slot: a server session replaces a loaded map
+// and rvUnloadVPSMap ends it, with the same numbering against stale requests.
+RCT_EXPORT_METHOD(rvStartVPSServerSession:(nonnull NSNumber *)reactTag
+                                     load:(double)load
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    uint64_t request = [self rv_requestVPSLoad:"map" tag:reactTag load:load];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            if (![self rv_isNewestVPSRequest:request slot:"map" tag:reactTag]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": kRVVPSSuperseded})); return;
+            }
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+            }
+            BOOL ok = [(VRTARSceneNavigator *)view rvStartVPSServerSession];
+            if (ok) [self rv_noteVPSApplied:request slot:"map" tag:reactTag];
+            resolve(RVJsonString(@{@"success": @(ok)}));
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
+// One backend fix for a frame rvCaptureVPSQueryFrame captured.
+RCT_EXPORT_METHOD(rvReportVPSServerFix:(nonnull NSNumber *)reactTag
+                       worldFromCamera:(NSArray<NSNumber *> *)worldFromCamera
+                         mapFromCamera:(NSArray<NSNumber *> *)mapFromCamera
+                               inliers:(double)inliers
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+            }
+            BOOL ok = [(VRTARSceneNavigator *)view rvReportVPSServerFix:worldFromCamera
+                                                           mapFromCamera:mapFromCamera
+                                                                 inliers:(int)inliers];
+            resolve(RVJsonString(@{@"success": @(ok)}));
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
 // One camera image for a VPS visual query; JSON like the other rv* methods.
 RCT_EXPORT_METHOD(rvCaptureVPSQueryFrame:(nonnull NSNumber *)reactTag
                                  maxSide:(nonnull NSNumber *)maxSide

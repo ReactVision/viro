@@ -1778,6 +1778,74 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /**
+     * VPS server mode: the backend localises frames, the fuser runs without a map.
+     * It takes the "map" slot, so it replaces a loaded map, {@link #rvUnloadVPSMap}
+     * ends it, and stale requests are numbered out the same way.
+     */
+    @ReactMethod
+    public void rvStartVPSServerSession(final int sceneNavTag, final double load, final Promise promise) {
+        final long request = requestVpsLoad("map", sceneNavTag, load);
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    if (!isNewestVpsRequest("map", sceneNavTag, request)) {
+                        promise.resolve(rvJson("success", false, "error", VPS_SUPERSEDED));
+                        return;
+                    }
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvStartVPSServerSession(json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /**
+     * One backend fix for a frame {@link #rvCaptureVPSQueryFrame} captured: its
+     * worldFromCamera as the capture handed it out, and the backend's T_map_cam
+     * (16 numbers row-major).
+     */
+    @ReactMethod
+    public void rvReportVPSServerFix(final int sceneNavTag, final ReadableArray worldFromCamera,
+                                     final ReadableArray mapFromCamera, final double inliers,
+                                     final Promise promise) {
+        if (worldFromCamera == null || mapFromCamera == null || worldFromCamera.size() != 16
+                || mapFromCamera.size() != 16) {
+            promise.resolve(rvJson("success", false, "error", "Both poses are 16 numbers"));
+            return;
+        }
+        final float[] wc = new float[16], mc = new float[16];
+        for (int i = 0; i < 16; i++) {
+            wc[i] = (float) worldFromCamera.getDouble(i);
+            mc[i] = (float) mapFromCamera.getDouble(i);
+        }
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvReportVPSServerFix(wc, mc, (int) inliers,
+                            json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
     /** Drops whatever {@link #rvLoadVPSMap} loaded. Fire-and-forget, same shape as {@link #rvStartScan}. */
     @ReactMethod
     public void rvUnloadVPSMap(final int sceneNavTag, final double load) {
@@ -1854,7 +1922,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                         return;
                     }
                     ((VRTARSceneNavigator) view).rvCaptureVPSQueryFrame(maxSide,
-                            (ok, gray, width, height, fx, fy, cx, cy) -> {
+                            (ok, gray, width, height, fx, fy, cx, cy, worldFromCamera) -> {
                         if (!ok || gray.length == 0) {
                             promise.resolve(rvJson("success", false, "error", "No camera frame with intrinsics yet"));
                             return;
@@ -1867,9 +1935,15 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                                 return;
                             }
                             // NV21 needs even sides: a dropped last row or column leaves the intrinsics as they are.
+                            // the frame's sensor pose, column-major: what a server fix for this image is paired with
+                            JSONArray pose = new JSONArray();
+                            for (float v : worldFromCamera) {
+                                try { pose.put((double) v); } catch (JSONException e) { pose.put(0); }
+                            }
                             promise.resolve(rvJson("success", true, "image", jpeg,
                                     "width", width & ~1, "height", height & ~1,
-                                    "fx", (double) fx, "fy", (double) fy, "cx", (double) cx, "cy", (double) cy));
+                                    "fx", (double) fx, "fy", (double) fy, "cx", (double) cx, "cy", (double) cy,
+                                    "worldFromCamera", pose));
                         }, "ViroVPSQueryFrame").start();
                     });
                 } catch (Exception e) {

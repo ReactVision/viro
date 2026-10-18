@@ -155,6 +155,11 @@ export function parseVPSQueryFrame(json: string | null | undefined): ViroVPSQuer
     fy: parsed.fy,
     cx: parsed.cx,
     cy: parsed.cy,
+    ...(Array.isArray(parsed.worldFromCamera) &&
+    parsed.worldFromCamera.length === 16 &&
+    parsed.worldFromCamera.every((v: unknown) => typeof v === "number" && Number.isFinite(v))
+      ? { worldFromCamera: parsed.worldFromCamera as number[] }
+      : {}),
   };
 }
 

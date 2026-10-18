@@ -646,6 +646,12 @@ export type ViroVPSQueryFrame = {
   fy: number;
   cx: number;
   cy: number;
+  /**
+   * The camera's sensor pose when this frame was taken (16 numbers, opaque):
+   * what a server-mode fix for the image is paired with
+   * (reportVPSServerFix()). Absent from older native builds.
+   */
+  worldFromCamera?: number[];
 };
 
 export type ViroVPSQueryFrameResult =
@@ -660,8 +666,10 @@ export type ViroVPSQueryFrameResult =
 export type ViroVPSLocalizationResult = {
   /** False when no ReactVision provider is configured. */
   available: boolean;
-  /** True while a map is loaded (between loadVPSMap() and unloadVPSMap()). */
+  /** True while a map is loaded (between loadVPSMap() and unloadVPSMap()), or a server-mode session runs. */
   loaded?: boolean;
+  /** "server" during a server-mode session (startVPSServerSession()), else "device". */
+  mode?: "device" | "server";
   /**
    * True once the smoothed pose estimate has accepted at least one pair of
    * agreeing localisation hits. renderPose is only present once this is true.

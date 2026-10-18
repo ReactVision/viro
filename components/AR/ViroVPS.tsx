@@ -18,7 +18,12 @@ import {
   ViroVPSMapDownload,
   ViroVPSSemanticObject,
 } from "./ViroVPSMapDownload";
-import { pickVisualCandidate, queryLocationsByImage } from "./ViroVPSQuery";
+import {
+  localiseFrameOnServer,
+  nearFromRenderPose,
+  pickVisualCandidate,
+  queryLocationsByImage,
+} from "./ViroVPSQuery";
 import { resolveVPSCredentials, ViroVPSError } from "./ViroVPSClient";
 import type { ViroVPSCredentials, ViroVPSCredentialsSource } from "./ViroVPSClient";
 import type { ViroARSceneNavigator } from "./ViroARSceneNavigator";
@@ -110,6 +115,8 @@ export type ViroVPSNavigator = Partial<
     | "loadVPSMapMesh"
     | "unloadVPSMapMesh"
     | "captureVPSQueryFrame"
+    | "startVPSServerSession"
+    | "reportVPSServerFix"
     | "getVPSLocalization"
     | "getCameraGeospatialPose"
   >
@@ -212,6 +219,29 @@ export type ViroVPSProps = {
 
   /** Pause between visual search attempts, in ms. Default 3000. */
   visualSearchIntervalMs?: number;
+
+  /**
+   * Where localisation runs.
+   *
+   * - `"device"` (default): the location's map is downloaded and the device
+   *   matches the camera against it (SIFT), as before.
+   * - `"server"`: no map is downloaded. The device sends a camera frame every
+   *   `serverFixIntervalMs` to vps-server (`POST /vps/locations/{id}/localise`),
+   *   which matches it with DISK + LightGlue and answers with the pose; the same
+   *   fuser turns those answers into tracking, and ARKit / ARCore carry the pose
+   *   between them. It holds up across days, lighting and moved objects where
+   *   SIFT does not, at the cost of a network round trip per fix. The location's
+   *   map must have been built with server mode on (vps-server's
+   *   `VPS_SERVER_MAPS`); otherwise the state goes to `error` with code
+   *   `NO_SERVER_MAP`.
+   */
+  localization?: "device" | "server";
+
+  /** Server mode: ms between frames sent until localisation converges. Default 1000. */
+  serverFixIntervalMs?: number;
+
+  /** Server mode: ms between frames once converged, to keep correcting drift. Default 10000. */
+  serverRefreshIntervalMs?: number;
 
   /**
    * Rendered as-is. `<ViroVPS>` holds no transform of its own — it is a
@@ -607,17 +637,27 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
       this._unloadNative();
     }
     const nav = this.props.arSceneNavigator;
-    if (!nav?.loadVPSMap) {
+    const server = this.props.localization === "server";
+    if (
+      server
+        ? !nav?.startVPSServerSession || !nav.reportVPSServerFix || !nav.captureVPSQueryFrame
+        : !nav?.loadVPSMap
+    ) {
       return this._fail(
         session,
         undefined,
-        localError("UNSUPPORTED", "This navigator does not expose loadVPSMap")
+        localError(
+          "UNSUPPORTED",
+          server
+            ? "This navigator does not expose server-mode VPS (startVPSServerSession)"
+            : "This navigator does not expose loadVPSMap"
+        )
       );
     }
     this._setPhase({ state: "searching", everConverged: false }, undefined);
 
     let resolvedId: string;
-    let mapDownload: ViroVPSMapDownload;
+    let mapDownload: ViroVPSMapDownload | undefined;
     try {
       if (locationId === "auto" || locationId === "visual") {
         const found = await this._findLocation(session, locationId);
@@ -627,16 +667,19 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         mapDownload = found.map;
       } else {
         resolvedId = locationId;
-        mapDownload = await getLocationMapDownload(
-          this.props.endpoint,
-          this._credentials,
-          locationId
-        );
+        // server mode needs no map on the device
+        mapDownload = server
+          ? undefined
+          : await getLocationMapDownload(this.props.endpoint, this._credentials, locationId);
       }
     } catch (e) {
       return this._fail(session, undefined, toErrorDetail(e));
     }
     if (session !== this._session) return SUPERSEDED;
+    if (server) return this._startServerSession(session, resolvedId);
+    if (!mapDownload) {
+      return this._fail(session, resolvedId, localError("UNKNOWN", "No map to download"));
+    }
 
     let bytes: Uint8Array;
     try {
@@ -655,7 +698,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     const dropLoad = () => this._unloadNative(mapLoad);
     let loadCall: Promise<ViroVPSMapLoadResult>;
     try {
-      loadCall = Promise.resolve(nav.loadVPSMap(bytes, mapLoad));
+      loadCall = Promise.resolve(nav.loadVPSMap!(bytes, mapLoad));
     } catch (e) {
       loadCall = Promise.reject(e);
     }
@@ -696,6 +739,127 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     void this._loadWorldMesh(session, resolvedId);
     return { success: true, locationId: resolvedId };
   };
+
+  /**
+   * Server mode's half of startTracking(): the native fuser starts without a
+   * map (taking the map slot, so it is numbered and unloaded like a map), and
+   * frames go to the backend until the component stops tracking.
+   */
+  private async _startServerSession(
+    session: number,
+    locationId: string
+  ): Promise<ViroVPSStartTrackingResult> {
+    const nav = this.props.arSceneNavigator;
+    const loadTimeoutMs = this.props.loadTimeoutMs ?? 30000;
+    const mapLoad = startLoad(nav, "map");
+    this._mapLoad = mapLoad;
+    const dropLoad = () => this._unloadNative(mapLoad);
+    let call: Promise<ViroVPSMapLoadResult>;
+    try {
+      call = Promise.resolve(nav.startVPSServerSession!(mapLoad));
+    } catch (e) {
+      call = Promise.reject(e);
+    }
+    let result: ViroVPSMapLoadResult;
+    try {
+      const timed = await withTimeout(call, loadTimeoutMs);
+      if (timed.timedOut) {
+        call.then(dropLoad, dropLoad);
+        return this._fail(
+          session,
+          locationId,
+          localError(
+            "MAP_LOAD_FAILED",
+            `startVPSServerSession did not answer within ${loadTimeoutMs} ms`
+          )
+        );
+      }
+      result = timed.value;
+    } catch (e) {
+      dropLoad();
+      return this._fail(session, locationId, localError("MAP_LOAD_FAILED", errorMessage(e)));
+    }
+    const superseded = !this._mounted || session !== this._session;
+    if (superseded || !result?.success) dropLoad();
+    if (superseded) return SUPERSEDED;
+    if (!result?.success) {
+      return this._fail(
+        session,
+        locationId,
+        localError("MAP_LOAD_FAILED", result?.error ?? "startVPSServerSession failed")
+      );
+    }
+
+    this._loadedSession = session;
+    this._locationId = locationId;
+    this._setPhase({ state: "mapLoaded", everConverged: false }, locationId);
+    this._startPolling(session, locationId);
+    void this._serverFixes(session, locationId);
+    void this._loadWorldMesh(session, locationId);
+    return { success: true, locationId };
+  }
+
+  /**
+   * Sends frames to the backend while this session lasts: one every
+   * `serverFixIntervalMs` until the fuser converges, then one every
+   * `serverRefreshIntervalMs`, each with the last pose as a hint. A frame
+   * that does not localise, or a network failure, is simply retried; a
+   * location without a server map ends tracking with that error.
+   */
+  private async _serverFixes(session: number, locationId: string) {
+    const nav = this.props.arSceneNavigator;
+    const live = () => this._mounted && session === this._session && this._loadedSession === session;
+    while (live()) {
+      const converged = this._phase.state === "tracking";
+      try {
+        const frame = await nav.captureVPSQueryFrame!();
+        if (!live()) return;
+        if (frame.success) {
+          if (!frame.worldFromCamera) {
+            this._endServerSession(
+              session,
+              locationId,
+              localError(
+                "UNSUPPORTED",
+                "This native build does not report the camera pose with captured frames"
+              )
+            );
+            return;
+          }
+          const fix = await localiseFrameOnServer(
+            this.props.endpoint,
+            this._credentials,
+            locationId,
+            frame,
+            converged ? nearFromRenderPose(this._lastRenderPose) : undefined
+          );
+          if (!live()) return;
+          if (fix.localised && fix.T_map_cam) {
+            await nav.reportVPSServerFix!(frame.worldFromCamera, fix.T_map_cam, fix.inliers);
+          }
+        }
+      } catch (e) {
+        if (!live()) return;
+        const detail = toErrorDetail(e);
+        if (detail.code === "NO_SERVER_MAP" || detail.code === "NOT_FOUND") {
+          this._endServerSession(session, locationId, detail);
+          return;
+        }
+        // anything else (offline, rate limited, the server busy) is retried
+      }
+      const waitMs = converged
+        ? this.props.serverRefreshIntervalMs ?? 10000
+        : this.props.serverFixIntervalMs ?? 1000;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+
+  private _endServerSession(session: number, locationId: string, detail: ViroVPSErrorDetail) {
+    this._stopPolling();
+    this._loadedSession = undefined;
+    this._unloadNative();
+    this._fail(session, locationId, detail);
+  }
 
   /**
    * The location for `"auto"` / `"visual"`: GPS first (auto only), then the

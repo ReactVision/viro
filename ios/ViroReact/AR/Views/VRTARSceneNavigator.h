@@ -271,6 +271,16 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion;
 /** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
 - (NSString *)rvGetVPSLocalizationJson;
+/** VPS server mode: the fuser runs without a map, fed by rvReportVPSServerFix:. Unloads any map. */
+- (BOOL)rvStartVPSServerSession;
+/**
+ One backend fix. worldFromCamera: the capture's 16 numbers as rvCaptureVPSQueryFrame handed them out
+ (column-major). mapFromCamera: the backend's T_map_cam, 16 numbers row-major, OpenCV camera axes.
+ NO outside server mode or for malformed input.
+ */
+- (BOOL)rvReportVPSServerFix:(NSArray<NSNumber *> *)worldFromCamera
+               mapFromCamera:(NSArray<NSNumber *> *)mapFromCamera
+                     inliers:(int)inliers;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

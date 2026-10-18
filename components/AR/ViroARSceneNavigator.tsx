@@ -1050,6 +1050,47 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * Starts VPS server mode: the backend localises camera frames
+   * (`localiseFrameOnServer()`) instead of the device matching a downloaded
+   * map, and its answers come back through reportVPSServerFix(). Unloads any
+   * map; unloadVPSMap() ends the session. `load` numbers it as loadVPSMap()'s.
+   */
+  _startVPSServerSession = async (load: number = 0): Promise<ViroVPSMapLoadResult> => {
+    try {
+      return parseVPSMapLoadResult(
+        await ViroARSceneNavigatorModule.rvStartVPSServerSession(findNodeHandle(this), load)
+      );
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  };
+
+  /**
+   * One server-mode fix: `worldFromCamera` as captureVPSQueryFrame() returned it
+   * with the frame, and the backend's `T_map_cam` for that frame (16 numbers,
+   * row-major). Feeds the same fuser a downloaded map does; it converges once
+   * two fixes agree.
+   */
+  _reportVPSServerFix = async (
+    worldFromCamera: number[],
+    mapFromCamera: number[],
+    inliers: number = 0
+  ): Promise<ViroVPSMapLoadResult> => {
+    try {
+      return parseVPSMapLoadResult(
+        await ViroARSceneNavigatorModule.rvReportVPSServerFix(
+          findNodeHandle(this),
+          worldFromCamera,
+          mapFromCamera,
+          inliers
+        )
+      );
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  };
+
+  /**
    * Loads the VPS location's mesh (the backend's `world_mesh`, an RVWM file in
    * the map's frame; ViroVPSMapDownload's fetchWorldMeshBytes()) for occlusion
    * and/or physics against the real place. It stays hidden until VPS
@@ -1881,6 +1922,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getScanStatus: this._getScanStatus,
     loadVPSMap: this._loadVPSMap,
     unloadVPSMap: this._unloadVPSMap,
+    startVPSServerSession: this._startVPSServerSession,
+    reportVPSServerFix: this._reportVPSServerFix,
     loadVPSMapMesh: this._loadVPSMapMesh,
     unloadVPSMapMesh: this._unloadVPSMapMesh,
     captureVPSQueryFrame: this._captureVPSQueryFrame,
@@ -1963,6 +2006,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     getScanStatus: this._getScanStatus,
     loadVPSMap: this._loadVPSMap,
     unloadVPSMap: this._unloadVPSMap,
+    startVPSServerSession: this._startVPSServerSession,
+    reportVPSServerFix: this._reportVPSServerFix,
     loadVPSMapMesh: this._loadVPSMapMesh,
     unloadVPSMapMesh: this._unloadVPSMapMesh,
     captureVPSQueryFrame: this._captureVPSQueryFrame,

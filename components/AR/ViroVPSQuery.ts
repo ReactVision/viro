@@ -148,3 +148,68 @@ export function pickVisualCandidate(
   }
   return best;
 }
+
+/** The backend's answer to a server-mode frame (`POST /vps/locations/{id}/localise`). */
+export type ViroVPSServerFix = {
+  location_id: string;
+  scan_id: string;
+  localised: boolean;
+  inliers: number;
+  /** The camera in the map, 16 numbers row-major, OpenCV camera axes; null when not localised. */
+  T_map_cam: number[] | null;
+};
+
+/**
+ * `POST /vps/locations/{id}/localise`: where the frame was taken in the
+ * location's map, solved on the server (DISK + LightGlue) instead of on the
+ * device. `near` is the T_map_cam the caller expects (row-major), so the
+ * server matches the keyframes around it first. Throws a ViroVPSError with
+ * code `NO_SERVER_MAP` when the location's map was built without server mode.
+ */
+export async function localiseFrameOnServer(
+  endpoint: string,
+  credentials: ViroVPSCredentialsSource,
+  locationId: string,
+  frame: ViroVPSQueryFrame,
+  near?: number[]
+): Promise<ViroVPSServerFix> {
+  const fields: Record<string, string> = {
+    intrinsics: [frame.fx, frame.fy, frame.cx, frame.cy].join(","),
+  };
+  if (near && near.length === 16) fields.near = near.join(",");
+  const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
+  const response = await vpsFetch(
+    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/localise`,
+    {
+      method: "POST",
+      headers: {
+        ...(await vpsAuthHeaders(credentials)),
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body: body as unknown as BodyInit,
+    }
+  );
+  await throwIfVPSError(response);
+  return (await response.json()) as ViroVPSServerFix;
+}
+
+/**
+ * The `near` hint for localiseFrameOnServer() from the last localised pose:
+ * `renderPose` (getVPSLocalization(), 16 floats column-major, GL camera axes)
+ * as T_map_cam in OpenCV camera axes, row-major. Undefined without a pose.
+ */
+export function nearFromRenderPose(renderPose: string | undefined): number[] | undefined {
+  if (!renderPose) return undefined;
+  const m = renderPose.split(",").map(Number);
+  if (m.length !== 16 || !m.every(Number.isFinite)) return undefined;
+  const out: number[] = [];
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 4; col++) {
+      // column-major m[col * 4 + row]; GL to OpenCV camera axes flips y and z (columns 1 and 2)
+      const v = m[col * 4 + row];
+      out.push(col === 1 || col === 2 ? -v : v);
+    }
+  }
+  return out;
+}

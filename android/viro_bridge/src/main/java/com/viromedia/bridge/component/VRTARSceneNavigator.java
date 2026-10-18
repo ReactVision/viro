@@ -1345,10 +1345,32 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void rvCaptureVPSQueryFrame(int maxSide, ARScene.VPSQueryFrameCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
-            callback.onFrame(false, new byte[0], 0, 0, 0, 0, 0, 0);
+            callback.onFrame(false, new byte[0], 0, 0, 0, 0, 0, 0, new float[16]);
             return;
         }
         arScene.captureVPSQueryFrame(maxSide, callback);
+    }
+
+    /** VPS server mode; see {@link ARScene#rvStartVPSServerSession}. */
+    public void rvStartVPSServerSession(ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"success\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        ensureRvConfigApplied(arScene);
+        arScene.rvStartVPSServerSession(callback);
+    }
+
+    /** One backend fix; see {@link ARScene#rvReportVPSServerFix}. */
+    public void rvReportVPSServerFix(float[] worldFromCamera, float[] mapFromCamera, int inliers,
+                                     ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"success\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        arScene.rvReportVPSServerFix(worldFromCamera, mapFromCamera, inliers, callback);
     }
 
     /** The latest continuous VPS localisation result, as JSON. No ensureRvConfigApplied — a reader shouldn't configure the provider. */

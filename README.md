@@ -139,7 +139,7 @@ A web page served from `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0` or a `.local
 
 To turn it off, use either of these:
 
-- `ViroTelemetryEnabled` = `false` in Info.plist, or the `com.reactvision.ViroTelemetryEnabled` meta-data with the value `false` in AndroidManifest.xml.
+- The Expo plugin option `"telemetry": false`. It writes `ViroTelemetryEnabled` = `false` to Info.plist and the `com.reactvision.ViroTelemetryEnabled` meta-data with the value `false` to AndroidManifest.xml. Without Expo, and in a visionOS app's Info.plist, set those keys yourself.
 - `ViroTelemetry.setEnabled(false)` from `@reactvision/react-viro`, called before the first navigator mounts. It works on every platform, web included.
 
 ## Documentation

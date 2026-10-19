@@ -367,6 +367,23 @@ const withViroManifest = (config: ExpoConfig) =>
         }
       }
 
+      // Removed before it is written, or a later `telemetry: true` would leave "false" behind.
+      const telemetry = Array.isArray(viroPlugin)
+        ? (viroPlugin[1] as ViroConfigurationOptions | undefined)?.telemetry
+        : undefined;
+      const application = contents.manifest.application[0];
+      application["meta-data"] = (application["meta-data"] as any[]).filter(
+        (meta) => meta.$?.["android:name"] !== "com.reactvision.ViroTelemetryEnabled"
+      );
+      if (telemetry === false) {
+        application["meta-data"].push({
+          $: {
+            "android:name": "com.reactvision.ViroTelemetryEnabled",
+            "android:value": "false",
+          },
+        });
+      }
+
       if (
         activeXrModes.includes("GVR") ||
         activeXrModes.includes("OVR_MOBILE")

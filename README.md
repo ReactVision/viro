@@ -135,7 +135,7 @@ Each request carries:
 - whether `RVApiKey` is set (never the key itself), and `RVProjectId` when it is set
 - a few of the navigator's own settings, such as the anchor provider or the occlusion mode, and never ids, keys, URLs or scene content
 
-A web page served from `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0` or a `.local` host sends nothing.
+A web page served from `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0` or a `.local` host sends nothing. The iOS privacy manifest declares this data as Device ID, Product Interaction and Other Diagnostic Data, used for analytics, not linked to the user and not used for tracking.
 
 To turn it off, use either of these:
 

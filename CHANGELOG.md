@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- **Every scene navigator sends a usage ping when it mounts.** Each mount of `ViroARSceneNavigator`, `Viro3DSceneNavigator`, `ViroVRSceneNavigator`, `ViroSceneNavigator`, and the web AR, 3D and scene navigators sends one request. `ViroXRSceneNavigator` sends one for itself and none for the navigator it renders, the Quest headset view included. The request carries a random install id, the app id, version and build, the platform, OS version and device model, the navigator and a few of its settings, the ViroReact and React Native versions, whether it is a development build, and whether `RVApiKey` is set. Native apps read these from the new `VRTUsageModule`; web pages use the hostname and the browser, and send nothing from `localhost` and other local hosts. It is sent with `fetch` after the navigator mounts, never retried, and a failure is ignored. `ViroTelemetry.setEnabled(false)`, exported from the package root, turns it off from JS on every platform, and so does `ViroTelemetryEnabled` = `false` in Info.plist or `com.reactvision.ViroTelemetryEnabled` = `false` in AndroidManifest. JS from this release on an older native binary sends nothing. See "Usage data" in the README.
+
 ## v3.0.3 — 6 October 2026
 
 ### Added

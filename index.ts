@@ -331,6 +331,7 @@ import {
 import { ViroSurface } from "./components/ViroSurface";
 import { ViroSceneNavigator } from "./components/ViroSceneNavigator";
 import { VIRO_VERSION } from "./components/Utilities/ViroVersion";
+import { ViroTelemetry } from "./components/Utilities/ViroUsagePing";
 import { ViroQuestEntryPoint } from "./components/ViroQuestEntryPoint";
 import { VRQuestNavigatorBridge } from "./components/Utilities/VRQuestNavigatorBridge";
 import {
@@ -542,6 +543,7 @@ export {
   ViroShaderUniform,
   ViroShaderModifier,
   VIRO_VERSION,
+  ViroTelemetry,
   // Provider Types
   ViroProvider,
   // Cloud Anchor Types

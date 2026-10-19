@@ -27,6 +27,10 @@ import { ViroSceneDictionary } from "./Types/ViroUtils";
 import { ViroScene } from "./ViroScene";
 import { isVisionOS } from "./Utilities/ViroPlatform";
 import { unsupportedCapture } from "./Utilities/VRModuleOpenXR";
+import {
+  sendViroUsagePing,
+  ViroUsagePingSuppressed,
+} from "./Utilities/ViroUsagePing";
 
 var ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 
@@ -85,6 +89,17 @@ type State = {
 export class ViroSceneNavigator extends React.Component<Props, State> {
   // TODO: type of this component (native component)
   _component: any;
+
+  static contextType = ViroUsagePingSuppressed;
+  declare context: React.ContextType<typeof ViroUsagePingSuppressed>;
+
+  componentDidMount() {
+    if (!this.context) {
+      sendViroUsagePing("scene", {
+        vr_mode_enabled: this.props.vrModeEnabled ?? true,
+      });
+    }
+  }
 
   sceneNavigator = {
     push: this.push,

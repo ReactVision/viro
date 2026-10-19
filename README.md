@@ -122,6 +122,26 @@ Drop the `StudioSceneNavigator` component into your ViroReact app, point it at a
 
 Full walkthrough — including Studio setup, exporting a scene, and wiring `StudioSceneNavigator` into a React Native app — is in our blog: <https://updates.reactvision.xyz/how-to-build-your-first-ar-vr-app-with-studio-and-react-native-f2421ecce9ae>
 
+## Usage data
+
+Each scene navigator sends ReactVision one request every time it mounts, so we can see which platforms, navigators and ViroReact versions are in use. That covers `ViroARSceneNavigator`, `Viro3DSceneNavigator`, `ViroVRSceneNavigator`, `ViroSceneNavigator`, the web AR, 3D and scene navigators, and `ViroXRSceneNavigator`, which counts once whichever navigator it renders. The request is sent in the background after the navigator mounts. It is never retried, and a failure is ignored.
+
+Each request carries:
+
+- a random install id, created on first use and kept in the app's own storage (`NSUserDefaults` on iOS and visionOS, a file in the no-backup directory on Android, `localStorage` on web), and a random id for the request itself
+- the app's bundle id or package name, version and build number (on web, the page's hostname)
+- the platform, OS version and device model (on web, the OS family and the browser)
+- the navigator, the ViroReact and React Native versions, and whether it is a development build
+- whether `RVApiKey` is set (never the key itself), and `RVProjectId` when it is set
+- a few of the navigator's own settings, such as the anchor provider or the occlusion mode, and never ids, keys, URLs or scene content
+
+A web page served from `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0` or a `.local` host sends nothing.
+
+To turn it off, use either of these:
+
+- `ViroTelemetryEnabled` = `false` in Info.plist, or the `com.reactvision.ViroTelemetryEnabled` meta-data with the value `false` in AndroidManifest.xml.
+- `ViroTelemetry.setEnabled(false)` from `@reactvision/react-viro`, called before the first navigator mounts. It works on every platform, web included.
+
 ## Documentation
 
 - Full API reference and guides: <https://viro-community.readme.io/docs/overview>

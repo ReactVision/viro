@@ -32,6 +32,10 @@ import {
 } from "./ViroScanStatus";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
+  sendViroUsagePing,
+  ViroUsagePingSuppressed,
+} from "../Utilities/ViroUsagePing";
+import {
   ViroWorldOrigin,
   ViroProvider,
   ViroHostCloudAnchorResult,
@@ -316,6 +320,8 @@ type State = {
 export class ViroARSceneNavigator extends React.Component<Props, State> {
   static _questWarningLogged = false;
   static _visionOSWarningLogged = false;
+  static contextType = ViroUsagePingSuppressed;
+  declare context: React.ContextType<typeof ViroUsagePingSuppressed>;
   _component: ViroNativeRef = null;
 
   constructor(props: Props) {
@@ -340,6 +346,16 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   }
 
   componentDidMount() {
+    if (!this.context) {
+      sendViroUsagePing("ar", {
+        provider: this.props.provider ?? "reactvision",
+        occlusion_mode: this.props.occlusionMode,
+        depth_enabled: this.props.depthEnabled,
+        world_mesh_enabled: this.props.worldMeshEnabled,
+        front_camera_enabled: this.props.frontCameraEnabled,
+        world_alignment: this.props.worldAlignment,
+      });
+    }
     // Apply initial prefer monocular depth setting if provided
     if (this.props.preferMonocularDepth !== undefined) {
       this._setPreferMonocularDepth(this.props.preferMonocularDepth);

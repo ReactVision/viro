@@ -165,15 +165,19 @@ export type ViroVPSServerFix = {
  * `POST /vps/locations/{id}/localise`: where the frame was taken in the
  * location's map, solved on the server (DISK + LightGlue) instead of on the
  * device. `near` is the T_map_cam the caller expects (row-major), so the
- * server matches the keyframes around it first. Throws a ViroVPSError with
- * code `NO_SERVER_MAP` when the location's map was built without server mode.
+ * server matches the keyframes around it first. `device` is an id the caller
+ * keeps while it sends one frame at a time: the server does not notice a
+ * caller that hung up while its frame waits in line, and gives that frame's
+ * place to the next one with the same id. Throws a ViroVPSError with code
+ * `NO_SERVER_MAP` when the location's map was built without server mode.
  */
 export async function localiseFrameOnServer(
   endpoint: string,
   credentials: ViroVPSCredentialsSource,
   locationId: string,
   frame: ViroVPSQueryFrame,
-  near?: number[]
+  near?: number[],
+  device?: string
 ): Promise<ViroVPSServerFix> {
   const fields: Record<string, string> = {
     intrinsics: [frame.fx, frame.fy, frame.cx, frame.cy].join(","),
@@ -188,6 +192,7 @@ export async function localiseFrameOnServer(
       headers: {
         ...(await vpsAuthHeaders(credentials)),
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        ...(device ? { "x-rv-device": device } : {}),
       },
       body: body as unknown as BodyInit,
     },

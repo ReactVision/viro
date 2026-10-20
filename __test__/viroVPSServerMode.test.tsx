@@ -134,12 +134,14 @@ describe('<ViroVPS localization="server">', () => {
     expect(mockLocalise.mock.calls[0][4]).toBeUndefined(); // no hint before it converges
     expect(nav.reportVPSServerFix).toHaveBeenCalledWith(POSE, T, 120);
 
-    // the next frame goes a second later, until it converges
+    // the next frame goes a second later, until it converges, with the same device id
     await act(async () => {
       jest.advanceTimersByTime(1000);
       await flush();
     });
     expect(mockLocalise).toHaveBeenCalledTimes(2);
+    expect(mockLocalise.mock.calls[0][5]).toMatch(/^[0-9a-z]{8,}$/);
+    expect(mockLocalise.mock.calls[1][5]).toBe(mockLocalise.mock.calls[0][5]);
   });
 
   it("a frame that does not localise reports nothing and is retried", async () => {

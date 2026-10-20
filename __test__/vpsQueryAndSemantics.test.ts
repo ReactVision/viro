@@ -9,6 +9,7 @@ import { parseVPSQueryFrame } from "../components/AR/ViroScanStatus";
 import {
   base64ToBytes,
   buildQueryMultipart,
+  localiseFrameOnServer,
   pickVisualCandidate,
   queryLocationsByImage,
 } from "../components/AR/ViroVPSQuery";
@@ -116,6 +117,26 @@ describe("vps-server requests", () => {
     expect(text).toContain('name="intrinsics"\r\n\r\n9,9,2,1\r\n');
     expect(text).toContain('name="lat"\r\n\r\n19.4\r\n');
     expect(text).toContain('name="radius_m"\r\n\r\n500\r\n');
+  });
+
+  it("localiseFrameOnServer sends the device id it is given, and none without one", async () => {
+    const fetchMock = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ location_id: "l", scan_id: "s", localised: false, inliers: 0, T_map_cam: null }),
+      text: async () => "",
+    }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const frame = { image: "AA==", width: 1, height: 1, fx: 1, fy: 1, cx: 0, cy: 0 };
+
+    await localiseFrameOnServer("https://vps.test", creds, "l", frame, undefined, "phone-1");
+    await localiseFrameOnServer("https://vps.test", creds, "l", frame, undefined, undefined);
+
+    const headersOf = (i: number) =>
+      (fetchMock.mock.calls[i] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe("https://vps.test/vps/locations/l/localise");
+    expect(headersOf(0)["x-rv-device"]).toBe("phone-1");
+    expect(headersOf(1)).not.toHaveProperty("x-rv-device");
   });
 
   it("queryLocationsByImage surfaces a server error", async () => {

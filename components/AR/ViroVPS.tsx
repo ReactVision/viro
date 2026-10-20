@@ -809,6 +809,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private async _serverFixes(session: number, locationId: string) {
     const nav = this.props.arSceneNavigator;
     const live = () => this._mounted && session === this._session && this._loadedSession === session;
+    const device = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
     while (live()) {
       const converged = this._phase.state === "tracking";
       try {
@@ -831,7 +832,8 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
             this._credentials,
             locationId,
             frame,
-            converged ? nearFromRenderPose(this._lastRenderPose) : undefined
+            converged ? nearFromRenderPose(this._lastRenderPose) : undefined,
+            device
           );
           if (!live()) return;
           if (fix.localised && fix.T_map_cam) {

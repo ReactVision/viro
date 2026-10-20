@@ -23,11 +23,11 @@ import { NativeModules } from "react-native";
 import {
   ViroVPSCredentialsSource,
   ViroVPSError,
-  throwIfVPSError,
   vpsAuthHeaders,
   vpsBaseUrl,
   vpsErrorFromBody,
   vpsFetch,
+  vpsJson,
 } from "./ViroVPSClient";
 
 export type ViroVPSScanTarget =
@@ -242,10 +242,9 @@ export async function getScan(
   credentials: ViroVPSCredentialsSource,
   scanId: string
 ): Promise<ViroVPSScan> {
-  const response = await vpsFetch(
+  return (await vpsFetch(
     `${vpsBaseUrl(endpoint)}/vps/scans/${encodeURIComponent(scanId)}`,
-    { headers: await vpsAuthHeaders(credentials) }
-  );
-  await throwIfVPSError(response);
-  return (await response.json()) as ViroVPSScan;
+    { headers: await vpsAuthHeaders(credentials) },
+    vpsJson
+  )) as ViroVPSScan;
 }

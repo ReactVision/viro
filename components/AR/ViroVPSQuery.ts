@@ -17,10 +17,10 @@
 import type { ViroVPSQueryFrame } from "../Types/ViroEvents";
 import {
   ViroVPSCredentialsSource,
-  throwIfVPSError,
   vpsAuthHeaders,
   vpsBaseUrl,
   vpsFetch,
+  vpsJson,
 } from "./ViroVPSClient";
 
 /** One location the server matched the image to, best first. */
@@ -120,16 +120,18 @@ export async function queryLocationsByImage(
   }
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
-  const response = await vpsFetch(`${vpsBaseUrl(endpoint)}/vps/locations/query`, {
-    method: "POST",
-    headers: {
-      ...(await vpsAuthHeaders(credentials)),
-      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+  const parsed = (await vpsFetch(
+    `${vpsBaseUrl(endpoint)}/vps/locations/query`,
+    {
+      method: "POST",
+      headers: {
+        ...(await vpsAuthHeaders(credentials)),
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body: body as unknown as BodyInit,
     },
-    body: body as unknown as BodyInit,
-  });
-  await throwIfVPSError(response);
-  const parsed = (await response.json()) as { candidates?: ViroVPSQueryCandidate[] };
+    vpsJson
+  )) as { candidates?: ViroVPSQueryCandidate[] };
   return Array.isArray(parsed.candidates) ? parsed.candidates : [];
 }
 
@@ -179,7 +181,7 @@ export async function localiseFrameOnServer(
   if (near && near.length === 16) fields.near = near.join(",");
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
-  const response = await vpsFetch(
+  return (await vpsFetch(
     `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/localise`,
     {
       method: "POST",
@@ -188,10 +190,9 @@ export async function localiseFrameOnServer(
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body: body as unknown as BodyInit,
-    }
-  );
-  await throwIfVPSError(response);
-  return (await response.json()) as ViroVPSServerFix;
+    },
+    vpsJson
+  )) as ViroVPSServerFix;
 }
 
 /**

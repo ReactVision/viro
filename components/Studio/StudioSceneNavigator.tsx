@@ -391,11 +391,11 @@ export interface StudioSceneNavigatorProps {
    * Its plane assets show only while the state is `tracking`, and its on_load
    * function waits for the first `tracking`, so a scene that never tracks
    * shows none of them and does not run it. A failure that may pass (no
-   * network, a 5xx or 429, a failed map load) is retried with backoff while
-   * the scene is on screen, so `error` can be followed by `searching`, and
-   * the handle's `retryVps()` restarts it at once after any error. A bound
-   * scene that leaves the screen reports `idle`. Meta Quest and Apple Vision
-   * Pro report `unsupported`.
+   * network or no answer within 30 s, a 5xx or 429, a failed map load) is
+   * retried with backoff while the scene is on screen, so `error` can be
+   * followed by `searching`, and the handle's `retryVps()` restarts it at
+   * once after any error. A bound scene that leaves the screen reports
+   * `idle`. Meta Quest and Apple Vision Pro report `unsupported`.
    */
   onVpsStateChange?: (event: StudioVpsStateEvent) => void;
 }

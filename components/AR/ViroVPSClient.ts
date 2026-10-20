@@ -110,13 +110,62 @@ export async function vpsAuthHeaders(
   return headers;
 }
 
-/** fetch(), with a request that got no response thrown as a `NETWORK_ERROR`. */
-export async function vpsFetch(url: string, init?: RequestInit): Promise<Response> {
+/** How long a VPS call may take before it is a `NETWORK_ERROR`. */
+export const VPS_REQUEST_TIMEOUT_MS = 30000;
+
+/**
+ * fetch(), then `read` of its response, together within `timeoutMs`: a request
+ * that got no response, or did not finish in time, is thrown as a
+ * `NETWORK_ERROR`. Expo's fetch resolves as soon as the headers arrive, so the
+ * body is read inside the limit for the limit to cover the download.
+ */
+export async function vpsFetch<T>(
+  url: string,
+  init: RequestInit | undefined,
+  read: (response: Response) => Promise<T>,
+  timeoutMs = VPS_REQUEST_TIMEOUT_MS
+): Promise<T> {
+  const controller = new AbortController();
+  // A race, not a wait for the abort to surface: on iOS, Expo's arrayBuffer()
+  // never settles once its request is aborted.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new ViroVPSError(`No answer within ${Math.round(timeoutMs / 1000)} s`, "NETWORK_ERROR"));
+    }, timeoutMs);
+  });
+  const exchange = (async () => {
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: controller.signal });
+    } catch (e) {
+      throw new ViroVPSError(e instanceof Error ? e.message : String(e), "NETWORK_ERROR");
+    }
+    return read(response);
+  })();
+  // Once the limit has passed, nobody is waiting for its outcome.
+  exchange.catch(() => {});
   try {
-    return await fetch(url, init);
-  } catch (e) {
-    throw new ViroVPSError(e instanceof Error ? e.message : String(e), "NETWORK_ERROR");
+    return await Promise.race([exchange, expired]);
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** A `read` for vpsFetch(): the JSON body, or the server's error as a ViroVPSError. */
+export async function vpsJson(response: Response): Promise<unknown> {
+  await throwIfVPSError(response);
+  return response.json();
+}
+
+/**
+ * How long a signed link's file may take: 30 s and a second for every 100 KB,
+ * so a 20 MB map has about four minutes. Five minutes when the size is unknown.
+ */
+export function vpsDownloadTimeoutMs(bytes: number | null | undefined): number {
+  if (bytes == null || !(bytes >= 0)) return 300000;
+  return 30000 + Math.ceil(bytes / 100000) * 1000;
 }
 
 /** Builds the error for a non-2xx response from its status and raw body text. */

@@ -4,11 +4,16 @@
  */
 import {
   bytesToBase64,
+  fetchMapBytes,
   findNearbyLocations,
   getLocationMapDownload,
   getLocationWorldMeshDownload,
 } from "../components/AR/ViroVPSMapDownload";
-import { ViroVPSError } from "../components/AR/ViroVPSClient";
+import {
+  VPS_REQUEST_TIMEOUT_MS,
+  ViroVPSError,
+  vpsDownloadTimeoutMs,
+} from "../components/AR/ViroVPSClient";
 
 function asciiBytes(s: string): Uint8Array {
   const out = new Uint8Array(s.length);
@@ -88,10 +93,10 @@ describe("vps-server requests", () => {
     await getLocationMapDownload("https://vps.test", { ...creds, appUserId: "" }, "a");
 
     expect(provider).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
-      { headers: { "x-project-id": "p", Authorization: "Bearer t1", "x-app-user-id": "user-1" } },
-      { headers: { "x-project-id": "p", Authorization: "Bearer t2", "x-app-user-id": "user-1" } },
-      { headers: { "x-project-id": creds.projectId, "x-api-key": "k" } },
+    expect(fetchMock.mock.calls.map((c) => ((c as unknown[])[1] as RequestInit).headers)).toEqual([
+      { "x-project-id": "p", Authorization: "Bearer t1", "x-app-user-id": "user-1" },
+      { "x-project-id": "p", Authorization: "Bearer t2", "x-app-user-id": "user-1" },
+      { "x-project-id": creds.projectId, "x-api-key": "k" },
     ]);
   });
 
@@ -129,5 +134,62 @@ describe("vps-server requests", () => {
       status: undefined,
       message: "Network request failed",
     });
+  });
+
+  it("gives up on a request with no answer in time, as NETWORK_ERROR", async () => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) =>
+            init?.signal?.addEventListener("abort", () => reject(new Error("Aborted")))
+          )
+      ) as unknown as typeof fetch;
+      const pending = findNearbyLocations("https://vps.test", creds, 1, 2);
+      const outcome = expect(pending).rejects.toMatchObject({
+        code: "NETWORK_ERROR",
+        message: "No answer within 30 s",
+      });
+      await jest.advanceTimersByTimeAsync(VPS_REQUEST_TIMEOUT_MS);
+      await outcome;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("gives up on a download whose body stalls after the headers, at the file's limit", async () => {
+    jest.useFakeTimers();
+    try {
+      // Expo's fetch resolves when the headers arrive, and on iOS its body read
+      // never settles once the request is aborted
+      const signals: AbortSignal[] = [];
+      global.fetch = jest.fn(async (_url: string, init?: RequestInit) => {
+        signals.push(init!.signal!);
+        return { ok: true, status: 200, arrayBuffer: () => new Promise(() => {}) };
+      }) as unknown as typeof fetch;
+      const pending = fetchMapBytes({
+        kind: "map",
+        url: "https://storage.test/map.rvmap",
+        scan_id: "s",
+        expires_at: 0,
+        bytes: 480_000,
+        quality: null,
+      });
+      const outcome = expect(pending).rejects.toMatchObject({
+        code: "NETWORK_ERROR",
+        message: "No answer within 35 s",
+      });
+      await jest.advanceTimersByTimeAsync(vpsDownloadTimeoutMs(480_000));
+      await outcome;
+      expect(signals[0].aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("gives a file download time by its size", () => {
+    expect(vpsDownloadTimeoutMs(0)).toBe(30000);
+    expect(vpsDownloadTimeoutMs(20_000_000)).toBe(230000);
+    expect(vpsDownloadTimeoutMs(null)).toBe(300000);
   });
 });

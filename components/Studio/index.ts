@@ -17,7 +17,11 @@ export type {
   StudioSceneNavigatorProps,
 } from "./StudioSceneNavigator";
 export type { StudioQuestMenuItem } from "./domain/questMenuStore";
-export type { StudioVpsState, StudioVpsStateEvent } from "./domain/vps";
+export type {
+  StudioVpsLocalization,
+  StudioVpsState,
+  StudioVpsStateEvent,
+} from "./domain/vps";
 export { isStudioApiError } from "./domain/studioApiError";
 export type {
   StudioApiError,

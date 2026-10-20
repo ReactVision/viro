@@ -689,6 +689,7 @@ export type {
   StudioColocationRoom,
   StudioColocationState,
   StudioQuestMenuItem,
+  StudioVpsLocalization,
   StudioVpsState,
   StudioVpsStateEvent,
 } from "./components/Studio";

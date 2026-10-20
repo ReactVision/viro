@@ -1069,6 +1069,34 @@ describe("StudioSceneNavigator onVpsStateChange", () => {
   });
 });
 
+describe("StudioSceneNavigator vpsLocalization", () => {
+  it("starts the scene on screen in the host's mode and restarts it when the mode changes", async () => {
+    studio.rvGetScene.mockImplementation(async () => ({
+      success: true,
+      data: JSON.stringify(sceneData()),
+    }));
+    const tree = render(
+      <StudioSceneNavigator sceneId="scene-a" vpsLocalization="server" />
+    );
+    act(() => jest.advanceTimersByTime(1));
+    await flush();
+    const [vps] = liveVps();
+    expect(vps.props.localization).toBe("server");
+    expect(vps.startTracking).toHaveBeenCalledTimes(1);
+
+    act(() =>
+      tree.update(
+        <StudioSceneNavigator sceneId="scene-a" vpsLocalization="device" />
+      )
+    );
+    await flush();
+    expect(liveVps()).toEqual([vps]);
+    expect(vps.props.localization).toBe("device");
+    expect(vps.startTracking).toHaveBeenCalledTimes(2);
+    expect(vps.startTracking).toHaveBeenLastCalledWith("loc-1");
+  });
+});
+
 describe("retryVps", () => {
   const failure = (code: string, status: number | null) => ({
     errorDetail: { code, status, message: code },

@@ -465,6 +465,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // render under ViroVPSAnchor alone and show only while tracking. Of the
   // scenes the navigator has pushed, only the one on screen tracks.
   const vpsBinding = useMemo(() => studioVpsBinding(sceneData), [sceneData]);
+  // The host's choice, the same for every scene; a change restarts tracking.
+  const vpsLocalization = useSyncExternalStore(
+    vps?.subscribe ?? subscribeToNothing,
+    () => vps?.localization ?? "device",
+    () => vps?.localization ?? "device"
+  );
   const vpsEndpoint =
     isQuest || isVisionOS ? null : (vpsBinding?.endpoint ?? null);
   // Where a bound scene renders no plane assets, nothing plays at them either.
@@ -538,7 +544,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       clearTimeout(retry.timer);
       if (vpsRetryRef.current === retry) vpsRetryRef.current = null;
     };
-  }, [vpsEndpoint, vpsActive, vpsBinding]);
+  }, [vpsEndpoint, vpsActive, vpsBinding, vpsLocalization]);
 
   const vpsCredentials = useCallback(
     () => studioVpsCredentials(scene.belongs_to_project),
@@ -2288,6 +2294,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           arSceneNavigator={arSceneNavigator ?? {}}
           endpoint={vpsEndpoint}
           credentials={vpsCredentials}
+          localization={vpsLocalization}
           worldMesh
           onTrackingState={handleVpsTrackingState}
         />

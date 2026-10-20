@@ -26,6 +26,9 @@ export interface StudioVpsStateEvent {
 
 type StudioVpsError = NonNullable<StudioVpsStateEvent["error"]>;
 
+/** Where a bound scene localises: `<ViroVPS localization>`. */
+export type StudioVpsLocalization = "device" | "server";
+
 export const STUDIO_VPS_UNSUPPORTED: StudioVpsError = {
   code: "UNSUPPORTED",
   status: null,
@@ -175,6 +178,24 @@ type Claim = {
 export class StudioVpsCoordinator {
   onStateChange: ((event: StudioVpsStateEvent) => void) | null = null;
   private claims: Claim[] = [];
+  private listeners = new Set<() => void>();
+
+  constructor(public localization: StudioVpsLocalization = "device") {}
+
+  /** The scene tracking now starts again in the new mode. */
+  setLocalization(localization: StudioVpsLocalization) {
+    if (localization === this.localization) return;
+    this.localization = localization;
+    for (const listener of this.listeners) listener();
+  }
+
+  /** For `useSyncExternalStore` over `localization`. */
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
 
   /**
    * A scene mounting. The scene it covers is told first, so its map unloads

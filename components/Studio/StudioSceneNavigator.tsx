@@ -51,7 +51,11 @@ import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { studioApiError } from "./domain/studioApiError";
-import { StudioVpsCoordinator, type StudioVpsStateEvent } from "./domain/vps";
+import {
+  StudioVpsCoordinator,
+  type StudioVpsLocalization,
+  type StudioVpsStateEvent,
+} from "./domain/vps";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
@@ -400,6 +404,15 @@ export interface StudioSceneNavigatorProps {
    * Pro report `unsupported`.
    */
   onVpsStateChange?: (event: StudioVpsStateEvent) => void;
+  /**
+   * Where a scene bound to a VPS location localises: `"device"` (default)
+   * downloads the location's map, `"server"` sends camera frames to
+   * vps-server, which needs a map built with server mode and is billed as
+   * Advanced VPS compute (`<ViroVPS localization>`). A change restarts the
+   * tracking of the scene on screen in the new mode, so a host can offer
+   * both to compare.
+   */
+  vpsLocalization?: StudioVpsLocalization;
 }
 
 /**
@@ -445,6 +458,7 @@ export const StudioSceneNavigator = forwardRef<
     onColocationStateChange,
     onColocationRoom,
     onVpsStateChange,
+    vpsLocalization = "device",
   },
   ref
 ) {
@@ -574,10 +588,13 @@ export const StudioSceneNavigator = forwardRef<
   // one VPS map, which only the scene on screen tracks.
   const vpsRef = useRef<StudioVpsCoordinator | null>(null);
   if (vpsRef.current === null) {
-    const coordinator = new StudioVpsCoordinator();
+    const coordinator = new StudioVpsCoordinator(vpsLocalization);
     coordinator.onStateChange = (event) => onVpsStateChangeRef.current?.(event);
     vpsRef.current = coordinator;
   }
+  useEffect(() => {
+    vpsRef.current?.setLocalization(vpsLocalization);
+  }, [vpsLocalization]);
 
   // The tap-to-place overlay would catch taps for content that is withheld
   // while a shared session is set up.

@@ -112,7 +112,9 @@ import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewpor
 import {
   STUDIO_VPS_UNSUPPORTED,
   studioVpsBinding,
+  STUDIO_VPS_MAP_RETRIES,
   studioVpsErrorIsTransient,
+  studioVpsMapFailed,
   studioVpsRetryDelayMs,
   type StudioVpsCoordinator,
   type StudioVpsHandle,
@@ -305,6 +307,8 @@ type AnimOverride = {
 type VpsRetry = {
   locationId: string;
   attempt: number;
+  /** Of `attempt`, the restarts after the map itself failed. */
+  mapAttempts: number;
   timer?: ReturnType<typeof setTimeout>;
   /** The last state `<ViroVPS>` reported, read without waiting for a render. */
   state: StudioVpsState;
@@ -492,6 +496,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     clearTimeout(retry.timer);
     retry.timer = undefined;
     retry.attempt = 0;
+    retry.mapAttempts = 0;
     retry.state = "searching";
     void vpsRef.current?.startTracking(retry.locationId);
     return true;
@@ -524,6 +529,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     const retry: VpsRetry = {
       locationId: vpsBinding.locationId,
       attempt: 0,
+      mapAttempts: 0,
       state: "searching",
     };
     vpsRetryRef.current = retry;
@@ -540,20 +546,27 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   );
   // A transient failure is retried with backoff while the scene is on screen,
   // and so is an idle: nothing here stops tracking, so an idle means the
-  // native map went away.
+  // native map went away. A failed map is retried STUDIO_VPS_MAP_RETRIES times.
   const handleVpsTrackingState = useCallback(
     (event: ViroVPSTrackingStateEvent) => {
       reportVps(event.state, event.errorDetail);
       const retry = vpsRetryRef.current;
       if (!retry) return;
       retry.state = event.state;
-      if (event.state === "tracking") retry.attempt = 0;
+      if (event.state === "tracking") {
+        retry.attempt = 0;
+        retry.mapAttempts = 0;
+      }
       const transient =
         event.state === "idle" ||
         (event.state === "error" &&
           !!event.errorDetail &&
           studioVpsErrorIsTransient(event.errorDetail));
       if (!transient || retry.timer !== undefined) return;
+      if (studioVpsMapFailed(event.state, event.errorDetail)) {
+        if (retry.mapAttempts >= STUDIO_VPS_MAP_RETRIES) return;
+        retry.mapAttempts++;
+      }
       retry.timer = setTimeout(() => {
         retry.timer = undefined;
         void vpsRef.current?.startTracking(retry.locationId);

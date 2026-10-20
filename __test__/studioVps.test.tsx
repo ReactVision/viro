@@ -890,6 +890,26 @@ describe("StudioARScene bound to a VPS location", () => {
       expect(vps.startTracking).toHaveBeenCalledTimes(1);
     });
 
+    it("retries a map that keeps failing four times, then leaves it to the host's Retry", () => {
+      render(
+        <StudioARScene sceneData={sceneData()} arSceneNavigator={mockArNav} />
+      );
+      const [vps] = liveVps();
+      for (const state of ["error", "idle", "error", "error"] as const) {
+        track(state, state === "error" ? failure("MAP_LOAD_FAILED", null) : {});
+        act(() => jest.advanceTimersByTime(60000));
+        track("searching");
+      }
+      expect(vps.startTracking).toHaveBeenCalledTimes(5);
+      track("error", failure("MAP_LOAD_FAILED", null));
+      act(() => jest.advanceTimersByTime(120000));
+      expect(vps.startTracking).toHaveBeenCalledTimes(5);
+      // a failure on the way to the map is still retried
+      track("error", failure("NETWORK_ERROR", null));
+      act(() => jest.advanceTimersByTime(60000));
+      expect(vps.startTracking).toHaveBeenCalledTimes(6);
+    });
+
     it("stops retrying once the scene unmounts", () => {
       render(
         <StudioARScene sceneData={sceneData()} arSceneNavigator={mockArNav} />

@@ -130,6 +130,22 @@ export function studioVpsErrorIsTransient(error: StudioVpsError): boolean {
   return error.status !== null && (error.status >= 500 || error.status === 429);
 }
 
+/**
+ * Automatic restarts after the map itself failed: it did not load, or went
+ * away (an `idle`). Each one downloads the whole map again, so past these the
+ * host's Retry is left to start again. A failure on the way to the map
+ * (network, the server's own trouble) is retried for as long as the scene is
+ * on screen.
+ */
+export const STUDIO_VPS_MAP_RETRIES = 4;
+
+export function studioVpsMapFailed(
+  state: StudioVpsState,
+  error?: StudioVpsError
+): boolean {
+  return state === "idle" || error?.code === "MAP_LOAD_FAILED";
+}
+
 const RETRY_FIRST_MS = 2000;
 const RETRY_MAX_MS = 60000;
 

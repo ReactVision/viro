@@ -24,6 +24,12 @@ jest.mock("react-native", () => ({
   View: "View",
 }));
 
+jest.mock("../components/Studio/VRTStudioModule", () => ({
+  VRTStudioModule: {
+    rvGetAuthHeaders: async () => ({ mode: "none", baseUrl: null, headers: {}, projectId: null }),
+  },
+}));
+
 import { uploadScanRecording } from "../components/AR/ViroVPSScanUpload";
 import { ViroVPSError } from "../components/AR/ViroVPSClient";
 

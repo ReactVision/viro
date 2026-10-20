@@ -1,12 +1,22 @@
 /**
  * Copyright © 2026 ReactVision
  *
- * What every vps-server call shares: the credential headers, the error type,
- * and turning an error response (`{ "error": { "code", "message" } }`, see
- * spatial/vps-server/API.md) into that error.
+ * What every VPS call shares: where it goes, the credential headers, the
+ * error type, and turning an error response
+ * (`{ "error": { "code", "message" } }`) into that error. Studio serves every
+ * call but image search and server-mode frames, which go to the VPS server
+ * whose address Studio gives out.
  */
 
 "use strict";
+
+import { VRTStudioModule, type StudioAuthContext } from "../Studio/VRTStudioModule";
+import {
+  PLATFORM_ENDPOINT,
+  PLATFORM_FUNCTION_REGION,
+  platformRegionAnswers,
+  platformUndelivered,
+} from "./ViroPlatformRegion";
 
 /** Either credential form API.md accepts; always paired with the project id. */
 export type ViroVPSCredentials = (
@@ -25,27 +35,53 @@ export type ViroVPSCredentials = (
 };
 
 /**
- * Called before every vps-server request, so a short-lived token the host
- * refreshes reaches the next request. A function that throws or rejects fails
- * that request with `CREDENTIALS_UNAVAILABLE`.
+ * Called before every VPS request, so a short-lived token the host refreshes
+ * reaches the next request. A function that throws or rejects fails that
+ * request with `CREDENTIALS_UNAVAILABLE`.
  */
 export type ViroVPSCredentialsProvider = () => Promise<ViroVPSCredentials> | ViroVPSCredentials;
 
 export type ViroVPSCredentialsSource = ViroVPSCredentials | ViroVPSCredentialsProvider;
 
-// vps-server's rule. A header carries bytes, so only printable ASCII reaches
+/** Where VPS calls go and as whom. Every field has a default. */
+export type ViroVPSConnection = {
+  /**
+   * Studio's address, which serves every VPS call but image search and
+   * server-mode frames. Default: the Studio session's, else
+   * `https://platform.reactvision.xyz`.
+   */
+  endpoint?: string;
+  /**
+   * The VPS server's address, for image search and server-mode frames.
+   * Default: the one Studio gives out, asked at most once an hour.
+   */
+  serverEndpoint?: string;
+  /**
+   * Default: the Studio session, or the `rvApiKey` and `rvProjectId` set in
+   * viro's Expo plugin.
+   */
+  credentials?: ViroVPSCredentialsSource;
+  /**
+   * The app's own id for its signed-in user, sent as `x-app-user-id`; see
+   * `ViroVPSCredentials.appUserId`. Replaces one given in `credentials`.
+   */
+  appUserId?: string;
+};
+
+// Studio's rule. A header carries bytes, so only printable ASCII reaches
 // the server as the same id on every transport; "." and ".." would vanish
 // from the path of DELETE /vps/app-users/{id}.
 const APP_USER_ID = /^[\x21-\x7e]{1,255}$/;
 
 /**
- * A failed vps-server request, or a local step around one (reading the
- * recording, fetching a signed map URL). `code` and `status` are the
- * server's, when the failure came from a response. Codes this package sets,
- * with no status: `NETWORK_ERROR` (no response), `CREDENTIALS_UNAVAILABLE`,
- * `INVALID_APP_USER_ID`, `BAD_REQUEST` (uploadScanRecording()'s options) and
- * `UNSUPPORTED`. vps-server answers the same mistakes with the same two
- * codes and status 400.
+ * A failed VPS request, or a local step around one (reading the recording,
+ * fetching a signed map URL). `code` and `status` are the server's, when the
+ * failure came from a response. Codes this package sets, with no status:
+ * `NETWORK_ERROR` (no response), `CREDENTIALS_UNAVAILABLE`,
+ * `INVALID_APP_USER_ID`, `BAD_REQUEST` (uploadScanRecording()'s options),
+ * `VPS_SERVER_NOT_CONFIGURED` (Studio gave out no VPS server address) and
+ * `UNSUPPORTED`. Studio answers the same mistakes with the same two codes and
+ * status 400.
  *
  * `scanId` is set by uploadScanRecording() when its scan exists on the
  * server but the recording did not arrive: pass it back as
@@ -63,9 +99,39 @@ export class ViroVPSError extends Error {
   }
 }
 
-/** The credentials `source` gives now, with `appUserId` in place of their own when it is given. */
+function headerValue(headers: Record<string, string>, name: string): string | undefined {
+  const key = Object.keys(headers).find((k) => k.toLowerCase() === name);
+  return key === undefined ? undefined : headers[key];
+}
+
+/**
+ * The credential viro's native layer holds (a Studio session, or the
+ * manifest's RVApiKey), for `projectId`: the manifest's RVProjectId unless
+ * given.
+ */
+export function credentialsFromAuthContext(
+  context: StudioAuthContext,
+  projectId: string | null = context.projectId
+): ViroVPSCredentials {
+  const accessToken = headerValue(context.headers, "authorization")?.replace(/^Bearer\s+/i, "");
+  const apiKey = headerValue(context.headers, "x-api-key");
+  if (projectId && accessToken) return { projectId, accessToken };
+  if (projectId && apiKey) return { projectId, apiKey };
+  throw new ViroVPSError(
+    "No VPS credentials: pass credentials, or set rvApiKey and rvProjectId in viro's Expo plugin",
+    "CREDENTIALS_UNAVAILABLE"
+  );
+}
+
+const nativeCredentials: ViroVPSCredentialsProvider = async () =>
+  credentialsFromAuthContext(await VRTStudioModule.rvGetAuthHeaders());
+
+/**
+ * The credentials `source` gives now (the native ones when there is no
+ * source), with `appUserId` in place of their own when it is given.
+ */
 export async function resolveVPSCredentials(
-  source: ViroVPSCredentialsSource,
+  source: ViroVPSCredentialsSource = nativeCredentials,
   appUserId?: string
 ): Promise<ViroVPSCredentials> {
   let creds: ViroVPSCredentials | undefined;
@@ -85,7 +151,7 @@ export async function resolveVPSCredentials(
 }
 
 export async function vpsAuthHeaders(
-  source: ViroVPSCredentialsSource,
+  source?: ViroVPSCredentialsSource,
   appUserId?: string
 ): Promise<Record<string, string>> {
   const creds = await resolveVPSCredentials(source, appUserId);
@@ -113,6 +179,8 @@ export async function vpsAuthHeaders(
 /** How long a VPS call may take before it is a `NETWORK_ERROR`. */
 export const VPS_REQUEST_TIMEOUT_MS = 30000;
 
+type Send = (url: string, init: RequestInit) => Promise<Response>;
+
 /**
  * fetch(), then `read` of its response, together within `timeoutMs`: a request
  * that got no response, or did not finish in time, is thrown as a
@@ -123,7 +191,8 @@ export async function vpsFetch<T>(
   url: string,
   init: RequestInit | undefined,
   read: (response: Response) => Promise<T>,
-  timeoutMs = VPS_REQUEST_TIMEOUT_MS
+  timeoutMs = VPS_REQUEST_TIMEOUT_MS,
+  send: Send = (u, i) => fetch(u, i)
 ): Promise<T> {
   const controller = new AbortController();
   // A race, not a wait for the abort to surface: on iOS, Expo's arrayBuffer()
@@ -138,7 +207,7 @@ export async function vpsFetch<T>(
   const exchange = (async () => {
     let response: Response;
     try {
-      response = await fetch(url, { ...init, signal: controller.signal });
+      response = await send(url, { ...init, signal: controller.signal });
     } catch (e) {
       throw new ViroVPSError(e instanceof Error ? e.message : String(e), "NETWORK_ERROR");
     }
@@ -202,4 +271,110 @@ export async function throwIfVPSError(response: Response): Promise<void> {
 /** `endpoint` without trailing slashes, so `${base}/vps/...` never doubles one. */
 export function vpsBaseUrl(endpoint: string): string {
   return endpoint.replace(/\/+$/, "");
+}
+
+/** A resolved connection to Studio: its base URL, the region to pin, and the headers. */
+export type VPSStudio = {
+  base: string;
+  region: string | null;
+  headers: Record<string, string>;
+};
+
+/** Where Studio is and as whom to call it, from `connection` and, for what it leaves out, the native layer. */
+export async function resolveVPSStudio(connection: ViroVPSConnection = {}): Promise<VPSStudio> {
+  const context =
+    connection.endpoint !== undefined && connection.credentials !== undefined
+      ? null
+      : await VRTStudioModule.rvGetAuthHeaders();
+  const base = vpsBaseUrl(connection.endpoint ?? context?.baseUrl ?? PLATFORM_ENDPOINT);
+  const region =
+    base === PLATFORM_ENDPOINT
+      ? PLATFORM_FUNCTION_REGION
+      : connection.endpoint === undefined && context
+        ? (headerValue(context.headers, "x-region") ?? null)
+        : null;
+  const source =
+    connection.credentials ?? (context ? () => credentialsFromAuthContext(context) : undefined);
+  return { base, region, headers: await vpsAuthHeaders(source, connection.appUserId) };
+}
+
+/**
+ * The platform does not fail a pinned region over, so a call the region could
+ * not take is sent once more unpinned: an undelivered answer, or a network
+ * error while the region also fails a probe. ViroColocationRooms applies the
+ * same rule.
+ */
+function sendPinned(base: string, region: string | null): Send {
+  return async (url, init) => {
+    if (!region) return fetch(url, init);
+    try {
+      const response = await fetch(
+        `${url}${url.includes("?") ? "&" : "?"}forceFunctionRegion=${region}`,
+        init
+      );
+      if (!platformUndelivered(response)) return response;
+    } catch (e) {
+      if (!(e instanceof TypeError) || (await platformRegionAnswers(base, region))) throw e;
+    }
+    return fetch(url, init);
+  };
+}
+
+/** A call to Studio's `vps` function: `path` starts with `/vps/`. */
+export function vpsStudioFetch<T>(
+  studio: VPSStudio,
+  path: string,
+  init: RequestInit,
+  read: (response: Response) => Promise<T>,
+  timeoutMs = VPS_REQUEST_TIMEOUT_MS
+): Promise<T> {
+  return vpsFetch(
+    `${studio.base}/functions/v1${path}`,
+    { ...init, headers: { ...studio.headers, ...(init.headers as Record<string, string>) } },
+    read,
+    timeoutMs,
+    sendPinned(studio.base, studio.region)
+  );
+}
+
+const SERVER_ADDRESS_TTL_MS = 60 * 60 * 1000;
+const serverAddresses = new Map<string, { at: number; url: Promise<string> }>();
+
+/** For tests: forget the VPS server addresses Studio gave out. */
+export function clearVPSServerAddresses(): void {
+  serverAddresses.clear();
+}
+
+/**
+ * The VPS server's base URL and the headers to call it with: the connection's
+ * `serverEndpoint`, else the address Studio gives out, kept an hour.
+ */
+export async function resolveVPSServer(
+  connection: ViroVPSConnection = {}
+): Promise<{ base: string; headers: Record<string, string> }> {
+  const studio = await resolveVPSStudio(connection);
+  if (connection.serverEndpoint) {
+    return { base: vpsBaseUrl(connection.serverEndpoint), headers: studio.headers };
+  }
+  const now = Date.now();
+  let known = serverAddresses.get(studio.base);
+  if (!known || now - known.at > SERVER_ADDRESS_TTL_MS) {
+    const url = vpsStudioFetch(studio, "/vps/server", {}, vpsJson).then((body) => {
+      const address = (body as { url?: unknown })?.url;
+      if (typeof address !== "string" || !address) {
+        throw new ViroVPSError(
+          "Studio has no VPS server for image search and server-mode localisation",
+          "VPS_SERVER_NOT_CONFIGURED"
+        );
+      }
+      return vpsBaseUrl(address);
+    });
+    known = { at: now, url };
+    serverAddresses.set(studio.base, known);
+    // a failed answer is asked again next time
+    url.catch(() => {
+      if (serverAddresses.get(studio.base) === known) serverAddresses.delete(studio.base);
+    });
+  }
+  return { base: await known.url, headers: studio.headers };
 }

@@ -8,8 +8,14 @@
  * never answers ends in `error` instead of hanging. The map download itself
  * is mocked; only the component's own sequencing is under test.
  */
+jest.mock("../components/Studio/VRTStudioModule", () => ({
+  VRTStudioModule: {
+    rvGetAuthHeaders: async () => ({ mode: "none", baseUrl: null, headers: {}, projectId: null }),
+  },
+}));
+
 jest.mock("../components/AR/ViroVPSMapDownload", () => ({
-  getLocationMapDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
+  getLocationMapDownload: jest.fn(async (id: string) => {
     const { ViroVPSError } = jest.requireActual("../components/AR/ViroVPSClient");
     if (id === "loc_no_map") throw new ViroVPSError("the location has no active map", "NO_ASSET", 404);
     if (id === "loc_unpaid") throw new ViroVPSError("VPS needs a paid plan", "PAID_PLAN_REQUIRED", 403);
@@ -25,7 +31,7 @@ jest.mock("../components/AR/ViroVPSMapDownload", () => ({
   }),
   fetchMapBytes: jest.fn(async () => new Uint8Array([1, 2, 3])),
   findNearestMap: jest.fn(),
-  getLocationWorldMeshDownload: jest.fn(async (_e: string, _c: unknown, id: string) => {
+  getLocationWorldMeshDownload: jest.fn(async (id: string) => {
     if (id === "loc_no_mesh") {
       const { ViroVPSError } = jest.requireActual("../components/AR/ViroVPSClient");
       throw new ViroVPSError("the location has no active world_mesh", "NO_ASSET", 404);
@@ -593,7 +599,7 @@ describe("<ViroVPS> errors and credentials", () => {
     ]);
   });
 
-  it("hands each request a credentials function that reads the host's again, with appUserId", async () => {
+  it("hands each request the host's connection, so its credentials function is read again", async () => {
     const { nav, loads } = makeNav();
     let token = "t1";
     const credentials = jest.fn(async () => ({ projectId: "p", accessToken: token }));
@@ -607,10 +613,24 @@ describe("<ViroVPS> errors and credentials", () => {
 
     const calls = (MapDownload.getLocationMapDownload as jest.Mock).mock.calls;
     const passed = calls[calls.length - 1][1];
-    expect(typeof passed).toBe("function");
-    await expect(passed()).resolves.toEqual({ projectId: "p", accessToken: "t1", appUserId: "user-1" });
+    expect(passed).toEqual({
+      endpoint: "https://vps.example.com",
+      serverEndpoint: undefined,
+      credentials,
+      appUserId: "user-1",
+    });
+    const { resolveVPSCredentials } = jest.requireActual("../components/AR/ViroVPSClient");
+    await expect(resolveVPSCredentials(passed.credentials, passed.appUserId)).resolves.toEqual({
+      projectId: "p",
+      accessToken: "t1",
+      appUserId: "user-1",
+    });
     token = "t2";
-    await expect(passed()).resolves.toEqual({ projectId: "p", accessToken: "t2", appUserId: "user-1" });
+    await expect(resolveVPSCredentials(passed.credentials, passed.appUserId)).resolves.toEqual({
+      projectId: "p",
+      accessToken: "t2",
+      appUserId: "user-1",
+    });
     expect(credentials).toHaveBeenCalledTimes(2);
   });
 });

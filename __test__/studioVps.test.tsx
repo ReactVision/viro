@@ -416,12 +416,13 @@ afterEach(() => {
 });
 
 describe("StudioARScene bound to a VPS location", () => {
-  it("tracks the scene's location on its endpoint, with the scene's project and one credential", async () => {
+  it("tracks the scene's location with its VPS server, the scene's project and one credential", async () => {
     render(
       <StudioARScene sceneData={sceneData()} arSceneNavigator={mockArNav} />
     );
     const [vps] = liveVps();
-    expect(vps.props.endpoint).toBe(ENDPOINT);
+    expect(vps.props.serverEndpoint).toBe(ENDPOINT);
+    expect(vps.props.endpoint).toBeUndefined();
     expect(vps.props.arSceneNavigator).toBe(mockArNav);
     expect(vps.props.worldMesh).toBe(true);
     expect(vps.startTracking).toHaveBeenCalledWith("loc-1");
@@ -544,7 +545,7 @@ describe("StudioARScene bound to a VPS location", () => {
     expect(anchor()!.props.visible).toBe(false);
   });
 
-  it("reports an error and renders no plane group for a bound scene without an endpoint", () => {
+  it("tracks a bound scene that came without a VPS server, leaving <ViroVPS> to ask Studio", () => {
     const events: StudioVpsStateEvent[] = [];
     const coordinator = new StudioVpsCoordinator();
     coordinator.onStateChange = (e) => events.push(e);
@@ -556,11 +557,11 @@ describe("StudioARScene bound to a VPS location", () => {
       />
     );
     act(() => jest.advanceTimersByTime(7000));
-    expect(nodesOf("plane")).toHaveLength(0);
-    expect(liveVps()).toHaveLength(0);
-    expect(events.map((e) => [e.state, e.error?.code])).toEqual([
-      ["error", "VPS_NOT_CONFIGURED"],
-    ]);
+    const [vps] = liveVps();
+    expect(vps.props.serverEndpoint).toBeUndefined();
+    expect(vps.startTracking).toHaveBeenCalledWith("loc-1");
+    expect(nodesOf("plane").every(underAnchor)).toBe(true);
+    expect(events).toEqual([]);
   });
 
   it("keeps the plane group under the anchor while a shared co-location session runs", () => {
@@ -602,11 +603,13 @@ describe("StudioARScene bound to a VPS location", () => {
   });
 
   it.each([
-    ["renders", sceneData(), undefined],
-    ["does not render", sceneData({}, { vps: undefined }), ["plane"]],
+    ["renders", false, undefined],
+    ["does not render", true, ["plane"]],
   ])(
     "hands a shared session the plane assets it %s, whose remote PLAYs it skips",
-    (_name, data, unrendered) => {
+    (_name, onVisionPro, unrendered) => {
+      mockPlatform.isVisionOS = onVisionPro;
+      const data = sceneData();
       const frame = {
         phase: "off",
         role: null,
@@ -807,7 +810,6 @@ describe("StudioARScene bound to a VPS location", () => {
 
   it.each([
     ["Apple Vision Pro", () => (mockPlatform.isVisionOS = true), sceneData()],
-    ["no endpoint", () => {}, sceneData({}, { vps: undefined })],
   ])(
     "skips a PLAY at a plane asset it does not render (%s), and the sequence goes on",
     (_name, setUp, data) => {
@@ -923,27 +925,19 @@ describe("StudioARScene bound to a VPS location", () => {
     });
   });
 
-  it("sends no credential to an endpoint that is not https, and reports why", () => {
-    const events: StudioVpsStateEvent[] = [];
-    const coordinator = new StudioVpsCoordinator();
-    coordinator.onStateChange = (e) => events.push(e);
+  it("leaves out a VPS server that is not https, so no credential goes to it", () => {
     render(
       <StudioARScene
         sceneData={sceneData(
           {},
           { vps: { endpoint: "http://vps.example.test" } }
         )}
-        vps={coordinator}
         arSceneNavigator={mockArNav}
       />
     );
-    act(() => jest.advanceTimersByTime(7000));
-    expect(liveVps()).toHaveLength(0);
-    expect(studio.rvGetAuthHeaders).not.toHaveBeenCalled();
-    expect(nodesOf("plane")).toHaveLength(0);
-    expect(events.map((e) => [e.state, e.error?.code])).toEqual([
-      ["error", "VPS_ENDPOINT_NOT_HTTPS"],
-    ]);
+    const [vps] = liveVps();
+    expect(vps.props.serverEndpoint).toBeUndefined();
+    expect(vps.startTracking).toHaveBeenCalledWith("loc-1");
   });
 });
 
@@ -1148,11 +1142,6 @@ describe("retryVps", () => {
 
   it.each([
     ["an unbound scene", () => {}, sceneData({ vps_location_id: null })],
-    [
-      "a scene without an endpoint",
-      () => {},
-      sceneData({}, { vps: undefined }),
-    ],
     ["Meta Quest", () => (mockPlatform.isQuest = true), sceneData()],
   ])("has nothing to restart for %s", (_name, setUp, data) => {
     setUp();

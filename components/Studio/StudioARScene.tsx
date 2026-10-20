@@ -471,11 +471,10 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
     () => vps?.localization ?? "device",
     () => vps?.localization ?? "device"
   );
-  const vpsEndpoint =
-    isQuest || isVisionOS ? null : (vpsBinding?.endpoint ?? null);
+  const vpsTracks = !!vpsBinding && !isQuest && !isVisionOS;
   // Where a bound scene renders no plane assets, nothing plays at them either.
   const unrenderedAssetIds =
-    vpsBinding && !vpsEndpoint ? planeAssetIds : undefined;
+    vpsBinding && !vpsTracks ? planeAssetIds : undefined;
   const [vpsActive, setVpsActive] = useState(!vps);
   const [vpsState, setVpsState] = useState<StudioVpsState>("idle");
   const [vpsTrackedOnce, setVpsTrackedOnce] = useState(false);
@@ -524,14 +523,12 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       setVpsState("idle");
     } else if (isQuest || isVisionOS) {
       reportVps("unsupported", STUDIO_VPS_UNSUPPORTED);
-    } else if (vpsBinding.endpointError) {
-      reportVps("error", vpsBinding.endpointError);
     }
   }, [vpsBinding, vpsActive, reportVps]);
 
   // <ViroVPS> mounts with vpsActive, so its ref is set by now.
   useEffect(() => {
-    if (!vpsEndpoint || !vpsActive || !vpsBinding) return;
+    if (!vpsTracks || !vpsActive || !vpsBinding) return;
     const retry: VpsRetry = {
       locationId: vpsBinding.locationId,
       attempt: 0,
@@ -544,7 +541,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       clearTimeout(retry.timer);
       if (vpsRetryRef.current === retry) vpsRetryRef.current = null;
     };
-  }, [vpsEndpoint, vpsActive, vpsBinding, vpsLocalization]);
+  }, [vpsTracks, vpsActive, vpsBinding, vpsLocalization]);
 
   const vpsCredentials = useCallback(
     () => studioVpsCredentials(scene.belongs_to_project),
@@ -2279,7 +2276,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
         ))}
       {needsOrigin && renderOriginPicker()}
       {renderSharedContent()}
-      {vpsEndpoint && (
+      {vpsTracks && (
         <ViroVPSAnchor visible={vpsState === "tracking"}>
           {renderedPlaneAssets}
           <StudioSounds
@@ -2288,11 +2285,11 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
           />
         </ViroVPSAnchor>
       )}
-      {vpsEndpoint && vpsActive && (
+      {vpsTracks && vpsActive && (
         <ViroVPS
           ref={vpsRef}
           arSceneNavigator={arSceneNavigator ?? {}}
-          endpoint={vpsEndpoint}
+          serverEndpoint={vpsBinding?.serverEndpoint ?? undefined}
           credentials={vpsCredentials}
           localization={vpsLocalization}
           worldMesh
@@ -2339,7 +2336,7 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
       )}
       <StudioSounds
         manager={soundManagerRef.current!}
-        filter={vpsEndpoint ? soundOutsideVpsMap : undefined}
+        filter={vpsTracks ? soundOutsideVpsMap : undefined}
       />
       {questNoticeTransform && questNotice && (
         <ViroNode

@@ -129,9 +129,9 @@ describe('<ViroVPS localization="server">', () => {
       await flush();
     });
     expect(mockLocalise).toHaveBeenCalledTimes(1);
-    expect(mockLocalise.mock.calls[0][2]).toBe("loc");
-    expect(mockLocalise.mock.calls[0][3]).toBe(FRAME);
-    expect(mockLocalise.mock.calls[0][4]).toBeUndefined(); // no hint before it converges
+    expect(mockLocalise.mock.calls[0][0]).toBe("loc");
+    expect(mockLocalise.mock.calls[0][1]).toBe(FRAME);
+    expect(mockLocalise.mock.calls[0][2]).toBeUndefined(); // no hint before it converges
     expect(nav.reportVPSServerFix).toHaveBeenCalledWith(POSE, T, 120);
 
     // the next frame goes a second later, until it converges, with the same device id
@@ -140,8 +140,8 @@ describe('<ViroVPS localization="server">', () => {
       await flush();
     });
     expect(mockLocalise).toHaveBeenCalledTimes(2);
-    expect(mockLocalise.mock.calls[0][5]).toMatch(/^[0-9a-z]{8,}$/);
-    expect(mockLocalise.mock.calls[1][5]).toBe(mockLocalise.mock.calls[0][5]);
+    expect(mockLocalise.mock.calls[0][3]).toMatch(/^[0-9a-z]{8,}$/);
+    expect(mockLocalise.mock.calls[1][3]).toBe(mockLocalise.mock.calls[0][3]);
   });
 
   it("a frame that does not localise reports nothing and is retried", async () => {
@@ -190,7 +190,7 @@ describe('<ViroVPS localization="server">', () => {
       await tick(2000);
     });
     expect(mockLocalise.mock.calls.length).toBe(sent + 1);
-    expect(mockLocalise.mock.calls.at(-1)[4]).toEqual(nearFromRenderPose(renderPose));
+    expect(mockLocalise.mock.calls.at(-1)[2]).toEqual(nearFromRenderPose(renderPose));
   });
 
   it("a location without a server map ends tracking with NO_SERVER_MAP", async () => {
@@ -211,11 +211,12 @@ describe('<ViroVPS localization="server">', () => {
     expect(mockLocalise).toHaveBeenCalledTimes(1);
   });
 
-  it("a refusal for the plan or the team's compute billing ends tracking with its code", async () => {
+  it("a refusal for the plan or the team's compute billing, or no server, ends tracking with its code", async () => {
     for (const [code, status] of [
       ["COMPUTE_SPEND_LIMIT_REACHED", 403],
       ["PAID_PLAN_REQUIRED", 403],
       ["INVALID_API_KEY", 401],
+      ["VPS_SERVER_NOT_CONFIGURED", undefined],
     ] as const) {
       mockLocalise.mockReset();
       mockLocalise.mockRejectedValue(new ViroVPSError("refused", code, status));
@@ -228,7 +229,7 @@ describe('<ViroVPS localization="server">', () => {
         await flush();
       });
       expect(states.at(-1)?.state).toBe("error");
-      expect(states.at(-1)?.errorDetail).toMatchObject({ code, status });
+      expect(states.at(-1)?.errorDetail).toMatchObject({ code, status: status ?? null });
       expect(mockLocalise).toHaveBeenCalledTimes(1);
     }
   });

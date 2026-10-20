@@ -2,8 +2,8 @@
  * Copyright © 2026 ReactVision
  *
  * The "GPS nearby -> download the active .rvmap" half of the VPS map flow
- * (spatial/vps-server/API.md: GET /vps/locations, then
- * GET /vps/locations/{id}/map). Pure TS/fetch: these are small JSON
+ * (Studio's GET /vps/locations, then GET /vps/locations/{id}/map). Pure
+ * TS/fetch: these are small JSON
  * requests plus one map download of a few MB, so unlike the scan upload
  * (ViroVPSScanUpload.ts) they do not need a native streaming path.
  *
@@ -25,13 +25,13 @@
 "use strict";
 
 import {
-  ViroVPSCredentialsSource,
+  ViroVPSConnection,
   ViroVPSError,
-  vpsAuthHeaders,
-  vpsBaseUrl,
+  resolveVPSStudio,
   vpsDownloadTimeoutMs,
   vpsFetch,
   vpsJson,
+  vpsStudioFetch,
 } from "./ViroVPSClient";
 
 export type ViroVPSNearbyLocation = {
@@ -53,21 +53,35 @@ export type ViroVPSMapDownload = {
   quality: Record<string, number> | null;
 };
 
-/** `GET /vps/locations?lat=&lon=&radius_m=&limit=` — nearest first. */
+/** `GET /vps/locations?lat=&lon=&radius_m=&limit=`: nearest first. */
 export async function findNearbyLocations(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
   lat: number,
   lon: number,
   radiusMeters = 200,
-  limit = 20
+  limit = 20,
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSNearbyLocation[]> {
-  const url = `${vpsBaseUrl(endpoint)}/vps/locations?lat=${lat}&lon=${lon}&radius_m=${radiusMeters}&limit=${limit}`;
-  // The backend wraps the list: { "locations": [...] } (vps-server/API.md).
-  const body = (await vpsFetch(url, { headers: await vpsAuthHeaders(credentials) }, vpsJson)) as {
-    locations?: ViroVPSNearbyLocation[];
-  };
+  const body = (await vpsStudioFetch(
+    await resolveVPSStudio(connection),
+    `/vps/locations?lat=${lat}&lon=${lon}&radius_m=${radiusMeters}&limit=${limit}`,
+    {},
+    vpsJson
+  )) as { locations?: ViroVPSNearbyLocation[] };
   return body.locations ?? [];
+}
+
+/** `GET /vps/locations/{id}/{kind}`: a signed link to a file of the location's active scan. */
+async function locationFile<T>(
+  locationId: string,
+  kind: string,
+  connection: ViroVPSConnection | undefined
+): Promise<T> {
+  return (await vpsStudioFetch(
+    await resolveVPSStudio(connection),
+    `/vps/locations/${encodeURIComponent(locationId)}/${kind}`,
+    {},
+    vpsJson
+  )) as T;
 }
 
 /**
@@ -76,19 +90,14 @@ export async function findNearbyLocations(
  * Returns 404 (as a thrown ViroVPSError with code "NO_ASSET") if the
  * location has no active scan with a map.
  */
-export async function getLocationMapDownload(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
-  locationId: string
+export function getLocationMapDownload(
+  locationId: string,
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSMapDownload> {
-  return (await vpsFetch(
-    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/map`,
-    { headers: await vpsAuthHeaders(credentials) },
-    vpsJson
-  )) as ViroVPSMapDownload;
+  return locationFile(locationId, "map", connection);
 }
 
-/** The files a location (or scan) can have; see vps-server/API.md. */
+/** The files a location (or scan) can have; see Studio's docs/vps-api.md. */
 export type ViroVPSAssetKind = "map" | "mesh" | "world_mesh" | "splat" | "poses" | "semantic";
 
 /** A signed link to one of a location's files, as `GET /vps/locations/{id}/{kind}` answers. */
@@ -106,16 +115,11 @@ export type ViroVPSAssetDownload = {
  * the location's map. Throws a ViroVPSError with status 404 when the
  * location's active scan has none (a map-only scan).
  */
-export async function getLocationWorldMeshDownload(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
-  locationId: string
+export function getLocationWorldMeshDownload(
+  locationId: string,
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSAssetDownload> {
-  return (await vpsFetch(
-    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/world_mesh`,
-    { headers: await vpsAuthHeaders(credentials) },
-    vpsJson
-  )) as ViroVPSAssetDownload;
+  return locationFile(locationId, "world_mesh", connection);
 }
 
 /**
@@ -139,16 +143,11 @@ export type ViroVPSSemanticObject = {
  * `semantic.json`. Throws a ViroVPSError with status 404 when the scan has
  * none.
  */
-export async function getLocationSemanticDownload(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
-  locationId: string
+export function getLocationSemanticDownload(
+  locationId: string,
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSAssetDownload> {
-  return (await vpsFetch(
-    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/semantic`,
-    { headers: await vpsAuthHeaders(credentials) },
-    vpsJson
-  )) as ViroVPSAssetDownload;
+  return locationFile(locationId, "semantic", connection);
 }
 
 function isVec3(v: unknown): v is [number, number, number] {
@@ -187,13 +186,12 @@ export function parseSemanticObjects(json: unknown): ViroVPSSemanticObject[] {
  * `[]` when the scan has none (404 `NO_ASSET`).
  */
 export async function fetchLocationSemanticObjects(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
-  locationId: string
+  locationId: string,
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSSemanticObject[]> {
   let download: ViroVPSAssetDownload;
   try {
-    download = await getLocationSemanticDownload(endpoint, credentials, locationId);
+    download = await getLocationSemanticDownload(locationId, connection);
   } catch (e) {
     if (e instanceof ViroVPSError && e.status === 404) return [];
     throw e;
@@ -338,16 +336,15 @@ export function candidateLocationsForTracking(
  * for them.
  */
 export async function findNearestMap(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
   lat: number,
   lon: number,
-  radiusMeters = 200
+  radiusMeters = 200,
+  connection?: ViroVPSConnection
 ): Promise<{ location: ViroVPSNearbyLocation; map: ViroVPSMapDownload } | null> {
-  const nearby = await findNearbyLocations(endpoint, credentials, lat, lon, radiusMeters);
+  const nearby = await findNearbyLocations(lat, lon, radiusMeters, undefined, connection);
   for (const location of candidateLocationsForTracking(nearby)) {
     try {
-      const map = await getLocationMapDownload(endpoint, credentials, location.id);
+      const map = await getLocationMapDownload(location.id, connection);
       return { location, map };
     } catch (e) {
       if (e instanceof ViroVPSError && e.status === 404) continue;

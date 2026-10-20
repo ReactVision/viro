@@ -14,12 +14,8 @@ export interface StudioVpsStateEvent {
   locationId: string;
   state: StudioVpsState;
   /**
-   * With `error` and `unsupported`. `code` is vps-server's own, one that
-   * `<ViroVPS>` sets on the device (`ViroVPSErrorDetail`),
-   * `VPS_NOT_CONFIGURED` for a bound scene that came without an endpoint, or
-   * `VPS_ENDPOINT_NOT_HTTPS` for one whose endpoint is not https, to which
-   * no credential is sent. Plain http passes only to localhost or a private
-   * IP literal.
+   * With `error` and `unsupported`. `code` is the server's own, or one that
+   * `<ViroVPS>` sets on the device (`ViroVPSErrorDetail`).
    */
   error?: { code: string; status: number | null; message: string };
 }
@@ -33,20 +29,6 @@ export const STUDIO_VPS_UNSUPPORTED: StudioVpsError = {
   code: "UNSUPPORTED",
   status: null,
   message: "VPS needs an ARKit or ARCore session.",
-};
-
-export const STUDIO_VPS_NOT_CONFIGURED: StudioVpsError = {
-  code: "VPS_NOT_CONFIGURED",
-  status: null,
-  message:
-    "The scene is bound to a VPS location but came without a vps-server endpoint.",
-};
-
-export const STUDIO_VPS_ENDPOINT_NOT_HTTPS: StudioVpsError = {
-  code: "VPS_ENDPOINT_NOT_HTTPS",
-  status: null,
-  message:
-    "The scene's vps-server endpoint is not an https URL, so no credential is sent to it.",
 };
 
 // Leading zeros are refused because some resolvers read them as octal.
@@ -89,10 +71,11 @@ export function studioVpsEndpointAllowed(endpoint: string): boolean {
 export type StudioVpsBinding = {
   sceneId: string;
   locationId: string;
-  /** Null when the scene came without one, or with one that is refused. */
-  endpoint: string | null;
-  /** Why `endpoint` is null. */
-  endpointError: StudioVpsError | null;
+  /**
+   * The VPS server the scene came with, for server mode. Null without one,
+   * or for one no credential may be sent to; `<ViroVPS>` then asks Studio.
+   */
+  serverEndpoint: string | null;
 };
 
 export function studioVpsBinding(
@@ -101,16 +84,10 @@ export function studioVpsBinding(
   const { scene } = sceneData;
   if (!scene.vps_location_id) return null;
   const endpoint = sceneData.vps?.endpoint || null;
-  const endpointError = !endpoint
-    ? STUDIO_VPS_NOT_CONFIGURED
-    : studioVpsEndpointAllowed(endpoint)
-      ? null
-      : STUDIO_VPS_ENDPOINT_NOT_HTTPS;
   return {
     sceneId: scene.id,
     locationId: scene.vps_location_id,
-    endpoint: endpointError ? null : endpoint,
-    endpointError,
+    serverEndpoint: endpoint && studioVpsEndpointAllowed(endpoint) ? endpoint : null,
   };
 }
 

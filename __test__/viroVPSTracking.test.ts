@@ -4,6 +4,12 @@
  * directly here, against a scripted sequence of getVPSLocalization() polls —
  * same reasoning as vpsMapDownload.test.ts's bytesToBase64 coverage.
  */
+jest.mock("../components/Studio/VRTStudioModule", () => ({
+  VRTStudioModule: {
+    rvGetAuthHeaders: async () => ({ mode: "none", baseUrl: null, headers: {}, projectId: null }),
+  },
+}));
+
 import type { ViroVPSLocalizationResult } from "../components/Types/ViroEvents";
 import {
   nextTrackingPhase,

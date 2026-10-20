@@ -21,13 +21,15 @@
 
 import { NativeModules } from "react-native";
 import {
+  ViroVPSConnection,
   ViroVPSCredentialsSource,
   ViroVPSError,
+  resolveVPSStudio,
   vpsAuthHeaders,
   vpsBaseUrl,
   vpsErrorFromBody,
-  vpsFetch,
   vpsJson,
+  vpsStudioFetch,
 } from "./ViroVPSClient";
 
 export type ViroVPSScanTarget =
@@ -74,7 +76,7 @@ export type ViroVPSScan = {
   recording_bytes: number | null;
   assets: string[];
   /**
-   * The map's numbers; see vps-server/API.md. Includes `points`, `localised`,
+   * The map's numbers; see Studio's docs/vps-api.md. Includes `points`, `localised`,
    * `check_frames`, `position_error_median_m`, ..., and for a merge
    * `merged_scans` and `cross_scan_residual_px`.
    */
@@ -237,14 +239,11 @@ export async function uploadScanRecording(
 }
 
 /** `GET /vps/scans/{id}`: poll while `status` is `queued` or `processing`. */
-export async function getScan(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
-  scanId: string
-): Promise<ViroVPSScan> {
-  return (await vpsFetch(
-    `${vpsBaseUrl(endpoint)}/vps/scans/${encodeURIComponent(scanId)}`,
-    { headers: await vpsAuthHeaders(credentials) },
+export async function getScan(scanId: string, connection?: ViroVPSConnection): Promise<ViroVPSScan> {
+  return (await vpsStudioFetch(
+    await resolveVPSStudio(connection),
+    `/vps/scans/${encodeURIComponent(scanId)}`,
+    {},
     vpsJson
   )) as ViroVPSScan;
 }

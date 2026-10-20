@@ -178,6 +178,7 @@ export type {
   ViroVPSScanUploadOptions,
 } from "./components/AR/ViroVPSScanUpload";
 export type {
+  ViroVPSConnection,
   ViroVPSCredentials,
   ViroVPSCredentialsProvider,
   ViroVPSCredentialsSource,

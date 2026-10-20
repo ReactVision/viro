@@ -2,7 +2,7 @@
  * Copyright © 2026 ReactVision
  *
  * Finding a VPS location from a camera image, for places without GPS
- * (spatial/vps-server/API.md: POST /vps/locations/query). The server ranks
+ * (the VPS server's POST /vps/locations/query). The server ranks
  * the project's maps by a global image descriptor and checks the best ones by
  * localising the image against them, the way the device itself would.
  *
@@ -15,13 +15,7 @@
 "use strict";
 
 import type { ViroVPSQueryFrame } from "../Types/ViroEvents";
-import {
-  ViroVPSCredentialsSource,
-  vpsAuthHeaders,
-  vpsBaseUrl,
-  vpsFetch,
-  vpsJson,
-} from "./ViroVPSClient";
+import { ViroVPSConnection, resolveVPSServer, vpsFetch, vpsJson } from "./ViroVPSClient";
 
 /** One location the server matched the image to, best first. */
 export type ViroVPSQueryCandidate = {
@@ -105,10 +99,9 @@ function asciiBytes(s: string): Uint8Array {
  * from another one.
  */
 export async function queryLocationsByImage(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
   frame: ViroVPSQueryFrame,
-  options: ViroVPSQueryOptions = {}
+  options: ViroVPSQueryOptions = {},
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSQueryCandidate[]> {
   const fields: Record<string, string> = {
     intrinsics: [frame.fx, frame.fy, frame.cx, frame.cy].join(","),
@@ -120,12 +113,13 @@ export async function queryLocationsByImage(
   }
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
+  const server = await resolveVPSServer(connection);
   const parsed = (await vpsFetch(
-    `${vpsBaseUrl(endpoint)}/vps/locations/query`,
+    `${server.base}/vps/locations/query`,
     {
       method: "POST",
       headers: {
-        ...(await vpsAuthHeaders(credentials)),
+        ...server.headers,
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body: body as unknown as BodyInit,
@@ -172,12 +166,11 @@ export type ViroVPSServerFix = {
  * `NO_SERVER_MAP` when the location's map was built without server mode.
  */
 export async function localiseFrameOnServer(
-  endpoint: string,
-  credentials: ViroVPSCredentialsSource,
   locationId: string,
   frame: ViroVPSQueryFrame,
   near?: number[],
-  device?: string
+  device?: string,
+  connection?: ViroVPSConnection
 ): Promise<ViroVPSServerFix> {
   const fields: Record<string, string> = {
     intrinsics: [frame.fx, frame.fy, frame.cx, frame.cy].join(","),
@@ -185,12 +178,13 @@ export async function localiseFrameOnServer(
   if (near && near.length === 16) fields.near = near.join(",");
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
+  const server = await resolveVPSServer(connection);
   return (await vpsFetch(
-    `${vpsBaseUrl(endpoint)}/vps/locations/${encodeURIComponent(locationId)}/localise`,
+    `${server.base}/vps/locations/${encodeURIComponent(locationId)}/localise`,
     {
       method: "POST",
       headers: {
-        ...(await vpsAuthHeaders(credentials)),
+        ...server.headers,
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
         ...(device ? { "x-rv-device": device } : {}),
       },

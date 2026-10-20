@@ -5,6 +5,12 @@
  * renderer answers for a query frame, the multipart body sent to
  * POST /vps/locations/query, choosing a candidate, and reading semantic.json.
  */
+jest.mock("../components/Studio/VRTStudioModule", () => ({
+  VRTStudioModule: {
+    rvGetAuthHeaders: async () => ({ mode: "none", baseUrl: null, headers: {}, projectId: null }),
+  },
+}));
+
 import { parseVPSQueryFrame } from "../components/AR/ViroScanStatus";
 import {
   base64ToBytes,
@@ -103,7 +109,7 @@ describe("vps-server requests", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     const frame = { image: bytesToBase64(new Uint8Array([0xff, 0xd8, 0xff, 0xd9])), width: 4, height: 2, fx: 9, fy: 9, cx: 2, cy: 1 };
 
-    const candidates = await queryLocationsByImage("https://vps.test/", creds, frame, { lat: 19.4, lon: -99.1, radiusM: 500 });
+    const candidates = await queryLocationsByImage(frame, { lat: 19.4, lon: -99.1, radiusM: 500 }, { serverEndpoint: "https://vps.test/", endpoint: "https://vps.test/", credentials: creds });
 
     expect(candidates).toHaveLength(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
@@ -129,8 +135,8 @@ describe("vps-server requests", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     const frame = { image: "AA==", width: 1, height: 1, fx: 1, fy: 1, cx: 0, cy: 0 };
 
-    await localiseFrameOnServer("https://vps.test", creds, "l", frame, undefined, "phone-1");
-    await localiseFrameOnServer("https://vps.test", creds, "l", frame, undefined, undefined);
+    await localiseFrameOnServer("l", frame, undefined, "phone-1", { serverEndpoint: "https://vps.test", endpoint: "https://vps.test", credentials: creds });
+    await localiseFrameOnServer("l", frame, undefined, undefined, { serverEndpoint: "https://vps.test", endpoint: "https://vps.test", credentials: creds });
 
     const headersOf = (i: number) =>
       (fetchMock.mock.calls[i] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
@@ -147,7 +153,7 @@ describe("vps-server requests", () => {
       text: async () => JSON.stringify({ error: { code: "TOO_LARGE", message: "image over 8 MB" } }),
     })) as unknown as typeof fetch;
     const frame = { image: "AA==", width: 1, height: 1, fx: 1, fy: 1, cx: 0, cy: 0 };
-    await expect(queryLocationsByImage("https://vps.test", creds, frame)).rejects.toMatchObject({
+    await expect(queryLocationsByImage(frame, {}, { serverEndpoint: "https://vps.test", endpoint: "https://vps.test", credentials: creds })).rejects.toMatchObject({
       status: 413,
       code: "TOO_LARGE",
     });
@@ -167,8 +173,8 @@ describe("vps-server requests", () => {
         : { ok: true, status: 200, json: async () => semantic, text: async () => "" }
     );
     global.fetch = fetchMock as unknown as typeof fetch;
-    await expect(fetchLocationSemanticObjects("https://vps.test", creds, "loc")).resolves.toEqual(semantic.objects);
-    expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe("https://vps.test/vps/locations/loc/semantic");
+    await expect(fetchLocationSemanticObjects("loc", { endpoint: "https://vps.test", credentials: creds })).resolves.toEqual(semantic.objects);
+    expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe("https://vps.test/functions/v1/vps/locations/loc/semantic");
     expect((fetchMock.mock.calls[1] as unknown[])[0]).toBe("https://vps.test/files/t");
 
     global.fetch = jest.fn(async () => ({
@@ -177,7 +183,7 @@ describe("vps-server requests", () => {
       json: async () => ({}),
       text: async () => JSON.stringify({ error: { code: "NO_ASSET", message: "no semantic" } }),
     })) as unknown as typeof fetch;
-    await expect(fetchLocationSemanticObjects("https://vps.test", creds, "loc")).resolves.toEqual([]);
+    await expect(fetchLocationSemanticObjects("loc", { endpoint: "https://vps.test", credentials: creds })).resolves.toEqual([]);
   });
 });
 

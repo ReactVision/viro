@@ -24,8 +24,8 @@ import {
   pickVisualCandidate,
   queryLocationsByImage,
 } from "./ViroVPSQuery";
-import { resolveVPSCredentials, ViroVPSError } from "./ViroVPSClient";
-import type { ViroVPSCredentials, ViroVPSCredentialsSource } from "./ViroVPSClient";
+import { ViroVPSError } from "./ViroVPSClient";
+import type { ViroVPSConnection, ViroVPSCredentialsSource } from "./ViroVPSClient";
 import type { ViroARSceneNavigator } from "./ViroARSceneNavigator";
 import {
   nextTrackingPhase,
@@ -36,13 +36,16 @@ import {
 } from "./ViroVPSTracking";
 
 /**
- * Why a VPS step failed. `code` is vps-server's own `error.code` when the
+ * Why a VPS step failed. `code` is the server's own `error.code` when the
  * failure is its answer (such as `NO_ASSET` for a location with no map yet,
  * `PAID_PLAN_REQUIRED` or `mfa_required`), `HTTP_ERROR` for an error answer
  * without one, or one of these, set on the device:
  *
  * - `NETWORK_ERROR`: a request got no response.
- * - `CREDENTIALS_UNAVAILABLE`: the `credentials` function threw or rejected.
+ * - `CREDENTIALS_UNAVAILABLE`: the `credentials` function threw or rejected,
+ *   or there were none to default to.
+ * - `VPS_SERVER_NOT_CONFIGURED`: server mode or image search, and Studio gave
+ *   out no VPS server address.
  * - `INVALID_APP_USER_ID`: `appUserId` breaks the rule in `ViroVPSCredentials.appUserId`.
  * - `UNSUPPORTED`: the navigator cannot do it; the state is `unsupported`.
  * - `NO_LOCATION`: `"auto"` or `"visual"` found no location with a map.
@@ -53,7 +56,7 @@ import {
  */
 export type ViroVPSErrorDetail = {
   code: string;
-  /** The HTTP status of vps-server's answer; null when there was no answer. */
+  /** The HTTP status of the server's answer; null when there was no answer. */
   status: number | null;
   /** The same text as the `error` string beside it. */
   message: string;
@@ -131,21 +134,31 @@ export type ViroVPSProps = {
    */
   arSceneNavigator: ViroVPSNavigator;
 
-  /** vps-server's base URL, e.g. `"https://vps.example.com"`. */
-  endpoint: string;
+  /**
+   * Studio's address, which serves the location lookups and map downloads.
+   * Default: the Studio session's, else `https://platform.reactvision.xyz`.
+   */
+  endpoint?: string;
 
   /**
-   * Project credentials for vps-server (see `ViroVPSCredentials`), or a
-   * function returning them. A function is called before every request (each
-   * location lookup, image query and map download), so a short-lived token
-   * the host refreshes is used without a re-render.
+   * The VPS server's address, for server mode and image search. Default: the
+   * one Studio gives out.
    */
-  credentials: ViroVPSCredentialsSource;
+  serverEndpoint?: string;
+
+  /**
+   * Project credentials (see `ViroVPSCredentials`), or a function returning
+   * them. A function is called before every request (each location lookup,
+   * image query and map download), so a short-lived token the host refreshes
+   * is used without a re-render. Default: the Studio session, or the
+   * `rvApiKey` and `rvProjectId` set in viro's Expo plugin.
+   */
+  credentials?: ViroVPSCredentialsSource;
 
   /**
    * The app's own id for its signed-in user, sent as `x-app-user-id` on every
-   * vps-server request; see `ViroVPSCredentials.appUserId`. Replaces one
-   * given in `credentials`.
+   * VPS request; see `ViroVPSCredentials.appUserId`. Replaces one given in
+   * `credentials`.
    */
   appUserId?: string;
 
@@ -226,12 +239,12 @@ export type ViroVPSProps = {
    * - `"device"` (default): the location's map is downloaded and the device
    *   matches the camera against it (SIFT), as before.
    * - `"server"`: no map is downloaded. The device sends a camera frame every
-   *   `serverFixIntervalMs` to vps-server (`POST /vps/locations/{id}/localise`),
+   *   `serverFixIntervalMs` to the VPS server (`POST /vps/locations/{id}/localise`),
    *   which matches it with DISK + LightGlue and answers with the pose; the same
    *   fuser turns those answers into tracking, and ARKit / ARCore carry the pose
    *   between them. It holds up across days, lighting and moved objects where
    *   SIFT does not, at the cost of a network round trip per fix. The location's
-   *   map must have been built with server mode on (vps-server's
+   *   map must have been built with server mode on (the VPS server's
    *   `VPS_SERVER_MAPS`); otherwise the state goes to `error` with code
    *   `NO_SERVER_MAP`. It needs a paid plan and is billed as Advanced VPS
    *   compute time, per second the server spends on each frame. A refusal
@@ -343,7 +356,7 @@ function startLoad(nav: object, slot: keyof NavigatorLoads): number {
  * ## Finding a place without GPS
  *
  * `startTracking("visual")`, and `"auto"` when GPS gives nothing, send camera
- * images to the backend (`POST /vps/locations/query`), which finds the
+ * images to the VPS server (`POST /vps/locations/query`), which finds the
  * project's location whose map the image localises against. It retries
  * every `visualSearchIntervalMs` for up to `visualSearchTimeoutMs`, so point
  * the camera at the scanned place, not a blank wall.
@@ -409,8 +422,6 @@ function startLoad(nav: object, slot: keyof NavigatorLoads): number {
  *   <ViroVPS
  *     ref={vpsRef}
  *     arSceneNavigator={props.arSceneNavigator}
- *     endpoint="https://vps.example.com"
- *     credentials={{ projectId, apiKey }}
  *     onTrackingState={(e) => console.log(e.state)}
  *     onLocalized={(e) => applyMapRelativePose(e.renderPose)}
  *   />
@@ -447,8 +458,12 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private _phase: ViroVPSTrackingPhase = VPS_TRACKING_IDLE;
   private _lastError: string | undefined;
 
-  private _credentials = (): Promise<ViroVPSCredentials> =>
-    resolveVPSCredentials(this.props.credentials, this.props.appUserId);
+  private _connection = (): ViroVPSConnection => ({
+    endpoint: this.props.endpoint,
+    serverEndpoint: this.props.serverEndpoint,
+    credentials: this.props.credentials,
+    appUserId: this.props.appUserId,
+  });
 
   componentDidMount() {
     this._mounted = true;
@@ -493,11 +508,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
       if (this._mounted && session === this._session) this.props.onWorldMesh?.(event);
     };
     try {
-      const download = await getLocationWorldMeshDownload(
-        this.props.endpoint,
-        this._credentials,
-        locationId
-      );
+      const download = await getLocationWorldMeshDownload(locationId, this._connection());
       if (session !== this._session) return;
       const bytes = await fetchAssetBytes(download);
       if (session !== this._session) return;
@@ -683,7 +694,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         // server mode needs no map on the device
         mapDownload = server
           ? undefined
-          : await getLocationMapDownload(this.props.endpoint, this._credentials, locationId);
+          : await getLocationMapDownload(locationId, this._connection());
       }
     } catch (e) {
       return this._fail(session, undefined, toErrorDetail(e));
@@ -841,12 +852,11 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
             return;
           }
           const fix = await localiseFrameOnServer(
-            this.props.endpoint,
-            this._credentials,
             locationId,
             frame,
             converged ? nearFromRenderPose(this._lastRenderPose) : undefined,
-            device
+            device,
+            this._connection()
           );
           if (!live()) return;
           if (fix.localised && fix.T_map_cam) {
@@ -857,10 +867,11 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
         if (!live()) return;
         const detail = toErrorDetail(e);
         // a refusal the next frame would get too: the map, the credential,
-        // the plan or the team's compute billing
+        // the plan, the team's compute billing, or no server to send it to
         if (
           detail.code === "NO_SERVER_MAP" ||
           detail.code === "NOT_FOUND" ||
+          detail.code === "VPS_SERVER_NOT_CONFIGURED" ||
           detail.status === 401 ||
           detail.status === 403
         ) {
@@ -903,11 +914,10 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
       if (poseResult?.success && poseResult.pose) {
         position = { lat: poseResult.pose.latitude, lon: poseResult.pose.longitude };
         const found = await findNearestMap(
-          this.props.endpoint,
-          this._credentials,
           position.lat,
           position.lon,
-          this.props.autoRadiusMeters ?? 200
+          this.props.autoRadiusMeters ?? 200,
+          this._connection()
         );
         if (session !== this._session) return SUPERSEDED_SEARCH;
         if (found) return { locationId: found.location.id, map: found.map };
@@ -955,19 +965,14 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
       if (frame.success) {
         try {
           const candidates = await queryLocationsByImage(
-            this.props.endpoint,
-            this._credentials,
             frame,
-            position ? { lat: position.lat, lon: position.lon, radiusM: 500 } : {}
+            position ? { lat: position.lat, lon: position.lon, radiusM: 500 } : {},
+            this._connection()
           );
           if (session !== this._session) return SUPERSEDED_SEARCH;
           const best = pickVisualCandidate(candidates);
           if (best) {
-            const map = await getLocationMapDownload(
-              this.props.endpoint,
-              this._credentials,
-              best.location_id
-            );
+            const map = await getLocationMapDownload(best.location_id, this._connection());
             if (session !== this._session) return SUPERSEDED_SEARCH;
             return { locationId: best.location_id, map };
           }
@@ -995,7 +1000,7 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   getSemanticObjects = async (): Promise<ViroVPSSemanticObject[]> => {
     const locationId = this._locationId;
     if (!locationId) return [];
-    return fetchLocationSemanticObjects(this.props.endpoint, this._credentials, locationId);
+    return fetchLocationSemanticObjects(locationId, this._connection());
   };
 
   private _fail(

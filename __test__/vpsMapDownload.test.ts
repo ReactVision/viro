@@ -2,6 +2,12 @@
  * bytesToBase64() is a pure function with no native/bridge dependency, so its
  * output can be checked directly here, against the RFC 4648 test vectors.
  */
+jest.mock("../components/Studio/VRTStudioModule", () => ({
+  VRTStudioModule: {
+    rvGetAuthHeaders: async () => ({ mode: "none", baseUrl: null, headers: {}, projectId: null }),
+  },
+}));
+
 import {
   bytesToBase64,
   fetchMapBytes,
@@ -48,7 +54,7 @@ describe("bytesToBase64", () => {
 });
 
 
-describe("vps-server requests", () => {
+describe("VPS requests", () => {
   const realFetch = global.fetch;
   afterEach(() => {
     global.fetch = realFetch;
@@ -68,18 +74,18 @@ describe("vps-server requests", () => {
   it("findNearbyLocations unwraps the backend's { locations } body", async () => {
     const loc = { id: "a", name: "Hall", lat: 1, lon: 2, active_scan_id: "s", distance_m: 3, created_at: 0 };
     respond(200, { locations: [loc] });
-    await expect(findNearbyLocations("https://vps.test", creds, 1, 2)).resolves.toEqual([loc]);
+    await expect(findNearbyLocations(1, 2, undefined, undefined, { endpoint: "https://vps.test", credentials: creds })).resolves.toEqual([loc]);
   });
 
   it("asks for the world mesh by its asset kind, and surfaces a missing one as 404", async () => {
     const fetchMock = respond(200, { kind: "world_mesh", scan_id: "s", url: "u", expires_at: 0, bytes: 4 });
-    await getLocationWorldMeshDownload("https://vps.test/", creds, "loc a");
-    expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe("https://vps.test/vps/locations/loc%20a/world_mesh");
+    await getLocationWorldMeshDownload("loc a", { endpoint: "https://vps.test/", credentials: creds });
+    expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe("https://vps.test/functions/v1/vps/locations/loc%20a/world_mesh");
     respond(404, { error: { code: "NO_ASSET", message: "the location has no active world_mesh" } });
-    await expect(getLocationWorldMeshDownload("https://vps.test", creds, "x")).rejects.toMatchObject({
+    await expect(getLocationWorldMeshDownload("x", { endpoint: "https://vps.test", credentials: creds })).rejects.toMatchObject({
       status: 404,
     });
-    await expect(getLocationWorldMeshDownload("https://vps.test", creds, "x")).rejects.toBeInstanceOf(
+    await expect(getLocationWorldMeshDownload("x", { endpoint: "https://vps.test", credentials: creds })).rejects.toBeInstanceOf(
       ViroVPSError
     );
   });
@@ -88,9 +94,9 @@ describe("vps-server requests", () => {
     const fetchMock = respond(200, { kind: "map", scan_id: "s", url: "u", expires_at: 0, bytes: 3, quality: null });
     let n = 0;
     const provider = jest.fn(async () => ({ projectId: "p", accessToken: `t${++n}`, appUserId: "user-1" }));
-    await getLocationMapDownload("https://vps.test", provider, "a");
-    await getLocationMapDownload("https://vps.test", provider, "a");
-    await getLocationMapDownload("https://vps.test", { ...creds, appUserId: "" }, "a");
+    await getLocationMapDownload("a", { endpoint: "https://vps.test", credentials: provider });
+    await getLocationMapDownload("a", { endpoint: "https://vps.test", credentials: provider });
+    await getLocationMapDownload("a", { endpoint: "https://vps.test", credentials: { ...creds, appUserId: "" } });
 
     expect(provider).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls.map((c) => ((c as unknown[])[1] as RequestInit).headers)).toEqual([
@@ -100,22 +106,22 @@ describe("vps-server requests", () => {
     ]);
   });
 
-  it("refuses an appUserId vps-server would refuse, or a failing credentials function, before any request", async () => {
+  it("refuses an appUserId Studio would refuse, or a failing credentials function, before any request", async () => {
     const fetchMock = respond(200, {});
     // 600 header bytes once UTF-8 encoded, though only 200 UTF-16 units.
     const cjk = "用".repeat(200);
     for (const appUserId of ["u".repeat(256), "josé", cjk, "a b", "tab\there", ".", ".."]) {
       await expect(
-        getLocationMapDownload("https://vps.test", { ...creds, appUserId }, "a")
+        getLocationMapDownload("a", { endpoint: "https://vps.test", credentials: { ...creds, appUserId } })
       ).rejects.toMatchObject({ code: "INVALID_APP_USER_ID", status: undefined });
     }
     await expect(
-      getLocationMapDownload("https://vps.test", async () => Promise.reject(new Error("signed out")), "a")
+      getLocationMapDownload("a", { endpoint: "https://vps.test", credentials: async () => Promise.reject(new Error("signed out")) })
     ).rejects.toMatchObject({ code: "CREDENTIALS_UNAVAILABLE", message: "Could not get VPS credentials: signed out" });
     expect(fetchMock).not.toHaveBeenCalled();
 
     for (const appUserId of ["~".repeat(255), "...", "auth0|5f7c@example.com"]) {
-      await findNearbyLocations("https://vps.test", { ...creds, appUserId }, 1, 2);
+      await findNearbyLocations(1, 2, undefined, undefined, { endpoint: "https://vps.test", credentials: { ...creds, appUserId } });
     }
     const headers = fetchMock.mock.calls.map((c) => ((c as unknown[])[1] as any).headers);
     expect(headers.map((h) => h["x-app-user-id"])).toEqual([
@@ -129,7 +135,7 @@ describe("vps-server requests", () => {
     global.fetch = jest.fn(async () => {
       throw new TypeError("Network request failed");
     }) as unknown as typeof fetch;
-    await expect(findNearbyLocations("https://vps.test", creds, 1, 2)).rejects.toMatchObject({
+    await expect(findNearbyLocations(1, 2, undefined, undefined, { endpoint: "https://vps.test", credentials: creds })).rejects.toMatchObject({
       code: "NETWORK_ERROR",
       status: undefined,
       message: "Network request failed",
@@ -145,7 +151,7 @@ describe("vps-server requests", () => {
             init?.signal?.addEventListener("abort", () => reject(new Error("Aborted")))
           )
       ) as unknown as typeof fetch;
-      const pending = findNearbyLocations("https://vps.test", creds, 1, 2);
+      const pending = findNearbyLocations(1, 2, undefined, undefined, { endpoint: "https://vps.test", credentials: creds });
       const outcome = expect(pending).rejects.toMatchObject({
         code: "NETWORK_ERROR",
         message: "No answer within 30 s",

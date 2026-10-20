@@ -13,7 +13,7 @@ jest.mock("react-native", () => ({
 }));
 
 jest.mock("../components/AR/ViroVPSMapDownload", () => ({
-  getLocationMapDownload: jest.fn(async (_e: string, _c: unknown, id: string) => ({
+  getLocationMapDownload: jest.fn(async (id: string) => ({
     kind: "map",
     scan_id: `scan_${id}`,
     url: `https://vps.example.com/files/${id}`,
@@ -112,9 +112,9 @@ describe("<ViroVPS> visual search", () => {
 
     expect(result).toEqual({ success: true, locationId: "loc_indoor" });
     expect(nav.captureVPSQueryFrame).toHaveBeenCalledTimes(1);
-    expect(mockQuery.mock.calls[0][2]).toBe(FRAME);
+    expect(mockQuery.mock.calls[0][0]).toBe(FRAME);
     // No position known: no GPS prefilter.
-    expect(mockQuery.mock.calls[0][3]).toEqual({});
+    expect(mockQuery.mock.calls[0][1]).toEqual({});
     expect(nav.loadVPSMap).toHaveBeenCalledTimes(1);
   });
 
@@ -128,7 +128,7 @@ describe("<ViroVPS> visual search", () => {
       await ref.current!.startTracking("auto");
     });
     expect(MapDownload.findNearestMap).toHaveBeenCalled();
-    expect(mockQuery.mock.calls[0][3]).toEqual({ lat: 19.4, lon: -99.1, radiusM: 500 });
+    expect(mockQuery.mock.calls[0][1]).toEqual({ lat: 19.4, lon: -99.1, radiusM: 500 });
   });
 
   it("retries until a view localises, without loading a map for an unlocalised match", async () => {
@@ -251,7 +251,7 @@ describe("<ViroVPS> visual search", () => {
       await ref.current!.startTracking("visual");
     });
     await expect(ref.current!.getSemanticObjects()).resolves.toEqual([{ id: 0, label: "chair" }]);
-    expect((MapDownload.fetchLocationSemanticObjects as jest.Mock).mock.calls[0][2]).toBe("loc_s");
+    expect((MapDownload.fetchLocationSemanticObjects as jest.Mock).mock.calls[0][0]).toBe("loc_s");
   });
 });
 

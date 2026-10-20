@@ -393,6 +393,15 @@ function startLoad(nav: object, slot: keyof NavigatorLoads): number {
  * one: the navigator holds one map, and the newest load owns it. The mesh
  * works the same way. No callback fires after unmount.
  *
+ * ## One tracking `<ViroVPS>` per navigator
+ *
+ * Several `<ViroVPS>` may sit on one navigator, but only one may track at a
+ * time; two tracking at once is not supported. A second `startTracking()`
+ * takes the navigator's map without telling the first component, which then
+ * reports poses from the second location's map under its own location id
+ * (server mode included), and goes idle when the second stops. Stop or
+ * unmount the first before starting another; one after the other works.
+ *
  * ```tsx
  * const vpsRef = useRef<ViroVPS>(null);
  *

@@ -211,6 +211,44 @@ describe('<ViroVPS localization="server">', () => {
     expect(mockLocalise).toHaveBeenCalledTimes(1);
   });
 
+  it("a refusal for the plan or the team's compute billing ends tracking with its code", async () => {
+    for (const [code, status] of [
+      ["COMPUTE_SPEND_LIMIT_REACHED", 403],
+      ["PAID_PLAN_REQUIRED", 403],
+      ["INVALID_API_KEY", 401],
+    ] as const) {
+      mockLocalise.mockReset();
+      mockLocalise.mockRejectedValue(new ViroVPSError("refused", code, status));
+      const nav = makeNav();
+      const { ref, states } = mount(nav);
+      await act(async () => {
+        await ref.current!.startTracking("loc");
+        await flush();
+        jest.advanceTimersByTime(5000);
+        await flush();
+      });
+      expect(states.at(-1)?.state).toBe("error");
+      expect(states.at(-1)?.errorDetail).toMatchObject({ code, status });
+      expect(mockLocalise).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("a busy server or billing it could not check is retried", async () => {
+    mockLocalise
+      .mockRejectedValueOnce(new ViroVPSError("busy", "SERVER_BUSY", 503))
+      .mockRejectedValueOnce(new ViroVPSError("try again", "COMPUTE_BILLING_UNAVAILABLE", 503))
+      .mockResolvedValue(fix());
+    const nav = makeNav();
+    const { ref, states } = mount(nav);
+    await act(async () => {
+      await ref.current!.startTracking("loc");
+      await flush();
+      await tick(2000);
+    });
+    expect(states.some((s) => s.state === "error")).toBe(false);
+    expect(nav.reportVPSServerFix).toHaveBeenCalledTimes(1);
+  });
+
   it("a network failure is retried, not fatal", async () => {
     mockLocalise.mockRejectedValueOnce(new ViroVPSError("offline", "NETWORK_ERROR")).mockResolvedValue(fix());
     const nav = makeNav();

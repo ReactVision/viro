@@ -233,7 +233,11 @@ export type ViroVPSProps = {
    *   SIFT does not, at the cost of a network round trip per fix. The location's
    *   map must have been built with server mode on (vps-server's
    *   `VPS_SERVER_MAPS`); otherwise the state goes to `error` with code
-   *   `NO_SERVER_MAP`.
+   *   `NO_SERVER_MAP`. It needs a paid plan and is billed as Advanced VPS
+   *   compute time, per second the server spends on each frame. A refusal
+   *   (401 or 403, such as `PAID_PLAN_REQUIRED` or
+   *   `COMPUTE_SPEND_LIMIT_REACHED`) ends tracking with its code; no
+   *   answer, 429 and 5xx are retried with the next frame.
    */
   localization?: "device" | "server";
 
@@ -843,7 +847,14 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
       } catch (e) {
         if (!live()) return;
         const detail = toErrorDetail(e);
-        if (detail.code === "NO_SERVER_MAP" || detail.code === "NOT_FOUND") {
+        // a refusal the next frame would get too: the map, the credential,
+        // the plan or the team's compute billing
+        if (
+          detail.code === "NO_SERVER_MAP" ||
+          detail.code === "NOT_FOUND" ||
+          detail.status === 401 ||
+          detail.status === 403
+        ) {
           this._endServerSession(session, locationId, detail);
           return;
         }

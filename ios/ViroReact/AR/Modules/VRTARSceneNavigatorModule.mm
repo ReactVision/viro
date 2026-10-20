@@ -32,6 +32,7 @@
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
 #import "VRTUtils.h"
+#import "VRTVPSUploadSession.h"
 #import <CoreLocation/CoreLocation.h>
 #import <zlib.h>
 #include <stdio.h>
@@ -105,6 +106,19 @@ static NSString *const kVRTRecordingKeyUrl = @"url";
 static NSString *const kVRTRecordingKeyErrorCode = @"errorCode";
 
 RCT_EXPORT_MODULE()
+
+- (instancetype)init {
+    if ((self = [super init])) {
+        // Reconnects the VPS upload session, so transfers an earlier process
+        // started are delivered and finished.
+        [VRTVPSUploadSession shared];
+    }
+    return self;
+}
+
++ (BOOL)requiresMainQueueSetup {
+    return NO;
+}
 
 - (dispatch_queue_t)methodQueue {
     return RCTGetUIManagerQueue();
@@ -1509,7 +1523,7 @@ static void RVPutLE32(uint8_t *p, uint32_t v) {
 // central directory and end record. The CRC-32 is computed with zlib while
 // copying and patched into the local header afterwards; sizes are known up
 // front because stored entries are copied verbatim. No zip64, so the whole
-// archive must stay under 4 GiB (vps-server caps recordings at 2 GiB).
+// archive must stay under 4 GiB (Studio caps recordings at 2 GiB).
 // Returns nil on success, or why it failed; a partial zip is removed.
 static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSString *> *names) {
     NSFileManager *fm = [NSFileManager defaultManager];
@@ -1653,166 +1667,61 @@ static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSSt
     return failure;
 }
 
-static NSString *RVBodyString(NSData *data) {
-    if (!data) return @"";
-    return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
-}
-
-// /vps/scans/{scanId}/recording, the id escaped as one path segment.
-static NSString *RVScanRecordingPath(NSString *scanId) {
-    NSMutableCharacterSet *allowed = [[NSCharacterSet URLPathAllowedCharacterSet] mutableCopy];
-    [allowed removeCharactersInString:@"/"];
-    NSString *escapedId = [scanId stringByAddingPercentEncodingWithAllowedCharacters:allowed] ?: scanId;
-    return [NSString stringWithFormat:@"/vps/scans/%@/recording", escapedId];
-}
-
-// An upload result as JSON, with scan_id when the scan exists on the server.
-static NSString *RVScanUploadResult(NSDictionary *result, NSString *scanId) {
-    if (scanId.length == 0) return RVJsonString(result);
-    NSMutableDictionary *withId = [result mutableCopy];
-    withId[@"scan_id"] = scanId;
-    return RVJsonString(withId);
-}
-
-// Zips a ViroReact AR recording (session.jsonl + video.mp4 in recordingDir)
-// into a temp file and uploads it to vps-server: POST {endpoint}/vps/scans
-// with createBodyJson, then PUT the zip to the returned upload_path with
-// Content-Type application/zip, streamed from the file. A non-empty scanId
-// resumes that scan instead: no POST, and the zip goes to
-// /vps/scans/{scanId}/recording. The zip is written before the POST so a
-// recording that cannot be read never creates a scan. headersJson is the
-// credential headers as a JSON object. Resolves a JSON string:
-// {success, stage?: "zip"|"create"|"upload", status?, body?, error?, scan_id?},
-// with scan_id whenever the scan exists. Not tied to a navigator view: it
-// only reads files and talks HTTP.
-RCT_EXPORT_METHOD(rvUploadScanRecording:(NSString *)endpoint
-                            headersJson:(NSString *)headersJson
-                         createBodyJson:(NSString *)createBodyJson
-                           recordingDir:(NSString *)recordingDir
-                                 scanId:(NSString *)resumeScanId
-                                resolve:(RCTPromiseResolveBlock)resolve
-                                 reject:(RCTPromiseRejectBlock)reject) {
+// Zips a ViroReact AR recording (session.jsonl + video.mp4 in outputDir) into
+// the uploads directory, where it survives the app being suspended or
+// relaunched until rvTransferScanRecording sends it. Resolves a JSON string:
+// {success: true, path, bytes} or {success: false, stage: "zip", error}.
+// Not tied to a navigator view: it only reads and writes files.
+RCT_EXPORT_METHOD(rvPrepareScanRecording:(NSString *)outputDir
+                                 resolve:(RCTPromiseResolveBlock)resolve
+                                  reject:(RCTPromiseRejectBlock)reject) {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        NSString *existingScanId = resumeScanId.length > 0 ? resumeScanId : nil;
-        NSDictionary *headers = nil;
-        NSData *headerData = [headersJson dataUsingEncoding:NSUTF8StringEncoding];
-        if (headerData) {
-            id parsed = [NSJSONSerialization JSONObjectWithData:headerData options:0 error:nil];
-            if ([parsed isKindOfClass:[NSDictionary class]]) headers = parsed;
-        }
-        NSURL *createURL = [NSURL URLWithString:[endpoint stringByAppendingString:@"/vps/scans"]];
-        if (!headers || !createURL || (!existingScanId && createBodyJson.length == 0) ||
-            recordingDir.length == 0) {
-            resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"zip",
-                                         @"error": @"Invalid endpoint, headers, scan target or recording directory"},
-                                       existingScanId));
+        if (outputDir.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip",
+                                   @"error": @"Invalid recording directory"}));
             return;
         }
-
-        NSString *zipPath = [NSTemporaryDirectory() stringByAppendingPathComponent:
-            [NSString stringWithFormat:@"vps-scan-%@.zip", [NSUUID UUID].UUIDString]];
-        NSString *zipError = RVWriteStoredZip(zipPath, recordingDir, RVScanRecordingFiles());
+        NSString *dirError = nil;
+        NSString *zipPath = [VRTVPSUploadSession makeZipPath:&dirError];
+        if (!zipPath) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": dirError ?: @""}));
+            return;
+        }
+        NSString *zipError = RVWriteStoredZip(zipPath, outputDir, RVScanRecordingFiles());
         if (zipError) {
-            resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"zip", @"error": zipError},
-                                       existingScanId));
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": zipError}));
             return;
         }
-        void (^cleanup)(void) = ^{
+        NSNumber *bytes = [[NSFileManager defaultManager] attributesOfItemAtPath:zipPath error:nil][NSFileSize];
+        if (bytes == nil) {
             [[NSFileManager defaultManager] removeItemAtPath:zipPath error:nil];
-        };
-        NSURLSession *session = [NSURLSession sharedSession];
-
-        // PUTs the zip into a scan that exists, so every result names it.
-        void (^upload)(NSString *, NSString *) = ^(NSString *scanId, NSString *uploadPath) {
-            NSURL *uploadURL = [NSURL URLWithString:[endpoint stringByAppendingString:uploadPath]];
-            if (!uploadURL) {
-                cleanup();
-                resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"upload",
-                                             @"error": @"Invalid upload URL"}, scanId));
-                return;
-            }
-
-            NSMutableURLRequest *put = [NSMutableURLRequest requestWithURL:uploadURL];
-            put.HTTPMethod = @"PUT";
-            // Idle timeout between packets, not a cap on the whole transfer.
-            put.timeoutInterval = 120;
-            for (id key in headers) {
-                id value = headers[key];
-                if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
-                    [put setValue:value forHTTPHeaderField:key];
-                }
-            }
-            [put setValue:@"application/zip" forHTTPHeaderField:@"Content-Type"];
-
-            [[session uploadTaskWithRequest:put
-                                   fromFile:[NSURL fileURLWithPath:zipPath]
-                          completionHandler:^(NSData *putData, NSURLResponse *putResponse, NSError *putError) {
-                cleanup();
-                if (putError) {
-                    resolve(RVScanUploadResult(@{@"success": @NO, @"stage": @"upload",
-                                                 @"error": putError.localizedDescription ?: @"Upload failed"},
-                                               scanId));
-                    return;
-                }
-                NSInteger putStatus = [putResponse isKindOfClass:[NSHTTPURLResponse class]]
-                    ? ((NSHTTPURLResponse *)putResponse).statusCode : 0;
-                BOOL ok = putStatus >= 200 && putStatus < 300;
-                NSMutableDictionary *result = [@{@"success": @(ok), @"status": @(putStatus),
-                                                 @"body": RVBodyString(putData)} mutableCopy];
-                if (!ok) result[@"stage"] = @"upload";
-                resolve(RVScanUploadResult(result, scanId));
-            }] resume];
-        };
-
-        if (existingScanId) {
-            upload(existingScanId, RVScanRecordingPath(existingScanId));
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": @"Could not read the zip's size"}));
             return;
         }
-
-        NSMutableURLRequest *create = [NSMutableURLRequest requestWithURL:createURL];
-        create.HTTPMethod = @"POST";
-        create.timeoutInterval = 60;
-        for (id key in headers) {
-            id value = headers[key];
-            if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
-                [create setValue:value forHTTPHeaderField:key];
-            }
-        }
-        [create setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-        create.HTTPBody = [createBodyJson dataUsingEncoding:NSUTF8StringEncoding];
-
-        [[session dataTaskWithRequest:create
-                    completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            if (error) {
-                cleanup();
-                resolve(RVJsonString(@{@"success": @NO, @"stage": @"create",
-                                       @"error": error.localizedDescription ?: @"POST /vps/scans failed"}));
-                return;
-            }
-            NSInteger status = [response isKindOfClass:[NSHTTPURLResponse class]]
-                ? ((NSHTTPURLResponse *)response).statusCode : 0;
-            NSString *body = RVBodyString(data);
-            if (status < 200 || status >= 300) {
-                cleanup();
-                resolve(RVJsonString(@{@"success": @NO, @"stage": @"create",
-                                       @"status": @(status), @"body": body}));
-                return;
-            }
-            id scan = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
-            NSString *scanId = [scan isKindOfClass:[NSDictionary class]] ? scan[@"id"] : nil;
-            if (![scanId isKindOfClass:[NSString class]] || scanId.length == 0) {
-                cleanup();
-                resolve(RVJsonString(@{@"success": @NO, @"stage": @"create",
-                                       @"error": @"POST /vps/scans answered without a scan id"}));
-                return;
-            }
-            NSString *uploadPath = scan[@"upload_path"];
-            if (![uploadPath isKindOfClass:[NSString class]] || ![uploadPath hasPrefix:@"/"]) {
-                uploadPath = RVScanRecordingPath(scanId);
-            }
-            upload(scanId, uploadPath);
-        }] resume];
+        resolve(RVJsonString(@{@"success": @YES, @"path": zipPath, @"bytes": bytes}));
     });
+}
+
+// PUTs a prepared zip to Storage on a background NSURLSession, then POSTs
+// complete_url; see VRTVPSUploadSession. Resolves, never rejects, a JSON
+// string: {success, stage: "upload"|"complete", scan_id, status?, body?,
+// error?, code?}.
+RCT_EXPORT_METHOD(rvTransferScanRecording:(NSString *)requestJson
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    [[VRTVPSUploadSession shared] transfer:requestJson ?: @"" completion:^(NSString *resultJson) {
+        resolve(resultJson);
+    }];
+}
+
+// Deletes a prepared zip whose upload will never start. Only a zip in the
+// uploads directory that no transfer is using is deleted.
+RCT_EXPORT_METHOD(rvDiscardScanRecording:(NSString *)path
+                                 resolve:(RCTPromiseResolveBlock)resolve
+                                  reject:(RCTPromiseRejectBlock)reject) {
+    [[VRTVPSUploadSession shared] discardZip:path ?: @"" completion:^{
+        resolve(nil);
+    }];
 }
 
 RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag

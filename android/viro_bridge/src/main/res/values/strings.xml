@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Viro bridge</string>
+    <string name="viro_vps_uploads_channel">Scan uploads</string>
+    <string name="viro_vps_upload_notification">Uploading scan</string>
 </resources>

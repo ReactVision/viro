@@ -39,7 +39,6 @@ import {
   ViroVPSScanTarget,
   ViroVPSScanUploadOptions,
 } from "./ViroVPSScanUpload";
-import type { ViroVPSCredentialsSource } from "./ViroVPSClient";
 import { bytesToBase64 } from "./ViroVPSMapDownload";
 import { withMissingModuleFallback } from "../Utilities/ViroNativeModule";
 import {
@@ -1188,23 +1187,20 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   /**
    * Zips and uploads a ViroReact AR recording (startRecording()/
    * stopRecording()'s session.jsonl + video.mp4, not a SensorRecorder
-   * capture) to the VPS backend: POST /vps/scans then
-   * PUT /vps/scans/{id}/recording, per spatial/vps-server/API.md. Call this
-   * after stopRecording() has resolved, passing the same outputDir.
+   * capture) for VPS processing. Call this after stopRecording() has
+   * resolved, passing the same outputDir.
    *
-   * Zipping and the upload run natively and stream from disk; see
-   * ViroVPSScanUpload.ts. `endpoint` is vps-server's own base URL, unrelated
-   * to `RVEndpoint` (ReactVisionCCA's host/resolve backend). `options.scanId`
-   * resumes a failed upload into the scan it created (the error's `scanId`).
+   * Zipping and the upload run natively, stream from disk and keep going in
+   * the background; see ViroVPSScanUpload.ts. With no `options`, the scan goes
+   * to the app's own Studio project. `options.scanId` resumes a failed upload
+   * into the scan it created (the error's `scanId`).
    */
   _uploadScanRecording = async (
-    endpoint: string,
-    credentials: ViroVPSCredentialsSource,
     target: ViroVPSScanTarget,
     outputDir: string,
     options?: ViroVPSScanUploadOptions
   ): Promise<ViroVPSScan> => {
-    return await vpsUploadScanRecording(endpoint, credentials, target, outputDir, options);
+    return await vpsUploadScanRecording(target, outputDir, options);
   };
 
   /**

@@ -10,6 +10,7 @@ import { StudioSceneErrorBoundary } from "./Studio/StudioSceneErrorBoundary";
 import { ViroScene } from "./ViroScene";
 import { ViroAmbientLight } from "./ViroAmbientLight";
 import { ViroText } from "./ViroText";
+import { ViroUsagePingSuppressed } from "./Utilities/ViroUsagePing";
 
 // Rendered in place of the crashed scene. Has to be a full, valid Viro scene
 // (not a plain RN <View>) — VRActivity's display is exclusively driven by the
@@ -111,23 +112,26 @@ export function ViroQuestEntryPoint() {
 
   const { initialScene, rendererConfig } = intent;
 
+  // The intent comes from ViroXRSceneNavigator, which has already sent the ping for this scene.
   return (
-    <StudioSceneErrorBoundary
-      onError={(error) => VRQuestNavigatorBridge.reportQuestError(error)}
-      renderError={() => (
+    <ViroUsagePingSuppressed.Provider value={true}>
+      <StudioSceneErrorBoundary
+        onError={(error) => VRQuestNavigatorBridge.reportQuestError(error)}
+        renderError={() => (
+          <ViroVRSceneNavigator
+            initialScene={{ scene: QuestCrashFallbackScene }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+      >
         <ViroVRSceneNavigator
-          initialScene={{ scene: QuestCrashFallbackScene }}
+          ref={navRef}
+          key={intent.intentKey}
+          initialScene={initialScene}
+          {...rendererConfig}
           style={StyleSheet.absoluteFill}
         />
-      )}
-    >
-      <ViroVRSceneNavigator
-        ref={navRef}
-        key={intent.intentKey}
-        initialScene={initialScene}
-        {...rendererConfig}
-        style={StyleSheet.absoluteFill}
-      />
-    </StudioSceneErrorBoundary>
+      </StudioSceneErrorBoundary>
+    </ViroUsagePingSuppressed.Provider>
   );
 }

@@ -104,6 +104,17 @@ export interface ViroConfigurationOptions {
    */
   geospatialAnchorProvider?: GeospatialAnchorProvider;
 
+  /**
+   * Whether each scene navigator sends ReactVision an anonymous usage ping when it mounts
+   * (see "Usage data" in the README).
+   * `false` writes `ViroTelemetryEnabled` = false to Info.plist and the
+   * com.reactvision.ViroTelemetryEnabled meta-data as "false" to AndroidManifest.
+   * `true` or omitted removes both. `ViroTelemetry.setEnabled(false)` turns it off from JS.
+   *
+   * DEFAULTS TO: true
+   */
+  telemetry?: boolean;
+
   ios?: {
     /**
      * String for app to use for camera usage.

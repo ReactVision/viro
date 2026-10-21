@@ -20,6 +20,8 @@ Pod::Spec.new do |s|
   # behind an availability check, so this is the version the code actually requires today.
   s.visionos.deployment_target = '26.0'
 
+  s.resource_bundles = { 'ViroReact_privacy' => ['PrivacyInfo.xcprivacy'] }
+
   # visionOS: CompositorServices drives the immersive render loop.
   s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
 

@@ -353,6 +353,10 @@ public class VRTScene extends VRTNode implements Scene.VisibilityListener {
      */
     @Override
     public void onSceneWillAppear() {
+        // Posted from the render thread, so it can arrive after onTearDown disposed the scene.
+        if (isTornDown()) {
+            return;
+        }
         // Re-asserted here because a Scene opens tone-mapped whatever the last one was
         // told, the same reason the post-process effects are reset on appear.
         if (mNativeScene != null) {

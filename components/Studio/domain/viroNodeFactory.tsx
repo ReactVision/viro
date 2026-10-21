@@ -32,6 +32,10 @@ import { StudioPlacementStore, isTapToPlaceAsset } from "./placementStore";
 import { studioAssetPosition } from "./assetPosition";
 import type { StudioDragStore } from "./dragStore";
 import type { Vec3 } from "../colocation/frameMath";
+import type { ViroSource } from "../../Types/ViroUtils";
+import { isSelectClick } from "./questInput";
+import { isQuest } from "../../Utilities/ViroPlatform";
+import { QUEST_TEXT_SUPERSAMPLE, STUDIO_TEXT_FONT_SIZE } from "./questText";
 
 // Android (phones and Quest) loads fonts from /system/fonts alone, which has no
 // Arial. Naming the system sans-serif renders what the failed Arial lookup fell
@@ -62,7 +66,7 @@ export type NodeConfig = {
   lockedPhysicsBody?: Record<string, unknown>;
   /** Authored velocity, sent once on mount rather than on the body. */
   viroTag?: string;
-  onClick?: () => void;
+  onClick?: (position: unknown, source: ViroSource) => void;
   // On Gaze (headset eye-gaze). Setting it enables the node's native canHover.
   onGaze?: (
     isHovering: boolean,
@@ -87,8 +91,6 @@ export type StudioAssetErrorHandler = (asset: StudioAsset, error: Error) => void
  */
 function assetErrorHandler(asset: StudioAsset, config: NodeConfig, kind: string) {
   return (e: unknown) => {
-    console.error(`[Studio] ${kind} "${asset.name}" error:`, e);
-    if (!config.onAssetError) return;
     const error =
       e instanceof Error
         ? e
@@ -97,7 +99,11 @@ function assetErrorHandler(asset: StudioAsset, config: NodeConfig, kind: string)
               ? JSON.stringify((e as { nativeEvent: unknown }).nativeEvent)
               : String(e)
           );
-    config.onAssetError(asset, error);
+    // Never the event itself: it holds React's fiber tree, and an error
+    // reporter that records console arguments (Sentry's breadcrumbs) walks all
+    // of it, which blocks the JS thread until the heap runs out.
+    console.error(`[Studio] ${kind} "${asset.name}" error:`, error.message);
+    config.onAssetError?.(asset, error);
   };
 }
 
@@ -212,7 +218,7 @@ function createOnClickHandler(
   onAnimationTrigger?: (targetAssetId: string, animKey: string) => void,
   onSceneChange?: (sceneId: string, sceneName: string) => void,
   runtimeCtx?: SequenceRuntimeContext
-): (() => void) | undefined {
+): ((position: unknown, source: ViroSource) => void) | undefined {
   const fn = asset.scene_function;
   if (!fn) return undefined;
 
@@ -233,7 +239,8 @@ function createOnClickHandler(
     return undefined;
   }
 
-  return () =>
+  return (_position, source) => {
+    if (!isSelectClick(source)) return;
     executeFunctionWithRelations(
       fn,
       sceneNavigator,
@@ -243,6 +250,7 @@ function createOnClickHandler(
       onSceneChange,
       runtimeCtx
     );
+  };
 }
 
 function resolveType(
@@ -418,13 +426,24 @@ const VariableText: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, template]);
 
+  // Drawn larger under a smaller scale on Quest (questText.ts). The default
+  // box is 1 m, and the clip mode stays the default so a long text keeps the
+  // same line budget as on phones and in the editor.
+  const supersample = isQuest ? QUEST_TEXT_SUPERSAMPLE : 1;
+  const [scaleX, scaleY, scaleZ] = config.scale;
+
   return (
     <ViroText
       {...(nodeRef ? { ref: nodeRef as any } : {})}
       text={text}
       position={position ?? config.position}
       rotation={rotation ?? config.rotation}
-      scale={config.scale}
+      scale={
+        supersample === 1
+          ? config.scale
+          : [scaleX / supersample, scaleY / supersample, scaleZ / supersample]
+      }
+      {...(supersample === 1 ? {} : { width: supersample, height: supersample })}
       dragType={config.dragType}
       animation={config.animation as any}
       onClick={config.onClick}
@@ -432,7 +451,7 @@ const VariableText: React.FC<{
       {...(visible === undefined ? {} : { visible })}
       style={{
         fontFamily: STUDIO_TEXT_FONT_FAMILY,
-        fontSize: 20,
+        fontSize: STUDIO_TEXT_FONT_SIZE * supersample,
         color: "#FFFFFF",
         textAlign: "center",
         // Centred on the node rather than hung from the top of its box, so the

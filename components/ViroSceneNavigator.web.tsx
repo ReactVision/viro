@@ -26,6 +26,7 @@ import {
   ViroParentNodeContext,
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
+import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 
 type SceneDescriptor = { scene: React.ComponentType<any>; passProps?: any };
 
@@ -81,6 +82,7 @@ function resolveArgs(
 }
 
 export function ViroSceneNavigator(props: Props) {
+  useViroUsagePing("scene");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);

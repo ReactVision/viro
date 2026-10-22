@@ -27,6 +27,10 @@ import {
 } from "./VisionOS/ViroVisionOSModule";
 import { VRQuestNavigatorBridge } from "./Utilities/VRQuestNavigatorBridge";
 import { VRCapture, VRModuleOpenXR } from "./Utilities/VRModuleOpenXR";
+import {
+  sendViroUsagePing,
+  ViroUsagePingSuppressed,
+} from "./Utilities/ViroUsagePing";
 import type { Viro3DPoint } from "./Types/ViroUtils";
 
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
@@ -368,6 +372,15 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     // counter: it cannot collide, and it means nothing outside this comparison.
     const visionOSOwnerRef = React.useRef<symbol>(Symbol("ViroXRSceneNavigator"));
 
+    React.useEffect(() => {
+      sendViroUsagePing("xr", {
+        occlusion_mode: rest.occlusionMode,
+        passthrough_enabled: passthroughEnabled,
+        hand_tracking_enabled: handTrackingEnabled,
+        immersion_style: isVisionOS ? visionOSImmersionStyle : undefined,
+      });
+    }, []);
+
     // On visionOS: open the ImmersiveSpace on mount and close it on unmount.
     //
     // This mirrors what the Quest branch does with VRActivity — in both cases something other
@@ -499,13 +512,15 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       // native VRTScene reaches the renderer.
       const { style: _ignoredStyle, ...visionRest } = rest as { style?: unknown };
       return (
-        <View style={styles.visionOSHost} pointerEvents="none">
-          <ViroSceneNavigator
-            ref={visionRef}
-            initialScene={visionScene}
-            {...(visionRest as object)}
-          />
-        </View>
+        <ViroUsagePingSuppressed.Provider value={true}>
+          <View style={styles.visionOSHost} pointerEvents="none">
+            <ViroSceneNavigator
+              ref={visionRef}
+              initialScene={visionScene}
+              {...(visionRest as object)}
+            />
+          </View>
+        </ViroUsagePingSuppressed.Provider>
       );
     }
 
@@ -517,16 +532,18 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       return null;
     }
     return (
-      <ViroARSceneNavigator
-        ref={arRef}
-        initialScene={scene}
-        hdrEnabled={hdrEnabled}
-        pbrEnabled={pbrEnabled}
-        bloomEnabled={bloomEnabled}
-        shadowsEnabled={shadowsEnabled}
-        multisamplingEnabled={multisamplingEnabled}
-        {...rest}
-      />
+      <ViroUsagePingSuppressed.Provider value={true}>
+        <ViroARSceneNavigator
+          ref={arRef}
+          initialScene={scene}
+          hdrEnabled={hdrEnabled}
+          pbrEnabled={pbrEnabled}
+          bloomEnabled={bloomEnabled}
+          shadowsEnabled={shadowsEnabled}
+          multisamplingEnabled={multisamplingEnabled}
+          {...rest}
+        />
+      </ViroUsagePingSuppressed.Provider>
     );
   }
 );

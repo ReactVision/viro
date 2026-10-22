@@ -697,6 +697,99 @@ public:
         if (callback) callback(false, "", "", "Not supported");
     }
 
+    // ------------------------------------------------------------------
+    // Continuous VPS map localisation against a downloaded .rvmap
+    // (RVCCACloudAnchorProvider::loadVPSMap()/updateVPSMapFrame()). Separate
+    // from the cloud-anchor host/resolve API above: this matches the live
+    // camera against a whole map repeatedly, for as long as a map stays
+    // loaded, instead of resolving one anchor once.
+    // ------------------------------------------------------------------
+
+    /*
+     Parse rvmapBytes (a downloaded .rvmap's raw bytes) and load it for
+     matching. Returns false if the bytes don't parse as a supported map —
+     truncated, empty, or an unsupported format/version.
+     */
+    virtual bool rvLoadVPSMap(const std::string& rvmapBytes) {
+        return false;
+    }
+
+    /* Drop whatever rvLoadVPSMap() loaded; per-frame matching becomes a no-op. */
+    virtual void rvUnloadVPSMap() {
+        // Default implementation does nothing
+    }
+
+    virtual bool rvIsVPSMapLoaded() {
+        return false;
+    }
+
+    /**
+     * The latest continuous-localisation result, as JSON — a pollable
+     * stand-in for an event callback, same reasoning as rvGetScanStatusJson().
+     *
+     * Keys: available (false when no ReactVision provider is configured),
+     * loaded (a map is currently loaded), converged (the smoothed estimate
+     * has accepted at least one pair of agreeing hits — see
+     * VROVPSLocalizer::isConverged()), renderPose (16 comma-separated
+     * floats, column-major VROMatrix4f::getArray() order — the smoothed
+     * T_map_world applied to the session's own current camera pose; only
+     * present once converged is true).
+     */
+    virtual std::string rvGetVPSLocalizationJson() {
+        return "{\"available\":false}";
+    }
+
+    /*
+     The map-to-world transform the VPS fuser has converged on (the inverse of
+     its smoothed T_map_world), for placing things authored in the map's frame,
+     such as the location's mesh (VROARScene::setVPSMapMesh()). False until it
+     has converged, or without a loaded map. Render thread.
+     */
+    virtual bool rvGetVPSWorldFromMap(VROMatrix4f &T_world_map) const {
+        return false;
+    }
+
+    /*
+     VPS server mode: the backend localises frames the device sends
+     (POST /vps/locations/{id}/localise) instead of the device matching a
+     downloaded map. The fuser then runs without a map, fed only by
+     rvReportVPSServerFix(), and everything that reads it (anchors, the map
+     mesh, rvGetVPSLocalizationJson()'s renderPose) works as with a map.
+     Starting unloads any map and resets the fuser; rvGetVPSLocalizationJson()
+     reports loaded true and mode "server" until rvStopVPSServerSession() or
+     rvLoadVPSMap().
+     */
+    virtual bool rvStartVPSServerSession() {
+        return false;
+    }
+    virtual void rvStopVPSServerSession() {
+        // Default implementation does nothing
+    }
+
+    /*
+     One fix from the backend: T_map_cam, the camera in the map (OpenCV camera
+     axes), solved from a frame captured with sensor pose T_world_cam
+     (VROARScene::VPSQueryFrameCallback's). Reported to the fuser as
+     vpsServerFixToWorldMap(). False when server mode is off.
+     */
+    virtual bool rvReportVPSServerFix(const VROMatrix4f &T_world_cam, const VROMatrix4f &T_map_cam,
+                                      int inliers) {
+        return false;
+    }
+
+    /*
+     The fuser's input for a server fix: the map-to-world transform, composed
+     the way IFeatureMatcher::localize() composes its own hits
+     (cam2world · diag(1,-1,-1,1) · T_cam_map): the flip takes OpenCV camera
+     axes (y down, z forward) to GL's (y up, z back).
+     */
+    static VROMatrix4f vpsServerFixToWorldMap(const VROMatrix4f &T_world_cam, const VROMatrix4f &T_map_cam) {
+        VROMatrix4f flip;
+        flip[5] = -1;
+        flip[10] = -1;
+        return T_world_cam.multiply(flip).multiply(T_map_cam.invert());
+    }
+
     // ========================================================================
     // Shared coordinate frame — platform-native co-location (CL-H / CL-I)
     //

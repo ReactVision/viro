@@ -25,6 +25,7 @@ import { StudioPlacementStore } from "./placementStore";
 import type { StudioDragStore } from "./dragStore";
 import type { StudioColocationController } from "../colocation/controller";
 import type { StudioEffectOrigin } from "./utils";
+import type { StudioVpsCoordinator } from "./vps";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
@@ -163,6 +164,9 @@ export type SequenceRuntimeContext = {
   soundManager?: StudioSoundManager;
   dragStore?: StudioDragStore;
   getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
+  // Assets this device does not render, such as a VPS-bound scene's plane
+  // assets where VPS cannot run. A PLAY at one is skipped.
+  unrenderedAssetIds?: ReadonlySet<string>;
   // Scene navigation transport. When set (web host), NAVIGATION functions call
   // this to fetch + re-render the target scene. When absent (native), the
   // walker falls back to navigateToScene() which pushes onto the Viro navigator.
@@ -170,9 +174,24 @@ export type SequenceRuntimeContext = {
   // The navigator's shared session. While one runs, NAVIGATION goes through it
   // so every device follows; otherwise it is handed on to the scene pushed.
   colocation?: StudioColocationController;
+  // The navigator's VPS map, handed on to the scene pushed like colocation.
+  vps?: StudioVpsCoordinator;
   // Given to the sounds this dispatch plays and stops; "local" when absent.
   effectOrigin?: StudioEffectOrigin;
 };
+
+function playsAtUnrenderedAsset(
+  fnId: string,
+  sound: { target_asset_id?: string | null },
+  runtimeCtx?: SequenceRuntimeContext
+): boolean {
+  const target = sound.target_asset_id;
+  if (!target || !runtimeCtx?.unrenderedAssetIds?.has(target)) return false;
+  console.warn(
+    `[Studio] SOUND function ${fnId}: PLAY targets asset ${target}, which is not rendered here; skipping.`
+  );
+  return true;
+}
 
 function resolveById(
   id: string,
@@ -302,6 +321,10 @@ function runSteps(
             advance();
             return;
           }
+          if (playsAtUnrenderedAsset(fn.id, s, deps.runtimeCtx)) {
+            advance();
+            return;
+          }
           const position = s.target_asset_id
             ? deps.runtimeCtx.getAssetPosition?.(s.target_asset_id)
             : undefined;
@@ -312,6 +335,7 @@ function runSteps(
               audioAssetId: s.audio_asset_id ?? "",
               url: s.audio_url,
               position,
+              targetAssetId: s.target_asset_id ?? undefined,
               volume: s.volume,
               loop: s.loop,
               stopOthers: s.stop_other_sounds,
@@ -720,7 +744,8 @@ export function executeFunctionWithRelations(
       animations,
       onSceneChange,
       runtimeCtx?.variableStore,
-      runtimeCtx?.colocation
+      runtimeCtx?.colocation,
+      runtimeCtx?.vps
     );
   } else if (fn.function_type === "ALERT") {
     const alert = fn.scene_alert;
@@ -834,6 +859,7 @@ export function executeFunctionWithRelations(
         );
         return;
       }
+      if (playsAtUnrenderedAsset(fn.id, s, runtimeCtx)) return;
       const position = s.target_asset_id
         ? runtimeCtx?.getAssetPosition?.(s.target_asset_id)
         : undefined;
@@ -843,6 +869,7 @@ export function executeFunctionWithRelations(
           audioAssetId: s.audio_asset_id ?? "",
           url: s.audio_url,
           position,
+          targetAssetId: s.target_asset_id ?? undefined,
           volume: s.volume,
           loop: s.loop,
           stopOthers: s.stop_other_sounds,
@@ -988,7 +1015,8 @@ async function navigateToScene(
   currentAnimations: StudioAnimation[],
   onSceneChange?: (sceneId: string, sceneName: string) => void,
   variableStore?: StudioVariableStore,
-  colocation?: StudioColocationController
+  colocation?: StudioColocationController,
+  vps?: StudioVpsCoordinator
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");
@@ -1020,6 +1048,8 @@ async function navigateToScene(
         // So does the shared session: the AR session and its frame outlive a
         // push, so the next scene renders in the same frame without a resolve.
         colocation,
+        // And the VPS map, which only the scene on screen tracks.
+        vps,
       },
     });
 

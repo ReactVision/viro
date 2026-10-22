@@ -203,6 +203,7 @@ FOUNDATION_EXPORT const unsigned char ViroKitVersionString[];
 #import <ViroKit/VROARDeclarativeImageNode.h>
 #import <ViroKit/VROARDeclarativeObjectNode.h>
 #import <ViroKit/VROARDeclarativePlane.h>
+#import <ViroKit/VROVPSAnchorNode.h>
 #import <ViroKit/VROARDeclarativeNode.h>
 #import <ViroKit/VROARNodeDelegateiOS.h>
 #import <ViroKit/VROARSceneDelegateiOS.h>

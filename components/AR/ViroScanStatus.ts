@@ -14,6 +14,9 @@ import type {
   ViroFinishScanResult,
   ViroScanDiagnostics,
   ViroScanStatus,
+  ViroVPSLocalizationResult,
+  ViroVPSMapLoadResult,
+  ViroVPSQueryFrameResult,
 } from "../Types/ViroEvents";
 import type { ViroWorldMeshStatsResult } from "../Types/ViroWorldMesh";
 
@@ -94,6 +97,88 @@ export function isLocationTransform(value: unknown): value is string {
     const n = Number(p);
     return p.trim().length > 0 && Number.isFinite(n);
   });
+}
+
+/** Same contract as {@link parseScanStatus}: never throws. `success: false` with no `error` is malformed JSON. */
+export function parseVPSMapLoadResult(
+  json: string | null | undefined
+): ViroVPSMapLoadResult {
+  if (typeof json !== "string" || json.length === 0) {
+    return { success: false, error: "No response from the renderer" };
+  }
+  try {
+    const parsed = JSON.parse(json);
+    if (parsed == null || typeof parsed !== "object") {
+      return { success: false, error: "Malformed map load result" };
+    }
+    return parsed as ViroVPSMapLoadResult;
+  } catch {
+    return { success: false, error: "Malformed map load result" };
+  }
+}
+
+/** Same contract as {@link parseScanStatus}: never throws; anything incomplete is `success: false`. */
+export function parseVPSQueryFrame(json: string | null | undefined): ViroVPSQueryFrameResult {
+  if (typeof json !== "string" || json.length === 0) {
+    return { success: false, error: "No response from the renderer" };
+  }
+  let parsed: any;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return { success: false, error: "Malformed query frame result" };
+  }
+  if (parsed == null || typeof parsed !== "object") {
+    return { success: false, error: "Malformed query frame result" };
+  }
+  if (parsed.success !== true) {
+    return { success: false, error: typeof parsed.error === "string" ? parsed.error : "Could not capture a camera frame" };
+  }
+  const numbers = ["width", "height", "fx", "fy", "cx", "cy"];
+  if (
+    typeof parsed.image !== "string" ||
+    parsed.image.length === 0 ||
+    !numbers.every((k) => typeof parsed[k] === "number" && Number.isFinite(parsed[k])) ||
+    parsed.width <= 0 ||
+    parsed.height <= 0 ||
+    parsed.fx <= 0 ||
+    parsed.fy <= 0
+  ) {
+    return { success: false, error: "Malformed query frame result" };
+  }
+  return {
+    success: true,
+    image: parsed.image,
+    width: parsed.width,
+    height: parsed.height,
+    fx: parsed.fx,
+    fy: parsed.fy,
+    cx: parsed.cx,
+    cy: parsed.cy,
+    ...(Array.isArray(parsed.worldFromCamera) &&
+    parsed.worldFromCamera.length === 16 &&
+    parsed.worldFromCamera.every((v: unknown) => typeof v === "number" && Number.isFinite(v))
+      ? { worldFromCamera: parsed.worldFromCamera as number[] }
+      : {}),
+  };
+}
+
+/** Same contract as {@link parseScanStatus}: never throws, absence is `available: false`. */
+export function parseVPSLocalization(
+  json: string | null | undefined
+): ViroVPSLocalizationResult {
+  if (typeof json !== "string" || json.length === 0) {
+    return { available: false, error: "No response from the renderer" };
+  }
+  try {
+    const parsed = JSON.parse(json);
+    if (parsed == null || typeof parsed !== "object") {
+      return { available: false, error: "Malformed localization result" };
+    }
+    return parsed as ViroVPSLocalizationResult;
+  } catch {
+    return { available: false, error: "Malformed localization result" };
+  }
 }
 
 /**

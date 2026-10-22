@@ -32,9 +32,17 @@ jest.mock("../components/Studio/StudioColocationIndicator.web", () => ({
 }));
 
 import * as React from "react";
+import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator.web";
+import TestRenderer from "react-test-renderer";
+import {
+  StudioSceneNavigator,
+  type StudioSceneNavigatorWebHandle,
+} from "../components/Studio/StudioSceneNavigator.web";
+import type { StudioVpsStateEvent } from "../components/Studio/domain/vps";
 import type { StudioSceneResponse } from "../components/Studio/types";
+
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 function scene(planeDetection: string): StudioSceneResponse {
   return {
@@ -77,5 +85,75 @@ describe("StudioSceneNavigator (web) and onMotionUnavailable", () => {
     );
     expect(arNavigatorProps).toHaveLength(0);
     expect(threeDNavigatorProps).toHaveLength(1);
+  });
+});
+
+describe("StudioSceneNavigator (web) and onVpsStateChange", () => {
+  it("reports a scene bound to a VPS location as unsupported, and idle when it is left", () => {
+    const events: StudioVpsStateEvent[] = [];
+    const bound = {
+      scene: {
+        id: "scene-1",
+        plane_detection: "NONE",
+        vps_location_id: "loc-1",
+      },
+      assets: [],
+      vps: { endpoint: "https://vps.example.test" },
+    } as unknown as StudioSceneResponse;
+    let tree: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <StudioSceneNavigator
+          sceneData={bound}
+          onVpsStateChange={(e) => events.push(e)}
+        />
+      );
+    });
+    expect(events).toEqual([
+      {
+        sceneId: "scene-1",
+        locationId: "loc-1",
+        state: "unsupported",
+        error: expect.objectContaining({ code: "UNSUPPORTED", status: null }),
+      },
+    ]);
+
+    act(() => tree.unmount());
+    expect(events.map((e) => e.state)).toEqual(["unsupported", "idle"]);
+  });
+
+  it("has no VPS tracking to restart", () => {
+    const ref = React.createRef<StudioSceneNavigatorWebHandle>();
+    let tree: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <StudioSceneNavigator
+          ref={ref}
+          sceneData={
+            {
+              scene: { id: "scene-1", vps_location_id: "loc-1" },
+              assets: [],
+            } as unknown as StudioSceneResponse
+          }
+        />
+      );
+    });
+    expect(ref.current!.retryVps()).toBe(false);
+    act(() => tree.unmount());
+  });
+
+  it("reports nothing for an unbound scene", () => {
+    const onVpsStateChange = jest.fn();
+    let tree: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <StudioSceneNavigator
+          sceneData={scene("NONE")}
+          onVpsStateChange={onVpsStateChange}
+        />
+      );
+    });
+    act(() => tree.unmount());
+    expect(onVpsStateChange).not.toHaveBeenCalled();
   });
 });

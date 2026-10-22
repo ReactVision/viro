@@ -51,6 +51,11 @@ import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { studioApiError } from "./domain/studioApiError";
+import {
+  StudioVpsCoordinator,
+  type StudioVpsLocalization,
+  type StudioVpsStateEvent,
+} from "./domain/vps";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
@@ -236,6 +241,15 @@ export interface StudioSceneNavigatorHandle {
    * when the scan ended, false, changing nothing, before then or outside a scan.
    */
   finishColocationScan: () => boolean;
+  /**
+   * Start VPS tracking again for the scene on screen after it reported
+   * `error` or `idle`: at once, and whatever the error, where the automatic
+   * retry waits and takes only failures that may pass. False, changing
+   * nothing, when that scene is not bound to a VPS location, cannot track
+   * here (no endpoint it may use, Meta Quest, Apple Vision Pro), or is in
+   * another state.
+   */
+  retryVps: () => boolean;
 }
 
 export interface StudioSceneNavigatorProps {
@@ -331,7 +345,12 @@ export interface StudioSceneNavigatorProps {
    * NAVIGATE on any device takes every device to that scene, and the devices
    * that follow do not run its on_load function; a device that joins on
    * another scene moves to the room's. A scene outside the session's project
-   * is not entered, and is reported as one that failed to load.
+   * is not entered, and is reported as one that failed to load. Nor is a scene
+   * bound to a VPS location, whose content a shared frame cannot place: the
+   * device that navigates there, and each device the room would take there,
+   * stays on its scene and its session fails with `SCENE_BOUND_TO_VPS`. A
+   * session fails the same way when `sceneId` changes to such a scene, which
+   * then renders alone, and a host on one fails before it scans.
    * Collision bindings run on one device: the host while it is connected,
    * and otherwise the connected device with the lowest peer id, so they keep
    * running when the host leaves. The exception is image-triggered
@@ -371,6 +390,29 @@ export interface StudioSceneNavigatorProps {
   onColocationStateChange?: (state: StudioColocationState) => void;
   /** Once per room: when the host has its code, or when a joiner is in. */
   onColocationRoom?: (room: StudioColocationRoom) => void;
+  /**
+   * VPS tracking of the scene on screen, for a scene bound to a VPS location.
+   * Its plane assets show only while the state is `tracking`, and its on_load
+   * function waits for the first `tracking`, so a scene that never tracks
+   * shows none of them and does not run it. A failure that may pass (no
+   * network or no answer within 30 s, a 5xx or 429) is retried with backoff
+   * while the scene is on screen, and a map that failed to load or went away
+   * is retried four times, so `error` can be followed by `searching`. The
+   * handle's `retryVps()` restarts it at once after any error, so show a
+   * Retry for `error`. A bound
+   * scene that leaves the screen reports `idle`. Meta Quest and Apple Vision
+   * Pro report `unsupported`.
+   */
+  onVpsStateChange?: (event: StudioVpsStateEvent) => void;
+  /**
+   * Where a scene bound to a VPS location localises: `"device"` (default)
+   * downloads the location's map, `"server"` sends camera frames to
+   * vps-server, which needs a map built with server mode and is billed as
+   * Advanced VPS compute (`<ViroVPS localization>`). A change restarts the
+   * tracking of the scene on screen in the new mode, so a host can offer
+   * both to compare.
+   */
+  vpsLocalization?: StudioVpsLocalization;
 }
 
 /**
@@ -415,6 +457,8 @@ export const StudioSceneNavigator = forwardRef<
     colocationIndicator = true,
     onColocationStateChange,
     onColocationRoom,
+    onVpsStateChange,
+    vpsLocalization = "device",
   },
   ref
 ) {
@@ -538,6 +582,20 @@ export const StudioSceneNavigator = forwardRef<
     });
   }, [colocation, colocationStoreOwner]);
 
+  const onVpsStateChangeRef = useRef(onVpsStateChange);
+  onVpsStateChangeRef.current = onVpsStateChange;
+  // Handed to every scene like the colocation controller: the navigator holds
+  // one VPS map, which only the scene on screen tracks.
+  const vpsRef = useRef<StudioVpsCoordinator | null>(null);
+  if (vpsRef.current === null) {
+    const coordinator = new StudioVpsCoordinator(vpsLocalization);
+    coordinator.onStateChange = (event) => onVpsStateChangeRef.current?.(event);
+    vpsRef.current = coordinator;
+  }
+  useEffect(() => {
+    vpsRef.current?.setLocalization(vpsLocalization);
+  }, [vpsLocalization]);
+
   // The tap-to-place overlay would catch taps for content that is withheld
   // while a shared session is set up.
   const [colocationPending, setColocationPending] = useState(false);
@@ -606,6 +664,7 @@ export const StudioSceneNavigator = forwardRef<
         placementStore: placementStoreRef.current,
         placementApiRef,
         colocation: colocationRef.current,
+        vps: vpsRef.current,
         ...(skipOnLoadFunction ? { skipOnLoadFunction } : {}),
       },
     }),
@@ -665,6 +724,7 @@ export const StudioSceneNavigator = forwardRef<
       retryColocation: () => colocationRef.current?.retry() ?? false,
       getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
       finishColocationScan: () => colocationRef.current?.finishScan() ?? false,
+      retryVps: () => vpsRef.current?.retry() ?? false,
     }),
     []
   );

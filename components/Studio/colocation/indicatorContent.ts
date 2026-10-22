@@ -152,6 +152,10 @@ function failureDetail(
   switch (code) {
     case "PAID_PLAN_REQUIRED":
       return "Co-location is available on paid plans.";
+    case "COMPUTE_SPEND_LIMIT_REACHED":
+      return "Your team has reached its monthly compute spend limit. An owner or admin can raise it in ReactVision Studio.";
+    case "COMPUTE_BILLING_REFUSED":
+      return "Your team's compute billing needs attention. An owner or admin can fix it in ReactVision Studio.";
     case "ROOM_NOT_FOUND":
       return "The room was not found. Only members of the host's team can join its rooms.";
     case "ROOM_FULL":
@@ -172,6 +176,8 @@ function failureDetail(
       return "Your access to this project could not be verified.";
     case "SCENE_TOO_LARGE":
       return "This scene has too many assets and variables to share.";
+    case "SCENE_BOUND_TO_VPS":
+      return "This scene is placed in a scanned location, so it cannot be shared in a room.";
     case "UNAVAILABLE":
       return "Failed to reach the co-location service. Check your internet connection.";
     case "CONNECT_TIMEOUT":

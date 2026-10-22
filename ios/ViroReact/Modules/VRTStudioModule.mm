@@ -8,6 +8,10 @@ static NSString *const kBaseUrl      = @"https://platform.reactvision.xyz";
 // the database instead of nearest the device. A session on another base URL is
 // pinned only when it brings its own functionRegion.
 static NSString *const kFunctionRegion = @"eu-west-2";
+// Sent as x-rv-capabilities: what this runtime renders that an older one
+// cannot, so the scenes function can refuse such a scene to an older one
+// rather than have it drawn in the wrong place.
+static NSString *const kCapabilities = @"vps";
 static NSString *const kApiKeyKey    = @"RVApiKey";
 static NSString *const kProjectIdKey = @"RVProjectId";
 static const NSTimeInterval kTimeout = 30.0;
@@ -73,12 +77,14 @@ RCT_EXPORT_MODULE(VRTStudio);
         NSString *region = session[@"functionRegion"];
         if (region.length == 0 && [session[@"baseUrl"] isEqualToString:kBaseUrl]) region = kFunctionRegion;
         if (region.length > 0) headers[@"x-region"] = region;
+        headers[@"x-rv-capabilities"] = kCapabilities;
         return @{@"mode": @"session", @"baseUrl": session[@"baseUrl"], @"headers": headers};
     }
     NSString *apiKey = [self readApiKey];
     if (!apiKey) return nil;
     return @{@"mode": @"api_key", @"baseUrl": kBaseUrl,
-             @"headers": @{@"x-api-key": apiKey, @"x-region": kFunctionRegion}};
+             @"headers": @{@"x-api-key": apiKey, @"x-region": kFunctionRegion,
+                           @"x-rv-capabilities": kCapabilities}};
 }
 
 - (void)runGet:(NSString *)url headers:(NSDictionary *)headers resolve:(RCTPromiseResolveBlock)resolve {

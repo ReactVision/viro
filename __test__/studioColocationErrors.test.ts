@@ -29,6 +29,7 @@ describe("roomErrorCode", () => {
     [undefined, "MISSING_PROJECT_ID", "UNKNOWN"],
     [400, "INVALID_SCENE_ID", "UNKNOWN"],
     [409, "TOO_MANY_ROOMS", "UNKNOWN"],
+    [409, "SCENE_BOUND_TO_VPS", "SCENE_BOUND_TO_VPS"],
   ])("maps %s %s to %s", (status, code, expected) => {
     expect(roomErrorCode(status, code)).toBe(expected);
   });
@@ -39,6 +40,10 @@ describe("relayErrorCode", () => {
     [503, "ROOM_FULL", "ROOM_FULL"],
     [503, "RELAY_AT_CAPACITY", "RELAY_AT_CAPACITY"],
     [403, "PAID_PLAN_REQUIRED", "PAID_PLAN_REQUIRED"],
+    [403, "COMPUTE_SPEND_LIMIT_REACHED", "COMPUTE_SPEND_LIMIT_REACHED"],
+    [403, "COMPUTE_BILLING_NOT_SET_UP", "COMPUTE_BILLING_REFUSED"],
+    [403, "COMPUTE_PAYMENT_FAILED", "COMPUTE_BILLING_REFUSED"],
+    [503, "COMPUTE_BILLING_UNAVAILABLE", "UNAVAILABLE"],
     [401, "INVALID_SESSION_FORMAT", "NOT_AUTHORIZED"],
     [403, "PROJECT_ACCESS_DENIED", "NOT_AUTHORIZED"],
     [429, "TOO_MANY_CONNECTIONS", "UNAVAILABLE"],
@@ -47,6 +52,7 @@ describe("relayErrorCode", () => {
     [404, "NOT_FOUND", "UNAVAILABLE"],
     [undefined, undefined, "UNAVAILABLE"],
     [400, "INVALID_ROOM_ID", "UNKNOWN"],
+    [409, "SCENE_BOUND_TO_VPS", "SCENE_BOUND_TO_VPS"],
   ])("maps %s %s to %s", (status, code, expected) => {
     expect(relayErrorCode(status, code)).toBe(expected);
   });

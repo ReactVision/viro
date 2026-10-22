@@ -19,6 +19,7 @@ import {
   ViroParentNodeContext,
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
+import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
@@ -50,6 +51,12 @@ const canvasStyle: React.CSSProperties = {
 };
 
 export function Viro3DSceneNavigator(props: Props) {
+  useViroUsagePing("3d", {
+    hdr_enabled: props.hdrEnabled,
+    pbr_enabled: props.pbrEnabled,
+    bloom_enabled: props.bloomEnabled,
+    shadows_enabled: props.shadowsEnabled,
+  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);

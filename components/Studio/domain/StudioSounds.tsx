@@ -3,7 +3,7 @@ import { NativeSyntheticEvent } from "react-native";
 import { ViroErrorEvent } from "../../Types/ViroEvents";
 import { ViroSound } from "../../ViroSound";
 import { ViroSpatialSound } from "../../ViroSpatialSound";
-import { StudioSoundManager } from "./soundManager";
+import { StudioSoundEntry, StudioSoundManager } from "./soundManager";
 
 /**
  * Renders every actively-playing sound from the manager, re-painting the whole
@@ -11,14 +11,17 @@ import { StudioSoundManager } from "./soundManager";
  * remove themselves on finish; any sound removes itself on error so a clip that
  * fails to load releases a waiting step instead of stalling the sequence.
  */
-export const StudioSounds: React.FC<{ manager: StudioSoundManager }> = ({
-  manager,
-}) => {
+export const StudioSounds: React.FC<{
+  manager: StudioSoundManager;
+  /** Which sounds this list renders, when the scene splits them between frames. */
+  filter?: (sound: StudioSoundEntry) => boolean;
+}> = ({ manager, filter }) => {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => manager.subscribe(force), [manager]);
+  const active = manager.getActive();
   return (
     <>
-      {manager.getActive().map((s) => {
+      {(filter ? active.filter(filter) : active).map((s) => {
         const shared = {
           source: { uri: s.url },
           volume: s.volume,

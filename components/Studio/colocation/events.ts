@@ -27,6 +27,8 @@ export type StudioEventTarget = {
   sounds?: StudioSoundManager | null;
   /** The clips the scene's functions play. */
   audioUrls: ReadonlySet<string>;
+  /** Assets this device does not render; a PLAY at one is skipped. */
+  unrenderedAssetIds?: ReadonlySet<string>;
 };
 
 export type StudioEventHost = {
@@ -102,6 +104,7 @@ function encode(event: StudioSharedEvent): Fields {
             audioAssetId: event.audioAssetId,
             url: event.url,
             position: event.position ?? null,
+            targetAssetId: event.targetAssetId ?? null,
             volume: event.volume,
             loop: event.loop,
             stopOthers: event.stopOthers,
@@ -133,7 +136,15 @@ function decode(fields: Fields): StudioSharedEvent | null {
     if (audioAssetId !== null && typeof audioAssetId !== "string") return null;
     return { kind, sceneId, action: "stop", audioAssetId };
   }
-  const { audioAssetId, url, position, volume, loop, stopOthers } = fields;
+  const {
+    audioAssetId,
+    url,
+    position,
+    targetAssetId,
+    volume,
+    loop,
+    stopOthers,
+  } = fields;
   if (
     fields.action !== "play" ||
     typeof audioAssetId !== "string" ||
@@ -142,7 +153,9 @@ function decode(fields: Fields): StudioSharedEvent | null {
     !Number.isFinite(volume) ||
     typeof loop !== "boolean" ||
     typeof stopOthers !== "boolean" ||
-    (position !== null && !isVec3(position))
+    (position !== null && !isVec3(position)) ||
+    // Absent from runtimes that do not send it.
+    (targetAssetId != null && typeof targetAssetId !== "string")
   ) {
     return null;
   }
@@ -153,6 +166,7 @@ function decode(fields: Fields): StudioSharedEvent | null {
     audioAssetId,
     url,
     ...(position ? { position } : {}),
+    ...(targetAssetId ? { targetAssetId } : {}),
     volume,
     loop,
     stopOthers,
@@ -312,11 +326,18 @@ export class StudioEventRing {
         // Any peer can write a slot, and a PLAY has every device fetch its
         // URL, so only a clip the scene itself plays is played.
         if (!target.audioUrls.has(event.url)) return;
+        if (
+          event.targetAssetId &&
+          target.unrenderedAssetIds?.has(event.targetAssetId)
+        ) {
+          return;
+        }
         sounds.play(
           {
             audioAssetId: event.audioAssetId,
             url: event.url,
             position: event.position,
+            targetAssetId: event.targetAssetId,
             volume: event.volume,
             loop: event.loop,
             stopOthers: event.stopOthers,

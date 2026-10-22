@@ -28,10 +28,10 @@
 #define VROARCamera_h
 
 #include <stdio.h>
+#include "VROMatrix4f.h"
+#include "VROVector3f.h"
 
 class VROViewport;
-class VROMatrix4f;
-class VROVector3f;
 class VROFieldOfView;
 
 enum class VROARTrackingState {
@@ -75,6 +75,22 @@ public:
      */
     virtual VROMatrix4f getRotation() const = 0;
     virtual VROVector3f getPosition() const = 0;
+
+    /*
+     The camera's pose in world space (GL camera axes) for the camera image as
+     the sensor delivers it, not rotated to the display: what a pose solved
+     from that image, such as a VPS server fix, must be paired with. On a
+     portrait phone getRotation() is rolled 90 degrees from it. The default is
+     getRotation() and getPosition(), for platforms where the two agree.
+     */
+    virtual VROMatrix4f getImageTransform() const {
+        VROMatrix4f t = getRotation();
+        VROVector3f p = getPosition();
+        t[12] = p.x;
+        t[13] = p.y;
+        t[14] = p.z;
+        return t;
+    }
     
     /*
      Get the projection matrix needed to render a 3D scene to match the image

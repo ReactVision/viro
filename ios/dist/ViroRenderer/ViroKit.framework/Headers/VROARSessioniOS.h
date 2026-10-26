@@ -336,10 +336,11 @@ private:
      a single pose correction. Created once and never reassigned, because the
      render thread (per-frame hits) and the bridge (load, unload, polling)
      both use it; it locks internally. Reset by rvLoadVPSMap() and
-     rvUnloadVPSMap().
+     rvUnloadVPSMap(). Made in the constructor, where VROVPSLocalizer is a
+     complete type: an initializer here instantiates make_shared against the
+     forward declaration above, which older libc++ refuses.
      */
-    const std::shared_ptr<ReactVisionCCA::VROVPSLocalizer> _vpsLocalizerRV =
-        std::make_shared<ReactVisionCCA::VROVPSLocalizer>();
+    const std::shared_ptr<ReactVisionCCA::VROVPSLocalizer> _vpsLocalizerRV;
 
     /*
      Guards the cached VPS state below, written on the render thread and read

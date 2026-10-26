@@ -66,6 +66,20 @@ public class VRTColocationModule extends ReactContextBaseJavaModule {
         promise.resolve(true);
     }
 
+    /**
+     * A user token for the next join and the joined room's reconnects; empty
+     * clears it. Resolves false when the renderer library cannot take one.
+     */
+    @ReactMethod
+    public void setAccessToken(String accessToken, Promise promise) {
+        try {
+            ColocationSession.getInstance().setAccessToken(accessToken);
+            promise.resolve(true);
+        } catch (Throwable t) {
+            promise.resolve(false);
+        }
+    }
+
     /** Pose as 16 comma-separated floats, column-major, in the location frame. */
     @ReactMethod
     public void setLocalPose(String csv, Promise promise) {

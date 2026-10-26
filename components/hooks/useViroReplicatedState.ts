@@ -15,6 +15,7 @@ import {
   type ViroReplicationState,
   type ViroWriteOptions,
 } from "../AR/ViroReplication";
+import type { ViroVPSCredentialsRequest } from "../AR/ViroVPSClient";
 
 export type UseViroReplicatedStateOptions = ViroReplicationConfig & {
   /** Set false to stay disconnected — typically until the frame is established. */
@@ -76,6 +77,7 @@ export function useViroReplicatedState(
     projectId,
     endpoint,
     headers,
+    credentials,
     enabled = true,
     onReject,
   } = options;
@@ -91,6 +93,10 @@ export function useViroReplicatedState(
   const headersRef = useRef(headers);
   headersRef.current = headers;
   const hasHeaders = headers !== undefined;
+  // Same for credentials, read through the ref so a reconnect uses the latest.
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+  const hasCredentials = credentials !== undefined;
 
   useEffect(() => {
     client.onReject = (r) => rejectRef.current?.(r);
@@ -103,7 +109,13 @@ export function useViroReplicatedState(
         projectId,
         endpoint,
         headers: hasHeaders ? () => headersRef.current?.() ?? {} : undefined,
-      });
+        credentials: hasCredentials
+          ? (request?: ViroVPSCredentialsRequest) => {
+              const current = credentialsRef.current!;
+              return typeof current === "function" ? current(request) : current;
+            }
+          : undefined,
+      } as ViroReplicationConfig);
     }
 
     return () => {
@@ -111,7 +123,7 @@ export function useViroReplicatedState(
       client.onReject = undefined;
       client.disconnect();
     };
-  }, [client, roomId, apiKey, projectId, endpoint, hasHeaders, enabled]);
+  }, [client, roomId, apiKey, projectId, endpoint, hasHeaders, hasCredentials, enabled]);
 
   return {
     state: client.state,

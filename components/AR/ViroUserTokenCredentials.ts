@@ -11,7 +11,7 @@
 "use strict";
 
 import type { ViroVPSCredentialsRequest } from "./ViroVPSClient";
-import { renewBeforeMs, tokenClaims } from "./ViroUserTokens";
+import { registerUserTokenSource, renewBeforeMs, tokenClaims } from "./ViroUserTokens";
 
 /**
  * What `fetchToken` gives: the mint's answer as the backend passes it on, or
@@ -31,7 +31,8 @@ export type ViroUserTokenCredentialsOptions = {
 
 /**
  * Pass as `credentials` to `<ViroVPS>`, uploadScanRecording() and the other
- * VPS calls.
+ * VPS calls, and to the co-location calls (joinColocation(), the room helpers
+ * and ViroReplicationClient).
  */
 export type ViroUserTokenCredentials = ((
   request?: ViroVPSCredentialsRequest
@@ -93,6 +94,15 @@ export function createUserTokenCredentials(
   let pending: Promise<Held> | null = null;
   // A fetch that began before clear() belongs to the user who signed out.
   let generation = 0;
+  const listeners = new Set<(token: string | null) => void>();
+  const notify = (token: string | null) =>
+    listeners.forEach((listener) => {
+      try {
+        listener(token);
+      } catch {
+        // One listener's failure is not the fetch's.
+      }
+    });
 
   function fetchNew(): Promise<Held> {
     if (pending) return pending;
@@ -114,7 +124,10 @@ export function createUserTokenCredentials(
                 refreshAt: now + life - renewBeforeMs(life),
                 expiresAt: now + life,
               };
-        if (generation === started) held = next;
+        if (generation === started) {
+          held = next;
+          notify(token);
+        }
         return next;
       })
       .finally(() => {
@@ -136,11 +149,20 @@ export function createUserTokenCredentials(
     }
     return { projectId: options.projectId, accessToken: current.token };
   };
-  return Object.assign(credentials, {
+  const made = Object.assign(credentials, {
     clear() {
       held = null;
       pending = null;
       generation++;
+      notify(null);
     },
   });
+  registerUserTokenSource(made, {
+    held: () => held && { token: held.token, refreshAt: held.refreshAt },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  });
+  return made;
 }

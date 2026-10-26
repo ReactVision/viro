@@ -18,6 +18,7 @@ import {
   type ViroColocationPeer,
   type ViroColocationState,
 } from "../AR/ViroColocation";
+import { isUserTokenCredentials } from "../AR/ViroUserTokens";
 
 export type UseViroColocationResult = {
   /** False when the channel is unavailable on this build or platform. */
@@ -97,6 +98,7 @@ export function useViroColocation(
     apiKey,
     projectId,
     endpoint,
+    credentials,
     enabled = true,
     pollMs = 33,
   } = options;
@@ -110,6 +112,14 @@ export function useViroColocation(
   // Guards every async continuation: joining and polling both outlive an
   // unmount, and a room switch has to invalidate the previous join's result.
   const activeRoom = useRef<string | null>(null);
+  // Read at join. Only credentials from createUserTokenCredentials(), one per
+  // user, rejoin when they change: any other object or function may be new
+  // every render, and would leave and rejoin the room every render.
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+  const credentialsKey = isUserTokenCredentials(credentials)
+    ? credentials
+    : credentials !== undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +137,8 @@ export function useViroColocation(
         apiKey,
         projectId,
         endpoint,
-      });
+        credentials: credentialsRef.current,
+      } as ViroColocationConfig);
       if (cancelled || activeRoom.current !== roomId) return;
 
       if (!result.success) {
@@ -162,7 +173,7 @@ export function useViroColocation(
       setLocalPeerId("");
       setState("idle");
     };
-  }, [roomId, apiKey, projectId, endpoint, enabled, pollMs]);
+  }, [roomId, apiKey, projectId, endpoint, credentialsKey, enabled, pollMs]);
 
   return {
     available,

@@ -78,6 +78,7 @@ export function useViroColocationRoom(
     projectId,
     endpoint,
     headers,
+    credentials,
     host,
     joinCode,
     enabled = true,
@@ -100,6 +101,10 @@ export function useViroColocationRoom(
   const headersRef = useRef(headers);
   headersRef.current = headers;
   const hasHeaders = headers !== undefined;
+  // Same for credentials, which a function gives anew for every request anyway.
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+  const hasCredentials = credentials !== undefined;
 
   const hostKey = host
     ? [
@@ -129,6 +134,7 @@ export function useViroColocationRoom(
         projectId,
         endpoint,
         headers: headersRef.current,
+        credentials: credentialsRef.current,
       };
       const result = joinCode
         ? await lookupColocationRoom(config, joinCode)
@@ -151,7 +157,7 @@ export function useViroColocationRoom(
     // `status` is deliberately absent: it changes inside the effect, and the
     // retry path goes through `attempt` instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, projectId, endpoint, hasHeaders, target, enabled, attempt]);
+  }, [apiKey, projectId, endpoint, hasHeaders, hasCredentials, target, enabled, attempt]);
 
   const frameSource = useMemo(() => {
     if (!room) return null;

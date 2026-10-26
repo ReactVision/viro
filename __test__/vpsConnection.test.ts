@@ -21,6 +21,7 @@ import {
 } from "../components/AR/ViroVPSClient";
 import { findNearbyLocations } from "../components/AR/ViroVPSMapDownload";
 import { queryLocationsByImage } from "../components/AR/ViroVPSQuery";
+import { createUserTokenCredentials } from "../components/AR/ViroUserTokenCredentials";
 
 const API_KEY_CONTEXT = {
   mode: "api_key",
@@ -54,6 +55,7 @@ describe("resolveVPSStudio", () => {
       base: "https://platform.reactvision.xyz",
       region: "eu-west-2",
       headers: { "x-project-id": "manifest-project", "x-api-key": "key-1" },
+      renewToken: expect.any(Function),
     });
   });
 
@@ -70,6 +72,7 @@ describe("resolveVPSStudio", () => {
       base: "https://studio.test",
       region: "eu-west-1",
       headers: { "x-project-id": "p", Authorization: "Bearer own" },
+      renewToken: expect.any(Function),
     });
   });
 
@@ -80,6 +83,7 @@ describe("resolveVPSStudio", () => {
       base: "https://studio.test",
       region: null,
       headers: { "x-project-id": "p", "x-api-key": "k" },
+      renewToken: expect.any(Function),
     });
     expect(mockAuthContext).not.toHaveBeenCalled();
   });
@@ -166,6 +170,7 @@ describe("resolveVPSServer", () => {
     ).resolves.toEqual({
       base: "http://192.168.1.24:8788",
       headers: { "x-project-id": "manifest-project", "x-api-key": "key-1" },
+      renewToken: expect.any(Function),
     });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -175,5 +180,89 @@ describe("resolveVPSServer", () => {
     await expect(resolveVPSServer()).rejects.toMatchObject({ code: "VPS_SERVER_NOT_CONFIGURED" });
     await expect(resolveVPSServer()).rejects.toMatchObject({ code: "VPS_SERVER_NOT_CONFIGURED" });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("a refused user token", () => {
+  const STUDIO = "https://studio.test";
+  const refused = (code = "APP_USER_TOKEN_EXPIRED") =>
+    answer(401, { error: { code, message: "refused" } });
+  const sentTokens = () => fetchSpy.mock.calls.map((c) => c[1].headers.Authorization);
+  /** Credentials giving t1, t2, ... one per call. */
+  function rotating() {
+    let n = 0;
+    return jest.fn(async () => ({ projectId: "p", accessToken: `t${++n}` }));
+  }
+
+  it("is replaced and the call sent once more, and the new token stays for the calls that follow", async () => {
+    const credentials = rotating();
+    const studio = await resolveVPSStudio({ endpoint: STUDIO, credentials });
+    fetchSpy.mockResolvedValueOnce(refused()).mockResolvedValue(answer(200, { url: null }));
+
+    await expect(vpsStudioFetch(studio, "/vps/server", {}, vpsJson)).resolves.toEqual({ url: null });
+    await vpsStudioFetch(studio, "/vps/server", {}, vpsJson);
+
+    expect(sentTokens()).toEqual(["Bearer t1", "Bearer t2", "Bearer t2"]);
+    expect(credentials).toHaveBeenLastCalledWith({ refusedToken: "t1" });
+  });
+
+  it("is sent once more at most", async () => {
+    fetchSpy.mockResolvedValue(refused("INVALID_APP_USER_TOKEN"));
+    const studio = await resolveVPSStudio({ endpoint: STUDIO, credentials: rotating() });
+    await expect(vpsStudioFetch(studio, "/vps/server", {}, vpsJson)).rejects.toMatchObject({
+      code: "INVALID_APP_USER_TOKEN",
+      status: 401,
+    });
+    expect(sentTokens()).toEqual(["Bearer t1", "Bearer t2"]);
+  });
+
+  it("is not sent again when the credentials give the same token, or for any other refusal", async () => {
+    const same = await resolveVPSStudio({
+      endpoint: STUDIO,
+      credentials: { projectId: "p", accessToken: "t1" },
+    });
+    fetchSpy.mockResolvedValueOnce(refused());
+    await expect(vpsStudioFetch(same, "/vps/server", {}, vpsJson)).rejects.toMatchObject({
+      code: "APP_USER_TOKEN_EXPIRED",
+    });
+
+    const other = await resolveVPSStudio({ endpoint: STUDIO, credentials: rotating() });
+    fetchSpy.mockResolvedValueOnce(refused("PROJECT_ACCESS_DENIED"));
+    await expect(vpsStudioFetch(other, "/vps/server", {}, vpsJson)).rejects.toMatchObject({
+      code: "PROJECT_ACCESS_DENIED",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("is renewed on the VPS server too", async () => {
+    fetchSpy.mockResolvedValueOnce(refused()).mockResolvedValueOnce(answer(200, { candidates: [] }));
+    await expect(
+      queryLocationsByImage({ image: "AQID", fx: 1, fy: 1, cx: 0, cy: 0 } as any, {}, {
+        endpoint: STUDIO,
+        serverEndpoint: "https://gpu.test",
+        credentials: rotating(),
+      })
+    ).resolves.toEqual([]);
+    expect(fetchSpy.mock.calls.map((c) => c[0])).toEqual([
+      "https://gpu.test/vps/locations/query",
+      "https://gpu.test/vps/locations/query",
+    ]);
+    expect(sentTokens()).toEqual(["Bearer t1", "Bearer t2"]);
+  });
+
+  it("is fetched again by createUserTokenCredentials(), which otherwise keeps it", async () => {
+    let n = 0;
+    const fetchToken = jest.fn(async () => ({ token: `u${++n}`, expires_in: 3600 }));
+    const credentials = createUserTokenCredentials({ projectId: "p", fetchToken });
+    fetchSpy
+      .mockResolvedValueOnce(answer(200, { locations: [] }))
+      .mockResolvedValueOnce(refused())
+      .mockResolvedValueOnce(answer(200, { locations: [] }));
+
+    await findNearbyLocations(1, 2, undefined, undefined, { endpoint: STUDIO, credentials });
+    await findNearbyLocations(1, 2, undefined, undefined, { endpoint: STUDIO, credentials });
+
+    expect(sentTokens()).toEqual(["Bearer u1", "Bearer u1", "Bearer u2"]);
+    expect(fetchToken).toHaveBeenCalledTimes(2);
   });
 });

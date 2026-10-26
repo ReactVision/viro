@@ -99,6 +99,7 @@ import {
 import { queryLocationsByImage } from "./components/AR/ViroVPSQuery";
 import { uploadScanRecording, getScan } from "./components/AR/ViroVPSScanUpload";
 import { ViroVPSError } from "./components/AR/ViroVPSClient";
+import { createUserTokenCredentials } from "./components/AR/ViroUserTokenCredentials";
 import { ViroARScene } from "./components/AR/ViroARScene";
 import { ViroARSceneNavigator } from "./components/AR/ViroARSceneNavigator";
 import { ViroBox } from "./components/ViroBox";
@@ -181,8 +182,14 @@ export type {
   ViroVPSConnection,
   ViroVPSCredentials,
   ViroVPSCredentialsProvider,
+  ViroVPSCredentialsRequest,
   ViroVPSCredentialsSource,
 } from "./components/AR/ViroVPSClient";
+export type {
+  ViroUserToken,
+  ViroUserTokenCredentials,
+  ViroUserTokenCredentialsOptions,
+} from "./components/AR/ViroUserTokenCredentials";
 export type {
   ViroColocationState,
   ViroColocationPeer,
@@ -455,6 +462,7 @@ export {
   uploadScanRecording,
   getScan,
   ViroVPSError,
+  createUserTokenCredentials,
   ViroARScene,
   ViroARSceneNavigator,
   ViroBox,

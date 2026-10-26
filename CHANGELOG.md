@@ -14,6 +14,30 @@
 - **Every scene navigator sends a usage ping when it mounts.** Each mount of `ViroARSceneNavigator`, `Viro3DSceneNavigator`, `ViroVRSceneNavigator`, `ViroSceneNavigator`, and the web AR, 3D and scene navigators sends one request. `ViroXRSceneNavigator` sends one for itself and none for the navigator it renders, the Quest headset view included. The request carries a random install id, the app id, version and build, the platform, OS version and device model, the navigator and a few of its settings, the ViroReact and React Native versions, whether it is a development build, and whether `RVApiKey` is set. Native apps read these from the new `VRTUsageModule`; web pages use the hostname and the browser, and send nothing from `localhost` and other local hosts. It is sent with `fetch` after the navigator mounts, never retried, and a failure is ignored. `ViroTelemetry.setEnabled(false)`, exported from the package root, turns it off from JS on every platform, and so does `ViroTelemetryEnabled` = `false` in Info.plist or `com.reactvision.ViroTelemetryEnabled` = `false` in AndroidManifest. JS from this release on an older native binary sends nothing. See "Usage data" in the README.
 - **Expo plugin option `telemetry`.** `telemetry: false` writes `ViroTelemetryEnabled` to Info.plist and `com.reactvision.ViroTelemetryEnabled` to AndroidManifest, and setting it back to `true` or removing it removes them.
 - **The iOS privacy manifest ships with the pod.** `ios/PrivacyInfo.xcprivacy` was in the repository but in neither the npm package nor the podspec. It is now in both, as the `ViroReact_privacy` resource bundle, and declares the usage ping's Device ID, Product Interaction and Other Diagnostic Data as used for analytics, not linked to the user and not used for tracking.
+- **VPS calls accept a user token (`ViroVPS`, `ViroVPSClient`, `ViroVPSScanUpload`).** Studio takes a user token on every VPS call, so an app with its own sign-in can act for its signed-in user without a secret key on the device and without `appUserId`: the locations and scans it makes are that user's, and it sees them and the project's shared ones. The app's backend mints the token with a secret key (`POST /functions/v1/app-user-tokens` with `project_id` and `app_user_id`, answering `token`, `expires_at` and `expires_in`, at most an hour away), and the app passes it as `accessToken` in `credentials`, or from a function returning credentials, which viro calls before each VPS request (once per `uploadScanRecording()`, below), so a token the function refreshes is picked up. `createUserTokenCredentials()` (next entry) makes that function. A client key in `credentials` still works, read-only and for the project's shared locations only, and cannot send `appUserId` (403 `APP_USER_ID_NOT_ALLOWED`).
+
+  ```tsx
+  import { ViroVPS, createUserTokenCredentials, uploadScanRecording } from "@reactvision/react-viro";
+
+  // One per signed-in user, or call credentials.clear() at sign-out.
+  const credentials = createUserTokenCredentials({
+    projectId: PROJECT_ID,
+    // Your backend's own route, which calls app-user-tokens with its secret key.
+    fetchToken: async () => {
+      const r = await fetch("https://api.example.com/rv-token", {
+        headers: { Authorization: `Bearer ${await getSessionToken()}` },
+      });
+      return r.json(); // { token, expires_in, ... } as app-user-tokens answered
+    },
+  });
+
+  <ViroVPS arSceneNavigator={props.arSceneNavigator} credentials={credentials} />
+
+  await uploadScanRecording({ locationId }, outputDir, { credentials });
+  ```
+
+  `uploadScanRecording()` asks for the credentials once, when it starts, and the background transfer sends the same headers to Studio's complete call when the zip has landed. A token that expires during a long upload makes that call fail with 401 `APP_USER_TOKEN_EXPIRED`. The recording is stored by then, so the upload still answers the scan in `awaiting_upload`, and Studio queues it by itself: a sweep that runs every minute queues every admitted scan whose recording is stored at its declared size. Processing then starts up to a minute later, and nothing is lost. To avoid the wait, start an upload with a token that has the transfer's length left.
+- **`createUserTokenCredentials({ projectId, fetchToken })` keeps a user token between VPS requests, and a refused user token is replaced once (`ViroUserTokenCredentials`, `ViroVPSClient`, `ViroVPSQuery`).** viro asks for credentials before every VPS request, a frame a second in server mode, and the mint gives each app user at most 60 tokens an hour, so a function that fetched a new token each time failed within the first minute. The function this makes calls `fetchToken` the first time, when less than two minutes (or a quarter of a shorter token's life) is left, and after a refusal. Requests that need a token at the same moment share one fetch, and while a refresh fails the token held is used until it expires. `fetchToken` returns the mint's answer as the backend passes it on, or the token alone. The lifetime comes from `expires_in`, else the token's `exp` minus `iat`, so a phone whose clock is wrong still refreshes on time. `clear()` forgets the token at sign-out, and a fetch that began before it is not kept. Separately, when Studio or the VPS server answers 401 `APP_USER_TOKEN_EXPIRED` or `INVALID_APP_USER_TOKEN`, viro calls the credentials function again with `{ refusedToken }`, and when it gives a different token, sends the request once more with that one, which the calls after it then use too (a scan upload's background complete call included). So server mode keeps tracking past a token's expiry instead of ending with the 401. Credentials functions now receive that optional `ViroVPSCredentialsRequest`; one that ignores it works as before.
 
 ### Changed
 

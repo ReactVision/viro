@@ -161,6 +161,31 @@ describe("uploadScanRecording", () => {
     expect(transferRequest().scan_id).toBe("s1");
   });
 
+  it("renews a refused user token, and hands native the new one for the complete call", async () => {
+    let n = 0;
+    const credentials = jest.fn(async () => ({ projectId: "p", accessToken: `t${++n}` }));
+    let refused = false;
+    studio({
+      create: () =>
+        refused
+          ? [201, waiting]
+          : ((refused = true), [401, { error: { code: "APP_USER_TOKEN_EXPIRED", message: "expired" } }]),
+      upload: () => [200, { scan: waiting, upload: PUT }],
+    });
+
+    await uploadScanRecording({ locationId: "l1" }, "/data/rec", {
+      endpoint: "https://studio.test",
+      credentials,
+    });
+
+    expect(requests().map((r) => [r.path, r.headers.Authorization])).toEqual([
+      ["/vps/scans", "Bearer t1"],
+      ["/vps/scans", "Bearer t2"],
+      ["/vps/scans/s1/upload", "Bearer t2"],
+    ]);
+    expect(transferRequest().complete_headers.Authorization).toBe("Bearer t2");
+  });
+
   it("skips the PUT when Studio already holds the recording", async () => {
     studio({ upload: () => [200, { scan: waiting, upload: null }] });
     await uploadScanRecording({ locationId: "l1" }, "/data/rec", CONNECTION);

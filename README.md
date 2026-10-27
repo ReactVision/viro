@@ -103,6 +103,7 @@ import { createUserTokenCredentials, useViroColocation } from "@reactvision/reac
 const credentials = useMemo(() => createUserTokenCredentials({ projectId: PROJECT_ID, fetchToken }), [userId]);
 
 useViroColocation({ roomId, credentials }); // also useViroColocationRoom, useViroReplicatedState
+<StudioSceneNavigator sceneId={sceneId} colocation={{ mode: "join", code, credentials }} />
 <ViroVPS arSceneNavigator={nav} credentials={credentials} />
 ```
 

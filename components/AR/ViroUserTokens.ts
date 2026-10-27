@@ -68,6 +68,16 @@ export async function readCredentials(
   return credentials;
 }
 
+/** @internal How a co-location request sends `credentials`, for `projectId` in place of theirs. */
+export function credentialHeaders(
+  credentials: ViroVPSCredentials,
+  projectId: string = credentials.projectId
+): Record<string, string> {
+  return "accessToken" in credentials
+    ? { Authorization: `Bearer ${credentials.accessToken}`, "x-project-id": projectId }
+    : { "x-api-key": credentials.apiKey, "x-project-id": projectId };
+}
+
 /** @internal A token in place of the refused one, or undefined when `source` gives no other. */
 export async function renewedToken(
   source: ViroVPSCredentialsSource,

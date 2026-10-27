@@ -1179,6 +1179,24 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * the mesh takes a few seconds of looking around to accumulate after `worldMeshEnabled` goes
    * true, so this is how a caller knows when the snapshot is worth attempting.
    */
+  /**
+   * Clears the fused world mesh, so the next scan starts from an empty room rather than carrying
+   * the last one into it.
+   *
+   * Only the accumulating sources are affected — `"depth"` and `"monocular"`. On a LiDAR device
+   * ARKit owns the accumulation and this does nothing. Resolves false if the navigator is not
+   * mounted.
+   */
+  _resetWorldMesh = async (): Promise<boolean> => {
+    try {
+      return Boolean(
+        await ViroARSceneNavigatorModule.rvResetWorldMesh(findNodeHandle(this))
+      );
+    } catch {
+      return false;
+    }
+  };
+
   _getWorldMeshStats = async (): Promise<ViroWorldMeshStatsResult> => {
     try {
       return parseWorldMeshStats(
@@ -1941,6 +1959,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     captureVPSQueryFrame: this._captureVPSQueryFrame,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
+    resetWorldMesh: this._resetWorldMesh,
     getScanDiagnostics: this._getScanDiagnostics,
     uploadScanRecording: this._uploadScanRecording,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
@@ -2025,6 +2044,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     captureVPSQueryFrame: this._captureVPSQueryFrame,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
+    resetWorldMesh: this._resetWorldMesh,
     getScanDiagnostics: this._getScanDiagnostics,
     uploadScanRecording: this._uploadScanRecording,
     rvCreateSharedFrame: this._rvCreateSharedFrame,

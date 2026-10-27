@@ -37,6 +37,16 @@ export function isUserTokenCredentials(credentials: unknown): boolean {
   return typeof credentials === "function" && sources.has(credentials);
 }
 
+/** @internal Calls `listener` at each clear() of credentials createUserTokenCredentials() made. Returns the unsubscribe. */
+export function onUserTokenCleared(credentials: unknown, listener: () => void): () => void {
+  const source = typeof credentials === "function" ? sources.get(credentials) : undefined;
+  return (
+    source?.subscribe((token) => {
+      if (token === null) listener();
+    }) ?? (() => {})
+  );
+}
+
 /**
  * How Studio and the VPS server refuse a user token before the call does
  * anything, so a new token and one resend is safe.

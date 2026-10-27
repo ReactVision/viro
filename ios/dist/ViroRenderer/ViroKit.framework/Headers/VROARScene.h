@@ -39,6 +39,7 @@ class VROARAnchor;
 class VROARDeclarativeSession;
 class VROARImperativeSession;
 class VROFixedParticleEmitter;
+class VROVPSAnchorNode;
 
 class VROARSceneDelegate {
 public:
@@ -182,6 +183,51 @@ public:
      */
     void debugDrawWorldMesh(const VRORenderContext &context);
 
+    /*
+     The VPS location's mesh: an RVWM snapshot in the VPS map's frame (ViroScan's
+     mesh.rvwm), for occlusion and physics against the real place. Independent of
+     the live world mesh: it needs neither setWorldMeshEnabled() nor depth
+     hardware, and the live mesh's updates do not replace it.
+
+     It stays hidden and out of the physics world until the session's VPS fuser
+     converges (VROARSession::rvGetVPSWorldFromMap()). From then on it follows
+     the fuser's map-to-world transform every frame, so each correction moves it
+     together with content placed in the map's frame.
+
+     Replaces any mesh set before. Returns false for bytes that are not an RVWM
+     snapshot. Callable from any thread; the scene graph and the physics world
+     change on the render thread.
+     */
+    bool setVPSMapMesh(const std::vector<uint8_t> &rvwm, bool occlusion, bool physics);
+    void clearVPSMapMesh();
+
+    /*
+     Nodes whose children are in the VPS map's frame (VROVPSAnchorNode). Each
+     frame they take the same map-to-world transform as the map mesh, and stay
+     hidden while the fuser has not converged. Callable from any thread.
+     */
+    void addVPSAnchorNode(std::shared_ptr<VROVPSAnchorNode> node);
+    void removeVPSAnchorNode(std::shared_ptr<VROVPSAnchorNode> node);
+
+    /*
+     One camera image for a VPS visual query (finding the location from the
+     image when there is no GPS): the luma plane of the latest AR frame,
+     sensor-native orientation, scaled so its longest side is at most maxSide,
+     with the intrinsics scaled to match. Callable from any thread; the frame
+     is copied on the render thread and the callback runs on a background
+     thread. ok is false when no frame with intrinsics arrives within about a
+     second.
+
+     T_world_cam is the camera's sensor pose for that same frame
+     (VROARCamera::getImageTransform(), GL camera axes): a pose solved from
+     the image on a server is turned into a VPS fix with it
+     (VROARSession::rvReportVPSServerFix()).
+     */
+    typedef std::function<void(bool ok, std::vector<uint8_t> gray, int width, int height,
+                               float fx, float fy, float cx, float cy,
+                               const VROMatrix4f &T_world_cam)> VPSQueryFrameCallback;
+    void captureVPSQueryFrame(int maxSide, VPSQueryFrameCallback callback);
+
 private:
     
     /*
@@ -240,6 +286,40 @@ private:
      Updates the world mesh from the current AR frame.
      */
     void updateWorldMesh();
+
+    /*
+     VPS map mesh (see setVPSMapMesh()). Render thread only. The physics body is
+     kinematic: its motion state takes the map-to-world transform each frame.
+     */
+    std::shared_ptr<VRONode> _vpsMapMeshNode;
+    std::shared_ptr<VROPhysicsShape> _vpsMapMeshShape;
+    std::shared_ptr<btDefaultMotionState> _vpsMapMeshMotion;
+    std::shared_ptr<btRigidBody> _vpsMapMeshBody;
+    bool _vpsMapMeshInWorld = false;
+    // Bumped by every set/clear, so a physics shape still building in the
+    // background for a replaced mesh is dropped when it lands.
+    uint64_t _vpsMapMeshGen = 0;
+    // Collisions with it report the live world mesh's default tag, so apps
+    // handle both the same way. Owned here; the rigid body points at it.
+    std::string _vpsMapMeshTag = VROWorldMeshConfig().collisionTag;
+
+    // Registered VPS anchor nodes. Render thread only.
+    std::vector<std::weak_ptr<VROVPSAnchorNode>> _vpsAnchorNodes;
+
+    // Pending captureVPSQueryFrame() requests. Render thread only.
+    struct VPSQueryFrameRequest {
+        int maxSide;
+        int framesLeft;
+        VPSQueryFrameCallback callback;
+    };
+    std::vector<VPSQueryFrameRequest> _vpsQueryFrameRequests;
+    void serviceVPSQueryFrameRequests();
+
+    void installVPSMapMesh(std::shared_ptr<VROARDepthMesh> mesh, bool occlusion, bool physics);
+    void clearVPSMapMeshNow();
+    void updateVPSPlacement();
+    void updateVPSMapMesh(bool placed, const VROMatrix4f &T_world_map);
+    void updateVPSAnchorNodes(bool placed, const VROMatrix4f &T_world_map);
 };
 
 #endif /* VROARScene_h */

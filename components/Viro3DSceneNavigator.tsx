@@ -29,6 +29,10 @@ import {
 import { ViroScene } from "./ViroScene";
 import { isVisionOS } from "./Utilities/ViroPlatform";
 import { warnUnsupported } from "./Utilities/ViroUnsupported";
+import {
+  sendViroUsagePing,
+  ViroUsagePingSuppressed,
+} from "./Utilities/ViroUsagePing";
 
 const Viro3DSceneNavigatorModule = NativeModules.VRT3DSceneNavigatorModule;
 
@@ -87,6 +91,20 @@ type State = {
  */
 export class Viro3DSceneNavigator extends React.Component<Props, State> {
   _component: ViroNativeRef = null;
+
+  static contextType = ViroUsagePingSuppressed;
+  declare context: React.ContextType<typeof ViroUsagePingSuppressed>;
+
+  componentDidMount() {
+    if (!this.context) {
+      sendViroUsagePing("3d", {
+        hdr_enabled: this.props.hdrEnabled,
+        pbr_enabled: this.props.pbrEnabled,
+        bloom_enabled: this.props.bloomEnabled,
+        shadows_enabled: this.props.shadowsEnabled,
+      });
+    }
+  }
 
   /**
    * Pushes a scene and reference it with the given key if provided.

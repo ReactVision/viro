@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import {
   getColocationPeers,
   getColocationState,
@@ -33,6 +32,8 @@ import {
 } from "../../AR/ViroReplication";
 import type { ViroScanStatus } from "../../Types/ViroEvents";
 import { isQuest } from "../../Utilities/ViroPlatform";
+import { onRoomMoved } from "../../Utilities/VRModuleOpenXR";
+import { showStudioAlert } from "../domain/questAlertStore";
 import { studioApiError } from "../domain/studioApiError";
 import type { StudioSceneResponse } from "../types";
 import { type StudioAuthContext, VRTStudioModule } from "../VRTStudioModule";
@@ -49,6 +50,7 @@ import {
   resolveErrorCode,
   ROOM_PEER_LIMIT,
   roomErrorCode,
+  SCENE_BOUND_TO_VPS_FAILURE,
   type StudioColocationFailure,
 } from "./errors";
 import {
@@ -169,18 +171,20 @@ export const STUDIO_COLOCATION_OFF_FRAME: StudioColocationFrame = {
 
 /**
  * Quest roots a scene in ViroScene (StudioARScene says why), except the scene
- * on screen while a session is set up or shared. The OpenXR session, where a
+ * on screen while a session is set up or shared, and outside a session a scene
+ * that can use the room's planes (`questPlanes`). The OpenXR session, where a
  * Meta shared anchor lives, is attached only to the selected scene, and the
  * Quest navigator sends shared-frame calls to its first ViroARScene child, so
- * a scene under a push must stay ViroScene.
+ * a scene under a push must stay ViroScene while a session runs.
  */
 export function studioSceneRootsInAR(
   frame: Pick<StudioColocationFrame, "phase" | "sceneMount">,
   mount: number,
-  quest: boolean
+  quest: boolean,
+  questPlanes = false
 ): boolean {
   if (!quest) return true;
-  if (frame.phase === "off") return false;
+  if (frame.phase === "off") return questPlanes;
   // A scene renders before it attaches, and only the one being pushed can be
   // newer than the attached scene.
   return frame.sceneMount === null || mount >= frame.sceneMount;
@@ -217,6 +221,8 @@ export type StudioColocationDeps = {
   now: () => number;
   loadScene: (sceneId: string) => Promise<StudioSceneResponse>;
   onNavigationError: (error: unknown) => void;
+  /** Quest: a recentre moved world coordinates against the room. */
+  onRoomMoved: (listener: (move: Mat4) => void) => () => void;
 };
 
 function defaultFrameSourceFor(
@@ -266,7 +272,7 @@ function outsideProjectError(sceneId: string): Error {
 /** As a NAVIGATE on its own reports a scene that failed to load. */
 function reportNavigationError(error: unknown): void {
   console.error("[Studio] Error navigating to scene:", error);
-  Alert.alert("Navigation Error", "Failed to load scene");
+  showStudioAlert("Navigation Error", "Failed to load scene");
 }
 
 const DEFAULT_DEPS: StudioColocationDeps = {
@@ -291,6 +297,7 @@ const DEFAULT_DEPS: StudioColocationDeps = {
   now: () => Date.now(),
   loadScene: loadStudioScene,
   onNavigationError: reportNavigationError,
+  onRoomMoved,
 };
 
 function optionsKey(options: StudioColocationOptions): string {
@@ -557,6 +564,15 @@ export class StudioColocationController {
     this.sceneMount = mount ?? null;
     this.sceneStores = stores ?? null;
     this.sceneHooks = hooks ?? null;
+    // The app changing `sceneId` mid-session, refused as a NAVIGATE there is.
+    // A remount of the same scene is not a change.
+    if (
+      this.active &&
+      sceneData.scene.vps_location_id &&
+      prev?.scene.id !== sceneData.scene.id
+    ) {
+      this.fail(this.run, SCENE_BOUND_TO_VPS_FAILURE);
+    }
     this.noteSceneShown(prev, sceneData);
     this.sharedState?.bindScene(sceneData, this.sceneStores, this.sceneHooks);
     if (this.pendingStart) this.begin();
@@ -574,7 +590,8 @@ export class StudioColocationController {
   /**
    * A NAVIGATE while a session is set up or shared goes through the navigator
    * and into the room, so every device follows. False when no session runs:
-   * the scene then navigates on its own.
+   * the scene then navigates on its own. A scene bound to a VPS location is
+   * not entered while a session runs, and the session fails instead.
    */
   navigate(targetSceneId: string): boolean {
     if (this.frame.phase === "off" || !this.pushScene) return false;
@@ -582,8 +599,16 @@ export class StudioColocationController {
     this.deps.loadScene(targetSceneId).then(
       (sceneData) => {
         if (seq !== this.navigationSeq) return;
-        if (this.inSessionProject(sceneData)) this.enterScene(sceneData, false);
-        else this.deps.onNavigationError(outsideProjectError(targetSceneId));
+        if (!this.inSessionProject(sceneData)) {
+          this.deps.onNavigationError(outsideProjectError(targetSceneId));
+        } else if (
+          sceneData.scene.vps_location_id &&
+          this.frame.phase !== "off"
+        ) {
+          this.fail(this.run, SCENE_BOUND_TO_VPS_FAILURE);
+        } else {
+          this.enterScene(sceneData, false);
+        }
       },
       (error) => {
         if (seq === this.navigationSeq) this.deps.onNavigationError(error);
@@ -701,6 +726,12 @@ export class StudioColocationController {
     this.active = true;
     const run = this.run;
     this.relayUrl = options.relayUrl ?? STUDIO_COLOCATION_DEFAULT_RELAY_URL;
+    // The anchor stays in the room, so its world pose moves with a recentre.
+    this.cleanups.push(
+      this.deps.onRoomMoved((move) => {
+        if (this.location) this.setLocation(multiply(move, this.location));
+      })
+    );
     const flow =
       options.mode === "host"
         ? this.host(run, scene)
@@ -712,6 +743,10 @@ export class StudioColocationController {
   }
 
   private async host(run: number, scene: StudioSceneResponse): Promise<void> {
+    // The rooms service refuses it too, but only at createRoom, after the scan.
+    if (scene.scene.vps_location_id) {
+      return this.fail(run, SCENE_BOUND_TO_VPS_FAILURE);
+    }
     if (!this.checkBudget(run, scene)) return;
     const frameKind = this.deps.hostFrameKind();
     const nav = this.getNavigator();
@@ -1417,8 +1452,13 @@ export class StudioColocationController {
         const sceneData = await this.deps.loadScene(sceneId);
         if (!current()) return;
         // Any peer with the room's credential can write the room's scene.
-        if (this.inSessionProject(sceneData)) this.enterScene(sceneData, true);
-        else this.deps.onNavigationError(outsideProjectError(sceneId));
+        if (!this.inSessionProject(sceneData)) {
+          this.deps.onNavigationError(outsideProjectError(sceneId));
+        } else if (sceneData.scene.vps_location_id) {
+          this.fail(run, SCENE_BOUND_TO_VPS_FAILURE);
+        } else {
+          this.enterScene(sceneData, true);
+        }
         return;
       } catch (e) {
         failure = e;

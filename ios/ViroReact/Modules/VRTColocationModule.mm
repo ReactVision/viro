@@ -77,6 +77,13 @@ RCT_EXPORT_METHOD(getState:(RCTPromiseResolveBlock)resolve
     });
 }
 
+/// The x-rv-device the native socket sends.
+RCT_EXPORT_METHOD(getDeviceId:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    resolve([VROColocationBridge.shared deviceId] ?: @"");
+}
+
 RCT_EXPORT_METHOD(getPeers:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {

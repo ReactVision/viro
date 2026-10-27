@@ -1,5 +1,4 @@
-import { Alert, AppState } from "react-native";
-import { isQuest } from "../../Utilities/ViroPlatform";
+import { AppState } from "react-native";
 import {
   StudioAnimation,
   StudioApiRequestExecutor,
@@ -17,7 +16,7 @@ import {
   valueMatchesType,
 } from "./expressionEvaluator";
 import { studioRecordingStore } from "./recordingStore";
-import { questAlertStore } from "./questAlertStore";
+import { showStudioAlert } from "./questAlertStore";
 import { studioApiError } from "./studioApiError";
 import { StudioSoundManager } from "./soundManager";
 import { StudioVariableStore } from "./variableStore";
@@ -26,6 +25,7 @@ import { StudioPlacementStore } from "./placementStore";
 import type { StudioDragStore } from "./dragStore";
 import type { StudioColocationController } from "../colocation/controller";
 import type { StudioEffectOrigin } from "./utils";
+import type { StudioVpsCoordinator } from "./vps";
 
 type SceneNavigator = any; // ViroARSceneNavigator navigator object passed to AR scenes
 
@@ -164,6 +164,9 @@ export type SequenceRuntimeContext = {
   soundManager?: StudioSoundManager;
   dragStore?: StudioDragStore;
   getAssetPosition?: (assetId: string) => [number, number, number] | undefined;
+  // Assets this device does not render, such as a VPS-bound scene's plane
+  // assets where VPS cannot run. A PLAY at one is skipped.
+  unrenderedAssetIds?: ReadonlySet<string>;
   // Scene navigation transport. When set (web host), NAVIGATION functions call
   // this to fetch + re-render the target scene. When absent (native), the
   // walker falls back to navigateToScene() which pushes onto the Viro navigator.
@@ -171,9 +174,24 @@ export type SequenceRuntimeContext = {
   // The navigator's shared session. While one runs, NAVIGATION goes through it
   // so every device follows; otherwise it is handed on to the scene pushed.
   colocation?: StudioColocationController;
+  // The navigator's VPS map, handed on to the scene pushed like colocation.
+  vps?: StudioVpsCoordinator;
   // Given to the sounds this dispatch plays and stops; "local" when absent.
   effectOrigin?: StudioEffectOrigin;
 };
+
+function playsAtUnrenderedAsset(
+  fnId: string,
+  sound: { target_asset_id?: string | null },
+  runtimeCtx?: SequenceRuntimeContext
+): boolean {
+  const target = sound.target_asset_id;
+  if (!target || !runtimeCtx?.unrenderedAssetIds?.has(target)) return false;
+  console.warn(
+    `[Studio] SOUND function ${fnId}: PLAY targets asset ${target}, which is not rendered here; skipping.`
+  );
+  return true;
+}
 
 function resolveById(
   id: string,
@@ -303,6 +321,10 @@ function runSteps(
             advance();
             return;
           }
+          if (playsAtUnrenderedAsset(fn.id, s, deps.runtimeCtx)) {
+            advance();
+            return;
+          }
           const position = s.target_asset_id
             ? deps.runtimeCtx.getAssetPosition?.(s.target_asset_id)
             : undefined;
@@ -313,6 +335,7 @@ function runSteps(
               audioAssetId: s.audio_asset_id ?? "",
               url: s.audio_url,
               position,
+              targetAssetId: s.target_asset_id ?? undefined,
               volume: s.volume,
               loop: s.loop,
               stopOthers: s.stop_other_sounds,
@@ -721,7 +744,8 @@ export function executeFunctionWithRelations(
       animations,
       onSceneChange,
       runtimeCtx?.variableStore,
-      runtimeCtx?.colocation
+      runtimeCtx?.colocation,
+      runtimeCtx?.vps
     );
   } else if (fn.function_type === "ALERT") {
     const alert = fn.scene_alert;
@@ -733,15 +757,7 @@ export function executeFunctionWithRelations(
       s ? interpolateDisplayTemplate(s, (name) => store?.get(name)) : "";
     const title = fill(alert.alert_title);
     const message = fill(alert.alert_message);
-    if (isQuest) {
-      // Alert.alert shows a 2D panel dialog — invisible in the VR compositor.
-      // questAlertStore drives an in-scene head-locked panel instead (see
-      // StudioQuestAlertOverlay), dismissed by a controller click, same as
-      // tapping "OK" dismisses the native dialog on phones.
-      questAlertStore.show(title, message);
-      return;
-    }
-    Alert.alert(title || "Alert", message, [{ text: "OK", style: "default" }]);
+    showStudioAlert(title, message);
   } else if (fn.function_type === "ANIMATION") {
     const anim = fn.scene_animation;
     if (!anim || !onAnimationTrigger) return;
@@ -843,6 +859,7 @@ export function executeFunctionWithRelations(
         );
         return;
       }
+      if (playsAtUnrenderedAsset(fn.id, s, runtimeCtx)) return;
       const position = s.target_asset_id
         ? runtimeCtx?.getAssetPosition?.(s.target_asset_id)
         : undefined;
@@ -852,6 +869,7 @@ export function executeFunctionWithRelations(
           audioAssetId: s.audio_asset_id ?? "",
           url: s.audio_url,
           position,
+          targetAssetId: s.target_asset_id ?? undefined,
           volume: s.volume,
           loop: s.loop,
           stopOthers: s.stop_other_sounds,
@@ -867,7 +885,7 @@ export function executeFunctionWithRelations(
     // Captures the AR view via the navigator's native takeScreenshot, which
     // saves to the camera roll and burns in the free-tier watermark natively.
     // Fire-and-forget: as a sequence step the walk advances immediately
-    // Failure policy: warn + skip, and surface save/permission failure to the end user via Alert
+    // Failure policy: warn + skip, and surface save/permission failure to the end user via showStudioAlert
     if (typeof sceneNavigator?.takeScreenshot !== "function") {
       console.warn(
         `[Studio] TAKE_PHOTO function ${fn.id}: navigator has no takeScreenshot (Quest / unmounted); skipping.`
@@ -881,18 +899,16 @@ export function executeFunctionWithRelations(
         console.warn(
           `[Studio] TAKE_PHOTO function ${fn.id} failed (errorCode=${result?.errorCode}).`
         );
-        Alert.alert(
+        showStudioAlert(
           "Couldn't Save Photo",
-          "The photo could not be saved. Check that photo access is allowed and try again.",
-          [{ text: "OK" }]
+          "The photo could not be saved. Check that photo access is allowed and try again."
         );
       })
       .catch((err: unknown) => {
         console.warn(`[Studio] TAKE_PHOTO function ${fn.id} error:`, err);
-        Alert.alert(
+        showStudioAlert(
           "Couldn't Save Photo",
-          "The photo could not be saved. Check that photo access is allowed and try again.",
-          [{ text: "OK" }]
+          "The photo could not be saved. Check that photo access is allowed and try again."
         );
       });
   } else if (fn.function_type === "RECORD_VIDEO") {
@@ -923,20 +939,18 @@ export function executeFunctionWithRelations(
             console.warn(
               `[Studio] RECORD_VIDEO function ${fn.id} failed to start (errorCode=${errorCode}).`
             );
-            Alert.alert(
+            showStudioAlert(
               "Couldn't Record Video",
-              "Video recording could not start. Check that camera and microphone access are allowed and try again.",
-              [{ text: "OK" }]
+              "Video recording could not start. Check that camera and microphone access are allowed and try again."
             );
           }
         );
       } catch (err: unknown) {
         studioRecordingStore.stop();
         console.warn(`[Studio] RECORD_VIDEO function ${fn.id} start error:`, err);
-        Alert.alert(
+        showStudioAlert(
           "Couldn't Record Video",
-          "Video recording could not start. Check that camera and microphone access are allowed and try again.",
-          [{ text: "OK" }]
+          "Video recording could not start. Check that camera and microphone access are allowed and try again."
         );
       }
     } else {
@@ -947,18 +961,16 @@ export function executeFunctionWithRelations(
           console.warn(
             `[Studio] RECORD_VIDEO function ${fn.id} failed to save (errorCode=${result?.errorCode}).`
           );
-          Alert.alert(
+          showStudioAlert(
             "Couldn't Save Video",
-            "The video could not be saved. Check that photo access is allowed and try again.",
-            [{ text: "OK" }]
+            "The video could not be saved. Check that photo access is allowed and try again."
           );
         })
         .catch((err: unknown) => {
           console.warn(`[Studio] RECORD_VIDEO function ${fn.id} stop error:`, err);
-          Alert.alert(
+          showStudioAlert(
             "Couldn't Save Video",
-            "The video could not be saved. Check that photo access is allowed and try again.",
-            [{ text: "OK" }]
+            "The video could not be saved. Check that photo access is allowed and try again."
           );
         });
     }
@@ -1003,11 +1015,12 @@ async function navigateToScene(
   currentAnimations: StudioAnimation[],
   onSceneChange?: (sceneId: string, sceneName: string) => void,
   variableStore?: StudioVariableStore,
-  colocation?: StudioColocationController
+  colocation?: StudioColocationController,
+  vps?: StudioVpsCoordinator
 ): Promise<void> {
   if (!sceneNavigator) {
     console.error("[Studio] SceneNavigator not available for navigation");
-    Alert.alert("Navigation Error", "Unable to navigate to scene");
+    showStudioAlert("Navigation Error", "Unable to navigate to scene");
     return;
   }
 
@@ -1035,6 +1048,8 @@ async function navigateToScene(
         // So does the shared session: the AR session and its frame outlive a
         // push, so the next scene renders in the same frame without a resolve.
         colocation,
+        // And the VPS map, which only the scene on screen tracks.
+        vps,
       },
     });
 
@@ -1042,6 +1057,6 @@ async function navigateToScene(
     console.log(`[Studio] Navigated to scene: ${sceneData.scene.name}`);
   } catch (error) {
     console.error("[Studio] Error navigating to scene:", error);
-    Alert.alert("Navigation Error", "Failed to load scene");
+    showStudioAlert("Navigation Error", "Failed to load scene");
   }
 }

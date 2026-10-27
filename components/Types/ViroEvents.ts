@@ -625,6 +625,71 @@ export type ViroScanDiagnostics = {
 };
 
 /**
+ * Result of loadVPSMap(). success is false when the bytes didn't parse as a
+ * supported map — truncated, empty, or an unsupported format/version.
+ */
+export type ViroVPSMapLoadResult = {
+  success: boolean;
+  error?: string;
+};
+
+/**
+ * One camera image for a VPS visual query (captureVPSQueryFrame()): the latest
+ * AR frame's luma plane as a base64 JPEG, in the camera sensor's native
+ * orientation, with the pinhole intrinsics of that image (pixels).
+ */
+export type ViroVPSQueryFrame = {
+  image: string;
+  width: number;
+  height: number;
+  fx: number;
+  fy: number;
+  cx: number;
+  cy: number;
+  /**
+   * The camera's sensor pose when this frame was taken (16 numbers, opaque):
+   * what a server-mode fix for the image is paired with
+   * (reportVPSServerFix()). Absent from older native builds.
+   */
+  worldFromCamera?: number[];
+};
+
+export type ViroVPSQueryFrameResult =
+  | ({ success: true } & ViroVPSQueryFrame)
+  | { success: false; error: string };
+
+/**
+ * The latest continuous VPS localisation result against a map loaded with
+ * loadVPSMap(), polled on a timer — a stand-in for an onLocalized event;
+ * see getVPSLocalization().
+ */
+export type ViroVPSLocalizationResult = {
+  /** False when no ReactVision provider is configured. */
+  available: boolean;
+  /** True while a map is loaded (between loadVPSMap() and unloadVPSMap()), or a server-mode session runs. */
+  loaded?: boolean;
+  /** "server" during a server-mode session (startVPSServerSession()), else "device". */
+  mode?: "device" | "server";
+  /**
+   * True once the smoothed pose estimate has accepted at least one pair of
+   * agreeing localisation hits. renderPose is only present once this is true.
+   */
+  converged?: boolean;
+  /** Inlier count from the most recent raw localisation hit, whether or not it was accepted into the smoothed estimate. */
+  lastHitInliers?: number;
+  /** Reprojection RMS (pixels) from the most recent raw localisation hit. */
+  lastHitReprojRms?: number;
+  /**
+   * The smoothed T_map_world applied to the current camera pose, as 16
+   * comma-separated floats (column-major VROMatrix4f::getArray() order) —
+   * the same encoding resolveCloudAnchor()/finishScan() use elsewhere.
+   * Treat as opaque; only present when converged is true.
+   */
+  renderPose?: string;
+  error?: string;
+};
+
+/**
  * Result of snapshotWorldMeshToFile() (WS-C). filePath points at a local
  * cache file — pass it straight into rvUploadAsset() to persist it as a
  * cloud anchor asset.

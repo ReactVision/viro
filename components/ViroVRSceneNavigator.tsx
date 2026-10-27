@@ -34,6 +34,10 @@ import {
 import { isVisionOS } from "./Utilities/ViroPlatform";
 import { warnUnsupported } from "./Utilities/ViroUnsupported";
 import { VRCapture } from "./Utilities/VRModuleOpenXR";
+import {
+  sendViroUsagePing,
+  ViroUsagePingSuppressed,
+} from "./Utilities/ViroUsagePing";
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule;
 const VRModuleOpenXR = NativeModules.VRModuleOpenXR as {
   recenterTracking: (viewTag: number) => void;
@@ -95,7 +99,7 @@ type Props = ViewProps & {
   passthroughEnabled?: boolean;
 
   /**
-   * Enable skeletal hand tracking (Quest — requires com.oculus.permission.HAND_TRACKING in manifest).
+   * Enable skeletal hand tracking (Quest only; needs horizonos.permission.HAND_TRACKING in the manifest, which the Expo plugin declares for Quest builds).
    * Pinch and grab gestures fire the same onClick/onDrag events as controller buttons.
    */
   handTrackingEnabled?: boolean;
@@ -114,6 +118,19 @@ type Props = ViewProps & {
  */
 export class ViroVRSceneNavigator extends React.Component<Props, State> {
   _component: ViroNativeRef = null;
+
+  static contextType = ViroUsagePingSuppressed;
+  declare context: React.ContextType<typeof ViroUsagePingSuppressed>;
+
+  componentDidMount() {
+    if (!this.context) {
+      sendViroUsagePing("vr", {
+        vr_mode_enabled: this.props.vrModeEnabled,
+        passthrough_enabled: this.props.passthroughEnabled,
+        hand_tracking_enabled: this.props.handTrackingEnabled,
+      });
+    }
+  }
 
   /**
    * Called from native when either the user physically decides to exit vr (hits

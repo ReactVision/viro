@@ -23,6 +23,13 @@
 
 "use strict";
 
+import {
+  PLATFORM_ENDPOINT,
+  PLATFORM_FUNCTION_REGION,
+  platformRegionAnswers,
+  platformUndelivered,
+} from "./ViroPlatformRegion";
+
 export type ViroFrameKind = "cloud_anchor" | "meta_group" | "visionos_space";
 
 export type ViroColocationRoom = {
@@ -74,14 +81,8 @@ export type ViroColocationRoomResult =
       status?: number;
     };
 
-const DEFAULT_ENDPOINT = "https://platform.reactvision.xyz";
-/**
- * DEFAULT_ENDPOINT's database region, so its edge function runs beside the
- * database. The query parameter rather than an `x-region` header, which a
- * browser would have to clear through a CORS preflight the platform does not
- * allow it in.
- */
-const DEFAULT_FUNCTION_REGION = "eu-west-2";
+const DEFAULT_ENDPOINT = PLATFORM_ENDPOINT;
+const DEFAULT_FUNCTION_REGION = PLATFORM_FUNCTION_REGION;
 
 /**
  * The 30 characters a code can hold. O and 0, I and 1 and L, and U against V
@@ -206,19 +207,6 @@ async function request(
   return { success: true, room: toRoom(parsed.room) };
 }
 
-// What the gateway answers when it never reached a function. With a non-JSON
-// body (every platform function answers JSON) nothing ran, so a resend cannot
-// run a request twice. 500, 504, 520, 524 and 546 are left out: a function may
-// have run before any of them.
-const UNDELIVERED_STATUSES = new Set([502, 503, 521, 522, 523, 525, 526, 530]);
-
-function undelivered(response: Response): boolean {
-  return (
-    UNDELIVERED_STATUSES.has(response.status) &&
-    !/json/i.test(response.headers.get("content-type") ?? "")
-  );
-}
-
 /**
  * Pins by the query parameter on the default platform and by any `x-region`
  * the caller's headers carry. The platform does not fail a pinned region over,
@@ -247,26 +235,14 @@ async function fetchInRegion(
       : url;
   try {
     const response = await fetch(pinned, init);
-    if (!undelivered(response)) return response;
+    if (!platformUndelivered(response)) return response;
   } catch (e) {
-    if (!(e instanceof TypeError) || (await regionAnswers(base, region)))
+    if (!(e instanceof TypeError) || (await platformRegionAnswers(base, region)))
       throw e;
   }
   const headers = { ...init.headers };
   if (regionHeader) delete headers[regionHeader];
   return fetch(url, { ...init, headers });
-}
-
-// The region's runtime answers the bare path itself, with CORS headers and
-// without starting a function.
-async function regionAnswers(base: string, region: string): Promise<boolean> {
-  try {
-    return !undelivered(
-      await fetch(`${base}/functions/v1/?forceFunctionRegion=${region}`)
-    );
-  } catch {
-    return false;
-  }
 }
 
 function toRoom(raw: any): ViroColocationRoom {

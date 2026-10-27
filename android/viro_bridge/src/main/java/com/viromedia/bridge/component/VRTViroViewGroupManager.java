@@ -27,6 +27,7 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.LayoutShadowNode;
+import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.ViewGroupManager;
 import com.facebook.react.uimanager.ReactStylesDiffMap;
 import com.facebook.react.uimanager.annotations.ReactProp;
@@ -86,7 +87,16 @@ public abstract class VRTViroViewGroupManager<T extends ViewGroup>
 
     @Override
     public void onDropViewInstance(T view) {
-        super.onDropViewInstance(view);
+        // A VRTComponent's context is the Activity, not a ThemedReactContext, and React
+        // Native logs an error for each such view it drops. Its drop only clears these two
+        // listeners for a view like that (recycling needs a ThemedReactContext), so clear
+        // them here instead.
+        if (view.getContext() instanceof ThemedReactContext) {
+            super.onDropViewInstance(view);
+        } else {
+            view.setOnFocusChangeListener(null);
+            view.setOnHierarchyChangeListener(null);
+        }
         if (view instanceof VRTComponent) {
             ((VRTComponent) view).onDrop();
         }

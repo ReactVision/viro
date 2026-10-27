@@ -79,6 +79,7 @@
     "ios/*.m",
     "ios/*.mm",
     "ios/ViroReact.podspec",
+    "ios/PrivacyInfo.xcprivacy",
     "ios/ViroReactUI.podspec",
     "bin",
     "LICENSE"

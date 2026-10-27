@@ -71,6 +71,45 @@ public:
      */
     void recordFrame(ARFrame *frame);
 
+    /*
+     A GPS/heading fix to attach to the next `pose` line recordFrame() writes,
+     for map geo-registration downstream. hasGps gates the whole `gps` object
+     (latitude/longitude/altitude); without a valid heading (hasHeading false,
+     or a heading outside [0, 360)) the heading fields are written as null —
+     see writePoseLine().
+
+     headingDegrees must already be the compass bearing of the AR camera's
+     forward axis, projected onto the horizontal plane, at the instant of the
+     fix (degrees, [0, 360), clockwise from true north) — this class does not
+     derive that fusion itself. The caller (VROARSessioniOS, reusing the GPS
+     pose it already maintains for ReactVision geospatial anchors) is
+     responsible for supplying it, the same division of responsibility
+     ReactVisionCCA's setKeyframeLocation()/KeyframeGeoReading uses for the
+     analogous per-keyframe input.
+     */
+    struct VROARRecordingGeoReading {
+        bool   hasGps                  = false;
+        double latitude                = 0.0;
+        double longitude               = 0.0;
+        double altitude                = 0.0;
+        double hAccuracy               = -1.0; // < 0 == unknown, omitted from the sidecar
+        bool   hasHeading              = false;
+        double headingDegrees          = 0.0;
+        double headingAccuracyDegrees  = -1.0; // < 0 == unknown, omitted from the sidecar
+    };
+
+    /*
+     Feed a fresh GPS/heading fix. Attached to the next pose line recordFrame()
+     writes, then cleared — so a pose only ever carries a reading taken at (as
+     close as the caller can manage) that instant, matching session.jsonl's
+     "not every pose record needs one". Safe to call from any thread, at
+     whatever rate the location/compass source delivers (~1 Hz is fine);
+     recordFrame() always runs on the AR/render thread, so this just guards a
+     small struct the two threads share. A no-op call (default-constructed
+     reading) is harmless — it simply never produces a `gps` field.
+     */
+    void setLocationReading(const VROARRecordingGeoReading &reading);
+
 private:
 
     VROARRecordingStatus _status;
@@ -110,6 +149,14 @@ private:
     // individually monotonic.
     struct SidecarLine { int64_t t; std::string text; };
     std::vector<SidecarLine> _bufferedLines;
+
+    // GPS/heading fix pending attachment to the next pose
+    // line. Set from any thread via setLocationReading(), consumed (and
+    // cleared) by writePoseLine() on the AR/render thread. A dedicated mutex,
+    // not _sidecarMutex: setLocationReading() should never block on whatever
+    // the sidecar writer is doing.
+    std::mutex _geoMutex;
+    VROARRecordingGeoReading _pendingGeo;
 
     // Guards _status and the video writer pointers together, so stop() and
     // recordFrame() can never interleave: stop() takes this lock, flips

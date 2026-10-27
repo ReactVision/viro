@@ -70,7 +70,42 @@ export type ViroWorldMeshConfig = {
    * @default false
    */
   debugDrawEnabled?: boolean;
+
+  /**
+   * Fuse depth frames into a surface that persists across them, instead of rebuilding from the
+   * current frame.
+   *
+   * Only affects the `"depth"` and `"monocular"` sources. ARKit already accumulates behind
+   * `"lidar"`, and `"plane"` has nothing to average. Without this, a room scan and the snapshot
+   * taken from it are whatever the camera last pointed at.
+   *
+   * @default true
+   */
+  accumulate?: boolean;
+
+  /**
+   * Voxel edge for the fused volume, in meters. Smaller keeps more detail and costs more memory.
+   * @default 0.04
+   */
+  voxelSize?: number;
+
+  /**
+   * Budget for the fused volume. Blocks past it are dropped least-recently-seen first, so walking
+   * away from part of a room eventually forgets it rather than growing without bound.
+   * @default 64
+   */
+  maxMemoryMB?: number;
 };
+
+/**
+ * The data source behind a world mesh. See {@link ViroWorldMeshStats.source}.
+ */
+export type ViroWorldMeshSource =
+  | "lidar"
+  | "depth"
+  | "monocular"
+  | "plane"
+  | "unknown";
 
 /**
  * Statistics about the current world mesh state.
@@ -85,6 +120,22 @@ export type ViroWorldMeshStats = {
    * Number of triangles in the current mesh.
    */
   triangleCount: number;
+
+  /**
+   * Which path produced the mesh, so an app can tell a real surface from the fallback.
+   *
+   * - `"lidar"` — ARKit mesh anchors. Accumulates across frames.
+   * - `"depth"` — ARCore's depth camera image. **Current frame only.**
+   * - `"monocular"` — estimated depth on a non-LiDAR iPhone. **Current frame only.**
+   * - `"plane"` — triangulated AR plane anchors. Flat polygons, not a scanned surface.
+   */
+  source?: ViroWorldMeshSource;
+
+  /**
+   * Whether the mesh is fused across frames or a single view. `false` with a `"depth"` or
+   * `"monocular"` source means a snapshot taken now holds one frame, not the room walked.
+   */
+  accumulated?: boolean;
 
   /**
    * Average confidence of depth samples used to generate the mesh (0.0-1.0).

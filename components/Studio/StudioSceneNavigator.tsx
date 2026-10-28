@@ -336,6 +336,14 @@ export interface StudioSceneNavigatorProps {
    * reports why; `connectTimeoutMs` bounds the wait for the room once the
    * frame is known (`CONNECT_TIMEOUT`, `HOST_TIMEOUT`).
    *
+   * `credentials`, such as a user token from createUserTokenCredentials(),
+   * authenticate the room, the relay, the pose channel and the shared state in
+   * place of `rvApiKey` or the Studio session, which scene loads, cloud anchors
+   * and VPS keep: `colocation={{ mode: "join", code, credentials }}`. A change
+   * of createUserTokenCredentials() object, or a clear() of the one in use,
+   * fails a running session with `NOT_AUTHORIZED`; `retryColocation()` starts
+   * it again.
+   *
    * Variables, visibility and tap-to-place positions are shared, the last
    * write winning; a device that joins or reconnects takes the room's copy
    * over its own. A drag is shared while it runs: the device dragging an

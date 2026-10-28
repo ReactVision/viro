@@ -15,7 +15,10 @@
 "use strict";
 
 import type { ViroVPSQueryFrame } from "../Types/ViroEvents";
-import { ViroVPSConnection, resolveVPSServer, vpsFetch, vpsJson } from "./ViroVPSClient";
+import { ViroVPSConnection, resolveVPSServer, vpsJson, vpsServerFetch } from "./ViroVPSClient";
+import { base64ToBytes } from "../Utilities/ViroBase64";
+
+export { base64ToBytes };
 
 /** One location the server matched the image to, best first. */
 export type ViroVPSQueryCandidate = {
@@ -34,34 +37,6 @@ export type ViroVPSQueryOptions = {
   lon?: number;
   radiusM?: number;
 };
-
-const BASE64_LOOKUP: Int16Array = (() => {
-  const table = new Int16Array(128).fill(-1);
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  for (let i = 0; i < chars.length; i++) table[chars.charCodeAt(i)] = i;
-  return table;
-})();
-
-/** Decodes standard base64 (padding optional, whitespace ignored). Throws on other characters. */
-export function base64ToBytes(base64: string): Uint8Array {
-  const clean = base64.replace(/[\s=]/g, "");
-  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
-  let buffer = 0;
-  let bits = 0;
-  let o = 0;
-  for (let i = 0; i < clean.length; i++) {
-    const code = clean.charCodeAt(i);
-    const value = code < 128 ? BASE64_LOOKUP[code] : -1;
-    if (value < 0) throw new Error("Invalid base64");
-    buffer = (buffer << 6) | value;
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      out[o++] = (buffer >> bits) & 0xff;
-    }
-  }
-  return out.subarray(0, o);
-}
 
 /** A multipart/form-data body from text fields and one JPEG file part. */
 export function buildQueryMultipart(
@@ -114,12 +89,12 @@ export async function queryLocationsByImage(
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
   const server = await resolveVPSServer(connection);
-  const parsed = (await vpsFetch(
-    `${server.base}/vps/locations/query`,
+  const parsed = (await vpsServerFetch(
+    server,
+    "/vps/locations/query",
     {
       method: "POST",
       headers: {
-        ...server.headers,
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body: body as unknown as BodyInit,
@@ -179,12 +154,12 @@ export async function localiseFrameOnServer(
   const boundary = `viro-vps-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   const body = buildQueryMultipart(fields, base64ToBytes(frame.image), boundary);
   const server = await resolveVPSServer(connection);
-  return (await vpsFetch(
-    `${server.base}/vps/locations/${encodeURIComponent(locationId)}/localise`,
+  return (await vpsServerFetch(
+    server,
+    `/vps/locations/${encodeURIComponent(locationId)}/localise`,
     {
       method: "POST",
       headers: {
-        ...server.headers,
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
         ...(device ? { "x-rv-device": device } : {}),
       },

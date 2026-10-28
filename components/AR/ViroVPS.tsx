@@ -150,8 +150,10 @@ export type ViroVPSProps = {
    * Project credentials (see `ViroVPSCredentials`), or a function returning
    * them. A function is called before every request (each location lookup,
    * image query and map download), so a short-lived token the host refreshes
-   * is used without a re-render. Default: the Studio session, or the
-   * `rvApiKey` and `rvProjectId` set in viro's Expo plugin.
+   * is used without a re-render. For a user token from the app's backend,
+   * pass createUserTokenCredentials(), which keeps the token between requests.
+   * Default: the Studio session, or the `rvApiKey` and `rvProjectId` set in
+   * viro's Expo plugin.
    */
   credentials?: ViroVPSCredentialsSource;
 
@@ -249,8 +251,10 @@ export type ViroVPSProps = {
    *   `NO_SERVER_MAP`. It needs a paid plan and is billed as Advanced VPS
    *   compute time, per second the server spends on each frame. A refusal
    *   (401 or 403, such as `PAID_PLAN_REQUIRED` or
-   *   `COMPUTE_SPEND_LIMIT_REACHED`) ends tracking with its code; no
-   *   answer, 429 and 5xx are retried with the next frame.
+   *   `COMPUTE_SPEND_LIMIT_REACHED`) ends tracking with its code, unless it
+   *   refused a user token and `credentials` give a new one, which the frame
+   *   is sent again with; no answer, 429 and 5xx are retried with the next
+   *   frame.
    */
   localization?: "device" | "server";
 

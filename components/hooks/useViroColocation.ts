@@ -18,6 +18,7 @@ import {
   type ViroColocationPeer,
   type ViroColocationState,
 } from "../AR/ViroColocation";
+import { useCredentialsKey } from "./useCredentialsKey";
 
 export type UseViroColocationResult = {
   /** False when the channel is unavailable on this build or platform. */
@@ -84,7 +85,16 @@ function samePeers(a: ViroColocationPeer[], b: ViroColocationPeer[]): boolean {
  *   roomId: cloudAnchorId, apiKey, projectId,
  *   enabled: frameReady,
  * });
+ *
+ * // An app with its own sign-in: a user token in place of the key.
+ * const credentials = useMemo(
+ *   () => createUserTokenCredentials({ projectId, fetchToken }), [userId]);
+ * useViroColocation({ roomId: cloudAnchorId, credentials, enabled: frameReady });
  * ```
+ *
+ * The room is left and joined again when `credentials` is another
+ * createUserTokenCredentials() object, or at its clear(). The join reads the
+ * credentials again, so it fails when nobody is signed in by then.
  *
  * Poses on this channel are **location-frame** coordinates. Convert before
  * publishing and after receiving — see `ViroLocationFrame`.
@@ -97,6 +107,7 @@ export function useViroColocation(
     apiKey,
     projectId,
     endpoint,
+    credentials,
     enabled = true,
     pollMs = 33,
   } = options;
@@ -110,6 +121,10 @@ export function useViroColocation(
   // Guards every async continuation: joining and polling both outlive an
   // unmount, and a room switch has to invalidate the previous join's result.
   const activeRoom = useRef<string | null>(null);
+  // Read at join; useCredentialsKey says when to join again.
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+  const [credentialsKey, credentialsCleared] = useCredentialsKey(credentials);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +142,8 @@ export function useViroColocation(
         apiKey,
         projectId,
         endpoint,
-      });
+        credentials: credentialsRef.current,
+      } as ViroColocationConfig);
       if (cancelled || activeRoom.current !== roomId) return;
 
       if (!result.success) {
@@ -162,7 +178,16 @@ export function useViroColocation(
       setLocalPeerId("");
       setState("idle");
     };
-  }, [roomId, apiKey, projectId, endpoint, enabled, pollMs]);
+  }, [
+    roomId,
+    apiKey,
+    projectId,
+    endpoint,
+    credentialsKey,
+    credentialsCleared,
+    enabled,
+    pollMs,
+  ]);
 
   return {
     available,

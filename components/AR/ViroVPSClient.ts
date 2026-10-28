@@ -17,6 +17,7 @@ import {
   platformRegionAnswers,
   platformUndelivered,
 } from "./ViroPlatformRegion";
+import { USER_TOKEN_REFUSALS } from "./ViroUserTokens";
 
 /** Either credential form API.md accepts; always paired with the project id. */
 export type ViroVPSCredentials = (
@@ -34,12 +35,27 @@ export type ViroVPSCredentials = (
   appUserId?: string;
 };
 
+/** What viro tells a credentials function when it calls it. */
+export type ViroVPSCredentialsRequest = {
+  /**
+   * Set when Studio or the VPS server has just refused this user token (401
+   * `APP_USER_TOKEN_EXPIRED` or `INVALID_APP_USER_TOKEN`). Give another, and
+   * viro sends the request once more with it; give the same one, and the
+   * request fails with that refusal.
+   */
+  refusedToken?: string;
+};
+
 /**
  * Called before every VPS request, so a short-lived token the host refreshes
  * reaches the next request. A function that throws or rejects fails that
- * request with `CREDENTIALS_UNAVAILABLE`.
+ * request with `CREDENTIALS_UNAVAILABLE`. For a user token from the app's
+ * backend, createUserTokenCredentials() makes this function and keeps the
+ * token between requests.
  */
-export type ViroVPSCredentialsProvider = () => Promise<ViroVPSCredentials> | ViroVPSCredentials;
+export type ViroVPSCredentialsProvider = (
+  request?: ViroVPSCredentialsRequest
+) => Promise<ViroVPSCredentials> | ViroVPSCredentials;
 
 export type ViroVPSCredentialsSource = ViroVPSCredentials | ViroVPSCredentialsProvider;
 
@@ -104,6 +120,10 @@ function headerValue(headers: Record<string, string>, name: string): string | un
   return key === undefined ? undefined : headers[key];
 }
 
+function bearerToken(headers: Record<string, string>): string | undefined {
+  return headerValue(headers, "authorization")?.replace(/^Bearer\s+/i, "");
+}
+
 /**
  * The credential viro's native layer holds (a Studio session, or the
  * manifest's RVApiKey), for `projectId`: the manifest's RVProjectId unless
@@ -113,7 +133,7 @@ export function credentialsFromAuthContext(
   context: StudioAuthContext,
   projectId: string | null = context.projectId
 ): ViroVPSCredentials {
-  const accessToken = headerValue(context.headers, "authorization")?.replace(/^Bearer\s+/i, "");
+  const accessToken = bearerToken(context.headers);
   const apiKey = headerValue(context.headers, "x-api-key");
   if (projectId && accessToken) return { projectId, accessToken };
   if (projectId && apiKey) return { projectId, apiKey };
@@ -132,11 +152,12 @@ const nativeCredentials: ViroVPSCredentialsProvider = async () =>
  */
 export async function resolveVPSCredentials(
   source: ViroVPSCredentialsSource = nativeCredentials,
-  appUserId?: string
+  appUserId?: string,
+  request?: ViroVPSCredentialsRequest
 ): Promise<ViroVPSCredentials> {
   let creds: ViroVPSCredentials | undefined;
   try {
-    creds = typeof source === "function" ? await source() : source;
+    creds = typeof source === "function" ? await source(request) : source;
   } catch (e) {
     if (e instanceof ViroVPSError) throw e;
     throw new ViroVPSError(
@@ -152,9 +173,10 @@ export async function resolveVPSCredentials(
 
 export async function vpsAuthHeaders(
   source?: ViroVPSCredentialsSource,
-  appUserId?: string
+  appUserId?: string,
+  request?: ViroVPSCredentialsRequest
 ): Promise<Record<string, string>> {
-  const creds = await resolveVPSCredentials(source, appUserId);
+  const creds = await resolveVPSCredentials(source, appUserId, request);
   const headers: Record<string, string> = { "x-project-id": creds.projectId };
   if ("apiKey" in creds) {
     headers["x-api-key"] = creds.apiKey;
@@ -248,8 +270,12 @@ export function vpsErrorFromBody(
   if (bodyText) {
     try {
       const body = JSON.parse(bodyText);
-      code = body?.error?.code;
-      message = body?.error?.message ?? message;
+      // The platform's gateway answers some requests itself with a top-level
+      // {code, message}, such as NOT_FOUND for a function that is not deployed.
+      // Its JWT refusal carries a numeric code, which is not one of ours.
+      code = body?.error?.code ?? (typeof body?.code === "string" ? body.code : undefined);
+      message =
+        body?.error?.message ?? (typeof body?.message === "string" ? body.message : message);
     } catch {
       // Non-JSON error body: keep the generic HTTP message.
     }
@@ -273,11 +299,62 @@ export function vpsBaseUrl(endpoint: string): string {
   return endpoint.replace(/\/+$/, "");
 }
 
+/**
+ * Headers carrying a new user token in place of the refused one in `refused`,
+ * or null when the credentials give no other.
+ */
+export type RenewToken = (refused: Record<string, string>) => Promise<Record<string, string> | null>;
+
+function tokenRenewal(
+  source: ViroVPSCredentialsSource | undefined,
+  appUserId: string | undefined
+): RenewToken {
+  return async (refused) => {
+    const token = bearerToken(refused);
+    if (!token || typeof source !== "function") return null;
+    const headers = await vpsAuthHeaders(source, appUserId, { refusedToken: token });
+    return bearerToken(headers) === token ? null : headers;
+  };
+}
+
+/**
+ * `send(target.headers)`, and once more when the user token in them was
+ * refused and the credentials give another, which then replaces it in
+ * `target.headers` for the calls that follow.
+ */
+async function withTokenRenewal<T>(
+  target: { headers: Record<string, string>; renewToken: RenewToken },
+  send: (headers: Record<string, string>) => Promise<T>
+): Promise<T> {
+  const headers = target.headers;
+  try {
+    return await send(headers);
+  } catch (e) {
+    if (!(e instanceof ViroVPSError) || e.status !== 401 || !USER_TOKEN_REFUSALS.has(e.code ?? "")) {
+      throw e;
+    }
+    // Credentials that fail to give another token leave the refusal standing,
+    // as the room helpers do, so server mode ends on it instead of retrying.
+    const renewed = await target.renewToken(headers).catch(() => null);
+    if (!renewed) throw e;
+    target.headers = renewed;
+    return send(renewed);
+  }
+}
+
 /** A resolved connection to Studio: its base URL, the region to pin, and the headers. */
 export type VPSStudio = {
   base: string;
   region: string | null;
   headers: Record<string, string>;
+  renewToken: RenewToken;
+};
+
+/** A resolved connection to the VPS server. */
+export type VPSServer = {
+  base: string;
+  headers: Record<string, string>;
+  renewToken: RenewToken;
 };
 
 /** Where Studio is and as whom to call it, from `connection` and, for what it leaves out, the native layer. */
@@ -295,7 +372,12 @@ export async function resolveVPSStudio(connection: ViroVPSConnection = {}): Prom
         : null;
   const source =
     connection.credentials ?? (context ? () => credentialsFromAuthContext(context) : undefined);
-  return { base, region, headers: await vpsAuthHeaders(source, connection.appUserId) };
+  return {
+    base,
+    region,
+    headers: await vpsAuthHeaders(source, connection.appUserId),
+    renewToken: tokenRenewal(source, connection.appUserId),
+  };
 }
 
 /**
@@ -320,7 +402,10 @@ function sendPinned(base: string, region: string | null): Send {
   };
 }
 
-/** A call to Studio's `vps` function: `path` starts with `/vps/`. */
+/**
+ * A call to Studio's `vps` function: `path` starts with `/vps/`. A refused
+ * user token is renewed and the call sent once more (see withTokenRenewal()).
+ */
 export function vpsStudioFetch<T>(
   studio: VPSStudio,
   path: string,
@@ -328,12 +413,32 @@ export function vpsStudioFetch<T>(
   read: (response: Response) => Promise<T>,
   timeoutMs = VPS_REQUEST_TIMEOUT_MS
 ): Promise<T> {
-  return vpsFetch(
-    `${studio.base}/functions/v1${path}`,
-    { ...init, headers: { ...studio.headers, ...(init.headers as Record<string, string>) } },
-    read,
-    timeoutMs,
-    sendPinned(studio.base, studio.region)
+  return withTokenRenewal(studio, (headers) =>
+    vpsFetch(
+      `${studio.base}/functions/v1${path}`,
+      { ...init, headers: { ...headers, ...(init.headers as Record<string, string>) } },
+      read,
+      timeoutMs,
+      sendPinned(studio.base, studio.region)
+    )
+  );
+}
+
+/** A call to the VPS server, `path` from `/vps/`, renewing a refused user token as vpsStudioFetch() does. */
+export function vpsServerFetch<T>(
+  server: VPSServer,
+  path: string,
+  init: RequestInit,
+  read: (response: Response) => Promise<T>,
+  timeoutMs = VPS_REQUEST_TIMEOUT_MS
+): Promise<T> {
+  return withTokenRenewal(server, (headers) =>
+    vpsFetch(
+      `${server.base}${path}`,
+      { ...init, headers: { ...headers, ...(init.headers as Record<string, string>) } },
+      read,
+      timeoutMs
+    )
   );
 }
 
@@ -349,12 +454,14 @@ export function clearVPSServerAddresses(): void {
  * The VPS server's base URL and the headers to call it with: the connection's
  * `serverEndpoint`, else the address Studio gives out, kept an hour.
  */
-export async function resolveVPSServer(
-  connection: ViroVPSConnection = {}
-): Promise<{ base: string; headers: Record<string, string> }> {
+export async function resolveVPSServer(connection: ViroVPSConnection = {}): Promise<VPSServer> {
   const studio = await resolveVPSStudio(connection);
   if (connection.serverEndpoint) {
-    return { base: vpsBaseUrl(connection.serverEndpoint), headers: studio.headers };
+    return {
+      base: vpsBaseUrl(connection.serverEndpoint),
+      headers: studio.headers,
+      renewToken: studio.renewToken,
+    };
   }
   const now = Date.now();
   let known = serverAddresses.get(studio.base);
@@ -376,5 +483,5 @@ export async function resolveVPSServer(
       if (serverAddresses.get(studio.base) === known) serverAddresses.delete(studio.base);
     });
   }
-  return { base: await known.url, headers: studio.headers };
+  return { base: await known.url, headers: studio.headers, renewToken: studio.renewToken };
 }

@@ -41,6 +41,8 @@ import { Platform } from "react-native";
 import { isWeb } from "../Utilities/ViroPlatform";
 import { VIRO_VERSION } from "../Utilities/ViroVersion";
 import { colocationDeviceIdNow } from "./ViroColocation";
+import type { ViroVPSCredentialsSource } from "./ViroVPSClient";
+import { readCredentials } from "./ViroUserTokens";
 
 /** React Native's constructor, which the DOM typing does not describe. */
 type HeaderWebSocket = new (
@@ -88,11 +90,12 @@ export type ViroReplicationConfig = {
   /** Same id that names the frame and the channel room. */
   roomId: string;
   /**
-   * Required unless `headers` is given. The only credential a browser can
-   * send.
+   * Required unless `headers` or `credentials` are given. The only credential
+   * a browser can send.
    */
   apiKey?: string;
-  projectId: string;
+  /** Required unless `credentials` are given, which carry it. Replaces theirs. */
+  projectId?: string;
   /**
    * Co-location relay base URL; `http(s)` is converted to `ws(s)`.
    *
@@ -108,7 +111,16 @@ export type ViroReplicationConfig = {
    * cannot set handshake headers.
    */
   headers?: () => Promise<Record<string, string>> | Record<string, string>;
-};
+  /**
+   * Credentials as `<ViroVPS credentials>` takes them, in place of `apiKey`
+   * and `headers`, read before every connect and reconnect. A user token from
+   * createUserTokenCredentials() is sent as `Authorization: Bearer` with no
+   * `x-api-key`. A handshake refused with 401 asks the credentials for a new
+   * token once, since a refused WebSocket shows JS the status but not the
+   * code. Native only, like `headers`.
+   */
+  credentials?: ViroVPSCredentialsSource;
+} & ({ projectId: string } | { credentials: ViroVPSCredentialsSource });
 
 export type ViroWriteOptions = {
   /**
@@ -157,6 +169,12 @@ export class ViroReplicationClient {
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   /** Bumped per open and on disconnect, so a late `headers` answer is dropped. */
   private openSeq = 0;
+  /** The user token the last handshake sent, from `credentials`. */
+  private sentToken: string | undefined;
+  /** Set when a handshake was refused with 401, so the next one asks for a new token. */
+  private refusedToken: string | undefined;
+  /** One renewal per refusal: cleared again once a socket opens. */
+  private renewed = false;
 
   private listeners = new Set<Listener>();
   /**
@@ -207,6 +225,9 @@ export class ViroReplicationClient {
     this.config = config;
     this.closedByUs = false;
     this.attempt = 0;
+    this.sentToken = undefined;
+    this.refusedToken = undefined;
+    this.renewed = false;
     this.open();
   }
 
@@ -313,12 +334,13 @@ export class ViroReplicationClient {
       this.attach(
         new WebSocket(
           `${path}?apiKey=${encodeURIComponent(cfg.apiKey)}` +
-            `&projectId=${encodeURIComponent(cfg.projectId)}`
+            `&projectId=${encodeURIComponent(cfg.projectId ?? "")}`
         )
       );
       return;
     }
-    if (!cfg.apiKey && !cfg.headers) {
+    const credentials = cfg.credentials;
+    if (!cfg.apiKey && !cfg.headers && credentials === undefined) {
       this.fail("an apiKey or a headers provider is required");
       return;
     }
@@ -330,8 +352,8 @@ export class ViroReplicationClient {
     ) => {
       if (seq !== this.openSeq) return;
       const headers: Record<string, string> = { ...provided };
-      if (cfg.apiKey) headers["x-api-key"] = cfg.apiKey;
-      headers["x-project-id"] = cfg.projectId;
+      if (cfg.apiKey && credentials === undefined) headers["x-api-key"] = cfg.apiKey;
+      headers["x-project-id"] = cfg.projectId ?? headers["x-project-id"] ?? "";
       // The native pose channel's id, so the relay bills this device once
       // while either socket is open.
       if (device) headers["x-rv-device"] = device;
@@ -365,7 +387,10 @@ export class ViroReplicationClient {
 
     let provided: Record<string, string> | PromiseLike<Record<string, string>>;
     try {
-      provided = cfg.headers?.() ?? {};
+      provided =
+        credentials !== undefined
+          ? this.credentialHeaders(credentials)
+          : (cfg.headers?.() ?? {});
     } catch {
       providerFailed();
       return;
@@ -375,10 +400,30 @@ export class ViroReplicationClient {
     else withDevice(provided);
   }
 
+  private async credentialHeaders(
+    source: ViroVPSCredentialsSource
+  ): Promise<Record<string, string>> {
+    const refused = this.refusedToken;
+    this.refusedToken = undefined;
+    const credentials = await readCredentials(source, refused ? { refusedToken: refused } : undefined);
+    const headers: Record<string, string> = { "x-project-id": credentials.projectId };
+    if ("accessToken" in credentials) {
+      this.sentToken = credentials.accessToken;
+      headers.Authorization = `Bearer ${credentials.accessToken}`;
+    } else {
+      this.sentToken = undefined;
+      headers["x-api-key"] = credentials.apiKey;
+    }
+    return headers;
+  }
+
   private attach(ws: WebSocket): void {
     this.ws = ws;
+    let opened = false;
 
     ws.onopen = () => {
+      opened = true;
+      this.renewed = false;
       this.attempt = 0;
       // State becomes synced on the welcome, not here: an open socket without a
       // snapshot has nothing to answer reads with.
@@ -397,9 +442,18 @@ export class ViroReplicationClient {
       this.handle(msg);
     };
 
+    let errorText = "";
     const dropped = (ev?: { code?: number; reason?: string }) => {
       if (this.closedByUs || this.ws !== ws) return;
       this.ws = null;
+
+      // The refusal reaches JS only as the platform's error text, which names
+      // the status; 401 is how the relay refuses an expired or invalid token.
+      const failure = `${errorText} ${ev?.reason ?? ""}`;
+      if (!opened && this.sentToken && !this.renewed && /\b401\b/.test(failure)) {
+        this.renewed = true;
+        this.refusedToken = this.sentToken;
+      }
 
       // Keyed on the reason, not the code: 1008 also carries rate-limited,
       // too-large and slow-consumer, and all three are meant to reconnect.
@@ -411,7 +465,14 @@ export class ViroReplicationClient {
       this.retryOrFail();
     };
     ws.onclose = dropped;
-    ws.onerror = () => dropped();
+    // React Native follows a failed handshake's error with a close. Older
+    // versions put the platform's text on the error as `message`; 0.86 sends a
+    // bare error and puts the text in the close's `reason`. So the close
+    // handles the drop, and the timer covers an error no close follows.
+    ws.onerror = (ev: unknown) => {
+      errorText = (ev as { message?: string } | undefined)?.message ?? "";
+      setTimeout(() => dropped(), 0);
+    };
   }
 
   private retryOrFail(): void {

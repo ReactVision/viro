@@ -21,6 +21,7 @@ import {
   type ViroColocationRoomsConfig,
   type ViroRoomFrame,
 } from "../AR/ViroColocationRooms";
+import { useCredentialsKey } from "./useCredentialsKey";
 
 export type UseViroColocationRoomOptions = ViroColocationRoomsConfig & {
   /**
@@ -65,7 +66,15 @@ export type UseViroColocationRoomResult = {
  * // Everyone else
  * const guest = useViroColocationRoom({ apiKey, projectId, joinCode: typed });
  * // <ViroSharedFrame source={guest.frameSource} ... />
+ *
+ * // An app with its own sign-in: a user token in place of the key.
+ * const credentials = useMemo(
+ *   () => createUserTokenCredentials({ projectId, fetchToken }), [userId]);
+ * const room = useViroColocationRoom({ credentials, joinCode: typed });
  * ```
+ *
+ * A failed request is sent again when `credentials` is another
+ * createUserTokenCredentials() object, or at its clear().
  *
  * One request, before the session starts. The frame acquisition that follows it
  * takes 12 to 30 seconds on phones, so this is not the slow part.
@@ -78,6 +87,7 @@ export function useViroColocationRoom(
     projectId,
     endpoint,
     headers,
+    credentials,
     host,
     joinCode,
     enabled = true,
@@ -100,6 +110,11 @@ export function useViroColocationRoom(
   const headersRef = useRef(headers);
   headersRef.current = headers;
   const hasHeaders = headers !== undefined;
+  // Same for credentials, which a function gives anew for every request anyway.
+  // Their changes only retry a failed request, below.
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+  const [credentialsKey, credentialsCleared] = useCredentialsKey(credentials);
 
   const hostKey = host
     ? [
@@ -129,6 +144,7 @@ export function useViroColocationRoom(
         projectId,
         endpoint,
         headers: headersRef.current,
+        credentials: credentialsRef.current,
       };
       const result = joinCode
         ? await lookupColocationRoom(config, joinCode)
@@ -162,6 +178,13 @@ export function useViroColocationRoom(
     inFlight.current = null;
     setAttempt((n) => n + 1);
   }, []);
+
+  // A room already found or created is kept when the credentials change: it is
+  // the project's, not the user's, and the relay checks whoever joins it.
+  useEffect(() => {
+    if (status === "failed") retry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credentialsKey, credentialsCleared]);
 
   return {
     status,

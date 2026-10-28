@@ -30,6 +30,9 @@ export function roomErrorCode(
       return "ROOM_NOT_FOUND";
     case "MISSING_API_KEY":
       return "NOT_AUTHORIZED";
+    // Reading `credentials` failed: often the app's backend or the network.
+    case "CREDENTIALS_UNAVAILABLE":
+      return "UNAVAILABLE";
     case "SCENE_BOUND_TO_VPS":
       return "SCENE_BOUND_TO_VPS";
   }
@@ -141,6 +144,16 @@ export const SCENE_BOUND_TO_VPS_FAILURE: StudioColocationFailure = {
   code: "SCENE_BOUND_TO_VPS",
   message:
     "This scene is placed in an Advanced VPS location, so it cannot be shared through a co-location room.",
+};
+
+/**
+ * A running session's `credentials` became another
+ * createUserTokenCredentials() object, or stopped or started being one, or
+ * the one it uses was cleared.
+ */
+export const CREDENTIALS_CHANGED_FAILURE: StudioColocationFailure = {
+  code: "NOT_AUTHORIZED",
+  message: "The co-location credentials changed during the shared session.",
 };
 
 /** The relay refused the host's scene origin write. */

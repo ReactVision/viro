@@ -96,6 +96,19 @@ Cloud Anchors, Geospatial Anchors, co-location, Advanced VPS and AI-powered 3D a
 
 You can get a Studio account, which includes Platform access, for free at <https://studio.reactvision.xyz>.
 
+Co-location and VPS can also run on a user token instead of `rvApiKey`, for an app with its own sign-in. Its backend mints a short-lived token for the signed-in user with a secret key (`POST /functions/v1/app-user-tokens`), and the app passes viro a function that fetches it. viro renews the token before it expires:
+
+```tsx
+import { createUserTokenCredentials, useViroColocation } from "@reactvision/react-viro";
+
+// fetchToken calls your backend and returns what app-user-tokens answered.
+const credentials = useMemo(() => createUserTokenCredentials({ projectId: PROJECT_ID, fetchToken }), [userId]);
+
+useViroColocation({ roomId, credentials }); // also useViroColocationRoom, useViroReplicatedState
+<StudioSceneNavigator sceneId={sceneId} colocation={{ mode: "join", code, credentials }} />
+<ViroVPS arSceneNavigator={nav} credentials={credentials} />
+```
+
 - Cloud Anchors guide: <https://viro-community.readme.io/docs/cloud-anchors>
 - Geospatial Anchors guide: <https://viro-community.readme.io/docs/geospatial>
 

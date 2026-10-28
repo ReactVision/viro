@@ -93,13 +93,16 @@ export type ViroWorldMeshConfig = {
 
   /**
    * Voxel edge for the fused volume, in meters. Smaller keeps more detail and costs more memory.
+   * Changing it once a room has been fused starts a new room at the new size. 0 keeps the current
+   * value.
    * @default 0.04
    */
   voxelSize?: number;
 
   /**
    * Budget for the fused volume. Blocks past it are dropped least-recently-seen first, so walking
-   * away from part of a room eventually forgets it rather than growing without bound.
+   * away from part of a room eventually forgets it rather than growing without bound. Changing it
+   * once a room has been fused starts a new room. 0 keeps the current value.
    * @default 64
    */
   maxMemoryMB?: number;

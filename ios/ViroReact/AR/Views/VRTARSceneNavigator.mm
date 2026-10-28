@@ -2473,14 +2473,16 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
             _worldMeshConfigCpp.debugDrawEnabled = [worldMeshConfig[@"debugDrawEnabled"] boolValue];
         }
         // Fusion across frames. Only the depth-image and monocular paths use these; on a LiDAR
-        // device ARKit owns the accumulation and they are ignored.
+        // device ARKit owns the accumulation and they are ignored. A voxel size or budget of 0
+        // keeps the current value, as on Android — a 0 MB budget used to reach the volume as 1 MB
+        // here and start evicting the room almost at once.
         if (worldMeshConfig[@"accumulate"]) {
             _worldMeshConfigCpp.accumulate = [worldMeshConfig[@"accumulate"] boolValue];
         }
-        if (worldMeshConfig[@"voxelSize"]) {
+        if (worldMeshConfig[@"voxelSize"] && [worldMeshConfig[@"voxelSize"] floatValue] > 0) {
             _worldMeshConfigCpp.voxelSize = [worldMeshConfig[@"voxelSize"] floatValue];
         }
-        if (worldMeshConfig[@"maxMemoryMB"]) {
+        if (worldMeshConfig[@"maxMemoryMB"] && [worldMeshConfig[@"maxMemoryMB"] intValue] > 0) {
             _worldMeshConfigCpp.maxMemoryMB = [worldMeshConfig[@"maxMemoryMB"] intValue];
         }
     }

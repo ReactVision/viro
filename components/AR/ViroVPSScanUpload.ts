@@ -40,8 +40,8 @@ export type ViroVPSScanOutput = "mesh" | "splat" | "semantic";
 
 /**
  * How detailed the mesh is. `low` is the quickest and builds no HD mesh;
- * `high` uses full-resolution depth and twice the triangles and texture, and
- * takes about three times as long to process.
+ * `high` uses full-resolution depth, a denser HD mesh and twice the texture
+ * resolution, and takes about 1.75 times as long to process.
  */
 export type ViroVPSMeshQuality = "low" | "medium" | "high";
 

@@ -367,10 +367,13 @@ export const StudioARScene: React.FC<StudioARSceneProps> = (props) => {
     props.sceneData ??
     (isQuest && load.status === "ready" ? load.sceneData : null);
   if (!sceneData) {
-    // Quest keeps its own root here for the reason spelled out at the main
-    // return below.
-    return isQuest ? (
-      <StudioQuestLoadScene failed={load.status === "failed"} />
+    // Quest and visionOS keep their own root here for the reason spelled out at
+    // the main return below.
+    if (isQuest) {
+      return <StudioQuestLoadScene failed={load.status === "failed"} />;
+    }
+    return isVisionOS ? (
+      <ViroScene toneMappingEnabled={false} />
     ) : (
       <ViroARScene toneMappingEnabled={false} />
     );
@@ -1846,12 +1849,21 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // ViroARPlane and ViroARPlaneSelector need an AR root: under the ViroScene
   // root Quest uses outside a shared session, the Android bridge casts the
   // plane's scene to VRTARScene and the app crashes as the plane mounts.
-  const rootsInAR = studioSceneRootsInAR(
-    colocationFrame,
-    sceneMount,
-    isQuest,
-    questSpatialData === true
-  );
+  //
+  // visionOS roots every scene in ViroScene, in a shared session too: its
+  // ImmersiveSpace cannot host a ViroARScene, which renders null there, so the
+  // scene would be blank. Quest's session exception exists because the Quest
+  // navigator sends shared-frame calls to its first ViroARScene child, which
+  // visionOS does not, so it does not apply. StudioSceneNavigator already pairs
+  // the two platforms (isQuest || isVisionOS) for the same reason.
+  const rootsInAR =
+    !isVisionOS &&
+    studioSceneRootsInAR(
+      colocationFrame,
+      sceneMount,
+      isQuest,
+      questSpatialData === true
+    );
 
   // A room without Space Setup has no planes, so on Quest assets still waiting
   // for one are placed as a NONE scene's are after QUEST_PLANE_WAIT_MS. Kept

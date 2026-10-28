@@ -1172,6 +1172,28 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
+   * Clears the world mesh, so the next scan starts from an empty room rather than carrying the
+   * last one into it.
+   *
+   * On the accumulating sources — `"depth"` and `"monocular"` — this empties the fused room. On a
+   * LiDAR device ARKit owns the accumulation: the mesh is cleared until ARKit's next mesh-anchor
+   * update brings it back, so a snapshot taken in between finds no mesh.
+   *
+   * Resolves false if the navigator is not mounted, or on a build whose native code predates this
+   * method. True means the request reached a mounted navigator, not that a mesh existed to clear:
+   * read `getWorldMeshStats()` for that.
+   */
+  _resetWorldMesh = async (): Promise<boolean> => {
+    try {
+      return Boolean(
+        await ViroARSceneNavigatorModule.rvResetWorldMesh(findNodeHandle(this))
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  /**
    * Whether a world mesh exists and how big it is.
    *
    * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
@@ -1941,6 +1963,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     captureVPSQueryFrame: this._captureVPSQueryFrame,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
+    resetWorldMesh: this._resetWorldMesh,
     getScanDiagnostics: this._getScanDiagnostics,
     uploadScanRecording: this._uploadScanRecording,
     rvCreateSharedFrame: this._rvCreateSharedFrame,
@@ -2025,6 +2048,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     captureVPSQueryFrame: this._captureVPSQueryFrame,
     getVPSLocalization: this._getVPSLocalization,
     getWorldMeshStats: this._getWorldMeshStats,
+    resetWorldMesh: this._resetWorldMesh,
     getScanDiagnostics: this._getScanDiagnostics,
     uploadScanRecording: this._uploadScanRecording,
     rvCreateSharedFrame: this._rvCreateSharedFrame,

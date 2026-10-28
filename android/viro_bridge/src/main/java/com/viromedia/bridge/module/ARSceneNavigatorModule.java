@@ -1638,6 +1638,31 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         rvResolveScanJson(sceneNavTag, true, promise);
     }
 
+    /**
+     * Clears the world mesh. Resolves true once the request reaches a mounted navigator, false
+     * otherwise; whether a mesh existed to clear is what rvGetWorldMeshStats says.
+     */
+    @ReactMethod
+    public void rvResetWorldMesh(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(false); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(false);
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvResetWorldMesh();
+                    promise.resolve(true);
+                } catch (Exception e) {
+                    promise.resolve(false);
+                }
+            }
+        });
+    }
+
     /** Whether a world mesh exists and how big it is. Poll it: the update event never fires. */
     @ReactMethod
     public void rvGetWorldMeshStats(final int sceneNavTag, final Promise promise) {

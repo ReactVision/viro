@@ -272,10 +272,16 @@ public:
      * Atomically snapshot the depth and confidence buffers for offline processing
      * (e.g. world-mesh generation). Thread-safe — takes a copy under the depth mutex.
      * Returns false if no data is available.
+     *
+     * outCameraToWorld, when given, receives the camera pose of the frame these buffers were
+     * inferred from. Inference runs a few times a second, so by the time a caller reads the
+     * buffers the camera has moved on: placing them with the current frame's pose puts the
+     * surface in the wrong place, and the world mesh fuses that error into the room.
      */
     bool snapshotDepthBuffers(std::vector<float> &outDepth,
                               std::vector<float> &outConfidence,
-                              int &outWidth, int &outHeight) const;
+                              int &outWidth, int &outHeight,
+                              VROMatrix4f *outCameraToWorld = nullptr) const;
 
     /**
      * Sample the synthesized per-pixel confidence at depth-texture UV coordinates.
@@ -317,6 +323,11 @@ private:
     CVPixelBufferRef _processingImage;
     CVPixelBufferRef _nextImage;
     VROMatrix4f _nextTransform;
+    VROMatrix4f _nextCameraToWorld;
+    // The frame being inferred. Its own copies, because _next* belong to whatever frame is queued
+    // behind it by the time the result comes back.
+    VROMatrix4f _processingTransform;
+    VROMatrix4f _processingCameraToWorld;
     CGImagePropertyOrientation _nextOrientation;
     std::atomic<bool> _isProcessing;
 
@@ -325,6 +336,11 @@ private:
     std::vector<float> _depthBuffer;
     std::vector<float> _previousDepthBuffer;
     std::vector<float> _confidenceBuffer;  // per-pixel synthesized confidence [0,1]
+    // Filled on the depth queue only, then published to the two above under _depthMutex, so a
+    // reader never sees half of one inference and half of the next.
+    std::vector<float> _workDepth;
+    std::vector<float> _workConfidence;
+    VROMatrix4f _depthCameraToWorld;       // pose of the frame _depthBuffer was inferred from
     int _depthWidth;
     int _depthHeight;
     VROMatrix4f _depthTextureTransform;

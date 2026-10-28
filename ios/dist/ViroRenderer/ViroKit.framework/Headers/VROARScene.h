@@ -170,6 +170,9 @@ public:
     void setWorldMeshEnabled(bool enabled);
     bool isWorldMeshEnabled() const;
     void setWorldMeshConfig(const VROWorldMeshConfig& config);
+
+    /* The config in force, so a caller can change one field without restating the rest. */
+    const VROWorldMeshConfig &getWorldMeshConfig() const { return _worldMeshConfig; }
     VROWorldMeshStats getWorldMeshStats() const;
     std::shared_ptr<VROARWorldMesh> getWorldMesh() const { return _worldMesh; }
 

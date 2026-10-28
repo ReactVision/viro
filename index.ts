@@ -225,6 +225,13 @@ export type {
 } from "./components/AR/ViroFrameSource";
 export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
 export type {
+  ViroWorldMeshConfig,
+  ViroWorldMeshSource,
+  ViroWorldMeshStats,
+  ViroWorldMeshStatsResult,
+  ViroWorldMeshUpdatedEvent,
+} from "./components/Types/ViroWorldMesh";
+export type {
   ViroSmoothingOptions,
   ViroEntitySmoothingOptions,
   ViroSmoothedFields,

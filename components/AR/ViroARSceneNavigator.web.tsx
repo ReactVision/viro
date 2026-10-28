@@ -60,6 +60,7 @@ type ArOptions = Partial<
     | "detectPlanes"
     | "maxPlanes"
     | "renderWhileLimited"
+    | "hideContentWhenLost"
     | "playback"
   >
 >;

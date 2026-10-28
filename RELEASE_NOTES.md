@@ -31,6 +31,10 @@
 
 - **Web AR content stays in the room on iPhone,** and hides while tracking is lost (`hideContentWhenLost` turns that off). From viro-web-renderer 1.1.0.
 
+### visionOS
+
+- **Studio scenes render in the ImmersiveSpace.** They rooted in `ViroARScene`, which renders nothing on visionOS, so a Studio scene was blank. They now root in `ViroScene`, as on Meta Quest, in shared sessions too.
+
 ### Everywhere
 
 - **Every scene navigator sends one usage ping when it mounts,** replacing the device registration ReactVisionCCA used to do. It carries no API key. Turn it off with `ViroTelemetry.setEnabled(false)` or the Expo plugin's `telemetry: false`. The iOS privacy manifest now ships with the pod.

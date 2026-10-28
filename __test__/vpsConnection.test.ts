@@ -120,6 +120,25 @@ describe("vpsStudioFetch", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("reads the gateway's own answer, such as a function that is not deployed", async () => {
+    const studio = await resolveVPSStudio();
+    fetchSpy
+      .mockResolvedValueOnce(
+        answer(404, { code: "NOT_FOUND", message: "Requested function was not found" })
+      )
+      .mockResolvedValueOnce(answer(401, { code: 401, message: "Invalid JWT" }));
+    await expect(vpsStudioFetch(studio, "/vps/server", {}, vpsJson)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+      message: "Requested function was not found",
+    });
+    await expect(vpsStudioFetch(studio, "/vps/server", {}, vpsJson)).rejects.toMatchObject({
+      code: undefined,
+      status: 401,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("resends after a network error only when the region also fails a probe", async () => {
     const studio = await resolveVPSStudio();
     fetchSpy

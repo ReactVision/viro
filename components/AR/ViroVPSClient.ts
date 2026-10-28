@@ -270,8 +270,12 @@ export function vpsErrorFromBody(
   if (bodyText) {
     try {
       const body = JSON.parse(bodyText);
-      code = body?.error?.code;
-      message = body?.error?.message ?? message;
+      // The platform's gateway answers some requests itself with a top-level
+      // {code, message}, such as NOT_FOUND for a function that is not deployed.
+      // Its JWT refusal carries a numeric code, which is not one of ours.
+      code = body?.error?.code ?? (typeof body?.code === "string" ? body.code : undefined);
+      message =
+        body?.error?.message ?? (typeof body?.message === "string" ? body.message : message);
     } catch {
       // Non-JSON error body: keep the generic HTTP message.
     }

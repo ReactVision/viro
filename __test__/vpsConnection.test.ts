@@ -253,6 +253,21 @@ describe("a refused user token", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
+  it("stays refused when the credentials fail to give another", async () => {
+    const credentials = jest
+      .fn()
+      .mockResolvedValueOnce({ projectId: "p", accessToken: "t1" })
+      .mockRejectedValueOnce(new Error("token backend down"));
+    const studio = await resolveVPSStudio({ endpoint: STUDIO, credentials });
+    fetchSpy.mockResolvedValueOnce(refused());
+    await expect(vpsStudioFetch(studio, "/vps/server", {}, vpsJson)).rejects.toMatchObject({
+      code: "APP_USER_TOKEN_EXPIRED",
+      status: 401,
+    });
+    expect(credentials).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("is renewed on the VPS server too", async () => {
     fetchSpy.mockResolvedValueOnce(refused()).mockResolvedValueOnce(answer(200, { candidates: [] }));
     await expect(

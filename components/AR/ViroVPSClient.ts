@@ -333,7 +333,9 @@ async function withTokenRenewal<T>(
     if (!(e instanceof ViroVPSError) || e.status !== 401 || !USER_TOKEN_REFUSALS.has(e.code ?? "")) {
       throw e;
     }
-    const renewed = await target.renewToken(headers);
+    // Credentials that fail to give another token leave the refusal standing,
+    // as the room helpers do, so server mode ends on it instead of retrying.
+    const renewed = await target.renewToken(headers).catch(() => null);
     if (!renewed) throw e;
     target.headers = renewed;
     return send(renewed);

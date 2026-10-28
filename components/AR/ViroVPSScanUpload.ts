@@ -39,6 +39,13 @@ export type ViroVPSScanTarget =
 export type ViroVPSScanOutput = "mesh" | "splat" | "semantic";
 
 /**
+ * How detailed the mesh is. `low` is the quickest and builds no HD mesh;
+ * `high` uses full-resolution depth and twice the triangles and texture, and
+ * takes about three times as long to process.
+ */
+export type ViroVPSMeshQuality = "low" | "medium" | "high";
+
+/**
  * Where the upload goes and as whom (see `ViroVPSConnection`; `appUserId`
  * makes the scan, and a location it creates, that user's), plus how the scan
  * is built.
@@ -49,6 +56,8 @@ export type ViroVPSScanUploadOptions = ViroVPSConnection & {
    * scan builds its default, the map and the mesh.
    */
   outputs?: ViroVPSScanOutput[];
+  /** The mesh's quality. Left out, the scan builds `medium`. */
+  meshQuality?: ViroVPSMeshQuality;
   /**
    * Whether Studio keeps the recording once the scan is processed. Default
    * true. With false it is stored only while it is processed, and deleted
@@ -59,8 +68,8 @@ export type ViroVPSScanUploadOptions = ViroVPSConnection & {
   /**
    * Upload into this scan, which must still be in `awaiting_upload`, instead
    * of creating one: the `scanId` of the ViroVPSError an earlier attempt
-   * threw. The scan keeps the location, `outputs` and `keepRecording` it was
-   * created with, so `target`, `outputs` and `keepRecording` are not used.
+   * threw. The scan keeps the location, `outputs`, `meshQuality` and
+   * `keepRecording` it was created with, so those and `target` are not used.
    */
   scanId?: string;
 };
@@ -133,12 +142,13 @@ function scanUploadModule(): NativeScanUpload | null {
 }
 
 const SCAN_OUTPUTS: readonly ViroVPSScanOutput[] = ["mesh", "splat", "semantic"];
+const MESH_QUALITIES: readonly ViroVPSMeshQuality[] = ["low", "medium", "high"];
 
 /** Studio's answers to the complete call that mean the stored recording will not be processed. */
 const RECORDING_REFUSALS = new Set(["RECORDING_NOT_UPLOADED", "RECORDING_SIZE_MISMATCH"]);
 
 /** Studio's checks on the same fields, and scanId's type, so a mistake costs no zip. */
-function checkUploadOptions({ outputs, keepRecording, scanId }: ViroVPSScanUploadOptions) {
+function checkUploadOptions({ outputs, meshQuality, keepRecording, scanId }: ViroVPSScanUploadOptions) {
   if (scanId !== undefined && typeof scanId !== "string") {
     throw new ViroVPSError("scanId is a string", "BAD_REQUEST");
   }
@@ -149,6 +159,9 @@ function checkUploadOptions({ outputs, keepRecording, scanId }: ViroVPSScanUploa
     if (outputs.includes("semantic") && !outputs.includes("mesh")) {
       throw new ViroVPSError("semantic needs mesh", "BAD_REQUEST");
     }
+  }
+  if (meshQuality !== undefined && !MESH_QUALITIES.includes(meshQuality)) {
+    throw new ViroVPSError(`meshQuality is one of ${MESH_QUALITIES.join(", ")}`, "BAD_REQUEST");
   }
   if (keepRecording !== undefined && typeof keepRecording !== "boolean") {
     throw new ViroVPSError("keepRecording is a boolean", "BAD_REQUEST");
@@ -238,6 +251,7 @@ export async function uploadScanRecording(
       const body: Record<string, unknown> =
         "locationId" in target ? { location_id: target.locationId } : { location: target.location };
       if (options.outputs !== undefined) body.outputs = options.outputs;
+      if (options.meshQuality !== undefined) body.mesh_quality = options.meshQuality;
       if (options.keepRecording !== undefined) body.keep_recording = options.keepRecording;
       const created = (await vpsStudioFetch(
         studio,

@@ -275,13 +275,14 @@ describe("uploadScanRecording", () => {
     }
   });
 
-  it("sends appUserId as x-app-user-id, and outputs and keep_recording in the create body", async () => {
+  it("sends appUserId as x-app-user-id, and outputs, mesh_quality and keep_recording in the create body", async () => {
     const credentials = jest.fn(async () => ({ projectId: "p", accessToken: "fresh" }));
     await uploadScanRecording({ locationId: "l1" }, "/data/rec", {
       endpoint: "https://studio.test",
       credentials,
       appUserId: "user-1",
       outputs: ["mesh", "semantic"],
+      meshQuality: "high",
       keepRecording: false,
     });
     expect(credentials).toHaveBeenCalledTimes(1);
@@ -290,6 +291,7 @@ describe("uploadScanRecording", () => {
     expect(requests()[0].body).toEqual({
       location_id: "l1",
       outputs: ["mesh", "semantic"],
+      mesh_quality: "high",
       keep_recording: false,
     });
     expect(transferRequest().complete_headers).toEqual({ ...auth, "content-type": "application/json" });
@@ -312,6 +314,10 @@ describe("uploadScanRecording", () => {
         message: "outputs is a list of mesh, splat, semantic",
       });
     }
+    expect(await upload({ meshQuality: "ultra" })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "meshQuality is one of low, medium, high",
+    });
     expect(await upload({ keepRecording: "false" })).toMatchObject({
       code: "BAD_REQUEST",
       message: "keepRecording is a boolean",

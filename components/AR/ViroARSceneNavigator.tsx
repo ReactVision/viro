@@ -1172,20 +1172,16 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   };
 
   /**
-   * Whether a world mesh exists and how big it is.
+   * Clears the world mesh, so the next scan starts from an empty room rather than carrying the
+   * last one into it.
    *
-   * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
-   * {@link ViroWorldMeshStatsResult}. `snapshotWorldMeshToFile()` needs a non-zero `vertexCount`,
-   * the mesh takes a few seconds of looking around to accumulate after `worldMeshEnabled` goes
-   * true, so this is how a caller knows when the snapshot is worth attempting.
-   */
-  /**
-   * Clears the fused world mesh, so the next scan starts from an empty room rather than carrying
-   * the last one into it.
+   * On the accumulating sources — `"depth"` and `"monocular"` — this empties the fused room. On a
+   * LiDAR device ARKit owns the accumulation: the mesh is cleared until ARKit's next mesh-anchor
+   * update brings it back, so a snapshot taken in between finds no mesh.
    *
-   * Only the accumulating sources are affected — `"depth"` and `"monocular"`. On a LiDAR device
-   * ARKit owns the accumulation and this does nothing. Resolves false if the navigator is not
-   * mounted.
+   * Resolves false if the navigator is not mounted, or on a build whose native code predates this
+   * method. True means the request reached a mounted navigator, not that a mesh existed to clear:
+   * read `getWorldMeshStats()` for that.
    */
   _resetWorldMesh = async (): Promise<boolean> => {
     try {
@@ -1197,6 +1193,14 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     }
   };
 
+  /**
+   * Whether a world mesh exists and how big it is.
+   *
+   * Poll this rather than relying on the `onWorldMeshUpdated` prop, which never fires — see
+   * {@link ViroWorldMeshStatsResult}. `snapshotWorldMeshToFile()` needs a non-zero `vertexCount`,
+   * the mesh takes a few seconds of looking around to accumulate after `worldMeshEnabled` goes
+   * true, so this is how a caller knows when the snapshot is worth attempting.
+   */
   _getWorldMeshStats = async (): Promise<ViroWorldMeshStatsResult> => {
     try {
       return parseWorldMeshStats(

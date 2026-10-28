@@ -1638,7 +1638,10 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         rvResolveScanJson(sceneNavTag, true, promise);
     }
 
-    /** Whether a world mesh exists and how big it is. Poll it: the update event never fires. */
+    /**
+     * Clears the world mesh. Resolves true once the request reaches a mounted navigator, false
+     * otherwise; whether a mesh existed to clear is what rvGetWorldMeshStats says.
+     */
     @ReactMethod
     public void rvResetWorldMesh(final int sceneNavTag, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
@@ -1660,6 +1663,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /** Whether a world mesh exists and how big it is. Poll it: the update event never fires. */
     @ReactMethod
     public void rvGetWorldMeshStats(final int sceneNavTag, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);

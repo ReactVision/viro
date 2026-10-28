@@ -603,7 +603,7 @@ describe("the scene root", () => {
     expect(rootsInAR(h, [h.controller.claimSceneMount()])).toEqual([true]);
   });
 
-  it("is what StudioARScene decides its Quest root by", () => {
+  it("is what StudioARScene decides its Quest and visionOS root by", () => {
     const source = fs.readFileSync(
       path.resolve(
         __dirname,
@@ -619,10 +619,15 @@ describe("the scene root", () => {
     );
     expect(source).toMatch(/colocation\.attachScene\([^;]*sceneMount\s*\);/);
     expect(source).toMatch(
-      /const rootsInAR = studioSceneRootsInAR\(\s*colocationFrame,\s*sceneMount,\s*isQuest,\s*questSpatialData === true\s*\);/
+      /const rootsInAR =\s*!isVisionOS &&\s*studioSceneRootsInAR\(\s*colocationFrame,\s*sceneMount,\s*isQuest,\s*questSpatialData === true\s*\);/
     );
     expect(source).toMatch(/if \(!rootsInAR\) \{\s*return \(\s*<ViroScene/);
     expect(source).not.toMatch(/if \(isQuest\) \{\s*return \(\s*<ViroScene/);
+    // ViroARScene renders null on visionOS, so a scene still loading must not
+    // root in one there either.
+    expect(source).toMatch(
+      /return isVisionOS \? \(\s*<ViroScene toneMappingEnabled=\{false\} \/>\s*\) : \(\s*<ViroARScene/
+    );
   });
 
   it("keeps plane components out of a ViroScene root", () => {

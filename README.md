@@ -68,6 +68,8 @@ ViroReact ships with a complete spatial computing toolkit out of the box — no 
 - Geospatial Anchors that pin content to real-world latitude, longitude, and altitude _(Platform feature)_
 - Co-location: two devices in the same room agreeing on where the scene is, with replicated state on top _(Platform feature)_
 - VPS: scan a whole room to define its own persistent coordinate frame, then localise back into it later or from another device, with an optional world mesh for occlusion and physics _(Platform feature)_
+- Advanced VPS: continuous localisation against a place's map that improves with every scan, matched on the device or on ReactVision's servers _(Platform feature)_
+- World mesh and depth: a mesh of the real surroundings from LiDAR, ARCore depth or monocular depth, fused across frames, for occlusion and physics
 
 **Rendering**
 
@@ -90,7 +92,7 @@ ViroReact ships with a complete spatial computing toolkit out of the box — no 
 
 ## Platform Features
 
-Cloud Anchors, Geospatial Anchors, and AI-powered 3D asset creation are powered by **ReactVision Platform** — managed cloud infrastructure built directly into ViroReact. Add your `rvApiKey` and `rvProjectId` and the platform handles hosting, resolution, and geospatial infrastructure for you.
+Cloud Anchors, Geospatial Anchors, co-location, Advanced VPS and AI-powered 3D asset creation are powered by **ReactVision Platform** — managed cloud infrastructure built directly into ViroReact. Add your `rvApiKey` and `rvProjectId` and the platform handles hosting, resolution, the co-location relay and geospatial infrastructure for you. Co-location and Advanced VPS server mode need a paid plan.
 
 You can get a Studio account, which includes Platform access, for free at <https://studio.reactvision.xyz>.
 

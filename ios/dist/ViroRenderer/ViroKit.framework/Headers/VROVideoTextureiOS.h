@@ -31,6 +31,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreVideo/CVMetalTextureCache.h>
 #import <memory>
+#import <atomic>
 
 @class VROVideoCaptureDelegate;
 @class VROAVPlayerDelegate;
@@ -140,7 +141,7 @@ private:
      AVPlayer for recorded video playback.
      */
     AVPlayer *_player;
-    bool _paused;
+    std::atomic<bool> _paused;
     bool _loop;
     bool _isCMSampleBuffered;
     VROAVPlayerDelegate *_avPlayerDelegate;

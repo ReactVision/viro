@@ -130,7 +130,7 @@ export type ViroMaterial = {
   lightingModel?: "Phong" | "Blinn" | "Lambert" | "Constant" | "PBR";
   writesToDepthBuffer?: boolean;
   readsFromDepthBuffer?: boolean;
-  colorWritesMask?: "None" | "Red" | "Green" | "Blue" | "Alpha" | "All";
+  colorWriteMask?: ("None" | "Red" | "Green" | "Blue" | "Alpha" | "All")[];
   cullMode?: "None" | "Back" | "Front";
   blendMode?: "None" | "Alpha" | "Add" | "Subtract" | "Multiply" | "Screen";
   /** Material transparency, 0 to 1. Multiplied with the node's opacity and with

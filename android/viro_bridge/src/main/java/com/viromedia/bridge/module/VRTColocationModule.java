@@ -87,6 +87,16 @@ public class VRTColocationModule extends ReactContextBaseJavaModule {
         promise.resolve(r);
     }
 
+    /** The x-rv-device the native socket sends. */
+    @ReactMethod
+    public void getDeviceId(Promise promise) {
+        try {
+            promise.resolve(ColocationSession.getInstance().getDeviceId());
+        } catch (Throwable t) {
+            promise.resolve(null);
+        }
+    }
+
     @ReactMethod
     public void getPeers(Promise promise) {
         WritableArray out = Arguments.createArray();

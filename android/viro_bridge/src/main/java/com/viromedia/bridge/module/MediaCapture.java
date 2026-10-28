@@ -439,7 +439,12 @@ final class MediaCapture {
      * immediately when nothing needs to be requested.
      */
     private void checkPermissionsAndRun(PermissionListener listener, boolean audioAndRecordingPerm) {
-        Activity activity = mContext.getCurrentActivity();
+        // A prompt asked through the 2D panel closes the headset view, see
+        // VRLauncherModule.requestPermissions.
+        List<Activity> vrActivities = VRLauncherModule.liveVRActivities();
+        Activity activity = vrActivities.isEmpty()
+                ? mContext.getCurrentActivity()
+                : vrActivities.get(0);
 
         List<String> needed = new ArrayList<>();
         if (audioAndRecordingPerm && !hasPermission(mContext, Manifest.permission.RECORD_AUDIO)) {

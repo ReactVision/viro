@@ -1,2 +1,6 @@
 configurations.maybeCreate("default")
 artifacts.add("default", file('react_viro-release.aar'))
+
+// A local AAR brings none of its dependencies, so an app gets the bridge's from here.
+// Keep in step with viro_bridge/build.gradle.
+dependencies.add("default", "androidx.work:work-runtime:2.9.1")

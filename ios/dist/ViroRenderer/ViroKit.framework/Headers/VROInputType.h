@@ -59,7 +59,7 @@ namespace ViroOculus{
     enum InputSource{
         Controller      = 1,  // right controller primary ray (legacy alias for RightController)
         TouchPad        = 2,
-        BackButton      = 3,  // menu (left) and B (right) buttons, left-palm menu pinch (hands) — navigation / back
+        BackButton      = 3,  // B (right) button: navigation / back
         LeftController  = 4,  // left controller primary ray
         AButton         = 5,  // right-hand A button
         XButton         = 6,  // left-hand X button
@@ -69,6 +69,7 @@ namespace ViroOculus{
         LeftThumbstick  = 10, // left thumbstick scroll axis
         RightThumbstick = 11, // right thumbstick scroll axis
         EyeGaze         = 12, // eye-gaze ray (XR_EXT_eye_gaze_interaction; Quest Pro only)
+        MenuButton      = 13, // left Menu button, or the non-dominant hand's palm-up pinch: the app's own menu
     };
 }
 

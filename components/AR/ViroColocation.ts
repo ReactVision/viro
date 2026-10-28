@@ -150,6 +150,34 @@ export async function getColocationState(): Promise<{
   };
 }
 
+/**
+ * The device id the native channel sends as x-rv-device, for the replication
+ * socket to send too: the relay bills a device once while either socket is
+ * open. Null without a native channel (web).
+ */
+export async function getColocationDeviceId(): Promise<string | null> {
+  if (!VRTColocationModule?.getDeviceId) return null;
+  try {
+    const id = await VRTColocationModule.getDeviceId();
+    return typeof id === "string" && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+let knownDeviceId: string | null | undefined;
+
+/**
+ * getColocationDeviceId for a socket about to open: synchronous once the id is
+ * known, and when there is no native module to ask, so a client that never
+ * had one connects exactly as it did before.
+ */
+export function colocationDeviceIdNow(): string | null | Promise<string | null> {
+  if (knownDeviceId !== undefined) return knownDeviceId;
+  if (!VRTColocationModule?.getDeviceId) return (knownDeviceId = null);
+  return getColocationDeviceId().then((id) => (knownDeviceId = id));
+}
+
 /** Peers currently in the room, excluding this device. */
 export async function getColocationPeers(): Promise<ViroColocationPeer[]> {
   if (!VRTColocationModule?.getPeers) return [];

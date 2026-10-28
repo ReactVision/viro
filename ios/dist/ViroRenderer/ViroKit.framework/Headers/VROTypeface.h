@@ -128,6 +128,12 @@ public:
      Get the line height of this typeface.
      */
     virtual float getLineHeight() const = 0;
+
+    /*
+     Get how far this typeface's lines reach below the baseline, as a positive
+     distance.
+     */
+    virtual float getDescender() const = 0;
     
 protected:
     

@@ -50,6 +50,7 @@ import com.viro.core.Material;
 import com.viro.core.Node;
 import com.viro.core.VideoTexture;
 import com.viro.core.ViroContext;
+import com.viro.core.ViroViewOpenXR;
 import com.viro.core.internal.ExecutableAnimation;
 import com.viro.core.PhysicsBody;
 import com.viro.core.PhysicsShape;
@@ -57,6 +58,7 @@ import com.viro.core.PhysicsShapeAutoCompound;
 import com.viro.core.PhysicsShapeBox;
 import com.viro.core.PhysicsShapeSphere;
 import com.viro.core.Vector;
+import com.viromedia.bridge.component.VRT3DSceneNavigator;
 import com.viromedia.bridge.component.VRTAnimatedComponent;
 import com.viromedia.bridge.component.VRTComponent;
 import com.viromedia.bridge.component.VRTLight;
@@ -164,7 +166,7 @@ public class VRTNode extends VRTComponent {
          * we try again later.
          *
          * @param position The position at which to anchor the node.
-         * @return True if anchoring succeeded.
+         * @return True if anchoring succeeded, or the scene cannot anchor and no retry is needed.
          */
         private boolean anchorNode(final VRTNode node, final Vector position) {
             if (DEBUG_ANCHORING) {
@@ -198,6 +200,15 @@ public class VRTNode extends VRTComponent {
                     Log.i(TAG, "   Delaying anchoring: ViroContext is null");
                 }
                 return false;
+            }
+            // Only ARCore makes world anchors. createAnchoredNode always returns null for
+            // a scene in an OpenXR view, so the node keeps its plain position, which the
+            // headset's own tracking holds steady.
+            final ViewParent navigator = ((VRTARScene) parent).getParent();
+            if (navigator instanceof VRT3DSceneNavigator
+                    && ((VRT3DSceneNavigator) navigator).getViroView() instanceof ViroViewOpenXR) {
+                node.mNodeJni.setPosition(position);
+                return true;
             }
 
             node.mAnchor = scene.createAnchoredNode(position);

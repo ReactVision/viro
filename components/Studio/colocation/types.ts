@@ -26,6 +26,10 @@ export type StudioColocationOptions =
 
 export type StudioColocationErrorCode =
   | "PAID_PLAN_REQUIRED"
+  /** The team's monthly compute spend, which co-location is billed from, is at its limit. */
+  | "COMPUTE_SPEND_LIMIT_REACHED"
+  /** The team has no card for compute time, or a compute invoice is unpaid. */
+  | "COMPUTE_BILLING_REFUSED"
   | "ROOM_NOT_FOUND"
   | "ROOM_FULL"
   | "RELAY_AT_CAPACITY"
@@ -34,6 +38,8 @@ export type StudioColocationErrorCode =
   | "HOST_FAILED"
   | "NOT_AUTHORIZED"
   | "SCENE_TOO_LARGE"
+  /** The scene is placed in an Advanced VPS map, which a co-location frame does not share. */
+  | "SCENE_BOUND_TO_VPS"
   | "UNAVAILABLE"
   /** The channel or the shared state did not connect within `connectTimeoutMs`. */
   | "CONNECT_TIMEOUT"

@@ -311,6 +311,16 @@ public:
      */
     static std::shared_ptr<VROGeometry> buildOcclusionGeometry(std::shared_ptr<VROARDepthMesh> mesh);
 
+    /**
+     * Vertex-clustering simplification. Groups all vertices within cellSize metres
+     * into a single representative, rebuilds triangles, drops degenerate ones.
+     * Produces a gap-free mesh: max gap = sqrt(3)*cellSize.
+     * 0.10m cells → catches objects wider than ~8cm reliably.
+     * Public for the VPS map mesh (VROARScene::setVPSMapMesh()).
+     */
+    static std::shared_ptr<VROARDepthMesh> clusterMesh(
+        std::shared_ptr<VROARDepthMesh> mesh, float cellSize);
+
 private:
     std::weak_ptr<VROPhysicsWorld> _physicsWorld;
 
@@ -386,14 +396,6 @@ private:
     static std::shared_ptr<VROARDepthMesh> decimateMesh(
         std::shared_ptr<VROARDepthMesh> mesh, int maxTriangles);
 
-    /**
-     * Vertex-clustering simplification. Groups all vertices within cellSize metres
-     * into a single representative, rebuilds triangles, drops degenerate ones.
-     * Produces a gap-free mesh: max gap = sqrt(3)*cellSize.
-     * 0.10m cells → catches objects wider than ~8cm reliably.
-     */
-    static std::shared_ptr<VROARDepthMesh> clusterMesh(
-        std::shared_ptr<VROARDepthMesh> mesh, float cellSize);
 };
 
 #endif /* VROARWorldMesh_h */

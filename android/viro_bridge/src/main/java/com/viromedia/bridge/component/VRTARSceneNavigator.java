@@ -252,6 +252,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Normal attach (first time or after resume without disposal)
         super.onAttachedToWindow();
 
+        // An AR session runs without touches (walking a scan, say), and a
+        // screen timeout pauses the activity. A view's flag, unlike the
+        // window's, leaves a host's own keep-awake alone on detach.
+        setKeepScreenOn(true);
+
         // Re-enable rotation listener when view is reattached
         if (mRotationListener != null) {
             mRotationListener.enable();
@@ -268,6 +273,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
 
         // Mark that we were detached - used to detect tab switches
         mWasDetachedFromWindow = true;
+
+        setKeepScreenOn(false);
 
         // Disable rotation listener
         if (mRotationListener != null) {
@@ -438,6 +445,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private String mRvEndpoint = null;
     private boolean mGeoProviderApplied = false;
     private static final String TAG = "ViroAR";
+    // Below this horizontal component (about 80 degrees of pitch) the camera's
+    // forward axis has no useful compass bearing.
+    private static final double CAMERA_HEADING_MIN_HORIZONTAL = 0.17;
 
     // ReactVision GPS pose support
     private LocationManager mLocationManager = null;
@@ -445,7 +455,14 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private SensorManager mSensorManager = null;
     private SensorEventListener mSensorListener = null;
     private double mLastHeading = 0.0;
-    private double mLastHeadingAccuracy = 0.0;
+    // -1 until the first rotation-vector event: native treats a negative
+    // accuracy as "no valid heading" rather than a perfect one.
+    private double mLastHeadingAccuracy = -1.0;
+    // Compass bearing of the back camera's forward axis, for AR recordings.
+    // Accuracy -1 while there is none, or the camera points too far up or down
+    // for a bearing to mean anything.
+    private double mLastCameraHeading = 0.0;
+    private double mLastCameraHeadingAccuracy = -1.0;
     private double mLastLat = 0.0;
     private double mLastLng = 0.0;
     private double mLastAlt = 0.0;
@@ -917,6 +934,21 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                             // Accuracy from sensor accuracy level (approximate degrees)
                             mLastHeadingAccuracy = event.accuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH ? 5.0
                                     : event.accuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM ? 15.0 : 45.0;
+                            // The camera looks along the device's -Z axis. rotMatrix maps
+                            // device axes into East-North-Up, so its third column is +Z
+                            // in ENU and the camera's forward is minus that.
+                            double east = -rotMatrix[2];
+                            double north = -rotMatrix[5];
+                            if (Math.hypot(east, north) < CAMERA_HEADING_MIN_HORIZONTAL) {
+                                mLastCameraHeadingAccuracy = -1.0;
+                            } else {
+                                double bearing = Math.toDegrees(Math.atan2(east, north));
+                                mLastCameraHeading = bearing < 0 ? bearing + 360.0 : bearing;
+                                // values[4] is the sensor's own heading accuracy in
+                                // radians, where the device reports one
+                                mLastCameraHeadingAccuracy = event.values.length > 4 && event.values[4] > 0
+                                        ? Math.toDegrees(event.values[4]) : mLastHeadingAccuracy;
+                            }
                             pushLocationToNative();
                         }
                         @Override public void onAccuracyChanged(Sensor s, int a) {}
@@ -949,6 +981,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             arScene.setLastKnownLocation(mLastLat, mLastLng, mLastAlt,
                                          mLastHorizAcc, mLastVertAcc,
                                          mLastHeading, mLastHeadingAccuracy);
+            arScene.setCameraHeading(mLastCameraHeading, mLastCameraHeadingAccuracy);
         }
     }
 
@@ -1259,6 +1292,19 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     }
 
     /**
+     * Clears the world mesh so the next scan starts from an empty room. On the depth-image and
+     * monocular paths that empties the fused room; Android has no mesh-anchor path. Does nothing
+     * when no AR scene is mounted.
+     */
+    public void rvResetWorldMesh() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            return;
+        }
+        arScene.resetWorldMesh();
+    }
+
+    /**
      * Whether a world mesh exists and how big it is, as JSON.
      *
      * Separate from {@link #rvGetScanJson} rather than a third flag on it: mesh capture is scene
@@ -1273,6 +1319,81 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
         arScene.rvGetWorldMeshStats(callback);
+    }
+
+    /**
+     * Loads a downloaded {@code .rvmap}'s raw bytes for continuous VPS
+     * localisation against the live camera. Resolves {@code {"success":...}}
+     * as JSON, same shape as {@link #rvGetScanJson}.
+     */
+    public void rvLoadVPSMap(byte[] rvmapBytes, ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"success\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        ensureRvConfigApplied(arScene);
+        arScene.rvLoadVPSMap(rvmapBytes, callback);
+    }
+
+    /** Drops whatever {@link #rvLoadVPSMap} loaded. No ensureRvConfigApplied — same reasoning as {@link #rvGetScanJson}. */
+    public void rvUnloadVPSMap() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) return;
+        arScene.rvUnloadVPSMap();
+    }
+
+    /** The VPS location's mesh; see {@link ARScene#setVPSMapMesh}. False without a scene or for bytes that are not RVWM. */
+    public boolean rvLoadVPSMapMesh(byte[] rvwmBytes, boolean occlusion, boolean physics) {
+        ARScene arScene = getCurrentARScene();
+        return arScene != null && arScene.setVPSMapMesh(rvwmBytes, occlusion, physics);
+    }
+
+    public void rvUnloadVPSMapMesh() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene != null) arScene.clearVPSMapMesh();
+    }
+
+    /** One camera image for a VPS visual query; see {@link ARScene#captureVPSQueryFrame}. */
+    public void rvCaptureVPSQueryFrame(int maxSide, ARScene.VPSQueryFrameCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            callback.onFrame(false, new byte[0], 0, 0, 0, 0, 0, 0, new float[16]);
+            return;
+        }
+        arScene.captureVPSQueryFrame(maxSide, callback);
+    }
+
+    /** VPS server mode; see {@link ARScene#rvStartVPSServerSession}. */
+    public void rvStartVPSServerSession(ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"success\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        ensureRvConfigApplied(arScene);
+        arScene.rvStartVPSServerSession(callback);
+    }
+
+    /** One backend fix; see {@link ARScene#rvReportVPSServerFix}. */
+    public void rvReportVPSServerFix(float[] worldFromCamera, float[] mapFromCamera, int inliers,
+                                     ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"success\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        arScene.rvReportVPSServerFix(worldFromCamera, mapFromCamera, inliers, callback);
+    }
+
+    /** The latest continuous VPS localisation result, as JSON. No ensureRvConfigApplied — a reader shouldn't configure the provider. */
+    public void rvGetVPSLocalization(ARScene.RvScanJsonCallback callback) {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            if (callback != null) callback.onResult("{\"available\":false,\"error\":\"AR scene not available\"}");
+            return;
+        }
+        arScene.rvGetVPSLocalization(callback);
     }
 
     // CL-H: platform-native shared frames (Quest). No ensureRvConfigApplied —
@@ -1463,6 +1584,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     private boolean mNeedsWorldMeshToggle = false;
     private int mWorldMeshStride = 4;
     private float mWorldMeshMinConfidence = 0.3f;
+    private boolean mWorldMeshAccumulate = true;
+    private float mWorldMeshVoxelSize = 0.0f;      // 0 = keep the renderer's default
+    private int mWorldMeshMaxMemoryMB = 0;         // 0 = keep the renderer's default
     private float mWorldMeshMaxDepth = 5.0f;
     private double mWorldMeshUpdateIntervalMs = 100.0;
     private double mWorldMeshPersistenceMs = 500.0;
@@ -1514,6 +1638,17 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         if (config.hasKey("debugDrawEnabled")) {
             mWorldMeshDebugDrawEnabled = config.getBoolean("debugDrawEnabled");
         }
+        // Fusion across frames. Sent separately from the positional setWorldMeshConfig below,
+        // whose signature is public API on ARScene.
+        if (config.hasKey("accumulate")) {
+            mWorldMeshAccumulate = config.getBoolean("accumulate");
+        }
+        if (config.hasKey("voxelSize")) {
+            mWorldMeshVoxelSize = (float) config.getDouble("voxelSize");
+        }
+        if (config.hasKey("maxMemoryMB")) {
+            mWorldMeshMaxMemoryMB = config.getInt("maxMemoryMB");
+        }
 
         // Apply to ARScene if available
         ARScene arScene = getCurrentARScene();
@@ -1529,6 +1664,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 mWorldMeshCollisionTag,
                 mWorldMeshDebugDrawEnabled
             );
+            arScene.setWorldMeshFusion(mWorldMeshAccumulate, mWorldMeshVoxelSize, mWorldMeshMaxMemoryMB);
         }
     }
 
@@ -1551,6 +1687,7 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             mWorldMeshCollisionTag,
             mWorldMeshDebugDrawEnabled
         );
+        arScene.setWorldMeshFusion(mWorldMeshAccumulate, mWorldMeshVoxelSize, mWorldMeshMaxMemoryMB);
 
         // Then enable/disable
         arScene.setWorldMeshEnabled(mWorldMeshEnabled);

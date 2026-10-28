@@ -91,6 +91,9 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
 - (NSString *)localPeerId;
 - (NSArray<VROColocationPeerInfo *> *)peers;
 
+/** Sent as x-rv-device on the co-location socket; the same for the whole process. */
+- (NSString *)deviceId;
+
 @end
 
 NS_ASSUME_NONNULL_END

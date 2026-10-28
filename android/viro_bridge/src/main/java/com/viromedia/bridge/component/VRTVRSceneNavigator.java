@@ -24,7 +24,9 @@ package com.viromedia.bridge.component;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.WritableArray;
 import com.viro.core.ViroViewGVR;
 import com.viro.core.ViroViewOVR;
 import com.viro.core.ViroViewOpenXR;
@@ -145,6 +147,50 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    private static class InputFocusListenerOpenXR implements ViroViewOpenXR.InputFocusListener {
+
+        private WeakReference<VRTVRSceneNavigator> mNavigator;
+
+        public InputFocusListenerOpenXR(VRTVRSceneNavigator navigator) {
+            mNavigator = new WeakReference<VRTVRSceneNavigator>(navigator);
+        }
+
+        @Override
+        public void onInputFocusChanged(boolean focused) {
+            VRTVRSceneNavigator navigator = mNavigator.get();
+            if (navigator != null) {
+                navigator.onInputFocusChanged(focused);
+            }
+        }
+    }
+
+    // A device event rather than a view event: what an app keeps in the room
+    // need not be under the navigator.
+    private static class RoomMoveListenerOpenXR implements ViroViewOpenXR.RoomMoveListener {
+
+        private WeakReference<VRTVRSceneNavigator> mNavigator;
+
+        public RoomMoveListenerOpenXR(VRTVRSceneNavigator navigator) {
+            mNavigator = new WeakReference<VRTVRSceneNavigator>(navigator);
+        }
+
+        @Override
+        public void onRoomMoved(float[] move) {
+            VRTVRSceneNavigator navigator = mNavigator.get();
+            if (navigator == null) {
+                return;
+            }
+            WritableArray matrix = Arguments.createArray();
+            for (float value : move) {
+                matrix.pushDouble(value);
+            }
+            navigator.mReactContext.emitDeviceEvent(ROOM_MOVED_EVENT, matrix);
+        }
+    }
+
+    /** JS: `onRoomMoved` in components/Utilities/VRModuleOpenXR.ts. */
+    private static final String ROOM_MOVED_EVENT = "ViroRoomMoved";
+
     public VRTVRSceneNavigator(ReactContext reactContext,
                                ReactViroPackage.ViroPlatform platform) {
         super(reactContext, platform);
@@ -162,8 +208,11 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
                 return new ViroViewOVR(reactContext.getCurrentActivity(),
                         new StartupListenerOVR(this));
             case QUEST:
-                return new ViroViewOpenXR(reactContext.getCurrentActivity(),
+                ViroViewOpenXR view = new ViroViewOpenXR(reactContext.getCurrentActivity(),
                         new StartupListenerOpenXR(this));
+                view.setInputFocusListener(new InputFocusListenerOpenXR(this));
+                view.setRoomMoveListener(new RoomMoveListenerOpenXR(this));
+                return view;
             case GVR:
                 // default case is to use GVR
             default:

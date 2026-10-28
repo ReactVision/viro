@@ -37,6 +37,7 @@ import {
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
+import { useViroUsagePing } from "../Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
@@ -59,6 +60,7 @@ type ArOptions = Partial<
     | "detectPlanes"
     | "maxPlanes"
     | "renderWhileLimited"
+    | "hideContentWhenLost"
     | "playback"
   >
 >;
@@ -198,6 +200,10 @@ function trackingLabel(state: ViroTrackingState): string {
 }
 
 export function ViroARSceneNavigator(props: Props) {
+  useViroUsagePing("ar", {
+    detect_planes: props.arOptions?.detectPlanes,
+    facing_mode: props.arOptions?.facingMode,
+  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);

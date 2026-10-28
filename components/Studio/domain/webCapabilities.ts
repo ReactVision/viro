@@ -58,5 +58,9 @@ export function webUnsupportedFeatures(
     features.push("manual plane selection");
   }
 
+  // A bound scene's plane assets are in its VPS location's map frame, which a
+  // browser cannot track.
+  if (scene.vps_location_id) features.push("VPS location");
+
   return features;
 }

@@ -1,5 +1,6 @@
 import { ViroAnimations } from "../../Animation/ViroAnimations";
 import { StudioAnimation } from "../types";
+import { scaleKeyframesForSupersampledText } from "./questText";
 
 const MAX_CONCURRENT_ANIMATIONS = 10;
 const MAX_DURATION_MS = 30_000;
@@ -10,9 +11,11 @@ const MIN_SCALE = 0.01;
 /**
  * Builds the Viro animation registry object from StudioAnimation rows.
  * The properties field is already in Viro's native keyframe format.
+ * `supersampledTextIds` are the text assets drawn supersampled (questText.ts).
  */
 export function buildViroAnimationRegistry(
-  animations: StudioAnimation[]
+  animations: StudioAnimation[],
+  supersampledTextIds?: ReadonlySet<string>
 ): Record<string, unknown> {
   const registry: Record<string, unknown> = {};
 
@@ -27,7 +30,9 @@ export function buildViroAnimationRegistry(
     // transaction. The per-trigger prop is the one that keeps it, because
     // `on_start` fires between the two and the editor fires it after the delay.
     registry[anim.animation_key] = {
-      properties: anim.properties,
+      properties: supersampledTextIds?.has(anim.target_asset_id)
+        ? scaleKeyframesForSupersampledText(anim.properties)
+        : anim.properties,
       duration: anim.duration_ms ?? 1000,
       ...(anim.easing ? { easing: anim.easing } : {}),
     };
@@ -40,7 +45,10 @@ export function buildViroAnimationRegistry(
  * Registers all scene animations with ViroReact.
  * Must be called before any animated Viro components mount.
  */
-export function registerSceneAnimations(animations: StudioAnimation[]): void {
+export function registerSceneAnimations(
+  animations: StudioAnimation[],
+  supersampledTextIds?: ReadonlySet<string>
+): void {
   if (animations.length === 0) return;
 
   if (animations.length > MAX_CONCURRENT_ANIMATIONS) {
@@ -50,7 +58,7 @@ export function registerSceneAnimations(animations: StudioAnimation[]): void {
     );
   }
 
-  const registry = buildViroAnimationRegistry(animations);
+  const registry = buildViroAnimationRegistry(animations, supersampledTextIds);
   ViroAnimations.registerAnimations(registry as any);
 
   console.log(

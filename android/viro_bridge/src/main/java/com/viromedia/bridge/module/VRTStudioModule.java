@@ -42,6 +42,10 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     // beside the database instead of nearest the device. A session on another
     // base URL is pinned only when it brings its own functionRegion.
     private static final String FUNCTION_REGION   = "eu-west-2";
+    // Sent as x-rv-capabilities: what this runtime renders that an older one
+    // cannot, so the scenes function can refuse such a scene to an older one
+    // rather than have it drawn in the wrong place.
+    private static final String CAPABILITIES      = "vps";
     private static final String API_KEY_META      = "com.reactvision.RVApiKey";
     private static final String PROJECT_ID_META   = "com.reactvision.RVProjectId";
     private static final int    TIMEOUT_SEC       = 30;
@@ -70,7 +74,7 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
     private static final class RequestAuth {
         final String baseUrl;
         final String apiKey;         // null in session mode
-        final String[] headerNames;  // the credential in session mode, plus x-region when one resolves
+        final String[] headerNames;  // the credential in session mode, x-region when one resolves, x-rv-capabilities
         final String[] headerValues;
         RequestAuth(String baseUrl, String apiKey, String[] headerNames, String[] headerValues) {
             this.baseUrl = baseUrl;
@@ -294,13 +298,16 @@ public class VRTStudioModule extends ReactContextBaseJavaModule {
                 names.add("x-region");
                 values.add(region);
             }
+            names.add("x-rv-capabilities");
+            values.add(CAPABILITIES);
             return new RequestAuth(session.baseUrl, null,
                     names.toArray(new String[0]), values.toArray(new String[0]));
         }
         String apiKey = readApiKey();
         if (apiKey == null) return null;
         return new RequestAuth(BASE_URL, apiKey,
-                new String[]{"x-region"}, new String[]{FUNCTION_REGION});
+                new String[]{"x-region", "x-rv-capabilities"},
+                new String[]{FUNCTION_REGION, CAPABILITIES});
     }
 
     // Throwable, not Exception: a missing renderer library surfaces as

@@ -36,6 +36,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import androidx.core.content.ContextCompat;
+import android.util.Base64;
 import android.util.Log;
 import android.view.PixelCopy;
 import android.view.View;
@@ -77,8 +78,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 @ReactModule(name = "VRTARSceneNavigatorModule")
@@ -1632,6 +1638,31 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         rvResolveScanJson(sceneNavTag, true, promise);
     }
 
+    /**
+     * Clears the world mesh. Resolves true once the request reaches a mounted navigator, false
+     * otherwise; whether a mesh existed to clear is what rvGetWorldMeshStats says.
+     */
+    @ReactMethod
+    public void rvResetWorldMesh(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(false); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(false);
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvResetWorldMesh();
+                    promise.resolve(true);
+                } catch (Exception e) {
+                    promise.resolve(false);
+                }
+            }
+        });
+    }
+
     /** Whether a world mesh exists and how big it is. Poll it: the update event never fires. */
     @ReactMethod
     public void rvGetWorldMeshStats(final int sceneNavTag, final Promise promise) {
@@ -1650,6 +1681,382 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     promise.resolve("{\"available\":false,\"reason\":\"" + String.valueOf(e.getMessage()) + "\"}");
                 }
             }
+        });
+    }
+
+    /** A JSON object string from key/value pairs; values are escaped by JSONObject. */
+    private static String rvJson(Object... keyValues) {
+        JSONObject object = new JSONObject();
+        try {
+            for (int i = 0; i + 1 < keyValues.length; i += 2) {
+                object.put((String) keyValues[i], keyValues[i + 1]);
+            }
+        } catch (JSONException e) {
+            // Only thrown for non-finite doubles, which nothing here passes.
+        }
+        return object.toString();
+    }
+
+    /**
+     * A navigator holds one VPS map and one mesh. Each load and unload request
+     * is counted when it arrives here, in call order, and a load is applied
+     * only while it is still the newest request for its slot, so an older load
+     * that finishes after a newer one never replaces it. {@code load} is the
+     * caller's number for a load (ViroVPS counts them per navigator). An unload
+     * naming a load that a newer load request has replaced does nothing; 0
+     * names no load, and an unload of 0 always runs.
+     */
+    private static final class VpsSlot {
+        long requests;
+        double newestLoad;
+    }
+
+    private static final String VPS_SUPERSEDED = "Superseded by a newer load or unload";
+
+    /** Keyed by slot and navigator tag. Read and written only while holding its own lock. */
+    private final Map<String, VpsSlot> mVpsSlots = new HashMap<>();
+
+    /** Caller holds the lock on {@link #mVpsSlots}. */
+    private VpsSlot vpsSlotLocked(String slot, int sceneNavTag) {
+        String key = slot + ":" + sceneNavTag;
+        VpsSlot s = mVpsSlots.get(key);
+        if (s == null) {
+            s = new VpsSlot();
+            mVpsSlots.put(key, s);
+        }
+        return s;
+    }
+
+    private long requestVpsLoad(String slot, int sceneNavTag, double load) {
+        synchronized (mVpsSlots) {
+            VpsSlot s = vpsSlotLocked(slot, sceneNavTag);
+            s.newestLoad = load;
+            return ++s.requests;
+        }
+    }
+
+    private boolean isNewestVpsRequest(String slot, int sceneNavTag, long request) {
+        synchronized (mVpsSlots) {
+            return vpsSlotLocked(slot, sceneNavTag).requests == request;
+        }
+    }
+
+    private boolean requestVpsUnload(String slot, int sceneNavTag, double load) {
+        synchronized (mVpsSlots) {
+            VpsSlot s = vpsSlotLocked(slot, sceneNavTag);
+            if (load != 0 && load != s.newestLoad) return false;
+            s.requests++;
+            return true;
+        }
+    }
+
+    /**
+     * Loads a downloaded {@code .rvmap}'s raw bytes (base64, same transport as
+     * {@code StreamingAudioModule.pushSamples}) for continuous VPS localisation.
+     * Resolves the renderer's own JSON verbatim ({@code {"success":...}}),
+     * same reasoning as {@link #rvGetScanStatus}.
+     *
+     * The base64 decode runs here, on the native modules thread, not on the UI
+     * or renderer thread. The map parse runs on the renderer thread inside
+     * the session (see ARScene.rvLoadVPSMap), which is where the session state
+     * it replaces lives.
+     */
+    @ReactMethod
+    public void rvLoadVPSMap(final int sceneNavTag, final String rvmapBase64, final double load,
+                             final Promise promise) {
+        final long request = requestVpsLoad("map", sceneNavTag, load);
+        final byte[] rvmapBytes;
+        try {
+            rvmapBytes = Base64.decode(rvmapBase64, Base64.NO_WRAP);
+        } catch (Exception e) {
+            promise.resolve(rvJson("success", false, "error", "Malformed base64 map data"));
+            return;
+        }
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    if (!isNewestVpsRequest("map", sceneNavTag, request)) {
+                        promise.resolve(rvJson("success", false, "error", VPS_SUPERSEDED));
+                        return;
+                    }
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvLoadVPSMap(rvmapBytes, json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /**
+     * VPS server mode: the backend localises frames, the fuser runs without a map.
+     * It takes the "map" slot, so it replaces a loaded map, {@link #rvUnloadVPSMap}
+     * ends it, and stale requests are numbered out the same way.
+     */
+    @ReactMethod
+    public void rvStartVPSServerSession(final int sceneNavTag, final double load, final Promise promise) {
+        final long request = requestVpsLoad("map", sceneNavTag, load);
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    if (!isNewestVpsRequest("map", sceneNavTag, request)) {
+                        promise.resolve(rvJson("success", false, "error", VPS_SUPERSEDED));
+                        return;
+                    }
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvStartVPSServerSession(json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /**
+     * One backend fix for a frame {@link #rvCaptureVPSQueryFrame} captured: its
+     * worldFromCamera as the capture handed it out, and the backend's T_map_cam
+     * (16 numbers row-major).
+     */
+    @ReactMethod
+    public void rvReportVPSServerFix(final int sceneNavTag, final ReadableArray worldFromCamera,
+                                     final ReadableArray mapFromCamera, final double inliers,
+                                     final Promise promise) {
+        if (worldFromCamera == null || mapFromCamera == null || worldFromCamera.size() != 16
+                || mapFromCamera.size() != 16) {
+            promise.resolve(rvJson("success", false, "error", "Both poses are 16 numbers"));
+            return;
+        }
+        final float[] wc = new float[16], mc = new float[16];
+        for (int i = 0; i < 16; i++) {
+            wc[i] = (float) worldFromCamera.getDouble(i);
+            mc[i] = (float) mapFromCamera.getDouble(i);
+        }
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvReportVPSServerFix(wc, mc, (int) inliers,
+                            json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /** Drops whatever {@link #rvLoadVPSMap} loaded. Fire-and-forget, same shape as {@link #rvStartScan}. */
+    @ReactMethod
+    public void rvUnloadVPSMap(final int sceneNavTag, final double load) {
+        if (!requestVpsUnload("map", sceneNavTag, load)) return;
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) return;
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) return;
+                    ((VRTARSceneNavigator) view).rvUnloadVPSMap();
+                } catch (Exception e) { /* no-op */ }
+            }
+        });
+    }
+
+    /**
+     * Sets the VPS location's mesh (an RVWM snapshot, base64 like
+     * {@link #rvLoadVPSMap}), for occlusion and physics. It appears once VPS
+     * localisation converges and follows the map from then on.
+     */
+    @ReactMethod
+    public void rvLoadVPSMapMesh(final int sceneNavTag, final String rvwmBase64,
+                                 final boolean occlusion, final boolean physics, final double load,
+                                 final Promise promise) {
+        final long request = requestVpsLoad("mesh", sceneNavTag, load);
+        final byte[] rvwmBytes;
+        try {
+            rvwmBytes = Base64.decode(rvwmBase64, Base64.NO_WRAP);
+        } catch (Exception e) {
+            promise.resolve(rvJson("success", false, "error", "Malformed base64 mesh data"));
+            return;
+        }
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    if (!isNewestVpsRequest("mesh", sceneNavTag, request)) {
+                        promise.resolve(rvJson("success", false, "error", VPS_SUPERSEDED));
+                        return;
+                    }
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    boolean ok = ((VRTARSceneNavigator) view).rvLoadVPSMapMesh(rvwmBytes, occlusion, physics);
+                    promise.resolve(ok ? rvJson("success", true)
+                                       : rvJson("success", false, "error", "Not an RVWM mesh, or no AR scene"));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /**
+     * One camera image for a VPS visual query: the latest AR frame's luma plane,
+     * sensor-native orientation, longest side at most maxSide, as base64 JPEG
+     * with intrinsics to match. Resolves JSON like the other rv* methods.
+     */
+    @ReactMethod
+    public void rvCaptureVPSQueryFrame(final int sceneNavTag, final int maxSide, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("success", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("success", false, "error", "Invalid view type"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvCaptureVPSQueryFrame(maxSide,
+                            (ok, gray, width, height, fx, fy, cx, cy, worldFromCamera) -> {
+                        if (!ok || gray.length == 0) {
+                            promise.resolve(rvJson("success", false, "error", "No camera frame with intrinsics yet"));
+                            return;
+                        }
+                        // JPEG off the UI thread.
+                        new Thread(() -> {
+                            String jpeg = encodeGrayJpeg(gray, width, height);
+                            if (jpeg == null) {
+                                promise.resolve(rvJson("success", false, "error", "JPEG encoding failed"));
+                                return;
+                            }
+                            // NV21 needs even sides: a dropped last row or column leaves the intrinsics as they are.
+                            // the frame's sensor pose, column-major: what a server fix for this image is paired with
+                            JSONArray pose = new JSONArray();
+                            for (float v : worldFromCamera) {
+                                try { pose.put((double) v); } catch (JSONException e) { pose.put(0); }
+                            }
+                            promise.resolve(rvJson("success", true, "image", jpeg,
+                                    "width", width & ~1, "height", height & ~1,
+                                    "fx", (double) fx, "fy", (double) fy, "cx", (double) cx, "cy", (double) cy,
+                                    "worldFromCamera", pose));
+                        }, "ViroVPSQueryFrame").start();
+                    });
+                } catch (Exception e) {
+                    promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    /** A width x height luma plane as base64 JPEG, through NV21 with neutral chroma; null on failure. */
+    private static String encodeGrayJpeg(byte[] gray, int width, int height) {
+        int w = width & ~1, h = height & ~1;
+        if (w <= 0 || h <= 0) return null;
+        byte[] nv21 = new byte[w * h * 3 / 2];
+        for (int row = 0; row < h; row++) {
+            System.arraycopy(gray, row * width, nv21, row * w, w);
+        }
+        java.util.Arrays.fill(nv21, w * h, nv21.length, (byte) 128);
+        android.graphics.YuvImage image = new android.graphics.YuvImage(nv21, android.graphics.ImageFormat.NV21, w, h, null);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        if (!image.compressToJpeg(new android.graphics.Rect(0, 0, w, h), 85, out)) return null;
+        return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+    }
+
+    /** Removes the mesh {@link #rvLoadVPSMapMesh} set. Fire-and-forget. */
+    @ReactMethod
+    public void rvUnloadVPSMapMesh(final int sceneNavTag, final double load) {
+        if (!requestVpsUnload("mesh", sceneNavTag, load)) return;
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) return;
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) return;
+                    ((VRTARSceneNavigator) view).rvUnloadVPSMapMesh();
+                } catch (Exception e) { /* no-op */ }
+            }
+        });
+    }
+
+    /**
+     * The latest continuous VPS localisation result, as JSON — a pollable
+     * stand-in for an onLocalized event. Resolves the renderer's own JSON
+     * verbatim, same reasoning as {@link #rvGetScanStatus}.
+     */
+    @ReactMethod
+    public void rvGetVPSLocalization(final int sceneNavTag, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) { promise.resolve(rvJson("available", false, "error", "UIManager not available")); return; }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                try {
+                    View view = viewResolver.resolveView(sceneNavTag);
+                    if (!(view instanceof VRTARSceneNavigator)) {
+                        promise.resolve(rvJson("available", false, "error", "AR navigator is not mounted yet"));
+                        return;
+                    }
+                    ((VRTARSceneNavigator) view).rvGetVPSLocalization(json -> promise.resolve(json));
+                } catch (Exception e) {
+                    promise.resolve(rvJson("available", false, "error", String.valueOf(e.getMessage())));
+                }
+            }
+        });
+    }
+
+    // ── VPS scan upload ─────────────────────────────────────────────────────
+
+    /** Off the native modules thread, one call at a time: zipping is disk bound and enqueueing blocks. */
+    private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor();
+
+    /**
+     * Zips a ViroReact AR recording (session.jsonl + video.mp4 in
+     * {@code recordingDir}) into app-private storage that outlives the
+     * process. Resolves {success, path, bytes} or {success: false, stage: "zip", error}.
+     */
+    @ReactMethod
+    public void rvPrepareScanRecording(final String recordingDir, final Promise promise) {
+        sVpsUploadExecutor.execute(() -> promise.resolve(VpsScanUpload.prepare(mContext, recordingDir)));
+    }
+
+    /**
+     * Uploads a prepared zip and completes the scan in WorkManager, so it
+     * carries on in the background and after the process dies. Resolves once
+     * the work ends, never rejects: {success, stage, scan_id, status?, body?, error?, code?}.
+     */
+    @ReactMethod
+    public void rvTransferScanRecording(final String requestJson, final Promise promise) {
+        sVpsUploadExecutor.execute(() -> VpsScanUpload.transfer(mContext, requestJson, promise));
+    }
+
+    /** Deletes a prepared zip no transfer was started for. Resolves null. */
+    @ReactMethod
+    public void rvDiscardScanRecording(final String path, final Promise promise) {
+        sVpsUploadExecutor.execute(() -> {
+            VpsScanUpload.deletePreparedZip(mContext, path);
+            promise.resolve(null);
         });
     }
 

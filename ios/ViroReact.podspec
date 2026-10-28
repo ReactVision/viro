@@ -20,6 +20,8 @@ Pod::Spec.new do |s|
   # behind an availability check, so this is the version the code actually requires today.
   s.visionos.deployment_target = '26.0'
 
+  s.resource_bundles = { 'ViroReact_privacy' => ['PrivacyInfo.xcprivacy'] }
+
   # visionOS: CompositorServices drives the immersive render loop.
   s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
 
@@ -27,6 +29,9 @@ Pod::Spec.new do |s|
   # (VRTObjectDetectorView uses AVFoundation + Accelerate; CoreVideo for CVPixelBuffer; ARKit for
   # the ARSession and ARFrame it reads the camera through)
   s.ios.frameworks = ['AVFoundation', 'Accelerate', 'CoreVideo', 'ARKit']
+
+  # zlib: VRTARSceneNavigatorModule computes the CRC-32 of the VPS scan zip with crc32().
+  s.libraries = 'z'
 
   # Base source files (always included)
   source_files_array = ['ViroReact/**/*.{h,m,mm,swift}']

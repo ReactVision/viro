@@ -3,6 +3,7 @@ import {
   ExportedConfigWithProps,
   XcodeProject,
   withDangerousMod,
+  withInfoPlist,
   withPlugins,
   withXcodeProject,
 } from "@expo/config-plugins";
@@ -315,12 +316,31 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
   return config;
 };
 
+// A mod rather than config.ios.infoPlist, which is merged over an existing Info.plist and so
+// can add a key but never remove one.
+export const withViroTelemetryInfoPlist = (config: ExpoConfig) =>
+  withInfoPlist(config, (newConfig) => {
+    const pluginConfig = newConfig.plugins?.find(
+      (plugin) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
+    );
+    const options = Array.isArray(pluginConfig)
+      ? (pluginConfig[1] as ViroConfigurationOptions | undefined)
+      : undefined;
+    if (options?.telemetry === false) {
+      newConfig.modResults.ViroTelemetryEnabled = false;
+    } else {
+      delete newConfig.modResults.ViroTelemetryEnabled;
+    }
+    return newConfig;
+  });
+
 export const withViroIos: ConfigPlugin<ViroConfigurationOptions> = (
   config,
   props
 ) => {
   config = withPlugins(config, [[withViroPods, props]]);
   withDefaultInfoPlist(config, props);
+  config = withViroTelemetryInfoPlist(config);
   withEnabledBitcode(config);
   withExcludedSimulatorArchitectures(config);
   return config;

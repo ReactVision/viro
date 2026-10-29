@@ -74,6 +74,46 @@ export type ViroVPSScanUploadOptions = ViroVPSConnection & {
   scanId?: string;
 };
 
+/**
+ * How far to trust a scan's mesh, from ViroScan: `poor` on a room of blank
+ * walls, a fast sweep or a track that jumped. `reasons` explain anything short
+ * of `good` to whoever recorded; the other fields are the signals behind it
+ * (`photos_with_depth_share`, `faces_without_photo_share`, `pose_jumps`,
+ * `rotation_median_deg_s`, …). It never decides whether the map is accepted.
+ */
+export type ViroVPSMeshConfidence = {
+  level: "good" | "fair" | "poor";
+  reasons: string[];
+  [signal: string]: unknown;
+};
+
+/**
+ * A scan's or map's numbers; see Studio's docs/vps-api.md. Fields an older
+ * backend does not send are absent.
+ */
+export type ViroVPSScanQuality = {
+  points?: number;
+  keyframes?: number;
+  check_frames?: number;
+  localised?: number;
+  position_error_median_m?: number | null;
+  rotation_error_median_deg?: number | null;
+  reprojection_error_median_px?: number | null;
+  view_sectors?: number | null;
+  view_sectors_of?: number | null;
+  pose_image_disagreement_deg?: number | null;
+  alignment_spread_m?: number | null;
+  merged_scans?: number | null;
+  cross_scan_residual_px?: number | null;
+  server_check_frames?: number | null;
+  server_localised?: number | null;
+  server_position_error_median_m?: number | null;
+  server_only?: boolean;
+  /** Null when the scan built no mesh, or the backend predates it. */
+  mesh_confidence?: ViroVPSMeshConfidence | null;
+  [measure: string]: unknown;
+};
+
 export type ViroVPSScan = {
   id: string;
   location_id: string;
@@ -87,7 +127,7 @@ export type ViroVPSScan = {
    * `check_frames`, `position_error_median_m`, ..., and for a merge
    * `merged_scans` and `cross_scan_residual_px`.
    */
-  quality: Record<string, number | null> | null;
+  quality: ViroVPSScanQuality | null;
   /** Where the map sits on Earth (map origin, and the map -> East-North-Up rotation's rows); null without usable GPS. */
   geo: { lat: number; lon: number; alt: number; r_enu_map: number[][] } | null;
   /** The location's active scan when this one was submitted; this scan was built in that map's frame. */

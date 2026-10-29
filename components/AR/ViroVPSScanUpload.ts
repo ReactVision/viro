@@ -40,8 +40,10 @@ export type ViroVPSScanOutput = "mesh" | "splat" | "semantic";
 
 /**
  * How detailed the mesh is. `low` is the quickest and builds no HD mesh;
- * `high` uses full-resolution depth, a denser HD mesh and twice the texture
- * resolution, and takes about 1.75 times as long to process.
+ * `high` uses full-resolution depth, a denser HD mesh and twice the device
+ * mesh's texture resolution, and takes about 1.75 times as long to process.
+ * The HD mesh's atlas is 4096 px in both `medium` and `high`, so phones can
+ * load it.
  */
 export type ViroVPSMeshQuality = "low" | "medium" | "high";
 

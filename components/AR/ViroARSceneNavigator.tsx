@@ -1252,7 +1252,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * app picks, and it doubles as the co-location room key.
    */
   _rvCreateSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
-    // only the Android bridge (Quest) has it: elsewhere answer as the native side would
+    // the iOS bridge has no shared frames: answer as the Android one does off Quest
     if (typeof ViroARSceneNavigatorModule.rvCreateSharedFrame !== "function") {
       return { success: false, error: SHARED_FRAME_UNSUPPORTED };
     }

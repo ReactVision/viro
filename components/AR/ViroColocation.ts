@@ -262,7 +262,11 @@ let knownDeviceId: string | null | undefined;
 export function colocationDeviceIdNow(): string | null | Promise<string | null> {
   if (knownDeviceId !== undefined) return knownDeviceId;
   if (!VRTColocationModule?.getDeviceId) return (knownDeviceId = null);
-  return getColocationDeviceId().then((id) => (knownDeviceId = id));
+  // A null from a failed call is asked again by the next socket.
+  return getColocationDeviceId().then((id) => {
+    if (id !== null) knownDeviceId = id;
+    return id;
+  });
 }
 
 /** Peers currently in the room, excluding this device. */

@@ -53,7 +53,7 @@ void populateIntArrayFromNSArray(NSArray<NSNumber *> *arraySource, int arrayDest
     }
 }
 
-// Request data from a URL from a background thread and invoke a block on the main UI thread on completion.
+// Request data from a URL and invoke a block on the download session's queue on completion (a non-2xx status is an error).
 // Default timeout is 30 seconds on the NSMutableURLRequest, after a timeout, the block is called with an error.
 NSURLSessionDataTask* downloadDataWithURL(NSURL *url, void (^completionBlock)(NSData *data, NSError *error)){
     // One session for all downloads; creating a session per request leaks it until invalidated.
@@ -77,9 +77,9 @@ NSURLSessionDataTask* downloadDataWithURL(NSURL *url, void (^completionBlock)(NS
                                                                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"HTTP status %ld", (long)status]}];
                                                                  }
                                                              }
-                                                             dispatch_async(dispatch_get_main_queue(), ^{
-                                                                 completionBlock(resultData, resultError);
-                                                             });
+                                                             // On the session's queue, not main: callers decode here (HDR,
+                                                             // images, image targets) and hop to main themselves for UI work.
+                                                             completionBlock(resultData, resultError);
                                                          }];
     [downloadTask resume];
     return downloadTask;

@@ -149,6 +149,7 @@
 - **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
 - **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
 - **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
+- **iOS bridge hardening (`VRTUtils`, image and HDR loaders, `VRTARTrackingTargetsModule`, Studio and VPS modules).** Downloads share one URL session and fail on a non-2xx status instead of decoding an error page; a failed HDR download is reported and uses a unique temporary file; tracking target promises settle on every path; nil strings, providers and video qualities no longer crash a conversion or comparison; view lookups after module teardown settle instead of hanging; the AR frame observer is not added twice; registered material definitions survive clearing GL materials; monocular depth settings apply once the AR view exists. The podspec now keeps `VIRO_ONNXRUNTIME_AVAILABLE` when `onnxruntime.xcframework` is vendored into `ios/dist/Frameworks` (the published package does not include it), which compiles the in-package ONNX path for the first time in that setup.
 
 ## v3.0.3 — 6 October 2026
 

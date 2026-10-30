@@ -105,6 +105,29 @@ type Props = ViewProps & {
   handTrackingEnabled?: boolean;
 
   /**
+   * Hand occlusion for Meta Quest passthrough: the tracked hands are drawn
+   * depth-only before the scene, so the real (passthrough) hands show through
+   * virtual content in front of them. Only draws while `passthroughEnabled`
+   * and `handTrackingEnabled` are both on; otherwise a no-op. Quest only.
+   * Defaults to false.
+   */
+  handOcclusion?: boolean;
+
+  /**
+   * Geometry used for hand occlusion. `"mesh"` (default) uses the runtime's
+   * hand mesh (XR_FB_hand_tracking_mesh) and falls back to `"capsules"` when
+   * that extension is unavailable; `"capsules"` approximates each bone with a
+   * capsule.
+   */
+  handOcclusionMode?: "capsules" | "mesh";
+
+  /**
+   * How far the hand occluder is inflated past the tracked hand, in
+   * millimetres, to hide tracking error at the edges. Defaults to 2.
+   */
+  handOcclusionInflateMm?: number;
+
+  /**
    * Per-frame skeletal hand joint data. Fires at display refresh rate (72/90 Hz).
    * null for a hand means it is not currently tracked.
    */

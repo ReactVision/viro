@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- **Hand occlusion on Meta Quest passthrough (`handOcclusion`, `handOcclusionMode`, `handOcclusionInflateMm` on `ViroVRSceneNavigator` and `ViroXRSceneNavigator`; `VRModuleOpenXR.setHandOcclusion(viewTag, enabled)`).** Each eye, the tracked hands are drawn depth-only before the scene, so the wearer's real hands show through virtual content in front of them. Off by default, and draws only while passthrough and hand tracking are both on. `handOcclusionMode` is `"mesh"` (default; the runtime's hand mesh, falling back to capsules without XR_FB_hand_tracking_mesh) or `"capsules"`, and `handOcclusionInflateMm` (default 2) grows the occluder past the tracked hand. Not applicable on iOS or visionOS. Needs the `viro_renderer-release.aar` and `react_viro-release.aar` built from ViroCore with ReactVision/virocore#425.
+
+### Changed
+
+- **`ViroVPSScan.quality` is typed (`ViroVPSScanQuality`) and carries `mesh_confidence` (`ViroVPSMeshConfidence`).** The backend scores how far to trust a scan's mesh: `good`, `fair` or `poor`, with `reasons` for whoever recorded (blank walls, a fast sweep, a track that jumped) and the signals behind them. It never decides whether the map is accepted, and is null without a mesh or on an older backend. The known measures keep their number types and `server_only` is a boolean; other keys read as `unknown` instead of `number | null`. `ViroVPSMapDownload.quality` has the same type. Both types are exported.
+
 ## v3.1.0 — 27 October 2026
 
 ### Added

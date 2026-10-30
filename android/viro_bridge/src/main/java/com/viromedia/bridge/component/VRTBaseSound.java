@@ -83,7 +83,7 @@ public abstract class VRTBaseSound extends VRTComponent {
         mLoop = loop;
     }
 
-    public void seekToTime(int seconds) {
+    public void seekToTime(float seconds) {
         if (mNativeSound != null) {
             mNativeSound.seekToTime(seconds);
             if (!mPaused) {

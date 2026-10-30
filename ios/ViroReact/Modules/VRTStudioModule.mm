@@ -240,8 +240,10 @@ RCT_EXPORT_METHOD(rvGetProjectId:(RCTPromiseResolveBlock)resolve
 RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    NSString *baseUrl     = [config isKindOfClass:[NSDictionary class]] ? config[@"baseUrl"] : nil;
-    NSString *accessToken = [config isKindOfClass:[NSDictionary class]] ? config[@"accessToken"] : nil;
+    id rawBaseUrl     = [config isKindOfClass:[NSDictionary class]] ? config[@"baseUrl"] : nil;
+    id rawAccessToken = [config isKindOfClass:[NSDictionary class]] ? config[@"accessToken"] : nil;
+    NSString *baseUrl     = [rawBaseUrl isKindOfClass:[NSString class]] ? rawBaseUrl : nil;
+    NSString *accessToken = [rawAccessToken isKindOfClass:[NSString class]] ? rawAccessToken : nil;
     if (baseUrl.length == 0 || accessToken.length == 0) {
         gStudioSession = nil;
         [VROColocationBridge setStudioSessionBaseUrl:nil accessToken:nil clientTag:nil];
@@ -253,7 +255,8 @@ RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
     }
     NSMutableDictionary *snapshot =
         [@{ @"baseUrl": baseUrl, @"accessToken": accessToken } mutableCopy];
-    NSString *clientTag = config[@"clientTag"];
+    id rawClientTag = config[@"clientTag"];
+    NSString *clientTag = [rawClientTag isKindOfClass:[NSString class]] ? rawClientTag : nil;
     if (clientTag.length > 0) snapshot[@"clientTag"] = clientTag;
     NSString *functionRegion = config[@"functionRegion"];
     if ([functionRegion isKindOfClass:[NSString class]] && functionRegion.length > 0) {

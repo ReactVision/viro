@@ -179,9 +179,9 @@ type Props = ViewProps & {
    * `depthEnabled` and `worldMeshEnabled` already ask for; it never turns their depth off.
    *
    * iOS: LiDAR scene depth, on devices that have it; others are unaffected.
+   * Android: ARCore's Depth API, on devices that support it; others are unaffected.
    *
    * @default false
-   * @platform ios
    */
   depthCaptureEnabled?: boolean;
 
@@ -902,9 +902,9 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param options - `depth` (default false) also records the device's depth under
    *                  `outputDir/depth/`, one frame every 100 ms, with a `depth` line per frame in
    *                  session.jsonl. It takes effect only if the navigator was mounted with
-   *                  `depthCaptureEnabled` on a device that measures depth (iOS with LiDAR);
-   *                  otherwise the recording is made without depth and its header says
-   *                  `"depth": false`.
+   *                  `depthCaptureEnabled` on a device that measures depth (iOS with LiDAR,
+   *                  Android with the ARCore Depth API); otherwise the recording is made
+   *                  without depth and its header says `"depth": false`.
    * @returns Promise resolving to { success: boolean, error?: string }.
    */
   _startRecording = async (

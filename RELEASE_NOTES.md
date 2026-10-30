@@ -11,6 +11,7 @@
 - **`<ViroVPSAnchor>` and the place's mesh.** Content placed in map coordinates, and the scanned mesh (occlusion and physics), follow the map every frame.
 - **Scanning from your app.** `uploadScanRecording(target, outputDir, options?)` zips a recording natively and sends it straight to Storage; on iOS the upload carries on in the background. `getScan(scanId)` follows processing. `meshQuality` picks the mesh's detail: `low`, `medium` (the default) or `high`.
 - **Record device depth while scanning (iOS with LiDAR, Android with ARCore Depth).** `startRecording(outputDir, { depth: true })` adds depth frames to the recording; set the navigator's `depthCaptureEnabled` when it mounts so the AR session is not reconfigured mid-scan. The scan upload carries the depth files.
+- **Each scan says how far to trust its mesh:** `scan.quality.mesh_confidence` is `good`, `fair` or `poor`, with reasons for whoever recorded (blank walls, a fast sweep, tracking that jumped). It never decides whether the map is accepted.
 - **VPS calls go to Studio** and need no address or credentials beyond the Studio session or the Expo plugin's `rvApiKey` and `rvProjectId`. Requests time out instead of hanging.
 
 ### World mesh
@@ -25,6 +26,7 @@
 - **Studio scenes feel native in the headset.** A menu on the left controller's menu button (or a palm pinch), panels styled after Meta Horizon OS at a quarter of the size, the HUD centred where the wearer looks, and placement along the controller's ray.
 - **The room stays put.** Content on room surfaces, tap-placed models and the co-location frame keep their place when the wearer recentres; `onRoomMoved(listener)` reports a recentre to your app. Plane scenes use the room's planes and pick the one nearest the wearer.
 - **Input behaves like the platform's.** Y goes back as B does, only a trigger or pinch selects, a hand and a controller on one side press once, and a released hand releases its pinch. `ViroController.getControllerRayAsync(source)` says where a ray points.
+- **Hand occlusion in passthrough:** `handOcclusion` on `ViroXRSceneNavigator` and `ViroVRSceneNavigator` lets the wearer's real hands show through virtual content in front of them (off by default; `handOcclusionMode` `"mesh"` or `"capsules"`).
 - **Fewer crashes and leaks:** videos no longer abort the app or leak, a scene's root can change as the headset view starts, and closing a scene logs no OpenXR errors.
 - **Expo plugin:** Quest builds declare minSdkVersion 32, the Horizon OS SDK, a network security config and Meta's recommended activity settings, and no longer declare NFC.
 
@@ -43,6 +45,9 @@
 - **A click goes to what is drawn on top,** not always the nearest object, and a click on nothing reaches `ViroController`'s `onClick` again.
 - **Text sits where its vertical alignment puts it,** and no longer disappears after a front-culled material.
 - **Video:** a paused iOS video stays paused, and Android play and pause reach the player in the order they were made.
-- `ViroKit.framework` targets iOS 15.1, the minimum the podspec already declared.
+- **Physics runs at real time on every display,** ARCore reports the ambient light again, and a paused AR session stays paused when its options change.
+- **Sounds seek to fractional seconds,** `Viro360Image` takes `stereoMode`, shared frames answer `{ success: false }` outside Quest, and calls that do nothing on a platform say so once.
+- **visionOS:** spot light cones and morph targets match the other platforms.
+- `ViroKit.framework` targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.
 
 See `CHANGELOG.md` for every change.

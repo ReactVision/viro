@@ -1,22 +1,5 @@
 # CHANGELOG
 
-## Unreleased
-
-### Added
-
-- **Hand occlusion on Meta Quest passthrough (`handOcclusion`, `handOcclusionMode`, `handOcclusionInflateMm` on `ViroVRSceneNavigator` and `ViroXRSceneNavigator`; `VRModuleOpenXR.setHandOcclusion(viewTag, enabled)`).** Each eye, the tracked hands are drawn depth-only before the scene, so the wearer's real hands show through virtual content in front of them. Off by default, and draws only while passthrough and hand tracking are both on. `handOcclusionMode` is `"mesh"` (default; the runtime's hand mesh, falling back to capsules without XR_FB_hand_tracking_mesh) or `"capsules"`, and `handOcclusionInflateMm` (default 2) grows the occluder past the tracked hand. Not applicable on iOS or visionOS. Needs the `viro_renderer-release.aar` and `react_viro-release.aar` built from ViroCore with ReactVision/virocore#425.
-
-### Changed
-
-- **`ViroVPSScan.quality` is typed (`ViroVPSScanQuality`) and carries `mesh_confidence` (`ViroVPSMeshConfidence`).** The backend scores how far to trust a scan's mesh: `good`, `fair` or `poor`, with `reasons` for whoever recorded (blank walls, a fast sweep, a track that jumped) and the signals behind them. It never decides whether the map is accepted, and is null without a mesh or on an older backend. The known measures keep their number types and `server_only` is a boolean; other keys read as `unknown` instead of `number | null`. `ViroVPSMapDownload.quality` has the same type. Both types are exported.
-- **Calls that do nothing on a platform say so once instead of failing silently:** `resetARSession` and `setWorldOrigin` on Android, `ViroARObjectMarker` on Android and Quest, and scene navigation in the web `ViroARSceneNavigator` and `Viro3DSceneNavigator`. `depthDebugEnabled` is documented iOS only. (#582)
-
-### Fixed
-
-- **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
-- **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
-- **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
-
 ## v3.1.0 — 27 October 2026
 
 ### Added
@@ -77,6 +60,7 @@
 - **`worldMeshConfig` takes `accumulate`, `voxelSize` and `maxMemoryMB`.** They configure the renderer's fusion of depth frames: whether to fuse at all (default on), the fusion voxel edge in metres (default 0.04) and the budget for the fused volume (default 64 MB), past which the least recently seen blocks are dropped. `accumulate: false` reproduces the per-frame behaviour.
 - **`getWorldMeshStats()` reports `source` and `accumulated`.** `source` is `"lidar"`, `"depth"`, `"monocular"`, `"plane"` or `"unknown"`, so an app can tell a scanned surface from the triangulated plane-anchor fallback the renderer quietly fell back to. `accumulated` says whether the mesh covers more than the current view — fused by the renderer on the depth paths, accumulated by ARKit on `"lidar"` — which is what decides whether a snapshot holds the room or one camera position. The new `ViroWorldMeshSource` type documents what each source means for accumulation. Both need the matching renderer, which marshals them across each bridge.
 - **`startRecording(outputDir, { depth: true })` records the device's depth, and `ViroARSceneNavigator` takes `depthCaptureEnabled` (iOS and Android).** With LiDAR on iOS or ARCore's Depth API on Android, the recording gains `depth/NNNNNN.png` (16-bit grayscale, millimetres) and `depth/NNNNNN_c.png` (8-bit confidence) at most every 100 ms, a `depth` line per frame in `session.jsonl`, and `"depth": true` in its header. Switching depth on reconfigures the AR session, which can make tracking jump, so set `depthCaptureEnabled` on the navigator when it mounts, not when recording starts; a recording started with `depth: true` without it, or on a device that cannot measure depth, is made as before and says `"depth": false`. `depthCaptureEnabled` is merged with what `occlusionMode`, `depthEnabled` and `worldMeshEnabled` ask of the session and never turns their depth off. `ViroRecordingOptions` is exported. On Android the depth is ARCore's smoothed depth with its raw confidence, and `uploadScanRecording` zips `depth/` on both platforms, storing the PNGs. Needs `ViroKit` and `libViroReact.a` rebuilt on iOS, and the ViroCore AAR on Android.
+- **Hand occlusion on Meta Quest passthrough (`handOcclusion`, `handOcclusionMode`, `handOcclusionInflateMm` on `ViroVRSceneNavigator` and `ViroXRSceneNavigator`; `VRModuleOpenXR.setHandOcclusion(viewTag, enabled)`).** Each eye, the tracked hands are drawn depth-only before the scene, so the wearer's real hands show through virtual content in front of them. Off by default, and draws only while passthrough and hand tracking are both on. `handOcclusionMode` is `"mesh"` (default; the runtime's hand mesh, falling back to capsules without XR_FB_hand_tracking_mesh) or `"capsules"`, and `handOcclusionInflateMm` (default 2) grows the occluder past the tracked hand. Not applicable on iOS or visionOS. Needs the `viro_renderer-release.aar` and `react_viro-release.aar` built from ViroCore with ReactVision/virocore#425.
 
 ### Changed
 
@@ -100,6 +84,8 @@
 - **The Meta Quest panels look like Meta Horizon OS panels (`StudioQuestAlertOverlay`, `StudioQuestSceneHudOverlay`, `StudioQuestLoadScene`).** The menu, the status panel, the loading and failed-load panel and an ALERT were translucent rectangles with centred text, and their items read `[ Exit ]`. Each is now an opaque dark card with rounded corners and its text aligned left, and the menu's card is wide enough to keep its hint on one line. Menu items and the Retry and Exit buttons are grey rounded buttons, and an ALERT has a blue OK button, which a long message replaces with Next and a page count until its last page; only that button closes an ALERT, where a click anywhere on it did. An ALERT's text no longer shrinks to fit, since at the new size the smallest step was too small to read: a long message goes on more pages instead. The cards are opaque because over passthrough a translucent panel let the room, and the scene behind it, show through far more than its alpha suggested.
 
 - **`minConfidence` is documented per platform (`ViroWorldMeshConfig`).** On iOS it excludes samples below the threshold. On Android it is not a cutoff: ARCore pairs its confidence image with the raw depth estimate while the mesh is built from the dense, smoothed one, which has no confidence of its own, so applying it as a cutoff discarded most of a well-lit wall at the default. The value is kept as a per-sample weight for fusion.
+- **`ViroVPSScan.quality` is typed (`ViroVPSScanQuality`) and carries `mesh_confidence` (`ViroVPSMeshConfidence`).** The backend scores how far to trust a scan's mesh: `good`, `fair` or `poor`, with `reasons` for whoever recorded (blank walls, a fast sweep, a track that jumped) and the signals behind them. It never decides whether the map is accepted, and is null without a mesh or on an older backend. The known measures keep their number types and `server_only` is a boolean; other keys read as `unknown` instead of `number | null`. `ViroVPSMapDownload.quality` has the same type. Both types are exported.
+- **Calls that do nothing on a platform say so once instead of failing silently:** `resetARSession` and `setWorldOrigin` on Android, `ViroARObjectMarker` on Android and Quest, and scene navigation in the web `ViroARSceneNavigator` and `Viro3DSceneNavigator`. `depthDebugEnabled` is documented iOS only. (#582)
 
 ### Fixed
 
@@ -160,6 +146,9 @@
 - **Stopping an Android scan recording no longer logs `signalEndOfInputStream failed` (`viro_renderer-release.aar`).** The recorder ended its video stream with a call its encoder does not support, so it relied on the encoder having handed over every frame already, which an encoder that holds frames back would not have. It now ends the stream the way the encoder expects and waits for its last frames before finishing the mp4.
 - **An Android video's play and pause reach the player in the order they were made (`viro_renderer-release.aar`).** A pause also goes to the player from the calling thread, so a play and a pause from two threads could reach the player in the opposite order and leave it paused while it reported playing.
 - **`recenterTracking()` on Meta Quest no longer races the renderer or leaves the room's planes behind (`viro_renderer-release.aar`).** It replaced the scene's space on the UI thread while the renderer used it, and the planes stopped updating. The renderer now makes the change between frames and locates the planes again, a second recentre lands in front of the wearer, and `onRoomMoved` hears about it as it does a system recentre.
+- **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
+- **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
+- **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
 
 ## v3.0.3 — 6 October 2026
 

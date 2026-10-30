@@ -348,8 +348,19 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    // React Native checks the argument count of a bridge call, so the call without options and
+    // the one with them are two methods.
     @ReactMethod
-    public void startRecording(final int sceneNavTag, final String outputDir, final ReadableMap options, final Promise promise) {
+    public void startRecording(final int sceneNavTag, final String outputDir, final Promise promise) {
+        startRecordingInternal(sceneNavTag, outputDir, null, promise);
+    }
+
+    @ReactMethod
+    public void startRecordingWithOptions(final int sceneNavTag, final String outputDir, final ReadableMap options, final Promise promise) {
+        startRecordingInternal(sceneNavTag, outputDir, options, promise);
+    }
+
+    private void startRecordingInternal(final int sceneNavTag, final String outputDir, final ReadableMap options, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) {
             WritableMap result = Arguments.createMap();

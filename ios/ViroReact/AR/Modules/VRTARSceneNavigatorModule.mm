@@ -463,12 +463,27 @@ RCT_EXPORT_METHOD(hostCloudAnchor:(nonnull NSNumber *)reactTag
 
 #pragma mark - AR Session Recording Methods
 
+// React Native checks the argument count of a bridge call, so the call without options and
+// the one with them are two methods.
 RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                         outputDir:(NSString *)outputDir
-                          options:(NSDictionary *)options
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
-    BOOL depth = [options[@"depth"] boolValue];
+    [self rv_startRecording:reactTag outputDir:outputDir depth:NO resolve:resolve];
+}
+
+RCT_EXPORT_METHOD(startRecordingWithOptions:(nonnull NSNumber *)reactTag
+                                  outputDir:(NSString *)outputDir
+                                    options:(NSDictionary *)options
+                                    resolve:(RCTPromiseResolveBlock)resolve
+                                     reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_startRecording:reactTag outputDir:outputDir depth:[options[@"depth"] boolValue] resolve:resolve];
+}
+
+- (void)rv_startRecording:(NSNumber *)reactTag
+                outputDir:(NSString *)outputDir
+                    depth:(BOOL)depth
+                  resolve:(RCTPromiseResolveBlock)resolve {
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);

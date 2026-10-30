@@ -919,17 +919,30 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    *                  session.jsonl. It takes effect only if the navigator was mounted with
    *                  `depthCaptureEnabled` on a device that measures depth (iOS with LiDAR,
    *                  Android with the ARCore Depth API); otherwise the recording is made
-   *                  without depth and its header says `"depth": false`.
+   *                  without depth and its header says `"depth": false`. A recording with
+   *                  more than about 54 minutes of depth cannot be uploaded: it holds two
+   *                  files per frame and the upload zip takes at most 65535 entries.
    * @returns Promise resolving to { success: boolean, error?: string }.
    */
   _startRecording = async (
     outputDir: string,
     options?: ViroRecordingOptions
   ) => {
+    // The options go through their own native method (the bridge checks argument counts), and
+    // only a depth request uses it, so a plain call also works on a binary without it.
+    if (
+      options?.depth === true &&
+      NativeModules.VRTARSceneNavigatorModule?.startRecordingWithOptions != null
+    ) {
+      return await ViroARSceneNavigatorModule.startRecordingWithOptions(
+        findNodeHandle(this),
+        outputDir,
+        { depth: true }
+      );
+    }
     return await ViroARSceneNavigatorModule.startRecording(
       findNodeHandle(this),
-      outputDir,
-      { depth: options?.depth === true }
+      outputDir
     );
   };
 

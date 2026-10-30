@@ -165,6 +165,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 navigator.applyWorldMeshEnabled();
                 navigator.mNeedsWorldMeshToggle = false;
             }
+
+            // Depth for recording is asked for now, before any recording starts, since it
+            // reconfigures the ARCore session
+            if (navigator.mNeedsDepthCaptureToggle) {
+                navigator.applyDepthCaptureEnabled();
+                navigator.mNeedsDepthCaptureToggle = false;
+            }
         }
 
         @Override
@@ -654,13 +661,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
      * ViroWorkspace/plans/viro-ar-recording-playback-plan.md. Not to be confused with
      * startVideoRecording/stopVideoRecording above, which capture the rendered screen only.
      */
-    public void startRecording(String outputDir, RecordingCallback callback) {
+    public void startRecording(String outputDir, boolean depth, RecordingCallback callback) {
         ARScene arScene = getCurrentARScene();
         if (arScene == null) {
             callback.onFailure("AR scene not available");
             return;
         }
-        arScene.startRecording(outputDir, getContext(), new ARScene.RecordingStartListener() {
+        arScene.startRecording(outputDir, getContext(), depth, new ARScene.RecordingStartListener() {
             @Override
             public void onSuccess() {
                 callback.onSuccess();
@@ -1604,6 +1611,28 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
         applyWorldMeshEnabled();
+    }
+
+    private boolean mDepthCaptureEnabled = false;
+    private boolean mNeedsDepthCaptureToggle = false;
+
+    public void setDepthCaptureEnabled(boolean enabled) {
+        mDepthCaptureEnabled = enabled;
+        if (getCurrentARScene() == null) {
+            mNeedsDepthCaptureToggle = true;
+            return;
+        }
+        applyDepthCaptureEnabled();
+    }
+
+    private void applyDepthCaptureEnabled() {
+        ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            Log.w(TAG, "Cannot apply depth capture: AR scene not available");
+            return;
+        }
+        arScene.setDepthCaptureEnabled(mDepthCaptureEnabled);
+        mNeedsDepthCaptureToggle = false;
     }
 
     public void setWorldMeshConfig(com.facebook.react.bridge.ReadableMap config) {

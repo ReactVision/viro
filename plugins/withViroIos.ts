@@ -4,13 +4,14 @@ import {
   XcodeProject,
   withDangerousMod,
   withInfoPlist,
-  withPlugins,
   withXcodeProject,
 } from "@expo/config-plugins";
 import { ExpoConfig } from "@expo/config-types";
 import fs from "fs";
 import path from "path";
+import { removeGeneratedBlock, wrapGeneratedBlock } from "./util/generatedBlock";
 import { insertLinesHelper } from "./util/insertLinesHelper";
+import { resolveViroOptions } from "./util/viroPluginOptions";
 import { DEFAULTS, ViroConfigurationOptions } from "./withViro";
 
 /**
@@ -39,113 +40,119 @@ export function resolveViroIosRelativePath(projectRoot: string, iosRoot: string)
   }
 }
 
-const withViroPods = (config: ExpoConfig) => {
-  config = withDangerousMod(config, [
-    "ios",
-    async (newConfig) => {
-      const root = newConfig.modRequest.platformProjectRoot;
-      const projectRoot = newConfig.modRequest.projectRoot;
+export interface ViroPodfileOptions {
+  viroIosRoot: string;
+  cloudAnchorProvider?: string;
+  geospatialAnchorProvider?: string;
+  iosLinkage?: "dynamic" | "static";
+  includeARCore?: boolean;
+  includeSemantics?: boolean;
+}
 
-      // Check plugin configuration options
-      let cloudAnchorProvider: string | undefined;
-      let geospatialAnchorProvider: string | undefined;
-      let iosLinkage: "dynamic" | "static" | undefined;
-      let includeARCore: boolean | undefined;
-      let includeSemantics: boolean | undefined;
-      if (Array.isArray(config.plugins)) {
-        const pluginConfig = config?.plugins?.find(
-          (plugin) =>
-            Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
-        );
-        if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
-          const options = pluginConfig[1] as ViroConfigurationOptions;
-          // Resolve unified provider prop; old props override for backward compat.
-          // Default to "reactvision" only when rvApiKey is present (implies RV intent).
-          const defaultProvider = options.rvApiKey ? "reactvision" : undefined;
-          const legacyOpts = options as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
-          cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? options.provider ?? defaultProvider;
-          geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? options.provider ?? defaultProvider;
-          iosLinkage = options.iosLinkage;
-          includeARCore = options.ios?.includeARCore;
-          includeSemantics = options.ios?.includeSemantics;
-        }
-      }
+const PODS_TAG = "viro-pods";
+const LINKAGE_TAG = "viro-linkage";
+const WEAK_LINKING_TAG = "viro-weak-linking";
 
-      fs.readFile(`${root}/Podfile`, "utf-8", (err, data) => {
-        // ViroReact with integrated Fabric support
-        const viroIosRoot = resolveViroIosRelativePath(projectRoot, root);
-        let viroPods =
-          `  # ViroReact with integrated New Architecture (Fabric) support\n` +
-          `  # Automatically includes Fabric components when RCT_NEW_ARCH_ENABLED=1\n` +
-          `  pod 'ViroReact', :path => '${viroIosRoot}'\n` +
-          `  pod 'ViroKit', :path => '${viroIosRoot}/dist/ViroRenderer/'`;
+// Blocks written before the begin/end markers existed. Removed so a prebuild over
+// an older ios/ directory does not end up with a second copy.
+const LEGACY_PODS_BLOCK =
+  /^[ \t]*# ViroReact with integrated New Architecture \(Fabric\) support\n[\s\S]*?pod 'ViroKit'[^\n]*\n?(?:\n[ \t]*# ARCore SDK - Cloud Anchors[\s\S]*?pod 'ARCore\/Semantics'[^\n]*\n?)?(?:\n[ \t]*# Enforce New Architecture requirement\n[^\n]*\n[^\n]*\n[^\n]*\n[ \t]*end\n?)?/m;
+const LEGACY_LINKAGE_BLOCK =
+  /^(?:# WARNING: ARCore SDK typically requires dynamic frameworks\.\n# Static linkage[^\n]*\n|# Framework linkage[^\n]*\n)use_frameworks! :linkage => :\w+\n\n?/gm;
+const LEGACY_WEAK_LINKING_BLOCK =
+  /^[ \t]*# ViroKit ARCore weak linking - makes ARCore frameworks optional at runtime\n[\s\S]*?config\.build_settings\['OTHER_LDFLAGS'\] = other_ldflags\n[ \t]*end\n[ \t]*end\n/m;
 
-        // Add ARCore pods if enabled (explicitly via includeARCore/includeSemantics or implicitly via providers)
-        // ViroKit.podspec declares these as weak_frameworks, making ARCore optional at runtime
-        const needsARCoreForFeatures = cloudAnchorProvider === "arcore" || geospatialAnchorProvider === "arcore";
-        const shouldIncludeARCore = includeARCore === true || needsARCoreForFeatures;
-        const shouldIncludeSemantics = shouldIncludeARCore || includeSemantics === true;
+/**
+ * Returns the Podfile with Viro's pods, framework linkage and ARCore weak
+ * linking hook applied. Each piece sits between begin/end markers, so running
+ * it again, or with different options, replaces the previous block.
+ */
+export function applyViroPodfile(data: string, options: ViroPodfileOptions): string {
+  const {
+    viroIosRoot,
+    cloudAnchorProvider,
+    geospatialAnchorProvider,
+    iosLinkage,
+    includeARCore,
+    includeSemantics,
+  } = options;
 
-        if (shouldIncludeSemantics) {
-          viroPods +=
-            `\n\n  # ARCore SDK - Cloud Anchors, Geospatial, and Scene Semantics API\n` +
-            `  # ViroKit uses weak linking for these frameworks, making ARCore optional at runtime.\n` +
-            `  # ViroKit checks availability using NSClassFromString and gracefully degrades if not present.\n` +
-            `  pod 'ARCore/CloudAnchors', '~> 1.51.0'`;
+  data = removeGeneratedBlock(data, PODS_TAG);
+  data = removeGeneratedBlock(data, LINKAGE_TAG);
+  data = removeGeneratedBlock(data, WEAK_LINKING_TAG);
+  data = data
+    .replace(LEGACY_PODS_BLOCK, "")
+    .replace(LEGACY_LINKAGE_BLOCK, "")
+    .replace(LEGACY_WEAK_LINKING_BLOCK, "");
 
-          // Add Geospatial pod if geospatial is enabled or full ARCore inclusion
-          if (geospatialAnchorProvider === "arcore" || includeARCore === true) {
-            viroPods +=
-              `\n  pod 'ARCore/Geospatial', '~> 1.51.0'`;
-          }
+  // ViroReact with integrated Fabric support
+  let viroPods =
+    `  # ViroReact with integrated New Architecture (Fabric) support\n` +
+    `  # Automatically includes Fabric components when RCT_NEW_ARCH_ENABLED=1\n` +
+    `  pod 'ViroReact', :path => '${viroIosRoot}'\n` +
+    `  pod 'ViroKit', :path => '${viroIosRoot}/dist/ViroRenderer/'`;
 
-          // Add Semantics pod for Scene Semantics API (ML-based scene understanding)
-          // Included whenever ARCore is present OR includeSemantics: true
-          viroPods +=
-            `\n  pod 'ARCore/Semantics', '~> 1.51.0'`;
-        }
+  // Add ARCore pods if enabled (explicitly via includeARCore/includeSemantics or implicitly via providers)
+  // ViroKit.podspec declares these as weak_frameworks, making ARCore optional at runtime
+  const needsARCoreForFeatures = cloudAnchorProvider === "arcore" || geospatialAnchorProvider === "arcore";
+  const shouldIncludeARCore = includeARCore === true || needsARCoreForFeatures;
+  const shouldIncludeSemantics = shouldIncludeARCore || includeSemantics === true;
 
-        // Add use_frameworks! if configured
-        // User's iosLinkage setting is respected; if not set and ARCore/Semantics is enabled, default to dynamic
-        const effectiveLinkage = iosLinkage || (shouldIncludeSemantics ? "dynamic" : undefined);
-        if (effectiveLinkage) {
-          // Insert use_frameworks! before the target block
-          let linkageComment: string;
-          if (shouldIncludeSemantics && effectiveLinkage === "static") {
-            // Warn user that static linkage may not work with ARCore
-            linkageComment = `# WARNING: ARCore SDK typically requires dynamic frameworks.\n# Static linkage is set but may cause build issues with ARCore pods.`;
-          } else if (shouldIncludeSemantics) {
-            linkageComment = `# Framework linkage: ${effectiveLinkage} (ARCore requires dynamic frameworks)`;
-          } else {
-            linkageComment = `# Framework linkage configured via app.json (iosLinkage: "${effectiveLinkage}")`;
-          }
-          data = insertLinesHelper(
-            `${linkageComment}\nuse_frameworks! :linkage => :${effectiveLinkage}\n`,
-            "target '",
-            data,
-            -1
-          );
-        }
+  if (shouldIncludeSemantics) {
+    viroPods +=
+      `\n\n  # ARCore SDK - Cloud Anchors, Geospatial, and Scene Semantics API\n` +
+      `  # ViroKit uses weak linking for these frameworks, making ARCore optional at runtime.\n` +
+      `  # ViroKit checks availability using NSClassFromString and gracefully degrades if not present.\n` +
+      `  pod 'ARCore/CloudAnchors', '~> 1.51.0'`;
 
-        // Add New Architecture enforcement
-        viroPods +=
-          `\n\n  # Enforce New Architecture requirement\n` +
-          `  # ViroReact 2.43.1+ requires React Native New Architecture\n` +
-          `  if ENV['RCT_NEW_ARCH_ENABLED'] != '1'\n` +
-          `    raise "ViroReact requires New Architecture to be enabled. Please set RCT_NEW_ARCH_ENABLED=1 in ios/.xcode.env"\n` +
-          `  end`;
+    // Add Geospatial pod if geospatial is enabled or full ARCore inclusion
+    if (geospatialAnchorProvider === "arcore" || includeARCore === true) {
+      viroPods +=
+        `\n  pod 'ARCore/Geospatial', '~> 1.51.0'`;
+    }
 
-        // Insert the pods into the Podfile
-        data = insertLinesHelper(
-          viroPods,
-          "post_install do |installer|",
-          data,
-          -1
-        );
+    // Add Semantics pod for Scene Semantics API (ML-based scene understanding)
+    // Included whenever ARCore is present OR includeSemantics: true
+    viroPods +=
+      `\n  pod 'ARCore/Semantics', '~> 1.51.0'`;
+  }
 
-        // Add ViroKit ARCore weak linking post_install hook if ARCore is enabled
-        if (shouldIncludeARCore) {
-          const weakLinkingHook = `    # ViroKit ARCore weak linking - makes ARCore frameworks optional at runtime
+  // Add use_frameworks! if configured
+  // User's iosLinkage setting is respected; if not set and ARCore/Semantics is enabled, default to dynamic
+  const effectiveLinkage = iosLinkage || (shouldIncludeSemantics ? "dynamic" : undefined);
+  if (effectiveLinkage) {
+    // Insert use_frameworks! before the target block
+    let linkageComment: string;
+    if (shouldIncludeSemantics && effectiveLinkage === "static") {
+      // Warn user that static linkage may not work with ARCore
+      linkageComment = `# WARNING: ARCore SDK typically requires dynamic frameworks.\n# Static linkage is set but may cause build issues with ARCore pods.`;
+    } else if (shouldIncludeSemantics) {
+      linkageComment = `# Framework linkage: ${effectiveLinkage} (ARCore requires dynamic frameworks)`;
+    } else {
+      linkageComment = `# Framework linkage configured via app.json (iosLinkage: "${effectiveLinkage}")`;
+    }
+    data = insertLinesHelper(
+      wrapGeneratedBlock(
+        LINKAGE_TAG,
+        `${linkageComment}\nuse_frameworks! :linkage => :${effectiveLinkage}`
+      ),
+      "target '",
+      data,
+      -1
+    );
+  }
+
+  // Insert the pods into the Podfile
+  data = insertLinesHelper(
+    wrapGeneratedBlock(PODS_TAG, viroPods, "#", "  "),
+    "post_install do |installer|",
+    data,
+    -1
+  );
+
+  // Add ViroKit ARCore weak linking post_install hook if ARCore is enabled
+  if (shouldIncludeARCore) {
+    const weakLinkingHook = `    # ViroKit ARCore weak linking - makes ARCore frameworks optional at runtime
     # Only applied when ARCore pods are installed to prevent linker errors
     virokit_targets = installer.pods_project.targets.select { |target|
       target.name.include?('ViroKit') ||
@@ -174,27 +181,51 @@ const withViroPods = (config: ExpoConfig) => {
 
         config.build_settings['OTHER_LDFLAGS'] = other_ldflags
       end
-    end
-`;
+    end`;
 
-          // Insert weak linking hook inside post_install block (right after the block starts)
-          data = insertLinesHelper(
-            weakLinkingHook,
-            "post_install do |installer|",
-            data,
-            1
-          );
-        }
+    // Insert weak linking hook inside post_install block (right after the block starts)
+    data = insertLinesHelper(
+      wrapGeneratedBlock(WEAK_LINKING_TAG, weakLinkingHook, "#", "    "),
+      "post_install do |installer|",
+      data,
+      1
+    );
+  }
 
-        fs.writeFile(`${root}/Podfile`, data, "utf-8", function (err) {
-          if (err) console.log("Error writing Podfile");
-        });
+  return data;
+}
+
+const withViroPods: ConfigPlugin<ViroConfigurationOptions> = (config, props) => {
+  const options = resolveViroOptions(config, props);
+  // Resolve unified provider prop; old props override for backward compat.
+  // Default to "reactvision" only when rvApiKey is present (implies RV intent).
+  const defaultProvider = options.rvApiKey ? "reactvision" : undefined;
+  const legacyOpts = options as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
+  const cloudAnchorProvider = legacyOpts.cloudAnchorProvider ?? options.provider ?? defaultProvider;
+  const geospatialAnchorProvider = legacyOpts.geospatialAnchorProvider ?? options.provider ?? defaultProvider;
+
+  return withDangerousMod(config, [
+    "ios",
+    async (newConfig) => {
+      const root = newConfig.modRequest.platformProjectRoot;
+      const projectRoot = newConfig.modRequest.projectRoot;
+      const podfilePath = path.join(root, "Podfile");
+
+      const data = await fs.promises.readFile(podfilePath, "utf-8");
+      const updated = applyViroPodfile(data, {
+        viroIosRoot: resolveViroIosRelativePath(projectRoot, root),
+        cloudAnchorProvider,
+        geospatialAnchorProvider,
+        iosLinkage: options.iosLinkage,
+        includeARCore: options.ios?.includeARCore,
+        includeSemantics: options.ios?.includeSemantics,
       });
+      if (updated !== data) {
+        await fs.promises.writeFile(podfilePath, updated, "utf-8");
+      }
       return newConfig;
     },
   ]);
-
-  return config;
 };
 
 const withEnabledBitcode: ConfigPlugin = (config) =>
@@ -231,7 +262,7 @@ const withExcludedSimulatorArchitectures = (config: ExpoConfig) => {
 
 export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
   config,
-  _props
+  props
 ) => {
   let savePhotosPermission = DEFAULTS.ios.savePhotosPermission;
   let photosPermission = DEFAULTS.ios.photosPermission;
@@ -246,35 +277,27 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
   let geospatialAnchorProvider: string | undefined;
   let includeARCore: boolean | undefined;
 
-  if (Array.isArray(config.plugins)) {
-    const pluginConfig = config?.plugins?.find(
-      (plugin) =>
-        Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
-    );
-    if (Array.isArray(pluginConfig) && pluginConfig.length > 1) {
-      const pluginOptions = pluginConfig[1] as ViroConfigurationOptions;
-      savePhotosPermission =
-        pluginOptions.ios?.savePhotosPermission || savePhotosPermission;
-      photosPermission = pluginOptions.ios?.photosPermission || photosPermission;
-      microphoneUsagePermission =
-        pluginOptions.ios?.microphoneUsagePermission || microphoneUsagePermission;
-      cameraUsagePermission =
-        pluginOptions.ios?.cameraUsagePermission || cameraUsagePermission;
-      locationUsagePermission =
-        pluginOptions.ios?.locationUsagePermission || locationUsagePermission;
-      googleCloudApiKey = pluginOptions.googleCloudApiKey;
-      rvApiKey = pluginOptions.rvApiKey;
-      rvProjectId = pluginOptions.rvProjectId;
-      rvEndpoint = pluginOptions.rvEndpoint;
-      // Resolve unified provider prop; old props override for backward compat.
-      // Default to "reactvision" only when rvApiKey is present (implies RV intent).
-      const defaultProvider2 = pluginOptions.rvApiKey ? "reactvision" : undefined;
-      const legacyOpts2 = pluginOptions as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
-      cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? pluginOptions.provider ?? defaultProvider2;
-      geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? pluginOptions.provider ?? defaultProvider2;
-      includeARCore = pluginOptions.ios?.includeARCore;
-    }
-  }
+  const pluginOptions = resolveViroOptions(config, props);
+  savePhotosPermission =
+    pluginOptions.ios?.savePhotosPermission || savePhotosPermission;
+  photosPermission = pluginOptions.ios?.photosPermission || photosPermission;
+  microphoneUsagePermission =
+    pluginOptions.ios?.microphoneUsagePermission || microphoneUsagePermission;
+  cameraUsagePermission =
+    pluginOptions.ios?.cameraUsagePermission || cameraUsagePermission;
+  locationUsagePermission =
+    pluginOptions.ios?.locationUsagePermission || locationUsagePermission;
+  googleCloudApiKey = pluginOptions.googleCloudApiKey;
+  rvApiKey = pluginOptions.rvApiKey;
+  rvProjectId = pluginOptions.rvProjectId;
+  rvEndpoint = pluginOptions.rvEndpoint;
+  // Resolve unified provider prop; old props override for backward compat.
+  // Default to "reactvision" only when rvApiKey is present (implies RV intent).
+  const defaultProvider2 = pluginOptions.rvApiKey ? "reactvision" : undefined;
+  const legacyOpts2 = pluginOptions as { cloudAnchorProvider?: string; geospatialAnchorProvider?: string };
+  cloudAnchorProvider = legacyOpts2.cloudAnchorProvider ?? pluginOptions.provider ?? defaultProvider2;
+  geospatialAnchorProvider = legacyOpts2.geospatialAnchorProvider ?? pluginOptions.provider ?? defaultProvider2;
+  includeARCore = pluginOptions.ios?.includeARCore;
 
   if (!config.ios) config.ios = {};
   if (!config.ios.infoPlist) config.ios.infoPlist = {};
@@ -318,29 +341,25 @@ export const withDefaultInfoPlist: ConfigPlugin<ViroConfigurationOptions> = (
 
 // A mod rather than config.ios.infoPlist, which is merged over an existing Info.plist and so
 // can add a key but never remove one.
-export const withViroTelemetryInfoPlist = (config: ExpoConfig) =>
-  withInfoPlist(config, (newConfig) => {
-    const pluginConfig = newConfig.plugins?.find(
-      (plugin) => Array.isArray(plugin) && plugin[0] === "@reactvision/react-viro"
-    );
-    const options = Array.isArray(pluginConfig)
-      ? (pluginConfig[1] as ViroConfigurationOptions | undefined)
-      : undefined;
-    if (options?.telemetry === false) {
+export const withViroTelemetryInfoPlist = (config: ExpoConfig, props?: ViroConfigurationOptions) => {
+  const options = resolveViroOptions(config, props);
+  return withInfoPlist(config, (newConfig) => {
+    if (options.telemetry === false) {
       newConfig.modResults.ViroTelemetryEnabled = false;
     } else {
       delete newConfig.modResults.ViroTelemetryEnabled;
     }
     return newConfig;
   });
+};
 
 export const withViroIos: ConfigPlugin<ViroConfigurationOptions> = (
   config,
   props
 ) => {
-  config = withPlugins(config, [[withViroPods, props]]);
+  config = withViroPods(config, props);
   withDefaultInfoPlist(config, props);
-  config = withViroTelemetryInfoPlist(config);
+  config = withViroTelemetryInfoPlist(config, props);
   withEnabledBitcode(config);
   withExcludedSimulatorArchitectures(config);
   return config;

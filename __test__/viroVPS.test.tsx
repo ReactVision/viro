@@ -494,8 +494,8 @@ describe("<ViroVPS> polling", () => {
       jest.advanceTimersByTime(200); // past the 450 ms timeout
       await flush();
     });
-    expect(states[states.length - 1].state).toBe("error");
-    expect(states[states.length - 1].error).toMatch(/did not answer/);
+    // One timed-out poll is not an error yet.
+    expect(states[states.length - 1].state).toBe("mapLoaded");
     // Still pending natively, so still no second call.
     expect(nav.getVPSLocalization).toHaveBeenCalledTimes(1);
 
@@ -546,9 +546,13 @@ describe("<ViroVPS> polling", () => {
         await flush();
       });
     };
+    // The third failed poll in a row is the one that reports.
     await tick({ available: false, error: "first" }, 0);
     await tick({ available: false, error: "first" }, 1);
-    await tick({ available: false, error: "second" }, 2);
+    expect(states.some((s) => s.state === "error")).toBe(false);
+    await tick({ available: false, error: "first" }, 2);
+    await tick({ available: false, error: "first" }, 3);
+    await tick({ available: false, error: "second" }, 4);
 
     const errors = states.filter((s) => s.state === "error").map((s) => s.error);
     expect(errors).toEqual(["first", "second"]);

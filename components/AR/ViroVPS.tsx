@@ -279,6 +279,9 @@ const SUPERSEDED: ViroVPSStartTrackingResult = {
   error: "superseded",
   errorDetail: { code: "SUPERSEDED", status: null, message: "superseded" },
 };
+/** Failed polls in a row before the tracking state becomes `error`. */
+const POLL_ERRORS_BEFORE_ERROR = 3;
+
 const SUPERSEDED_SEARCH = Symbol("superseded");
 
 type FoundLocation = { locationId: string; map: ViroVPSMapDownload };
@@ -451,6 +454,8 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
   private _pollTimer: ReturnType<typeof setInterval> | undefined;
   // True while a getVPSLocalization() call is pending; ticks skip until it settles.
   private _pollInFlight = false;
+  // Polls in a row that came back as an error; see POLL_ERRORS_BEFORE_ERROR.
+  private _pollErrors = 0;
   private _locationId: string | undefined;
   private _lastRenderPose: string | undefined;
   // The session whose map is loaded natively, if this component loaded one
@@ -561,6 +566,9 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
 
   private _startPolling(session: number, locationId: string) {
     this._stopPolling();
+    // A call still pending from an earlier session no longer blocks this one.
+    this._pollInFlight = false;
+    this._pollErrors = 0;
     const intervalMs = this.props.pollIntervalMs ?? 500;
     this._pollTimer = setInterval(() => {
       void this._poll(session, locationId);
@@ -582,14 +590,10 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     this._pollInFlight = true;
     // Cleared when the native call itself settles, not when the timeout
     // fires, so a stuck call blocks further ticks instead of stacking more.
-    call.then(
-      () => {
-        this._pollInFlight = false;
-      },
-      () => {
-        this._pollInFlight = false;
-      }
-    );
+    const settled = () => {
+      if (session === this._session) this._pollInFlight = false;
+    };
+    call.then(settled, settled);
 
     let localization: ViroVPSLocalizationResult;
     try {
@@ -606,6 +610,14 @@ export class ViroVPS extends React.Component<ViroVPSProps, State> {
     if (!this._mounted || session !== this._session) return;
 
     const next = nextTrackingPhase(this._phase, localization);
+    // One poll that fails or times out is not the end of tracking: the state
+    // changes only when it keeps failing.
+    if (next.state === "error") {
+      this._pollErrors += 1;
+      if (this._pollErrors < POLL_ERRORS_BEFORE_ERROR) return;
+    } else {
+      this._pollErrors = 0;
+    }
     this._setPhase(
       next,
       locationId,

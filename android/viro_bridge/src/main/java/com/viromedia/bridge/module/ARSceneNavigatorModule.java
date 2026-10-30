@@ -1971,13 +1971,20 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     }
                     ((VRTARSceneNavigator) view).rvCaptureVPSQueryFrame(maxSide,
                             (ok, gray, width, height, fx, fy, cx, cy, worldFromCamera) -> {
-                        if (!ok || gray.length == 0) {
+                        if (!ok || gray == null || gray.length == 0) {
                             promise.resolve(rvJson("success", false, "error", "No camera frame with intrinsics yet"));
                             return;
                         }
                         // JPEG off the UI thread.
-                        new Thread(() -> {
-                            String jpeg = encodeGrayJpeg(gray, width, height);
+                        Thread worker = new Thread(() -> {
+                            String jpeg;
+                            try {
+                                jpeg = encodeGrayJpeg(gray, width, height);
+                            } catch (Throwable e) {
+                                // Includes OutOfMemoryError: the Promise must still settle.
+                                promise.resolve(rvJson("success", false, "error", "JPEG encoding failed: " + e));
+                                return;
+                            }
                             if (jpeg == null) {
                                 promise.resolve(rvJson("success", false, "error", "JPEG encoding failed"));
                                 return;
@@ -1992,7 +1999,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                                     "width", width & ~1, "height", height & ~1,
                                     "fx", (double) fx, "fy", (double) fy, "cx", (double) cx, "cy", (double) cy,
                                     "worldFromCamera", pose));
-                        }, "ViroVPSQueryFrame").start();
+                        }, "ViroVPSQueryFrame");
+                        worker.setDaemon(true);
+                        worker.start();
                     });
                 } catch (Exception e) {
                     promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
@@ -2004,7 +2013,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     /** A width x height luma plane as base64 JPEG, through NV21 with neutral chroma; null on failure. */
     private static String encodeGrayJpeg(byte[] gray, int width, int height) {
         int w = width & ~1, h = height & ~1;
-        if (w <= 0 || h <= 0) return null;
+        if (w <= 0 || h <= 0 || gray == null || gray.length < (long) width * height) return null;
         byte[] nv21 = new byte[w * h * 3 / 2];
         for (int row = 0; row < h; row++) {
             System.arraycopy(gray, row * width, nv21, row * w, w);
@@ -2061,7 +2070,11 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     // ── VPS scan upload ─────────────────────────────────────────────────────
 
     /** Off the native modules thread, one call at a time: zipping is disk bound and enqueueing blocks. */
-    private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor();
+    private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "ViroVPSUpload");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /**
      * Zips a ViroReact AR recording (session.jsonl + video.mp4 and every file
@@ -2070,7 +2083,13 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void rvPrepareScanRecording(final String recordingDir, final Promise promise) {
-        sVpsUploadExecutor.execute(() -> promise.resolve(VpsScanUpload.prepare(mContext, recordingDir)));
+        sVpsUploadExecutor.execute(() -> {
+            try {
+                promise.resolve(VpsScanUpload.prepare(mContext, recordingDir));
+            } catch (Throwable e) {
+                promise.resolve(rvJson("success", false, "stage", "zip", "error", String.valueOf(e)));
+            }
+        });
     }
 
     /**
@@ -2080,14 +2099,25 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void rvTransferScanRecording(final String requestJson, final Promise promise) {
-        sVpsUploadExecutor.execute(() -> VpsScanUpload.transfer(mContext, requestJson, promise));
+        sVpsUploadExecutor.execute(() -> {
+            try {
+                VpsScanUpload.transfer(mContext, requestJson, promise);
+            } catch (Throwable e) {
+                // A second resolve after transfer settled the Promise is ignored by React Native.
+                promise.resolve(rvJson("success", false, "stage", "upload", "error", String.valueOf(e)));
+            }
+        });
     }
 
     /** Deletes a prepared zip no transfer was started for. Resolves null. */
     @ReactMethod
     public void rvDiscardScanRecording(final String path, final Promise promise) {
         sVpsUploadExecutor.execute(() -> {
-            VpsScanUpload.deletePreparedZip(mContext, path);
+            try {
+                VpsScanUpload.deletePreparedZip(mContext, path);
+            } catch (Throwable e) {
+                Log.w("ARSceneNavigatorModule", "Discarding a prepared scan failed: " + e);
+            }
             promise.resolve(null);
         });
     }

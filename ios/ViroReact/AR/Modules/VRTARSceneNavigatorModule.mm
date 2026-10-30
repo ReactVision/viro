@@ -465,8 +465,10 @@ RCT_EXPORT_METHOD(hostCloudAnchor:(nonnull NSNumber *)reactTag
 
 RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                         outputDir:(NSString *)outputDir
+                          options:(NSDictionary *)options
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
+    BOOL depth = [options[@"depth"] boolValue];
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
@@ -484,6 +486,7 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
             }
 
             [component startRecording:outputDir
+                                depth:depth
                      completionHandler:^(BOOL success, NSString *error) {
                 NSMutableDictionary *result = [NSMutableDictionary new];
                 [result setObject:@(success) forKey:@"success"];

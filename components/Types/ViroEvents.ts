@@ -821,6 +821,20 @@ export type ViroRecordingStatus =
   | "Unsupported";
 
 /**
+ * Options of `ViroARSceneNavigator.startRecording()`.
+ */
+export type ViroRecordingOptions = {
+  /**
+   * Also record the device's depth (`depth/` PNGs and `depth` lines in session.jsonl). Needs
+   * the navigator's `depthCaptureEnabled` prop and a device that measures depth; without
+   * either, the recording is made without depth.
+   *
+   * @default false
+   */
+  depth?: boolean;
+};
+
+/**
  * VPS (Visual Positioning System) availability at a location.
  */
 export type ViroVPSAvailability = "Available" | "Unavailable" | "Unknown";

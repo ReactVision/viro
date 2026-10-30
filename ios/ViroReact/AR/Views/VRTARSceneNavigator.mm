@@ -196,6 +196,12 @@ static NSString * const kRVWatermarkURL =
             }
         }
 
+        // Depth for recording is asked for now, before any recording starts, since it
+        // reconfigures the AR session
+        if (_depthCaptureEnabled) {
+            arSession->setDepthCaptureEnabled(true);
+        }
+
         // Apply initial depth debug setting if set
         if (_depthDebugEnabled) {
             [viewAR setDepthDebugEnabled:_depthDebugEnabled opacity:0.7f];
@@ -774,6 +780,17 @@ static NSString * const kRVWatermarkURL =
     }
 }
 
+- (void)setDepthCaptureEnabled:(BOOL)depthCaptureEnabled {
+    _depthCaptureEnabled = depthCaptureEnabled;
+    if (_vroView) {
+        VROViewAR *viewAR = (VROViewAR *) _vroView;
+        std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+        if (arSession) {
+            arSession->setDepthCaptureEnabled(depthCaptureEnabled);
+        }
+    }
+}
+
 - (void)setDepthDebugEnabled:(BOOL)depthDebugEnabled {
     _depthDebugEnabled = depthDebugEnabled;
     if (_vroView) {
@@ -962,6 +979,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
 }
 
 - (void)startRecording:(NSString *)outputDir
+                 depth:(BOOL)depth
       completionHandler:(RecordingStartCompletionHandler)completionHandler {
     if (!_vroView) {
         if (completionHandler) {
@@ -981,6 +999,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
 
     VROARRecordingConfig config;
     config.outputDir = std::string([outputDir UTF8String]);
+    config.depth = depth;
 
     arSession->startRecording(config,
         [completionHandler] {

@@ -349,7 +349,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void startRecording(final int sceneNavTag, final String outputDir, final Promise promise) {
+    public void startRecording(final int sceneNavTag, final String outputDir, final ReadableMap options, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) {
             WritableMap result = Arguments.createMap();

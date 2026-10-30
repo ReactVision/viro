@@ -49,6 +49,7 @@
 @property (nonatomic, readwrite) BOOL multisamplingEnabled;
 @property (nonatomic, copy) NSString *occlusionMode;
 @property (nonatomic, assign) BOOL depthEnabled;
+@property (nonatomic, assign) BOOL depthCaptureEnabled;
 @property (nonatomic, assign) BOOL depthDebugEnabled;
 @property (nonatomic, assign) BOOL semanticDebugEnabled;
 @property (nonatomic, assign) float monocularDepthScale;
@@ -119,7 +120,10 @@ typedef void (^CloudAnchorResolveCompletionHandler)(BOOL success,
 typedef void (^RecordingStartCompletionHandler)(BOOL success,
                                                  NSString * _Nullable error);
 
+// depth also records the device's depth; it only takes effect if depthCaptureEnabled
+// was on before the recording started.
 - (void)startRecording:(NSString *)outputDir
+                 depth:(BOOL)depth
       completionHandler:(RecordingStartCompletionHandler)completionHandler;
 
 - (void)stopRecording;

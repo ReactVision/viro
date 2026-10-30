@@ -372,7 +372,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 }
 
                 VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
-                sceneNavigator.startRecording(outputDir, new VRTARSceneNavigator.RecordingCallback() {
+                boolean depth = options != null && options.hasKey("depth") && options.getBoolean("depth");
+                sceneNavigator.startRecording(outputDir, depth, new VRTARSceneNavigator.RecordingCallback() {
                     @Override
                     public void onSuccess() {
                         WritableMap result = Arguments.createMap();
@@ -2032,8 +2033,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor();
 
     /**
-     * Zips a ViroReact AR recording (session.jsonl + video.mp4 in
-     * {@code recordingDir}) into app-private storage that outlives the
+     * Zips a ViroReact AR recording (session.jsonl + video.mp4 and every file
+     * under depth/ in {@code recordingDir}) into app-private storage that outlives the
      * process. Resolves {success, path, bytes} or {success: false, stage: "zip", error}.
      */
     @ReactMethod

@@ -1,8 +1,8 @@
 /**
  * Copyright © 2026 ReactVision
  *
- * Packages a ViroReact AR recording (session.jsonl + video.mp4, written by
- * startRecording()/stopRecording(); see VROARSessionRecorderIOS /
+ * Packages a ViroReact AR recording (session.jsonl + video.mp4, plus depth/ when it
+ * was recorded with depth, written by startRecording()/stopRecording(); see VROARSessionRecorderIOS /
  * ARSessionRecorder) and uploads it for processing: Studio creates the scan
  * (POST /vps/scans) and admits the upload (POST /vps/scans/{id}/upload), which
  * answers with a signed Storage URL; the device PUTs the zip there and tells

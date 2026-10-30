@@ -10,7 +10,7 @@
 - **Two ways to localise, behind one prop.** `localization="device"` (the default) downloads the place's map and matches on the phone. `localization="server"` sends camera frames to the GPU server instead, which holds up much better across days and lighting, and needs no map download. `StudioSceneNavigator` takes the same choice as `vpsLocalization`.
 - **`<ViroVPSAnchor>` and the place's mesh.** Content placed in map coordinates, and the scanned mesh (occlusion and physics), follow the map every frame.
 - **Scanning from your app.** `uploadScanRecording(target, outputDir, options?)` zips a recording natively and sends it straight to Storage; on iOS the upload carries on in the background. `getScan(scanId)` follows processing. `meshQuality` picks the mesh's detail: `low`, `medium` (the default) or `high`.
-- **Record device depth while scanning (iOS with LiDAR).** `startRecording(outputDir, { depth: true })` adds depth frames to the recording; set the navigator's `depthCaptureEnabled` when it mounts so the AR session is not reconfigured mid-scan.
+- **Record device depth while scanning (iOS with LiDAR, Android with ARCore Depth).** `startRecording(outputDir, { depth: true })` adds depth frames to the recording; set the navigator's `depthCaptureEnabled` when it mounts so the AR session is not reconfigured mid-scan. The scan upload carries the depth files.
 - **VPS calls go to Studio** and need no address or credentials beyond the Studio session or the Expo plugin's `rvApiKey` and `rvProjectId`. Requests time out instead of hanging.
 
 ### World mesh

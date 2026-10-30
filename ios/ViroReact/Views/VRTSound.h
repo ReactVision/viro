@@ -52,7 +52,7 @@
 - (void)createSoundWithPath:(NSString *)path resourceType:(VROResourceType)resourceType;
 // This function should reset all the props on the underlying native Sound object.
 - (void)setNativeProps;
-- (void)seekToTime:(NSInteger)time;
+- (void)seekToTime:(float)time;
 
 @end
 

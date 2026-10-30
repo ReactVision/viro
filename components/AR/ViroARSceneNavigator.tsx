@@ -16,6 +16,7 @@ import * as React from "react";
 import {
   findNodeHandle,
   NativeModules,
+  Platform,
   requireNativeComponent,
   StyleSheet,
   Text,
@@ -23,6 +24,7 @@ import {
   ViewProps,
 } from "react-native";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import {
   isLocationTransform,
   parseScanDiagnostics,
@@ -95,6 +97,8 @@ const ViroARSceneNavigatorModule = withMissingModuleFallback(
   NativeModules.VRTARSceneNavigatorModule,
   "VRTARSceneNavigatorModule"
 );
+
+const SHARED_FRAME_UNSUPPORTED = "Shared frames are only available on Meta Quest";
 
 let mathRandomOffset = 0;
 
@@ -186,6 +190,8 @@ type Props = ViewProps & {
   depthCaptureEnabled?: boolean;
 
   /**
+   * @platform ios
+   *
    * [Debug] Enable depth debug visualization to see how the depth texture is being sampled.
    * When enabled, the camera background will show a color overlay representing depth values:
    * - Magenta = No depth data
@@ -854,6 +860,11 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param removeAnchors - determines if the existing anchors should be removed too.
    */
   _resetARSession = (resetTracking: any, removeAnchors: any) => {
+    // ARCore has no reset: the Android bridge and session accept the call and do nothing
+    if (Platform.OS === "android") {
+      warnUnsupported("resetARSession", "Android", "ARCore cannot reset a running session.");
+      return;
+    }
     ViroARSceneNavigatorModule.resetARSession(
       findNodeHandle(this),
       resetTracking,
@@ -873,6 +884,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    *  array containing 3 floats (note: rotation is in degrees).
    */
   _setWorldOrigin = (worldOrigin: ViroWorldOrigin) => {
+    if (Platform.OS === "android") {
+      warnUnsupported("setWorldOrigin", "Android", "ARCore has no equivalent of ARKit's setWorldOrigin.");
+      return;
+    }
     ViroARSceneNavigatorModule.setWorldOrigin(
       findNodeHandle(this),
       worldOrigin
@@ -1275,6 +1290,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * app picks, and it doubles as the co-location room key.
    */
   _rvCreateSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    // the iOS bridge has no shared frames: answer as the Android one does off Quest
+    if (typeof ViroARSceneNavigatorModule.rvCreateSharedFrame !== "function") {
+      return { success: false, error: SHARED_FRAME_UNSUPPORTED };
+    }
     return await ViroARSceneNavigatorModule.rvCreateSharedFrame(
       findNodeHandle(this),
       groupId
@@ -1283,6 +1302,9 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
 
   /** CL-H: recover a shared frame another device published to `groupId`. */
   _rvJoinSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    if (typeof ViroARSceneNavigatorModule.rvJoinSharedFrame !== "function") {
+      return { success: false, error: SHARED_FRAME_UNSUPPORTED };
+    }
     return await ViroARSceneNavigatorModule.rvJoinSharedFrame(
       findNodeHandle(this),
       groupId

@@ -314,6 +314,40 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
         }
     }
 
+    /**
+     * Enable or disable hand occlusion: the tracked hands are drawn depth-only
+     * so the real (passthrough) hands show through virtual content. Only takes
+     * effect while passthrough and hand tracking are both on.
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setHandOcclusionEnabled(boolean enabled) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setHandOcclusionEnabled(enabled);
+        }
+    }
+
+    /**
+     * Hand occlusion geometry: "mesh" (default) or "capsules". A null mode
+     * (prop removed) resets to "mesh".
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setHandOcclusionMode(String mode) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setHandOcclusionMode(mode != null ? mode : "mesh");
+        }
+    }
+
+    /**
+     * How far the hand occluder is inflated past the tracked hand, in
+     * millimetres (default 2).
+     * No-op when the underlying view is not a {@link ViroViewOpenXR}.
+     */
+    public void setHandOcclusionInflateMm(float mm) {
+        if (mViroView instanceof ViroViewOpenXR) {
+            ((ViroViewOpenXR) mViroView).setHandOcclusionInflateMm(mm);
+        }
+    }
+
     @Override
     public void onPropsSet() {
         if (mNeedsSetVrMode) {

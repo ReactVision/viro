@@ -171,6 +171,18 @@ type Props = ViewProps & {
   vrModeEnabled?: boolean;
   passthroughEnabled?: boolean;
   handTrackingEnabled?: boolean;
+  /**
+   * Quest passthrough hand occlusion: real hands show through virtual content.
+   * Needs `passthroughEnabled` and `handTrackingEnabled`; otherwise a no-op.
+   * Defaults to false. Like the other Quest flags it is read when the headset
+   * view launches; to toggle it while the VR scene is running, call
+   * `VRModuleOpenXR.setHandOcclusion(viewTag, enabled)`.
+   */
+  handOcclusion?: boolean;
+  /** Hand occlusion geometry. `"mesh"` (default; falls back to capsules natively) or `"capsules"`. */
+  handOcclusionMode?: "capsules" | "mesh";
+  /** Hand occluder inflation past the tracked hand, in millimetres. Defaults to 2. */
+  handOcclusionInflateMm?: number;
   onExitViro?: () => void;
 
   // ── Meta Quest panel ───────────────────────────────────────────────────────
@@ -246,7 +258,8 @@ type Props = ViewProps & {
  * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
  * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
  * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`
- * and `handTrackingEnabled` are Quest-only and go over the bridge alone.
+ * and `handTrackingEnabled` (and the `handOcclusion*` props) are Quest-only
+ * and go over the bridge alone.
  */
 export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
   function ViroXRSceneNavigator(props, ref) {
@@ -270,6 +283,9 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       vrModeEnabled,
       passthroughEnabled,
       handTrackingEnabled,
+      handOcclusion,
+      handOcclusionMode,
+      handOcclusionInflateMm,
       onExitViro,
       debug,
       renderQuestPanel,
@@ -459,6 +475,9 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
             vrModeEnabled,
             passthroughEnabled,
             handTrackingEnabled,
+            handOcclusion,
+            handOcclusionMode,
+            handOcclusionInflateMm,
             onExitViro,
             debug,
           });

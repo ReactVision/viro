@@ -10,6 +10,7 @@ import * as React from "react";
 import { ViroNode } from "../ViroNode";
 import { ViroCloudAnchorState, ViroLocalizedEvent } from "../Types/ViroEvents";
 import {
+  ViroFrameOutcome,
   ViroFrameSource,
   ViroSharedFrameValue,
 } from "./ViroFrameSource";
@@ -115,6 +116,10 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
   private _pollTimer: ReturnType<typeof setInterval> | undefined;
   private _retryTimer: ReturnType<typeof setTimeout> | undefined;
   private _attempt = 0;
+  // Counts acquires, so one that lands after a newer began knows it is stale
+  // and leaves the newer one's polling alone.
+  private _generation = 0;
+  private _acquiring = false;
 
   componentDidMount() {
     this._mounted = true;
@@ -126,15 +131,31 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
       this.setState({ frame: null });
       this._attempt = 0;
       this._clearRetry();
+      this._stopPolling();
+      this._cancelAcquire();
       this._acquire();
     }
   }
 
   componentWillUnmount() {
     this._mounted = false;
+    this._generation += 1;
     this._stopPolling();
     this._clearRetry();
+    this._cancelAcquire();
   }
+
+  // Native keeps resolving after the JS side stopped caring, so what is in
+  // flight is asked to stop.
+  _cancelAcquire = () => {
+    if (!this._acquiring) return;
+    this._acquiring = false;
+    try {
+      this.props.arSceneNavigator?.cancelCloudAnchorOperations?.();
+    } catch {
+      // Nothing more to do for an operation that cannot be cancelled.
+    }
+  };
 
   _clearRetry = () => {
     if (this._retryTimer) {
@@ -157,7 +178,13 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
     this._stopPolling();
     this._pollTimer = setInterval(async () => {
       const requested = source.key;
-      const message = await source.progress!({ arSceneNavigator });
+      let message: string | null;
+      try {
+        message = await source.progress!({ arSceneNavigator });
+      } catch {
+        // A poll that fails is not an acquire that failed.
+        return;
+      }
       // A poll in flight outlives the acquire that started it, and a stale one
       // would report the previous anchor's progress against the current one.
       if (!this._mounted || requested !== this.props.source.key) return;
@@ -184,13 +211,32 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
     }
 
     const requested = source.key;
+    const generation = ++this._generation;
     this._attempt += 1;
     this._startPolling();
-    const outcome = await source.acquire({ arSceneNavigator });
-    this._stopPolling();
+    this._acquiring = true;
+    let outcome: ViroFrameOutcome;
+    try {
+      outcome = await source.acquire({ arSceneNavigator });
+    } catch (e: any) {
+      outcome = {
+        success: false,
+        error: e?.message ?? String(e),
+        state: "ErrorInternal",
+      };
+    }
 
-    // Ignore an acquire that landed after unmount, or after the source changed.
-    if (!this._mounted || requested !== this.props.source.key) return;
+    // Ignore an acquire that landed after unmount, or after a newer one began:
+    // the polling and the in-flight flag are the newer one's now.
+    if (
+      !this._mounted ||
+      generation !== this._generation ||
+      requested !== this.props.source.key
+    ) {
+      return;
+    }
+    this._acquiring = false;
+    this._stopPolling();
 
     if (!outcome.success) {
       const attemptsAllowed = this.props.maxAttempts ?? 3;

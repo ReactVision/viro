@@ -200,23 +200,33 @@ public class RVHttpClient {
         return conn;
     }
 
-    // https only, except for localhost and private LAN hosts, which local
-    // development servers use.
+    /**
+     * Hosts plain http may reach: localhost, a private network (10/8, 172.16/12,
+     * 192.168/16, 100.64/10 as Tailscale uses, IPv6 ULA) or a .local name. The same
+     * rule as studioVpsEndpointAllowed in JS, so a URL is accepted or refused alike
+     * on both sides of the bridge. Used by VpsScanUpload too.
+     */
+    public static boolean isLocalNetworkHost(String host) {
+        if (host == null) return false;
+        host = host.toLowerCase(java.util.Locale.ROOT);
+        return host.equals("localhost") || host.equals("[::1]") || host.endsWith(".local")
+                || host.matches("\\[f[cd][0-9a-f]{2}:.*\\]")
+                || host.matches("127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("192\\.168\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("172\\.(1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}");
+    }
+
+    // https only, except for the local hosts above, which development servers use.
     private static void requireAllowedUrl(String url) throws IOException {
         try {
             java.net.URI uri = new java.net.URI(url);
             String scheme = uri.getScheme();
             if ("https".equalsIgnoreCase(scheme)) return;
             String host = uri.getHost();
-            if ("http".equalsIgnoreCase(scheme) && host != null) {
-                host = host.toLowerCase(java.util.Locale.ROOT);
-                if (host.equals("localhost") || host.equals("[::1]") || host.endsWith(".local")
-                        || host.matches("127\\.\\d+\\.\\d+\\.\\d+")
-                        || host.matches("10\\.\\d+\\.\\d+\\.\\d+")
-                        || host.matches("192\\.168\\.\\d+\\.\\d+")
-                        || host.matches("172\\.(1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+")) {
-                    return;
-                }
+            if ("http".equalsIgnoreCase(scheme) && isLocalNetworkHost(host)) {
+                return;
             }
         } catch (java.net.URISyntaxException e) {
             throw new IOException("Malformed URL");

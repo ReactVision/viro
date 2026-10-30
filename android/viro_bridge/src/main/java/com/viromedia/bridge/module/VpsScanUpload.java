@@ -179,14 +179,7 @@ final class VpsScanUpload {
             String scheme = uri.getScheme();
             if ("https".equalsIgnoreCase(scheme)) return true;
             if (!"http".equalsIgnoreCase(scheme)) return false;
-            String host = uri.getHost();
-            if (host == null) return false;
-            host = host.toLowerCase(java.util.Locale.ROOT);
-            return host.equals("localhost") || host.equals("[::1]") || host.endsWith(".local")
-                    || host.matches("127\\.\\d+\\.\\d+\\.\\d+")
-                    || host.matches("10\\.\\d+\\.\\d+\\.\\d+")
-                    || host.matches("192\\.168\\.\\d+\\.\\d+")
-                    || host.matches("172\\.(1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+");
+            return com.reactvision.cca.RVHttpClient.isLocalNetworkHost(uri.getHost());
         } catch (java.net.URISyntaxException e) {
             return false;
         }

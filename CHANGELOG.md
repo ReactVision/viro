@@ -86,6 +86,7 @@
 - **`minConfidence` is documented per platform (`ViroWorldMeshConfig`).** On iOS it excludes samples below the threshold. On Android it is not a cutoff: ARCore pairs its confidence image with the raw depth estimate while the mesh is built from the dense, smoothed one, which has no confidence of its own, so applying it as a cutoff discarded most of a well-lit wall at the default. The value is kept as a per-sample weight for fusion.
 - **`ViroVPSScan.quality` is typed (`ViroVPSScanQuality`) and carries `mesh_confidence` (`ViroVPSMeshConfidence`).** The backend scores how far to trust a scan's mesh: `good`, `fair` or `poor`, with `reasons` for whoever recorded (blank walls, a fast sweep, a track that jumped) and the signals behind them. It never decides whether the map is accepted, and is null without a mesh or on an older backend. The known measures keep their number types and `server_only` is a boolean; other keys read as `unknown` instead of `number | null`. `ViroVPSMapDownload.quality` has the same type. Both types are exported.
 - **Calls that do nothing on a platform say so once instead of failing silently:** `resetARSession` and `setWorldOrigin` on Android, `ViroARObjectMarker` on Android and Quest, and scene navigation in the web `ViroARSceneNavigator` and `Viro3DSceneNavigator`. `depthDebugEnabled` is documented iOS only. (#582)
+- **Android: a few calls behave differently (`MediaCapture`, `ViroARSceneNavigator`).** `startVideoRecording` fails with error 1 when `RECORD_AUDIO` is denied, where iOS records without sound; `takeScreenshot` keeps only the last path segment of its file name (`"dir/shot"` saves as `shot.jpg`); and `projectPoint` / `unprojectPoint` on a stale view reject instead of never settling, so give them a `catch`.
 
 ### Fixed
 
@@ -149,6 +150,7 @@
 - **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
 - **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
 - **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
+- **Android bridge hardening (`RVHttpClient`, `VpsScanUpload`, `MediaCapture`, the scene navigator modules).** Requests with credentials go only to https or a local host (localhost, a private network including 100.64/10, IPv6 ULA, `.local`), the same rule as in JS, and no longer follow redirects; downloads are capped and multipart names sanitised; the upload worker reads only zips from its uploads folder; promises from a stale or missing AR view settle instead of hanging; the AR view pauses without a current activity, location start retries, and the library ships consumer keep rules for its JNI, WorkManager and React Native lookups, so a release build with R8 no longer strips them.
 
 ## v3.0.3 — 6 October 2026
 

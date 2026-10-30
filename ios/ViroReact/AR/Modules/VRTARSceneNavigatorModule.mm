@@ -640,7 +640,7 @@ RCT_EXPORT_METHOD(isGeospatialModeSupported:(nonnull NSNumber *)reactTag
             BOOL supported = [component isGeospatialModeSupported];
             resolve(@{@"supported": @(supported)});
         } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
+            resolve(@{@"supported": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -660,7 +660,7 @@ RCT_EXPORT_METHOD(isLocationAccuracyReduced:(nonnull NSNumber *)reactTag
             BOOL reduced = [component isLocationAccuracyReduced];
             resolve(@{@"reduced": @(reduced)});
         } @catch (NSException *exception) {
-            resolve(@{@"reduced": @NO, @"error": exception.reason});
+            resolve(@{@"reduced": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -691,7 +691,7 @@ RCT_EXPORT_METHOD(getEarthTrackingState:(nonnull NSNumber *)reactTag
             NSString *state = [component getEarthTrackingState];
             resolve(@{@"state": state});
         } @catch (NSException *exception) {
-            resolve(@{@"state": @"Stopped", @"error": exception.reason});
+            resolve(@{@"state": @"Stopped", @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -726,7 +726,7 @@ RCT_EXPORT_METHOD(getCameraGeospatialPose:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -752,7 +752,7 @@ RCT_EXPORT_METHOD(checkVPSAvailability:(nonnull NSNumber *)reactTag
                 resolve(@{@"availability": availability});
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"availability": @"Unknown", @"error": exception.reason});
+            resolve(@{@"availability": @"Unknown", @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -795,7 +795,7 @@ RCT_EXPORT_METHOD(createGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -838,7 +838,7 @@ RCT_EXPORT_METHOD(createTerrainAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -881,7 +881,7 @@ RCT_EXPORT_METHOD(createRooftopAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -968,7 +968,7 @@ RCT_EXPORT_METHOD(rvGetGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1000,7 +1000,7 @@ RCT_EXPORT_METHOD(rvFindNearbyGeospatialAnchors:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"anchors": @[], @"error": exception.reason});
+            resolve(@{@"success": @NO, @"anchors": @[], @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1034,7 +1034,7 @@ RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1062,7 +1062,7 @@ RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
                 if (error)       [result setObject:error       forKey:@"error"];
                 resolve(result);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1085,7 +1085,7 @@ RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
                 resolve(@{@"success": @NO,
                           @"error": reason ?: @"No world mesh available to snapshot"});
             }
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1107,7 +1107,7 @@ RCT_EXPORT_METHOD(rvLoadWorldMeshFromFile:(nonnull NSNumber *)reactTag
             } else {
                 resolve(@{@"success": @NO, @"error": @"Failed to load world mesh (no scene, no world mesh enabled, or malformed file)"});
             }
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1131,7 +1131,7 @@ RCT_EXPORT_METHOD(rvDeleteGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1155,7 +1155,7 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1191,7 +1191,7 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
                 if (error)                 [r setObject:error                forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1781,7 +1781,7 @@ RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error)      [r setObject:error      forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1804,7 +1804,7 @@ RCT_EXPORT_METHOD(rvListCloudAnchors:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1829,7 +1829,7 @@ RCT_EXPORT_METHOD(rvUpdateCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error)      [r setObject:error      forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1850,7 +1850,7 @@ RCT_EXPORT_METHOD(rvDeleteCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1876,7 +1876,7 @@ RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1896,7 +1896,7 @@ RCT_EXPORT_METHOD(rvGetProject:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1918,7 +1918,7 @@ RCT_EXPORT_METHOD(rvGetScene:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1940,7 +1940,7 @@ RCT_EXPORT_METHOD(rvGetSceneAssets:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1967,7 +1967,7 @@ RCT_EXPORT_METHOD(rvAttachAssetToCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1989,7 +1989,7 @@ RCT_EXPORT_METHOD(rvRemoveAssetFromCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -2019,7 +2019,7 @@ RCT_EXPORT_METHOD(rvTrackCloudAnchorResolution:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -2040,7 +2040,7 @@ RCT_EXPORT_METHOD(isSemanticModeSupported:(nonnull NSNumber *)reactTag
             BOOL supported = [component isSemanticModeSupported];
             resolve(@{@"supported": @(supported)});
         } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
+            resolve(@{@"supported": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -2075,7 +2075,7 @@ RCT_EXPORT_METHOD(getSemanticLabelFractions:(nonnull NSNumber *)reactTag
             [result setObject:fractions forKey:@"fractions"];
             resolve(result);
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -2100,7 +2100,7 @@ RCT_EXPORT_METHOD(getSemanticLabelFraction:(nonnull NSNumber *)reactTag
             [result setObject:@(fraction) forKey:@"fraction"];
             resolve(result);
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"fraction": @0.0, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"fraction": @0.0, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -2133,7 +2133,7 @@ RCT_EXPORT_METHOD(isPreferMonocularDepth:(nonnull NSNumber *)reactTag
             BOOL preferred = [component isPreferMonocularDepth];
             resolve(@{@"preferred": @(preferred)});
         } @catch (NSException *exception) {
-            resolve(@{@"preferred": @NO, @"error": exception.reason});
+            resolve(@{@"preferred": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -2154,7 +2154,7 @@ RCT_EXPORT_METHOD(isDepthOcclusionSupported:(nonnull NSNumber *)reactTag
             // On iOS, depth occlusion is always supported (via monocular depth or LiDAR)
             resolve(@{@"supported": @YES});
         } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
+            resolve(@{@"supported": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -2193,7 +2193,7 @@ RCT_EXPORT_METHOD(getGeospatialSetupStatus:(nonnull NSNumber *)reactTag
                 @"geospatialSupported": @NO,
                 @"locationServicesAvailable": @NO,
                 @"apiKeyConfigured": @YES,
-                @"error": exception.reason
+                @"error": exception.reason ?: exception.name
             });
         }
     }];

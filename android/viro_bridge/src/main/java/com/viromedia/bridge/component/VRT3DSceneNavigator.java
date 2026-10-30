@@ -418,13 +418,21 @@ public class VRT3DSceneNavigator extends FrameLayout {
          * materials.
          */
         MaterialManager materialManager = mReactContext.getNativeModule(MaterialManager.class);
-        materialManager.shouldReload();
+        if (materialManager != null) {
+            materialManager.shouldReload();
+        }
 
         if (mViroView != null) {
-            mViroView.onActivityStopped(mReactContext.getCurrentActivity());
+            android.app.Activity activity = mReactContext.getCurrentActivity();
+            if (activity != null) {
+                mViroView.onActivityStopped(activity);
+            }
             mViroView.dispose();
             mViroView = null;
         }
+
+        // The view is gone for good after dispose, so stop receiving host events.
+        mReactContext.removeLifecycleEventListener(mLifecycleListener);
     }
 
     /**

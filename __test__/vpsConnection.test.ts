@@ -300,3 +300,42 @@ describe("a refused user token", () => {
     expect(fetchToken).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("native credentials and custom addresses", () => {
+  it("refuses the native credentials to an http endpoint that is not local", async () => {
+    await expect(resolveVPSStudio({ endpoint: "http://vps.example.com" })).rejects.toMatchObject({
+      code: "ENDPOINT_NOT_ALLOWED",
+    });
+    expect(mockAuthContext).not.toHaveBeenCalled();
+  });
+
+  it("sends the native credentials to https and local-network endpoints", async () => {
+    await expect(resolveVPSStudio({ endpoint: "https://studio.test" })).resolves.toMatchObject({
+      base: "https://studio.test",
+      headers: { "x-api-key": "key-1" },
+    });
+    await expect(resolveVPSStudio({ endpoint: "http://192.168.1.20:8788" })).resolves.toMatchObject({
+      headers: { "x-api-key": "key-1" },
+    });
+  });
+
+  it("sends explicit credentials to any endpoint", async () => {
+    await expect(
+      resolveVPSStudio({ endpoint: "http://vps.example.com", credentials: { projectId: "p", apiKey: "k" } })
+    ).resolves.toMatchObject({ headers: { "x-api-key": "k" } });
+  });
+
+  it("refuses the native credentials to a serverEndpoint that is not safe", async () => {
+    await expect(
+      resolveVPSServer({ serverEndpoint: "http://vps.example.com" })
+    ).rejects.toMatchObject({ code: "ENDPOINT_NOT_ALLOWED" });
+    await expect(resolveVPSServer({ serverEndpoint: "https://vps.test" })).resolves.toMatchObject({
+      base: "https://vps.test",
+    });
+  });
+
+  it("refuses the native credentials to an unsafe address Studio gives out", async () => {
+    fetchSpy.mockResolvedValueOnce(answer(200, { url: "http://evil.example.com" }));
+    await expect(resolveVPSServer()).rejects.toMatchObject({ code: "ENDPOINT_NOT_ALLOWED" });
+  });
+});

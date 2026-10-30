@@ -110,7 +110,7 @@ public class VRTSpatialSoundManager extends VRTViroViewGroupManager<VRTSpatialSo
     public void receiveCommand(VRTSpatialSoundWrapper sound, int commandType, @Nullable ReadableArray args) {
         switch (commandType) {
             case ViroCommands.SEEK_TO_TIME_INDEX:
-                sound.seekToTime((int) args.getDouble(0));
+                sound.seekToTime((float) args.getDouble(0));
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported command " + commandType

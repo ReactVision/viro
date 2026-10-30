@@ -33,6 +33,7 @@ import {
   vpsJson,
   vpsStudioFetch,
 } from "./ViroVPSClient";
+import type { ViroVPSScanQuality } from "./ViroVPSScanUpload";
 
 export type ViroVPSNearbyLocation = {
   id: string;
@@ -50,7 +51,7 @@ export type ViroVPSMapDownload = {
   url: string;
   expires_at: number;
   bytes: number;
-  quality: Record<string, number> | null;
+  quality: ViroVPSScanQuality | null;
 };
 
 /** `GET /vps/locations?lat=&lon=&radius_m=&limit=`: nearest first. */

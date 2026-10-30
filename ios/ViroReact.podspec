@@ -222,14 +222,13 @@ Pod::Spec.new do |s|
   #   GCC_PREPROCESSOR_DEFINITIONS = $(inherited) VIRO_ONNXRUNTIME_AVAILABLE=1
   # Until then, VRTObjectDetectorView compiles with the camera pipeline active
   # and inference returning empty results.
+  onnx_defines = ''
   if File.exist?(File.join(__dir__, 'dist/Frameworks/onnxruntime.xcframework'))
+    onnx_defines = ' VIRO_ONNXRUNTIME_AVAILABLE=1'
     s.vendored_frameworks = [
       'dist/ViroRenderer/ViroKit.framework',
       'dist/Frameworks/onnxruntime.xcframework'
     ]
-    s.pod_target_xcconfig = {
-      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1 VIRO_ONNXRUNTIME_AVAILABLE=1'
-    }
   end
 
   # Fabric dependencies
@@ -255,7 +254,7 @@ Pod::Spec.new do |s|
       # layer fails — the headers exist, they are just somewhere these paths never look.
       '"${PODS_XCFRAMEWORKS_BUILD_DIR}/ViroKit/Headers"'
     ].join(' '),
-    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1',
+    'GCC_PREPROCESSOR_DEFINITIONS' => "$(inherited) RCT_NEW_ARCH_ENABLED=1#{onnx_defines}",
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'
   }
 

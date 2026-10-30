@@ -88,14 +88,14 @@ export type ViroVPSMeshConfidence = {
 };
 
 /**
- * A scan's or map's numbers; see Studio's docs/vps-api.md. Fields an older
- * backend does not send are absent.
+ * A scan's or map's numbers; see Studio's docs/vps-api.md. The first four
+ * always come; fields an older backend does not send are absent.
  */
 export type ViroVPSScanQuality = {
-  points?: number;
-  keyframes?: number;
-  check_frames?: number;
-  localised?: number;
+  points: number;
+  keyframes: number;
+  check_frames: number;
+  localised: number;
   position_error_median_m?: number | null;
   rotation_error_median_deg?: number | null;
   reprojection_error_median_px?: number | null;

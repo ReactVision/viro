@@ -9,6 +9,13 @@
 ### Changed
 
 - **`ViroVPSScan.quality` is typed (`ViroVPSScanQuality`) and carries `mesh_confidence` (`ViroVPSMeshConfidence`).** The backend scores how far to trust a scan's mesh: `good`, `fair` or `poor`, with `reasons` for whoever recorded (blank walls, a fast sweep, a track that jumped) and the signals behind them. It never decides whether the map is accepted, and is null without a mesh or on an older backend. The known measures keep their number types and `server_only` is a boolean; other keys read as `unknown` instead of `number | null`. `ViroVPSMapDownload.quality` has the same type. Both types are exported.
+- **Calls that do nothing on a platform say so once instead of failing silently:** `resetARSession` and `setWorldOrigin` on Android, `ViroARObjectMarker` on Android and Quest, and scene navigation in the web `ViroARSceneNavigator` and `Viro3DSceneNavigator`. `depthDebugEnabled` is documented iOS only. (#582)
+
+### Fixed
+
+- **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
+- **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
+- **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
 
 ## v3.1.0 — 27 October 2026
 

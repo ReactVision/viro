@@ -2,7 +2,7 @@
 
 ## v3.1.0
 
-**Advanced VPS arrives: scan a place with the phone, then find it again and pin content to it, matched on the device or on the GPU server. The world mesh now fuses depth across frames into a room that persists, and Meta Quest gets a headset-native Studio experience.** Renderer binaries are rebuilt on virocore 3.1.0, with ReactVisionCCA 1.4.0. The web build uses `@reactvision/viro-web-renderer` 1.1.0.
+**Advanced VPS arrives: scan a place with the phone, then find it again and pin content to it, matched on the device or on the GPU server. Scans can carry the device's depth, so blank walls reconstruct. The world mesh now fuses depth across frames into a room that persists, and Meta Quest gets a headset-native Studio experience with the real hands showing through virtual content.** Renderer binaries are rebuilt on virocore 3.1.0, with ReactVisionCCA 1.4.0. The web build uses `@reactvision/viro-web-renderer` 1.1.0.
 
 ### Advanced VPS
 

@@ -22,6 +22,7 @@
 "use strict";
 
 import { NativeModules } from "react-native";
+import { studioVpsEndpointAllowed } from "../Studio/domain/vps";
 import {
   ViroVPSConnection,
   ViroVPSError,
@@ -223,6 +224,12 @@ function parseNative<T extends { success: boolean; error?: string }>(raw: unknow
   return { success: false, error: "Malformed result from the native scan upload" } as T;
 }
 
+/** A rejected native call as a ViroVPSError, naming the scan to resume when there is one. */
+function nativeFailure(what: string, e: unknown, scanId?: string): ViroVPSError {
+  const detail = e instanceof Error ? e.message : String(e);
+  return new ViroVPSError(`${what}: ${detail}`, undefined, undefined, scanId);
+}
+
 /** The same error, naming the scan to resume into. */
 function withScanId(e: unknown, scanId: string): unknown {
   return e instanceof ViroVPSError && !e.scanId
@@ -273,9 +280,13 @@ export async function uploadScanRecording(
   const studio = await resolveVPSStudio(options);
 
   const dir = outputDir.startsWith("file://") ? outputDir.slice("file://".length) : outputDir;
-  const prepared = parseNative<NativePrepared>(
-    await native.rvPrepareScanRecording(dir.endsWith("/") ? dir.slice(0, -1) : dir)
-  );
+  let preparedRaw: unknown;
+  try {
+    preparedRaw = await native.rvPrepareScanRecording(dir.endsWith("/") ? dir.slice(0, -1) : dir);
+  } catch (e) {
+    throw nativeFailure("The recording could not be packaged", e, options.scanId);
+  }
+  const prepared = parseNative<NativePrepared>(preparedRaw);
   if (!prepared.success || typeof prepared.path !== "string" || typeof prepared.bytes !== "number") {
     throw new ViroVPSError(
       prepared.error ?? "The recording could not be packaged",
@@ -320,12 +331,26 @@ export async function uploadScanRecording(
       throw withScanId(e, scanId);
     }
 
-    sending = true;
     const completeUrl = `${studio.base}/functions/v1${path}/complete${
       studio.region ? `?forceFunctionRegion=${studio.region}` : ""
     }`;
-    const result = parseNative<NativeTransfer>(
-      await native.rvTransferScanRecording(
+    // Both requests carry credentials or a signed URL, so they go over https,
+    // or to the local network, as an endpoint does.
+    for (const url of [granted.upload?.url, completeUrl]) {
+      if (url && !studioVpsEndpointAllowed(url)) {
+        throw new ViroVPSError(
+          "The upload address must be https, or http on localhost or a private IP",
+          "ENDPOINT_NOT_ALLOWED",
+          undefined,
+          scanId
+        );
+      }
+    }
+
+    sending = true;
+    let transferRaw: unknown;
+    try {
+      transferRaw = await native.rvTransferScanRecording(
         JSON.stringify({
           scan_id: scanId,
           zip_path: zipPath,
@@ -335,8 +360,13 @@ export async function uploadScanRecording(
           complete_url: completeUrl,
           complete_headers: { ...studio.headers, "content-type": "application/json" },
         })
-      )
-    );
+      );
+    } catch (e) {
+      // A rejected transfer is not one the native side is still running.
+      sending = false;
+      throw nativeFailure("The recording could not be sent", e, scanId);
+    }
+    const result = parseNative<NativeTransfer>(transferRaw);
     if (result.success) {
       try {
         return (JSON.parse(result.body ?? "") as { scan: ViroVPSScan }).scan;

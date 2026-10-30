@@ -757,10 +757,16 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   decrementReferenceForLastNScenes = (n: number) => {
     this.setState((prev) => {
       const { sceneHistory } = prev;
+      // the root never pops: two pops queued in one tick both passed popN's
+      // guard on the same stale state, so count against the history as it is now
+      const k = Math.min(n, sceneHistory.length - 1);
+      if (k <= 0) {
+        return null;
+      }
       const sceneDictionary = { ...prev.sceneDictionary };
 
       // Now update and release any reference counts
-      for (let i = 1; i <= n; i++) {
+      for (let i = 1; i <= k; i++) {
         const sceneTag = sceneHistory[sceneHistory.length - i];
         const scene = sceneDictionary[sceneTag];
         if (scene == undefined) {
@@ -824,8 +830,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   popHistoryByN(n: number) {
     this.setState((prev) => {
+      const k = Math.min(n, prev.sceneHistory.length - 1);
+      if (k <= 0) {
+        return null;
+      }
       const sceneHistory = [...prev.sceneHistory];
-      sceneHistory.splice(sceneHistory.length - n, n);
+      sceneHistory.splice(sceneHistory.length - k, k);
       return {
         currentSceneIndex: this.getSceneIndex(
           sceneHistory[sceneHistory.length - 1],

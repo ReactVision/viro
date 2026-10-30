@@ -40,7 +40,35 @@ function create(props: Record<string, unknown> = {}) {
 const keys = (nav: Viro3DSceneNavigator) =>
   nav._renderSceneStackItems().map((el: React.ReactElement) => el.key);
 
+// As React batches inside one event: updaters queue and run in order later, and this.state stays
+// the old one meanwhile. A null result leaves the state as it is.
+function createBatched() {
+  const nav = new Viro3DSceneNavigator({ initialScene: A } as any);
+  const queue: any[] = [];
+  (nav as any).setState = (update: any) => queue.push(update);
+  const flush = () => {
+    while (queue.length) {
+      const update = queue.shift();
+      const next = typeof update === "function" ? update(nav.state, nav.props) : update;
+      if (next) (nav as any).state = { ...nav.state, ...next };
+    }
+  };
+  return { nav, flush };
+}
+
 describe("scene navigator stack", () => {
+  it("two pops in one tick never pop the root", () => {
+    const { nav, flush } = createBatched();
+    nav.push("b", B);
+    flush();
+    const root = nav.state.sceneHistory[0];
+    nav.pop();
+    nav.pop();
+    flush();
+    expect(nav.state.sceneHistory).toEqual([root]);
+    expect(Object.keys(nav.state.sceneDictionary)).toEqual([root]);
+  });
+
   it("merges the user's style after the container style", () => {
     const nav = create({ style: { backgroundColor: "red" } });
     const { style } = (nav.render() as React.ReactElement<any>).props;

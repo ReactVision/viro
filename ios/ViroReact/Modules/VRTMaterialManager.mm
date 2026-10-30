@@ -190,12 +190,13 @@ RCT_EXPORT_METHOD(updateShaderUniform:(NSString *)materialName
     // The uniforms will be bound automatically during rendering via bindMaterialUniforms()
 }
 
-// Clear all materials and images to release memory
+// Release the GL-side material objects and images to free memory. _materials holds the
+// JS-registered definitions on a bridge-wide singleton and must survive so that
+// reloadMaterials can rebuild them when a navigator is mounted again.
 - (void)clearAllMaterials {
     [_materialDictionary removeAllObjects];
     [_imageDictionary removeAllObjects];
     [_materialChangeListeners removeAllObjects];
-    [_materials removeAllObjects];
 }
 
 - (dispatch_queue_t)methodQueue {

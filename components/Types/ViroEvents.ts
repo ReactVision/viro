@@ -827,7 +827,9 @@ export type ViroRecordingOptions = {
   /**
    * Also record the device's depth (`depth/` PNGs and `depth` lines in session.jsonl). Needs
    * the navigator's `depthCaptureEnabled` prop and a device that measures depth; without
-   * either, the recording is made without depth.
+   * either, the recording is made without depth. A recording with more than about 54 minutes of
+   * depth cannot be uploaded: it needs two files per frame and the upload zip holds at most
+   * 65535 entries.
    *
    * @default false
    */

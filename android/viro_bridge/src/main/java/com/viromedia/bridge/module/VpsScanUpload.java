@@ -237,19 +237,27 @@ final class VpsScanUpload {
     }
 
     /**
-     * The zip entry names of a recording: its fixed files, then whatever depth/ holds, in
-     * name order.
+     * The zip entry names of a recording: its fixed files, then the PNGs depth/ holds, in
+     * name order. A missing depth/ is a recording made without depth; one that cannot be read
+     * is an error.
      */
-    private static List<String> recordingEntries(File dir) {
+    private static List<String> recordingEntries(File dir) throws IOException {
         List<String> names = new ArrayList<>(Arrays.asList(RECORDING_FILES));
-        File[] depthFiles = new File(dir, DEPTH_DIR).listFiles();
-        if (depthFiles != null) {
+        File depthDir = new File(dir, DEPTH_DIR);
+        if (depthDir.exists()) {
+            File[] depthFiles = depthDir.listFiles();
+            if (depthFiles == null) throw new IOException("Could not read " + depthDir);
             List<String> depthNames = new ArrayList<>();
             for (File f : depthFiles) {
-                if (f.isFile()) depthNames.add(DEPTH_DIR + "/" + f.getName());
+                if (f.isFile() && f.getName().endsWith(".png")) depthNames.add(DEPTH_DIR + "/" + f.getName());
             }
             Collections.sort(depthNames);
             names.addAll(depthNames);
+        }
+        // The end record counts entries in 16 bits; stay below the zip64 switch.
+        if (names.size() > 0xFFFF) {
+            throw new IOException("The recording has too many files to upload (" + names.size()
+                    + "; depth frames are two files each, so about 54 minutes of depth at most)");
         }
         return names;
     }

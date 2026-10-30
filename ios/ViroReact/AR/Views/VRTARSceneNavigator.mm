@@ -64,6 +64,10 @@ static NSString * const kRVWatermarkURL =
     BOOL _pendingGeospatialModeEnabled;
     BOOL _needsGeospatialModeApply;
 
+    // Monocular depth preference set before the view existed
+    BOOL _pendingPreferMonocularDepth;
+    BOOL _hasPendingPreferMonocularDepth;
+
     // World mesh configuration
     BOOL _pendingWorldMeshEnabled;
     BOOL _needsWorldMeshApply;
@@ -211,6 +215,15 @@ static NSString * const kRVWatermarkURL =
         // Apply initial monocular depth scale if set
         if (_monocularDepthScale != 0.0f && _monocularDepthScale != 1.0f) {
             [viewAR setMonocularDepthScale:_monocularDepthScale];
+        }
+
+        if (_monocularDepthTargetFPS > 0) {
+            [viewAR setMonocularDepthTargetFPS:_monocularDepthTargetFPS];
+        }
+
+        if (_hasPendingPreferMonocularDepth) {
+            [viewAR setPreferMonocularDepth:_pendingPreferMonocularDepth];
+            _hasPendingPreferMonocularDepth = NO;
         }
 
         // Apply front camera setting if enabled before view was ready
@@ -2546,7 +2559,8 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
 
 - (void)setPreferMonocularDepth:(BOOL)prefer {
     if (!_vroView) {
-        RCTLogWarn(@"[ViroAR] Cannot set prefer monocular depth: AR view not initialized");
+        _pendingPreferMonocularDepth = prefer;
+        _hasPendingPreferMonocularDepth = YES;
         return;
     }
 

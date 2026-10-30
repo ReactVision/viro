@@ -85,7 +85,13 @@ static const int kRVViewLookupMaxFrames = 60;
         if (found == nil && attempt < kRVViewLookupMaxFrames) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(16 * NSEC_PER_MSEC)),
                            dispatch_get_main_queue(), ^{
-                [weakSelf rv_withViewForTag:reactTag attempt:attempt + 1 block:block];
+                __typeof(self) strongSelf = weakSelf;
+                if (strongSelf) {
+                    [strongSelf rv_withViewForTag:reactTag attempt:attempt + 1 block:block];
+                } else {
+                    // Module is gone; run the block anyway so its promise settles with an error.
+                    block(viewRegistry);
+                }
             });
             return;
         }
@@ -1151,7 +1157,7 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
                 completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                [r setObject:(success && anchors) ? anchors : @[] forKey:@"anchors"];
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
@@ -1232,6 +1238,8 @@ RCT_EXPORT_METHOD(rvGetWorldMeshStats:(nonnull NSNumber *)reactTag
     }];
 }
 
+static NSString *RVJsonString(NSDictionary *object);
+
 RCT_EXPORT_METHOD(rvGetScanStatus:(nonnull NSNumber *)reactTag
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
@@ -1243,7 +1251,7 @@ RCT_EXPORT_METHOD(rvGetScanStatus:(nonnull NSNumber *)reactTag
             }
             resolve([(VRTARSceneNavigator *)view rvGetScanStatusJson]);
         } @catch (NSException *ex) {
-            resolve([NSString stringWithFormat:@"{\"available\":false,\"error\":\"%@\"}", ex.reason]);
+            resolve(RVJsonString(@{@"available": @NO, @"error": ex.reason ?: ex.name}));
         }
     }];
 }
@@ -1800,7 +1808,7 @@ RCT_EXPORT_METHOD(rvListCloudAnchors:(nonnull NSNumber *)reactTag
                 completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                [r setObject:(success && anchors) ? anchors : @[] forKey:@"anchors"];
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
@@ -1872,7 +1880,7 @@ RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
                 completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                [r setObject:(success && anchors) ? anchors : @[] forKey:@"anchors"];
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];

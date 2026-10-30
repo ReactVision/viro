@@ -97,6 +97,8 @@ const ViroARSceneNavigatorModule = withMissingModuleFallback(
   "VRTARSceneNavigatorModule"
 );
 
+const SHARED_FRAME_UNSUPPORTED = "Shared frames are only available on Meta Quest";
+
 let mathRandomOffset = 0;
 
 /**
@@ -1263,6 +1265,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * app picks, and it doubles as the co-location room key.
    */
   _rvCreateSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    // the iOS bridge has no shared frames: answer as the Android one does off Quest
+    if (typeof ViroARSceneNavigatorModule.rvCreateSharedFrame !== "function") {
+      return { success: false, error: SHARED_FRAME_UNSUPPORTED };
+    }
     return await ViroARSceneNavigatorModule.rvCreateSharedFrame(
       findNodeHandle(this),
       groupId
@@ -1271,6 +1277,9 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
 
   /** CL-H: recover a shared frame another device published to `groupId`. */
   _rvJoinSharedFrame = async (groupId: string): Promise<ViroSharedFrameResult> => {
+    if (typeof ViroARSceneNavigatorModule.rvJoinSharedFrame !== "function") {
+      return { success: false, error: SHARED_FRAME_UNSUPPORTED };
+    }
     return await ViroARSceneNavigatorModule.rvJoinSharedFrame(
       findNodeHandle(this),
       groupId

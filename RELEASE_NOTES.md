@@ -50,4 +50,9 @@
 - **visionOS:** spot light cones and morph targets match the other platforms.
 - `ViroKit.framework` targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.
 
+### Check when upgrading
+
+- **A `style` on a scene navigator now applies.** It was silently dropped before, so check the layout of any navigator you pass one.
+- **`cloudAnchorProvider` and `geospatialAnchorProvider` are honoured** when `provider` is not set. An app that still passes `cloudAnchorProvider="arcore"` now uses ARCore Cloud Anchors and needs a Google Cloud API key; remove the prop or pass `provider` to keep ReactVision's.
+
 See `CHANGELOG.md` for every change.

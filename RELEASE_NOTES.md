@@ -2,7 +2,7 @@
 
 ## v3.1.0
 
-**Advanced VPS arrives: scan a place with the phone, then find it again and pin content to it, matched on the device or on the GPU server. Scans can carry the device's depth, so blank walls reconstruct. The world mesh now fuses depth across frames into a room that persists, and Meta Quest gets a headset-native Studio experience with the real hands showing through virtual content.** Renderer binaries are rebuilt on virocore 3.1.0, with ReactVisionCCA 1.4.0. The web build uses `@reactvision/viro-web-renderer` 1.1.0.
+**Advanced VPS arrives: scan a place with the phone, then find it again and pin content to it, matched on the device or on the GPU server. Scans can carry the device's depth, so blank walls reconstruct. The world mesh now fuses depth across frames into a room that persists, and Meta Quest gets a headset-native Studio experience with the real hands showing through virtual content.** Renderer binaries are rebuilt on virocore 3.1.0, with Spatial 1.4.0. The web build uses `@reactvision/viro-web-renderer` 1.1.0.
 
 ### Advanced VPS
 
@@ -40,7 +40,7 @@
 
 ### Everywhere
 
-- **Every scene navigator sends one usage ping when it mounts,** replacing the device registration ReactVisionCCA used to do. It carries no API key. Turn it off with `ViroTelemetry.setEnabled(false)` or the Expo plugin's `telemetry: false`. The iOS privacy manifest now ships with the pod.
+- **Every scene navigator sends one usage ping when it mounts,** replacing the device registration Spatial used to do. It carries no API key. Turn it off with `ViroTelemetry.setEnabled(false)` or the Expo plugin's `telemetry: false`. The iOS privacy manifest now ships with the pod.
 - **Co-location:** the replication socket sends a per-device id (`getColocationDeviceId()`), and a join refused for the team's compute billing says so.
 - **A click goes to what is drawn on top,** not always the nearest object, and a click on nothing reaches `ViroController`'s `onClick` again.
 - **Text sits where its vertical alignment puts it,** and no longer disappears after a front-culled material.

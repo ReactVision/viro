@@ -24,6 +24,11 @@ import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
 } from "./Web/useViroRendererEffects";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
+
+/** Scene navigation is not implemented in this navigator on the web: say so instead of doing nothing. */
+const noNavigationOnWeb = (method: string) => () =>
+  warnUnsupported(`Viro3DSceneNavigator's sceneNavigator.${method}`, "the web", "ViroSceneNavigator has scene navigation on the web.");
 
 type Props = {
   initialScene: { scene: React.ComponentType<any> };
@@ -101,13 +106,13 @@ export function Viro3DSceneNavigator(props: Props) {
     return () => observer.disconnect();
   }, [renderer]);
 
-  // Minimal sceneNavigator surface so scenes can mount (navigation is a follow-up).
+  // Minimal sceneNavigator surface so scenes can mount; navigation is not implemented here yet.
   const sceneNavigator = {
-    push: () => {},
-    pop: () => {},
-    popN: () => {},
-    jump: () => {},
-    replace: () => {},
+    push: noNavigationOnWeb("push"),
+    pop: noNavigationOnWeb("pop"),
+    popN: noNavigationOnWeb("popN"),
+    jump: noNavigationOnWeb("jump"),
+    replace: noNavigationOnWeb("replace"),
     viroAppProps: props.viroAppProps ?? {},
   };
 

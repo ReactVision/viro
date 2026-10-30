@@ -177,6 +177,8 @@ export type {
   ViroVPSScan,
   ViroVPSScanOutput,
   ViroVPSMeshQuality,
+  ViroVPSScanQuality,
+  ViroVPSMeshConfidence,
   ViroVPSScanUploadOptions,
 } from "./components/AR/ViroVPSScanUpload";
 export type {

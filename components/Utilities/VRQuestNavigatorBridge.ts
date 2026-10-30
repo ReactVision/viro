@@ -41,6 +41,9 @@ export type VRQuestRendererConfig = {
   vrModeEnabled?: boolean;
   passthroughEnabled?: boolean;
   handTrackingEnabled?: boolean;
+  handOcclusion?: boolean;
+  handOcclusionMode?: "capsules" | "mesh";
+  handOcclusionInflateMm?: number;
   debug?: boolean;
   onExitViro?: () => void;
 };

@@ -43,6 +43,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Screenshot and video capture shared by the navigator modules.
@@ -59,6 +61,8 @@ final class MediaCapture {
     static final int UNSUPPORTED_PLATFORM_ERROR = 6;
     /** The view can capture, but not yet: the Quest recorder needs the XR swapchains. */
     static final int NOT_READY_ERROR = 7;
+    /** The user denied a permission the capture needs. */
+    static final int NO_PERMISSION_ERROR = 1;
 
     static final String SUCCESS_KEY = "success";
     static final String URL_KEY = "url";
@@ -68,6 +72,13 @@ final class MediaCapture {
     private static final int PERMISSION_REQ_CODE_STORAGE = 2;
 
     private final ReactApplicationContext mContext;
+    // Bitmap encoding and the gallery copy are disk bound and must not run on the
+    // thread the renderer or the UI hands results back on.
+    private final ExecutorService mIoExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "ViroMediaCapture");
+        thread.setDaemon(true);
+        return thread;
+    });
     // Remembers whether the in-flight video recording should also be published to
     // the device gallery. Set on startVideoRecording, consumed on stopVideoRecording
     // (the native recorder always writes to app-specific storage; gallery publishing
@@ -122,6 +133,10 @@ final class MediaCapture {
         checkPermissionsAndRun(new PermissionListener() {
             @Override
             public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                if (isDenied(Manifest.permission.RECORD_AUDIO, permissions, grantResults)) {
+                    reactErrorDelegate.invoke(NO_PERMISSION_ERROR);
+                    return true;
+                }
                 recorder.startRecordingAsync(fileName, false, viroErrorDelegate);
                 return true;
             }
@@ -143,39 +158,82 @@ final class MediaCapture {
                 // Publish the finished mp4 into the device gallery if the caller
                 // asked to save to the camera roll. Non-fatal: the recording at
                 // `url` (app-specific storage) exists regardless and is returned.
-                if (mRecordingSaveToCameraRoll && url != null) {
-                    File mp4 = new File(url);
-                    if (mp4.exists()) {
-                        Uri galleryUri = publishToGallery(mp4, mp4.getName(), true);
-                        if (galleryUri == null) {
-                            Log.w("Viro", "Video saved locally but could not be published to the gallery");
+                final boolean publish = mRecordingSaveToCameraRoll && url != null;
+                mIoExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (publish) {
+                            try {
+                                File mp4 = new File(url);
+                                if (mp4.exists()) {
+                                    Uri galleryUri = publishToGallery(mp4, mp4.getName(), true);
+                                    if (galleryUri == null) {
+                                        Log.w("Viro", "Video saved locally but could not be published to the gallery");
+                                    }
+                                }
+                            } catch (Throwable e) {
+                                Log.w("Viro", "Video gallery publish failed: " + e);
+                            }
                         }
+                        WritableMap returnMap = Arguments.createMap();
+                        returnMap.putBoolean(SUCCESS_KEY, true);
+                        returnMap.putInt(ERROR_KEY, Error.NONE.toInt());
+                        returnMap.putString(URL_KEY, url);
+                        promise.resolve(returnMap);
                     }
-                }
-                WritableMap returnMap = Arguments.createMap();
-                returnMap.putBoolean(SUCCESS_KEY, true);
-                returnMap.putInt(ERROR_KEY, Error.NONE.toInt());
-                returnMap.putString(URL_KEY, url);
-                promise.resolve(returnMap);
+                });
             }
         };
 
-        // Stop recording if we have the right permissions
-        checkPermissionsAndRun(new PermissionListener() {
-            @Override
-            public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-                recorder.stopRecordingAsync(completionCallback);
-                return true;
+        // Permissions were settled when the recording started; stopping needs none.
+        recorder.stopRecordingAsync(completionCallback);
+    }
+
+    /** True when {@code permission} was part of the request and was not granted. */
+    private static boolean isDenied(String permission, String[] permissions, int[] grantResults) {
+        for (int i = 0; i < permissions.length && i < grantResults.length; i++) {
+            if (permission.equals(permissions[i])) {
+                return grantResults[i] != PackageManager.PERMISSION_GRANTED;
             }
-        }, true);
+        }
+        return false;
     }
 
     /**
      * Watermarks (free tier), saves and resolves a captured frame. Recycles
      * {@code bitmap}.
      */
-    void resolveScreenshot(Bitmap bitmap, String fileName, boolean saveToCameraRoll,
-                           Promise promise) {
+    void resolveScreenshot(final Bitmap bitmap, final String fileName, final boolean saveToCameraRoll,
+                           final Promise promise) {
+        try {
+            mIoExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    resolveScreenshotBlocking(bitmap, fileName, saveToCameraRoll, promise);
+                }
+            });
+        } catch (RuntimeException e) {
+            bitmap.recycle();
+            promise.resolve(failure(Error.UNKNOWN.toInt()));
+        }
+    }
+
+    private void resolveScreenshotBlocking(Bitmap bitmap, String fileName, boolean saveToCameraRoll,
+                                           Promise promise) {
+        WritableMap returnMap;
+        try {
+            returnMap = encodeScreenshot(bitmap, fileName, saveToCameraRoll);
+        } catch (Throwable e) {
+            // Includes OutOfMemoryError from the watermark copy: the Promise must still settle.
+            Log.e("Viro", "Screenshot failed: " + e);
+            returnMap = failure(Error.WRITE_TO_FILE.toInt());
+        } finally {
+            bitmap.recycle();
+        }
+        promise.resolve(returnMap);
+    }
+
+    private WritableMap encodeScreenshot(Bitmap bitmap, String fileName, boolean saveToCameraRoll) {
         // The capture doesn't include the overlay View, so burn the mark into
         // the bitmap (covers both the file and camera roll).
         Bitmap output = bitmap;
@@ -183,22 +241,21 @@ final class MediaCapture {
             output = drawWatermark(bitmap);
         }
 
-        String filePath = saveScreenshotToFile(output, fileName, saveToCameraRoll);
-
-        WritableMap returnMap;
-        if (filePath != null) {
-            returnMap = Arguments.createMap();
+        try {
+            String filePath = saveScreenshotToFile(output, fileName, saveToCameraRoll);
+            if (filePath == null) {
+                return failure(Error.WRITE_TO_FILE.toInt());
+            }
+            WritableMap returnMap = Arguments.createMap();
             returnMap.putBoolean(SUCCESS_KEY, true);
             returnMap.putInt(ERROR_KEY, Error.NONE.toInt());
             returnMap.putString(URL_KEY, filePath);
-        } else {
-            returnMap = failure(Error.WRITE_TO_FILE.toInt());
+            return returnMap;
+        } finally {
+            if (output != bitmap) {
+                output.recycle();
+            }
         }
-        if (output != bitmap) {
-            output.recycle();
-        }
-        bitmap.recycle();
-        promise.resolve(returnMap);
     }
 
     // Composites the pill bottom-centre; returns the source unchanged if a
@@ -276,7 +333,9 @@ final class MediaCapture {
      * public Pictures/ directory threw EACCES under scoped storage.
      */
     private String saveScreenshotToFile(Bitmap bitmap, String fileName, boolean saveToCameraRoll) {
-        if (fileName == null || fileName.trim().isEmpty()) {
+        // fileName comes from JS: keep only the last path segment so it cannot leave the media dir.
+        String baseName = fileName == null ? "" : new File(fileName).getName().trim();
+        if (baseName.isEmpty() || baseName.equals(".") || baseName.equals("..")) {
             return null;
         }
 
@@ -286,11 +345,17 @@ final class MediaCapture {
             return null;
         }
 
-        File outputFile = new File(dir, fileName + ".jpg");
+        File outputFile = new File(dir, baseName + ".jpg");
         BufferedOutputStream bos = null;
         try {
             bos = new BufferedOutputStream(new FileOutputStream(outputFile));
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bos);
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bos)) {
+                Log.e("Viro", "Failed to encode screenshot");
+                closeQuietly(bos);
+                bos = null;
+                outputFile.delete();
+                return null;
+            }
             bos.flush();
         } catch (IOException e) {
             Log.e("Viro", "Failed to save screenshot: " + e.getMessage());
@@ -302,7 +367,7 @@ final class MediaCapture {
         // Also publish into the device gallery when requested. Non-fatal: the
         // app-local file above already exists and is returned regardless.
         if (saveToCameraRoll) {
-            Uri galleryUri = publishToGallery(outputFile, fileName + ".jpg", false);
+            Uri galleryUri = publishToGallery(outputFile, baseName + ".jpg", false);
             if (galleryUri == null) {
                 Log.w("Viro", "Screenshot saved locally but could not be published to the gallery");
             }

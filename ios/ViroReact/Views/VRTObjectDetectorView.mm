@@ -247,6 +247,10 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
             });
         }
     });
+    // Repeated starts must not stack observers, or each frame is delivered more than once.
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:kVROARFrameNotification
+                                                  object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(_onARFrame:)
                                                  name:kVROARFrameNotification

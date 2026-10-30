@@ -67,22 +67,26 @@ public class VRTCameraTextureModule extends ReactContextBaseJavaModule {
             return;
         }
         ((FabricUIManager) uiManager).addUIBlock(viewResolver -> {
-            View view = viewResolver.resolveView(reactTag);
-            if (!(view instanceof VRTCameraTexture)) {
-                throw new IllegalViewOperationException(
-                    "capturePhoto: expected VRTCameraTexture, got " + view);
+            try {
+                View view = viewResolver.resolveView(reactTag);
+                if (!(view instanceof VRTCameraTexture)) {
+                    rejectPromise(promise, "capturePhoto: expected VRTCameraTexture, got " + view);
+                    return;
+                }
+                ((VRTCameraTexture) view).capturePhoto(outputPath, new CameraTexture.CaptureCallback() {
+                    @Override public void onSuccess(String path) {
+                        WritableMap result = Arguments.createMap();
+                        result.putBoolean(KEY_SUCCESS, true);
+                        result.putString(KEY_URL, path);
+                        promise.resolve(result);
+                    }
+                    @Override public void onError(String error) {
+                        rejectPromise(promise, error);
+                    }
+                });
+            } catch (RuntimeException e) {
+                rejectPromise(promise, String.valueOf(e.getMessage()));
             }
-            ((VRTCameraTexture) view).capturePhoto(outputPath, new CameraTexture.CaptureCallback() {
-                @Override public void onSuccess(String path) {
-                    WritableMap result = Arguments.createMap();
-                    result.putBoolean(KEY_SUCCESS, true);
-                    result.putString(KEY_URL, path);
-                    promise.resolve(result);
-                }
-                @Override public void onError(String error) {
-                    rejectPromise(promise, error);
-                }
-            });
         });
     }
 
@@ -102,22 +106,26 @@ public class VRTCameraTextureModule extends ReactContextBaseJavaModule {
             return;
         }
         ((FabricUIManager) uiManager).addUIBlock(viewResolver -> {
-            View view = viewResolver.resolveView(reactTag);
-            if (!(view instanceof VRTCameraTexture)) {
-                throw new IllegalViewOperationException(
-                    "startRecording: expected VRTCameraTexture, got " + view);
+            try {
+                View view = viewResolver.resolveView(reactTag);
+                if (!(view instanceof VRTCameraTexture)) {
+                    rejectPromise(promise, "startRecording: expected VRTCameraTexture, got " + view);
+                    return;
+                }
+                ((VRTCameraTexture) view).startRecording(outputPath, new CameraTexture.CaptureCallback() {
+                    @Override public void onSuccess(String path) {
+                        WritableMap result = Arguments.createMap();
+                        result.putBoolean(KEY_SUCCESS, true);
+                        result.putString(KEY_URL, path);
+                        promise.resolve(result);
+                    }
+                    @Override public void onError(String error) {
+                        rejectPromise(promise, error);
+                    }
+                });
+            } catch (RuntimeException e) {
+                rejectPromise(promise, String.valueOf(e.getMessage()));
             }
-            ((VRTCameraTexture) view).startRecording(outputPath, new CameraTexture.CaptureCallback() {
-                @Override public void onSuccess(String path) {
-                    WritableMap result = Arguments.createMap();
-                    result.putBoolean(KEY_SUCCESS, true);
-                    result.putString(KEY_URL, path);
-                    promise.resolve(result);
-                }
-                @Override public void onError(String error) {
-                    rejectPromise(promise, error);
-                }
-            });
         });
     }
 
@@ -129,22 +137,26 @@ public class VRTCameraTextureModule extends ReactContextBaseJavaModule {
             return;
         }
         ((FabricUIManager) uiManager).addUIBlock(viewResolver -> {
-            View view = viewResolver.resolveView(reactTag);
-            if (!(view instanceof VRTCameraTexture)) {
-                throw new IllegalViewOperationException(
-                    "stopRecording: expected VRTCameraTexture, got " + view);
+            try {
+                View view = viewResolver.resolveView(reactTag);
+                if (!(view instanceof VRTCameraTexture)) {
+                    rejectPromise(promise, "stopRecording: expected VRTCameraTexture, got " + view);
+                    return;
+                }
+                ((VRTCameraTexture) view).stopRecording(new CameraTexture.CaptureCallback() {
+                    @Override public void onSuccess(String path) {
+                        WritableMap result = Arguments.createMap();
+                        result.putBoolean(KEY_SUCCESS, true);
+                        result.putString(KEY_URL, path);
+                        promise.resolve(result);
+                    }
+                    @Override public void onError(String error) {
+                        rejectPromise(promise, error);
+                    }
+                });
+            } catch (RuntimeException e) {
+                rejectPromise(promise, String.valueOf(e.getMessage()));
             }
-            ((VRTCameraTexture) view).stopRecording(new CameraTexture.CaptureCallback() {
-                @Override public void onSuccess(String path) {
-                    WritableMap result = Arguments.createMap();
-                    result.putBoolean(KEY_SUCCESS, true);
-                    result.putString(KEY_URL, path);
-                    promise.resolve(result);
-                }
-                @Override public void onError(String error) {
-                    rejectPromise(promise, error);
-                }
-            });
         });
     }
 

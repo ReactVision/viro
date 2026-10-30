@@ -298,7 +298,19 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         // Pause AR session before disposal
         ViroViewARCore arView = getARView();
         if (arView != null) {
+            // The React context has no current activity while the host is already
+            // gone; the view was built on that activity, so pause against it.
             android.app.Activity activity = mReactContext.getCurrentActivity();
+            if (activity == null) {
+                android.content.Context context = arView.getContext();
+                while (context instanceof android.content.ContextWrapper) {
+                    if (context instanceof android.app.Activity) {
+                        activity = (android.app.Activity) context;
+                        break;
+                    }
+                    context = ((android.content.ContextWrapper) context).getBaseContext();
+                }
+            }
             if (activity != null) {
                 android.util.Log.i(TAG, "  Pausing AR session");
                 arView.onActivityPaused(activity);
@@ -912,7 +924,11 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                                 == PackageManager.PERMISSION_GRANTED;
             if (hasFine) {
                 mLocationAccuracyReduced = false;
-                mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                // Some devices have no GPS provider, or have it switched off.
+                String provider = mLocationManager.getAllProviders().contains(LocationManager.GPS_PROVIDER)
+                        && mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                        ? LocationManager.GPS_PROVIDER : LocationManager.NETWORK_PROVIDER;
+                mLocationManager.requestLocationUpdates(provider,
                         1000L, 0f, mLocationListener, Looper.getMainLooper());
             } else if (hasCoarse) {
                 mLocationAccuracyReduced = true;
@@ -969,6 +985,8 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             }
         } catch (Exception e) {
             Log.w(TAG, "Failed to start location updates: " + e.getMessage());
+            // Release what was registered and clear the fields so a later start can retry.
+            stopRVLocationUpdates();
         }
     }
 

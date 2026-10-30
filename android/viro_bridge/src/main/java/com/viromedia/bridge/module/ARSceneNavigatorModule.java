@@ -112,6 +112,20 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         return "VRTARSceneNavigatorModule";
     }
 
+    /**
+     * The view for a tag, or null when the tag is stale. resolveView throws for
+     * tags Fabric no longer holds, which on the UI thread would crash the app
+     * and leave the caller's Promise unsettled.
+     */
+    private static View resolveViewOrNull(
+            com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver, int tag) {
+        try {
+            return viewResolver.resolveView(tag);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     @ReactMethod
     public void startVideoRecording(final int sceneNavTag, final String fileName,
                                     final boolean saveToCameraRool, final Callback reactErrorDelegate) {
@@ -123,14 +137,16 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(sceneNavTag);
+                View sceneView = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
+                    reactErrorDelegate.invoke(UNSUPPORTED_PLATFORM_ERROR);
+                    return;
                 }
                 VRTARSceneNavigator scene = (VRTARSceneNavigator) sceneView;
 
-                // Grab the recorder from the ar scene view
-                final ViroMediaRecorder recorder = scene.getARView().getRecorder();
+                // The AR view is null once the navigator has been detached
+                final ViroViewARCore arView = scene.getARView();
+                final ViroMediaRecorder recorder = arView == null ? null : arView.getRecorder();
                 if (recorder == null){
                     reactErrorDelegate.invoke(UNSUPPORTED_PLATFORM_ERROR);
                     return;
@@ -150,14 +166,16 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(sceneNavTag);
+                View sceneView = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
+                    promise.resolve(MediaCapture.failure(UNSUPPORTED_PLATFORM_ERROR));
+                    return;
                 }
                 VRTARSceneNavigator scene = (VRTARSceneNavigator) sceneView;
 
-                // Grab the recorder from the ar scene view
-                final ViroMediaRecorder recorder = scene.getARView().getRecorder();
+                // The AR view is null once the navigator has been detached
+                final ViroViewARCore arView = scene.getARView();
+                final ViroMediaRecorder recorder = arView == null ? null : arView.getRecorder();
                 if (recorder == null){
                     promise.resolve(MediaCapture.failure(UNSUPPORTED_PLATFORM_ERROR));
                     return;
@@ -178,9 +196,10 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(sceneNavTag);
+                View sceneView = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Viro: Attempted to call takeScreenshot on a non-ARSceneNav view!");
+                    promise.resolve(MediaCapture.failure(UNSUPPORTED_PLATFORM_ERROR));
+                    return;
                 }
                 VRTARSceneNavigator scene = (VRTARSceneNavigator) sceneView;
                 final ViroViewARCore arView = scene.getARView();
@@ -215,7 +234,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     sceneNavigator.resetARSession();
@@ -239,8 +258,12 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
-                if (view instanceof VRTARSceneNavigator) {
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view type");
+                    return;
+                }
+                try {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     float[] projectPoint = {0,0,0};
                     projectPoint[0] = (float)point.getDouble(0);
@@ -254,6 +277,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     writablePosArray.pushDouble(projectedPoint.y);
                     returnMap.putArray("screenPosition", writablePosArray);
                     promise.resolve(returnMap);
+                } catch (Exception e) {
+                    promise.reject("ERROR", e.getMessage(), e);
                 }
             }
         });
@@ -269,8 +294,12 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
-                if (view instanceof VRTARSceneNavigator) {
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view type");
+                    return;
+                }
+                try {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     float[] unprojectPoint = {0,0,0};
                     unprojectPoint[0] = (float)point.getDouble(0);
@@ -285,6 +314,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     writablePosArray.pushDouble(unProjectedPoint.z);
                     returnMap.putArray("position", writablePosArray);
                     promise.resolve(returnMap);
+                } catch (Exception e) {
+                    promise.reject("ERROR", e.getMessage(), e);
                 }
             }
         });
@@ -312,7 +343,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
@@ -373,7 +404,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
@@ -415,7 +446,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     ((VRTARSceneNavigator) view).stopRecording();
                 }
@@ -435,7 +466,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     promise.resolve(((VRTARSceneNavigator) view).getRecordingStatus());
                 } else {
@@ -461,7 +492,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     promise.resolve(emptyCloudAnchorStatus());
                     return;
@@ -511,7 +542,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
@@ -1951,13 +1982,20 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     }
                     ((VRTARSceneNavigator) view).rvCaptureVPSQueryFrame(maxSide,
                             (ok, gray, width, height, fx, fy, cx, cy, worldFromCamera) -> {
-                        if (!ok || gray.length == 0) {
+                        if (!ok || gray == null || gray.length == 0) {
                             promise.resolve(rvJson("success", false, "error", "No camera frame with intrinsics yet"));
                             return;
                         }
                         // JPEG off the UI thread.
-                        new Thread(() -> {
-                            String jpeg = encodeGrayJpeg(gray, width, height);
+                        Thread worker = new Thread(() -> {
+                            String jpeg;
+                            try {
+                                jpeg = encodeGrayJpeg(gray, width, height);
+                            } catch (Throwable e) {
+                                // Includes OutOfMemoryError: the Promise must still settle.
+                                promise.resolve(rvJson("success", false, "error", "JPEG encoding failed: " + e));
+                                return;
+                            }
                             if (jpeg == null) {
                                 promise.resolve(rvJson("success", false, "error", "JPEG encoding failed"));
                                 return;
@@ -1972,7 +2010,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                                     "width", width & ~1, "height", height & ~1,
                                     "fx", (double) fx, "fy", (double) fy, "cx", (double) cx, "cy", (double) cy,
                                     "worldFromCamera", pose));
-                        }, "ViroVPSQueryFrame").start();
+                        }, "ViroVPSQueryFrame");
+                        worker.setDaemon(true);
+                        worker.start();
                     });
                 } catch (Exception e) {
                     promise.resolve(rvJson("success", false, "error", String.valueOf(e.getMessage())));
@@ -1984,7 +2024,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     /** A width x height luma plane as base64 JPEG, through NV21 with neutral chroma; null on failure. */
     private static String encodeGrayJpeg(byte[] gray, int width, int height) {
         int w = width & ~1, h = height & ~1;
-        if (w <= 0 || h <= 0) return null;
+        if (w <= 0 || h <= 0 || gray == null || gray.length < (long) width * height) return null;
         byte[] nv21 = new byte[w * h * 3 / 2];
         for (int row = 0; row < h; row++) {
             System.arraycopy(gray, row * width, nv21, row * w, w);
@@ -2041,7 +2081,11 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     // ── VPS scan upload ─────────────────────────────────────────────────────
 
     /** Off the native modules thread, one call at a time: zipping is disk bound and enqueueing blocks. */
-    private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor();
+    private static final ExecutorService sVpsUploadExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "ViroVPSUpload");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /**
      * Zips a ViroReact AR recording (session.jsonl + video.mp4 and every file
@@ -2050,7 +2094,13 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void rvPrepareScanRecording(final String recordingDir, final Promise promise) {
-        sVpsUploadExecutor.execute(() -> promise.resolve(VpsScanUpload.prepare(mContext, recordingDir)));
+        sVpsUploadExecutor.execute(() -> {
+            try {
+                promise.resolve(VpsScanUpload.prepare(mContext, recordingDir));
+            } catch (Throwable e) {
+                promise.resolve(rvJson("success", false, "stage", "zip", "error", String.valueOf(e)));
+            }
+        });
     }
 
     /**
@@ -2060,14 +2110,25 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void rvTransferScanRecording(final String requestJson, final Promise promise) {
-        sVpsUploadExecutor.execute(() -> VpsScanUpload.transfer(mContext, requestJson, promise));
+        sVpsUploadExecutor.execute(() -> {
+            try {
+                VpsScanUpload.transfer(mContext, requestJson, promise);
+            } catch (Throwable e) {
+                // A second resolve after transfer settled the Promise is ignored by React Native.
+                promise.resolve(rvJson("success", false, "stage", "upload", "error", String.valueOf(e)));
+            }
+        });
     }
 
     /** Deletes a prepared zip no transfer was started for. Resolves null. */
     @ReactMethod
     public void rvDiscardScanRecording(final String path, final Promise promise) {
         sVpsUploadExecutor.execute(() -> {
-            VpsScanUpload.deletePreparedZip(mContext, path);
+            try {
+                VpsScanUpload.deletePreparedZip(mContext, path);
+            } catch (Throwable e) {
+                Log.w("ARSceneNavigatorModule", "Discarding a prepared scan failed: " + e);
+            }
             promise.resolve(null);
         });
     }
@@ -2639,10 +2700,17 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     private String[] toManifestPermissions(ReadableArray permissions) {
         java.util.List<String> list = new java.util.ArrayList<>();
         for (int i = 0; i < permissions.size(); i++) {
-            switch (permissions.getString(i)) {
+            String name = permissions.getString(i);
+            if (name == null) continue;
+            switch (name) {
                 case "camera":     list.add(Manifest.permission.CAMERA); break;
                 case "microphone": list.add(Manifest.permission.RECORD_AUDIO); break;
-                case "storage":    list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE); break;
+                // Scoped storage: the permission has no effect from API 29 and is always denied.
+                case "storage":
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                    }
+                    break;
                 case "location":   list.add(Manifest.permission.ACCESS_FINE_LOCATION); break;
             }
         }
@@ -2652,7 +2720,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     private WritableMap buildPermissionsResult(ReadableArray permissions) {
         WritableMap result = Arguments.createMap();
         for (int i = 0; i < permissions.size(); i++) {
-            switch (permissions.getString(i)) {
+            String name = permissions.getString(i);
+            if (name == null) continue;
+            switch (name) {
                 case "camera":
                     result.putBoolean("camera", ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) == 0);
                     break;
@@ -2660,7 +2730,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     result.putBoolean("microphone", ContextCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO) == 0);
                     break;
                 case "storage":
-                    result.putBoolean("storage", ContextCompat.checkSelfPermission(mContext, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0);
+                    result.putBoolean("storage", Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                            || ContextCompat.checkSelfPermission(mContext, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0);
                     break;
                 case "location":
                     result.putBoolean("location", ContextCompat.checkSelfPermission(mContext, Manifest.permission.ACCESS_FINE_LOCATION) == 0);

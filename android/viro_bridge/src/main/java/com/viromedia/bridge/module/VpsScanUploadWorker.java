@@ -103,7 +103,10 @@ public final class VpsScanUploadWorker extends Worker {
 
     /** Null once the zip is stored, by this PUT or an earlier one whose answer was lost. */
     private JSONObject put(JSONObject request, String scanId, String putUrl) {
-        File zip = new File(request.optString("zip_path"));
+        File zip = VpsScanUpload.uploadZip(getApplicationContext(), request.optString("zip_path"));
+        if (zip == null) {
+            return result(scanId, false, "upload", "error", "The recording zip is outside the uploads directory");
+        }
         long bytes = request.optLong("bytes", -1);
         if (!zip.isFile()) {
             return result(scanId, false, "upload", "error", "The recording zip is missing: " + zip);
@@ -129,6 +132,10 @@ public final class VpsScanUploadWorker extends Worker {
             int status = put.getResponseCode();
             String body = VpsScanUpload.readResponseBody(put, status);
             if (status >= 200 && status < 300) return null;
+            if (status >= 300 && status < 400) {
+                return result(scanId, false, "upload", "status", status,
+                        "error", "The upload URL redirected, which a streamed upload cannot follow");
+            }
             if (status == 409 || (status == 400 && (body.contains("Duplicate") || body.contains("already exists")))) {
                 return null;
             }
@@ -179,8 +186,11 @@ public final class VpsScanUploadWorker extends Worker {
     }
 
     private HttpURLConnection open(String url, String method, int readTimeoutMs) throws IOException {
+        if (!VpsScanUpload.isAllowedUrl(url)) throw new IOException("Upload URLs must be https");
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         mConnection = connection;
+        // A redirect cannot be replayed once the body is streamed, and would send the signed headers elsewhere.
+        connection.setInstanceFollowRedirects(false);
         // onStopped may have run before mConnection was set, and would not have disconnected this one.
         if (isStopped()) throw new IOException("The upload was stopped");
         connection.setRequestMethod(method);

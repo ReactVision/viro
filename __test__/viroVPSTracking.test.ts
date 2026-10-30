@@ -28,7 +28,20 @@ describe("nextTrackingPhase", () => {
     const tracking: ViroVPSTrackingPhase = { state: "tracking", everConverged: true };
     expect(nextTrackingPhase(tracking, loc({ available: false }))).toEqual({
       state: "error",
+      everConverged: true,
+    });
+    const searching: ViroVPSTrackingPhase = { state: "mapLoaded", everConverged: false };
+    expect(nextTrackingPhase(searching, loc({ available: false }))).toEqual({
+      state: "error",
       everConverged: false,
+    });
+  });
+
+  it("is lost, not a first search, after an error that followed convergence", () => {
+    const failed: ViroVPSTrackingPhase = { state: "error", everConverged: true };
+    expect(nextTrackingPhase(failed, loc({ available: true, loaded: true, converged: false }))).toEqual({
+      state: "lost",
+      everConverged: true,
     });
   });
 

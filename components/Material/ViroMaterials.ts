@@ -186,10 +186,22 @@ export class ViroMaterials {
               reflectiveShape[cubeMapTexture] = cubeMapSource;
             }
             resultMaterial[prop] = reflectiveShape;
-          } else if (material[prop].hasOwnProperty("source")) {
+          } else if (material[prop] == null) {
+            console.warn(
+              `ViroMaterials: material "${key}" has no texture for "${prop}"`
+            );
+          } else if (
+            Object.prototype.hasOwnProperty.call(material[prop], "source")
+          ) {
             var source = resolveAssetSource(material[prop]["source"]);
-            resultMaterial[prop] = material[prop];
-            resultMaterial[prop]["source"] = source;
+            if (!source) {
+              console.warn(
+                `ViroMaterials: the source of "${prop}" in material "${key}" did not resolve to an asset`
+              );
+            }
+            // A copy: the caller's material is reused, and a source already
+            // resolved is not an asset to resolve again.
+            resultMaterial[prop] = { ...material[prop], source };
           } else {
             var assetType = "unknown";
             if (typeof material[prop] !== "object") {
@@ -203,6 +215,10 @@ export class ViroMaterials {
             if (source) {
               source["type"] = assetType;
               resultMaterial[prop] = source;
+            } else {
+              console.warn(
+                `ViroMaterials: the texture "${prop}" in material "${key}" did not resolve to an asset`
+              );
             }
           }
         } else if (prop.endsWith("color") || prop.endsWith("Color")) {
@@ -211,11 +227,11 @@ export class ViroMaterials {
         } else if (prop === "semanticMask") {
           const config = material[prop] as ViroSemanticMaskConfig;
           let labelMask = 0;
-          for (const label of config.labels) {
+          for (const label of config?.labels ?? []) {
             labelMask |= kSemanticLabelBit[label] ?? 0;
           }
           resultMaterial["semanticMask"] = {
-            mode: config.mode,
+            mode: config?.mode,
             labelMask,
           };
         } else {

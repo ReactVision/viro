@@ -103,6 +103,15 @@ export function useViroColocationRoom(
   // one. This is what an effect that can run twice needs instead of a guard on
   // the request itself.
   const inFlight = useRef<string | null>(null);
+  // Set again on every mount, so Strict Mode's mount, unmount, mount ends
+  // mounted.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Read when the request goes out, not a dependency: a token refresh would
   // restart the effect and drop an in-flight create's result, which the guard
@@ -133,7 +142,6 @@ export function useViroColocationRoom(
     if (!enabled || !target) return;
     if (inFlight.current === target && status !== "failed") return;
 
-    let cancelled = false;
     inFlight.current = target;
     setStatus("working");
     setError(undefined);
@@ -149,7 +157,10 @@ export function useViroColocationRoom(
       const result = joinCode
         ? await lookupColocationRoom(config, joinCode)
         : await createColocationRoom(config, host!);
-      if (cancelled) return;
+      // The result belongs to the request while it is still the latest target.
+      // An effect that ran again for the same target skipped its own request
+      // above, so this one is the only one that can answer it.
+      if (!mounted.current || inFlight.current !== target) return;
 
       if (!result.success) {
         setError(result.error);
@@ -161,9 +172,6 @@ export function useViroColocationRoom(
     };
 
     run();
-    return () => {
-      cancelled = true;
-    };
     // `status` is deliberately absent: it changes inside the effect, and the
     // retry path goes through `attempt` instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps

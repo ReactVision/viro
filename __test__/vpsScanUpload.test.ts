@@ -370,6 +370,33 @@ describe("uploadScanRecording", () => {
       message: expect.stringMatching(/not available/),
     });
   });
+
+  it("turns a rejected prepare into a ViroVPSError", async () => {
+    native.rvPrepareScanRecording.mockRejectedValue(new Error("disk full"));
+    await expect(
+      uploadScanRecording({ location: { name: "Hall" } }, "/data/rec", { ...CONNECTION, scanId: "s1" })
+    ).rejects.toMatchObject({ message: expect.stringMatching(/disk full/), scanId: "s1" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("discards the zip and names the scan when the transfer rejects", async () => {
+    native.rvTransferScanRecording.mockRejectedValue(new Error("bridge gone"));
+    const failure = await uploadScanRecording({ location: { name: "Hall" } }, "/data/rec", CONNECTION).catch(
+      (e) => e
+    );
+    expect(failure).toBeInstanceOf(ViroVPSError);
+    expect(failure).toMatchObject({ scanId: "s1", message: expect.stringMatching(/bridge gone/) });
+    expect(native.rvDiscardScanRecording).toHaveBeenCalledWith("/support/ViroVPSUploads/a.zip");
+  });
+
+  it("refuses an upload address that is not https or local, and discards the zip", async () => {
+    studio({ upload: () => [200, { scan: waiting, upload: { ...PUT, url: "http://evil.example.com/put" } }] });
+    await expect(
+      uploadScanRecording({ location: { name: "Hall" } }, "/data/rec", CONNECTION)
+    ).rejects.toMatchObject({ code: "ENDPOINT_NOT_ALLOWED", scanId: "s1" });
+    expect(native.rvTransferScanRecording).not.toHaveBeenCalled();
+    expect(native.rvDiscardScanRecording).toHaveBeenCalled();
+  });
 });
 
 describe("ViroARSceneNavigator forwarding", () => {

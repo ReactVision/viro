@@ -154,6 +154,9 @@ function toSocketScheme(endpoint: string): string {
   return endpoint;
 }
 
+/** The least time between two resync requests. */
+const RESYNC_MIN_INTERVAL_MS = 1000;
+
 export class ViroReplicationClient {
   private ws: WebSocket | null = null;
   private config: ViroReplicationConfig | null = null;
@@ -164,6 +167,7 @@ export class ViroReplicationClient {
   private _localPeerId = "";
   private _error: string | undefined;
 
+  private lastResyncAt = 0;
   private attempt = 0;
   private closedByUs = false;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -222,6 +226,7 @@ export class ViroReplicationClient {
 
   connect(config: ViroReplicationConfig): void {
     this.disconnect();
+    this._error = undefined;
     this.config = config;
     this.closedByUs = false;
     this.attempt = 0;
@@ -254,18 +259,25 @@ export class ViroReplicationClient {
     this.pending.clear();
     this.lastSeq = -1;
     this._localPeerId = "";
+    this.lastResyncAt = 0;
     this.setState("idle");
   }
 
   // ── Operations ────────────────────────────────────────────────────────────
 
+  // Each operation returns whether it was sent: false while the socket is not
+  // open, when the operation is dropped, so the caller can retry or tell the
+  // user. A refusal by the server arrives through `onReject` instead.
+
   /** Take authority. Creates the entity if it does not exist yet. */
-  claim(id: string, opts: ViroWriteOptions = {}): void {
-    this.send({ op: "claim", id, expectVersion: opts.expectVersion });
+  claim(id: string, opts: ViroWriteOptions = {}): boolean {
+    return (
+      this.send({ op: "claim", id, expectVersion: opts.expectVersion }) !== null
+    );
   }
 
-  release(id: string): void {
-    this.send({ op: "release", id });
+  release(id: string): boolean {
+    return this.send({ op: "release", id }) !== null;
   }
 
   /** Merge `fields` into the entity. Creates it if absent. */
@@ -273,14 +285,15 @@ export class ViroReplicationClient {
     id: string,
     fields: Record<string, unknown>,
     opts: ViroWriteOptions = {}
-  ): void {
+  ): boolean {
     const ref = this.send({
       op: "set",
       id,
       fields,
       expectVersion: opts.expectVersion,
     });
-    if (!opts.optimistic || !ref) return;
+    if (!ref) return false;
+    if (!opts.optimistic) return true;
 
     // Remember what to restore if the server refuses, then show the change now.
     const before = this.entities.get(id);
@@ -292,10 +305,13 @@ export class ViroReplicationClient {
     const base = before ?? { id, fields: {}, version: 0, owner: null };
     this.entities.set(id, { ...base, fields: { ...base.fields, ...fields } });
     this.emit();
+    return true;
   }
 
-  delete(id: string, opts: ViroWriteOptions = {}): void {
-    this.send({ op: "delete", id, expectVersion: opts.expectVersion });
+  delete(id: string, opts: ViroWriteOptions = {}): boolean {
+    return (
+      this.send({ op: "delete", id, expectVersion: opts.expectVersion }) !== null
+    );
   }
 
   /**
@@ -306,8 +322,8 @@ export class ViroReplicationClient {
    * entity refuses `not-owner`, so exactly the objects somebody is still
    * holding would survive it.
    */
-  clear(): void {
-    this.send({ op: "clear" });
+  clear(): boolean {
+    return this.send({ op: "clear" }) !== null;
   }
 
   // ── Socket ────────────────────────────────────────────────────────────────
@@ -493,6 +509,7 @@ export class ViroReplicationClient {
   private handle(msg: Record<string, unknown>): void {
     switch (msg.t) {
       case "welcome":
+        this._error = undefined;
         this._localPeerId = String(msg.you ?? "");
         this.replaceAll(
           msg.entities as ViroReplicatedEntity[],
@@ -618,6 +635,11 @@ export class ViroReplicationClient {
 
   private requestResync(): void {
     if (this.ws?.readyState !== 1) return;
+    // Every delta behind a gap asks again until the answer lands, so asks
+    // closer together than the round trip are one.
+    const now = Date.now();
+    if (now - this.lastResyncAt < RESYNC_MIN_INTERVAL_MS) return;
+    this.lastResyncAt = now;
     this.ws.send(JSON.stringify({ op: "resync", sinceSeq: this.lastSeq }));
   }
 

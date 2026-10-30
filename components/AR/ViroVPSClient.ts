@@ -18,6 +18,7 @@ import {
   platformUndelivered,
 } from "./ViroPlatformRegion";
 import { USER_TOKEN_REFUSALS } from "./ViroUserTokens";
+import { studioVpsEndpointAllowed } from "../Studio/domain/vps";
 
 /** Either credential form API.md accepts; always paired with the project id. */
 export type ViroVPSCredentials = (
@@ -357,8 +358,24 @@ export type VPSServer = {
   renewToken: RenewToken;
 };
 
+function refusedAddress(name: string, address: string): ViroVPSError {
+  return new ViroVPSError(
+    `${name} ${address} must be https, or http on localhost or a private IP, to be sent the app's credentials; pass credentials to use it anyway`,
+    "ENDPOINT_NOT_ALLOWED"
+  );
+}
+
 /** Where Studio is and as whom to call it, from `connection` and, for what it leaves out, the native layer. */
 export async function resolveVPSStudio(connection: ViroVPSConnection = {}): Promise<VPSStudio> {
+  // The native credentials are the app's own: they go to a custom address only
+  // when it is https or the local network.
+  if (
+    connection.endpoint !== undefined &&
+    connection.credentials === undefined &&
+    !studioVpsEndpointAllowed(connection.endpoint)
+  ) {
+    throw refusedAddress("endpoint", connection.endpoint);
+  }
   const context =
     connection.endpoint !== undefined && connection.credentials !== undefined
       ? null
@@ -456,7 +473,13 @@ export function clearVPSServerAddresses(): void {
  */
 export async function resolveVPSServer(connection: ViroVPSConnection = {}): Promise<VPSServer> {
   const studio = await resolveVPSStudio(connection);
+  // Credentials the caller did not pass are the native ones, kept to addresses
+  // that are safe to send them to.
+  const ownCredentials = connection.credentials !== undefined;
   if (connection.serverEndpoint) {
+    if (!ownCredentials && !studioVpsEndpointAllowed(connection.serverEndpoint)) {
+      throw refusedAddress("serverEndpoint", connection.serverEndpoint);
+    }
     return {
       base: vpsBaseUrl(connection.serverEndpoint),
       headers: studio.headers,
@@ -464,7 +487,8 @@ export async function resolveVPSServer(connection: ViroVPSConnection = {}): Prom
     };
   }
   const now = Date.now();
-  let known = serverAddresses.get(studio.base);
+  const cacheKey = `${ownCredentials ? "own" : "native"} ${studio.base}`;
+  let known = serverAddresses.get(cacheKey);
   if (!known || now - known.at > SERVER_ADDRESS_TTL_MS) {
     const url = vpsStudioFetch(studio, "/vps/server", {}, vpsJson).then((body) => {
       const address = (body as { url?: unknown })?.url;
@@ -474,13 +498,16 @@ export async function resolveVPSServer(connection: ViroVPSConnection = {}): Prom
           "VPS_SERVER_NOT_CONFIGURED"
         );
       }
+      if (!ownCredentials && !studioVpsEndpointAllowed(address)) {
+        throw refusedAddress("The VPS server address", address);
+      }
       return vpsBaseUrl(address);
     });
     known = { at: now, url };
-    serverAddresses.set(studio.base, known);
+    serverAddresses.set(cacheKey, known);
     // a failed answer is asked again next time
     url.catch(() => {
-      if (serverAddresses.get(studio.base) === known) serverAddresses.delete(studio.base);
+      if (serverAddresses.get(cacheKey) === known) serverAddresses.delete(cacheKey);
     });
   }
   return { base: await known.url, headers: studio.headers, renewToken: studio.renewToken };

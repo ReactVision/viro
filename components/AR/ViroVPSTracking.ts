@@ -60,7 +60,8 @@ export const VPS_TRACKING_IDLE: ViroVPSTrackingPhase = {
  *
  * `available: false` (no ReactVision provider configured) always resolves to
  * `error`, even mid-tracking — there is no smoothed estimate to keep
- * reporting on top of.
+ * reporting on top of. Whether the map has converged before is kept, so the
+ * phase after the error is `lost` rather than a first search.
  *
  * `loaded: false` while the phase is not already `idle`/`searching` means the
  * map was dropped out from under a poll in flight (e.g. a concurrent
@@ -72,7 +73,7 @@ export function nextTrackingPhase(
   localization: ViroVPSLocalizationResult
 ): ViroVPSTrackingPhase {
   if (!localization.available) {
-    return { state: "error", everConverged: false };
+    return { state: "error", everConverged: phase.everConverged };
   }
   if (!localization.loaded) {
     return VPS_TRACKING_IDLE;

@@ -35,8 +35,11 @@ export const STUDIO_VPS_UNSUPPORTED: StudioVpsError = {
 const IPV4 =
   /^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/;
 
+// The same hosts as RVHttpClient and VpsScanUpload on Android, so a URL is
+// accepted or refused alike on both sides of the bridge.
 function isLocalNetworkHost(host: string): boolean {
   if (host === "localhost" || host === "[::1]") return true;
+  if (host.endsWith(".local")) return true; // mDNS on the LAN
   if (/^\[f[cd][0-9a-f]{2}:/.test(host)) return true;
   const ip = IPV4.exec(host);
   if (!ip) return false;
@@ -46,7 +49,8 @@ function isLocalNetworkHost(host: string): boolean {
     a === 127 ||
     a === 10 ||
     (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) // carrier-grade NAT, as Tailscale uses
   );
 }
 

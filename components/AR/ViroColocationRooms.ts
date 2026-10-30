@@ -238,6 +238,9 @@ async function request(
   return { success: true, room: toRoom(parsed.room) };
 }
 
+/** How long a room request may take, headers and body. */
+const REQUEST_TIMEOUT_MS = 30000;
+
 async function exchange(
   base: string,
   url: string,
@@ -245,24 +248,38 @@ async function exchange(
   headers: Record<string, string>,
   body: Record<string, unknown> | undefined
 ): Promise<{ response: Response; parsed: any } | { success: false; error: string }> {
-  let response: Response;
-  try {
-    response = await fetchInRegion(base, url, {
+  const controller = new AbortController();
+  // A race, not a wait for the abort to surface: the body read can stall too.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`No answer within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} s`));
+    }, REQUEST_TIMEOUT_MS);
+  });
+  const sent = (async () => {
+    const response = await fetchInRegion(base, url, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
     });
+    let parsed: any = null;
+    try {
+      parsed = await response.json();
+    } catch {
+      // Falls through to the status-only message in request().
+    }
+    return { response, parsed };
+  })();
+  sent.catch(() => {});
+  try {
+    return await Promise.race([sent, expired]);
   } catch (e: any) {
     return { success: false, error: e?.message ?? "Network request failed" };
+  } finally {
+    clearTimeout(timer);
   }
-
-  let parsed: any = null;
-  try {
-    parsed = await response.json();
-  } catch {
-    // Falls through to the status-only message in request().
-  }
-  return { response, parsed };
 }
 
 /**
@@ -275,7 +292,12 @@ async function exchange(
 async function fetchInRegion(
   base: string,
   url: string,
-  init: { method: string; headers: Record<string, string>; body?: string }
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+  }
 ): Promise<Response> {
   const regionHeader = Object.keys(init.headers).find(
     (name) => name.toLowerCase() === "x-region"

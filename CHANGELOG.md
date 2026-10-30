@@ -149,6 +149,7 @@
 - **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
 - **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
 - **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
+- **The Expo plugin can run again over an existing `android/` and `ios/` (`expo prebuild` without `--clean`).** It appended its meta-data, launcher categories, `settings.gradle` and `app/build.gradle` lines and Podfile blocks on every run, so a changed `rvApiKey` kept the old key beside the new one. Each is now replaced in place (meta-data and `uses-feature` by name, the gradle and Podfile pieces between `@generated` markers, those an earlier version wrote included), and `uses-feature` entries from `app.json` or other plugins are kept. The Podfile check that raised unless `RCT_NEW_ARCH_ENABLED=1` is gone, as it aborted `pod install` on React Native versions where the New Architecture is always on. The plugin reads the options it is called with, so registering it without options no longer throws, and a missing Podfile or a failed write now fails the prebuild instead of being logged.
 
 ## v3.0.3 — 6 October 2026
 

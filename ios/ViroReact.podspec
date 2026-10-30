@@ -20,6 +20,8 @@ Pod::Spec.new do |s|
   # behind an availability check, so this is the version the code actually requires today.
   s.visionos.deployment_target = '26.0'
 
+  s.resource_bundles = { 'ViroReact_privacy' => ['PrivacyInfo.xcprivacy'] }
+
   # visionOS: CompositorServices drives the immersive render loop.
   s.visionos.frameworks = ['Metal', 'MetalKit', 'CompositorServices', 'ARKit']
 
@@ -27,6 +29,9 @@ Pod::Spec.new do |s|
   # (VRTObjectDetectorView uses AVFoundation + Accelerate; CoreVideo for CVPixelBuffer; ARKit for
   # the ARSession and ARFrame it reads the camera through)
   s.ios.frameworks = ['AVFoundation', 'Accelerate', 'CoreVideo', 'ARKit']
+
+  # zlib: VRTARSceneNavigatorModule computes the CRC-32 of the VPS scan zip with crc32().
+  s.libraries = 'z'
 
   # Base source files (always included)
   source_files_array = ['ViroReact/**/*.{h,m,mm,swift}']
@@ -217,14 +222,13 @@ Pod::Spec.new do |s|
   #   GCC_PREPROCESSOR_DEFINITIONS = $(inherited) VIRO_ONNXRUNTIME_AVAILABLE=1
   # Until then, VRTObjectDetectorView compiles with the camera pipeline active
   # and inference returning empty results.
+  onnx_defines = ''
   if File.exist?(File.join(__dir__, 'dist/Frameworks/onnxruntime.xcframework'))
+    onnx_defines = ' VIRO_ONNXRUNTIME_AVAILABLE=1'
     s.vendored_frameworks = [
       'dist/ViroRenderer/ViroKit.framework',
       'dist/Frameworks/onnxruntime.xcframework'
     ]
-    s.pod_target_xcconfig = {
-      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1 VIRO_ONNXRUNTIME_AVAILABLE=1'
-    }
   end
 
   # Fabric dependencies
@@ -250,7 +254,7 @@ Pod::Spec.new do |s|
       # layer fails — the headers exist, they are just somewhere these paths never look.
       '"${PODS_XCFRAMEWORKS_BUILD_DIR}/ViroKit/Headers"'
     ].join(' '),
-    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) RCT_NEW_ARCH_ENABLED=1',
+    'GCC_PREPROCESSOR_DEFINITIONS' => "$(inherited) RCT_NEW_ARCH_ENABLED=1#{onnx_defines}",
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -std=c++17'
   }
 

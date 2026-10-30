@@ -49,6 +49,7 @@
 @property (nonatomic, readwrite) BOOL multisamplingEnabled;
 @property (nonatomic, copy) NSString *occlusionMode;
 @property (nonatomic, assign) BOOL depthEnabled;
+@property (nonatomic, assign) BOOL depthCaptureEnabled;
 @property (nonatomic, assign) BOOL depthDebugEnabled;
 @property (nonatomic, assign) BOOL semanticDebugEnabled;
 @property (nonatomic, assign) float monocularDepthScale;
@@ -119,7 +120,10 @@ typedef void (^CloudAnchorResolveCompletionHandler)(BOOL success,
 typedef void (^RecordingStartCompletionHandler)(BOOL success,
                                                  NSString * _Nullable error);
 
+// depth also records the device's depth; it only takes effect if depthCaptureEnabled
+// was on before the recording started.
 - (void)startRecording:(NSString *)outputDir
+                 depth:(BOOL)depth
       completionHandler:(RecordingStartCompletionHandler)completionHandler;
 
 - (void)stopRecording;
@@ -241,6 +245,9 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 // VRTARScene forwards that call, so the chain to JS was never finished.
 - (NSDictionary *)rvGetWorldMeshStats;
 
+/* Clears the fused world mesh, so the next scan starts from an empty room. */
+- (void)rvResetWorldMesh;
+
 - (NSString *)rvGetScanStatusJson;
 /** Last scan-based host's measurements as the renderer's JSON. */
 - (NSString *)rvGetScanDiagnosticsJson;
@@ -248,6 +255,39 @@ typedef void (^GeospatialAnchorCompletionHandler)(BOOL success,
 - (void)rvFinishScan:(NSInteger)ttlDays
    completionHandler:(void (^)(BOOL success, NSString *cloudAnchorId,
                                NSString *locationTransformCsv, NSString *error))completionHandler;
+
+// Continuous VPS map localisation against a downloaded .rvmap
+/** Parses rvmapData and loads it for matching. Returns NO if it doesn't parse as a supported map. */
+- (BOOL)rvLoadVPSMap:(NSData *)rvmapData;
+/** Drops whatever rvLoadVPSMap: loaded; per-frame matching becomes a no-op. */
+- (void)rvUnloadVPSMap;
+/**
+ The VPS location's mesh (an RVWM snapshot in the map's frame), for occlusion
+ and physics. Hidden until VPS localisation converges, then follows the map.
+ NO for bytes that are not RVWM, or without a mounted AR scene.
+ */
+- (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics;
+/** Removes the mesh rvLoadVPSMapMesh: set. */
+- (void)rvUnloadVPSMapMesh;
+/**
+ One camera image for a VPS visual query: the latest AR frame's luma plane,
+ sensor-native orientation, longest side at most maxSide, as base64 JPEG with
+ intrinsics to match. The completion runs on a background queue with
+ { success, image, width, height, fx, fy, cx, cy } or { success: NO, error }.
+ */
+- (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion;
+/** Latest continuous-localisation result as the renderer's JSON; `{"available":false}` with no session. */
+- (NSString *)rvGetVPSLocalizationJson;
+/** VPS server mode: the fuser runs without a map, fed by rvReportVPSServerFix:. Unloads any map. */
+- (BOOL)rvStartVPSServerSession;
+/**
+ One backend fix. worldFromCamera: the capture's 16 numbers as rvCaptureVPSQueryFrame handed them out
+ (column-major). mapFromCamera: the backend's T_map_cam, 16 numbers row-major, OpenCV camera axes.
+ NO outside server mode or for malformed input.
+ */
+- (BOOL)rvReportVPSServerFix:(NSArray<NSNumber *> *)worldFromCamera
+               mapFromCamera:(NSArray<NSNumber *> *)mapFromCamera
+                     inliers:(int)inliers;
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL success, NSDictionary *anchorData, NSString *error))completionHandler;
 - (void)rvListCloudAnchors:(int)limit

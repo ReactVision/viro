@@ -170,6 +170,8 @@ public class VRT3DSceneNavigator extends FrameLayout {
 
     private boolean mViewAdded = false;
     protected boolean mGLInitialized = false;
+    // Waking from sleep resumes the host before the headset gives focus back.
+    private boolean mInputFocused = true;
 
     private boolean mHasOnExitViroCallback = false;
 
@@ -416,17 +418,42 @@ public class VRT3DSceneNavigator extends FrameLayout {
          * materials.
          */
         MaterialManager materialManager = mReactContext.getNativeModule(MaterialManager.class);
-        materialManager.shouldReload();
+        if (materialManager != null) {
+            materialManager.shouldReload();
+        }
 
         if (mViroView != null) {
-            mViroView.onActivityStopped(mReactContext.getCurrentActivity());
+            android.app.Activity activity = mReactContext.getCurrentActivity();
+            if (activity != null) {
+                mViroView.onActivityStopped(activity);
+            }
             mViroView.dispose();
             mViroView = null;
+        }
+
+        // The view is gone for good after dispose, so stop receiving host events.
+        mReactContext.removeLifecycleEventListener(mLifecycleListener);
+    }
+
+    /**
+     * While a headset's system UI holds input focus (its menu, a dialog), the
+     * scene is paused as it is for a host pause, which pauses its video and
+     * sound, and resumed when focus returns.
+     */
+    protected void onInputFocusChanged(boolean focused) {
+        mInputFocused = focused;
+        if (mViewAdded && mGLInitialized && mSelectedSceneIndex < mSceneArray.size()) {
+            VRTScene childScene = mSceneArray.get(mSelectedSceneIndex);
+            if (focused) {
+                childScene.onHostResume();
+            } else {
+                childScene.onHostPause();
+            }
         }
     }
 
     private void onHostResume() {
-        if (mViewAdded && mGLInitialized && mSelectedSceneIndex < mSceneArray.size()) {
+        if (mInputFocused && mViewAdded && mGLInitialized && mSelectedSceneIndex < mSceneArray.size()) {
             VRTScene childScene = mSceneArray.get(mSelectedSceneIndex);
             childScene.onHostResume();
         }

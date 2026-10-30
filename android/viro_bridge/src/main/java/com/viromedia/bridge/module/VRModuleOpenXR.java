@@ -31,6 +31,7 @@ import com.viro.core.ViroViewOpenXR;
  * JS usage (via NativeModules.VRModuleOpenXR):
  *   recenterTracking(viewTag)
  *   setPassthroughEnabled(viewTag, enabled)  // Week 4
+ *   setHandOcclusion(viewTag, enabled)
  *   takeScreenshot(viewTag, fileName, saveToCameraRoll) → {success, url, errorCode}
  *   startVideoRecording(viewTag, fileName, saveToCameraRoll, onError(errorCode))
  *   stopVideoRecording(viewTag) → {success, url, errorCode}
@@ -189,6 +190,28 @@ public class VRModuleOpenXR extends ReactContextBaseJavaModule {
                 View view = viewResolver.resolveView(sceneNavTag);
                 if (view instanceof VRTVRSceneNavigator) {
                     ((VRTVRSceneNavigator) view).setPassthroughStyle(opacity, edgeR, edgeG, edgeB, edgeA);
+                }
+            }
+        });
+    }
+
+    /**
+     * Enable or disable hand occlusion (tracked hands drawn depth-only so the
+     * passthrough hands show through virtual content). Only draws while
+     * passthrough and hand tracking are both on.
+     */
+    @ReactMethod
+    public void setHandOcclusion(final int sceneNavTag, final boolean enabled) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            return;
+        }
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = viewResolver.resolveView(sceneNavTag);
+                if (view instanceof VRTVRSceneNavigator) {
+                    ((VRTVRSceneNavigator) view).setHandOcclusionEnabled(enabled);
                 }
             }
         });

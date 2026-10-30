@@ -69,9 +69,9 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
 /**
  * Join the room named by `roomId` — the cloud anchor id, Meta group id or
  * visionOS session id that already names the shared frame. Leaves any current
- * room. Pass nil for `endpoint` to use the default. The session wins over
- * `apiKey` when both exist; an empty `apiKey` joins on the session alone, and
- * fails at once when there is none.
+ * room. Pass nil for `endpoint` to use the default. A setAccessToken: token
+ * wins over the session, which wins over `apiKey`; an empty `apiKey` joins on
+ * either alone, and fails at once when there is neither.
  */
 - (void)joinRoom:(NSString *)roomId
           apiKey:(NSString *)apiKey
@@ -79,7 +79,16 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
         endpoint:(nullable NSString *)endpoint
       completion:(void (^)(BOOL success, NSString *error))completion;
 
+/** Leaves the room and clears the setAccessToken: token. */
 - (void)leave;
+
+/**
+ * An app user token (rv_ut_...) the channel sends as `Authorization: Bearer`,
+ * with no x-api-key, in place of the session and `apiKey`. Set it before
+ * joinRoom:; it is read at every connect, so one set while joined reaches the
+ * next reconnect. nil or empty clears it. Cloud anchors do not read it.
+ */
+- (void)setAccessToken:(nullable NSString *)accessToken;
 
 /**
  * Publish the local pose as 16 comma-separated floats, column-major, **in the
@@ -90,6 +99,9 @@ typedef NS_ENUM(NSInteger, VROColocationBridgeState) {
 - (VROColocationBridgeState)state;
 - (NSString *)localPeerId;
 - (NSArray<VROColocationPeerInfo *> *)peers;
+
+/** Sent as x-rv-device on the co-location socket; the same for the whole process. */
+- (NSString *)deviceId;
 
 @end
 

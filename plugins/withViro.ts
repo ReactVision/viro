@@ -104,6 +104,17 @@ export interface ViroConfigurationOptions {
    */
   geospatialAnchorProvider?: GeospatialAnchorProvider;
 
+  /**
+   * Whether each scene navigator sends ReactVision an anonymous usage ping when it mounts
+   * (see "Usage data" in the README).
+   * `false` writes `ViroTelemetryEnabled` = false to Info.plist and the
+   * com.reactvision.ViroTelemetryEnabled meta-data as "false" to AndroidManifest.
+   * `true` or omitted removes both. `ViroTelemetry.setEnabled(false)` turns it off from JS.
+   *
+   * DEFAULTS TO: true
+   */
+  telemetry?: boolean;
+
   ios?: {
     /**
      * String for app to use for camera usage.
@@ -184,6 +195,14 @@ export interface ViroConfigurationOptions {
      */
     questTargetSdkVersion?: number;
     /**
+     * minSdkVersion floor applied when xRMode includes "QUEST". The Meta
+     * Quest Store accepts 29 to 34 and recommends 32; above 32 excludes
+     * headsets on Horizon OS before v76. Only ever raises the value.
+     *
+     * DEFAULTS TO: 32
+     */
+    questMinSdkVersion?: number;
+    /**
      * Build arm64-v8a only when xRMode includes "QUEST". Quest hardware is
      * 64-bit and the store warns on 32-bit libraries.
      *
@@ -220,7 +239,7 @@ export interface ViroConfigurationOptions {
     };
     /**
      * The Horizon OS SDK versions written to the manifest as
-     * <horizonos:uses-horizonos-sdk> when xRMode includes "QUEST". Horizon OS
+     * <metavr:uses-metavr-sdk> when xRMode includes "QUEST". Horizon OS
      * warns that an app without it will lose access to its SDK managers.
      *
      * DEFAULTS TO: minSdkVersion 69, and targetSdkVersion equal to minSdkVersion

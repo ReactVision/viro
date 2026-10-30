@@ -18,6 +18,7 @@ import {
   type ViroColocationPeer,
   type ViroColocationState,
 } from "../AR/ViroColocation";
+import { useCredentialsKey } from "./useCredentialsKey";
 
 export type UseViroColocationResult = {
   /** False when the channel is unavailable on this build or platform. */
@@ -84,7 +85,16 @@ function samePeers(a: ViroColocationPeer[], b: ViroColocationPeer[]): boolean {
  *   roomId: cloudAnchorId, apiKey, projectId,
  *   enabled: frameReady,
  * });
+ *
+ * // An app with its own sign-in: a user token in place of the key.
+ * const credentials = useMemo(
+ *   () => createUserTokenCredentials({ projectId, fetchToken }), [userId]);
+ * useViroColocation({ roomId: cloudAnchorId, credentials, enabled: frameReady });
  * ```
+ *
+ * The room is left and joined again when `credentials` is another
+ * createUserTokenCredentials() object, or at its clear(). The join reads the
+ * credentials again, so it fails when nobody is signed in by then.
  *
  * Poses on this channel are **location-frame** coordinates. Convert before
  * publishing and after receiving — see `ViroLocationFrame`.
@@ -97,6 +107,7 @@ export function useViroColocation(
     apiKey,
     projectId,
     endpoint,
+    credentials,
     enabled = true,
     pollMs = 33,
   } = options;
@@ -110,6 +121,10 @@ export function useViroColocation(
   // Guards every async continuation: joining and polling both outlive an
   // unmount, and a room switch has to invalidate the previous join's result.
   const activeRoom = useRef<string | null>(null);
+  // Read at join; useCredentialsKey says when to join again.
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+  const [credentialsKey, credentialsCleared] = useCredentialsKey(credentials);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,12 +137,21 @@ export function useViroColocation(
       if (!ok || !enabled || !roomId) return;
 
       activeRoom.current = roomId;
-      const result = await joinColocation({
-        roomId,
-        apiKey,
-        projectId,
-        endpoint,
-      });
+      let result: Awaited<ReturnType<typeof joinColocation>>;
+      try {
+        result = await joinColocation({
+          roomId,
+          apiKey,
+          projectId,
+          endpoint,
+          credentials: credentialsRef.current,
+        } as ViroColocationConfig);
+      } catch (e) {
+        if (cancelled || activeRoom.current !== roomId) return;
+        setError(e instanceof Error ? e.message : String(e));
+        setState("failed");
+        return;
+      }
       if (cancelled || activeRoom.current !== roomId) return;
 
       if (!result.success) {
@@ -137,19 +161,30 @@ export function useViroColocation(
       }
       setError(undefined);
 
+      // A poll that is still waiting on native holds the next ones back, so a
+      // slow bridge does not stack calls.
+      let polling = false;
       timer = setInterval(async () => {
-        const [s, p] = await Promise.all([
-          getColocationState(),
-          getColocationPeers(),
-        ]);
-        if (cancelled || activeRoom.current !== roomId) return;
-        setState(s.state);
-        setLocalPeerId(s.localPeerId);
-        setPeers((prev) => (samePeers(prev, p) ? prev : p));
+        if (polling) return;
+        polling = true;
+        try {
+          const [s, p] = await Promise.all([
+            getColocationState(),
+            getColocationPeers(),
+          ]);
+          if (cancelled || activeRoom.current !== roomId) return;
+          setState(s.state);
+          setLocalPeerId(s.localPeerId);
+          setPeers((prev) => (samePeers(prev, p) ? prev : p));
+        } catch {
+          // The next poll reads the state again.
+        } finally {
+          polling = false;
+        }
       }, pollMs);
     };
 
-    run();
+    run().catch(() => {});
 
     return () => {
       cancelled = true;
@@ -157,12 +192,21 @@ export function useViroColocation(
       if (timer) clearInterval(timer);
       // Leaving on unmount is right even mid-join: the native session is
       // process-wide, so a stale membership would outlive the component.
-      leaveColocation();
+      leaveColocation().catch(() => {});
       setPeers([]);
       setLocalPeerId("");
       setState("idle");
     };
-  }, [roomId, apiKey, projectId, endpoint, enabled, pollMs]);
+  }, [
+    roomId,
+    apiKey,
+    projectId,
+    endpoint,
+    credentialsKey,
+    credentialsCleared,
+    enabled,
+    pollMs,
+  ]);
 
   return {
     available,

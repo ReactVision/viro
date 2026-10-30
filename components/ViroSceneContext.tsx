@@ -5,15 +5,7 @@ import type {
 } from "./Utilities/ViroActiveCameraTracker";
 
 export const ViroSceneContext = React.createContext<ViroSceneCameraCallbacks>({
-  cameraDidMount: (camera: ViroSceneCamera) => {
-    console.log("ViroSceneContext.cameraDidMount: " + camera);
-  },
-  cameraWillUnmount: (camera: ViroSceneCamera) => {
-    console.log("ViroSceneContext.cameraWillUnmount: " + camera);
-  },
-  cameraDidUpdate: (camera: ViroSceneCamera, active: boolean) => {
-    console.log(
-      "ViroSceneContext.cameraDidUpdate: " + camera + " active: " + active
-    );
-  },
+  cameraDidMount: (_camera: ViroSceneCamera) => {},
+  cameraWillUnmount: (_camera: ViroSceneCamera) => {},
+  cameraDidUpdate: (_camera: ViroSceneCamera, _active: boolean) => {},
 });

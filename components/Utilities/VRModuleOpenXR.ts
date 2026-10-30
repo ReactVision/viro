@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NativeModules } from "react-native";
+import { DeviceEventEmitter, NativeModules } from "react-native";
 import { VRQuestNavigatorBridge } from "./VRQuestNavigatorBridge";
 import { ViroRecordingErrorConstants } from "../ViroConstants";
 
@@ -53,6 +53,11 @@ export type VRModuleOpenXRType = {
   /** CL-H: recover the frame another headset published to that group. */
   rvJoinSharedFrame?: (viewTag: number, groupId: string) => Promise<VRSharedFrameResult>;
   setPassthroughEnabled?: (viewTag: number, enabled: boolean) => void;
+  /**
+   * Toggle passthrough hand occlusion on the running VR scene. Only draws
+   * while passthrough and hand tracking are both on.
+   */
+  setHandOcclusion?: (viewTag: number, enabled: boolean) => void;
   setPassthroughStyle?: (
     viewTag: number,
     opacity: number,
@@ -96,6 +101,33 @@ export function setPassthroughStyle(
  */
 export const VRModuleOpenXR =
   (NativeModules.VRModuleOpenXR as VRModuleOpenXRType | undefined) ?? undefined;
+
+/**
+ * Quest: called on the frame a recentre takes effect (the headset waking
+ * reports one too) with how scene coordinates moved against the room. A point
+ * fixed in the room was at p and is now at `move` × p, a column-major 4x4.
+ *
+ * The scene follows the wearer, as Meta's store requires of a recentre, and
+ * room planes stay on their surfaces by themselves. Content placed in the room
+ * at scene coordinates, or a shared frame, stays put only if the app applies
+ * `move` to it. Never called off Quest. Returns the unsubscribe.
+ */
+export function onRoomMoved(listener: (move: number[]) => void): () => void {
+  if (!VRModuleOpenXR) return () => {};
+  const subscription = DeviceEventEmitter.addListener(
+    "ViroRoomMoved",
+    (move: unknown) => {
+      if (
+        Array.isArray(move) &&
+        move.length === 16 &&
+        move.every((v) => typeof v === "number" && Number.isFinite(v))
+      ) {
+        listener(move);
+      }
+    }
+  );
+  return () => subscription.remove();
+}
 
 /**
  * Returns the live viewTag of the ViroVRSceneNavigator running in VRActivity,

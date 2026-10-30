@@ -32,9 +32,26 @@
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
 #import "VRTUtils.h"
+#import "VRTVPSUploadSession.h"
 #import <CoreLocation/CoreLocation.h>
+#import <zlib.h>
+#include <stdio.h>
+#include <map>
+#include <mutex>
+#include <string>
+#include <vector>
 
-@implementation VRTARSceneNavigatorModule
+// One navigator's VPS map or mesh slot; see rv_requestVPSLoad:.
+struct RVVPSSlot {
+    uint64_t requests = 0;   // load and unload requests counted so far
+    uint64_t applied = 0;    // the newest request that has changed the slot
+    double newestLoad = 0;   // the caller's number for the newest load request
+};
+
+@implementation VRTARSceneNavigatorModule {
+    std::mutex _vpsSlotsMutex;
+    std::map<std::string, RVVPSSlot> _vpsSlots;
+}
 @synthesize bridge = _bridge;
 // Views are looked up through RCTViewRegistry, not the NSDictionary the legacy
 // RCTUIManager block hands out: under the new architecture that dictionary
@@ -68,7 +85,13 @@ static const int kRVViewLookupMaxFrames = 60;
         if (found == nil && attempt < kRVViewLookupMaxFrames) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(16 * NSEC_PER_MSEC)),
                            dispatch_get_main_queue(), ^{
-                [weakSelf rv_withViewForTag:reactTag attempt:attempt + 1 block:block];
+                __typeof(self) strongSelf = weakSelf;
+                if (strongSelf) {
+                    [strongSelf rv_withViewForTag:reactTag attempt:attempt + 1 block:block];
+                } else {
+                    // Module is gone; run the block anyway so its promise settles with an error.
+                    block(viewRegistry);
+                }
             });
             return;
         }
@@ -89,6 +112,19 @@ static NSString *const kVRTRecordingKeyUrl = @"url";
 static NSString *const kVRTRecordingKeyErrorCode = @"errorCode";
 
 RCT_EXPORT_MODULE()
+
+- (instancetype)init {
+    if ((self = [super init])) {
+        // Reconnects the VPS upload session, so transfers an earlier process
+        // started are delivered and finished.
+        [VRTVPSUploadSession shared];
+    }
+    return self;
+}
+
++ (BOOL)requiresMainQueueSetup {
+    return NO;
+}
 
 - (dispatch_queue_t)methodQueue {
     return RCTGetUIManagerQueue();
@@ -433,10 +469,27 @@ RCT_EXPORT_METHOD(hostCloudAnchor:(nonnull NSNumber *)reactTag
 
 #pragma mark - AR Session Recording Methods
 
+// React Native checks the argument count of a bridge call, so the call without options and
+// the one with them are two methods.
 RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                         outputDir:(NSString *)outputDir
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_startRecording:reactTag outputDir:outputDir depth:NO resolve:resolve];
+}
+
+RCT_EXPORT_METHOD(startRecordingWithOptions:(nonnull NSNumber *)reactTag
+                                  outputDir:(NSString *)outputDir
+                                    options:(NSDictionary *)options
+                                    resolve:(RCTPromiseResolveBlock)resolve
+                                     reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_startRecording:reactTag outputDir:outputDir depth:[options[@"depth"] boolValue] resolve:resolve];
+}
+
+- (void)rv_startRecording:(NSNumber *)reactTag
+                outputDir:(NSString *)outputDir
+                    depth:(BOOL)depth
+                  resolve:(RCTPromiseResolveBlock)resolve {
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
@@ -454,6 +507,7 @@ RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
             }
 
             [component startRecording:outputDir
+                                depth:depth
                      completionHandler:^(BOOL success, NSString *error) {
                 NSMutableDictionary *result = [NSMutableDictionary new];
                 [result setObject:@(success) forKey:@"success"];
@@ -607,7 +661,7 @@ RCT_EXPORT_METHOD(isGeospatialModeSupported:(nonnull NSNumber *)reactTag
             BOOL supported = [component isGeospatialModeSupported];
             resolve(@{@"supported": @(supported)});
         } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
+            resolve(@{@"supported": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -627,7 +681,7 @@ RCT_EXPORT_METHOD(isLocationAccuracyReduced:(nonnull NSNumber *)reactTag
             BOOL reduced = [component isLocationAccuracyReduced];
             resolve(@{@"reduced": @(reduced)});
         } @catch (NSException *exception) {
-            resolve(@{@"reduced": @NO, @"error": exception.reason});
+            resolve(@{@"reduced": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -658,7 +712,7 @@ RCT_EXPORT_METHOD(getEarthTrackingState:(nonnull NSNumber *)reactTag
             NSString *state = [component getEarthTrackingState];
             resolve(@{@"state": state});
         } @catch (NSException *exception) {
-            resolve(@{@"state": @"Stopped", @"error": exception.reason});
+            resolve(@{@"state": @"Stopped", @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -693,7 +747,7 @@ RCT_EXPORT_METHOD(getCameraGeospatialPose:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -719,7 +773,7 @@ RCT_EXPORT_METHOD(checkVPSAvailability:(nonnull NSNumber *)reactTag
                 resolve(@{@"availability": availability});
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"availability": @"Unknown", @"error": exception.reason});
+            resolve(@{@"availability": @"Unknown", @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -762,7 +816,7 @@ RCT_EXPORT_METHOD(createGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -805,7 +859,7 @@ RCT_EXPORT_METHOD(createTerrainAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -848,7 +902,7 @@ RCT_EXPORT_METHOD(createRooftopAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -935,7 +989,7 @@ RCT_EXPORT_METHOD(rvGetGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -967,7 +1021,7 @@ RCT_EXPORT_METHOD(rvFindNearbyGeospatialAnchors:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"anchors": @[], @"error": exception.reason});
+            resolve(@{@"success": @NO, @"anchors": @[], @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1001,7 +1055,7 @@ RCT_EXPORT_METHOD(rvUpdateGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1029,7 +1083,7 @@ RCT_EXPORT_METHOD(rvUploadAsset:(nonnull NSNumber *)reactTag
                 if (error)       [result setObject:error       forKey:@"error"];
                 resolve(result);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1052,7 +1106,7 @@ RCT_EXPORT_METHOD(rvSnapshotWorldMeshToFile:(nonnull NSNumber *)reactTag
                 resolve(@{@"success": @NO,
                           @"error": reason ?: @"No world mesh available to snapshot"});
             }
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1074,7 +1128,7 @@ RCT_EXPORT_METHOD(rvLoadWorldMeshFromFile:(nonnull NSNumber *)reactTag
             } else {
                 resolve(@{@"success": @NO, @"error": @"Failed to load world mesh (no scene, no world mesh enabled, or malformed file)"});
             }
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1098,7 +1152,7 @@ RCT_EXPORT_METHOD(rvDeleteGeospatialAnchor:(nonnull NSNumber *)reactTag
                 resolve(result);
             }];
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1118,11 +1172,11 @@ RCT_EXPORT_METHOD(rvListGeospatialAnchors:(nonnull NSNumber *)reactTag
                 completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                [r setObject:(success && anchors) ? anchors : @[] forKey:@"anchors"];
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1158,7 +1212,7 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
                 if (error)                 [r setObject:error                forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1166,6 +1220,23 @@ RCT_EXPORT_METHOD(rvFinishScan:(nonnull NSNumber *)reactTag
 //
 // Both resolve the renderer's own JSON string, parsed on the JS side. The shape is defined once,
 // in VROARSession, instead of being restated in each bridge and drifting between them.
+RCT_EXPORT_METHOD(rvResetWorldMesh:(nonnull NSNumber *)reactTag
+                           resolve:(RCTPromiseResolveBlock)resolve
+                            reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(@NO); return;
+            }
+            [(VRTARSceneNavigator *)view rvResetWorldMesh];
+            resolve(@YES);
+        } @catch (NSException *ex) {
+            resolve(@NO);
+        }
+    }];
+}
+
 RCT_EXPORT_METHOD(rvGetWorldMeshStats:(nonnull NSNumber *)reactTag
                               resolve:(RCTPromiseResolveBlock)resolve
                                reject:(RCTPromiseRejectBlock)reject) {
@@ -1182,6 +1253,8 @@ RCT_EXPORT_METHOD(rvGetWorldMeshStats:(nonnull NSNumber *)reactTag
     }];
 }
 
+static NSString *RVJsonString(NSDictionary *object);
+
 RCT_EXPORT_METHOD(rvGetScanStatus:(nonnull NSNumber *)reactTag
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
@@ -1193,7 +1266,7 @@ RCT_EXPORT_METHOD(rvGetScanStatus:(nonnull NSNumber *)reactTag
             }
             resolve([(VRTARSceneNavigator *)view rvGetScanStatusJson]);
         } @catch (NSException *ex) {
-            resolve([NSString stringWithFormat:@"{\"available\":false,\"error\":\"%@\"}", ex.reason]);
+            resolve(RVJsonString(@{@"available": @NO, @"error": ex.reason ?: ex.name}));
         }
     }];
 }
@@ -1211,6 +1284,519 @@ RCT_EXPORT_METHOD(rvGetScanDiagnostics:(nonnull NSNumber *)reactTag
         } @catch (NSException *ex) {
             resolve(@"{\"valid\":false}");
         }
+    }];
+}
+
+// JSON for a promise that resolves a JSON string. Built with
+// NSJSONSerialization so exception reasons and server bodies are escaped.
+static NSString *RVJsonString(NSDictionary *object) {
+    NSData *data = object ? [NSJSONSerialization dataWithJSONObject:object options:0 error:nil] : nil;
+    NSString *json = data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : nil;
+    return json ?: @"{\"success\":false,\"error\":\"Could not encode the result\"}";
+}
+
+// A navigator holds one VPS map and one mesh. Each load and unload request is
+// counted when it arrives here, in call order, and a load is applied only
+// while it is still the newest request for its slot: the decodes run on a
+// concurrent queue, so an older load can finish after a newer one and must
+// not replace it. An unload is skipped once a load requested after it has
+// been applied, since rv_withViewForTag can retry its block past that load's.
+// `load` is the caller's number for a load (<ViroVPS> counts them per
+// navigator). An unload naming a load that a newer load request has replaced
+// does nothing; 0 names no load, and an unload of 0 always runs.
+static NSString *const kRVVPSSuperseded = @"Superseded by a newer load or unload";
+
+static std::string RVVPSSlotKey(const char *slot, NSNumber *reactTag) {
+    return std::string(slot) + ":" + std::to_string(reactTag.longLongValue);
+}
+
+- (uint64_t)rv_requestVPSLoad:(const char *)slot tag:(NSNumber *)reactTag load:(double)load {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    s.newestLoad = load;
+    return ++s.requests;
+}
+
+- (BOOL)rv_isNewestVPSRequest:(uint64_t)request slot:(const char *)slot tag:(NSNumber *)reactTag {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    return _vpsSlots[RVVPSSlotKey(slot, reactTag)].requests == request;
+}
+
+- (void)rv_noteVPSApplied:(uint64_t)request slot:(const char *)slot tag:(NSNumber *)reactTag {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    if (request > s.applied) s.applied = request;
+}
+
+// 0 when the unload does nothing; requests are numbered from 1.
+- (uint64_t)rv_requestVPSUnload:(const char *)slot tag:(NSNumber *)reactTag load:(double)load {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    if (load != 0 && load != s.newestLoad) return 0;
+    return ++s.requests;
+}
+
+- (BOOL)rv_claimVPSUnload:(uint64_t)request slot:(const char *)slot tag:(NSNumber *)reactTag {
+    std::lock_guard<std::mutex> lock(_vpsSlotsMutex);
+    RVVPSSlot &s = _vpsSlots[RVVPSSlotKey(slot, reactTag)];
+    if (s.applied > request) return NO;
+    s.applied = request;
+    return YES;
+}
+
+// Loads a downloaded .rvmap's raw bytes (base64, same transport
+// VRTStreamingAudioModule.pushSamples uses) for continuous VPS localisation.
+// Resolves the renderer's own JSON verbatim ({"success":...}), same reasoning
+// as rvGetScanStatus above.
+//
+// The base64 decode (several MB) runs on a background queue. The map parse
+// itself still runs inside VROARSessioniOS::rvLoadVPSMap on the main thread.
+// The session state that call resets is locked, so the parse could move to a
+// background queue too; that has not been done or measured yet.
+RCT_EXPORT_METHOD(rvLoadVPSMap:(nonnull NSNumber *)reactTag
+                    rvmapBase64:(NSString *)rvmapBase64
+                           load:(double)load
+                        resolve:(RCTPromiseResolveBlock)resolve
+                         reject:(RCTPromiseRejectBlock)reject) {
+    uint64_t request = [self rv_requestVPSLoad:"map" tag:reactTag load:load];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *rvmapData = rvmapBase64
+            ? [[NSData alloc] initWithBase64EncodedString:rvmapBase64 options:0]
+            : nil;
+        if (!rvmapData || rvmapData.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": @"Empty or malformed base64 map data"}));
+            return;
+        }
+        dispatch_async(RCTGetUIManagerQueue(), ^{
+            [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+                @try {
+                    if (![self rv_isNewestVPSRequest:request slot:"map" tag:reactTag]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": kRVVPSSuperseded})); return;
+                    }
+                    VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+                    if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+                    }
+                    BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMap:rvmapData];
+                    if (ok) [self rv_noteVPSApplied:request slot:"map" tag:reactTag];
+                    resolve(RVJsonString(@{@"success": @(ok)}));
+                } @catch (NSException *ex) {
+                    resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+                }
+            }];
+        });
+    });
+}
+
+RCT_EXPORT_METHOD(rvUnloadVPSMap:(nonnull NSNumber *)reactTag load:(double)load) {
+    uint64_t request = [self rv_requestVPSUnload:"map" tag:reactTag load:load];
+    if (request == 0) return;
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            if (![self rv_claimVPSUnload:request slot:"map" tag:reactTag]) return;
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
+            [(VRTARSceneNavigator *)view rvUnloadVPSMap];
+        } @catch (NSException *ex) { /* no-op — unload has no promise to reject */ }
+    }];
+}
+
+// The VPS location's mesh, base64 like rvLoadVPSMap. Decoded off the main
+// thread; the scene installs it on the render thread.
+RCT_EXPORT_METHOD(rvLoadVPSMapMesh:(nonnull NSNumber *)reactTag
+                        rvwmBase64:(NSString *)rvwmBase64
+                         occlusion:(BOOL)occlusion
+                           physics:(BOOL)physics
+                              load:(double)load
+                           resolve:(RCTPromiseResolveBlock)resolve
+                            reject:(RCTPromiseRejectBlock)reject) {
+    uint64_t request = [self rv_requestVPSLoad:"mesh" tag:reactTag load:load];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *rvwmData = rvwmBase64
+            ? [[NSData alloc] initWithBase64EncodedString:rvwmBase64 options:0]
+            : nil;
+        if (!rvwmData || rvwmData.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": @"Empty or malformed base64 mesh data"}));
+            return;
+        }
+        dispatch_async(RCTGetUIManagerQueue(), ^{
+            [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+                @try {
+                    if (![self rv_isNewestVPSRequest:request slot:"mesh" tag:reactTag]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": kRVVPSSuperseded})); return;
+                    }
+                    VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+                    if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                        resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+                    }
+                    BOOL ok = [(VRTARSceneNavigator *)view rvLoadVPSMapMesh:rvwmData
+                                                                  occlusion:occlusion
+                                                                    physics:physics];
+                    if (ok) [self rv_noteVPSApplied:request slot:"mesh" tag:reactTag];
+                    resolve(ok ? RVJsonString(@{@"success": @YES})
+                               : RVJsonString(@{@"success": @NO, @"error": @"Not an RVWM mesh, or no AR scene"}));
+                } @catch (NSException *ex) {
+                    resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+                }
+            }];
+        });
+    });
+}
+
+// VPS server mode. It takes the "map" slot: a server session replaces a loaded map
+// and rvUnloadVPSMap ends it, with the same numbering against stale requests.
+RCT_EXPORT_METHOD(rvStartVPSServerSession:(nonnull NSNumber *)reactTag
+                                     load:(double)load
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    uint64_t request = [self rv_requestVPSLoad:"map" tag:reactTag load:load];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            if (![self rv_isNewestVPSRequest:request slot:"map" tag:reactTag]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": kRVVPSSuperseded})); return;
+            }
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+            }
+            BOOL ok = [(VRTARSceneNavigator *)view rvStartVPSServerSession];
+            if (ok) [self rv_noteVPSApplied:request slot:"map" tag:reactTag];
+            resolve(RVJsonString(@{@"success": @(ok)}));
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
+// One backend fix for a frame rvCaptureVPSQueryFrame captured.
+RCT_EXPORT_METHOD(rvReportVPSServerFix:(nonnull NSNumber *)reactTag
+                       worldFromCamera:(NSArray<NSNumber *> *)worldFromCamera
+                         mapFromCamera:(NSArray<NSNumber *> *)mapFromCamera
+                               inliers:(double)inliers
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+            }
+            BOOL ok = [(VRTARSceneNavigator *)view rvReportVPSServerFix:worldFromCamera
+                                                           mapFromCamera:mapFromCamera
+                                                                 inliers:(int)inliers];
+            resolve(RVJsonString(@{@"success": @(ok)}));
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
+// One camera image for a VPS visual query; JSON like the other rv* methods.
+RCT_EXPORT_METHOD(rvCaptureVPSQueryFrame:(nonnull NSNumber *)reactTag
+                                 maxSide:(nonnull NSNumber *)maxSide
+                                 resolve:(RCTPromiseResolveBlock)resolve
+                                  reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"success": @NO, @"error": @"Invalid view type"})); return;
+            }
+            [(VRTARSceneNavigator *)view rvCaptureVPSQueryFrame:[maxSide intValue] completion:^(NSDictionary *result) {
+                resolve(RVJsonString(result));
+            }];
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"success": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(rvUnloadVPSMapMesh:(nonnull NSNumber *)reactTag load:(double)load) {
+    uint64_t request = [self rv_requestVPSUnload:"mesh" tag:reactTag load:load];
+    if (request == 0) return;
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            if (![self rv_claimVPSUnload:request slot:"mesh" tag:reactTag]) return;
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) return;
+            [(VRTARSceneNavigator *)view rvUnloadVPSMapMesh];
+        } @catch (NSException *ex) { /* no-op */ }
+    }];
+}
+
+// A pollable stand-in for an onLocalized event — see rvGetScanStatus above
+// for the same "resolve the renderer's JSON verbatim" reasoning.
+RCT_EXPORT_METHOD(rvGetVPSLocalization:(nonnull NSNumber *)reactTag
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        @try {
+            VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+            if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+                resolve(RVJsonString(@{@"available": @NO, @"error": @"AR navigator is not mounted yet"})); return;
+            }
+            resolve([(VRTARSceneNavigator *)view rvGetVPSLocalizationJson]);
+        } @catch (NSException *ex) {
+            resolve(RVJsonString(@{@"available": @NO, @"error": ex.reason ?: ex.name}));
+        }
+    }];
+}
+
+#pragma mark - VPS scan upload
+
+// The files of a ViroReact AR recording, in the order they go in the zip: the
+// two every recording has, then the PNGs depth/ holds, in name order. A missing
+// depth/ is a recording made without depth; one that cannot be read sets `error`
+// and returns nil. The depth PNGs are already compressed, so they go in stored
+// like everything else here.
+static NSArray<NSString *> *RVScanRecordingFiles(NSString *dir, NSString **error) {
+    NSMutableArray<NSString *> *names = [@[@"session.jsonl", @"video.mp4"] mutableCopy];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *depthDir = [dir stringByAppendingPathComponent:@"depth"];
+    BOOL depthIsDir = NO;
+    if (![fm fileExistsAtPath:depthDir isDirectory:&depthIsDir]) return names;
+    NSError *readError = nil;
+    NSArray<NSString *> *depthNames = depthIsDir ? [fm contentsOfDirectoryAtPath:depthDir error:&readError] : nil;
+    if (!depthNames) {
+        if (error) {
+            *error = [NSString stringWithFormat:@"Could not read %@: %@", depthDir,
+                      readError.localizedDescription ?: @"not a directory"];
+        }
+        return nil;
+    }
+    for (NSString *depthName in [depthNames sortedArrayUsingSelector:@selector(compare:)]) {
+        if (![depthName.pathExtension isEqualToString:@"png"]) continue;
+        NSString *name = [@"depth" stringByAppendingPathComponent:depthName];
+        BOOL isDir = NO;
+        if ([fm fileExistsAtPath:[dir stringByAppendingPathComponent:name] isDirectory:&isDir] && !isDir) {
+            [names addObject:name];
+        }
+    }
+    return names;
+}
+
+static void RVPutLE16(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v & 0xff);
+    p[1] = (uint8_t)((v >> 8) & 0xff);
+}
+
+static void RVPutLE32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v & 0xff);
+    p[1] = (uint8_t)((v >> 8) & 0xff);
+    p[2] = (uint8_t)((v >> 16) & 0xff);
+    p[3] = (uint8_t)((v >> 24) & 0xff);
+}
+
+// Writes a stored (uncompressed) zip of `names` from `dir` to `zipPath`,
+// streaming each file through a fixed buffer: local header, data, then the
+// central directory and end record. The CRC-32 is computed with zlib while
+// copying and patched into the local header afterwards; sizes are known up
+// front because stored entries are copied verbatim. No zip64, so the whole
+// archive must stay under 4 GiB (Studio caps recordings at 2 GiB).
+// Returns nil on success, or why it failed; a partial zip is removed.
+static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSString *> *names) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    // The end record counts entries in 16 bits and there is no zip64.
+    if (names.count > 0xFFFF) {
+        return @"The recording has too many files to upload (depth frames are two files each, so about 54 minutes of depth at most)";
+    }
+    std::vector<uint64_t> sizes;
+    uint64_t total = 22;
+    for (NSString *name in names) {
+        NSString *path = [dir stringByAppendingPathComponent:name];
+        BOOL isDir = NO;
+        if (![fm fileExistsAtPath:path isDirectory:&isDir] || isDir) {
+            return [NSString stringWithFormat:@"%@ is missing from %@", name, dir];
+        }
+        if (![fm isReadableFileAtPath:path]) {
+            return [NSString stringWithFormat:@"%@ is not readable", name];
+        }
+        NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+        uint64_t size = [attrs[NSFileSize] unsignedLongLongValue];
+        sizes.push_back(size);
+        total += 30 + 46 + 2 * (uint64_t)[name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] + size;
+    }
+    if (total >= 0xFFFFFFFFull) {
+        return @"The recording is too large to upload (over 4 GiB)";
+    }
+
+    FILE *out = fopen(zipPath.fileSystemRepresentation, "wb");
+    if (!out) return [NSString stringWithFormat:@"Could not create %@", zipPath];
+
+    NSDate *now = [NSDate date];
+    NSDateComponents *c = [[NSCalendar currentCalendar]
+        components:NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay |
+                   NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond
+          fromDate:now];
+    uint32_t dosTime = (uint32_t)((c.hour << 11) | (c.minute << 5) | (c.second / 2));
+    uint32_t dosDate = (uint32_t)((MAX(0, (int)c.year - 1980) << 9) | (c.month << 5) | c.day);
+
+    std::vector<uint32_t> crcs;
+    std::vector<uint32_t> offsets;
+    const size_t kBufSize = 1 << 20;
+    std::vector<uint8_t> buf(kBufSize);
+    NSString *failure = nil;
+
+    for (NSUInteger i = 0; i < names.count && !failure; i++) {
+        NSString *name = names[i];
+        NSData *nameData = [name dataUsingEncoding:NSUTF8StringEncoding];
+        uint32_t size = (uint32_t)sizes[i];
+        uint32_t offset = (uint32_t)ftello(out);
+
+        uint8_t header[30];
+        RVPutLE32(header + 0, 0x04034b50);
+        RVPutLE16(header + 4, 20);        // version needed to extract
+        RVPutLE16(header + 6, 0);         // flags
+        RVPutLE16(header + 8, 0);         // method: stored
+        RVPutLE16(header + 10, dosTime);
+        RVPutLE16(header + 12, dosDate);
+        RVPutLE32(header + 14, 0);        // CRC-32, patched below
+        RVPutLE32(header + 18, size);     // compressed size
+        RVPutLE32(header + 22, size);     // uncompressed size
+        RVPutLE16(header + 26, (uint32_t)nameData.length);
+        RVPutLE16(header + 28, 0);        // extra length
+        if (fwrite(header, 1, sizeof(header), out) != sizeof(header) ||
+            fwrite(nameData.bytes, 1, nameData.length, out) != nameData.length) {
+            failure = @"Could not write the zip";
+            break;
+        }
+
+        NSString *path = [dir stringByAppendingPathComponent:name];
+        FILE *in = fopen(path.fileSystemRepresentation, "rb");
+        if (!in) { failure = [NSString stringWithFormat:@"Could not open %@", name]; break; }
+        uLong crc = crc32(0L, Z_NULL, 0);
+        uint64_t copied = 0;
+        size_t n;
+        while ((n = fread(buf.data(), 1, kBufSize, in)) > 0) {
+            crc = crc32(crc, buf.data(), (uInt)n);
+            if (fwrite(buf.data(), 1, n, out) != n) { failure = @"Could not write the zip"; break; }
+            copied += n;
+        }
+        if (!failure && ferror(in)) failure = [NSString stringWithFormat:@"Could not read %@", name];
+        fclose(in);
+        if (failure) break;
+        if (copied != sizes[i]) {
+            failure = [NSString stringWithFormat:@"%@ changed while it was being zipped", name];
+            break;
+        }
+
+        uint8_t crcBytes[4];
+        RVPutLE32(crcBytes, (uint32_t)crc);
+        if (fseeko(out, (off_t)offset + 14, SEEK_SET) != 0 ||
+            fwrite(crcBytes, 1, 4, out) != 4 ||
+            fseeko(out, 0, SEEK_END) != 0) {
+            failure = @"Could not write the zip";
+            break;
+        }
+        crcs.push_back((uint32_t)crc);
+        offsets.push_back(offset);
+    }
+
+    if (!failure) {
+        uint32_t cdOffset = (uint32_t)ftello(out);
+        for (NSUInteger i = 0; i < names.count && !failure; i++) {
+            NSData *nameData = [names[i] dataUsingEncoding:NSUTF8StringEncoding];
+            uint32_t size = (uint32_t)sizes[i];
+            uint8_t cd[46];
+            RVPutLE32(cd + 0, 0x02014b50);
+            RVPutLE16(cd + 4, 20);        // version made by
+            RVPutLE16(cd + 6, 20);        // version needed
+            RVPutLE16(cd + 8, 0);         // flags
+            RVPutLE16(cd + 10, 0);        // method: stored
+            RVPutLE16(cd + 12, dosTime);
+            RVPutLE16(cd + 14, dosDate);
+            RVPutLE32(cd + 16, crcs[i]);
+            RVPutLE32(cd + 20, size);
+            RVPutLE32(cd + 24, size);
+            RVPutLE16(cd + 28, (uint32_t)nameData.length);
+            RVPutLE16(cd + 30, 0);        // extra length
+            RVPutLE16(cd + 32, 0);        // comment length
+            RVPutLE16(cd + 34, 0);        // disk number start
+            RVPutLE16(cd + 36, 0);        // internal attributes
+            RVPutLE32(cd + 38, 0);        // external attributes
+            RVPutLE32(cd + 42, offsets[i]);
+            if (fwrite(cd, 1, sizeof(cd), out) != sizeof(cd) ||
+                fwrite(nameData.bytes, 1, nameData.length, out) != nameData.length) {
+                failure = @"Could not write the zip";
+            }
+        }
+        if (!failure) {
+            uint32_t cdSize = (uint32_t)ftello(out) - cdOffset;
+            uint8_t eocd[22];
+            RVPutLE32(eocd + 0, 0x06054b50);
+            RVPutLE16(eocd + 4, 0);
+            RVPutLE16(eocd + 6, 0);
+            RVPutLE16(eocd + 8, (uint32_t)names.count);
+            RVPutLE16(eocd + 10, (uint32_t)names.count);
+            RVPutLE32(eocd + 12, cdSize);
+            RVPutLE32(eocd + 16, cdOffset);
+            RVPutLE16(eocd + 20, 0);      // comment length
+            if (fwrite(eocd, 1, sizeof(eocd), out) != sizeof(eocd)) failure = @"Could not write the zip";
+        }
+    }
+
+    if (fclose(out) != 0 && !failure) failure = @"Could not write the zip";
+    if (failure) [fm removeItemAtPath:zipPath error:nil];
+    return failure;
+}
+
+// Zips a ViroReact AR recording (session.jsonl + video.mp4, and depth/ if it has
+// one, in outputDir) into
+// the uploads directory, where it survives the app being suspended or
+// relaunched until rvTransferScanRecording sends it. Resolves a JSON string:
+// {success: true, path, bytes} or {success: false, stage: "zip", error}.
+// Not tied to a navigator view: it only reads and writes files.
+RCT_EXPORT_METHOD(rvPrepareScanRecording:(NSString *)outputDir
+                                 resolve:(RCTPromiseResolveBlock)resolve
+                                  reject:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        if (outputDir.length == 0) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip",
+                                   @"error": @"Invalid recording directory"}));
+            return;
+        }
+        NSString *dirError = nil;
+        NSString *zipPath = [VRTVPSUploadSession makeZipPath:&dirError];
+        if (!zipPath) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": dirError ?: @""}));
+            return;
+        }
+        NSString *zipError = nil;
+        NSArray<NSString *> *files = RVScanRecordingFiles(outputDir, &zipError);
+        if (files) zipError = RVWriteStoredZip(zipPath, outputDir, files);
+        if (zipError) {
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": zipError}));
+            return;
+        }
+        NSNumber *bytes = [[NSFileManager defaultManager] attributesOfItemAtPath:zipPath error:nil][NSFileSize];
+        if (bytes == nil) {
+            [[NSFileManager defaultManager] removeItemAtPath:zipPath error:nil];
+            resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": @"Could not read the zip's size"}));
+            return;
+        }
+        resolve(RVJsonString(@{@"success": @YES, @"path": zipPath, @"bytes": bytes}));
+    });
+}
+
+// PUTs a prepared zip to Storage on a background NSURLSession, then POSTs
+// complete_url; see VRTVPSUploadSession. Resolves, never rejects, a JSON
+// string: {success, stage: "upload"|"complete", scan_id, status?, body?,
+// error?, code?}.
+RCT_EXPORT_METHOD(rvTransferScanRecording:(NSString *)requestJson
+                                  resolve:(RCTPromiseResolveBlock)resolve
+                                   reject:(RCTPromiseRejectBlock)reject) {
+    [[VRTVPSUploadSession shared] transfer:requestJson ?: @"" completion:^(NSString *resultJson) {
+        resolve(resultJson);
+    }];
+}
+
+// Deletes a prepared zip whose upload will never start. Only a zip in the
+// uploads directory that no transfer is using is deleted.
+RCT_EXPORT_METHOD(rvDiscardScanRecording:(NSString *)path
+                                 resolve:(RCTPromiseResolveBlock)resolve
+                                  reject:(RCTPromiseRejectBlock)reject) {
+    [[VRTVPSUploadSession shared] discardZip:path ?: @"" completion:^{
+        resolve(nil);
     }];
 }
 
@@ -1232,7 +1818,7 @@ RCT_EXPORT_METHOD(rvGetCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error)      [r setObject:error      forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1251,11 +1837,11 @@ RCT_EXPORT_METHOD(rvListCloudAnchors:(nonnull NSNumber *)reactTag
                 completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                [r setObject:(success && anchors) ? anchors : @[] forKey:@"anchors"];
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1280,7 +1866,7 @@ RCT_EXPORT_METHOD(rvUpdateCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error)      [r setObject:error      forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1301,7 +1887,7 @@ RCT_EXPORT_METHOD(rvDeleteCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1323,11 +1909,11 @@ RCT_EXPORT_METHOD(rvFindNearbyCloudAnchors:(nonnull NSNumber *)reactTag
                 completionHandler:^(BOOL success, NSArray *anchors, NSString *error) {
                 NSMutableDictionary *r = [NSMutableDictionary new];
                 [r setObject:@(success) forKey:@"success"];
-                [r setObject:success ? anchors : @[] forKey:@"anchors"];
+                [r setObject:(success && anchors) ? anchors : @[] forKey:@"anchors"];
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1347,7 +1933,7 @@ RCT_EXPORT_METHOD(rvGetProject:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1369,7 +1955,7 @@ RCT_EXPORT_METHOD(rvGetScene:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1391,7 +1977,7 @@ RCT_EXPORT_METHOD(rvGetSceneAssets:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1418,7 +2004,7 @@ RCT_EXPORT_METHOD(rvAttachAssetToCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1440,7 +2026,7 @@ RCT_EXPORT_METHOD(rvRemoveAssetFromCloudAnchor:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1470,7 +2056,7 @@ RCT_EXPORT_METHOD(rvTrackCloudAnchorResolution:(nonnull NSNumber *)reactTag
                 if (error) [r setObject:error forKey:@"error"];
                 resolve(r);
             }];
-        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason}); }
+        } @catch (NSException *ex) { resolve(@{@"success": @NO, @"error": ex.reason ?: ex.name}); }
     }];
 }
 
@@ -1491,7 +2077,7 @@ RCT_EXPORT_METHOD(isSemanticModeSupported:(nonnull NSNumber *)reactTag
             BOOL supported = [component isSemanticModeSupported];
             resolve(@{@"supported": @(supported)});
         } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
+            resolve(@{@"supported": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1526,7 +2112,7 @@ RCT_EXPORT_METHOD(getSemanticLabelFractions:(nonnull NSNumber *)reactTag
             [result setObject:fractions forKey:@"fractions"];
             resolve(result);
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1551,7 +2137,7 @@ RCT_EXPORT_METHOD(getSemanticLabelFraction:(nonnull NSNumber *)reactTag
             [result setObject:@(fraction) forKey:@"fraction"];
             resolve(result);
         } @catch (NSException *exception) {
-            resolve(@{@"success": @NO, @"fraction": @0.0, @"error": exception.reason});
+            resolve(@{@"success": @NO, @"fraction": @0.0, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1584,7 +2170,7 @@ RCT_EXPORT_METHOD(isPreferMonocularDepth:(nonnull NSNumber *)reactTag
             BOOL preferred = [component isPreferMonocularDepth];
             resolve(@{@"preferred": @(preferred)});
         } @catch (NSException *exception) {
-            resolve(@{@"preferred": @NO, @"error": exception.reason});
+            resolve(@{@"preferred": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1605,7 +2191,7 @@ RCT_EXPORT_METHOD(isDepthOcclusionSupported:(nonnull NSNumber *)reactTag
             // On iOS, depth occlusion is always supported (via monocular depth or LiDAR)
             resolve(@{@"supported": @YES});
         } @catch (NSException *exception) {
-            resolve(@{@"supported": @NO, @"error": exception.reason});
+            resolve(@{@"supported": @NO, @"error": exception.reason ?: exception.name});
         }
     }];
 }
@@ -1644,7 +2230,7 @@ RCT_EXPORT_METHOD(getGeospatialSetupStatus:(nonnull NSNumber *)reactTag
                 @"geospatialSupported": @NO,
                 @"locationServicesAvailable": @NO,
                 @"apiKeyConfigured": @YES,
-                @"error": exception.reason
+                @"error": exception.reason ?: exception.name
             });
         }
     }];

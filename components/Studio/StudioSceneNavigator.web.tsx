@@ -39,6 +39,11 @@ import type {
 } from "./colocation/types";
 import type { SequenceRuntimeContext } from "./domain/sceneNavigationHandler";
 import type { StudioAssetErrorHandler } from "./domain/viroNodeFactory";
+import {
+  STUDIO_VPS_UNSUPPORTED,
+  studioVpsBinding,
+  type StudioVpsStateEvent,
+} from "./domain/vps";
 import type { StudioSceneResponse } from "./types";
 
 export interface StudioSceneNavigatorWebHandle {
@@ -49,6 +54,8 @@ export interface StudioSceneNavigatorWebHandle {
   retryColocation: () => boolean;
   getColocationRoom: () => StudioColocationRoom | null;
   finishColocationScan: () => boolean;
+  /** Always false on web, where VPS cannot track. */
+  retryVps: () => boolean;
 }
 
 export interface StudioSceneNavigatorWebProps {
@@ -128,6 +135,12 @@ export interface StudioSceneNavigatorWebProps {
   onColocationStateChange?: (state: StudioColocationState) => void;
   /** Never called on web: no room is ever joined. */
   onColocationRoom?: (room: StudioColocationRoom) => void;
+  /**
+   * Accepted for parity with native. A scene bound to a VPS location reports
+   * `unsupported`, renders none of its plane assets and does not run its
+   * on_load function, and reports `idle` when it is left.
+   */
+  onVpsStateChange?: (event: StudioVpsStateEvent) => void;
 }
 
 type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
@@ -245,6 +258,7 @@ export const StudioSceneNavigator = forwardRef<
     colocation,
     colocationIndicator = true,
     onColocationStateChange,
+    onVpsStateChange,
     arOptions,
     onSessionReady,
     onMotionUnavailable,
@@ -307,6 +321,22 @@ export const StudioSceneNavigator = forwardRef<
     () => () => studioColocationStore.reset(colocationStoreOwner),
     [colocationStoreOwner]
   );
+
+  const onVpsStateChangeRef = useRef(onVpsStateChange);
+  onVpsStateChangeRef.current = onVpsStateChange;
+  const vpsBinding = sceneData ? studioVpsBinding(sceneData) : null;
+  const vpsSceneId = vpsBinding?.sceneId;
+  const vpsLocationId = vpsBinding?.locationId;
+  useEffect(() => {
+    if (!vpsSceneId || !vpsLocationId) return;
+    const base = { sceneId: vpsSceneId, locationId: vpsLocationId };
+    onVpsStateChangeRef.current?.({
+      ...base,
+      state: "unsupported",
+      error: STUDIO_VPS_UNSUPPORTED,
+    });
+    return () => onVpsStateChangeRef.current?.({ ...base, state: "idle" });
+  }, [vpsSceneId, vpsLocationId]);
 
   // The navigators read their renderer options once, when they create it.
   const onRendererAbortRef = useRef(onRendererAbort);
@@ -380,6 +410,7 @@ export const StudioSceneNavigator = forwardRef<
       retryColocation: () => false,
       getColocationRoom: () => null,
       finishColocationScan: () => false,
+      retryVps: () => false,
     }),
     [],
   );

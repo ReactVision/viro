@@ -19,7 +19,10 @@ import {
 } from "react-native";
 import { ViroARScene } from "../AR/ViroARScene";
 import { ViroScene } from "../ViroScene";
-import { ViroXRSceneNavigator } from "../ViroXRSceneNavigator";
+import {
+  QuestRuntimePermission,
+  ViroXRSceneNavigator,
+} from "../ViroXRSceneNavigator";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { VRQuestNavigatorBridge } from "../Utilities/VRQuestNavigatorBridge";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator";
@@ -38,10 +41,21 @@ import type {
   StudioColocationState,
 } from "./colocation/types";
 import { registerSceneAnimations } from "./domain/animationRegistry";
+import {
+  QUEST_SCENE_LOADING,
+  questSceneLoadStore,
+} from "./domain/questSceneLoadStore";
+import { startQuestSpatialDataSession } from "./domain/questSpatialData";
+import { studioTextAssetIds } from "./domain/questText";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { studioApiError } from "./domain/studioApiError";
+import {
+  StudioVpsCoordinator,
+  type StudioVpsLocalization,
+  type StudioVpsStateEvent,
+} from "./domain/vps";
 import { StudioARScene, type StudioPlacementApi } from "./StudioARScene";
 import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { StudioProjectApiResponse, StudioSceneResponse } from "./types";
@@ -55,6 +69,11 @@ function LoadingARScene() {
 function LoadingVRScene() {
   return <ViroScene toneMappingEnabled={false} />;
 }
+
+// Spatial data is asked for inside the headset, by the first plane scene
+// (questSpatialData), since the headset view opens before the scene is known.
+// The headset camera is never read here, and sharing needs neither.
+const QUEST_PERMISSIONS: QuestRuntimePermission[] = [];
 
 type ViroOcclusionMode = "peopleOnly" | "depthBased" | undefined;
 
@@ -222,6 +241,15 @@ export interface StudioSceneNavigatorHandle {
    * when the scan ended, false, changing nothing, before then or outside a scan.
    */
   finishColocationScan: () => boolean;
+  /**
+   * Start VPS tracking again for the scene on screen after it reported
+   * `error` or `idle`: at once, and whatever the error, where the automatic
+   * retry waits and takes only failures that may pass. False, changing
+   * nothing, when that scene is not bound to a VPS location, cannot track
+   * here (no endpoint it may use, Meta Quest, Apple Vision Pro), or is in
+   * another state.
+   */
+  retryVps: () => boolean;
 }
 
 export interface StudioSceneNavigatorProps {
@@ -241,9 +269,11 @@ export interface StudioSceneNavigatorProps {
   renderQuestPanel?: (enter: () => void) => React.ReactNode;
   /**
    * Meta Quest only. Buttons for the in-scene menu, listed above its Exit
-   * button. The wearer opens and closes the menu with the left controller's Y
-   * button, and pressing a button closes it. Nothing 2D can be seen from
-   * inside the headset, so this is where the host's scene actions go.
+   * button. The wearer opens and closes the menu with the left controller's
+   * menu button or, with hands, a pinch with the palm facing them, and
+   * pressing a button closes it. B closes it too while it is open. Nothing 2D
+   * can be seen from inside the headset, so this is where the host's scene
+   * actions go.
    */
   questMenuItems?: readonly StudioQuestMenuItem[];
   /** Fired after the scene is fetched and parsed, before it is pushed. */
@@ -261,7 +291,9 @@ export interface StudioSceneNavigatorProps {
   noAssetsMessage?: string;
   /**
    * Opt-in overlay shown until the scene mounts. Omit to render nothing on AR
-   * during load (the camera feed); Quest falls back to a built-in spinner.
+   * during load (the camera feed); visionOS falls back to a built-in spinner.
+   * Meta Quest opens the headset view at once and shows its own loading panel
+   * there, so this only shows on the 2D panel behind it.
    */
   loadingView?: React.ReactNode;
   /**
@@ -304,6 +336,14 @@ export interface StudioSceneNavigatorProps {
    * reports why; `connectTimeoutMs` bounds the wait for the room once the
    * frame is known (`CONNECT_TIMEOUT`, `HOST_TIMEOUT`).
    *
+   * `credentials`, such as a user token from createUserTokenCredentials(),
+   * authenticate the room, the relay, the pose channel and the shared state in
+   * place of `rvApiKey` or the Studio session, which scene loads, cloud anchors
+   * and VPS keep: `colocation={{ mode: "join", code, credentials }}`. A change
+   * of createUserTokenCredentials() object, or a clear() of the one in use,
+   * fails a running session with `NOT_AUTHORIZED`; `retryColocation()` starts
+   * it again.
+   *
    * Variables, visibility and tap-to-place positions are shared, the last
    * write winning; a device that joins or reconnects takes the room's copy
    * over its own. A drag is shared while it runs: the device dragging an
@@ -313,7 +353,12 @@ export interface StudioSceneNavigatorProps {
    * NAVIGATE on any device takes every device to that scene, and the devices
    * that follow do not run its on_load function; a device that joins on
    * another scene moves to the room's. A scene outside the session's project
-   * is not entered, and is reported as one that failed to load.
+   * is not entered, and is reported as one that failed to load. Nor is a scene
+   * bound to a VPS location, whose content a shared frame cannot place: the
+   * device that navigates there, and each device the room would take there,
+   * stays on its scene and its session fails with `SCENE_BOUND_TO_VPS`. A
+   * session fails the same way when `sceneId` changes to such a scene, which
+   * then renders alone, and a host on one fails before it scans.
    * Collision bindings run on one device: the host while it is connected,
    * and otherwise the connected device with the lowest peer id, so they keep
    * running when the host leaves. The exception is image-triggered
@@ -332,10 +377,13 @@ export interface StudioSceneNavigatorProps {
    * with `FRAME_KIND_UNSUPPORTED`.
    *
    * On Quest the scene on screen roots in ViroARScene while a session is set
-   * up or shared, and in ViroScene otherwise. Changing the root remounts the
-   * whole scene, so a sound that is playing starts again from the beginning
-   * when a session starts after the scene mounted, and again when a session
-   * ends or fails. Set this before the scene mounts to avoid the first.
+   * up or shared. Outside a session it roots in ViroARScene only when it
+   * detects planes (AUTOMATIC or MANUAL) and the wearer has granted spatial
+   * data, and in ViroScene otherwise. Changing the root remounts the whole
+   * scene, so in a scene that roots in ViroScene on its own, a sound that is
+   * playing starts again from the beginning when a session starts after the
+   * scene mounted, and again when the session ends or fails. Set this before
+   * the scene mounts to avoid the first.
    */
   colocation?: StudioColocationOptions;
   /**
@@ -350,6 +398,29 @@ export interface StudioSceneNavigatorProps {
   onColocationStateChange?: (state: StudioColocationState) => void;
   /** Once per room: when the host has its code, or when a joiner is in. */
   onColocationRoom?: (room: StudioColocationRoom) => void;
+  /**
+   * VPS tracking of the scene on screen, for a scene bound to a VPS location.
+   * Its plane assets show only while the state is `tracking`, and its on_load
+   * function waits for the first `tracking`, so a scene that never tracks
+   * shows none of them and does not run it. A failure that may pass (no
+   * network or no answer within 30 s, a 5xx or 429) is retried with backoff
+   * while the scene is on screen, and a map that failed to load or went away
+   * is retried four times, so `error` can be followed by `searching`. The
+   * handle's `retryVps()` restarts it at once after any error, so show a
+   * Retry for `error`. A bound
+   * scene that leaves the screen reports `idle`. Meta Quest and Apple Vision
+   * Pro report `unsupported`.
+   */
+  onVpsStateChange?: (event: StudioVpsStateEvent) => void;
+  /**
+   * Where a scene bound to a VPS location localises: `"device"` (default)
+   * downloads the location's map, `"server"` sends camera frames to
+   * vps-server, which needs a map built with server mode and is billed as
+   * Advanced VPS compute (`<ViroVPS localization>`). A change restarts the
+   * tracking of the scene on screen in the new mode, so a host can offer
+   * both to compare.
+   */
+  vpsLocalization?: StudioVpsLocalization;
 }
 
 /**
@@ -361,9 +432,11 @@ export interface StudioSceneNavigatorProps {
  *   2. Native project (RVProjectId from manifest) → use `opening_scene.id`
  *   3. Fallback → first scene in the project's scene list
  *
- * On Quest, ViroXRSceneNavigator is not rendered until the scene data is
- * ready. This means VRActivity always launches with the actual content scene
- * as its initial scene, avoiding the LoadingVRScene → replace timing race.
+ * On Quest, VRActivity launches at once into a StudioARScene with no data,
+ * which shows a loading panel until the data arrives through
+ * questSceneLoadStore. Its initial scene never changes, so nothing is pushed or
+ * replaced across the launch, which avoids the LoadingVRScene → replace timing
+ * race. visionOS still mounts ViroXRSceneNavigator once the data is ready.
  */
 export const StudioSceneNavigator = forwardRef<
   StudioSceneNavigatorHandle,
@@ -392,6 +465,8 @@ export const StudioSceneNavigator = forwardRef<
     colocationIndicator = true,
     onColocationStateChange,
     onColocationRoom,
+    onVpsStateChange,
+    vpsLocalization = "device",
   },
   ref
 ) {
@@ -503,11 +578,31 @@ export const StudioSceneNavigator = forwardRef<
     return () => questMenuStore.clear(colocationStoreOwner);
   }, [questMenuItems, colocationStoreOwner]);
   useEffect(() => {
+    if (!isQuest) return;
+    startQuestSpatialDataSession();
+    questSceneLoadStore.open(colocationStoreOwner, retryLoad);
+    return () => questSceneLoadStore.close(colocationStoreOwner);
+  }, [colocationStoreOwner, retryLoad]);
+  useEffect(() => {
     if (colocation) studioColocationStore.clearFailure(colocationStoreOwner);
     colocationRef.current?.request(colocation ?? null, {
       restartFailed: false,
     });
   }, [colocation, colocationStoreOwner]);
+
+  const onVpsStateChangeRef = useRef(onVpsStateChange);
+  onVpsStateChangeRef.current = onVpsStateChange;
+  // Handed to every scene like the colocation controller: the navigator holds
+  // one VPS map, which only the scene on screen tracks.
+  const vpsRef = useRef<StudioVpsCoordinator | null>(null);
+  if (vpsRef.current === null) {
+    const coordinator = new StudioVpsCoordinator(vpsLocalization);
+    coordinator.onStateChange = (event) => onVpsStateChangeRef.current?.(event);
+    vpsRef.current = coordinator;
+  }
+  useEffect(() => {
+    vpsRef.current?.setLocalization(vpsLocalization);
+  }, [vpsLocalization]);
 
   // The tap-to-place overlay would catch taps for content that is withheld
   // while a shared session is set up.
@@ -557,7 +652,7 @@ export const StudioSceneNavigator = forwardRef<
   // reach the initial scene alone, as their props say.
   const sceneEntry = useCallback(
     (
-      sceneData: StudioSceneResponse,
+      sceneData: StudioSceneResponse | null,
       initial: boolean,
       skipOnLoadFunction = false
     ) => ({
@@ -577,6 +672,7 @@ export const StudioSceneNavigator = forwardRef<
         placementStore: placementStoreRef.current,
         placementApiRef,
         colocation: colocationRef.current,
+        vps: vpsRef.current,
         ...(skipOnLoadFunction ? { skipOnLoadFunction } : {}),
       },
     }),
@@ -600,12 +696,16 @@ export const StudioSceneNavigator = forwardRef<
     return () => controller?.setScenePusher(null);
   }, [sceneEntry, rememberPlacementNames]);
 
-  // On Quest: holds the resolved scene entry. ViroXRSceneNavigator is not
-  // rendered until this is non-null, so VRActivity always launches into content.
+  // On visionOS: holds the resolved scene entry. ViroXRSceneNavigator is not
+  // rendered until this is non-null, so the ImmersiveSpace opens into content.
   const [vrSceneEntry, setVrSceneEntry] = useState<{
     scene: any;
     passProps?: any;
   } | null>(null);
+  // VRActivity reads it once, at launch.
+  const [questOpeningEntry] = useState(() =>
+    isQuest ? sceneEntry(null, true) : null
+  );
 
   // Host config derived from the loaded scene; native setters apply post-mount,
   // so setting these after the navigator mounts is fine.
@@ -632,6 +732,7 @@ export const StudioSceneNavigator = forwardRef<
       retryColocation: () => colocationRef.current?.retry() ?? false,
       getColocationRoom: () => colocationRef.current?.getRoom() ?? null,
       finishColocationScan: () => colocationRef.current?.finishScan() ?? false,
+      retryVps: () => vpsRef.current?.retry() ?? false,
     }),
     []
   );
@@ -675,6 +776,9 @@ export const StudioSceneNavigator = forwardRef<
       if (isCancelled()) return;
 
       if (loadedSceneIdRef.current === resolvedSceneId) return;
+      if (isQuest) {
+        questSceneLoadStore.set(colocationStoreOwner, QUEST_SCENE_LOADING);
+      }
 
       const result = await VRTStudioModule.rvGetScene(resolvedSceneId);
       if (isCancelled()) return;
@@ -703,29 +807,38 @@ export const StudioSceneNavigator = forwardRef<
 
       onSceneLoadedRef.current?.(sceneData);
 
-      // On Quest, pre-register animations and materials before VRActivity
-      // launches so the native registrations land before any Viro component
-      // mounts; otherwise registerAnimations/createMaterials races the Fabric
-      // commit that creates those components. visionOS is the same shape of
-      // problem: the ImmersiveSpace renderer starts outside this commit.
+      // On Quest, pre-register animations and materials before the scene gets
+      // its data, so the native registrations are sent ahead of the Fabric
+      // commit that creates those components (StudioARScene registers them as
+      // it renders too, and a NAVIGATE relies on that alone). visionOS is the
+      // same shape of problem: the ImmersiveSpace renderer starts outside this
+      // commit.
       if (isQuest || isVisionOS) {
-        registerSceneAnimations(sceneData.animations);
+        registerSceneAnimations(
+          sceneData.animations,
+          isQuest ? studioTextAssetIds(sceneData.assets) : undefined
+        );
         registerStudioMaterialsForAssets(sceneData.assets);
       }
 
       const entry = sceneEntry(sceneData, true);
 
-      if (isQuest || isVisionOS) {
+      if (isQuest) {
+        questSceneLoadStore.set(colocationStoreOwner, {
+          status: "ready",
+          sceneData,
+        });
+      } else if (isVisionOS) {
         // Setting vrSceneEntry mounts ViroXRSceneNavigator with StudioARScene as
-        // vrInitialScene, so VRActivity launches straight into content. visionOS reads the
-        // same prop — its ImmersiveSpace cannot host a ViroARScene either — so it takes this
-        // path rather than pushing onto a navigator that starts on the loading scene.
+        // vrInitialScene, so the ImmersiveSpace opens straight into content. It
+        // cannot host a ViroARScene, so it takes this path rather than pushing
+        // onto a navigator that starts on the loading scene.
         setVrSceneEntry(entry);
       } else {
         navigatorRef.current?.arSceneNavigator?.push(entry);
       }
     },
-    [resolveSceneId, sceneEntry, rememberPlacementNames]
+    [resolveSceneId, sceneEntry, rememberPlacementNames, colocationStoreOwner]
   );
 
   useEffect(() => {
@@ -736,6 +849,9 @@ export const StudioSceneNavigator = forwardRef<
       if (cancelled) return;
       const err = e instanceof Error ? e : new Error(String(e));
       setLoadError(err);
+      if (isQuest) {
+        questSceneLoadStore.set(colocationStoreOwner, { status: "failed" });
+      }
       const handler = onErrorRef.current;
       if (handler) handler(err);
       else console.error("[Studio] Failed to load scene:", err);
@@ -746,26 +862,20 @@ export const StudioSceneNavigator = forwardRef<
     };
     // loadAttempt is the retry trigger: loadScene is stable within a mount, so
     // bumping it is what re-runs the fetch without remounting the AR session.
-  }, [sceneId, loadScene, loadAttempt]);
+  }, [sceneId, loadScene, loadAttempt, colocationStoreOwner]);
 
   // Falls back to loadingView when the host passes no renderError, so callers
   // that never opted in keep exactly their previous behaviour.
   const loadErrorView = loadError ? renderError?.(loadError, retryLoad) : null;
   const overlay = isSceneReady ? null : (loadErrorView ?? loadingView ?? null);
 
-  // Before vrSceneEntry resolves, VRActivity hasn't been launched yet (Quest)
-  // or the ImmersiveSpace hasn't opened yet (visionOS), so this window has
-  // nothing of its own to show — it always needs something on screen: the
-  // caller's loadingView, else a built-in spinner. (Phone AR shows the live
-  // camera during load, so its overlay stays opt-in.) This branch sits above
-  // the error boundary, which is why it has to handle loadError itself.
-  // (Quest 3/3S do have colour passthrough once the scene mounts — this branch
-  // is about the pre-launch panel window, not about passthrough support.)
-  //
-  // visionOS needs the same treatment for a different reason: its passthrough lives in
-  // the ImmersiveSpace, not in this window, so the window would otherwise sit blank
-  // while the scene loads.
-  if ((isQuest || isVisionOS) && !vrSceneEntry) {
+  // Before vrSceneEntry resolves, the ImmersiveSpace hasn't opened yet
+  // (visionOS). Its passthrough lives there, not in this window, so the window
+  // always needs something on screen while the scene loads: the caller's
+  // loadingView, else a built-in spinner. (Phone AR shows the live camera
+  // during load, so its overlay stays opt-in.) This branch sits above the error
+  // boundary, which is why it has to handle loadError itself.
+  if (isVisionOS && !vrSceneEntry) {
     // The host's view fills the window, as it does over the phone camera;
     // centring it here shrank it to its content's width.
     return (
@@ -789,7 +899,9 @@ export const StudioSceneNavigator = forwardRef<
         <ViroXRSceneNavigator
           ref={navigatorRef}
           arInitialScene={{ scene: LoadingARScene }}
-          vrInitialScene={vrSceneEntry ?? { scene: LoadingVRScene }}
+          vrInitialScene={
+            questOpeningEntry ?? vrSceneEntry ?? { scene: LoadingVRScene }
+          }
           worldAlignment={worldAlignment}
           autofocus={autofocus}
           numberOfTrackedImages={numberOfTrackedImages}
@@ -815,9 +927,11 @@ export const StudioSceneNavigator = forwardRef<
           bloomEnabled={false}
           onExitViro={onExitViro}
           renderQuestPanel={renderQuestPanel}
+          questPermissions={QUEST_PERMISSIONS}
           // Quest-only (no-op on phones). Quest mounts a ViroScene root rather
-          // than ViroARScene outside a shared session (see StudioARScene for
-          // why), and a virtual root turns none of this on by itself, so both
+          // than ViroARScene outside a shared session, except for a plane scene
+          // with spatial data granted (see StudioARScene for why), and a
+          // virtual root turns none of this on by itself, so both
           // are asked for outright.
           // They reach VRActivity through the navigator bridge and do not depend
           // on which root the scene uses.

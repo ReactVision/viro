@@ -29,6 +29,10 @@ import java.util.UUID;
 
 public class RVHttpClient {
 
+    // Upper bound for downloadBinary: a response past it is dropped rather than
+    // held in memory.
+    private static final long MAX_DOWNLOAD_BYTES = 256L * 1024 * 1024;
+
     // -----------------------------------------------------------------------
     // JSON / binary request
     //
@@ -154,6 +158,7 @@ public class RVHttpClient {
     public static byte[] downloadBinary(String url, int timeoutSec) {
         HttpURLConnection conn = null;
         try {
+            requireAllowedUrl(url);
             URL u = new URL(url);
             conn = (HttpURLConnection) u.openConnection();
             conn.setConnectTimeout(timeoutSec * 1000);
@@ -161,8 +166,9 @@ public class RVHttpClient {
 
             int status = conn.getResponseCode();
             if (status < 200 || status >= 300) return null;
+            if (conn.getContentLengthLong() > MAX_DOWNLOAD_BYTES) return null;
 
-            return readAllBytes(conn.getInputStream());
+            return readAllBytes(conn.getInputStream(), MAX_DOWNLOAD_BYTES);
 
         } catch (Exception e) {
             return null;
@@ -179,6 +185,7 @@ public class RVHttpClient {
             String url, String method, String apiKey, int timeoutSec)
             throws IOException {
 
+        requireAllowedUrl(url);
         HttpURLConnection conn =
                 (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod(method.toUpperCase());
@@ -187,8 +194,54 @@ public class RVHttpClient {
         if (apiKey != null) {
             conn.setRequestProperty("x-api-key", apiKey);
         }
-        conn.setInstanceFollowRedirects(true);
+        // A followed redirect would replay x-api-key and Authorization to
+        // whichever host it names; the 3xx is returned to the caller instead.
+        conn.setInstanceFollowRedirects(false);
         return conn;
+    }
+
+    /**
+     * Hosts plain http may reach: localhost, a private network (10/8, 172.16/12,
+     * 192.168/16, 100.64/10 as Tailscale uses, IPv6 ULA) or a .local name. The same
+     * rule as studioVpsEndpointAllowed in JS, so a URL is accepted or refused alike
+     * on both sides of the bridge. Used by VpsScanUpload too.
+     */
+    public static boolean isLocalNetworkHost(String host) {
+        if (host == null) return false;
+        host = host.toLowerCase(java.util.Locale.ROOT);
+        return host.equals("localhost") || host.equals("[::1]") || host.endsWith(".local")
+                || host.matches("\\[f[cd][0-9a-f]{2}:.*\\]")
+                || host.matches("127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("192\\.168\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("172\\.(1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}")
+                || host.matches("100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}");
+    }
+
+    // https only, except for the local hosts above, which development servers use.
+    private static void requireAllowedUrl(String url) throws IOException {
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            String scheme = uri.getScheme();
+            if ("https".equalsIgnoreCase(scheme)) return;
+            String host = uri.getHost();
+            if ("http".equalsIgnoreCase(scheme) && isLocalNetworkHost(host)) {
+                return;
+            }
+        } catch (java.net.URISyntaxException e) {
+            throw new IOException("Malformed URL");
+        }
+        throw new IOException("Only https URLs are allowed");
+    }
+
+    // Part names and file names go inside quoted header values: a quote or line
+    // break would end the value and let the caller inject headers.
+    private static String headerSafe(String value) throws IOException {
+        if (value == null || value.indexOf('"') >= 0
+                || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
+            throw new IOException("Invalid multipart field name");
+        }
+        return value;
     }
 
     private static void applyHeaders(
@@ -219,10 +272,17 @@ public class RVHttpClient {
     }
 
     private static byte[] readAllBytes(InputStream is) throws IOException {
+        return readAllBytes(is, Long.MAX_VALUE);
+    }
+
+    private static byte[] readAllBytes(InputStream is, long limit) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
         int n;
-        while ((n = is.read(buf)) != -1) baos.write(buf, 0, n);
+        while ((n = is.read(buf)) != -1) {
+            if (baos.size() + (long) n > limit) throw new IOException("Response too large");
+            baos.write(buf, 0, n);
+        }
         return baos.toByteArray();
     }
 
@@ -230,7 +290,7 @@ public class RVHttpClient {
             DataOutputStream out, String boundary,
             String name, String value) throws IOException {
         out.writeBytes("--" + boundary + "\r\n");
-        out.writeBytes("Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n");
+        out.writeBytes("Content-Disposition: form-data; name=\"" + headerSafe(name) + "\"\r\n\r\n");
         out.write(value.getBytes(StandardCharsets.UTF_8));
         out.writeBytes("\r\n");
     }
@@ -241,8 +301,8 @@ public class RVHttpClient {
             String contentType, byte[] data) throws IOException {
         out.writeBytes("--" + boundary + "\r\n");
         out.writeBytes("Content-Disposition: form-data; name=\""
-                + fieldName + "\"; filename=\"" + filename + "\"\r\n");
-        out.writeBytes("Content-Type: " + contentType + "\r\n\r\n");
+                + headerSafe(fieldName) + "\"; filename=\"" + headerSafe(filename) + "\"\r\n");
+        out.writeBytes("Content-Type: " + headerSafe(contentType) + "\r\n\r\n");
         out.write(data);
         out.writeBytes("\r\n");
     }

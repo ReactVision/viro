@@ -53,15 +53,33 @@ void populateIntArrayFromNSArray(NSArray<NSNumber *> *arraySource, int arrayDest
     }
 }
 
-// Request data from a URL from a background thread and invoke a block on the main UI thread on completion.
+// Request data from a URL and invoke a block on the download session's queue on completion (a non-2xx status is an error).
 // Default timeout is 30 seconds on the NSMutableURLRequest, after a timeout, the block is called with an error.
 NSURLSessionDataTask* downloadDataWithURL(NSURL *url, void (^completionBlock)(NSData *data, NSError *error)){
-    NSURLSessionConfiguration *sessionConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
-    sessionConfig.timeoutIntervalForRequest = 30;
-    NSURLSession *downloadSession = [NSURLSession sessionWithConfiguration: sessionConfig];
+    // One session for all downloads; creating a session per request leaks it until invalidated.
+    static NSURLSession *downloadSession;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSURLSessionConfiguration *sessionConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
+        sessionConfig.timeoutIntervalForRequest = 30;
+        downloadSession = [NSURLSession sessionWithConfiguration:sessionConfig];
+    });
     NSURLSessionDataTask * downloadTask = [downloadSession dataTaskWithURL:url
                                                          completionHandler:^(NSData *data, NSURLResponse *response, NSError *error){
-                                                             completionBlock(data, error);
+                                                             NSData *resultData = data;
+                                                             NSError *resultError = error;
+                                                             if (!resultError && [response isKindOfClass:[NSHTTPURLResponse class]]) {
+                                                                 NSInteger status = ((NSHTTPURLResponse *)response).statusCode;
+                                                                 if (status < 200 || status > 299) {
+                                                                     resultData = nil;
+                                                                     resultError = [NSError errorWithDomain:NSURLErrorDomain
+                                                                                                       code:NSURLErrorBadServerResponse
+                                                                                                   userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"HTTP status %ld", (long)status]}];
+                                                                 }
+                                                             }
+                                                             // On the session's queue, not main: callers decode here (HDR,
+                                                             // images, image targets) and hop to main themselves for UI work.
+                                                             completionBlock(resultData, resultError);
                                                          }];
     [downloadTask resume];
     return downloadTask;

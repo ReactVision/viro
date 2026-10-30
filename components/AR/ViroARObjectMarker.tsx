@@ -13,7 +13,7 @@
 
 import { ViroBase } from "../ViroBase";
 import * as React from "react";
-import { NativeSyntheticEvent, requireNativeComponent } from "react-native";
+import { NativeSyntheticEvent, Platform, requireNativeComponent } from "react-native";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import {
@@ -54,8 +54,13 @@ export class ViroARObjectMarker extends ViroBase<Props> {
       return null;
     }
     if (isQuest) {
-      console.warn("[Viro] ViroARObjectMarker is not supported on Quest and will not render.");
+      warnUnsupported("ViroARObjectMarker", "Quest");
       return null;
+    }
+    // ARCore has no object tracking: the Android bridge drops object targets, so the marker
+    // mounts but never finds anything
+    if (Platform.OS === "android") {
+      warnUnsupported("ViroARObjectMarker", "Android", "ARCore has no object tracking; use ViroARImageMarker.");
     }
     // Uncomment this line to check for misnamed props
     //checkMisnamedProps("ViroARObjectMarker", this.props);

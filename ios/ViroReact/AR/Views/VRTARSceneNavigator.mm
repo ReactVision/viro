@@ -46,6 +46,11 @@
 // Notification name that VRTObjectDetectorView subscribes to in AR mode.
 static NSString * const kVROARFrameNotification = @"VROARDetectorFrame";
 
+// Converting a nil NSString through UTF8String into std::string is undefined; map nil to empty.
+static inline std::string RVStdString(NSString *value) {
+    return value ? std::string([value UTF8String]) : std::string();
+}
+
 // Free-tier "Powered by ReactVision Studio" watermark target.
 static NSString * const kRVWatermarkURL =
     @"https://www.reactvision.xyz/studio/?utm_source=scenenavigator-banner";
@@ -63,6 +68,10 @@ static NSString * const kRVWatermarkURL =
     BOOL _needsSemanticModeApply;
     BOOL _pendingGeospatialModeEnabled;
     BOOL _needsGeospatialModeApply;
+
+    // Monocular depth preference set before the view existed
+    BOOL _pendingPreferMonocularDepth;
+    BOOL _hasPendingPreferMonocularDepth;
 
     // World mesh configuration
     BOOL _pendingWorldMeshEnabled;
@@ -120,7 +129,8 @@ static NSString * const kRVWatermarkURL =
 
 - (void)setVideoQuality:(NSString *)videoQuality {
     _videoQuality = videoQuality;
-    if ([videoQuality caseInsensitiveCompare:@"Low"] == NSOrderedSame) {
+    // [nil caseInsensitiveCompare:] returns NSOrderedSame, so nil must be excluded explicitly.
+    if (videoQuality != nil && [videoQuality caseInsensitiveCompare:@"Low"] == NSOrderedSame) {
         _vroVideoQuality = VROVideoQuality::Low;
     } else {
         _vroVideoQuality = VROVideoQuality::High;
@@ -196,6 +206,12 @@ static NSString * const kRVWatermarkURL =
             }
         }
 
+        // Depth for recording is asked for now, before any recording starts, since it
+        // reconfigures the AR session
+        if (_depthCaptureEnabled) {
+            arSession->setDepthCaptureEnabled(true);
+        }
+
         // Apply initial depth debug setting if set
         if (_depthDebugEnabled) {
             [viewAR setDepthDebugEnabled:_depthDebugEnabled opacity:0.7f];
@@ -204,6 +220,15 @@ static NSString * const kRVWatermarkURL =
         // Apply initial monocular depth scale if set
         if (_monocularDepthScale != 0.0f && _monocularDepthScale != 1.0f) {
             [viewAR setMonocularDepthScale:_monocularDepthScale];
+        }
+
+        if (_monocularDepthTargetFPS > 0) {
+            [viewAR setMonocularDepthTargetFPS:_monocularDepthTargetFPS];
+        }
+
+        if (_hasPendingPreferMonocularDepth) {
+            [viewAR setPreferMonocularDepth:_pendingPreferMonocularDepth];
+            _hasPendingPreferMonocularDepth = NO;
         }
 
         // Apply front camera setting if enabled before view was ready
@@ -774,6 +799,17 @@ static NSString * const kRVWatermarkURL =
     }
 }
 
+- (void)setDepthCaptureEnabled:(BOOL)depthCaptureEnabled {
+    _depthCaptureEnabled = depthCaptureEnabled;
+    if (_vroView) {
+        VROViewAR *viewAR = (VROViewAR *) _vroView;
+        std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
+        if (arSession) {
+            arSession->setDepthCaptureEnabled(depthCaptureEnabled);
+        }
+    }
+}
+
 - (void)setDepthDebugEnabled:(BOOL)depthDebugEnabled {
     _depthDebugEnabled = depthDebugEnabled;
     if (_vroView) {
@@ -858,7 +894,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         VROViewAR *viewAR = (VROViewAR *) _vroView;
         std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
         if (arSession) {
-            if ([cloudAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
+            if (cloudAnchorProvider != nil && [cloudAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::ARCore);
                 RCTLogInfo(@"[ViroAR] ARCore Cloud Anchors provider enabled");
 
@@ -869,7 +905,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
                 } else {
                     RCTLogWarn(@"[ViroAR] WARNING: GARAPIKey not found in Info.plist. Cloud anchors will not work!");
                 }
-            } else if ([cloudAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
+            } else if (cloudAnchorProvider != nil && [cloudAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::ReactVision);
                 RCTLogInfo(@"[ViroAR] ReactVision Cloud Anchors provider enabled");
 
@@ -917,7 +953,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
     }
 
     // Find the anchor by ID
-    std::string anchorIdStr = std::string([anchorId UTF8String]);
+    std::string anchorIdStr = RVStdString(anchorId);
     std::shared_ptr<VROARAnchor> anchor = nullptr;
 
     // Search through frame anchors
@@ -962,6 +998,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
 }
 
 - (void)startRecording:(NSString *)outputDir
+                 depth:(BOOL)depth
       completionHandler:(RecordingStartCompletionHandler)completionHandler {
     if (!_vroView) {
         if (completionHandler) {
@@ -979,8 +1016,16 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         return;
     }
 
+    if (!outputDir) {
+        if (completionHandler) {
+            completionHandler(NO, @"Recording output directory is required");
+        }
+        return;
+    }
+
     VROARRecordingConfig config;
-    config.outputDir = std::string([outputDir UTF8String]);
+    config.outputDir = RVStdString(outputDir);
+    config.depth = depth;
 
     arSession->startRecording(config,
         [completionHandler] {
@@ -1065,7 +1110,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         return;
     }
 
-    std::string cloudIdStr = std::string([cloudAnchorId UTF8String]);
+    std::string cloudIdStr = RVStdString(cloudAnchorId);
 
     // Resolve the anchor
     arSession->resolveCloudAnchor(cloudIdStr,
@@ -1123,7 +1168,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         VROViewAR *viewAR = (VROViewAR *) _vroView;
         std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
         if (arSession) {
-            if ([geospatialAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
+            if (geospatialAnchorProvider != nil && [geospatialAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
                 arSession->setGeospatialAnchorProvider(VROGeospatialAnchorProvider::ARCoreGeospatial);
                 RCTLogInfo(@"[ViroAR] ARCore Geospatial provider enabled");
 
@@ -1134,7 +1179,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
                 } else {
                     RCTLogWarn(@"[ViroAR] WARNING: GARAPIKey not found in Info.plist. Geospatial features will not work!");
                 }
-            } else if ([geospatialAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
+            } else if (geospatialAnchorProvider != nil && [geospatialAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
                 arSession->setGeospatialAnchorProvider(VROGeospatialAnchorProvider::ReactVision);
                 RCTLogInfo(@"[ViroAR] ReactVision Geospatial provider enabled");
 
@@ -1459,7 +1504,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         return;
     }
     VROQuaternion quat = [self parseQuaternion:quaternion];
-    std::string uuidStr = std::string([platformUuid UTF8String]);
+    std::string uuidStr = RVStdString(platformUuid);
     arSession->resolveGeospatialAnchor(uuidStr, quat,
         [completionHandler](std::shared_ptr<VROGeospatialAnchor> anchor) {
             if (completionHandler) {
@@ -1601,7 +1646,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
     // Geospatial anchors are not in the ARKit frame anchor list (they are GPS-computed,
     // not ARKit-tracked). Construct a minimal anchor with just the ID and delegate
     // removal to the session, which uses getId() for the backend API call.
-    std::string anchorIdStr = std::string([anchorId UTF8String]);
+    std::string anchorIdStr = RVStdString(anchorId);
     auto geoAnchor = std::make_shared<VROGeospatialAnchor>(
         VROGeospatialAnchorType::WGS84, 0, 0, 0, VROQuaternion());
     geoAnchor->setId(anchorIdStr);
@@ -1634,7 +1679,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         return;
     }
     arSession->rvGetGeospatialAnchor(
-        std::string([anchorId UTF8String]),
+        RVStdString(anchorId),
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 if (success) {
@@ -1692,7 +1737,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         return;
     }
     arSession->rvUpdateGeospatialAnchor(
-        std::string([anchorId UTF8String]),
+        RVStdString(anchorId),
         sceneAssetId ? std::string([sceneAssetId UTF8String]) : "",
         sceneId      ? std::string([sceneId UTF8String])      : "",
         name         ? std::string([name UTF8String])         : "",
@@ -1724,8 +1769,12 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         if (completionHandler) completionHandler(NO, nil, nil, @"AR session not available");
         return;
     }
+    if (!filePath) {
+        if (completionHandler) completionHandler(NO, nil, nil, @"File path is required");
+        return;
+    }
     arSession->rvUploadAsset(
-        std::string([filePath UTF8String]),
+        RVStdString(filePath),
         assetType  ? std::string([assetType UTF8String])  : "",
         fileName   ? std::string([fileName UTF8String])   : "",
         appUserId  ? std::string([appUserId UTF8String])  : "",
@@ -1756,7 +1805,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         return;
     }
     arSession->rvDeleteGeospatialAnchor(
-        std::string([anchorId UTF8String]),
+        RVStdString(anchorId),
         [completionHandler](bool success, std::string error) {
             if (completionHandler) {
                 completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
@@ -1791,6 +1840,24 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     arSession->rvStartScan();
 }
 
+- (void)rvResetWorldMesh {
+    if (!_vroView || !_currentScene) {
+        return;
+    }
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) {
+        return;
+    }
+    std::shared_ptr<VROARScene> arScene = std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+    if (!arScene) {
+        return;
+    }
+    std::shared_ptr<VROARWorldMesh> worldMesh = arScene->getWorldMesh();
+    if (worldMesh) {
+        worldMesh->resetAccumulation();
+    }
+}
+
 - (NSDictionary *)rvGetWorldMeshStats {
     if (!_vroView || !_currentScene) {
         return @{@"available": @NO, @"reason": @"The AR view is not ready"};
@@ -1816,6 +1883,8 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
              @"enabled": @(arScene->isWorldMeshEnabled()),
              @"vertexCount": @(stats.vertexCount),
              @"triangleCount": @(stats.triangleCount),
+             @"source": [NSString stringWithUTF8String:VROWorldMeshSourceToString(stats.source)],
+             @"accumulated": @(stats.accumulated),
              @"averageConfidence": @(stats.averageConfidence),
              @"lastUpdateTimeMs": @(stats.lastUpdateTimeMs),
              @"isStale": @(stats.isStale)};
@@ -1853,13 +1922,115 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         });
 }
 
+- (BOOL)rvLoadVPSMap:(NSData *)rvmapData {
+    if (!_vroView || !rvmapData || rvmapData.length == 0) return NO;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return NO;
+    std::string rvmapBytes((const char *)rvmapData.bytes, rvmapData.length);
+    return arSession->rvLoadVPSMap(rvmapBytes);
+}
+
+- (void)rvUnloadVPSMap {
+    if (!_vroView) return;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return;
+    arSession->rvUnloadVPSMap();
+}
+
+- (std::shared_ptr<VROARScene>)rv_currentARScene {
+    if (!_currentScene) return nullptr;
+    std::shared_ptr<VROSceneController> sceneController = [_currentScene sceneController];
+    if (!sceneController) return nullptr;
+    return std::dynamic_pointer_cast<VROARScene>(sceneController->getScene());
+}
+
+- (BOOL)rvLoadVPSMapMesh:(NSData *)rvwmData occlusion:(BOOL)occlusion physics:(BOOL)physics {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (!arScene || !rvwmData || rvwmData.length == 0) return NO;
+    const uint8_t *bytes = (const uint8_t *)rvwmData.bytes;
+    std::vector<uint8_t> rvwm(bytes, bytes + rvwmData.length);
+    return arScene->setVPSMapMesh(rvwm, occlusion, physics);
+}
+
+- (void)rvUnloadVPSMapMesh {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (arScene) arScene->clearVPSMapMesh();
+}
+
+- (void)rvCaptureVPSQueryFrame:(int)maxSide completion:(void (^)(NSDictionary *result))completion {
+    std::shared_ptr<VROARScene> arScene = [self rv_currentARScene];
+    if (!arScene) {
+        completion(@{@"success": @NO, @"error": @"No AR scene"});
+        return;
+    }
+    arScene->captureVPSQueryFrame(maxSide, [completion](bool ok, std::vector<uint8_t> gray, int w, int h,
+                                                        float fx, float fy, float cx, float cy,
+                                                        const VROMatrix4f &T_world_cam) {
+        if (!ok || gray.empty()) {
+            completion(@{@"success": @NO, @"error": @"No camera frame with intrinsics yet"});
+            return;
+        }
+        NSData *pixels = [NSData dataWithBytes:gray.data() length:gray.size()];
+        CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)pixels);
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceGray();
+        CGImageRef cgImage = CGImageCreate(w, h, 8, 8, w, space, kCGBitmapByteOrderDefault | kCGImageAlphaNone,
+                                           provider, NULL, false, kCGRenderingIntentDefault);
+        CGColorSpaceRelease(space);
+        CGDataProviderRelease(provider);
+        NSData *jpeg = nil;
+        if (cgImage) {
+            jpeg = UIImageJPEGRepresentation([UIImage imageWithCGImage:cgImage], 0.85);
+            CGImageRelease(cgImage);
+        }
+        if (!jpeg) {
+            completion(@{@"success": @NO, @"error": @"JPEG encoding failed"});
+            return;
+        }
+        // the frame's sensor pose, column-major: what a server fix for this image is paired with
+        NSMutableArray<NSNumber *> *pose = [NSMutableArray arrayWithCapacity:16];
+        for (int i = 0; i < 16; ++i) [pose addObject:@(T_world_cam.getArray()[i])];
+        completion(@{@"success": @YES,
+                     @"image": [jpeg base64EncodedStringWithOptions:0],
+                     @"width": @(w), @"height": @(h),
+                     @"fx": @(fx), @"fy": @(fy), @"cx": @(cx), @"cy": @(cy),
+                     @"worldFromCamera": pose});
+    });
+}
+
+- (BOOL)rvStartVPSServerSession {
+    if (!_vroView) return NO;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    return arSession ? arSession->rvStartVPSServerSession() : NO;
+}
+
+- (BOOL)rvReportVPSServerFix:(NSArray<NSNumber *> *)worldFromCamera
+               mapFromCamera:(NSArray<NSNumber *> *)mapFromCamera
+                     inliers:(int)inliers {
+    if (!_vroView || worldFromCamera.count != 16 || mapFromCamera.count != 16) return NO;
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return NO;
+    float wc[16], mc[16];
+    for (int i = 0; i < 16; ++i) wc[i] = worldFromCamera[i].floatValue;
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 4; ++c) mc[c * 4 + r] = mapFromCamera[r * 4 + c].floatValue;   // row- to column-major
+    }
+    return arSession->rvReportVPSServerFix(VROMatrix4f(wc), VROMatrix4f(mc), inliers);
+}
+
+- (NSString *)rvGetVPSLocalizationJson {
+    if (!_vroView) return @"{\"available\":false,\"error\":\"AR view not initialized\"}";
+    std::shared_ptr<VROARSession> arSession = [(VROViewAR *)_vroView getARSession];
+    if (!arSession) return @"{\"available\":false,\"error\":\"AR session not available\"}";
+    return [NSString stringWithUTF8String:arSession->rvGetVPSLocalizationJson().c_str()];
+}
+
 - (void)rvGetCloudAnchor:(NSString *)anchorId
        completionHandler:(void (^)(BOOL, NSDictionary *, NSString *))completionHandler {
     if (!_vroView) { if (completionHandler) completionHandler(NO, nil, @"AR view not initialized"); return; }
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
-    arSession->rvGetCloudAnchor(std::string([anchorId UTF8String]),
+    arSession->rvGetCloudAnchor(RVStdString(anchorId),
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
@@ -1896,7 +2067,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
     arSession->rvUpdateCloudAnchor(
-        std::string([anchorId UTF8String]),
+        RVStdString(anchorId),
         name        ? std::string([name UTF8String])        : "",
         description ? std::string([description UTF8String]) : "",
         (bool)isPublic,
@@ -1915,7 +2086,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     VROViewAR *viewAR = (VROViewAR *) _vroView;
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
-    arSession->rvDeleteCloudAnchor(std::string([anchorId UTF8String]),
+    arSession->rvDeleteCloudAnchor(RVStdString(anchorId),
         [completionHandler](bool success, std::string error) {
             if (completionHandler)
                 completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
@@ -1952,7 +2123,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
         return;
     }
     arSession->rvGetProject(
-        std::string([projectId UTF8String]),
+        RVStdString(projectId),
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 NSString *dataStr = success ? [NSString stringWithUTF8String:jsonData.c_str()] : nil;
@@ -1969,7 +2140,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, nil, @"AR session not available"); return; }
     arSession->rvGetScene(
-        std::string([sceneId UTF8String]),
+        RVStdString(sceneId),
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 NSString *dataStr = success ? [NSString stringWithUTF8String:jsonData.c_str()] : nil;
@@ -1986,7 +2157,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, @[], @"AR session not available"); return; }
     arSession->rvGetSceneAssets(
-        std::string([sceneId UTF8String]),
+        RVStdString(sceneId),
         [completionHandler](bool success, std::string jsonData, std::string error) {
             if (completionHandler) {
                 NSString *jsonStr = [NSString stringWithUTF8String:jsonData.c_str()];
@@ -2008,8 +2179,8 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
     arSession->rvAttachAssetToCloudAnchor(
-        std::string([anchorId UTF8String]),
-        std::string([fileUrl UTF8String]),
+        RVStdString(anchorId),
+        RVStdString(fileUrl),
         fileSize,
         name           ? std::string([name UTF8String])           : "",
         assetType      ? std::string([assetType UTF8String])      : "",
@@ -2028,8 +2199,8 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
     arSession->rvRemoveAssetFromCloudAnchor(
-        std::string([anchorId UTF8String]),
-        std::string([assetId UTF8String]),
+        RVStdString(anchorId),
+        RVStdString(assetId),
         [completionHandler](bool success, std::string error) {
             if (completionHandler)
                 completionHandler(success, success ? nil : [NSString stringWithUTF8String:error.c_str()]);
@@ -2050,7 +2221,7 @@ static NSArray *rvParseAnchorArrayJson(NSString *json) {
     std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
     if (!arSession) { if (completionHandler) completionHandler(NO, @"AR session not available"); return; }
     arSession->rvTrackCloudAnchorResolution(
-        std::string([anchorId UTF8String]),
+        RVStdString(anchorId),
         (bool)success, confidence, matchCount, inlierCount, processingTimeMs,
         platform       ? std::string([platform UTF8String])       : "",
         externalUserId ? std::string([externalUserId UTF8String]) : "",
@@ -2350,6 +2521,19 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
         if (worldMeshConfig[@"debugDrawEnabled"]) {
             _worldMeshConfigCpp.debugDrawEnabled = [worldMeshConfig[@"debugDrawEnabled"] boolValue];
         }
+        // Fusion across frames. Only the depth-image and monocular paths use these; on a LiDAR
+        // device ARKit owns the accumulation and they are ignored. A voxel size or budget of 0
+        // keeps the current value, as on Android — a 0 MB budget used to reach the volume as 1 MB
+        // here and start evicting the room almost at once.
+        if (worldMeshConfig[@"accumulate"]) {
+            _worldMeshConfigCpp.accumulate = [worldMeshConfig[@"accumulate"] boolValue];
+        }
+        if (worldMeshConfig[@"voxelSize"] && [worldMeshConfig[@"voxelSize"] floatValue] > 0) {
+            _worldMeshConfigCpp.voxelSize = [worldMeshConfig[@"voxelSize"] floatValue];
+        }
+        if (worldMeshConfig[@"maxMemoryMB"] && [worldMeshConfig[@"maxMemoryMB"] intValue] > 0) {
+            _worldMeshConfigCpp.maxMemoryMB = [worldMeshConfig[@"maxMemoryMB"] intValue];
+        }
     }
 
     // Apply to AR scene if ready
@@ -2391,7 +2575,8 @@ static VROMatrix4f rvParseMatrixCsv(NSString *csv) {
 
 - (void)setPreferMonocularDepth:(BOOL)prefer {
     if (!_vroView) {
-        RCTLogWarn(@"[ViroAR] Cannot set prefer monocular depth: AR view not initialized");
+        _pendingPreferMonocularDepth = prefer;
+        _hasPendingPreferMonocularDepth = YES;
         return;
     }
 

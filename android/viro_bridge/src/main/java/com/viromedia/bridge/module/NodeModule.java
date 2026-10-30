@@ -21,6 +21,7 @@
 
 package com.viromedia.bridge.module;
 
+import android.util.Log;
 import android.view.View;
 
 import com.facebook.react.bridge.Arguments;
@@ -52,6 +53,7 @@ import static java.lang.Math.toDegrees;
 
 @ReactModule(name = "VRTNodeModule")
 public class NodeModule extends ReactContextBaseJavaModule {
+    private static final String TAG = "NodeModule";
 
     public NodeModule(ReactApplicationContext context) {
         super(context);
@@ -75,30 +77,34 @@ public class NodeModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View viroView = viewResolver.resolveView(viewTag);
-                if (!(viroView instanceof VRTNode)){
-                    throw new IllegalViewOperationException("Invalid view returned when applying force: expected a node-type control!");
-                }
+                try {
+                    View viroView = viewResolver.resolveView(viewTag);
+                    if (!(viroView instanceof VRTNode)){
+                        throw new IllegalViewOperationException("Invalid view returned when applying force: expected a node-type control!");
+                    }
 
-                if (force == null || force.size() != 3){
-                    throw new IllegalViewOperationException("Invalid impulse force parameters provided!");
-                }
+                    if (force == null || force.size() != 3){
+                        throw new IllegalViewOperationException("Invalid impulse force parameters provided!");
+                    }
 
-                if (position != null && position.size() != 3){
-                    throw new IllegalViewOperationException("Invalid impulse force position parameters provided!");
-                }
+                    if (position != null && position.size() != 3){
+                        throw new IllegalViewOperationException("Invalid impulse force position parameters provided!");
+                    }
 
-                // If no offset is given, default to a central impulse.
-                float[] forcePosition = {0,0,0};
-                if (position != null){
-                    forcePosition[0] = (float)position.getDouble(0);
-                    forcePosition[1] = (float)position.getDouble(1);
-                    forcePosition[2] = (float)position.getDouble(2);
-                }
-                float[] forceArray = { (float)force.getDouble(0), (float)force.getDouble(1), (float)force.getDouble(2)};
+                    // If no offset is given, default to a central impulse.
+                    float[] forcePosition = {0,0,0};
+                    if (position != null){
+                        forcePosition[0] = (float)position.getDouble(0);
+                        forcePosition[1] = (float)position.getDouble(1);
+                        forcePosition[2] = (float)position.getDouble(2);
+                    }
+                    float[] forceArray = { (float)force.getDouble(0), (float)force.getDouble(1), (float)force.getDouble(2)};
 
-                VRTNode nodeControl = (VRTNode) viroView;
-                nodeControl.applyImpulse(forceArray, forcePosition);
+                    VRTNode nodeControl = (VRTNode) viroView;
+                    nodeControl.applyImpulse(forceArray, forcePosition);
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "Dropped call: " + e.getMessage());
+                }
             }
         });
     }
@@ -112,18 +118,22 @@ public class NodeModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View viroView = viewResolver.resolveView(viewTag);
-                if (!(viroView instanceof VRTNode)){
-                    throw new IllegalViewOperationException("Invalid view returned when applying force: expected a node-type control!");
-                }
+                try {
+                    View viroView = viewResolver.resolveView(viewTag);
+                    if (!(viroView instanceof VRTNode)){
+                        throw new IllegalViewOperationException("Invalid view returned when applying force: expected a node-type control!");
+                    }
 
-                if (torque == null || torque.size() != 3){
-                    throw new IllegalViewOperationException("Invalid impulse torque params provided!");
-                }
+                    if (torque == null || torque.size() != 3){
+                        throw new IllegalViewOperationException("Invalid impulse torque params provided!");
+                    }
 
-                float[] torqueArray = { (float)torque.getDouble(0), (float)torque.getDouble(1), (float)torque.getDouble(2)};
-                VRTNode nodeControl = (VRTNode) viroView;
-                nodeControl.applyTorqueImpulse(torqueArray);
+                    float[] torqueArray = { (float)torque.getDouble(0), (float)torque.getDouble(1), (float)torque.getDouble(2)};
+                    VRTNode nodeControl = (VRTNode) viroView;
+                    nodeControl.applyTorqueImpulse(torqueArray);
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "Dropped call: " + e.getMessage());
+                }
             }
         });
     }
@@ -137,18 +147,22 @@ public class NodeModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View viroView = viewResolver.resolveView(viewTag);
-                if (!(viroView instanceof VRTNode)){
-                    throw new IllegalViewOperationException("Invalid view returned when applying velocity: expected a node-type control!");
-                }
+                try {
+                    View viroView = viewResolver.resolveView(viewTag);
+                    if (!(viroView instanceof VRTNode)){
+                        throw new IllegalViewOperationException("Invalid view returned when applying velocity: expected a node-type control!");
+                    }
 
-                if (velocity == null || velocity.size() != 3){
-                    throw new IllegalViewOperationException("Invalid velocity params provided!");
-                }
+                    if (velocity == null || velocity.size() != 3){
+                        throw new IllegalViewOperationException("Invalid velocity params provided!");
+                    }
 
-                float[] velocityArray = { (float)velocity.getDouble(0), (float)velocity.getDouble(1), (float)velocity.getDouble(2)};
-                VRTNode nodeControl = (VRTNode) viroView;
-                nodeControl.setVelocity(velocityArray, false);
+                    float[] velocityArray = { (float)velocity.getDouble(0), (float)velocity.getDouble(1), (float)velocity.getDouble(2)};
+                    VRTNode nodeControl = (VRTNode) viroView;
+                    nodeControl.setVelocity(velocityArray, false);
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "Dropped call: " + e.getMessage());
+                }
             }
         });
     }
@@ -164,48 +178,52 @@ public class NodeModule extends ReactContextBaseJavaModule {
          ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
              @Override
              public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                 View viroView = viewResolver.resolveView(viewTag);
-                 if (!(viroView instanceof VRTNode)) {
-                     // Transient view-lifecycle race: reject so the JS await settles (throwing in
-                     // the UIBlock leaked the promise; casting first risked ClassCastException).
-                     promise.reject("view_not_ready", "Node view not registered yet");
-                     return;
+                 try {
+                     View viroView = viewResolver.resolveView(viewTag);
+                     if (!(viroView instanceof VRTNode)) {
+                         // Transient view-lifecycle race: reject so the JS await settles (throwing in
+                         // the UIBlock leaked the promise; casting first risked ClassCastException).
+                         promise.reject("view_not_ready", "Node view not registered yet");
+                         return;
+                     }
+                     VRTNode nodeView = (VRTNode) viroView;
+
+                     Node nodeJNI = nodeView.getNodeJni();
+                     if (nodeJNI == null) {
+                         // Torn down but still registered: forceCascadeTearDown() nulls every
+                         // node in the tree when the scene navigator is destroyed, while the
+                         // views stay resolvable until React drops them.
+                         promise.reject("view_not_ready", "Node has been torn down");
+                         return;
+                     }
+                     Matrix matrix = nodeJNI.getWorldTransformRealTime();
+                     Vector scale = matrix.extractScale();
+                     Vector position = matrix.extractTranslation();
+                     Vector rotation = matrix.extractRotation(scale).toEuler();
+
+                     WritableMap returnMap = Arguments.createMap();
+                     WritableArray writablePosArray = Arguments.createArray();
+                     writablePosArray.pushDouble(position.x);
+                     writablePosArray.pushDouble(position.y);
+                     writablePosArray.pushDouble(position.z);
+
+                     WritableArray writableRotateArray = Arguments.createArray();
+                     writableRotateArray.pushDouble(toDegrees(rotation.x));
+                     writableRotateArray.pushDouble(toDegrees(rotation.y));
+                     writableRotateArray.pushDouble(toDegrees(rotation.z));
+
+                     WritableArray writeableScaleArray = Arguments.createArray();
+                     writeableScaleArray.pushDouble(scale.x);
+                     writeableScaleArray.pushDouble(scale.y);
+                     writeableScaleArray.pushDouble(scale.z);
+
+                     returnMap.putArray("position", writablePosArray);
+                     returnMap.putArray("rotation", writableRotateArray);
+                     returnMap.putArray("scale", writeableScaleArray);
+                     promise.resolve(returnMap);
+                 } catch (RuntimeException e) {
+                     promise.reject("ERROR", e.getMessage(), e);
                  }
-                 VRTNode nodeView = (VRTNode) viroView;
-
-                 Node nodeJNI = nodeView.getNodeJni();
-                 if (nodeJNI == null) {
-                     // Torn down but still registered: forceCascadeTearDown() nulls every
-                     // node in the tree when the scene navigator is destroyed, while the
-                     // views stay resolvable until React drops them.
-                     promise.reject("view_not_ready", "Node has been torn down");
-                     return;
-                 }
-                 Matrix matrix = nodeJNI.getWorldTransformRealTime();
-                 Vector scale = matrix.extractScale();
-                 Vector position = matrix.extractTranslation();
-                 Vector rotation = matrix.extractRotation(scale).toEuler();
-
-                 WritableMap returnMap = Arguments.createMap();
-                 WritableArray writablePosArray = Arguments.createArray();
-                 writablePosArray.pushDouble(position.x);
-                 writablePosArray.pushDouble(position.y);
-                 writablePosArray.pushDouble(position.z);
-
-                 WritableArray writableRotateArray = Arguments.createArray();
-                 writableRotateArray.pushDouble(toDegrees(rotation.x));
-                 writableRotateArray.pushDouble(toDegrees(rotation.y));
-                 writableRotateArray.pushDouble(toDegrees(rotation.z));
-
-                 WritableArray writeableScaleArray = Arguments.createArray();
-                 writeableScaleArray.pushDouble(scale.x);
-                 writeableScaleArray.pushDouble(scale.y);
-                 writeableScaleArray.pushDouble(scale.z);
-
-                 returnMap.putArray("position", writablePosArray);
-                 returnMap.putArray("rotation", writableRotateArray);
-                 returnMap.putArray("scale", writeableScaleArray);
-                 promise.resolve(returnMap);
             }
          });
     }
@@ -221,33 +239,37 @@ public class NodeModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View viroView = viewResolver.resolveView(viewTag);
-                if (!(viroView instanceof VRTNode)) {
-                    // Transient view-lifecycle race: reject so the JS await settles (throwing in
-                    // the UIBlock leaked the promise; casting first risked ClassCastException).
-                    promise.reject("view_not_ready", "Node view not registered yet");
-                    return;
-                }
-                VRTNode nodeView = (VRTNode) viroView;
+                try {
+                    View viroView = viewResolver.resolveView(viewTag);
+                    if (!(viroView instanceof VRTNode)) {
+                        // Transient view-lifecycle race: reject so the JS await settles (throwing in
+                        // the UIBlock leaked the promise; casting first risked ClassCastException).
+                        promise.reject("view_not_ready", "Node view not registered yet");
+                        return;
+                    }
+                    VRTNode nodeView = (VRTNode) viroView;
 
-                Node nodeJNI = nodeView.getNodeJni();
-                if (nodeJNI == null) {
-                    // Torn down but still registered (see getNodeTransform).
-                    promise.reject("view_not_ready", "Node has been torn down");
-                    return;
-                }
-                BoundingBox box = nodeJNI.getBoundingBox();
+                    Node nodeJNI = nodeView.getNodeJni();
+                    if (nodeJNI == null) {
+                        // Torn down but still registered (see getNodeTransform).
+                        promise.reject("view_not_ready", "Node has been torn down");
+                        return;
+                    }
+                    BoundingBox box = nodeJNI.getBoundingBox();
 
-                WritableMap returnMap = Arguments.createMap();
-                WritableMap boundingBoxMap = Arguments.createMap();
-                boundingBoxMap.putDouble("minX", box.minX);
-                boundingBoxMap.putDouble("maxX", box.maxX);
-                boundingBoxMap.putDouble("minY", box.minY);
-                boundingBoxMap.putDouble("maxY", box.maxY);
-                boundingBoxMap.putDouble("minZ", box.minZ);
-                boundingBoxMap.putDouble("maxZ", box.maxZ);
-                returnMap.putMap("boundingBox", boundingBoxMap);
-                promise.resolve(returnMap);
+                    WritableMap returnMap = Arguments.createMap();
+                    WritableMap boundingBoxMap = Arguments.createMap();
+                    boundingBoxMap.putDouble("minX", box.minX);
+                    boundingBoxMap.putDouble("maxX", box.maxX);
+                    boundingBoxMap.putDouble("minY", box.minY);
+                    boundingBoxMap.putDouble("maxY", box.maxY);
+                    boundingBoxMap.putDouble("minZ", box.minZ);
+                    boundingBoxMap.putDouble("maxZ", box.maxZ);
+                    returnMap.putMap("boundingBox", boundingBoxMap);
+                    promise.resolve(returnMap);
+                } catch (RuntimeException e) {
+                    promise.reject("ERROR", e.getMessage(), e);
+                }
             }
         });
     }
@@ -262,27 +284,31 @@ public class NodeModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View viroView = viewResolver.resolveView(viewTag);
-                if (!(viroView instanceof VRT3DObject)) {
-                    // Transient view-lifecycle race: reject instead of throwing (see getNodeTransform).
-                    promise.reject("view_not_ready", "Node view not registered yet");
-                    return;
+                try {
+                    View viroView = viewResolver.resolveView(viewTag);
+                    if (!(viroView instanceof VRT3DObject)) {
+                        // Transient view-lifecycle race: reject instead of throwing (see getNodeTransform).
+                        promise.reject("view_not_ready", "Node view not registered yet");
+                        return;
+                    }
+                    VRT3DObject nodeView = (VRT3DObject) viroView;
+                    Object3D node = (Object3D)nodeView.getNodeJni();
+                    if (node == null) {
+                        // Torn down but still registered (see getNodeTransform).
+                        promise.reject("view_not_ready", "Node has been torn down");
+                        return;
+                    }
+                    Set<String> keys = node.getMorphTargetKeys();
+                    WritableMap returnMap = Arguments.createMap();
+                    WritableArray targets = Arguments.createArray();
+                    for (String key : keys) {
+                        targets.pushString(key);
+                    }
+                    returnMap.putArray("targets", targets);
+                    promise.resolve(returnMap);
+                } catch (RuntimeException e) {
+                    promise.reject("ERROR", e.getMessage(), e);
                 }
-                VRT3DObject nodeView = (VRT3DObject) viroView;
-                Object3D node = (Object3D)nodeView.getNodeJni();
-                if (node == null) {
-                    // Torn down but still registered (see getNodeTransform).
-                    promise.reject("view_not_ready", "Node has been torn down");
-                    return;
-                }
-                Set<String> keys = node.getMorphTargetKeys();
-                WritableMap returnMap = Arguments.createMap();
-                WritableArray targets = Arguments.createArray();
-                for (String key : keys) {
-                    targets.pushString(key);
-                }
-                returnMap.putArray("targets", targets);
-                promise.resolve(returnMap);
             }
         });
     }

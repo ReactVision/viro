@@ -35,6 +35,7 @@ typedef struct {
     float attenuation_end_distance;
     float attenuation_falloff_exp;
     
+    // cosines of the half angles of the spot's cones, as in VROLightingUBO
     float spot_inner_angle;
     float spot_outer_angle;
 
@@ -192,12 +193,12 @@ float compute_attenuation(constant VROLightUniforms &light,
         attenuation = 1.0 - pow(d, 1.0 / light.attenuation_falloff_exp);
         
         // Spot light
+        // spot_inner/outer_angle are the cosines of the half angles: full light inside the inner
+        // cone, none outside the outer one, as compute_angle_attenuation does in GL
         if (light.type == 3) {
-            float light_surface_angle = acos(dot(*surface_to_light, normalize(light.direction)));
-            if (light_surface_angle > light.spot_inner_angle) {
-                float t = (light_surface_angle - light.spot_inner_angle) / light.spot_outer_angle;
-                attenuation = clamp(mix(attenuation, 0.0, t), 0.0, 1.0);
-            }
+            float theta = dot(*surface_to_light, normalize(light.direction));
+            float epsilon = max(0.0001, light.spot_inner_angle - light.spot_outer_angle);
+            attenuation *= clamp((theta - light.spot_outer_angle) / epsilon, 0.0, 1.0);
         }
     }
     
@@ -1519,11 +1520,9 @@ static float vro_attenuation_pbr(constant VROLightUniforms &light, float3 surfac
 
     // Spot cone
     if (light.type == 3) {
-        const float angle = acos(clamp(dot(-*L, normalize(light.direction)), -1.0, 1.0));
-        if (angle > light.spot_inner_angle) {
-            const float t = (angle - light.spot_inner_angle) / max(light.spot_outer_angle, 1e-3);
-            attenuation = mix(attenuation, 0.0, clamp(t, 0.0, 1.0));
-        }
+        const float theta = dot(-*L, normalize(light.direction));
+        const float epsilon = max(0.0001, light.spot_inner_angle - light.spot_outer_angle);
+        attenuation *= clamp((theta - light.spot_outer_angle) / epsilon, 0.0, 1.0);
     }
     return attenuation;
 }

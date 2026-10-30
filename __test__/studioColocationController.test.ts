@@ -2,6 +2,9 @@ import {
   lookupColocationRoom,
   type ViroColocationRoom,
 } from "../components/AR/ViroColocationRooms";
+import { createUserTokenCredentials } from "../components/AR/ViroUserTokenCredentials";
+import { readCredentials } from "../components/AR/ViroUserTokens";
+import type { ViroVPSCredentialsSource } from "../components/AR/ViroVPSClient";
 import type {
   ViroReplicatedEntity,
   ViroReplicationConfig,
@@ -917,6 +920,17 @@ describe("StudioColocationController: failures", () => {
     expect(h.controller.getFrame().phase).toBe("off");
   });
 
+  it("refuses hosting a scene bound to a VPS location before the scan", async () => {
+    const h = harness();
+    await startHost(h, scene({ vps_location_id: "loc-1" }));
+    expect(failed(h)).toBe("SCENE_BOUND_TO_VPS");
+    expect(h.deps.getAuth).not.toHaveBeenCalled();
+    expect(h.deps.probeRelay).not.toHaveBeenCalled();
+    expect(h.nav.startScan).not.toHaveBeenCalled();
+    expect(h.deps.createRoom).not.toHaveBeenCalled();
+    expect(h.controller.getFrame().phase).toBe("off");
+  });
+
   it("refuses hosting where cloud anchors cannot run", async () => {
     const h = harness({
       hostSupport: jest.fn(() => ({ ok: false as const, reason: "no camera" })),
@@ -1553,6 +1567,154 @@ describe("StudioColocationController: shared navigation", () => {
     });
   });
 
+  describe("a scene bound to a VPS location", () => {
+    const bound = () =>
+      harness({
+        loadScene: jest.fn(async (sceneId: string) =>
+          scene({ id: sceneId, vps_location_id: "loc-1" })
+        ),
+      });
+
+    it("is not navigated to, and the session fails with SCENE_BOUND_TO_VPS", async () => {
+      const h = bound();
+      const pushed = withNavigator(h);
+      const leave = await liveHost(h);
+      expect(h.controller.navigate("scene-2")).toBe(true);
+      await flush();
+      expect(pushed).toEqual([]);
+      expect(leave).not.toHaveBeenCalled();
+      expect(currentWrites(h)).toEqual([{ sceneId: "scene-1", n: 0 }]);
+      expect(h.deps.onNavigationError).not.toHaveBeenCalled();
+      expect(h.last()).toEqual({
+        status: "failed",
+        code: "SCENE_BOUND_TO_VPS",
+        message: expect.stringContaining("Advanced VPS location"),
+      });
+      expect(h.replication.disconnected).toBe(true);
+    });
+
+    it("is not followed when the room names it, and the session fails", async () => {
+      const h = bound();
+      const pushed = withNavigator(h);
+      const leave = await liveHost(h);
+      h.replication.upsert(
+        row("scene:current", { sceneId: "scene-3", n: 1 }, 2)
+      );
+      await flush();
+      expect(h.deps.loadScene).toHaveBeenCalledWith("scene-3");
+      expect(pushed).toEqual([]);
+      expect(leave).not.toHaveBeenCalled();
+      expect(h.last()).toMatchObject({
+        status: "failed",
+        code: "SCENE_BOUND_TO_VPS",
+      });
+    });
+
+    it("is not entered by a joiner whose room is on it", async () => {
+      const h = bound();
+      const pushed = withNavigator(h);
+      await joinerSynced(h, [
+        row("scene:current", { sceneId: "scene-3", n: 4 }),
+      ]);
+      expect(pushed).toEqual([]);
+      expect(h.last()).toMatchObject({
+        status: "failed",
+        code: "SCENE_BOUND_TO_VPS",
+      });
+    });
+
+    it("is not navigated to while the session is being set up", async () => {
+      const h = bound();
+      const pushed = withNavigator(h);
+      h.controller.request({ mode: "host", name: "Lab" });
+      h.controller.attachScene(scene());
+      await flush();
+      expect(h.last().status).toBe("scanning");
+      expect(h.controller.navigate("scene-2")).toBe(true);
+      await flush();
+      expect(pushed).toEqual([]);
+      expect(h.last()).toMatchObject({
+        status: "failed",
+        code: "SCENE_BOUND_TO_VPS",
+      });
+      expect(h.nav.cancelCloudAnchorOperations).toHaveBeenCalled();
+    });
+
+    it("fails the session when the app changes sceneId to it while live", async () => {
+      const h = harness();
+      withNavigator(h);
+      await liveHost(h);
+      h.controller.attachScene(
+        scene({ id: "scene-2", vps_location_id: "loc-1" })
+      );
+      await advance(100);
+      expect(currentWrites(h)).toEqual([{ sceneId: "scene-1", n: 0 }]);
+      expect(h.last()).toMatchObject({
+        status: "failed",
+        code: "SCENE_BOUND_TO_VPS",
+      });
+      expect(h.replication.disconnected).toBe(true);
+      expect(h.controller.getFrame().phase).toBe("off");
+    });
+
+    it("fails the session when the app changes sceneId to it during setup", async () => {
+      const h = harness();
+      h.controller.request({ mode: "host", name: "Lab" });
+      h.controller.attachScene(scene());
+      await flush();
+      expect(h.last().status).toBe("scanning");
+      h.controller.attachScene(
+        scene({ id: "scene-2", vps_location_id: "loc-1" })
+      );
+      await flush();
+      expect(h.last()).toMatchObject({
+        status: "failed",
+        code: "SCENE_BOUND_TO_VPS",
+      });
+      expect(h.nav.cancelCloudAnchorOperations).toHaveBeenCalled();
+      expect(h.deps.createRoom).not.toHaveBeenCalled();
+    });
+
+    it("does not fail a joiner on one that remounts, which then follows the room", async () => {
+      const h = harness();
+      const pushed = withNavigator(h);
+      const own = () => scene({ vps_location_id: "loc-1" });
+      h.controller.request({ mode: "join", code: "K7M2QX" });
+      h.controller.attachScene(own());
+      await flush();
+      h.controller.attachScene(own());
+      h.replication.sync([
+        originRow(),
+        row("scene:current", { sceneId: "scene-3", n: 4 }),
+      ]);
+      await flush();
+      expect(h.last().status).not.toBe("failed");
+      expect(pushed).toEqual([
+        { sceneId: "scene-3", skipOnLoadFunction: true },
+      ]);
+    });
+
+    it("is navigated to as before when the session ended while it loaded", async () => {
+      let finish!: (s: StudioSceneResponse) => void;
+      const h = harness({
+        loadScene: jest.fn(
+          () =>
+            new Promise<StudioSceneResponse>((resolve) => (finish = resolve))
+        ),
+      });
+      const pushed = withNavigator(h);
+      await liveHost(h);
+      h.controller.navigate("scene-2");
+      h.controller.leave();
+      finish(scene({ id: "scene-2", vps_location_id: "loc-1" }));
+      await flush();
+      expect(pushed).toEqual([
+        { sceneId: "scene-2", skipOnLoadFunction: false },
+      ]);
+      expect(h.last()).toEqual({ status: "idle" });
+    });
+  });
+
   it("takes the room's scene back after navigating while reconnecting", async () => {
     const h = harness();
     const pushed = withNavigator(h);
@@ -1979,5 +2141,204 @@ describe("StudioColocationController: authority", () => {
       op: "claim",
       id: "peer:host:me",
     });
+  });
+});
+
+describe("StudioColocationController: credentials", () => {
+  const NONE = {
+    mode: "none",
+    baseUrl: null,
+    headers: {},
+    projectId: null,
+  } as unknown as StudioAuthContext;
+  const CHANGED = {
+    status: "failed",
+    code: "NOT_AUTHORIZED",
+    message: "The co-location credentials changed during the shared session.",
+  };
+
+  const userToken = (token = "ut-1") =>
+    createUserTokenCredentials({
+      projectId: "token-project",
+      fetchToken: async () => token,
+    });
+
+  const join = (credentials: ViroVPSCredentialsSource) =>
+    ({ mode: "join", code: "K7M2QX", credentials }) as const;
+
+  async function joinToLive(h: Harness, credentials: ViroVPSCredentialsSource) {
+    h.controller.request(join(credentials));
+    h.controller.attachScene(scene());
+    await flush();
+    h.replication.sync([
+      {
+        id: "scene:origin",
+        fields: { p: [0, 0, 0], q: [0, 0, 0, 1], sceneId: "scene-1" },
+        version: 1,
+        owner: null,
+      },
+    ]);
+    await advance(500);
+    expect(h.last().status).toBe("live");
+  }
+
+  it("sends them to the room lookup, the relay, the channel and the shared state", async () => {
+    const credentials = userToken();
+    const h = harness();
+    await joinToLive(h, credentials);
+    expect(h.deps.lookupRoom.mock.calls[0][0]).toStrictEqual({
+      endpoint: SESSION.baseUrl,
+      credentials,
+      projectId: "proj-1",
+    });
+    expect(h.deps.probeRelay).toHaveBeenCalledWith(
+      "https://colocation.reactvision.xyz",
+      "room-1",
+      { Authorization: "Bearer ut-1", "x-project-id": "proj-1" }
+    );
+    expect(h.deps.joinChannel.mock.calls[0][0]).toStrictEqual({
+      roomId: "room-1",
+      projectId: "proj-1",
+      endpoint: "https://colocation.reactvision.xyz",
+      credentials,
+    });
+    expect(h.replication.config).toStrictEqual({
+      roomId: "room-1",
+      projectId: "proj-1",
+      endpoint: "https://colocation.reactvision.xyz",
+      credentials,
+    });
+  });
+
+  it("hosts with no native credential, creating the room on the default endpoint", async () => {
+    const credentials = userToken();
+    const h = harness({ getAuth: jest.fn().mockResolvedValue(NONE) });
+    h.controller.request({ mode: "host", name: "Lab", credentials });
+    h.controller.attachScene(scene());
+    await flush();
+    expect(h.deps.probeRelay).toHaveBeenCalledWith(
+      "https://colocation.reactvision.xyz",
+      "probe-room",
+      { Authorization: "Bearer ut-1", "x-project-id": "proj-1" }
+    );
+    await advance(500);
+    h.controller.finishScan();
+    await flush();
+    expect(h.deps.createRoom.mock.calls[0][0]).toStrictEqual({
+      endpoint: undefined,
+      credentials,
+      projectId: "proj-1",
+    });
+    h.controller.proposeOrigin(IDENTITY);
+    h.replication.sync();
+    await advance(500);
+    expect(h.last().status).toBe("live");
+  });
+
+  it("refuses credentials that cannot be read before the scan", async () => {
+    const h = harness();
+    h.controller.request({
+      mode: "host",
+      credentials: async () => {
+        throw new Error("Network request failed");
+      },
+    });
+    h.controller.attachScene(scene());
+    await flush();
+    expect(h.last()).toEqual({
+      status: "failed",
+      code: "UNAVAILABLE",
+      message: "Could not get credentials: Network request failed",
+    });
+    expect(h.deps.probeRelay).not.toHaveBeenCalled();
+    expect(h.nav.startScan).not.toHaveBeenCalled();
+  });
+
+  it("renews a user token the relay refuses, and goes on to the scan", async () => {
+    let fetched = 0;
+    const credentials = createUserTokenCredentials({
+      projectId: "token-project",
+      fetchToken: async () => `ut-${++fetched}`,
+    });
+    const probeRelay = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        code: "INVALID_APP_USER_TOKEN",
+        message: "Invalid user token",
+      })
+      .mockResolvedValue({ ok: true, peers: 0 });
+    const h = harness({ probeRelay });
+    h.controller.request({ mode: "host", credentials });
+    h.controller.attachScene(scene());
+    await flush();
+    expect(probeRelay.mock.calls.map((c) => c[2])).toEqual([
+      { Authorization: "Bearer ut-1", "x-project-id": "proj-1" },
+      { Authorization: "Bearer ut-2", "x-project-id": "proj-1" },
+    ]);
+    expect(h.nav.startScan).toHaveBeenCalledTimes(1);
+    expect(h.last().status).toBe("scanning");
+  });
+
+  it("reconnects with the latest inline credentials, not the ones it joined with", async () => {
+    const h = harness();
+    await joinToLive(h, { projectId: "token-project", accessToken: "ut-1" });
+    h.controller.request(
+      join({ projectId: "token-project", accessToken: "ut-2" }),
+      { restartFailed: false }
+    );
+    const replication = h.replication.config!.credentials!;
+    const channel = h.deps.joinChannel.mock.calls[0][0].credentials!;
+    for (const source of [replication, channel]) {
+      await expect(readCredentials(source)).resolves.toMatchObject({
+        accessToken: "ut-2",
+      });
+    }
+    expect(h.last().status).toBe("live");
+  });
+
+  it("fails when another user's credentials arrive, and leaves both sockets", async () => {
+    const h = harness();
+    await joinToLive(h, userToken());
+    h.controller.request(join(userToken("ut-2")), { restartFailed: false });
+    expect(h.last()).toEqual(CHANGED);
+    expect(h.deps.leaveChannel).toHaveBeenCalled();
+    expect(h.replication.disconnected).toBe(true);
+    await flush();
+    expect(h.deps.lookupRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails at a clear() of the credentials in use, and leaves both sockets", async () => {
+    const credentials = userToken();
+    const h = harness();
+    await joinToLive(h, credentials);
+    credentials.clear();
+    expect(h.last()).toEqual(CHANGED);
+    expect(h.deps.leaveChannel).toHaveBeenCalled();
+    expect(h.replication.disconnected).toBe(true);
+
+    expect(h.controller.retry()).toBe(true);
+    await flush();
+    expect(h.deps.lookupRoom).toHaveBeenCalledTimes(2);
+    expect(h.deps.joinChannel).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the session through inline credentials that are new every render", async () => {
+    const inline = () => async () => ({
+      projectId: "token-project",
+      accessToken: "ut-1",
+    });
+    const h = harness();
+    await joinToLive(h, inline());
+    for (let i = 0; i < 3; i++) {
+      h.controller.request(join(inline()), { restartFailed: false });
+    }
+    await advance(500);
+    expect(h.last().status).toBe("live");
+    expect(h.deps.lookupRoom).toHaveBeenCalledTimes(1);
+    expect(h.deps.joinChannel).toHaveBeenCalledTimes(1);
+    expect(h.deps.leaveChannel).not.toHaveBeenCalled();
+    expect(h.replication.disconnected).toBe(false);
   });
 });

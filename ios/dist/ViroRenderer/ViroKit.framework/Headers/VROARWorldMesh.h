@@ -33,7 +33,11 @@
 #include <map>
 #include <mutex>
 #include <cstdint>
+#include <vector>
+#include <atomic>
+#include <utility>
 #include "VROVector3f.h"
+#include "VROTSDFVolume.h"
 #include "VROMatrix4f.h"
 
 class VROARDepthMesh;
@@ -55,6 +59,12 @@ struct VROWorldMeshConfig {
     float minConfidence = 0.3f;         // Minimum confidence threshold (0.0-1.0)
     float maxDepth = 5.0f;              // Maximum depth in meters
 
+    // Fusion across frames. ARKit accumulates for us on LiDAR devices and hands back mesh anchors;
+    // ARCore and monocular depth give one frame at a time, so those two paths fuse here instead.
+    bool accumulate = true;             // false reproduces the per-frame behaviour exactly
+    float voxelSize = 0.04f;            // Fusion voxel edge, meters
+    int maxMemoryMB = 64;               // Budget for the fused volume; oldest blocks evicted first
+
     // Update settings
     double updateIntervalMs = 500.0;    // Minimum time between mesh updates
     double meshPersistenceMs = 500.0;   // Time to keep mesh after depth data lost
@@ -74,8 +84,17 @@ struct VROWorldMeshConfig {
     // Visualization
     bool debugDrawEnabled = false;         // Enable wireframe visualization of mesh
     bool debugDrawDepthTest = true;        // Depth-test wireframe against scene (occluded by real surfaces)
-    int debugDrawMaxTriangles = 1000;      // Triangle cap for wireframe debug draw
-    float debugDrawLineThickness = 0.001f; // Line thickness for wireframe (meters)
+    int debugDrawMaxEdges = 6000;          // Edge budget for the wireframe. Counted in unique edges,
+                                           // which is what costs: a shared edge is one line, not two.
+                                           // Replaces debugDrawMaxTriangles, whose 1000 was sized for
+                                           // one depth-image grid and starved an accumulated LiDAR mesh.
+    float debugDrawCellSize = 0.04f;       // Vertex-clustering cell size for the wireframe, in meters.
+                                           // Simplifies while keeping the surface connected, instead of
+                                           // dropping whole triangles. Grown automatically to fit the
+                                           // edge budget. 0 disables simplification.
+    float debugDrawLineThickness = 0.004f; // Line thickness for wireframe (meters). 1mm was under a
+                                           // screen pixel at arm's length, which is why the lines
+                                           // shimmered and dropped out.
 };
 
 /**
@@ -83,10 +102,17 @@ struct VROWorldMeshConfig {
  */
 enum class VROWorldMeshSource {
     LiDAR,      // ARKit ARMeshAnchor (LiDAR-equipped device)
+    Depth,      // ARCore depth camera image
     Monocular,  // Monocular depth estimation (non-LiDAR device)
     Plane,      // Triangulated AR plane anchors (fallback)
     Unknown
 };
+
+/**
+ * The name apps see. An app cannot tell a real depth mesh from the plane-anchor fallback without
+ * it, and until now it had no way to ask.
+ */
+const char *VROWorldMeshSourceToString(VROWorldMeshSource source);
 
 /**
  * Statistics about the current world mesh state.
@@ -97,6 +123,10 @@ struct VROWorldMeshStats {
     float averageConfidence = 0.0f;     // Average confidence of depth samples
     double lastUpdateTimeMs = 0.0;      // Timestamp of last mesh update
     bool isStale = false;               // True if depth data hasn't been received recently
+    VROWorldMeshSource source = VROWorldMeshSource::Unknown;  // Which of the three paths produced it
+    // True when the mesh covers more than the current view: fused here on the depth paths, or
+    // accumulated by ARKit on the mesh-anchor path. Not "our fusion ran".
+    bool accumulated = false;
 };
 
 /**
@@ -169,6 +199,10 @@ public:
     /**
      * Force an immediate mesh update, ignoring the update interval.
      *
+     * Bypasses the fusion: it replaces the accumulated mesh with this one frame, which is the
+     * single-frame behaviour the fusion exists to end. Nothing calls it today. Route it through
+     * updateFromFrame()'s fusion path before giving it a caller.
+     *
      * @param frame The current AR frame with depth data
      */
     void forceUpdate(const std::unique_ptr<VROARFrame>& frame);
@@ -189,6 +223,19 @@ public:
      */
     void setEnabled(bool enabled);
 
+    /*
+     Clears the fused volume, so the next scan starts from an empty room rather than carrying the
+     last one. Also drops the current mesh and its physics body, so getStats() reports zero and
+     serializeCurrentMesh() has nothing to upload until the next frame fuses — a snapshot taken
+     between a reset and the next frame must not carry the previous room.
+
+     On the mesh-anchor path ARKit owns the accumulation, so there is no volume to empty: the
+     current mesh is still dropped and comes back with ARKit's next mesh-anchor update.
+
+     Must be called on the render thread: it touches the physics world and the current mesh.
+     */
+    void resetAccumulation();
+
     /**
      * Check if the world mesh is enabled.
      */
@@ -197,7 +244,10 @@ public:
     /**
      * Get the current mesh data (may be nullptr if no mesh generated yet).
      */
-    std::shared_ptr<VROARDepthMesh> getCurrentMesh() const { return _currentMesh; }
+    std::shared_ptr<VROARDepthMesh> getCurrentMesh() const {
+        std::lock_guard<std::mutex> lock(_currentMeshMutex);
+        return _currentMesh;
+    }
 
     /**
      * Get statistics about the current mesh state.
@@ -292,6 +342,17 @@ public:
      *     repo has no way to render an AR scene, so it has not been visually
      *     confirmed to occlude correctly. Test on device before shipping.
      *
+     * It shares the live mesh's single slot, which has three consequences worth knowing before
+     * resolving an anchor in a session that is still scanning:
+     *   - The next live frame calls applyMeshToPhysics() in turn and takes the physics body with
+     *     it. The occlusion geometry stays, being a node of its own, so the resolved mesh keeps
+     *     occluding but stops colliding.
+     *   - _currentMesh becomes the resolved mesh, so getStats() reports it and
+     *     serializeCurrentMesh() would upload it back — a snapshot taken after a resolve returns
+     *     the downloaded room, not the scanned one, until the next frame lands.
+     *   - Each call adds another occlusion node and nothing removes them; resolving twice leaves
+     *     two overlapping meshes in the scene.
+     *
      * @param mesh The resolved mesh, already in this session's world space
      *        (see loadMeshSnapshot()'s resolvedTransform parameter).
      * @param scene The scene to add the occlusion geometry node to.
@@ -311,6 +372,16 @@ public:
      */
     static std::shared_ptr<VROGeometry> buildOcclusionGeometry(std::shared_ptr<VROARDepthMesh> mesh);
 
+    /**
+     * Vertex-clustering simplification. Groups all vertices within cellSize metres
+     * into a single representative, rebuilds triangles, drops degenerate ones.
+     * Produces a gap-free mesh: max gap = sqrt(3)*cellSize.
+     * 0.10m cells → catches objects wider than ~8cm reliably.
+     * Public for the VPS map mesh (VROARScene::setVPSMapMesh()).
+     */
+    static std::shared_ptr<VROARDepthMesh> clusterMesh(
+        std::shared_ptr<VROARDepthMesh> mesh, float cellSize);
+
 private:
     std::weak_ptr<VROPhysicsWorld> _physicsWorld;
 
@@ -320,8 +391,52 @@ private:
     std::unique_ptr<btDefaultMotionState> _motionState;
     std::shared_ptr<VROPhysicsShape> _physicsShape;
 
-    // Current mesh data
+    // Current mesh data. Replaced on the render thread only, but read from others too: Android
+    // snapshots it on the UI thread (rvSnapshotWorldMeshToFile → serializeCurrentMesh). Writes and
+    // off-thread reads hold _currentMeshMutex, and readers work on their own shared_ptr copy, so a
+    // replacement mid-serialisation cannot free the vectors being read.
     std::shared_ptr<VROARDepthMesh> _currentMesh;
+    mutable std::mutex _currentMeshMutex;
+    void setCurrentMesh(std::shared_ptr<VROARDepthMesh> mesh);
+
+    /*
+     Bumped whenever the physics body is torn down (a new mesh, a reset, a disable). The BVH for a
+     mesh is built on a background thread and its body installed later on the render thread; that
+     continuation compares the generation it was started under and drops itself if anything
+     happened since. Without it a reset could be undone by a build already in flight, and two
+     overlapping builds could finish out of order and leave the newer body out of the world.
+     Render thread only.
+     */
+    uint64_t _physicsGeneration = 0;
+
+    // Last source announced to the log, so the line appears on a change rather than every update.
+    VROWorldMeshSource _lastReportedSource = VROWorldMeshSource::Unknown;
+
+    /*
+     The fused volume, and the lock that lets the background fusion task touch it while the render
+     thread may be resetting it. Integrating a frame and extracting a room's surface cost tens of
+     milliseconds — measured, not guessed — so neither runs on the render thread.
+     */
+    std::unique_ptr<VROTSDFVolume> _volume;
+    std::mutex _volumeMutex;
+    std::atomic<bool> _fusionInFlight{false};
+    bool _lastMeshWasAccumulated = false;
+
+    /*
+     Bumped by resetAccumulation(). A surface extracted before the reset is already on its way to
+     the render thread, carrying the room that was just cleared; the continuation compares the
+     generation it read under _volumeMutex against this one and drops the stale result rather than
+     putting the old room back.
+     */
+    std::atomic<uint64_t> _fusionGeneration{0};
+
+    /*
+     Cached wireframe for debugDraw(). Rebuilding it means clustering the mesh and de-duplicating
+     its edges, which is far too much to redo on every render frame; the mesh only changes at
+     updateIntervalMs. _debugEdgeSource is the mesh _debugEdges was built from, compared by pointer.
+     */
+    std::shared_ptr<VROARDepthMesh> _debugEdgeSource;
+    std::vector<std::pair<VROVector3f, VROVector3f>> _debugEdges;
 
     // Configuration and state
     VROWorldMeshConfig _config;
@@ -346,6 +461,23 @@ private:
      * Creates a new physics shape and rigid body from the mesh.
      */
     void applyMeshToPhysics(std::shared_ptr<VROARDepthMesh> mesh);
+
+    /* Whether this source is one the volume should fuse. */
+    bool shouldFuse(VROWorldMeshSource source) const;
+
+    /*
+     Hands the frame's samples to the fused volume on a background thread and, when the volume has
+     changed, re-meshes it and applies the result on the render thread. Returns true when the frame
+     was taken over by fusion, so the caller does not also apply the single-frame mesh.
+     */
+    bool fuseFrame(std::shared_ptr<VROARDepthMesh> frameMesh,
+                   const std::unique_ptr<VROARFrame> &frame);
+
+    /*
+     Rebuilds _debugEdges from _currentMesh: simplify with vertex clustering, then collect each
+     edge once. Called from debugDraw() when the mesh has changed.
+     */
+    void rebuildDebugWireframe();
 
     /**
      * Remove the current physics body from the world.
@@ -386,14 +518,6 @@ private:
     static std::shared_ptr<VROARDepthMesh> decimateMesh(
         std::shared_ptr<VROARDepthMesh> mesh, int maxTriangles);
 
-    /**
-     * Vertex-clustering simplification. Groups all vertices within cellSize metres
-     * into a single representative, rebuilds triangles, drops degenerate ones.
-     * Produces a gap-free mesh: max gap = sqrt(3)*cellSize.
-     * 0.10m cells → catches objects wider than ~8cm reliably.
-     */
-    static std::shared_ptr<VROARDepthMesh> clusterMesh(
-        std::shared_ptr<VROARDepthMesh> mesh, float cellSize);
 };
 
 #endif /* VROARWorldMesh_h */

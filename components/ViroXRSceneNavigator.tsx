@@ -27,6 +27,10 @@ import {
 } from "./VisionOS/ViroVisionOSModule";
 import { VRQuestNavigatorBridge } from "./Utilities/VRQuestNavigatorBridge";
 import { VRCapture, VRModuleOpenXR } from "./Utilities/VRModuleOpenXR";
+import {
+  sendViroUsagePing,
+  ViroUsagePingSuppressed,
+} from "./Utilities/ViroUsagePing";
 import type { Viro3DPoint } from "./Types/ViroUtils";
 
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
@@ -55,12 +59,20 @@ const MIN_RN_FOR_VR = { major: 0, minor: 83 };
 // them. USE_ANCHOR_API/USE_SCENE gate plane & anchor data (needed now that the
 // ViroARScene root mounts on Quest too); HEADSET_CAMERA gates the passthrough
 // Camera2 feed ViroObjectDetector reads. Requested once before the first VR
-// launch; denial degrades gracefully elsewhere (no planes / no passthrough
-// feed, see QuestPassthroughCamera) rather than blocking VR.
-const QUEST_RUNTIME_PERMISSIONS = [
-  "horizonos.permission.USE_ANCHOR_API",
-  "com.oculus.permission.USE_SCENE",
-  "horizonos.permission.HEADSET_CAMERA",
+// launch, as questPermissions picks; denial degrades gracefully elsewhere (no
+// planes / no passthrough feed, see QuestPassthroughCamera) rather than
+// blocking VR.
+export type QuestRuntimePermission = "spatialData" | "headsetCamera";
+const QUEST_RUNTIME_PERMISSIONS: Record<QuestRuntimePermission, string[]> = {
+  spatialData: [
+    "horizonos.permission.USE_ANCHOR_API",
+    "com.oculus.permission.USE_SCENE",
+  ],
+  headsetCamera: ["horizonos.permission.HEADSET_CAMERA"],
+};
+const DEFAULT_QUEST_PERMISSIONS: QuestRuntimePermission[] = [
+  "spatialData",
+  "headsetCamera",
 ];
 
 function checkRNVersionForVR(): void {
@@ -137,10 +149,13 @@ type Props = ViewProps & {
    * The scene root may be either:
    *  - `ViroScene`   → fully-virtual VR.
    *  - `ViroARScene` → mixed reality: passthrough is enabled automatically and
-   *    real-time plane detection (XR_EXT_plane_detection, Quest 3 / 3S) drives
-   *    `onAnchorFound` and `ViroARPlane`, exactly as on phone AR. A single
-   *    AR-rooted `initialScene` therefore runs on phones (ARCore) and Quest (OpenXR)
-   *    with no per-platform changes. See docs/QUEST_SETUP.md §7b.
+   *    planes drive `onAnchorFound` and `ViroARPlane` as on phone AR. On Meta
+   *    Quest the planes are the room model the wearer made in Space Setup
+   *    (XR_FB_scene) rather than live detection, and arrive only with the
+   *    spatial data permission (`questPermissions`). A runtime with
+   *    XR_EXT_plane_detection detects them live instead. A single AR-rooted
+   *    `initialScene` therefore runs on phones (ARCore) and Quest (OpenXR)
+   *    with no per-platform changes.
    */
   vrInitialScene?: SceneFactory;
 
@@ -156,6 +171,18 @@ type Props = ViewProps & {
   vrModeEnabled?: boolean;
   passthroughEnabled?: boolean;
   handTrackingEnabled?: boolean;
+  /**
+   * Quest passthrough hand occlusion: real hands show through virtual content.
+   * Needs `passthroughEnabled` and `handTrackingEnabled`; otherwise a no-op.
+   * Defaults to false. Like the other Quest flags it is read when the headset
+   * view launches; to toggle it while the VR scene is running, call
+   * `VRModuleOpenXR.setHandOcclusion(viewTag, enabled)`.
+   */
+  handOcclusion?: boolean;
+  /** Hand occlusion geometry. `"mesh"` (default; falls back to capsules natively) or `"capsules"`. */
+  handOcclusionMode?: "capsules" | "mesh";
+  /** Hand occluder inflation past the tracked hand, in millimetres. Defaults to 2. */
+  handOcclusionInflateMm?: number;
   onExitViro?: () => void;
 
   // ── Meta Quest panel ───────────────────────────────────────────────────────
@@ -169,6 +196,14 @@ type Props = ViewProps & {
    * immersive view" button.
    */
   renderQuestPanel?: (enter: () => void) => React.ReactNode;
+  /**
+   * The Meta Quest runtime permissions asked for before the headset view first
+   * opens: "spatialData" for the room's planes and anchors, "headsetCamera" for
+   * the passthrough feed ViroObjectDetector reads. Horizon OS skips a permission
+   * the manifest does not declare, so ask only for what the app declares and
+   * uses; [] asks for nothing. Defaults to both.
+   */
+  questPermissions?: QuestRuntimePermission[];
 
   // ── visionOS ───────────────────────────────────────────────────────────────
   /**
@@ -223,7 +258,8 @@ type Props = ViewProps & {
  * `multisamplingEnabled`) reach ViroARSceneNavigator as props and
  * ViroVRSceneNavigator on Quest via the intent bridge. visionOS gets neither:
  * ViroSceneNavigator does not take them. `passthroughEnabled`, `vrModeEnabled`
- * and `handTrackingEnabled` are Quest-only and go over the bridge alone.
+ * and `handTrackingEnabled` (and the `handOcclusion*` props) are Quest-only
+ * and go over the bridge alone.
  */
 export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
   function ViroXRSceneNavigator(props, ref) {
@@ -247,9 +283,13 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       vrModeEnabled,
       passthroughEnabled,
       handTrackingEnabled,
+      handOcclusion,
+      handOcclusionMode,
+      handOcclusionInflateMm,
       onExitViro,
       debug,
       renderQuestPanel,
+      questPermissions = DEFAULT_QUEST_PERMISSIONS,
       visionOSImmersionStyle = "mixed",
       ...rest
     } = props;
@@ -348,6 +388,15 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
     // counter: it cannot collide, and it means nothing outside this comparison.
     const visionOSOwnerRef = React.useRef<symbol>(Symbol("ViroXRSceneNavigator"));
 
+    React.useEffect(() => {
+      sendViroUsagePing("xr", {
+        occlusion_mode: rest.occlusionMode,
+        passthrough_enabled: passthroughEnabled,
+        hand_tracking_enabled: handTrackingEnabled,
+        immersion_style: isVisionOS ? visionOSImmersionStyle : undefined,
+      });
+    }, []);
+
     // On visionOS: open the ImmersiveSpace on mount and close it on unmount.
     //
     // This mirrors what the Quest branch does with VRActivity — in both cases something other
@@ -426,6 +475,9 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
             vrModeEnabled,
             passthroughEnabled,
             handTrackingEnabled,
+            handOcclusion,
+            handOcclusionMode,
+            handOcclusionInflateMm,
             onExitViro,
             debug,
           });
@@ -436,7 +488,13 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       // Request the runtime grants once before the first launch. Caught and
       // ignored on failure — a denied/unavailable permission should degrade
       // (no planes, no passthrough camera), not block VR from opening at all.
-      PermissionsAndroid.requestMultiple(QUEST_RUNTIME_PERMISSIONS as any)
+      const permissions = questPermissions.flatMap(
+        (permission) => QUEST_RUNTIME_PERMISSIONS[permission]
+      );
+      (permissions.length > 0
+        ? PermissionsAndroid.requestMultiple(permissions as any)
+        : Promise.resolve()
+      )
         .catch(() => undefined)
         .then(registerIntentAndLaunch);
     }, []);
@@ -473,13 +531,15 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       // native VRTScene reaches the renderer.
       const { style: _ignoredStyle, ...visionRest } = rest as { style?: unknown };
       return (
-        <View style={styles.visionOSHost} pointerEvents="none">
-          <ViroSceneNavigator
-            ref={visionRef}
-            initialScene={visionScene}
-            {...(visionRest as object)}
-          />
-        </View>
+        <ViroUsagePingSuppressed.Provider value={true}>
+          <View style={styles.visionOSHost} pointerEvents="none">
+            <ViroSceneNavigator
+              ref={visionRef}
+              initialScene={visionScene}
+              {...(visionRest as object)}
+            />
+          </View>
+        </ViroUsagePingSuppressed.Provider>
       );
     }
 
@@ -491,16 +551,18 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       return null;
     }
     return (
-      <ViroARSceneNavigator
-        ref={arRef}
-        initialScene={scene}
-        hdrEnabled={hdrEnabled}
-        pbrEnabled={pbrEnabled}
-        bloomEnabled={bloomEnabled}
-        shadowsEnabled={shadowsEnabled}
-        multisamplingEnabled={multisamplingEnabled}
-        {...rest}
-      />
+      <ViroUsagePingSuppressed.Provider value={true}>
+        <ViroARSceneNavigator
+          ref={arRef}
+          initialScene={scene}
+          hdrEnabled={hdrEnabled}
+          pbrEnabled={pbrEnabled}
+          bloomEnabled={bloomEnabled}
+          shadowsEnabled={shadowsEnabled}
+          multisamplingEnabled={multisamplingEnabled}
+          {...rest}
+        />
+      </ViroUsagePingSuppressed.Provider>
     );
   }
 );

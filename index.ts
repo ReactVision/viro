@@ -39,6 +39,7 @@ import {
   setColocationLocalPose,
   getColocationState,
   getColocationPeers,
+  getColocationDeviceId,
   VIRO_POSE_INTERVAL_MS,
 } from "./components/AR/ViroColocation";
 import { useViroColocation } from "./components/hooks/useViroColocation";
@@ -83,6 +84,22 @@ import { ViroARObjectMarker } from "./components/AR/ViroARObjectMarker";
 import { ViroARTrackingTargets } from "./components/AR/ViroARTrackingTargets";
 import { ViroARPlane } from "./components/AR/ViroARPlane";
 import { ViroARPlaneSelector } from "./components/AR/ViroARPlaneSelector";
+import { ViroVPS } from "./components/AR/ViroVPS";
+import { ViroVPSAnchor } from "./components/AR/ViroVPSAnchor";
+import {
+  findNearbyLocations,
+  getLocationMapDownload,
+  fetchMapBytes,
+  findNearestMap,
+  getLocationWorldMeshDownload,
+  fetchAssetBytes,
+  getLocationSemanticDownload,
+  fetchLocationSemanticObjects,
+} from "./components/AR/ViroVPSMapDownload";
+import { queryLocationsByImage } from "./components/AR/ViroVPSQuery";
+import { uploadScanRecording, getScan } from "./components/AR/ViroVPSScanUpload";
+import { ViroVPSError } from "./components/AR/ViroVPSClient";
+import { createUserTokenCredentials } from "./components/AR/ViroUserTokenCredentials";
 import { ViroARScene } from "./components/AR/ViroARScene";
 import { ViroARSceneNavigator } from "./components/AR/ViroARSceneNavigator";
 import { ViroBox } from "./components/ViroBox";
@@ -132,6 +149,51 @@ export type {
 export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
 export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
 export type {
+  ViroVPSProps,
+  ViroVPSTrackingStateEvent,
+  ViroVPSLocalizedEvent,
+  ViroVPSWorldMeshEvent,
+  ViroVPSStartTrackingResult,
+  ViroVPSNavigator,
+  ViroVPSErrorDetail,
+} from "./components/AR/ViroVPS";
+export type { ViroVPSTrackingState } from "./components/AR/ViroVPSTracking";
+export type {
+  ViroVPSAnchorProps,
+  ViroVPSAnchorState,
+  ViroVPSAnchorStateEvent,
+} from "./components/AR/ViroVPSAnchor";
+export type {
+  ViroVPSNearbyLocation,
+  ViroVPSMapDownload,
+  ViroVPSAssetDownload,
+  ViroVPSAssetKind,
+  ViroVPSSemanticObject,
+} from "./components/AR/ViroVPSMapDownload";
+export type { ViroVPSQueryCandidate, ViroVPSQueryOptions } from "./components/AR/ViroVPSQuery";
+export type { ViroVPSQueryFrame, ViroVPSQueryFrameResult } from "./components/Types/ViroEvents";
+export type {
+  ViroVPSScanTarget,
+  ViroVPSScan,
+  ViroVPSScanOutput,
+  ViroVPSMeshQuality,
+  ViroVPSScanQuality,
+  ViroVPSMeshConfidence,
+  ViroVPSScanUploadOptions,
+} from "./components/AR/ViroVPSScanUpload";
+export type {
+  ViroVPSConnection,
+  ViroVPSCredentials,
+  ViroVPSCredentialsProvider,
+  ViroVPSCredentialsRequest,
+  ViroVPSCredentialsSource,
+} from "./components/AR/ViroVPSClient";
+export type {
+  ViroUserToken,
+  ViroUserTokenCredentials,
+  ViroUserTokenCredentialsOptions,
+} from "./components/AR/ViroUserTokenCredentials";
+export type {
   ViroColocationState,
   ViroColocationPeer,
   ViroColocationConfig,
@@ -172,6 +234,13 @@ export type {
   ViroSharedFrameValue,
 } from "./components/AR/ViroFrameSource";
 export type { ViroLocationTransform } from "./components/AR/ViroLocationFrame";
+export type {
+  ViroWorldMeshConfig,
+  ViroWorldMeshSource,
+  ViroWorldMeshStats,
+  ViroWorldMeshStatsResult,
+  ViroWorldMeshUpdatedEvent,
+} from "./components/Types/ViroWorldMesh";
 export type {
   ViroSmoothingOptions,
   ViroEntitySmoothingOptions,
@@ -305,6 +374,7 @@ import {
   ViroGeospatialAnchorProvider,
   ViroEarthTrackingState,
   ViroRecordingStatus,
+  ViroRecordingOptions,
   ViroVPSAvailability,
   ViroGeospatialAnchorType,
   ViroQuaternion,
@@ -331,6 +401,7 @@ import {
 import { ViroSurface } from "./components/ViroSurface";
 import { ViroSceneNavigator } from "./components/ViroSceneNavigator";
 import { VIRO_VERSION } from "./components/Utilities/ViroVersion";
+import { ViroTelemetry } from "./components/Utilities/ViroUsagePing";
 import { ViroQuestEntryPoint } from "./components/ViroQuestEntryPoint";
 import { VRQuestNavigatorBridge } from "./components/Utilities/VRQuestNavigatorBridge";
 import {
@@ -338,6 +409,7 @@ import {
   useVRViewTag,
   exitVRScene,
   setPassthroughStyle,
+  onRoomMoved,
 } from "./components/Utilities/VRModuleOpenXR";
 import type {
   VRModuleOpenXRType,
@@ -364,6 +436,7 @@ export {
   setColocationLocalPose,
   getColocationState,
   getColocationPeers,
+  getColocationDeviceId,
   VIRO_POSE_INTERVAL_MS,
   useViroColocation,
   useViroColocationRoom,
@@ -386,6 +459,21 @@ export {
   ViroARTrackingTargets,
   ViroARPlane,
   ViroARPlaneSelector,
+  ViroVPS,
+  ViroVPSAnchor,
+  findNearbyLocations,
+  getLocationMapDownload,
+  fetchMapBytes,
+  findNearestMap,
+  getLocationWorldMeshDownload,
+  fetchAssetBytes,
+  getLocationSemanticDownload,
+  fetchLocationSemanticObjects,
+  queryLocationsByImage,
+  uploadScanRecording,
+  getScan,
+  ViroVPSError,
+  createUserTokenCredentials,
   ViroARScene,
   ViroARSceneNavigator,
   ViroBox,
@@ -454,6 +542,7 @@ export {
   useVRViewTag,
   exitVRScene,
   setPassthroughStyle,
+  onRoomMoved,
   Viro3DSceneNavigator,
   // Streaming audio
   StreamingAudioManager,
@@ -542,6 +631,7 @@ export {
   ViroShaderUniform,
   ViroShaderModifier,
   VIRO_VERSION,
+  ViroTelemetry,
   // Provider Types
   ViroProvider,
   // Cloud Anchor Types
@@ -555,6 +645,7 @@ export {
   ViroGeospatialAnchorProvider,
   ViroEarthTrackingState,
   ViroRecordingStatus,
+  ViroRecordingOptions,
   ViroVPSAvailability,
   ViroGeospatialAnchorType,
   ViroQuaternion,
@@ -621,6 +712,9 @@ export type {
   StudioColocationRoom,
   StudioColocationState,
   StudioQuestMenuItem,
+  StudioVpsLocalization,
+  StudioVpsState,
+  StudioVpsStateEvent,
 } from "./components/Studio";
 
 export { isStudioApiError } from "./components/Studio";

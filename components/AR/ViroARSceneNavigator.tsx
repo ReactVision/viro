@@ -61,6 +61,7 @@ import {
   ViroLocationAccuracyResult,
   ViroEarthTrackingStateResult,
   ViroRecordingStatus,
+  ViroRecordingOptions,
   ViroGeospatialPoseResult,
   ViroVPSAvailabilityResult,
   ViroCreateGeospatialAnchorResult,
@@ -169,6 +170,20 @@ type Props = ViewProps & {
    * @default false
    */
   depthEnabled?: boolean;
+
+  /**
+   * Asks the AR session to measure depth for recording, so
+   * `startRecording(outputDir, { depth: true })` can write it. Set it when the navigator
+   * mounts: switching depth on reconfigures the AR session, which can make tracking jump,
+   * so it is not done when recording starts. Combined with what `occlusionMode`,
+   * `depthEnabled` and `worldMeshEnabled` already ask for; it never turns their depth off.
+   *
+   * iOS: LiDAR scene depth, on devices that have it; others are unaffected.
+   *
+   * @default false
+   * @platform ios
+   */
+  depthCaptureEnabled?: boolean;
 
   /**
    * [Debug] Enable depth debug visualization to see how the depth texture is being sampled.
@@ -884,12 +899,22 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    *
    * @param outputDir - A directory that will contain video.mp4 + session.jsonl. Created if
    *                    it doesn't exist.
+   * @param options - `depth` (default false) also records the device's depth under
+   *                  `outputDir/depth/`, one frame every 100 ms, with a `depth` line per frame in
+   *                  session.jsonl. It takes effect only if the navigator was mounted with
+   *                  `depthCaptureEnabled` on a device that measures depth (iOS with LiDAR);
+   *                  otherwise the recording is made without depth and its header says
+   *                  `"depth": false`.
    * @returns Promise resolving to { success: boolean, error?: string }.
    */
-  _startRecording = async (outputDir: string) => {
+  _startRecording = async (
+    outputDir: string,
+    options?: ViroRecordingOptions
+  ) => {
     return await ViroARSceneNavigatorModule.startRecording(
       findNodeHandle(this),
-      outputDir
+      outputDir,
+      { depth: options?.depth === true }
     );
   };
 

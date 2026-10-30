@@ -2689,10 +2689,17 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     private String[] toManifestPermissions(ReadableArray permissions) {
         java.util.List<String> list = new java.util.ArrayList<>();
         for (int i = 0; i < permissions.size(); i++) {
-            switch (permissions.getString(i)) {
+            String name = permissions.getString(i);
+            if (name == null) continue;
+            switch (name) {
                 case "camera":     list.add(Manifest.permission.CAMERA); break;
                 case "microphone": list.add(Manifest.permission.RECORD_AUDIO); break;
-                case "storage":    list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE); break;
+                // Scoped storage: the permission has no effect from API 29 and is always denied.
+                case "storage":
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                    }
+                    break;
                 case "location":   list.add(Manifest.permission.ACCESS_FINE_LOCATION); break;
             }
         }
@@ -2702,7 +2709,9 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     private WritableMap buildPermissionsResult(ReadableArray permissions) {
         WritableMap result = Arguments.createMap();
         for (int i = 0; i < permissions.size(); i++) {
-            switch (permissions.getString(i)) {
+            String name = permissions.getString(i);
+            if (name == null) continue;
+            switch (name) {
                 case "camera":
                     result.putBoolean("camera", ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) == 0);
                     break;
@@ -2710,7 +2719,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     result.putBoolean("microphone", ContextCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO) == 0);
                     break;
                 case "storage":
-                    result.putBoolean("storage", ContextCompat.checkSelfPermission(mContext, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0);
+                    result.putBoolean("storage", Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                            || ContextCompat.checkSelfPermission(mContext, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0);
                     break;
                 case "location":
                     result.putBoolean("location", ContextCompat.checkSelfPermission(mContext, Manifest.permission.ACCESS_FINE_LOCATION) == 0);

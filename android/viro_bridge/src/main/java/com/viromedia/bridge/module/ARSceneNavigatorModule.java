@@ -112,6 +112,20 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         return "VRTARSceneNavigatorModule";
     }
 
+    /**
+     * The view for a tag, or null when the tag is stale. resolveView throws for
+     * tags Fabric no longer holds, which on the UI thread would crash the app
+     * and leave the caller's Promise unsettled.
+     */
+    private static View resolveViewOrNull(
+            com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver, int tag) {
+        try {
+            return viewResolver.resolveView(tag);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     @ReactMethod
     public void startVideoRecording(final int sceneNavTag, final String fileName,
                                     final boolean saveToCameraRool, final Callback reactErrorDelegate) {
@@ -123,14 +137,16 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(sceneNavTag);
+                View sceneView = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
+                    reactErrorDelegate.invoke(UNSUPPORTED_PLATFORM_ERROR);
+                    return;
                 }
                 VRTARSceneNavigator scene = (VRTARSceneNavigator) sceneView;
 
-                // Grab the recorder from the ar scene view
-                final ViroMediaRecorder recorder = scene.getARView().getRecorder();
+                // The AR view is null once the navigator has been detached
+                final ViroViewARCore arView = scene.getARView();
+                final ViroMediaRecorder recorder = arView == null ? null : arView.getRecorder();
                 if (recorder == null){
                     reactErrorDelegate.invoke(UNSUPPORTED_PLATFORM_ERROR);
                     return;
@@ -150,14 +166,16 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(sceneNavTag);
+                View sceneView = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Viro: Attempted to call startVideoRecording on a non-ARSceneNav view!");
+                    promise.resolve(MediaCapture.failure(UNSUPPORTED_PLATFORM_ERROR));
+                    return;
                 }
                 VRTARSceneNavigator scene = (VRTARSceneNavigator) sceneView;
 
-                // Grab the recorder from the ar scene view
-                final ViroMediaRecorder recorder = scene.getARView().getRecorder();
+                // The AR view is null once the navigator has been detached
+                final ViroViewARCore arView = scene.getARView();
+                final ViroMediaRecorder recorder = arView == null ? null : arView.getRecorder();
                 if (recorder == null){
                     promise.resolve(MediaCapture.failure(UNSUPPORTED_PLATFORM_ERROR));
                     return;
@@ -178,9 +196,10 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(sceneNavTag);
+                View sceneView = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(sceneView instanceof VRTARSceneNavigator)) {
-                    throw new IllegalViewOperationException("Viro: Attempted to call takeScreenshot on a non-ARSceneNav view!");
+                    promise.resolve(MediaCapture.failure(UNSUPPORTED_PLATFORM_ERROR));
+                    return;
                 }
                 VRTARSceneNavigator scene = (VRTARSceneNavigator) sceneView;
                 final ViroViewARCore arView = scene.getARView();
@@ -215,7 +234,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     sceneNavigator.resetARSession();
@@ -239,8 +258,12 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
-                if (view instanceof VRTARSceneNavigator) {
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view type");
+                    return;
+                }
+                try {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     float[] projectPoint = {0,0,0};
                     projectPoint[0] = (float)point.getDouble(0);
@@ -254,6 +277,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     writablePosArray.pushDouble(projectedPoint.y);
                     returnMap.putArray("screenPosition", writablePosArray);
                     promise.resolve(returnMap);
+                } catch (Exception e) {
+                    promise.reject("ERROR", e.getMessage(), e);
                 }
             }
         });
@@ -269,8 +294,12 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
-                if (view instanceof VRTARSceneNavigator) {
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    promise.reject("ERROR", "Invalid view type");
+                    return;
+                }
+                try {
                     VRTARSceneNavigator sceneNavigator = (VRTARSceneNavigator) view;
                     float[] unprojectPoint = {0,0,0};
                     unprojectPoint[0] = (float)point.getDouble(0);
@@ -285,6 +314,8 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                     writablePosArray.pushDouble(unProjectedPoint.z);
                     returnMap.putArray("position", writablePosArray);
                     promise.resolve(returnMap);
+                } catch (Exception e) {
+                    promise.reject("ERROR", e.getMessage(), e);
                 }
             }
         });
@@ -312,7 +343,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
@@ -362,7 +393,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);
@@ -404,7 +435,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     ((VRTARSceneNavigator) view).stopRecording();
                 }
@@ -424,7 +455,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (view instanceof VRTARSceneNavigator) {
                     promise.resolve(((VRTARSceneNavigator) view).getRecordingStatus());
                 } else {
@@ -450,7 +481,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     promise.resolve(emptyCloudAnchorStatus());
                     return;
@@ -500,7 +531,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View view = viewResolver.resolveView(sceneNavTag);
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
                 if (!(view instanceof VRTARSceneNavigator)) {
                     WritableMap result = Arguments.createMap();
                     result.putBoolean("success", false);

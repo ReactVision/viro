@@ -149,6 +149,7 @@
 - **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
 - **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
 - **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
+- **`react` is a peer dependency only.** It was also listed in `dependencies` as `~19.2.3`, so an app on React 19.0 or 19.1 got a second, nested React and hooks failed with "Invalid hook call". The peer range `>=19.0.0` is unchanged.
 
 ## v3.0.3 — 6 October 2026
 

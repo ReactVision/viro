@@ -131,6 +131,12 @@ private:
     std::map<std::string, std::shared_ptr<VROPhysicsBody>> _activePhysicsBodies;
 
     /*
+     When the last physics step ran (VROTimeCurrentSeconds), 0 before the first one. Each step
+     advances the world by the time that really passed since.
+     */
+    double _lastStepTime;
+
+    /*
      Bullet's representation of the physics world.
      */
     btDiscreteDynamicsWorld* _dynamicsWorld;

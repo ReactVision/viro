@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <vector>
 #include <memory>
+#include <functional>
 #include "VROFrameListener.h"
 #include "VROMatrix4f.h"
 #include "VROVector3f.h"
@@ -43,6 +44,7 @@ class VROFrameSynchronizer;
 class VROTexture;
 class VROPencil;
 class VROInputControllerBase;
+class VRODriver;
 enum class VROEyeType;
 
 /*
@@ -288,6 +290,24 @@ public:
         return _viewport;
     }
 
+    /*
+     Depth-only draw run by the base render pass right after it binds and clears
+     its target, before any scene geometry: whatever it writes to the depth buffer
+     hides the scene behind it. Used on Quest to cut the user's tracked hands out
+     of the projection layer so the passthrough hands show through. Empty by
+     default; the platform renderer installs it once and it gates itself.
+
+     The callback may change driver state through the VRODriver setters, but
+     must leave no shader or vertex array bound.
+     */
+    typedef std::function<void(const VRORenderContext &, std::shared_ptr<VRODriver> &)> DepthPrepass;
+    void setDepthPrepass(DepthPrepass prepass) {
+        _depthPrepass = prepass;
+    }
+    const DepthPrepass &getDepthPrepass() const {
+        return _depthPrepass;
+    }
+
 private:
     
     int _frame;
@@ -360,6 +380,11 @@ private:
      after having rendered the scene, mainly for representing debug information.
      */
     std::shared_ptr<VROPencil> _pencil;
+
+    /*
+     See setDepthPrepass().
+     */
+    DepthPrepass _depthPrepass;
 
     /*
      The input controller being used.

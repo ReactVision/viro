@@ -115,6 +115,10 @@ public:
     bool isOcclusionSupported() const override;
     bool isOcclusionModeSupported(VROOcclusionMode mode) const override;
 
+    // Depth requested for the world mesh or for recording
+    void onWorldMeshEnabled(bool enabled) override;
+    void setDepthCaptureEnabled(bool enabled) override;
+
     // Monocular depth estimation (for non-LiDAR devices, or as alternative to LiDAR)
     void setMonocularDepthEnabled(bool enabled);
     bool isMonocularDepthEnabled() const;
@@ -299,6 +303,30 @@ private:
      Whether or not the session has been paused.
      */
     bool _sessionPaused;
+
+    /*
+     Whether the world mesh asked for scene depth (set by onWorldMeshEnabled).
+     */
+    bool _worldMeshDepthNeeded = false;
+
+    /*
+     The ARFrameSemantics (as a raw mask) the session needs: the union of what
+     occlusion, the world mesh and depth capture ask for, limited to what the
+     device supports. This is the only place frameSemantics is decided.
+     */
+    NSUInteger computeNeededFrameSemantics() const;
+
+    /*
+     Set the needed frameSemantics on the world tracking configuration and, if
+     they changed, re-run it (unless paused).
+     */
+    void updateFrameSemantics();
+
+    /*
+     Runs the configuration again so a change to it takes effect, unless the session is
+     paused: run() applies the whole configuration when it resumes.
+     */
+    void rerunIfRunning();
 
     /*
      The cloud anchor provider to use for hosting/resolving cloud anchors.

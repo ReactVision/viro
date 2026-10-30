@@ -94,6 +94,7 @@ enum class VROVideoQuality {
 enum class VROImageTrackingImpl {
     ARCore,
     ARKit,
+    None,   // no image tracking (visionOS, web)
 };
 
 enum class VROCloudAnchorProvider {
@@ -138,6 +139,13 @@ enum class VROARRecordingStatus {
  */
 struct VROARRecordingConfig {
     std::string outputDir;
+
+    /*
+     Also record the device's depth under depth/ (see session.jsonl's `depth`
+     records). Only honoured when the session already has depth capture on, see
+     VROARSession::setDepthCaptureEnabled().
+     */
+    bool depth = false;
 };
 
 /*
@@ -153,6 +161,8 @@ public:
         _imageTrackingImpl = VROImageTrackingImpl::ARKit;
 #elif VRO_PLATFORM_ANDROID
         _imageTrackingImpl = VROImageTrackingImpl::ARCore;
+#else
+        _imageTrackingImpl = VROImageTrackingImpl::None;
 #endif
     }
     virtual ~VROARSession() {}
@@ -412,6 +422,20 @@ public:
      world mesh needs it (e.g. ARCore must set DepthMode::Automatic).
      */
     virtual void onWorldMeshEnabled(bool enabled) {}
+
+    /*
+     Ask the session to measure depth for recording, on devices that can. This
+     reconfigures the underlying AR session, so it should be set before a
+     recording starts rather than by it. Combined with what occlusion and the
+     world mesh need: it never turns their depth off.
+     */
+    virtual void setDepthCaptureEnabled(bool enabled) {
+        _depthCaptureEnabled = enabled;
+    }
+
+    bool isDepthCaptureEnabled() const {
+        return _depthCaptureEnabled;
+    }
 
     /*
      Get the current occlusion mode.
@@ -994,6 +1018,7 @@ private:
     VROWorldAlignment _worldAlignment;
     VROImageTrackingImpl _imageTrackingImpl;
     VROOcclusionMode _occlusionMode = VROOcclusionMode::Disabled;
+    bool _depthCaptureEnabled = false;
     VROGeospatialAnchorProvider _geospatialAnchorProvider = VROGeospatialAnchorProvider::None;
     std::shared_ptr<VROScene> _scene;
     std::weak_ptr<VROARSessionDelegate> _delegate;

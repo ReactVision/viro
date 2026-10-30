@@ -27,6 +27,7 @@
 
 #include "VROARSession.h"
 #include <functional>
+#include <atomic>
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -129,6 +130,16 @@ private:
     // Last recorded ARFrame.timestamp; drops duplicates so poses match frames 1:1.
     double _lastFrameTimestamp;
 
+    // --- Depth (ARFrame.sceneDepth on LiDAR devices; PNGs written off the AR thread) ---
+    bool _depthRequested;
+    // ARFrame.timestamp of the last depth frame taken; depth is sampled by time, not frame count.
+    double _lastDepthTimestamp;
+    int _depthCount;
+    // Serial: PNG encoding and the `depth` sidecar lines happen here, never under _stateMutex.
+    dispatch_queue_t _depthQueue;
+    // Depth frames handed to _depthQueue and not yet written; bounds memory if the disk stalls.
+    std::atomic<int> _depthPending;
+
     // --- Raw IMU tap (independent of ARKit; CMMotionManager's raw, un-fused
     // accelerometer/gyro APIs, not the fused CMDeviceMotion path) ---
     CMMotionManager *_motionManager;
@@ -176,6 +187,7 @@ private:
     void writeHeaderIfNeeded(ARFrame *frame);
     void writeImuLine(double tSec, double ax, double ay, double az, double gx, double gy, double gz);
     void writePoseLine(ARFrame *frame);
+    void recordDepth(ARFrame *frame);
     void flushBufferedLinesSorted();
     void closeSidecar();
 };

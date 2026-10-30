@@ -28,8 +28,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
+import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -38,8 +43,10 @@ final class VpsScanUpload {
     static final String KEY_REQUEST = "request";
     static final String KEY_RESULT = "result";
 
-    /** The two files of a ViroReact AR recording, in the order they go in the zip. */
+    /** The files every ViroReact AR recording has, in the order they go in the zip. */
     private static final String[] RECORDING_FILES = {"session.jsonl", "video.mp4"};
+    /** Holds the PNGs of a recording made with depth; the files inside go in the zip after the others. */
+    private static final String DEPTH_DIR = "depth";
     private static final String UPLOADS_DIR = "viro-vps-uploads";
     private static final long ZIP_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000;
     private static final String WORK_NAME_PREFIX = "viro-vps-upload-";
@@ -63,7 +70,7 @@ final class VpsScanUpload {
 
         File zip = new File(uploads, UUID.randomUUID() + ".zip");
         try {
-            writeZip(zip, dir);
+            writeZip(zip, dir, recordingEntries(dir));
         } catch (IOException e) {
             zip.delete();
             return zipFailure(String.valueOf(e.getMessage()));
@@ -230,19 +237,54 @@ final class VpsScanUpload {
     }
 
     /**
+     * The zip entry names of a recording: its fixed files, then whatever depth/ holds, in
+     * name order.
+     */
+    private static List<String> recordingEntries(File dir) {
+        List<String> names = new ArrayList<>(Arrays.asList(RECORDING_FILES));
+        File[] depthFiles = new File(dir, DEPTH_DIR).listFiles();
+        if (depthFiles != null) {
+            List<String> depthNames = new ArrayList<>();
+            for (File f : depthFiles) {
+                if (f.isFile()) depthNames.add(DEPTH_DIR + "/" + f.getName());
+            }
+            Collections.sort(depthNames);
+            names.addAll(depthNames);
+        }
+        return names;
+    }
+
+    private static long crc32(File f, byte[] buf) throws IOException {
+        CRC32 crc = new CRC32();
+        try (InputStream in = new FileInputStream(f)) {
+            int n;
+            while ((n = in.read(buf)) != -1) crc.update(buf, 0, n);
+        }
+        return crc.getValue();
+    }
+
+    /**
      * Streams each file through a fixed buffer. video.mp4 is already
      * compressed, so it goes in with compression level 0; session.jsonl is
-     * text and deflates well.
+     * text and deflates well. The depth PNGs are compressed too, and numerous,
+     * so they are stored outright: a stored entry needs its size and CRC-32
+     * before its data, hence the extra read of each.
      */
-    private static void writeZip(File zip, File dir) throws IOException {
+    private static void writeZip(File zip, File dir, List<String> names) throws IOException {
         byte[] buf = new byte[64 * 1024];
         try (ZipOutputStream zos = new ZipOutputStream(
                 new BufferedOutputStream(new FileOutputStream(zip), 64 * 1024))) {
-            for (String name : RECORDING_FILES) {
+            for (String name : names) {
                 File f = new File(dir, name);
                 zos.setLevel(name.endsWith(".mp4") ? Deflater.NO_COMPRESSION : Deflater.DEFAULT_COMPRESSION);
                 ZipEntry entry = new ZipEntry(name);
                 entry.setTime(f.lastModified());
+                if (name.endsWith(".png")) {
+                    entry.setMethod(ZipEntry.STORED);
+                    entry.setSize(f.length());
+                    entry.setCompressedSize(f.length());
+                    entry.setCrc(crc32(f, buf));
+                }
                 zos.putNextEntry(entry);
                 try (InputStream in = new FileInputStream(f)) {
                     int n;

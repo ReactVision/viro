@@ -1521,9 +1521,23 @@ RCT_EXPORT_METHOD(rvGetVPSLocalization:(nonnull NSNumber *)reactTag
 
 #pragma mark - VPS scan upload
 
-// The two files of a ViroReact AR recording, in the order they go in the zip.
-static NSArray<NSString *> *RVScanRecordingFiles(void) {
-    return @[@"session.jsonl", @"video.mp4"];
+// The files of a ViroReact AR recording, in the order they go in the zip: the
+// two every recording has, then whatever depth/ holds, in name order. The depth
+// PNGs are already compressed, so they go in stored like everything else here.
+static NSArray<NSString *> *RVScanRecordingFiles(NSString *dir) {
+    NSMutableArray<NSString *> *names = [@[@"session.jsonl", @"video.mp4"] mutableCopy];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *depthNames = [[fm contentsOfDirectoryAtPath:[dir stringByAppendingPathComponent:@"depth"]
+                                                               error:nil]
+                                          sortedArrayUsingSelector:@selector(compare:)];
+    for (NSString *depthName in depthNames) {
+        NSString *name = [@"depth" stringByAppendingPathComponent:depthName];
+        BOOL isDir = NO;
+        if ([fm fileExistsAtPath:[dir stringByAppendingPathComponent:name] isDirectory:&isDir] && !isDir) {
+            [names addObject:name];
+        }
+    }
+    return names;
 }
 
 static void RVPutLE16(uint8_t *p, uint32_t v) {
@@ -1547,6 +1561,10 @@ static void RVPutLE32(uint8_t *p, uint32_t v) {
 // Returns nil on success, or why it failed; a partial zip is removed.
 static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSString *> *names) {
     NSFileManager *fm = [NSFileManager defaultManager];
+    // The end record counts entries in 16 bits and there is no zip64.
+    if (names.count > 0xFFFF) {
+        return @"The recording has too many files to upload";
+    }
     std::vector<uint64_t> sizes;
     uint64_t total = 22;
     for (NSString *name in names) {
@@ -1687,7 +1705,8 @@ static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSSt
     return failure;
 }
 
-// Zips a ViroReact AR recording (session.jsonl + video.mp4 in outputDir) into
+// Zips a ViroReact AR recording (session.jsonl + video.mp4, and depth/ if it has
+// one, in outputDir) into
 // the uploads directory, where it survives the app being suspended or
 // relaunched until rvTransferScanRecording sends it. Resolves a JSON string:
 // {success: true, path, bytes} or {success: false, stage: "zip", error}.
@@ -1707,7 +1726,7 @@ RCT_EXPORT_METHOD(rvPrepareScanRecording:(NSString *)outputDir
             resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": dirError ?: @""}));
             return;
         }
-        NSString *zipError = RVWriteStoredZip(zipPath, outputDir, RVScanRecordingFiles());
+        NSString *zipError = RVWriteStoredZip(zipPath, outputDir, RVScanRecordingFiles(outputDir));
         if (zipError) {
             resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": zipError}));
             return;

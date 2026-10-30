@@ -137,13 +137,21 @@ export function useViroColocation(
       if (!ok || !enabled || !roomId) return;
 
       activeRoom.current = roomId;
-      const result = await joinColocation({
-        roomId,
-        apiKey,
-        projectId,
-        endpoint,
-        credentials: credentialsRef.current,
-      } as ViroColocationConfig);
+      let result: Awaited<ReturnType<typeof joinColocation>>;
+      try {
+        result = await joinColocation({
+          roomId,
+          apiKey,
+          projectId,
+          endpoint,
+          credentials: credentialsRef.current,
+        } as ViroColocationConfig);
+      } catch (e) {
+        if (cancelled || activeRoom.current !== roomId) return;
+        setError(e instanceof Error ? e.message : String(e));
+        setState("failed");
+        return;
+      }
       if (cancelled || activeRoom.current !== roomId) return;
 
       if (!result.success) {
@@ -153,19 +161,30 @@ export function useViroColocation(
       }
       setError(undefined);
 
+      // A poll that is still waiting on native holds the next ones back, so a
+      // slow bridge does not stack calls.
+      let polling = false;
       timer = setInterval(async () => {
-        const [s, p] = await Promise.all([
-          getColocationState(),
-          getColocationPeers(),
-        ]);
-        if (cancelled || activeRoom.current !== roomId) return;
-        setState(s.state);
-        setLocalPeerId(s.localPeerId);
-        setPeers((prev) => (samePeers(prev, p) ? prev : p));
+        if (polling) return;
+        polling = true;
+        try {
+          const [s, p] = await Promise.all([
+            getColocationState(),
+            getColocationPeers(),
+          ]);
+          if (cancelled || activeRoom.current !== roomId) return;
+          setState(s.state);
+          setLocalPeerId(s.localPeerId);
+          setPeers((prev) => (samePeers(prev, p) ? prev : p));
+        } catch {
+          // The next poll reads the state again.
+        } finally {
+          polling = false;
+        }
       }, pollMs);
     };
 
-    run();
+    run().catch(() => {});
 
     return () => {
       cancelled = true;
@@ -173,7 +192,7 @@ export function useViroColocation(
       if (timer) clearInterval(timer);
       // Leaving on unmount is right even mid-join: the native session is
       // process-wide, so a stale membership would outlive the component.
-      leaveColocation();
+      leaveColocation().catch(() => {});
       setPeers([]);
       setLocalPeerId("");
       setState("idle");

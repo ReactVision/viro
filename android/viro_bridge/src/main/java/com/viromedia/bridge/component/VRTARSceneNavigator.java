@@ -223,6 +223,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             if (mFrontCameraEnabled) {
                 ((VRTARScene) child).setFrontCameraEnabled(true);
             }
+            if (mDepthCaptureEnabled) {
+                ((VRTARScene) child).setDepthCaptureEnabled(true);
+            }
         }
     }
 
@@ -1619,7 +1622,9 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
     public void setDepthCaptureEnabled(boolean enabled) {
         mDepthCaptureEnabled = enabled;
         if (getCurrentARScene() == null) {
-            mNeedsDepthCaptureToggle = true;
+            // Nothing to turn off on a session that has not started; a scene added later
+            // gets the value when it is added.
+            mNeedsDepthCaptureToggle = enabled;
             return;
         }
         applyDepthCaptureEnabled();
@@ -1632,6 +1637,13 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
             return;
         }
         arScene.setDepthCaptureEnabled(mDepthCaptureEnabled);
+        // Keeps what a scene applies when it appears in step with the prop.
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof VRTARScene) {
+                ((VRTARScene) child).setDepthCaptureEnabled(mDepthCaptureEnabled);
+            }
+        }
         mNeedsDepthCaptureToggle = false;
     }
 

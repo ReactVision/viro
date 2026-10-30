@@ -469,12 +469,27 @@ RCT_EXPORT_METHOD(hostCloudAnchor:(nonnull NSNumber *)reactTag
 
 #pragma mark - AR Session Recording Methods
 
+// React Native checks the argument count of a bridge call, so the call without options and
+// the one with them are two methods.
 RCT_EXPORT_METHOD(startRecording:(nonnull NSNumber *)reactTag
                         outputDir:(NSString *)outputDir
-                          options:(NSDictionary *)options
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject) {
-    BOOL depth = [options[@"depth"] boolValue];
+    [self rv_startRecording:reactTag outputDir:outputDir depth:NO resolve:resolve];
+}
+
+RCT_EXPORT_METHOD(startRecordingWithOptions:(nonnull NSNumber *)reactTag
+                                  outputDir:(NSString *)outputDir
+                                    options:(NSDictionary *)options
+                                    resolve:(RCTPromiseResolveBlock)resolve
+                                     reject:(RCTPromiseRejectBlock)reject) {
+    [self rv_startRecording:reactTag outputDir:outputDir depth:[options[@"depth"] boolValue] resolve:resolve];
+}
+
+- (void)rv_startRecording:(NSNumber *)reactTag
+                outputDir:(NSString *)outputDir
+                    depth:(BOOL)depth
+                  resolve:(RCTPromiseResolveBlock)resolve {
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         @try {
             VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
@@ -1530,15 +1545,27 @@ RCT_EXPORT_METHOD(rvGetVPSLocalization:(nonnull NSNumber *)reactTag
 #pragma mark - VPS scan upload
 
 // The files of a ViroReact AR recording, in the order they go in the zip: the
-// two every recording has, then whatever depth/ holds, in name order. The depth
-// PNGs are already compressed, so they go in stored like everything else here.
-static NSArray<NSString *> *RVScanRecordingFiles(NSString *dir) {
+// two every recording has, then the PNGs depth/ holds, in name order. A missing
+// depth/ is a recording made without depth; one that cannot be read sets `error`
+// and returns nil. The depth PNGs are already compressed, so they go in stored
+// like everything else here.
+static NSArray<NSString *> *RVScanRecordingFiles(NSString *dir, NSString **error) {
     NSMutableArray<NSString *> *names = [@[@"session.jsonl", @"video.mp4"] mutableCopy];
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray<NSString *> *depthNames = [[fm contentsOfDirectoryAtPath:[dir stringByAppendingPathComponent:@"depth"]
-                                                               error:nil]
-                                          sortedArrayUsingSelector:@selector(compare:)];
-    for (NSString *depthName in depthNames) {
+    NSString *depthDir = [dir stringByAppendingPathComponent:@"depth"];
+    BOOL depthIsDir = NO;
+    if (![fm fileExistsAtPath:depthDir isDirectory:&depthIsDir]) return names;
+    NSError *readError = nil;
+    NSArray<NSString *> *depthNames = depthIsDir ? [fm contentsOfDirectoryAtPath:depthDir error:&readError] : nil;
+    if (!depthNames) {
+        if (error) {
+            *error = [NSString stringWithFormat:@"Could not read %@: %@", depthDir,
+                      readError.localizedDescription ?: @"not a directory"];
+        }
+        return nil;
+    }
+    for (NSString *depthName in [depthNames sortedArrayUsingSelector:@selector(compare:)]) {
+        if (![depthName.pathExtension isEqualToString:@"png"]) continue;
         NSString *name = [@"depth" stringByAppendingPathComponent:depthName];
         BOOL isDir = NO;
         if ([fm fileExistsAtPath:[dir stringByAppendingPathComponent:name] isDirectory:&isDir] && !isDir) {
@@ -1571,7 +1598,7 @@ static NSString *RVWriteStoredZip(NSString *zipPath, NSString *dir, NSArray<NSSt
     NSFileManager *fm = [NSFileManager defaultManager];
     // The end record counts entries in 16 bits and there is no zip64.
     if (names.count > 0xFFFF) {
-        return @"The recording has too many files to upload";
+        return @"The recording has too many files to upload (depth frames are two files each, so about 54 minutes of depth at most)";
     }
     std::vector<uint64_t> sizes;
     uint64_t total = 22;
@@ -1734,7 +1761,9 @@ RCT_EXPORT_METHOD(rvPrepareScanRecording:(NSString *)outputDir
             resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": dirError ?: @""}));
             return;
         }
-        NSString *zipError = RVWriteStoredZip(zipPath, outputDir, RVScanRecordingFiles(outputDir));
+        NSString *zipError = nil;
+        NSArray<NSString *> *files = RVScanRecordingFiles(outputDir, &zipError);
+        if (files) zipError = RVWriteStoredZip(zipPath, outputDir, files);
         if (zipError) {
             resolve(RVJsonString(@{@"success": @NO, @"stage": @"zip", @"error": zipError}));
             return;

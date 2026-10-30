@@ -53,6 +53,11 @@ export type VRModuleOpenXRType = {
   /** CL-H: recover the frame another headset published to that group. */
   rvJoinSharedFrame?: (viewTag: number, groupId: string) => Promise<VRSharedFrameResult>;
   setPassthroughEnabled?: (viewTag: number, enabled: boolean) => void;
+  /**
+   * Toggle passthrough hand occlusion on the running VR scene. Only draws
+   * while passthrough and hand tracking are both on.
+   */
+  setHandOcclusion?: (viewTag: number, enabled: boolean) => void;
   setPassthroughStyle?: (
     viewTag: number,
     opacity: number,

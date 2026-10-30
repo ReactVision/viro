@@ -96,6 +96,8 @@ final class VpsScanUpload {
             problem = "Missing scan_id or complete_url";
         } else if (putUrl != null && (zipPath == null || request.optLong("bytes", 0) <= 0)) {
             problem = "Missing zip_path or bytes";
+        } else if (!isAllowedUrl(putUrl) || !isAllowedUrl(string(request, "complete_url"))) {
+            problem = "Upload URLs must be https";
         }
         if (problem != null) {
             deletePreparedZip(appContext, zipPath);
@@ -164,6 +166,41 @@ final class VpsScanUpload {
 
     static File uploadsDir(Context context) {
         return new File(context.getFilesDir(), UPLOADS_DIR);
+    }
+
+    /**
+     * https only, except for localhost and private LAN hosts, which local
+     * development servers use. A null URL is allowed: put_url is optional.
+     */
+    static boolean isAllowedUrl(String url) {
+        if (url == null) return true;
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            String scheme = uri.getScheme();
+            if ("https".equalsIgnoreCase(scheme)) return true;
+            if (!"http".equalsIgnoreCase(scheme)) return false;
+            String host = uri.getHost();
+            if (host == null) return false;
+            host = host.toLowerCase(java.util.Locale.ROOT);
+            return host.equals("localhost") || host.equals("[::1]") || host.endsWith(".local")
+                    || host.matches("127\\.\\d+\\.\\d+\\.\\d+")
+                    || host.matches("10\\.\\d+\\.\\d+\\.\\d+")
+                    || host.matches("192\\.168\\.\\d+\\.\\d+")
+                    || host.matches("172\\.(1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+");
+        } catch (java.net.URISyntaxException e) {
+            return false;
+        }
+    }
+
+    /** The zip at {@code path} when it lies directly in the uploads directory, else null. */
+    static File uploadZip(Context context, String path) {
+        if (path == null || path.isEmpty()) return null;
+        try {
+            File zip = new File(path).getCanonicalFile();
+            return uploadsDir(context).getCanonicalFile().equals(zip.getParentFile()) ? zip : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /** The path comes from JS, so nothing outside the uploads directory is ever deleted. */

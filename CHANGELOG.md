@@ -149,6 +149,13 @@
 - **`Viro360Image` takes `stereoMode`.** Its type declared `steroMode`, which both bridges ignore, so the correct name failed type-checking. `steroMode` stays as a deprecated alias and is now applied. (#579)
 - **`rvCreateSharedFrame` / `rvJoinSharedFrame` resolve `{ success: false }` outside Quest** instead of throwing `TypeError`. (#580)
 - **Sounds seek to fractional seconds.** `seekToTime` on `ViroSound`, `ViroSpatialSound` and `ViroSoundField` truncated to whole seconds in both bridges. (#581)
+- **The scene navigators keep the `style` prop.** `ViroARSceneNavigator`, `Viro3DSceneNavigator`, `ViroVRSceneNavigator` and `ViroSceneNavigator` dropped it through a comma expression; it now merges after the container style.
+- **`replace("key")` on the top scene no longer throws.** Naming the top scene without passing its definition released it and then re-added it with none, so rendering failed with a `TypeError`.
+- **Scene state no longer leaks between scenes on pop or replace.** The scene stack is no longer modified in place, and scenes are keyed by their tag, not their position, so React no longer hands a scene the instance of its neighbour.
+- **The navigators no longer modify `viroAppProps`.** `rootTag` is removed from a copy, so a frozen object (Redux, immer) no longer throws.
+- **A scene's `passProps` cannot replace `arSceneNavigator` (`ViroARSceneNavigator`).**
+- **`ViroARSceneNavigator` honours `cloudAnchorProvider` and `geospatialAnchorProvider`** when `provider` is not set; they were always overridden with `reactvision`.
+- **Deprecation warnings (`ViroSceneNavigator`, `ViroARScene.onTrackingInitialized`, `Viro3DObject.highAccuracyGaze`) are logged once** instead of on every render, and the default `ViroSceneContext` no longer logs on every camera change.
 
 ## v3.0.3 — 6 October 2026
 

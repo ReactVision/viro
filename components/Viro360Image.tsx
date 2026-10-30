@@ -37,6 +37,11 @@ type Props = ViewProps & {
   source: ImageSourcePropType;
   rotation?: ViroRotation;
   format?: "RGBA8" | "RGB565";
+  stereoMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
+  /**
+   * @deprecated The misspelling this type used to declare, which both platforms ignored. It is
+   * applied as `stereoMode` when that is not given; use `stereoMode`.
+   */
   steroMode?: "LeftRight" | "RightLeft" | "TopBottom" | "BottomTop" | "None";
   isHdr?: boolean;
   /**
@@ -99,6 +104,10 @@ export class Viro360Image extends React.Component<Props> {
     // Create native props object.
     let nativeProps = Object.assign({} as any, this.props);
     nativeProps.source = imgsrc;
+    if (nativeProps.stereoMode === undefined && nativeProps.steroMode !== undefined) {
+      nativeProps.stereoMode = nativeProps.steroMode;
+    }
+    delete nativeProps.steroMode;
     nativeProps.onErrorViro = this._onError;
     nativeProps.onLoadStartViro = this._onLoadStart;
     nativeProps.onLoadEndViro = this._onLoadEnd;

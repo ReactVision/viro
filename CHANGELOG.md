@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Changed
+
+- **`ViroVPSScan.quality` is typed (`ViroVPSScanQuality`) and carries `mesh_confidence` (`ViroVPSMeshConfidence`).** The backend scores how far to trust a scan's mesh: `good`, `fair` or `poor`, with `reasons` for whoever recorded (blank walls, a fast sweep, a track that jumped) and the signals behind them. It never decides whether the map is accepted, and is null without a mesh or on an older backend. The known measures keep their number types and `server_only` is a boolean; other keys read as `unknown` instead of `number | null`. `ViroVPSMapDownload.quality` has the same type. Both types are exported.
+
 ## v3.1.0 — 27 October 2026
 
 ### Added

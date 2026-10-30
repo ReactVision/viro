@@ -120,7 +120,8 @@ static NSString * const kRVWatermarkURL =
 
 - (void)setVideoQuality:(NSString *)videoQuality {
     _videoQuality = videoQuality;
-    if ([videoQuality caseInsensitiveCompare:@"Low"] == NSOrderedSame) {
+    // [nil caseInsensitiveCompare:] returns NSOrderedSame, so nil must be excluded explicitly.
+    if (videoQuality != nil && [videoQuality caseInsensitiveCompare:@"Low"] == NSOrderedSame) {
         _vroVideoQuality = VROVideoQuality::Low;
     } else {
         _vroVideoQuality = VROVideoQuality::High;
@@ -875,7 +876,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         VROViewAR *viewAR = (VROViewAR *) _vroView;
         std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
         if (arSession) {
-            if ([cloudAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
+            if (cloudAnchorProvider != nil && [cloudAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::ARCore);
                 RCTLogInfo(@"[ViroAR] ARCore Cloud Anchors provider enabled");
 
@@ -886,7 +887,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
                 } else {
                     RCTLogWarn(@"[ViroAR] WARNING: GARAPIKey not found in Info.plist. Cloud anchors will not work!");
                 }
-            } else if ([cloudAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
+            } else if (cloudAnchorProvider != nil && [cloudAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
                 arSession->setCloudAnchorProvider(VROCloudAnchorProvider::ReactVision);
                 RCTLogInfo(@"[ViroAR] ReactVision Cloud Anchors provider enabled");
 
@@ -1142,7 +1143,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
         VROViewAR *viewAR = (VROViewAR *) _vroView;
         std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
         if (arSession) {
-            if ([geospatialAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
+            if (geospatialAnchorProvider != nil && [geospatialAnchorProvider caseInsensitiveCompare:@"arcore"] == NSOrderedSame) {
                 arSession->setGeospatialAnchorProvider(VROGeospatialAnchorProvider::ARCoreGeospatial);
                 RCTLogInfo(@"[ViroAR] ARCore Geospatial provider enabled");
 
@@ -1153,7 +1154,7 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
                 } else {
                     RCTLogWarn(@"[ViroAR] WARNING: GARAPIKey not found in Info.plist. Geospatial features will not work!");
                 }
-            } else if ([geospatialAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
+            } else if (geospatialAnchorProvider != nil && [geospatialAnchorProvider caseInsensitiveCompare:@"reactvision"] == NSOrderedSame) {
                 arSession->setGeospatialAnchorProvider(VROGeospatialAnchorProvider::ReactVision);
                 RCTLogInfo(@"[ViroAR] ReactVision Geospatial provider enabled");
 

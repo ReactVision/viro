@@ -23,6 +23,7 @@ import {
   View,
   ViewProps,
 } from "react-native";
+import { withoutRootTag } from "../Utilities/ViroAppProps";
 import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import {
@@ -304,6 +305,16 @@ type Props = ViewProps & {
    * @platform ios,android
    */
   provider?: ViroProvider;
+
+  /**
+   * @deprecated Use `provider`. Only used when `provider` is not set.
+   */
+  cloudAnchorProvider?: ViroProvider;
+
+  /**
+   * @deprecated Use `provider`. Only used when `provider` is not set.
+   */
+  geospatialAnchorProvider?: ViroProvider;
 
   /**
    * Enable world mesh for physics collision with real-world surfaces.
@@ -612,6 +623,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       sceneKey = this.getRandomTag();
     }
 
+    // The scene being replaced is released below, so keep its definition for
+    // when the same key is re-added.
+    if (scene == undefined) {
+      scene = this.state.sceneDictionary[sceneKey]?.sceneClass;
+    }
+
     // Pop 1 off the scene history (do not use popN because in this case we allow
     // popping the root), then push this scene
     this.decrementReferenceForLastNScenes(1);
@@ -712,33 +729,21 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     sceneKey: string,
     limitOne: boolean
   ) => {
-    const currentSceneDictionary = this.state.sceneDictionary;
-    if (!(sceneKey in currentSceneDictionary)) {
-      const newScene = {
+    this.setState((prev) => {
+      const sceneDictionary = { ...prev.sceneDictionary };
+      const existing = sceneDictionary[sceneKey] ?? {
         sceneClass: scene,
         tag: sceneKey,
         referenceCount: 0,
       };
-      currentSceneDictionary[sceneKey] = newScene;
-    }
 
-    // Error out if there are no scenes matching the given sceneKey
-    const currentScene = currentSceneDictionary[sceneKey];
-    if (currentScene == null || currentScene == undefined) {
-      console.log("ERROR: No scene found for: " + sceneKey);
-      return;
-    }
-
-    // Update the scene's reference count and then the sceneDictionary
-    if ((limitOne && currentScene.referenceCount < 1) || !limitOne) {
-      currentScene.referenceCount++;
-    }
-
-    currentSceneDictionary[sceneKey] = currentScene;
-
-    // Finally update all states
-    this.setState({
-      sceneDictionary: currentSceneDictionary,
+      // Update the scene's reference count and then the sceneDictionary
+      const referenceCount =
+        limitOne && existing.referenceCount >= 1
+          ? existing.referenceCount
+          : existing.referenceCount + 1;
+      sceneDictionary[sceneKey] = { ...existing, referenceCount };
+      return { sceneDictionary };
     });
   };
 
@@ -750,24 +755,31 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param n number to decrement by.
    */
   decrementReferenceForLastNScenes = (n: number) => {
-    const { sceneHistory, sceneDictionary } = this.state;
-
-    // Now update and release any reference counts
-    for (let i = 1; i <= n; i++) {
-      const sceneTag = sceneHistory[sceneHistory.length - i];
-      const scene = sceneDictionary[sceneTag];
-      scene.referenceCount--;
-
-      if (scene.referenceCount <= 0) {
-        delete sceneDictionary[sceneTag];
-      } else {
-        sceneDictionary[sceneTag] = scene;
+    this.setState((prev) => {
+      const { sceneHistory } = prev;
+      // the root never pops: two pops queued in one tick both passed popN's
+      // guard on the same stale state, so count against the history as it is now
+      const k = Math.min(n, sceneHistory.length - 1);
+      if (k <= 0) {
+        return null;
       }
-    }
+      const sceneDictionary = { ...prev.sceneDictionary };
 
-    // Finally update all states
-    this.setState({
-      sceneDictionary: sceneDictionary,
+      // Now update and release any reference counts
+      for (let i = 1; i <= k; i++) {
+        const sceneTag = sceneHistory[sceneHistory.length - i];
+        const scene = sceneDictionary[sceneTag];
+        if (scene == undefined) {
+          continue;
+        }
+        const referenceCount = scene.referenceCount - 1;
+        if (referenceCount <= 0) {
+          delete sceneDictionary[sceneTag];
+        } else {
+          sceneDictionary[sceneTag] = { ...scene, referenceCount };
+        }
+      }
+      return { sceneDictionary };
     });
   };
 
@@ -778,12 +790,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param sceneKey scene to insert into the stack.
    */
   addToHistory = (sceneKey: string) => {
-    const updatedHistory = this.state.sceneHistory.concat([sceneKey]);
-    const currentIndex = this.getSceneIndex(sceneKey);
-    this.setState({
-      currentSceneIndex: currentIndex,
-      sceneHistory: updatedHistory,
-    });
+    this.setState((prev) => ({
+      currentSceneIndex: this.getSceneIndex(sceneKey, prev.sceneDictionary),
+      sceneHistory: prev.sceneHistory.concat([sceneKey]),
+    }));
   };
 
   /**
@@ -795,21 +805,21 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param sceneKey scene to put at the top of the stack.
    */
   reorderHistory = (sceneKey: string) => {
-    // Find the last sceneKey within sceneHistory and remove it.
-    const { sceneHistory } = this.state;
-    for (let i = sceneHistory.length - 1; i >= 0; i--) {
-      if (sceneKey == sceneHistory[i]) {
-        sceneHistory.splice(i, 1);
-        break;
+    this.setState((prev) => {
+      // Find the last sceneKey within sceneHistory and remove it.
+      const sceneHistory = [...prev.sceneHistory];
+      for (let i = sceneHistory.length - 1; i >= 0; i--) {
+        if (sceneKey == sceneHistory[i]) {
+          sceneHistory.splice(i, 1);
+          break;
+        }
       }
-    }
 
-    // Add back the sceneKey to the front of the History stack.
-    const updatedHistory = sceneHistory.concat([sceneKey]);
-    const currentIndex = this.getSceneIndex(sceneKey);
-    this.setState({
-      currentSceneIndex: currentIndex,
-      sceneHistory: updatedHistory,
+      // Add back the sceneKey to the front of the History stack.
+      return {
+        currentSceneIndex: this.getSceneIndex(sceneKey, prev.sceneDictionary),
+        sceneHistory: sceneHistory.concat([sceneKey]),
+      };
     });
   };
 
@@ -819,16 +829,20 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param n number of history entries to pop.
    */
   popHistoryByN(n: number) {
-    const { sceneHistory } = this.state;
-    sceneHistory.splice(sceneHistory.length - n, n);
-    const currentIndex = this.getSceneIndex(
-      sceneHistory[sceneHistory.length - 1]
-    );
-
-    // Finally update all states
-    this.setState({
-      currentSceneIndex: currentIndex,
-      sceneHistory: sceneHistory,
+    this.setState((prev) => {
+      const k = Math.min(n, prev.sceneHistory.length - 1);
+      if (k <= 0) {
+        return null;
+      }
+      const sceneHistory = [...prev.sceneHistory];
+      sceneHistory.splice(sceneHistory.length - k, k);
+      return {
+        currentSceneIndex: this.getSceneIndex(
+          sceneHistory[sceneHistory.length - 1],
+          prev.sceneDictionary
+        ),
+        sceneHistory,
+      };
     });
   }
 
@@ -838,8 +852,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param sceneTag tag of the scene
    * @returns the index of the scene
    */
-  getSceneIndex = (sceneTag: string) => {
-    const { sceneDictionary } = this.state;
+  getSceneIndex = (
+    sceneTag: string,
+    sceneDictionary = this.state.sceneDictionary
+  ) => {
     let i = 0;
     for (const sceneKey in sceneDictionary) {
       if (sceneTag == sceneDictionary[sceneKey].tag) {
@@ -1966,11 +1982,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       const props = sceneDictionary[scene].sceneClass.passProps;
       views.push(
         <Component
-          key={"scene" + i}
+          key={sceneDictionary[scene].tag}
+          {...props}
           sceneNavigator={this.sceneNavigator}
-          {...props}
           arSceneNavigator={this.arSceneNavigator}
-          {...props}
         />
       );
       i++;
@@ -2199,22 +2214,18 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     const items = this._renderSceneStackItems();
 
     // update the arSceneNavigator with the latest given props on every render
-    this.arSceneNavigator.viroAppProps = this.props.viroAppProps;
-    this.sceneNavigator.viroAppProps = this.props.viroAppProps;
-
     // If the user simply passes us the props from the root React component,
     // then we'll have an extra 'rootTag' key which React automatically includes
-    // so remove it.
-    if (this.arSceneNavigator.viroAppProps?.rootTag) {
-      delete this.arSceneNavigator.viroAppProps?.rootTag;
-    }
-    if (this.sceneNavigator.viroAppProps?.rootTag) {
-      delete this.sceneNavigator.viroAppProps?.rootTag;
-    }
+    // so remove it from a copy, leaving the user's object untouched.
+    const appProps = withoutRootTag(this.props.viroAppProps);
+    this.arSceneNavigator.viroAppProps = appProps;
+    this.sceneNavigator.viroAppProps = appProps;
 
     const {
-      viroAppProps = {},
-      provider = "reactvision",
+      viroAppProps: _viroAppProps,
+      provider,
+      cloudAnchorProvider,
+      geospatialAnchorProvider,
       ...restProps
     } = this.props;
 
@@ -2224,11 +2235,13 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
           this._component = component;
         }}
         {...restProps}
-        cloudAnchorProvider={provider}
-        geospatialAnchorProvider={provider}
-        viroAppProps={viroAppProps}
+        cloudAnchorProvider={provider ?? cloudAnchorProvider ?? "reactvision"}
+        geospatialAnchorProvider={
+          provider ?? geospatialAnchorProvider ?? "reactvision"
+        }
+        viroAppProps={appProps ?? {}}
         currentSceneIndex={this.state.currentSceneIndex}
-        style={(this.props.style, styles.container)}
+        style={[styles.container, this.props.style]}
         key={this.state.internalRemountKey}
         onTabSwitch={this._onTabSwitch}
       >

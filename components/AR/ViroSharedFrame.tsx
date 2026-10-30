@@ -145,16 +145,13 @@ export class ViroSharedFrame extends React.Component<ViroSharedFrameProps, State
     this._cancelAcquire();
   }
 
-  // Native keeps resolving after the JS side stopped caring, so what is in
-  // flight is asked to stop.
+  // Stop caring about what is in flight: _generation makes a late result a
+  // no-op. Native can only cancel every cloud anchor operation on the
+  // navigator, which would also stop a host or resolve another component or
+  // the app started, so it is left to finish.
   _cancelAcquire = () => {
     if (!this._acquiring) return;
     this._acquiring = false;
-    try {
-      this.props.arSceneNavigator?.cancelCloudAnchorOperations?.();
-    } catch {
-      // Nothing more to do for an operation that cannot be cancelled.
-    }
   };
 
   _clearRetry = () => {

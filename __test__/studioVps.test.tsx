@@ -952,6 +952,8 @@ describe("studioVpsEndpointAllowed", () => {
     "http://192.168.1.20:8788/",
     "http://[::1]:8788",
     "http://[fd12:3456::1]:8788",
+    "http://100.86.46.127:8788",
+    "http://vps-lab.local:8788",
   ])("allows %s", (endpoint) => {
     expect(studioVpsEndpointAllowed(endpoint)).toBe(true);
   });
@@ -967,6 +969,9 @@ describe("studioVpsEndpointAllowed", () => {
     "http://user@localhost@vps.example.com",
     "http://vps.example.com\\@localhost",
     "http://[2001:db8::1]",
+    "http://100.128.0.1",
+    "http://local.example.com",
+    "http://lab.local.example.com",
     "ws://localhost:8788",
     "vps.example.test",
     "https://",

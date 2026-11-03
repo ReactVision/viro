@@ -123,6 +123,15 @@ export type ViroVPSScan = {
   status: "awaiting_upload" | "queued" | "processing" | "succeeded" | "failed";
   stage: string | null;
   error: string | null;
+  /** What was asked for besides the map, as `options.outputs`. */
+  outputs: ViroVPSScanOutput[];
+  /**
+   * The mesh quality asked for; null builds `medium`, and a merge's is always
+   * null. Absent from servers older than mesh quality.
+   */
+  mesh_quality?: ViroVPSMeshQuality | null;
+  /** Whether Studio keeps the recording once the scan is processed. */
+  keep_recording: boolean;
   recording_bytes: number | null;
   assets: string[];
   /**
@@ -147,7 +156,15 @@ export type ViroVPSScan = {
   merged_scan_ids?: string[] | null;
   map_accepted: boolean | null;
   map_rejected_reason: string | null;
+  /** The app user the scan belongs to (`appUserId`), null when it is shared. */
+  app_user_id: string | null;
   created_at: number;
+  /** When it last became `queued`, after its upload or after its processing was cut off. */
+  queued_at: number | null;
+  /** When processing last started; null again once it goes back to `queued`. */
+  started_at: number | null;
+  /** When it succeeded or failed. */
+  finished_at: number | null;
   updated_at: number;
 };
 
@@ -403,4 +420,18 @@ export async function getScan(scanId: string, connection?: ViroVPSConnection): P
     {},
     vpsJson
   )) as ViroVPSScan;
+}
+
+/**
+ * `DELETE /vps/scans/{id}`: deletes the scan and its files. Deleting a
+ * location's active scan makes its newest remaining accepted scan the active
+ * one, or leaves it with no map.
+ */
+export async function deleteScan(scanId: string, connection?: ViroVPSConnection): Promise<void> {
+  await vpsStudioFetch(
+    await resolveVPSStudio(connection),
+    `/vps/scans/${encodeURIComponent(scanId)}`,
+    { method: "DELETE" },
+    vpsJson
+  );
 }

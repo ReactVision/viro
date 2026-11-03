@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- **Capture guidance for recording a place (`createViroCaptureGuidance`, `useViroCaptureGuidance`).** Live hints while an AR recording is made for a VPS scan: turning too fast (`fast`), pointing at the floor or ceiling (`pitch`), standing too close (`close`) and pointing at nothing with detail (`blank`), plus a count of tracking jumps. The engine is pure and takes poses, centre hit distances and ticks; the hook samples the centre hit test every `intervalMs` (default 250), gives up on one still pending after `hitTestTimeoutMs` (default 1000), and returns the hint and an `onCameraTransformUpdate` handler to pass to `ViroARScene`. Hints are ids, so the app supplies the wording. `VIRO_CAPTURE_RULES` holds the default thresholds, and `rules` overrides any of them.
+- **`useViroTrackingReady(state, { normalMs, limitedMs })`.** Ready once tracking has been normal for 1 s, or limited for 4 s, and never while unavailable, the wait before a recording is worth starting. `getLimitedSeconds()` reports how long tracking spent other than normal.
+- **`onTrackingUpdated` on `ViroARSceneNavigator`.** Receives the current scene's tracking updates, so an app no longer mounts a scene only to pass them up through `viroAppProps`. The scene's own `onTrackingUpdated` is still called first. `ViroXRSceneNavigator` passes it on, except on Quest and visionOS.
+- **`ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_LIGHT` (4).** Android already sent it; iOS does not report it.
+- **The rest of Studio's VPS device routes:** `listLocations`, `getLocation`, `createLocation`, `renameLocation`, `deleteLocation`, `listScans` and `deleteScan`, with `limit` and `cursor` paging on the lists, and `getVPSServerAddress`. `getLocationFileDownload(locationId, kind)` and `getScanFileDownload(scanId, kind)` give a signed link to any file of a location's active scan or of one scan. Each takes a `ViroVPSConnection` last, like `findNearbyLocations`.
+- **`ViroVPSErrorCodes`,** the codes viro itself gives a `ViroVPSError`, as constants.
+
+### Changed
+
+- **`ViroVPSScan` types `outputs`, `keep_recording`, `app_user_id`, `queued_at`, `started_at` and `finished_at`,** which Studio already sent, and `mesh_quality`, which a server older than mesh quality leaves out. Code that builds `ViroVPSScan` objects by hand must add the first six. `ViroVPSMapDownload` types `geo`.
+- **Scenes rendered by `ViroARSceneNavigator` remount once after upgrading,** because each is now wrapped in the provider that relays tracking updates.
+
 ## v3.1.0 — 27 October 2026
 
 ### Added

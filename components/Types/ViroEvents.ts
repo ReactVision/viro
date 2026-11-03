@@ -412,7 +412,8 @@ export type ViroTrackingState =
 export type ViroTrackingReason =
   | ViroARTrackingReasonConstants.TRACKING_REASON_NONE
   | ViroARTrackingReasonConstants.TRACKING_REASON_EXCESSIVE_MOTION
-  | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES;
+  | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES
+  | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_LIGHT;
 
 export type ViroAmbientLightUpdateEvent = {
   ambientLightInfo: ViroAmbientLightInfo;

@@ -81,7 +81,10 @@ import {
   ViroVPSMapLoadResult,
   ViroVPSQueryFrameResult,
   ViroVPSLocalizationResult,
+  ViroTrackingReason,
+  ViroTrackingState,
 } from "../Types/ViroEvents";
+import { ViroARTrackingRelayContext } from "./ViroARScene";
 import {
   Viro3DPoint,
   ViroNativeRef,
@@ -349,6 +352,17 @@ type Props = ViewProps & {
    * where it belongs: the renderer emits it from the scene, while this prop sits on the navigator.
    */
   onWorldMeshUpdated?: (stats: ViroWorldMeshStats) => void;
+
+  /**
+   * The current scene's tracking updates, as its `ViroARScene`'s own
+   * `onTrackingUpdated` receives them, without the scene having to pass them
+   * up. Scenes not on top of the stack are not reported. iOS and Android
+   * only; the web navigator does not relay it.
+   */
+  onTrackingUpdated?: (
+    state: ViroTrackingState,
+    reason: ViroTrackingReason
+  ) => void;
 };
 
 type State = {
@@ -775,6 +789,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
         const referenceCount = scene.referenceCount - 1;
         if (referenceCount <= 0) {
           delete sceneDictionary[sceneTag];
+          this._trackingRelays.delete(sceneTag);
         } else {
           sceneDictionary[sceneTag] = { ...scene, referenceCount };
         }
@@ -1993,17 +2008,41 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     for (const scene in sceneDictionary) {
       const Component = sceneDictionary[scene].sceneClass.scene;
       const props = sceneDictionary[scene].sceneClass.passProps;
+      const tag = sceneDictionary[scene].tag;
       views.push(
-        <Component
-          key={sceneDictionary[scene].tag}
-          {...props}
-          sceneNavigator={this.sceneNavigator}
-          arSceneNavigator={this.arSceneNavigator}
-        />
+        <ViroARTrackingRelayContext.Provider
+          key={tag}
+          value={this._trackingRelayFor(tag)}
+        >
+          <Component
+            {...props}
+            sceneNavigator={this.sceneNavigator}
+            arSceneNavigator={this.arSceneNavigator}
+          />
+        </ViroARTrackingRelayContext.Provider>
       );
       i++;
     }
     return views;
+  };
+
+  // One function per scene tag while the scene is mounted, so the context value never changes.
+  _trackingRelays = new Map<
+    string,
+    (state: ViroTrackingState, reason: ViroTrackingReason) => void
+  >();
+
+  _trackingRelayFor = (tag: string) => {
+    let relay = this._trackingRelays.get(tag);
+    if (!relay) {
+      relay = (state: ViroTrackingState, reason: ViroTrackingReason) => {
+        if (this.getSceneIndex(tag) === this.state.currentSceneIndex) {
+          this.props.onTrackingUpdated?.(state, reason);
+        }
+      };
+      this._trackingRelays.set(tag, relay);
+    }
+    return relay;
   };
 
   arSceneNavigator = {
@@ -2236,6 +2275,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
 
     const {
       viroAppProps: _viroAppProps,
+      onTrackingUpdated: _onTrackingUpdated,
       provider,
       cloudAnchorProvider,
       geospatialAnchorProvider,

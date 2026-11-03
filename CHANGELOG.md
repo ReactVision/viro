@@ -23,6 +23,7 @@
 ### Fixed
 
 - **A scan upload that loses its connection fails with code `NETWORK_ERROR`.** It had no code, which read the same as a recording that could not be read. A refused certificate is not tagged.
+- **An Android hit test always settles (`performARHitTestWithPoint`, the ray and position hit tests, the scene hit test).** The renderer held the result listener only weakly, so once the garbage collector took it the promise never settled; a recording that hit-tested every 250 ms lost one about 11 s in on a Pixel 6 Pro. Needs the matching `viro_renderer-release.aar`.
 - **Android `getRecordingStatus()` returns `"Unsupported"` when the AR view cannot be found,** not `"UNSUPPORTED"`, matching every other path on both platforms.
 
 ## v3.1.0 — 27 October 2026

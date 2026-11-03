@@ -21,7 +21,8 @@ Pod::Spec.new do |s|
     isAvailable = false at runtime.
   DESC
   s.source              = { :path => '.' } # source is required, but path will be defined in user's Podfile (this value will be ignored).
-  s.vendored_frameworks = 'ViroKit.framework'
+  # Device (ios-arm64) and simulator (ios-arm64_x86_64-simulator) slices.
+  s.vendored_frameworks = 'ViroKit.xcframework'
   s.homepage            = 'https://reactvision.xyz'
   s.license             = {:type => 'Copyright', :text => "Copyright 2025 ReactVision" }
   s.author              = 'ReactVision'

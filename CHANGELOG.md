@@ -89,6 +89,7 @@
 - **The scene navigators apply the `style` prop (`ViroARSceneNavigator`, `Viro3DSceneNavigator`, `ViroVRSceneNavigator`, `ViroSceneNavigator`).** It was dropped through a comma expression, so a `style` an app passed never took effect; it now merges after the container style. Check the layout of any navigator you give a `style`.
 - **`ViroARSceneNavigator` honours `cloudAnchorProvider` and `geospatialAnchorProvider` when `provider` is not set.** 3.0 always overrode them with `reactvision`. An app that still passes `cloudAnchorProvider="arcore"` now uses ARCore Cloud Anchors, which needs a Google Cloud API key; remove the prop, or pass `provider`, to keep ReactVision's.
 - **Android: a few calls behave differently (`MediaCapture`, `ViroARSceneNavigator`).** `startVideoRecording` fails with error 1 when `RECORD_AUDIO` is denied, where iOS records without sound; `takeScreenshot` keeps only the last path segment of its file name (`"dir/shot"` saves as `shot.jpg`); and `projectPoint` / `unprojectPoint` on a stale view reject instead of never settling, so give them a `catch`.
+- **The Expo plugin no longer excludes arm64 from simulator builds (`withViroIos`).** `EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64` dated from Intel Macs, and on Apple Silicon it left the simulator no architecture to run. The plugin now removes that value where an earlier prebuild wrote it.
 
 ### Fixed
 

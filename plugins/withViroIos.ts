@@ -234,28 +234,30 @@ const withEnabledBitcode: ConfigPlugin = (config) =>
     return newConfig;
   });
 
-const setExcludedArchitectures = (
+// Viro used to exclude arm64 from simulator builds, when ViroKit had no arm64 simulator slice.
+// It ships one now, and on an Apple Silicon Mac the exclusion leaves no architecture the
+// simulator can run, so a project that still carries the value Viro wrote has it removed.
+// Viro wrote it quoted, and Xcode or CocoaPods drop the quotes when they next save the project.
+export const removeExcludedSimulatorArchitectures = (
   project: ExportedConfigWithProps<XcodeProject>["modResults"]
 ) => {
   const configurations = project.pbxXCBuildConfigurationSection();
 
-  // @ts-ignore
-  for (const { buildSettings } of Object.values(configurations || {})) {
-    if (
-      typeof (buildSettings === null || buildSettings === void 0
-        ? void 0
-        : buildSettings.PRODUCT_NAME) !== "undefined"
-    ) {
-      buildSettings['"EXCLUDED_ARCHS[sdk=iphonesimulator*]"'] = '"arm64"';
+  for (const configuration of Object.values(configurations || {})) {
+    const buildSettings = (configuration as { buildSettings?: Record<string, string> })
+      .buildSettings;
+    const excluded = buildSettings?.['"EXCLUDED_ARCHS[sdk=iphonesimulator*]"'];
+    if (buildSettings && (excluded === '"arm64"' || excluded === "arm64")) {
+      delete buildSettings['"EXCLUDED_ARCHS[sdk=iphonesimulator*]"'];
     }
   }
 
   return project;
 };
 
-const withExcludedSimulatorArchitectures = (config: ExpoConfig) => {
+const withSimulatorArchitectures = (config: ExpoConfig) => {
   return withXcodeProject(config, (newConfig) => {
-    newConfig.modResults = setExcludedArchitectures(newConfig.modResults);
+    newConfig.modResults = removeExcludedSimulatorArchitectures(newConfig.modResults);
     return newConfig;
   });
 };
@@ -361,6 +363,6 @@ export const withViroIos: ConfigPlugin<ViroConfigurationOptions> = (
   withDefaultInfoPlist(config, props);
   config = withViroTelemetryInfoPlist(config, props);
   withEnabledBitcode(config);
-  withExcludedSimulatorArchitectures(config);
+  withSimulatorArchitectures(config);
   return config;
 };

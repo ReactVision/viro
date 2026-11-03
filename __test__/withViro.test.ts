@@ -1,5 +1,9 @@
 import { describe, expect, test } from "@jest/globals";
-import { withDefaultInfoPlist, withViroTelemetryInfoPlist } from "../plugins/withViroIos";
+import {
+  removeExcludedSimulatorArchitectures,
+  withDefaultInfoPlist,
+  withViroTelemetryInfoPlist,
+} from "../plugins/withViroIos";
 import { withViroAndroid } from "../plugins/withViroAndroid";
 import {
   noInfoPlistDefinitionsAppConfigAfter,
@@ -101,5 +105,32 @@ describe("telemetry option", () => {
       );
       expect(await telemetryMetaAfter(telemetry, ["false"])).toEqual([]);
     }
+  });
+});
+
+describe("simulator architectures", () => {
+  const KEY = '"EXCLUDED_ARCHS[sdk=iphonesimulator*]"';
+
+  function projectWith(settings: Record<string, string>[]): any {
+    const section: Record<string, unknown> = {};
+    settings.forEach((buildSettings, index) => {
+      section[`ID${index}`] = { isa: "XCBuildConfiguration", buildSettings };
+      section[`ID${index}_comment`] = "Debug";
+    });
+    return { pbxXCBuildConfigurationSection: () => section };
+  }
+
+  test("removes the arm64 exclusion earlier versions wrote, and keeps any other value", () => {
+    const project = projectWith([
+      { PRODUCT_NAME: "app", [KEY]: '"arm64"' },
+      { PRODUCT_NAME: "app", [KEY]: "arm64" },
+      { PRODUCT_NAME: "app", [KEY]: '"x86_64"' },
+      { PRODUCT_NAME: "app" },
+    ]);
+    const section = removeExcludedSimulatorArchitectures(project).pbxXCBuildConfigurationSection();
+    expect(section.ID0.buildSettings).not.toHaveProperty(KEY);
+    expect(section.ID1.buildSettings).not.toHaveProperty(KEY);
+    expect(section.ID2.buildSettings[KEY]).toBe('"x86_64"');
+    expect(section.ID3.buildSettings).toEqual({ PRODUCT_NAME: "app" });
   });
 });

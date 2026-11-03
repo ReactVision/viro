@@ -54,10 +54,6 @@ Please note that these examples are a bit old, the code targets an older version
 
 - **It doesn't work on my iOS simulator!**
 
-  AR _does not work on iOS simulators_. If you are getting an error that looks like:
-
-  `ARWorldTrackingConfiguration setAutoFocusEnabled: unrecognised`
-
-  that is expected. Sorry!
+  Apps using Viro build and run in the iOS Simulator, but ARKit has no simulator support, so an AR scene needs a device.
 
   See [running-on-device](https://reactnative.dev/docs/running-on-device) in the official react-native docs.

@@ -99,7 +99,9 @@ Pod::Spec.new do |s|
     'ViroReact/Views/VRTObjectDetectorViewManager.mm',
   ]
 
-  archive_path = File.join(__dir__, 'dist/lib/libViroReact.a')
+  # The device and simulator slices are built from the same sources, so the device slice answers
+  # for both.
+  archive_path = File.join(__dir__, 'dist/lib/ViroReact.xcframework/ios-arm64/libViroReact.a')
   if File.exist?(archive_path)
     archive = File.binread(archive_path)
     compiled_from_source = archive_fallback_sources.reject do |file|
@@ -203,17 +205,21 @@ Pod::Spec.new do |s|
     'VRTUIImageWrapper.m',
   ]
 
-  if File.exist?(File.join(__dir__, 'dist/lib/libViroReact.a'))
-    s.ios.vendored_libraries = 'dist/lib/libViroReact.a'
+  if File.exist?(File.join(__dir__, 'dist/lib/ViroReact.xcframework'))
+    s.ios.vendored_frameworks = 'dist/lib/ViroReact.xcframework'
+    # React Native finds the bridge classes by name, so the app must link the archive with -ObjC
+    # or they are stripped. CocoaPods adds -ObjC for a vendored .a or static framework, but not
+    # for a static-library xcframework, so an app with use_frameworks! :linkage => :dynamic and
+    # no other static pod would link none of them.
+    s.ios.user_target_xcconfig = { 'OTHER_LDFLAGS' => '$(inherited) -ObjC' }
   end
 
   # React Native dependencies
   # 32 files in ViroReact import <ViroKit/ViroKit.h>, so this dependency was always real —
-  # it simply went undeclared. On iOS that is survivable: ViroKit is a plain framework and its
-  # headers land in Pods/Headers/Public early enough that the compile finds them anyway. On
-  # visionOS it ships as an xcframework, whose headers are staged by a build phase on the
-  # ViroKit target, and without a declared dependency Xcode has no reason to run that phase
-  # first — so every ViroKit import fails while the headers sit in the package, unextracted.
+  # it simply went undeclared. ViroKit ships as an xcframework, whose headers are staged by a
+  # build phase on the ViroKit target, and without a declared dependency Xcode has no reason to
+  # run that phase first — so every ViroKit import fails while the headers sit in the package,
+  # unextracted.
   s.dependency 'ViroKit'
   s.dependency 'React-Core'
 
@@ -226,7 +232,7 @@ Pod::Spec.new do |s|
   if File.exist?(File.join(__dir__, 'dist/Frameworks/onnxruntime.xcframework'))
     onnx_defines = ' VIRO_ONNXRUNTIME_AVAILABLE=1'
     s.vendored_frameworks = [
-      'dist/ViroRenderer/ViroKit.framework',
+      'dist/ViroRenderer/ViroKit.xcframework',
       'dist/Frameworks/onnxruntime.xcframework'
     ]
   end
@@ -248,10 +254,10 @@ Pod::Spec.new do |s|
       '"$(PODS_ROOT)/Headers/Public/ViroKit"',
       '"$(PODS_ROOT)/ViroKit/dist/include"',
       '"$(PODS_ROOT)/ViroKit/Headers"',
-      # visionOS ships ViroKit as an xcframework rather than a plain framework, and CocoaPods
-      # stages the selected slice's headers here. The paths above assume the older layout and
-      # resolve to nothing on xros, so without this every `#import <ViroKit/...>` in the VRT
-      # layer fails — the headers exist, they are just somewhere these paths never look.
+      # ViroKit ships as an xcframework rather than a plain framework, and CocoaPods stages the
+      # selected slice's headers here. The paths above assume the older layout and resolve to
+      # nothing, so without this every `#import <ViroKit/...>` in the VRT layer fails — the
+      # headers exist, they are just somewhere these paths never look.
       '"${PODS_XCFRAMEWORKS_BUILD_DIR}/ViroKit/Headers"'
     ].join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => "$(inherited) RCT_NEW_ARCH_ENABLED=1#{onnx_defines}",

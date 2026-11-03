@@ -1,7 +1,7 @@
 /**
- * iOS links the prebuilt ios/dist/lib/libViroReact.a and the podspec keeps every bridge .mm out of
- * the compile while that archive exists, so a source that is not in the Xcode target that builds
- * the archive is in the package but in no iOS build. 3.0.2 shipped VRTObjectDetectorView that way
+ * iOS links the prebuilt libViroReact.a in ios/dist/lib/ViroReact.xcframework and the podspec
+ * keeps every bridge .mm out of the compile while that archive exists, so a source that is not in
+ * the Xcode target that builds the archive is in the package but in no iOS build. 3.0.2 shipped VRTObjectDetectorView that way
  * and <ViroObjectDetector /> failed to mount on every iPhone. The script this runs is the check
  * the release makes; running it here fails the suite on the commit that adds the file.
  */

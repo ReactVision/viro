@@ -1042,15 +1042,48 @@ static NSString *rvMatrixToCsv(const VROMatrix4f &m) {
     );
 }
 
-- (void)stopRecording {
-    if (!_vroView) {
+static NSDictionary *rvRecordingResultDictionary(const VROARRecordingResult &result) {
+    NSMutableDictionary *dictionary = [NSMutableDictionary new];
+    dictionary[@"success"] = @(result.success);
+    if (!result.error.empty()) {
+        dictionary[@"error"] = [NSString stringWithUTF8String:result.error.c_str()] ?: @"Unknown error";
+    }
+    dictionary[@"durationSec"] = @(result.durationSec);
+    dictionary[@"frames"] = @(result.frames);
+    dictionary[@"depthFrames"] = @(result.depthFrames);
+    dictionary[@"gpsFixes"] = @(result.gpsFixes);
+    if (result.bytes >= 0) {
+        dictionary[@"bytes"] = @(result.bytes);
+    }
+    return dictionary;
+}
+
+- (void)stopRecording:(RecordingStopCompletionHandler)completionHandler {
+    std::shared_ptr<VROARSession> arSession = _vroView ? [(VROViewAR *)_vroView getARSession] : nullptr;
+    if (!arSession) {
+        VROARRecordingResult result;
+        result.error = "AR session not available";
+        if (completionHandler) {
+            completionHandler(rvRecordingResultDictionary(result));
+        }
         return;
     }
-    VROViewAR *viewAR = (VROViewAR *) _vroView;
-    std::shared_ptr<VROARSession> arSession = [viewAR getARSession];
-    if (arSession) {
-        arSession->stopRecording();
+    // Finishing the files can take hundreds of milliseconds; keep it off the main thread.
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        arSession->stopRecording([completionHandler](const VROARRecordingResult &result) {
+            if (completionHandler) {
+                completionHandler(rvRecordingResultDictionary(result));
+            }
+        });
+    });
+}
+
+- (BOOL)isRecordingSupported:(BOOL)depth {
+    std::shared_ptr<VROARSession> arSession = _vroView ? [(VROViewAR *)_vroView getARSession] : nullptr;
+    if (!arSession || !arSession->isRecordingSupported()) {
+        return NO;
     }
+    return !depth || arSession->isRecordingDepthSupported();
 }
 
 - (NSString *)getRecordingStatus {

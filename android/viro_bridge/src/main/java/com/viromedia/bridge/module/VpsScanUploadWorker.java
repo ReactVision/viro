@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.os.Build;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -26,6 +27,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateException;
+
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLPeerUnverifiedException;
 
 /**
  * PUTs a prepared scan zip to its signed Storage URL, then POSTs Studio's
@@ -39,6 +44,17 @@ public final class VpsScanUploadWorker extends Worker {
     // character to six bytes, so a body or message in the result is cut to this.
     private static final int MAX_TEXT_CHARS = 1000;
     private static final long[] COMPLETE_RETRY_DELAYS_MS = {2000, 10000};
+    private static final long PROGRESS_INTERVAL_MS = 250;
+    static final String KEY_PROGRESS_SENT = "sent";
+    static final String KEY_PROGRESS_TOTAL = "total";
+    private static final String NETWORK_ERROR = "NETWORK_ERROR";
+
+    /** A failure before anything reached the network, or in reading the zip: never NETWORK_ERROR. */
+    private static final class LocalFailure extends IOException {
+        LocalFailure(String message) {
+            super(message);
+        }
+    }
 
     private volatile HttpURLConnection mConnection;
 
@@ -115,6 +131,7 @@ public final class VpsScanUploadWorker extends Worker {
             return result(scanId, false, "upload", "error",
                     "The recording zip is " + zip.length() + " bytes, not " + bytes);
         }
+        boolean progress = request.optBoolean("progress");
         HttpURLConnection put = null;
         try {
             put = open(putUrl, "PUT", 120000);
@@ -124,10 +141,21 @@ public final class VpsScanUploadWorker extends Worker {
             // buffering all of it to compute Content-Length.
             put.setFixedLengthStreamingMode(bytes);
             byte[] buf = new byte[64 * 1024];
-            try (InputStream in = new FileInputStream(zip);
+            try (InputStream in = openZip(zip);
                  OutputStream os = put.getOutputStream()) {
                 int n;
-                while ((n = in.read(buf)) != -1) os.write(buf, 0, n);
+                long sent = 0;
+                long reportedAt = 0;
+                while ((n = readZip(in, buf)) != -1) {
+                    os.write(buf, 0, n);
+                    sent += n;
+                    long now = SystemClock.elapsedRealtime();
+                    if (progress && (sent == bytes || now - reportedAt >= PROGRESS_INTERVAL_MS)) {
+                        reportedAt = now;
+                        setProgressAsync(new Data.Builder()
+                                .putLong(KEY_PROGRESS_SENT, sent).putLong(KEY_PROGRESS_TOTAL, bytes).build());
+                    }
+                }
             }
             int status = put.getResponseCode();
             String body = VpsScanUpload.readResponseBody(put, status);
@@ -140,12 +168,23 @@ public final class VpsScanUploadWorker extends Worker {
                 return null;
             }
             return result(scanId, false, "upload", "status", status, "body", body);
+        } catch (LocalFailure e) {
+            return result(scanId, false, "upload", "error", String.valueOf(e.getMessage()));
+        } catch (IOException e) {
+            if (isCertificateFailure(e)) return result(scanId, false, "upload", "error", String.valueOf(e.getMessage()));
+            return result(scanId, false, "upload", "code", NETWORK_ERROR, "error", String.valueOf(e.getMessage()));
         } catch (Exception e) {
             return result(scanId, false, "upload", "error", String.valueOf(e.getMessage()));
         } finally {
             mConnection = null;
             if (put != null) put.disconnect();
         }
+    }
+
+    /** A refused certificate is not a lost connection, as on iOS. */
+    private static boolean isCertificateFailure(IOException e) {
+        return e instanceof SSLPeerUnverifiedException
+                || (e instanceof SSLHandshakeException && e.getCause() instanceof CertificateException);
     }
 
     /** Transport errors and 5xx are retried; Studio's sweep finalizes a stored upload anyway. */
@@ -169,6 +208,12 @@ public final class VpsScanUploadWorker extends Worker {
                 boolean ok = status >= 200 && status < 300;
                 last = result(scanId, ok, "complete", "status", status, "body", response);
                 if (status < 500) return last;
+            } catch (LocalFailure e) {
+                last = result(scanId, false, "complete", "error", String.valueOf(e.getMessage()));
+            } catch (IOException e) {
+                last = isCertificateFailure(e)
+                        ? result(scanId, false, "complete", "error", String.valueOf(e.getMessage()))
+                        : result(scanId, false, "complete", "code", NETWORK_ERROR, "error", String.valueOf(e.getMessage()));
             } catch (Exception e) {
                 last = result(scanId, false, "complete", "error", String.valueOf(e.getMessage()));
             } finally {
@@ -185,19 +230,42 @@ public final class VpsScanUploadWorker extends Worker {
         }
     }
 
-    private HttpURLConnection open(String url, String method, int readTimeoutMs) throws IOException {
-        if (!VpsScanUpload.isAllowedUrl(url)) throw new IOException("Upload URLs must be https");
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        mConnection = connection;
-        // A redirect cannot be replayed once the body is streamed, and would send the signed headers elsewhere.
-        connection.setInstanceFollowRedirects(false);
-        // onStopped may have run before mConnection was set, and would not have disconnected this one.
-        if (isStopped()) throw new IOException("The upload was stopped");
-        connection.setRequestMethod(method);
-        connection.setConnectTimeout(30000);
-        connection.setReadTimeout(readTimeoutMs);
-        connection.setDoOutput(true);
-        return connection;
+    /** Configures the connection without connecting: nothing here touches the network. */
+    private HttpURLConnection open(String url, String method, int readTimeoutMs) throws LocalFailure {
+        if (!VpsScanUpload.isAllowedUrl(url)) throw new LocalFailure("Upload URLs must be https");
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+            mConnection = connection;
+            // A redirect cannot be replayed once the body is streamed, and would send the signed headers elsewhere.
+            connection.setInstanceFollowRedirects(false);
+            // onStopped may have run before mConnection was set, and would not have disconnected this one.
+            if (isStopped()) throw new LocalFailure("The upload was stopped");
+            connection.setRequestMethod(method);
+            connection.setConnectTimeout(30000);
+            connection.setReadTimeout(readTimeoutMs);
+            connection.setDoOutput(true);
+            return connection;
+        } catch (LocalFailure e) {
+            throw e;
+        } catch (IOException e) {
+            throw new LocalFailure(String.valueOf(e.getMessage()));
+        }
+    }
+
+    private static InputStream openZip(File zip) throws LocalFailure {
+        try {
+            return new FileInputStream(zip);
+        } catch (IOException e) {
+            throw new LocalFailure("Could not open the recording zip: " + e.getMessage());
+        }
+    }
+
+    private static int readZip(InputStream in, byte[] buf) throws LocalFailure {
+        try {
+            return in.read(buf);
+        } catch (IOException e) {
+            throw new LocalFailure("Could not read the recording zip: " + e.getMessage());
+        }
     }
 
     private static JSONObject result(String scanId, boolean success, String stage, Object... keyValues) {

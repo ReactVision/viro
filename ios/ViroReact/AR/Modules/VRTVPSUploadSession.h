@@ -34,7 +34,12 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSString *)makeZipPath:(NSString *_Nullable *_Nullable)error;
 
 // @internal Resolves a JSON string, never fails. See rvTransferScanRecording.
-- (void)transfer:(NSString *)requestJson completion:(void (^)(NSString *resultJson))completion;
+// When the request has "progress": true, progress is called on the session's
+// queue while the zip is sent, at most every 250 ms and once at the end, and
+// never after completion.
+- (void)transfer:(NSString *)requestJson
+        progress:(nullable void (^)(NSString *scanId, int64_t sent, int64_t total))progress
+      completion:(void (^)(NSString *resultJson))completion;
 
 // @internal Deletes a prepared zip that no transfer is using; a path outside
 // the uploads directory is ignored.

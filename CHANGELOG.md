@@ -10,11 +10,20 @@
 - **`ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_LIGHT` (4).** Android already sent it; iOS does not report it.
 - **The rest of Studio's VPS device routes:** `listLocations`, `getLocation`, `createLocation`, `renameLocation`, `deleteLocation`, `listScans` and `deleteScan`, with `limit` and `cursor` paging on the lists, and `getVPSServerAddress`. `getLocationFileDownload(locationId, kind)` and `getScanFileDownload(scanId, kind)` give a signed link to any file of a location's active scan or of one scan. Each takes a `ViroVPSConnection` last, like `findNearbyLocations`.
 - **`ViroVPSErrorCodes`,** the codes viro itself gives a `ViroVPSError`, as constants.
+- **`onProgress(sentBytes, totalBytes)` on `uploadScanRecording`,** at most four times a second, on iOS and Android. If Android restarts the transfer, the count starts again from 0.
+- **`stopRecording()` resolves to a `ViroRecordingResult`** once video.mp4, session.jsonl and any depth files are complete: `{ success, error?, durationSec, frames, depthFrames, gpsFixes, bytes? }`. It resolved to nothing before, so an app had to wait for the files and read session.jsonl to learn what was recorded.
+- **`isRecordingSupported({ depth })` on the AR scene navigator.** On Android it answers false until the AR session has started, so ask after the first tracking update.
 
 ### Changed
 
 - **`ViroVPSScan` types `outputs`, `keep_recording`, `app_user_id`, `queued_at`, `started_at` and `finished_at`,** which Studio already sent, and `mesh_quality`, which a server older than mesh quality leaves out. Code that builds `ViroVPSScan` objects by hand must add the first six. `ViroVPSMapDownload` types `geo`.
+- **`uploadScanRecording` reads credentials again just before sending,** so the complete call carries current ones rather than those read before zipping. A credentials function is now called twice per upload.
 - **Scenes rendered by `ViroARSceneNavigator` remount once after upgrading,** because each is now wrapped in the provider that relays tracking updates.
+
+### Fixed
+
+- **A scan upload that loses its connection fails with code `NETWORK_ERROR`.** It had no code, which read the same as a recording that could not be read. A refused certificate is not tagged.
+- **Android `getRecordingStatus()` returns `"Unsupported"` when the AR view cannot be found,** not `"UNSUPPORTED"`, matching every other path on both platforms.
 
 ## v3.1.0 — 27 October 2026
 

@@ -65,6 +65,7 @@ import {
   ViroEarthTrackingStateResult,
   ViroRecordingStatus,
   ViroRecordingOptions,
+  ViroRecordingResult,
   ViroGeospatialPoseResult,
   ViroVPSAvailabilityResult,
   ViroCreateGeospatialAnchorResult,
@@ -979,9 +980,48 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
 
   /**
    * Stops the recording started by startRecording and finalizes video.mp4 + session.jsonl.
+   *
+   * @returns Promise resolving once every file is complete, to what was written: frame,
+   *          depth frame and GPS fix counts, the duration, and the total size when known.
+   *          `success` is false, with an `error`, when nothing was recording or a file could
+   *          not be finished.
    */
-  _stopRecording = async () => {
-    return await ViroARSceneNavigatorModule.stopRecording(findNodeHandle(this));
+  _stopRecording = async (): Promise<ViroRecordingResult> => {
+    const result: ViroRecordingResult | null | undefined =
+      await ViroARSceneNavigatorModule.stopRecording(findNodeHandle(this));
+    return (
+      result ?? {
+        success: false,
+        error: "stopRecording is not available on this platform",
+        durationSec: 0,
+        frames: 0,
+        depthFrames: 0,
+        gpsFixes: 0,
+      }
+    );
+  };
+
+  /**
+   * Whether this device can record the AR session with `startRecording`, and with
+   * `{ depth: true }`, also record depth (iOS with LiDAR, Android with the ARCore Depth API).
+   * On Android both answers are false until the AR session has started, so ask
+   * after the first tracking update.
+   */
+  _isRecordingSupported = async (
+    options?: ViroRecordingOptions
+  ): Promise<boolean> => {
+    const nodeHandle = findNodeHandle(this);
+    if (
+      !nodeHandle ||
+      NativeModules.VRTARSceneNavigatorModule?.isRecordingSupported == null
+    ) {
+      return false;
+    }
+    const supported = await ViroARSceneNavigatorModule.isRecordingSupported(
+      nodeHandle,
+      { depth: options?.depth === true }
+    );
+    return supported === true;
   };
 
   /**
@@ -2056,6 +2096,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startRecording: this._startRecording,
     stopRecording: this._stopRecording,
     getRecordingStatus: this._getRecordingStatus,
+    isRecordingSupported: this._isRecordingSupported,
     takeScreenshot: this._takeScreenshot,
     resetARSession: this._resetARSession,
     setWorldOrigin: this._setWorldOrigin,
@@ -2141,6 +2182,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     startRecording: this._startRecording,
     stopRecording: this._stopRecording,
     getRecordingStatus: this._getRecordingStatus,
+    isRecordingSupported: this._isRecordingSupported,
     takeScreenshot: this._takeScreenshot,
     resetARSession: this._resetARSession,
     setWorldOrigin: this._setWorldOrigin,

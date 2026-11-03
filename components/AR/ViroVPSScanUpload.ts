@@ -21,7 +21,7 @@
 
 "use strict";
 
-import { NativeModules } from "react-native";
+import { DeviceEventEmitter, NativeModules } from "react-native";
 import { studioVpsEndpointAllowed } from "../Studio/domain/vps";
 import {
   ViroVPSConnection,
@@ -75,6 +75,14 @@ export type ViroVPSScanUploadOptions = ViroVPSConnection & {
    * `keepRecording` it was created with, so those and `target` are not used.
    */
   scanId?: string;
+  /**
+   * Called while the zip is sent, at most four times a second, with the bytes
+   * sent so far and the zip's size. Never called once uploadScanRecording()
+   * has settled. The count starts again from 0 when Android restarts the
+   * transfer (after losing the network, for one). A transfer that started
+   * before the app was relaunched reports none.
+   */
+  onProgress?: (sentBytes: number, totalBytes: number) => void;
 };
 
 /**
@@ -201,6 +209,9 @@ function scanUploadModule(): NativeScanUpload | null {
     : null;
 }
 
+/** `{ scan_id, sent, total }`, sent by rvTransferScanRecording when the request has `progress: true`. */
+const UPLOAD_PROGRESS_EVENT = "ViroVPSUploadProgress";
+
 const SCAN_OUTPUTS: readonly ViroVPSScanOutput[] = ["mesh", "splat", "semantic"];
 const MESH_QUALITIES: readonly ViroVPSMeshQuality[] = ["low", "medium", "high"];
 
@@ -208,9 +219,12 @@ const MESH_QUALITIES: readonly ViroVPSMeshQuality[] = ["low", "medium", "high"];
 const RECORDING_REFUSALS = new Set(["RECORDING_NOT_UPLOADED", "RECORDING_SIZE_MISMATCH"]);
 
 /** Studio's checks on the same fields, and scanId's type, so a mistake costs no zip. */
-function checkUploadOptions({ outputs, meshQuality, keepRecording, scanId }: ViroVPSScanUploadOptions) {
+function checkUploadOptions({ outputs, meshQuality, keepRecording, scanId, onProgress }: ViroVPSScanUploadOptions) {
   if (scanId !== undefined && typeof scanId !== "string") {
     throw new ViroVPSError("scanId is a string", "BAD_REQUEST");
+  }
+  if (onProgress !== undefined && typeof onProgress !== "function") {
+    throw new ViroVPSError("onProgress is a function", "BAD_REQUEST");
   }
   if (outputs !== undefined) {
     if (!Array.isArray(outputs) || !outputs.every((o) => SCAN_OUTPUTS.includes(o))) {
@@ -280,7 +294,8 @@ function withScanId(e: unknown, scanId: string): unknown {
  * @throws ViroVPSError when the recording can't be read, a request fails, or
  *         a server answers with an error (its `code` and `status` are set).
  *         When the scan exists but its recording did not arrive, `scanId` is
- *         set, also on a failure with no HTTP status. Options or credentials
+ *         set, also on a failure with no HTTP status (`NETWORK_ERROR` when
+ *         the transfer lost its connection). Options or credentials
  *         Studio would refuse throw `BAD_REQUEST`, `INVALID_APP_USER_ID` or
  *         `CREDENTIALS_UNAVAILABLE` before anything is zipped.
  */
@@ -316,6 +331,7 @@ export async function uploadScanRecording(
 
   let scanId = options.scanId;
   let sending = false;
+  let stopProgress = () => {};
   try {
     if (!scanId) {
       const body: Record<string, unknown> =
@@ -364,6 +380,37 @@ export async function uploadScanRecording(
       }
     }
 
+    // Read again just before sending, since a token read before zipping may be
+    // close to expiring. The native job keeps these headers for the complete
+    // call, so a very long PUT can still outlive them; failing either way,
+    // Studio queues a stored upload by itself.
+    let completeHeaders = studio.headers;
+    try {
+      completeHeaders = (await resolveVPSStudio(options)).headers;
+    } catch {
+      // keep studio.headers
+    }
+
+    const onProgress = options.onProgress;
+    if (onProgress) {
+      const sendingScanId = scanId;
+      const totalBytes = prepared.bytes;
+      let settled = false;
+      const subscription = DeviceEventEmitter.addListener(UPLOAD_PROGRESS_EVENT, (event: unknown) => {
+        const { scan_id, sent } = (event ?? {}) as { scan_id?: unknown; sent?: unknown };
+        if (settled || scan_id !== sendingScanId || typeof sent !== "number") return;
+        try {
+          onProgress(sent, totalBytes);
+        } catch {
+          // the app's callback cannot fail the upload
+        }
+      });
+      stopProgress = () => {
+        settled = true;
+        subscription.remove();
+      };
+    }
+
     sending = true;
     let transferRaw: unknown;
     try {
@@ -375,7 +422,8 @@ export async function uploadScanRecording(
           put_url: granted.upload?.url ?? null,
           put_headers: granted.upload?.headers ?? { "content-type": "application/zip" },
           complete_url: completeUrl,
-          complete_headers: { ...studio.headers, "content-type": "application/json" },
+          complete_headers: { ...completeHeaders, "content-type": "application/json" },
+          ...(onProgress ? { progress: true } : {}),
         })
       );
     } catch (e) {
@@ -408,6 +456,7 @@ export async function uploadScanRecording(
     }
     throw error;
   } finally {
+    stopProgress();
     if (!sending) native.rvDiscardScanRecording?.(zipPath).catch(() => {});
   }
 }

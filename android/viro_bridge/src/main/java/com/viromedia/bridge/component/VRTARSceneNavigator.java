@@ -695,11 +695,27 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
         });
     }
 
-    public void stopRecording() {
-        ARScene arScene = getCurrentARScene();
-        if (arScene != null) {
-            arScene.stopRecording();
+    public interface RecordingStopListener {
+        /** Null when there was no AR scene to stop. */
+        void onStopped(ARScene.RecordingResult result);
+    }
+
+    /**
+     * Call on the UI thread. Finishing the files can take hundreds of milliseconds, so it
+     * runs on a background thread, which calls the listener.
+     */
+    public void stopRecording(final RecordingStopListener listener) {
+        final ARScene arScene = getCurrentARScene();
+        if (arScene == null) {
+            listener.onStopped(null);
+            return;
         }
+        new Thread(() -> listener.onStopped(arScene.stopRecording()), "ViroStopRecording").start();
+    }
+
+    public boolean isRecordingSupported(boolean depth) {
+        ARScene arScene = getCurrentARScene();
+        return arScene != null && arScene.isRecordingSupported(depth);
     }
 
     /**

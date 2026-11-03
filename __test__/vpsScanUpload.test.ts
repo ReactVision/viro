@@ -11,10 +11,19 @@
  */
 let mockNativeModules: Record<string, unknown> = {};
 const mockAuthContext = jest.fn();
+const mockDeviceListeners = new Map<string, Set<(event: unknown) => void>>();
 
 jest.mock("react-native", () => ({
   get NativeModules() {
     return mockNativeModules;
+  },
+  DeviceEventEmitter: {
+    addListener: (name: string, listener: (event: unknown) => void) => {
+      const listeners = mockDeviceListeners.get(name) ?? new Set();
+      mockDeviceListeners.set(name, listeners);
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) };
+    },
   },
   Platform: { OS: "ios", constants: {}, select: (o: any) => o.ios ?? o.default },
   StyleSheet: { create: (s: any) => s },
@@ -161,7 +170,7 @@ describe("uploadScanRecording", () => {
     expect(transferRequest().scan_id).toBe("s1");
   });
 
-  it("renews a refused user token, and hands native the new one for the complete call", async () => {
+  it("renews a refused user token, and reads the credentials again for the complete call", async () => {
     let n = 0;
     const credentials = jest.fn(async () => ({ projectId: "p", accessToken: `t${++n}` }));
     let refused = false;
@@ -183,7 +192,35 @@ describe("uploadScanRecording", () => {
       ["/vps/scans", "Bearer t2"],
       ["/vps/scans/s1/upload", "Bearer t2"],
     ]);
-    expect(transferRequest().complete_headers.Authorization).toBe("Bearer t2");
+    expect(transferRequest().complete_headers.Authorization).toBe("Bearer t3");
+  });
+
+  it("reads the native session again for the complete call, after zipping", async () => {
+    mockAuthContext.mockResolvedValueOnce({
+      mode: "session",
+      baseUrl: "https://studio.test",
+      headers: { Authorization: "Bearer old" },
+      projectId: "p",
+    });
+    mockAuthContext.mockResolvedValue({
+      mode: "session",
+      baseUrl: "https://studio.test",
+      headers: { Authorization: "Bearer refreshed" },
+      projectId: "p",
+    });
+    await uploadScanRecording({ locationId: "l1" }, "/data/rec");
+    expect(requests().map((r) => r.headers.Authorization)).toEqual(["Bearer old", "Bearer old"]);
+    expect(transferRequest().complete_headers.Authorization).toBe("Bearer refreshed");
+  });
+
+  it("keeps the headers it has when the credentials fail on the second read", async () => {
+    let calls = 0;
+    const credentials = jest.fn(async () => {
+      if (++calls > 1) throw new Error("offline");
+      return { projectId: "p", accessToken: "first" };
+    });
+    await uploadScanRecording({ locationId: "l1" }, "/data/rec", { endpoint: "https://studio.test", credentials });
+    expect(transferRequest().complete_headers.Authorization).toBe("Bearer first");
   });
 
   it("skips the PUT when Studio already holds the recording", async () => {
@@ -224,6 +261,14 @@ describe("uploadScanRecording", () => {
       code: undefined,
       scanId: "s1",
     });
+
+    transferAnswers({
+      success: false,
+      stage: "upload",
+      code: "NETWORK_ERROR",
+      error: "The network connection was lost.",
+    });
+    expect(await upload()).toMatchObject({ code: "NETWORK_ERROR", status: undefined, scanId: "s1" });
 
     transferAnswers({ success: false, stage: "upload", code: "UPLOAD_IN_PROGRESS", error: "running" });
     expect(await upload()).toMatchObject({ code: "UPLOAD_IN_PROGRESS", scanId: "s1" });
@@ -285,7 +330,7 @@ describe("uploadScanRecording", () => {
       meshQuality: "high",
       keepRecording: false,
     });
-    expect(credentials).toHaveBeenCalledTimes(1);
+    expect(credentials).toHaveBeenCalledTimes(2);
     const auth = { "x-project-id": "p", Authorization: "Bearer fresh", "x-app-user-id": "user-1" };
     expect(requests()[0].headers).toEqual({ ...auth, "Content-Type": "application/json" });
     expect(requests()[0].body).toEqual({
@@ -326,6 +371,10 @@ describe("uploadScanRecording", () => {
     expect(await upload({ scanId: 7 })).toMatchObject({
       code: "BAD_REQUEST",
       message: "scanId is a string",
+    });
+    expect(await upload({ onProgress: true })).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "onProgress is a function",
     });
     expect(native.rvPrepareScanRecording).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -396,6 +445,43 @@ describe("uploadScanRecording", () => {
     ).rejects.toMatchObject({ code: "ENDPOINT_NOT_ALLOWED", scanId: "s1" });
     expect(native.rvTransferScanRecording).not.toHaveBeenCalled();
     expect(native.rvDiscardScanRecording).toHaveBeenCalled();
+  });
+
+  it("reports this scan's progress until the upload settles, and asks native for it only when wanted", async () => {
+    const emit = (event: unknown) =>
+      mockDeviceListeners.get("ViroVPSUploadProgress")?.forEach((listener) => listener(event));
+    let finish!: (json: string) => void;
+    native.rvTransferScanRecording.mockImplementation(
+      () => new Promise<string>((resolve) => (finish = resolve))
+    );
+    const onProgress = jest.fn();
+    const pending = uploadScanRecording({ locationId: "l1" }, "/data/rec", { ...CONNECTION, onProgress });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(transferRequest().progress).toBe(true);
+    emit({ scan_id: "s1", sent: 4, total: 10 });
+    emit({ scan_id: "other", sent: 9, total: 10 });
+    emit({ scan_id: "s1", sent: "10" });
+    finish(JSON.stringify(done));
+    await expect(pending).resolves.toEqual(scan);
+    emit({ scan_id: "s1", sent: 10, total: 10 });
+
+    expect(onProgress.mock.calls).toEqual([[4, 10]]);
+    expect(mockDeviceListeners.get("ViroVPSUploadProgress")?.size).toBe(0);
+
+    native.rvTransferScanRecording.mockResolvedValue(JSON.stringify(done));
+    native.rvTransferScanRecording.mockClear();
+    await uploadScanRecording({ locationId: "l1" }, "/data/rec", CONNECTION);
+    expect(transferRequest()).not.toHaveProperty("progress");
+  });
+
+  it("stops reporting progress when the upload fails", async () => {
+    const onProgress = jest.fn();
+    transferAnswers({ success: false, stage: "upload", status: 500, body: "{}" });
+    await expect(
+      uploadScanRecording({ locationId: "l1" }, "/data/rec", { ...CONNECTION, onProgress })
+    ).rejects.toMatchObject({ status: 500 });
+    expect(mockDeviceListeners.get("ViroVPSUploadProgress")?.size).toBe(0);
   });
 });
 

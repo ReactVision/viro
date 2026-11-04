@@ -46,10 +46,27 @@ static NSArray *const kDefaultOrbitFocalPoint = @[@0, @0, @0];
 
 - (void)setFocalPoint:(NSArray<NSNumber *> *)focal {
     _focalPoint = [focal copy];
-    
-    float values[3];
-    populateFloatArrayFromNSArray(focal, values, 3);
-    self.nodeCamera->setOrbitFocalPoint({values[0], values[1], values[2]});
+    [self updateOrbitFocalPoint];
+}
+
+- (void)setPosition:(NSArray<NSNumber *> *)position {
+    [super setPosition:position];
+    [self updateOrbitFocalPoint];
+}
+
+// The renderer adds the camera root node's world position, where VRTCamera puts
+// `position`, to the orbit focal point. Passing the focal point relative to
+// `position` keeps it a world point, as Android's bridge treats it.
+- (void)updateOrbitFocalPoint {
+    float focal[3];
+    float position[3] = {0, 0, 0};
+    populateFloatArrayFromNSArray(_focalPoint, focal, 3);
+    if (self.position) {
+        populateFloatArrayFromNSArray(self.position, position, 3);
+    }
+    self.nodeCamera->setOrbitFocalPoint({focal[0] - position[0],
+                                         focal[1] - position[1],
+                                         focal[2] - position[2]});
 }
 
 - (VROCameraRotationType)rotationType {

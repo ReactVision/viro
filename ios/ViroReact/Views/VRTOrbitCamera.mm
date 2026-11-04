@@ -58,6 +58,11 @@ static NSArray *const kDefaultOrbitFocalPoint = @[@0, @0, @0];
 // `position`, to the orbit focal point. Passing the focal point relative to
 // `position` keeps it a world point, as Android's bridge treats it.
 - (void)updateOrbitFocalPoint {
+    // focalPoint is optional: without one the renderer keeps its own, and a
+    // position alone must not hand it an unset point.
+    if (_focalPoint.count < 3) {
+        return;
+    }
     float focal[3];
     float position[3] = {0, 0, 0};
     populateFloatArrayFromNSArray(_focalPoint, focal, 3);

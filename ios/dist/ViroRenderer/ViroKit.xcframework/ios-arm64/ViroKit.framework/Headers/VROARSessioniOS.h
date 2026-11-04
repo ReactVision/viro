@@ -261,10 +261,12 @@ public:
 
     // AR Session Recording API (see VROARSessionRecorderIOS)
     bool isRecordingSupported() const override;
+    bool isRecordingDepthSupported() const override;
     void startRecording(const VROARRecordingConfig &config,
                          std::function<void()> onSuccess,
                          std::function<void(std::string error)> onFailure) override;
-    void stopRecording() override;
+    using VROARSession::stopRecording;
+    void stopRecording(std::function<void(const VROARRecordingResult &result)> onStopped) override;
     VROARRecordingStatus getRecordingStatus() const override;
 
     /*

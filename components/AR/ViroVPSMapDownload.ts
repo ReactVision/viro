@@ -33,7 +33,7 @@ import {
   vpsJson,
   vpsStudioFetch,
 } from "./ViroVPSClient";
-import type { ViroVPSScanQuality } from "./ViroVPSScanUpload";
+import type { ViroVPSScan, ViroVPSScanQuality } from "./ViroVPSScanUpload";
 
 export type ViroVPSNearbyLocation = {
   id: string;
@@ -52,6 +52,8 @@ export type ViroVPSMapDownload = {
   expires_at: number;
   bytes: number;
   quality: ViroVPSScanQuality | null;
+  /** Where the map sits on Earth, as the scan's `geo`. */
+  geo?: ViroVPSScan["geo"];
 };
 
 /** `GET /vps/locations?lat=&lon=&radius_m=&limit=`: nearest first. */
@@ -71,18 +73,61 @@ export async function findNearbyLocations(
   return body.locations ?? [];
 }
 
-/** `GET /vps/locations/{id}/{kind}`: a signed link to a file of the location's active scan. */
-async function locationFile<T>(
+/**
+ * `GET /vps/locations/{id}/{kind}`: a signed, credential-free link to a file
+ * of the location's active scan, valid for 15 minutes. Throws a ViroVPSError
+ * with status 404 and code `NO_ASSET` when the location has no active scan or
+ * that scan has no such file. `mesh`, `splat` and `poses` need a secret key, a
+ * user token or a session.
+ */
+export function getLocationFileDownload(
   locationId: string,
-  kind: string,
-  connection: ViroVPSConnection | undefined
-): Promise<T> {
+  kind: "map",
+  connection?: ViroVPSConnection
+): Promise<ViroVPSMapDownload>;
+export function getLocationFileDownload(
+  locationId: string,
+  kind: ViroVPSAssetKind,
+  connection?: ViroVPSConnection
+): Promise<ViroVPSAssetDownload>;
+export async function getLocationFileDownload(
+  locationId: string,
+  kind: ViroVPSAssetKind,
+  connection?: ViroVPSConnection
+): Promise<ViroVPSAssetDownload> {
   return (await vpsStudioFetch(
     await resolveVPSStudio(connection),
-    `/vps/locations/${encodeURIComponent(locationId)}/${kind}`,
+    `/vps/locations/${encodeURIComponent(locationId)}/${encodeURIComponent(kind)}`,
     {},
     vpsJson
-  )) as T;
+  )) as ViroVPSAssetDownload;
+}
+
+/**
+ * `GET /vps/scans/{id}/{kind}`: as getLocationFileDownload(), for one scan,
+ * accepted or not.
+ */
+export function getScanFileDownload(
+  scanId: string,
+  kind: "map",
+  connection?: ViroVPSConnection
+): Promise<ViroVPSMapDownload>;
+export function getScanFileDownload(
+  scanId: string,
+  kind: ViroVPSAssetKind,
+  connection?: ViroVPSConnection
+): Promise<ViroVPSAssetDownload>;
+export async function getScanFileDownload(
+  scanId: string,
+  kind: ViroVPSAssetKind,
+  connection?: ViroVPSConnection
+): Promise<ViroVPSAssetDownload> {
+  return (await vpsStudioFetch(
+    await resolveVPSStudio(connection),
+    `/vps/scans/${encodeURIComponent(scanId)}/${encodeURIComponent(kind)}`,
+    {},
+    vpsJson
+  )) as ViroVPSAssetDownload;
 }
 
 /**
@@ -95,7 +140,7 @@ export function getLocationMapDownload(
   locationId: string,
   connection?: ViroVPSConnection
 ): Promise<ViroVPSMapDownload> {
-  return locationFile(locationId, "map", connection);
+  return getLocationFileDownload(locationId, "map", connection);
 }
 
 /** The files a location (or scan) can have; see Studio's docs/vps-api.md. */
@@ -120,7 +165,7 @@ export function getLocationWorldMeshDownload(
   locationId: string,
   connection?: ViroVPSConnection
 ): Promise<ViroVPSAssetDownload> {
-  return locationFile(locationId, "world_mesh", connection);
+  return getLocationFileDownload(locationId, "world_mesh", connection);
 }
 
 /**
@@ -148,7 +193,7 @@ export function getLocationSemanticDownload(
   locationId: string,
   connection?: ViroVPSConnection
 ): Promise<ViroVPSAssetDownload> {
-  return locationFile(locationId, "semantic", connection);
+  return getLocationFileDownload(locationId, "semantic", connection);
 }
 
 function isVec3(v: unknown): v is [number, number, number] {

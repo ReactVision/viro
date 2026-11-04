@@ -27,6 +27,7 @@
 #ifndef VROARSession_h
 #define VROARSession_h
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <set>
@@ -146,6 +147,20 @@ struct VROARRecordingConfig {
      VROARSession::setDepthCaptureEnabled().
      */
     bool depth = false;
+};
+
+/*
+ What a finished recording wrote, passed to stopRecording()'s callback once
+ video.mp4, session.jsonl and any depth files are complete.
+ */
+struct VROARRecordingResult {
+    bool success = false;
+    std::string error;        // Empty on success
+    double durationSec = 0;   // First to last recorded frame
+    int frames = 0;           // Camera frames, one `pose` line each
+    int depthFrames = 0;      // `depth` lines (PNG pairs) written
+    int gpsFixes = 0;         // `pose` lines carrying a `gps` object
+    int64_t bytes = -1;       // Size of every file written; < 0 when unknown
 };
 
 /*
@@ -982,6 +997,14 @@ public:
     }
 
     /*
+     Returns true if this session can also record depth (see
+     VROARRecordingConfig::depth): LiDAR on iOS, the Depth API on ARCore.
+     */
+    virtual bool isRecordingDepthSupported() const {
+        return false;
+    }
+
+    /*
      Start recording video + IMU + ground-truth pose/anchors to config.outputDir.
      onSuccess is invoked once recording has actually started (files created,
      writers running); onFailure with a message otherwise — including
@@ -996,10 +1019,22 @@ public:
     }
 
     /*
-     Stop recording and finalize video.mp4 + session.jsonl. No-op if not
-     currently recording.
+     Stop recording and finalize video.mp4 + session.jsonl. onStopped is invoked
+     once the files are complete, with success false (error "Not recording")
+     if no recording was running. May block the calling thread while the
+     writers finish.
      */
-    virtual void stopRecording() {}
+    virtual void stopRecording(std::function<void(const VROARRecordingResult &result)> onStopped) {
+        if (onStopped) {
+            VROARRecordingResult result;
+            result.error = "Recording not supported";
+            onStopped(result);
+        }
+    }
+
+    void stopRecording() {
+        stopRecording(nullptr);
+    }
 
     /*
      The current recording state. See VROARRecordingStatus.

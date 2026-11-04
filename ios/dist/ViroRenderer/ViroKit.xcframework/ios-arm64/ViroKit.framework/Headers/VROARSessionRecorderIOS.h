@@ -57,9 +57,10 @@ public:
 
     /*
      Stop recording: stop the IMU taps, finish the AVAssetWriter, close the
-     sidecar. Safe to call when not recording (no-op).
+     sidecar. Blocks until the files are complete and returns what was written.
+     Safe to call when not recording: returns success false, "Not recording".
      */
-    void stop();
+    VROARRecordingResult stop();
 
     VROARRecordingStatus getStatus() const;
 
@@ -114,6 +115,12 @@ public:
 private:
 
     VROARRecordingStatus _status;
+    // True from a successful start() until stop(); _status alone cannot tell, since a
+    // failed finish leaves it at IOError after the recording has ended.
+    bool _running;
+    // True while stop() finishes the video and closes the files (up to 20 s). start() refuses
+    // meanwhile: a new recording would share the folder, counters and sidecar the stop is closing.
+    std::atomic<bool> _stopping;
     std::string _outputDir;
     double _startTimestamp; // ARFrame.timestamp of the first recorded frame, for relative t
 
@@ -129,6 +136,11 @@ private:
     size_t _videoHeight;
     // Last recorded ARFrame.timestamp; drops duplicates so poses match frames 1:1.
     double _lastFrameTimestamp;
+    // `pose` lines buffered, those of them carrying a `gps` object, and the last one's
+    // ARFrame.timestamp. Guarded by _sidecarMutex: stop() reads them off the AR thread.
+    int _poseCount;
+    int _gpsFixCount;
+    double _lastPoseTimestamp;
 
     // --- Depth (ARFrame.sceneDepth on LiDAR devices; PNGs written off the AR thread) ---
     bool _depthRequested;
@@ -139,6 +151,9 @@ private:
     dispatch_queue_t _depthQueue;
     // Depth frames handed to _depthQueue and not yet written; bounds memory if the disk stalls.
     std::atomic<int> _depthPending;
+    // Depth frames whose PNGs and `depth` line were written, and the PNGs' size.
+    std::atomic<int> _depthWritten;
+    std::atomic<int64_t> _depthBytes;
 
     // --- Raw IMU tap (independent of ARKit; CMMotionManager's raw, un-fused
     // accelerometer/gyro APIs, not the fused CMDeviceMotion path) ---

@@ -412,7 +412,8 @@ export type ViroTrackingState =
 export type ViroTrackingReason =
   | ViroARTrackingReasonConstants.TRACKING_REASON_NONE
   | ViroARTrackingReasonConstants.TRACKING_REASON_EXCESSIVE_MOTION
-  | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES;
+  | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_FEATURES
+  | ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_LIGHT;
 
 export type ViroAmbientLightUpdateEvent = {
   ambientLightInfo: ViroAmbientLightInfo;
@@ -834,6 +835,27 @@ export type ViroRecordingOptions = {
    * @default false
    */
   depth?: boolean;
+};
+
+/**
+ * What `ViroARSceneNavigator.stopRecording()` resolves to, once video.mp4, session.jsonl and
+ * any depth files are complete.
+ */
+export type ViroRecordingResult = {
+  /** True when every file was written and closed and at least one frame was recorded. */
+  success: boolean;
+  /** Why the recording failed. Set whenever `success` is false. */
+  error?: string;
+  /** Seconds from the first to the last recorded frame. */
+  durationSec: number;
+  /** Camera frames recorded, one `pose` line each in session.jsonl. */
+  frames: number;
+  /** Depth frames written under `depth/`; 0 for a recording without depth. */
+  depthFrames: number;
+  /** `pose` lines carrying a GPS fix. */
+  gpsFixes: number;
+  /** Size in bytes of every file the recording wrote, when known. */
+  bytes?: number;
 };
 
 /**

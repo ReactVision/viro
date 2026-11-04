@@ -95,10 +95,29 @@ import {
   fetchAssetBytes,
   getLocationSemanticDownload,
   fetchLocationSemanticObjects,
+  getLocationFileDownload,
+  getScanFileDownload,
 } from "./components/AR/ViroVPSMapDownload";
+import {
+  listLocations,
+  getLocation,
+  createLocation,
+  renameLocation,
+  deleteLocation,
+  listScans,
+} from "./components/AR/ViroVPSLocations";
 import { queryLocationsByImage } from "./components/AR/ViroVPSQuery";
-import { uploadScanRecording, getScan } from "./components/AR/ViroVPSScanUpload";
-import { ViroVPSError } from "./components/AR/ViroVPSClient";
+import { uploadScanRecording, getScan, deleteScan } from "./components/AR/ViroVPSScanUpload";
+import { ViroVPSError, ViroVPSErrorCodes, getVPSServerAddress } from "./components/AR/ViroVPSClient";
+import {
+  createViroCaptureGuidance,
+  createViroCaptureHitSampler,
+  nearestHitDistance,
+  VIRO_CAPTURE_HINTS,
+  VIRO_CAPTURE_RULES,
+} from "./components/AR/ViroCaptureGuidance";
+import { useViroCaptureGuidance } from "./components/hooks/useViroCaptureGuidance";
+import { useViroTrackingReady } from "./components/hooks/useViroTrackingReady";
 import { createUserTokenCredentials } from "./components/AR/ViroUserTokenCredentials";
 import { ViroARScene } from "./components/AR/ViroARScene";
 import { ViroARSceneNavigator } from "./components/AR/ViroARSceneNavigator";
@@ -187,7 +206,32 @@ export type {
   ViroVPSCredentialsProvider,
   ViroVPSCredentialsRequest,
   ViroVPSCredentialsSource,
+  ViroVPSErrorCode,
 } from "./components/AR/ViroVPSClient";
+export type {
+  ViroVPSLocation,
+  ViroVPSActiveScanSummary,
+  ViroVPSLocationPage,
+  ViroVPSScanPage,
+  ViroVPSPageOptions,
+} from "./components/AR/ViroVPSLocations";
+export type {
+  ViroCaptureHint,
+  ViroCaptureRules,
+  ViroCaptureGuidance,
+  ViroCaptureGuidanceState,
+  ViroCaptureHitResult,
+  ViroCaptureHitSampler,
+  ViroCaptureHitSamplerOptions,
+} from "./components/AR/ViroCaptureGuidance";
+export type {
+  ViroCaptureGuidanceOptions,
+  ViroCaptureGuidanceResult,
+} from "./components/hooks/useViroCaptureGuidance";
+export type {
+  ViroTrackingReadyOptions,
+  ViroTrackingReadyResult,
+} from "./components/hooks/useViroTrackingReady";
 export type {
   ViroUserToken,
   ViroUserTokenCredentials,
@@ -375,6 +419,7 @@ import {
   ViroEarthTrackingState,
   ViroRecordingStatus,
   ViroRecordingOptions,
+  ViroRecordingResult,
   ViroVPSAvailability,
   ViroGeospatialAnchorType,
   ViroQuaternion,
@@ -472,7 +517,25 @@ export {
   queryLocationsByImage,
   uploadScanRecording,
   getScan,
+  deleteScan,
+  getLocationFileDownload,
+  getScanFileDownload,
+  listLocations,
+  getLocation,
+  createLocation,
+  renameLocation,
+  deleteLocation,
+  listScans,
+  getVPSServerAddress,
   ViroVPSError,
+  ViroVPSErrorCodes,
+  createViroCaptureGuidance,
+  createViroCaptureHitSampler,
+  nearestHitDistance,
+  VIRO_CAPTURE_HINTS,
+  VIRO_CAPTURE_RULES,
+  useViroCaptureGuidance,
+  useViroTrackingReady,
   createUserTokenCredentials,
   ViroARScene,
   ViroARSceneNavigator,
@@ -646,6 +709,7 @@ export {
   ViroEarthTrackingState,
   ViroRecordingStatus,
   ViroRecordingOptions,
+  ViroRecordingResult,
   ViroVPSAvailability,
   ViroGeospatialAnchorType,
   ViroQuaternion,

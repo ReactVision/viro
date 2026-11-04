@@ -126,7 +126,15 @@ typedef void (^RecordingStartCompletionHandler)(BOOL success,
                  depth:(BOOL)depth
       completionHandler:(RecordingStartCompletionHandler)completionHandler;
 
-- (void)stopRecording;
+// Called once video.mp4, session.jsonl and any depth files are complete, with
+// success, error, durationSec, frames, depthFrames, gpsFixes and bytes (left
+// out when unknown). Called on a background queue.
+typedef void (^RecordingStopCompletionHandler)(NSDictionary * _Nonnull result);
+
+- (void)stopRecording:(RecordingStopCompletionHandler)completionHandler;
+
+// depth also asks whether the device can record depth (LiDAR).
+- (BOOL)isRecordingSupported:(BOOL)depth;
 
 // One of "None", "Recording", "IOError", "Unsupported" — mirrors
 // VROARRecordingStatus (VROARSession.h).

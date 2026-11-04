@@ -435,11 +435,13 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
         });
     }
 
+    // Resolves once the files are complete, with the same keys as iOS: success, error,
+    // durationSec, frames, depthFrames, gpsFixes and bytes (left out when unknown).
     @ReactMethod
     public void stopRecording(final int sceneNavTag, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) {
-            promise.resolve(null);
+            promise.resolve(recordingFailure("UIManager not available"));
             return;
         }
 
@@ -447,10 +449,59 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
                 View view = resolveViewOrNull(viewResolver, sceneNavTag);
-                if (view instanceof VRTARSceneNavigator) {
-                    ((VRTARSceneNavigator) view).stopRecording();
+                if (!(view instanceof VRTARSceneNavigator)) {
+                    promise.resolve(recordingFailure("Invalid view type"));
+                    return;
                 }
-                promise.resolve(null);
+                ((VRTARSceneNavigator) view).stopRecording(result -> {
+                    if (result == null) {
+                        promise.resolve(recordingFailure("AR scene not available"));
+                        return;
+                    }
+                    WritableMap map = Arguments.createMap();
+                    map.putBoolean("success", result.success);
+                    if (result.error != null) {
+                        map.putString("error", result.error);
+                    }
+                    map.putDouble("durationSec", result.durationSec);
+                    map.putInt("frames", result.frames);
+                    map.putInt("depthFrames", result.depthFrames);
+                    map.putInt("gpsFixes", result.gpsFixes);
+                    if (result.bytes >= 0) {
+                        map.putDouble("bytes", result.bytes);
+                    }
+                    promise.resolve(map);
+                });
+            }
+        });
+    }
+
+    private static WritableMap recordingFailure(String error) {
+        WritableMap map = Arguments.createMap();
+        map.putBoolean("success", false);
+        map.putString("error", error);
+        map.putDouble("durationSec", 0);
+        map.putInt("frames", 0);
+        map.putInt("depthFrames", 0);
+        map.putInt("gpsFixes", 0);
+        return map;
+    }
+
+    @ReactMethod
+    public void isRecordingSupported(final int sceneNavTag, final ReadableMap options, final Promise promise) {
+        UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
+        if (uiManager == null) {
+            promise.resolve(false);
+            return;
+        }
+        final boolean depth = options != null && options.hasKey("depth") && options.getBoolean("depth");
+
+        ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
+            @Override
+            public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
+                View view = resolveViewOrNull(viewResolver, sceneNavTag);
+                promise.resolve(view instanceof VRTARSceneNavigator
+                        && ((VRTARSceneNavigator) view).isRecordingSupported(depth));
             }
         });
     }
@@ -459,7 +510,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
     public void getRecordingStatus(final int sceneNavTag, final Promise promise) {
         UIManager uiManager = UIManagerHelper.getUIManager(getReactApplicationContext(), sceneNavTag);
         if (uiManager == null) {
-            promise.resolve("UNSUPPORTED");
+            promise.resolve("Unsupported");
             return;
         }
 
@@ -470,7 +521,7 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
                 if (view instanceof VRTARSceneNavigator) {
                     promise.resolve(((VRTARSceneNavigator) view).getRecordingStatus());
                 } else {
-                    promise.resolve("UNSUPPORTED");
+                    promise.resolve("Unsupported");
                 }
             }
         });

@@ -13,8 +13,11 @@ import androidx.work.OutOfQuotaPolicy;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.UiThreadUtil;
+import com.facebook.react.bridge.WritableMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -52,6 +55,8 @@ final class VpsScanUpload {
     private static final String WORK_NAME_PREFIX = "viro-vps-upload-";
     // Lets a call refused as a duplicate tell whether its zip is the one the running work reads.
     private static final String ZIP_TAG_PREFIX = "viro-vps-upload-zip:";
+    /** JS: uploadScanRecording()'s onProgress in components/AR/ViroVPSScanUpload.ts. */
+    private static final String PROGRESS_EVENT = "ViroVPSUploadProgress";
 
     private VpsScanUpload() {}
 
@@ -78,9 +83,14 @@ final class VpsScanUpload {
         return json("success", true, "path", zip.getAbsolutePath(), "bytes", zip.length());
     }
 
-    /** Blocks on WorkManager's database, so call it off the main thread. */
+    /**
+     * Blocks on WorkManager's database, so call it off the main thread. With
+     * "progress": true in the request and a ReactContext, emits the device event
+     * ViroVPSUploadProgress {scan_id, sent, total} while the worker sends the zip.
+     */
     static void transfer(Context context, String requestJson, final Promise promise) {
         final Context appContext = context.getApplicationContext();
+        final ReactContext reactContext = context instanceof ReactContext ? (ReactContext) context : null;
         JSONObject request;
         try {
             request = new JSONObject(requestJson);
@@ -143,12 +153,18 @@ final class VpsScanUpload {
         }
 
         final UUID workId = work.getId();
+        final boolean progress = reactContext != null && request.optBoolean("progress");
         UiThreadUtil.runOnUiThread(() -> {
             final LiveData<WorkInfo> live = workManager.getWorkInfoByIdLiveData(workId);
             live.observeForever(new Observer<WorkInfo>() {
+                private long mLastSent = -1;
+
                 @Override
                 public void onChanged(WorkInfo info) {
-                    if (info != null && !info.getState().isFinished()) return;
+                    if (info != null && !info.getState().isFinished()) {
+                        if (progress) reportProgress(info.getProgress());
+                        return;
+                    }
                     live.removeObserver(this);
                     String result = info != null ? info.getOutputData().getString(KEY_RESULT) : null;
                     if (result == null) {
@@ -159,6 +175,23 @@ final class VpsScanUpload {
                                 "error", "The upload ended without a result (" + state + ")");
                     }
                     promise.resolve(result);
+                }
+
+                private void reportProgress(Data data) {
+                    long sent = data.getLong(VpsScanUploadWorker.KEY_PROGRESS_SENT, -1);
+                    long total = data.getLong(VpsScanUploadWorker.KEY_PROGRESS_TOTAL, -1);
+                    if (sent < 0 || total <= 0 || sent == mLastSent) return;
+                    mLastSent = sent;
+                    if (!reactContext.hasActiveReactInstance()) return;
+                    WritableMap event = Arguments.createMap();
+                    event.putString("scan_id", scanId);
+                    event.putDouble("sent", sent);
+                    event.putDouble("total", total);
+                    try {
+                        reactContext.emitDeviceEvent(PROGRESS_EVENT, event);
+                    } catch (RuntimeException ignored) {
+                        // The React instance went away between the check and the emit.
+                    }
                 }
             });
         });

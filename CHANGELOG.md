@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- **Capture guidance for recording a place (`createViroCaptureGuidance`, `useViroCaptureGuidance`).** Live hints while an AR recording is made for a VPS scan: turning too fast (`fast`), pointing at the floor or ceiling (`pitch`), standing too close (`close`) and pointing at nothing with detail (`blank`), plus a count of tracking jumps. The engine is pure and takes poses, centre hit distances and ticks; the hook samples the centre hit test every `intervalMs` (default 250), gives up on one still pending after `hitTestTimeoutMs` (default 1000), and returns the hint and an `onCameraTransformUpdate` handler to pass to `ViroARScene`. Hints are ids, so the app supplies the wording. `VIRO_CAPTURE_RULES` holds the default thresholds, and `rules` overrides any of them.
+- **`useViroTrackingReady(state, { normalMs, limitedMs })`.** Ready once tracking has been normal for 1 s, or limited for 4 s, and never while unavailable, the wait before a recording is worth starting. `getLimitedSeconds()` reports how long tracking spent other than normal.
+- **`onTrackingUpdated` on `ViroARSceneNavigator`.** Receives the current scene's tracking updates, so an app no longer mounts a scene only to pass them up through `viroAppProps`. The scene's own `onTrackingUpdated` is still called first. `ViroXRSceneNavigator` passes it on, except on Quest and visionOS.
+- **`ViroARTrackingReasonConstants.TRACKING_REASON_INSUFFICIENT_LIGHT` (4).** Android already sent it; iOS does not report it.
+- **The rest of Studio's VPS device routes:** `listLocations`, `getLocation`, `createLocation`, `renameLocation`, `deleteLocation`, `listScans` and `deleteScan`, with `limit` and `cursor` paging on the lists, and `getVPSServerAddress`. `getLocationFileDownload(locationId, kind)` and `getScanFileDownload(scanId, kind)` give a signed link to any file of a location's active scan or of one scan. Each takes a `ViroVPSConnection` last, like `findNearbyLocations`.
+- **`ViroVPSErrorCodes`,** the codes viro itself gives a `ViroVPSError`, as constants.
+- **`onProgress(sentBytes, totalBytes)` on `uploadScanRecording`,** at most four times a second, on iOS and Android. If Android restarts the transfer, the count starts again from 0.
+- **`stopRecording()` resolves to a `ViroRecordingResult`** once video.mp4, session.jsonl and any depth files are complete: `{ success, error?, durationSec, frames, depthFrames, gpsFixes, bytes? }`. It resolved to nothing before, so an app had to wait for the files and read session.jsonl to learn what was recorded.
+- **`isRecordingSupported({ depth })` on the AR scene navigator.** On Android it answers false until the AR session has started, so ask after the first tracking update.
+
+### Changed
+
+- **`ViroVPSScan` types `outputs`, `keep_recording`, `app_user_id`, `queued_at`, `started_at` and `finished_at`,** which Studio already sent, and `mesh_quality`, which a server older than mesh quality leaves out. Code that builds `ViroVPSScan` objects by hand must add the first six. `ViroVPSMapDownload` types `geo`.
+- **`uploadScanRecording` reads credentials again just before sending,** so the complete call carries current ones rather than those read before zipping. A credentials function is now called twice per upload.
+- **Scenes rendered by `ViroARSceneNavigator` remount once after upgrading,** because each is now wrapped in the provider that relays tracking updates.
+
+### Fixed
+
+- **A scan upload that loses its connection fails with code `NETWORK_ERROR`.** It had no code, which read the same as a recording that could not be read. A refused certificate is not tagged.
+- **An Android hit test always settles (`performARHitTestWithPoint`, the ray and position hit tests, the scene hit test).** The renderer held the result listener only weakly, so once the garbage collector took it the promise never settled; a recording that hit-tested every 250 ms lost one about 11 s in on a Pixel 6 Pro. Needs the matching `viro_renderer-release.aar`.
+- **Android `getRecordingStatus()` returns `"Unsupported"` when the AR view cannot be found,** not `"UNSUPPORTED"`, matching every other path on both platforms.
+
 ## v3.1.0 — 27 October 2026
 
 ### Added

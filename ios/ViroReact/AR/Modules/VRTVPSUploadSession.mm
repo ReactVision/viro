@@ -11,8 +11,37 @@
 static NSString *const kRVUploadSessionId = @"com.reactvision.viro.vps-upload";
 static const NSTimeInterval kRVZipMaxAge = 7 * 24 * 60 * 60;
 static const NSUInteger kRVMaxBodyBytes = 64 * 1024;
+static const NSTimeInterval kRVProgressInterval = 0.25;
 
 static void (^sEventsCompletionHandler)(void);
+
+// The request never reached the server or its answer never came back, as
+// opposed to a missing zip, a cancelled task or a bad URL.
+static BOOL RVUploadIsNetworkError(NSError *error) {
+    if (![error.domain isEqualToString:NSURLErrorDomain]) return NO;
+    switch (error.code) {
+        case NSURLErrorTimedOut:
+        case NSURLErrorCannotFindHost:
+        case NSURLErrorCannotConnectToHost:
+        case NSURLErrorNetworkConnectionLost:
+        case NSURLErrorDNSLookupFailed:
+        case NSURLErrorNotConnectedToInternet:
+        case NSURLErrorInternationalRoamingOff:
+        case NSURLErrorCallIsActive:
+        case NSURLErrorDataNotAllowed:
+        case NSURLErrorCannotLoadFromNetwork:
+            return YES;
+        default:
+            return NO;
+    }
+}
+
+static NSDictionary *RVUploadFailure(NSString *stage, NSError *error, NSString *fallback) {
+    NSMutableDictionary *result = [@{@"success": @NO, @"stage": stage,
+                                     @"error": error.localizedDescription ?: fallback} mutableCopy];
+    if (RVUploadIsNetworkError(error)) result[@"code"] = @"NETWORK_ERROR";
+    return result;
+}
 
 static NSString *RVUploadJson(NSDictionary *object) {
     NSData *data = [NSJSONSerialization dataWithJSONObject:object options:0 error:nil];
@@ -141,6 +170,9 @@ static void RVRemoveUploadZip(NSString *path) {
     NSMutableDictionary<NSString *, void (^)(NSString *)> *_completions;
     NSMutableDictionary<NSString *, RVUploadBackgroundTime *> *_backgroundTimes;
     NSMutableDictionary<NSNumber *, NSMutableData *> *_bodies;
+    // Keyed by upload task identifier, for this process's transfers that asked for progress.
+    NSMutableDictionary<NSNumber *, void (^)(int64_t)> *_progress;
+    NSMutableDictionary<NSNumber *, NSNumber *> *_progressAt;
 }
 
 + (BOOL)handleEventsForBackgroundURLSession:(NSString *)identifier
@@ -188,6 +220,8 @@ static void RVRemoveUploadZip(NSString *path) {
     _completions = [NSMutableDictionary dictionary];
     _backgroundTimes = [NSMutableDictionary dictionary];
     _bodies = [NSMutableDictionary dictionary];
+    _progress = [NSMutableDictionary dictionary];
+    _progressAt = [NSMutableDictionary dictionary];
 
     NSOperationQueue *delegateQueue = [[NSOperationQueue alloc] init];
     delegateQueue.maxConcurrentOperationCount = 1;
@@ -236,9 +270,11 @@ static void RVRemoveUploadZip(NSString *path) {
     });
 }
 
-- (void)transfer:(NSString *)requestJson completion:(void (^)(NSString *))completion {
+- (void)transfer:(NSString *)requestJson
+        progress:(void (^)(NSString *, int64_t, int64_t))progress
+      completion:(void (^)(NSString *))completion {
     [self whenTasksLoaded:^{
-        [self startTransfer:requestJson completion:completion];
+        [self startTransfer:requestJson progress:progress completion:completion];
     }];
 }
 
@@ -253,7 +289,9 @@ static void RVRemoveUploadZip(NSString *path) {
     if (path && ![_zips.allValues containsObject:path]) RVRemoveUploadZip(path);
 }
 
-- (void)startTransfer:(NSString *)requestJson completion:(void (^)(NSString *))completion {
+- (void)startTransfer:(NSString *)requestJson
+             progress:(void (^)(NSString *, int64_t, int64_t))progress
+           completion:(void (^)(NSString *))completion {
     NSDictionary *request = RVUploadObject(requestJson);
     NSString *scanId = RVUploadString(request[@"scan_id"]);
     NSString *zipPath = RVUploadString(request[@"zip_path"]);
@@ -333,6 +371,11 @@ static void RVRemoveUploadZip(NSString *path) {
     NSURLSessionUploadTask *task = [_background uploadTaskWithRequest:put fromFile:[NSURL fileURLWithPath:zipPath]];
     // Read back in didCompleteWithError, possibly by a later process.
     task.taskDescription = RVUploadJson(job);
+    id wantsProgress = request[@"progress"];
+    if (progress && [wantsProgress isKindOfClass:[NSNumber class]] && [wantsProgress boolValue]) {
+        void (^report)(NSString *, int64_t, int64_t) = [progress copy];
+        _progress[@(task.taskIdentifier)] = [^(int64_t sent) { report(scanId, sent, bytes); } copy];
+    }
     [task resume];
 }
 
@@ -346,10 +389,27 @@ static void RVRemoveUploadZip(NSString *path) {
     if (body.length < kRVMaxBodyBytes) [body appendData:data];
 }
 
+- (void)URLSession:(NSURLSession *)session
+                 task:(NSURLSessionTask *)task
+      didSendBodyData:(int64_t)bytesSent
+       totalBytesSent:(int64_t)totalBytesSent
+totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
+    NSNumber *key = @(task.taskIdentifier);
+    void (^progress)(int64_t) = _progress[key];
+    if (!progress) return;
+    NSTimeInterval now = [NSProcessInfo processInfo].systemUptime;
+    BOOL last = totalBytesExpectedToSend > 0 && totalBytesSent >= totalBytesExpectedToSend;
+    if (!last && now - [_progressAt[key] doubleValue] < kRVProgressInterval) return;
+    _progressAt[key] = @(now);
+    progress(totalBytesSent);
+}
+
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
     NSNumber *key = @(task.taskIdentifier);
     NSData *body = _bodies[key];
     [_bodies removeObjectForKey:key];
+    [_progress removeObjectForKey:key];
+    [_progressAt removeObjectForKey:key];
 
     NSDictionary *job = RVUploadObject(task.taskDescription);
     NSString *scanId = RVUploadString(job[@"scan_id"]);
@@ -359,8 +419,7 @@ static void RVRemoveUploadZip(NSString *path) {
     RVRemoveUploadZip(zipPath);
 
     if (error) {
-        [self settle:scanId result:@{@"success": @NO, @"stage": @"upload",
-                                     @"error": error.localizedDescription ?: @"Upload failed"}];
+        [self settle:scanId result:RVUploadFailure(@"upload", error, @"Upload failed")];
         return;
     }
     NSInteger status = RVUploadStatus(task.response);
@@ -425,8 +484,7 @@ static void RVRemoveUploadZip(NSString *path) {
                 return;
             }
             if (error) {
-                [self settle:scanId result:@{@"success": @NO, @"stage": @"complete",
-                                             @"error": error.localizedDescription ?: @"Complete call failed"}];
+                [self settle:scanId result:RVUploadFailure(@"complete", error, @"Complete call failed")];
                 return;
             }
             BOOL ok = status >= 200 && status < 300;

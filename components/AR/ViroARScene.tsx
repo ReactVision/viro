@@ -61,6 +61,15 @@ const ViroCameraModule = withMissingModuleFallback(
   "ViroCameraModule"
 );
 
+/**
+ * How a scene's tracking updates reach the `onTrackingUpdated` prop of the
+ * `ViroARSceneNavigator` rendering it. The value must stay the same function
+ * across renders, or every scene re-renders with the navigator.
+ */
+export const ViroARTrackingRelayContext = React.createContext<
+  (state: ViroTrackingState, reason: ViroTrackingReason) => void
+>(() => {});
+
 type Props = ViroCommonProps & {
   displayPointCloud?: {
     imageSource?: ViroSource;
@@ -124,6 +133,8 @@ type State = {
 let warnedOnTrackingInitialized = false;
 
 export class ViroARScene extends ViroBase<Props, State> {
+  static contextType = ViroARTrackingRelayContext;
+  declare context: React.ContextType<typeof ViroARTrackingRelayContext>;
   state: State = { activeCameraTag: null };
   onTrackingFirstInitialized = false;
   _unmounting = false;
@@ -247,11 +258,15 @@ export class ViroARScene extends ViroBase<Props, State> {
   _onTrackingUpdated = (
     event: NativeSyntheticEvent<ViroTrackingUpdatedEvent>
   ) => {
-    if (this.props.onTrackingUpdated) {
-      this.props.onTrackingUpdated(
-        event.nativeEvent.state,
-        event.nativeEvent.reason
-      );
+    try {
+      if (this.props.onTrackingUpdated) {
+        this.props.onTrackingUpdated(
+          event.nativeEvent.state,
+          event.nativeEvent.reason
+        );
+      }
+    } finally {
+      this.context?.(event.nativeEvent.state, event.nativeEvent.reason);
     }
 
     // TODO VIRO-3172: Remove in favor of deprecating onTrackingInitialized

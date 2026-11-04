@@ -60,6 +60,8 @@ struct RVVPSSlot {
 // something else flushes it (observed 10 to 40 s late in bridgeless mode).
 // The registry returns the interop wrapper, hence the paper-view unwrap.
 @synthesize viewRegistry_DEPRECATED = _viewRegistry_DEPRECATED;
+// Device events (ViroVPSUploadProgress), as RCTEventEmitter sends them.
+@synthesize callableJSModules = _callableJSModules;
 
 static const int kRVViewLookupMaxFrames = 60;
 
@@ -526,15 +528,33 @@ RCT_EXPORT_METHOD(startRecordingWithOptions:(nonnull NSNumber *)reactTag
     }];
 }
 
+// Resolves once the files are complete; see VRTARSceneNavigator's stopRecording: for the keys.
 RCT_EXPORT_METHOD(stopRecording:(nonnull NSNumber *)reactTag
                          resolve:(RCTPromiseResolveBlock)resolve
                           reject:(RCTPromiseRejectBlock)reject) {
     [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
         VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
-        if ([view isKindOfClass:[VRTARSceneNavigator class]]) {
-            [(VRTARSceneNavigator *)view stopRecording];
+        if (![view isKindOfClass:[VRTARSceneNavigator class]]) {
+            resolve(@{ @"success": @NO, @"error": @"Invalid view type", @"durationSec": @0,
+                       @"frames": @0, @"depthFrames": @0, @"gpsFixes": @0 });
+            return;
         }
-        resolve(nil);
+        [(VRTARSceneNavigator *)view stopRecording:^(NSDictionary *result) {
+            resolve(result);
+        }];
+    }];
+}
+
+RCT_EXPORT_METHOD(isRecordingSupported:(nonnull NSNumber *)reactTag
+                               options:(NSDictionary *)options
+                               resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject) {
+    BOOL depth = [options[@"depth"] boolValue];
+    [self rv_withViewForTag:reactTag block:^(RCTViewRegistry *viewRegistry) {
+        VRTView *view = (VRTView *)RCTPaperViewOrCurrentView([viewRegistry viewForReactTag:reactTag]);
+        BOOL supported = [view isKindOfClass:[VRTARSceneNavigator class]] &&
+                         [(VRTARSceneNavigator *)view isRecordingSupported:depth];
+        resolve(@(supported));
     }];
 }
 
@@ -1781,11 +1801,20 @@ RCT_EXPORT_METHOD(rvPrepareScanRecording:(NSString *)outputDir
 // PUTs a prepared zip to Storage on a background NSURLSession, then POSTs
 // complete_url; see VRTVPSUploadSession. Resolves, never rejects, a JSON
 // string: {success, stage: "upload"|"complete", scan_id, status?, body?,
-// error?, code?}.
+// error?, code?}. With "progress": true in the request, emits the device
+// event ViroVPSUploadProgress {scan_id, sent, total} while the zip is sent.
 RCT_EXPORT_METHOD(rvTransferScanRecording:(NSString *)requestJson
                                   resolve:(RCTPromiseResolveBlock)resolve
                                    reject:(RCTPromiseRejectBlock)reject) {
-    [[VRTVPSUploadSession shared] transfer:requestJson ?: @"" completion:^(NSString *resultJson) {
+    __weak __typeof(self) weakSelf = self;
+    [[VRTVPSUploadSession shared] transfer:requestJson ?: @""
+                                  progress:^(NSString *scanId, int64_t sent, int64_t total) {
+        [weakSelf.callableJSModules invokeModule:@"RCTDeviceEventEmitter"
+                                          method:@"emit"
+                                        withArgs:@[@"ViroVPSUploadProgress",
+                                                   @{@"scan_id": scanId, @"sent": @(sent), @"total": @(total)}]];
+    }
+                                completion:^(NSString *resultJson) {
         resolve(resultJson);
     }];
 }

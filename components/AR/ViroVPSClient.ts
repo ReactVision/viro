@@ -91,14 +91,33 @@ export type ViroVPSConnection = {
 const APP_USER_ID = /^[\x21-\x7e]{1,255}$/;
 
 /**
+ * The codes viro itself gives a ViroVPSError, with no status. Any other code
+ * is the server's.
+ */
+export const ViroVPSErrorCodes = Object.freeze({
+  /** No response, or none within the time limit. Also an upload whose transfer lost its connection. */
+  NETWORK_ERROR: "NETWORK_ERROR",
+  CREDENTIALS_UNAVAILABLE: "CREDENTIALS_UNAVAILABLE",
+  INVALID_APP_USER_ID: "INVALID_APP_USER_ID",
+  /** uploadScanRecording()'s options. */
+  BAD_REQUEST: "BAD_REQUEST",
+  /** An address that is not https or the local network, for the app's own credentials. */
+  ENDPOINT_NOT_ALLOWED: "ENDPOINT_NOT_ALLOWED",
+  /** Studio gave out no VPS server address. */
+  VPS_SERVER_NOT_CONFIGURED: "VPS_SERVER_NOT_CONFIGURED",
+  UNSUPPORTED: "UNSUPPORTED",
+  /** The scan's recording is already being uploaded, by this process or an earlier one. */
+  UPLOAD_IN_PROGRESS: "UPLOAD_IN_PROGRESS",
+} as const);
+
+export type ViroVPSErrorCode = (typeof ViroVPSErrorCodes)[keyof typeof ViroVPSErrorCodes];
+
+/**
  * A failed VPS request, or a local step around one (reading the recording,
  * fetching a signed map URL). `code` and `status` are the server's, when the
- * failure came from a response. Codes this package sets, with no status:
- * `NETWORK_ERROR` (no response), `CREDENTIALS_UNAVAILABLE`,
- * `INVALID_APP_USER_ID`, `BAD_REQUEST` (uploadScanRecording()'s options),
- * `VPS_SERVER_NOT_CONFIGURED` (Studio gave out no VPS server address) and
- * `UNSUPPORTED`. Studio answers the same mistakes with the same two codes and
- * status 400.
+ * failure came from a response; otherwise `code` is one of
+ * {@link ViroVPSErrorCodes}, or absent. Studio answers `INVALID_APP_USER_ID`
+ * and `BAD_REQUEST` mistakes with the same codes and status 400.
  *
  * `scanId` is set by uploadScanRecording() when its scan exists on the
  * server but the recording did not arrive: pass it back as
@@ -465,6 +484,18 @@ const serverAddresses = new Map<string, { at: number; url: Promise<string> }>();
 /** For tests: forget the VPS server addresses Studio gave out. */
 export function clearVPSServerAddresses(): void {
   serverAddresses.clear();
+}
+
+/**
+ * `GET /vps/server`: the VPS server address Studio gives out for image search
+ * and server-mode localisation, null when it has none. Asked afresh on every
+ * call, and not checked against the addresses viro sends credentials to.
+ */
+export async function getVPSServerAddress(connection?: ViroVPSConnection): Promise<string | null> {
+  const body = (await vpsStudioFetch(await resolveVPSStudio(connection), "/vps/server", {}, vpsJson)) as {
+    url?: unknown;
+  };
+  return typeof body?.url === "string" && body.url ? body.url : null;
 }
 
 /**

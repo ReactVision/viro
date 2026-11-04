@@ -45,4 +45,6 @@ export enum ViroARTrackingReasonConstants {
   TRACKING_REASON_NONE = 1,
   TRACKING_REASON_EXCESSIVE_MOTION = 2,
   TRACKING_REASON_INSUFFICIENT_FEATURES = 3,
+  /** Too dark to track well. Android (ARCore) only: ARKit has no such reason. */
+  TRACKING_REASON_INSUFFICIENT_LIGHT = 4,
 }

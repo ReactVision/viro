@@ -32,6 +32,7 @@ import {
   ViroUsagePingSuppressed,
 } from "./Utilities/ViroUsagePing";
 import type { Viro3DPoint } from "./Types/ViroUtils";
+import type { ViroTrackingReason, ViroTrackingState } from "./Types/ViroEvents";
 
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
   | {
@@ -166,6 +167,8 @@ type Props = ViewProps & {
   numberOfTrackedImages?: number;
   /** AR depth/people occlusion. Flows via ...rest to ViroARSceneNavigator. */
   occlusionMode?: "peopleOnly" | "depthBased";
+  /** See ViroARSceneNavigator's `onTrackingUpdated`. Not relayed on Quest or visionOS. */
+  onTrackingUpdated?: (state: ViroTrackingState, reason: ViroTrackingReason) => void;
 
   // ── Forwarded to ViroVRSceneNavigator (Quest path via bridge) ──────────────
   vrModeEnabled?: boolean;

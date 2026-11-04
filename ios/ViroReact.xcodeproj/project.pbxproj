@@ -34,7 +34,7 @@
 		8A130D811E3AAEA10050D83B /* VRTSound.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A130D801E3AAEA10050D83B /* VRTSound.mm */; };
 		8A130D901E3BC0690050D83B /* VRTSoundManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A130D8F1E3BC0690050D83B /* VRTSoundManager.mm */; };
 		8A130DAE1E43A8AB0050D83B /* VRTSoundModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A130DAD1E43A8AB0050D83B /* VRTSoundModule.mm */; };
-		8A2161D02036558500D60008 /* ViroKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8AFCC4F520056B1000AD8B8D /* ViroKit.framework */; };
+		8A2161D02036558500D60008 /* ViroKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8AFCC4F520056B1000AD8B8D /* ViroKit.xcframework */; };
 		8A26F6C7211E471B001E7032 /* VRTARObjectMarkerManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A26F6C6211E471B001E7032 /* VRTARObjectMarkerManager.mm */; };
 		8A26F6CF211E478B001E7032 /* VRTARObjectMarker.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8A26F6CE211E478B001E7032 /* VRTARObjectMarker.mm */; };
 		8A2DA3C71F9438A7001FC3BA /* VRTARUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 8A2DA3C61F9438A7001FC3BA /* VRTARUtils.m */; };
@@ -143,7 +143,6 @@
 		8BDDA17C1E5BF02E00A42870 /* VRTUtils.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4801DFA15880032AB99 /* VRTUtils.h */; };
 		8BDDA17D1E5BF02E00A42870 /* VRTVideoSurfaceManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4821DFA15880032AB99 /* VRTVideoSurfaceManager.h */; };
 		8BDDA17E1E5BF02E00A42870 /* VRTViewContainerManager.h in Copy Headers to ios/dist/include */ = {isa = PBXBuildFile; fileRef = 8BE0D4F31DFA3D9B0032AB99 /* VRTViewContainerManager.h */; };
-		8BDDA1801E5BFBBF00A42870 /* libViroReact.a in Copy Files */ = {isa = PBXBuildFile; fileRef = 8BE0D4541DFA0D050032AB99 /* libViroReact.a */; };
 		8BE0D4991DFA15880032AB99 /* ViroViewManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D4681DFA15880032AB99 /* ViroViewManager.mm */; };
 		8BE0D49A1DFA15880032AB99 /* VRT360ImageManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D46A1DFA15880032AB99 /* VRT360ImageManager.mm */; };
 		8BE0D49B1DFA15880032AB99 /* VRT360VideoManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BE0D46C1DFA15880032AB99 /* VRT360VideoManager.mm */; };
@@ -905,17 +904,6 @@
 			name = "Copy Headers to ios/dist/include";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8BDDA17F1E5BFB9000A42870 /* Copy Files */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "${SRCROOT}/dist/lib";
-			dstSubfolderSpec = 0;
-			files = (
-				8BDDA1801E5BFBBF00A42870 /* libViroReact.a in Copy Files */,
-			);
-			name = "Copy Files";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		8BE0D4521DFA0D050032AB99 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -995,7 +983,7 @@
 		8AEFA22D1EF34487006851B7 /* VRTARAnchorNode.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTARAnchorNode.mm; path = ViroReact/AR/Views/VRTARAnchorNode.mm; sourceTree = "<group>"; };
 		8AFC1C351EC1001C0000F7EB /* VRTPolyline.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTPolyline.h; path = ViroReact/Views/VRTPolyline.h; sourceTree = "<group>"; };
 		8AFC1C361EC1001C0000F7EB /* VRTPolyline.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTPolyline.mm; path = ViroReact/Views/VRTPolyline.mm; sourceTree = "<group>"; };
-		8AFCC4F520056B1000AD8B8D /* ViroKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ViroKit.framework; path = dist/ViroRenderer/ViroKit.framework; sourceTree = "<group>"; };
+		8AFCC4F520056B1000AD8B8D /* ViroKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = ViroKit.xcframework; path = dist/ViroRenderer/ViroKit.xcframework; sourceTree = "<group>"; };
 		8AFCC4F620056B1100AD8B8D /* ViroKit.podspec */ = {isa = PBXFileReference; lastKnownFileType = text; name = ViroKit.podspec; path = dist/ViroRenderer/ViroKit.podspec; sourceTree = "<group>"; };
 		8B78C9851F9DE61900967DF1 /* VRTARHitTestUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VRTARHitTestUtil.h; path = ViroReact/Utility/VRTARHitTestUtil.h; sourceTree = "<group>"; };
 		8B78C9881F9DE61A00967DF1 /* VRTARHitTestUtil.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = VRTARHitTestUtil.mm; path = ViroReact/Utility/VRTARHitTestUtil.mm; sourceTree = "<group>"; };
@@ -1210,7 +1198,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8A2161D02036558500D60008 /* ViroKit.framework in Frameworks */,
+				8A2161D02036558500D60008 /* ViroKit.xcframework in Frameworks */,
 				59B520CD9761AD39BC81C7CB /* libPods-ViroReact.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1288,7 +1276,7 @@
 		8AFCC4F920056B1700AD8B8D /* ViroRenderer */ = {
 			isa = PBXGroup;
 			children = (
-				8AFCC4F520056B1000AD8B8D /* ViroKit.framework */,
+				8AFCC4F520056B1000AD8B8D /* ViroKit.xcframework */,
 				8AFCC4F620056B1100AD8B8D /* ViroKit.podspec */,
 			);
 			name = ViroRenderer;
@@ -1695,8 +1683,7 @@
 				8BE0D4511DFA0D050032AB99 /* Frameworks */,
 				8BE0D4521DFA0D050032AB99 /* CopyFiles */,
 				8BDDA13E1E5BEFD000A42870 /* Copy Headers to ios/dist/include */,
-				8BDDA17F1E5BFB9000A42870 /* Copy Files */,
-				13A6EC6F20B76B5200873F9B /* Lipo static library */,
+				13A6EC6F20B76B5200873F9B /* Stage ViroReact.xcframework */,
 			);
 			buildRules = (
 			);
@@ -2267,19 +2254,19 @@
 /* End PBXReferenceProxy section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		13A6EC6F20B76B5200873F9B /* Lipo static library */ = {
+		13A6EC6F20B76B5200873F9B /* Stage ViroReact.xcframework */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
 			);
-			name = "Lipo static library";
+			name = "Stage ViroReact.xcframework";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "VIROREACT_DIST_PATH=${SRCROOT}/dist/\n\nmkdir -p $VIROREACT_DIST_PATH/lib\ncp -r $TARGET_BUILD_DIR/libViroReact.a $VIROREACT_DIST_PATH/lib/libViroReact.a\n";
+			shellScript = "# Stage the archive into dist/lib/ViroReact.xcframework. Only this platform's slice is replaced, so\n# a device build and a simulator build can run in either order and each keeps the other's slice.\n# A simulator slice must carry arm64 and x86_64: an app's Release simulator build asks for both,\n# and CocoaPods will not pick a slice that lacks one. Builds of the active arch only are skipped.\nif [ \"$PLATFORM_NAME\" = iphonesimulator ]; then\n  case \" $ARCHS \" in *\" arm64 \"*) ;; *) echo \"warning: not staging a simulator slice without arm64 ($ARCHS)\"; exit 0 ;; esac\n  case \" $ARCHS \" in *\" x86_64 \"*) ;; *) echo \"warning: not staging a simulator slice without x86_64 ($ARCHS)\"; exit 0 ;; esac\nfi\nDIST=\"$SRCROOT/dist/lib\"\nXCFRAMEWORK=\"$DIST/ViroReact.xcframework\"\nSTAGE=\"$TARGET_TEMP_DIR/xcframework-slices\"\nset -e\nrm -rf \"$STAGE\"\nmkdir -p \"$STAGE/$PLATFORM_NAME\" \"$DIST\"\ncp \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\" \"$STAGE/$PLATFORM_NAME/\"\nset -- -library \"$STAGE/$PLATFORM_NAME/$FULL_PRODUCT_NAME\"\ni=0\nwhile id=$(/usr/libexec/PlistBuddy -c \"Print :AvailableLibraries:$i:LibraryIdentifier\" \"$XCFRAMEWORK/Info.plist\" 2>/dev/null); do\n  platform=iphoneos\n  if /usr/libexec/PlistBuddy -c \"Print :AvailableLibraries:$i:SupportedPlatformVariant\" \"$XCFRAMEWORK/Info.plist\" 2>/dev/null | grep -q simulator; then\n    platform=iphonesimulator\n  fi\n  i=$((i + 1))\n  [ \"$platform\" = \"$PLATFORM_NAME\" ] && continue\n  mkdir -p \"$STAGE/$platform\"\n  cp \"$XCFRAMEWORK/$id/$FULL_PRODUCT_NAME\" \"$STAGE/$platform/\"\n  set -- \"$@\" -library \"$STAGE/$platform/$FULL_PRODUCT_NAME\"\ndone\nxcodebuild -create-xcframework \"$@\" -output \"$STAGE/ViroReact.xcframework\"\nrm -rf \"$XCFRAMEWORK\"\nmv \"$STAGE/ViroReact.xcframework\" \"$XCFRAMEWORK\"\n";
 		};
 		50C8E889DD95560E347681F6 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2613,9 +2600,14 @@
 			baseConfigurationReference = AB4ED2A244DA92CFDC77EE77 /* Pods-ViroReact.debug.xcconfig */;
 			buildSettings = {
 				ENABLE_BITCODE = NO;
-				FRAMEWORK_SEARCH_PATHS = (
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/dist/ViroRenderer",
+					"$(PROJECT_DIR)/dist/ViroRenderer/ViroKit.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/dist/ViroRenderer/ViroKit.xcframework/ios-arm64_x86_64-simulator",
 				);
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../Examples/node_modules/react-native/React/**",
@@ -2639,9 +2631,14 @@
 			baseConfigurationReference = B23F778D18583A1428591854 /* Pods-ViroReact.release.xcconfig */;
 			buildSettings = {
 				ENABLE_BITCODE = YES;
-				FRAMEWORK_SEARCH_PATHS = (
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/dist/ViroRenderer",
+					"$(PROJECT_DIR)/dist/ViroRenderer/ViroKit.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/dist/ViroRenderer/ViroKit.xcframework/ios-arm64_x86_64-simulator",
 				);
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				HEADER_SEARCH_PATHS = (

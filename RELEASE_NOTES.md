@@ -38,6 +38,10 @@
 
 - **Studio scenes render in the ImmersiveSpace.** They rooted in `ViroARScene`, which renders nothing on visionOS, so a Studio scene was blank. They now root in `ViroScene`, as on Meta Quest, in shared sessions too.
 
+### iOS Simulator
+
+- **Apps using Viro build and run in the iOS Simulator.** ViroKit and the bridge ship as `ViroKit.xcframework` and `ViroReact.xcframework`, each with a simulator slice (arm64 and x86_64) beside the device one.
+
 ### Everywhere
 
 - **Every scene navigator sends one usage ping when it mounts,** replacing the device registration Spatial used to do. It carries no API key. Turn it off with `ViroTelemetry.setEnabled(false)` or the Expo plugin's `telemetry: false`. The iOS privacy manifest now ships with the pod.
@@ -48,11 +52,13 @@
 - **Physics runs at real time on every display,** ARCore reports the ambient light again, and a paused AR session stays paused when its options change.
 - **Sounds seek to fractional seconds,** `Viro360Image` takes `stereoMode`, shared frames answer `{ success: false }` outside Quest, and calls that do nothing on a platform say so once.
 - **visionOS:** spot light cones and morph targets match the other platforms.
-- `ViroKit.framework` targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.
+- ViroKit targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.
 
 ### Check when upgrading
 
 - **A `style` on a scene navigator now applies.** It was silently dropped before, so check the layout of any navigator you pass one.
 - **`cloudAnchorProvider` and `geospatialAnchorProvider` are honoured** when `provider` is not set. An app that still passes `cloudAnchorProvider="arcore"` now uses ARCore Cloud Anchors and needs a Google Cloud API key; remove the prop or pass `provider` to keep ReactVision's.
+
+- **The iOS binaries moved** to `ios/dist/ViroRenderer/ViroKit.xcframework` and `ios/dist/lib/ViroReact.xcframework`. The podspecs and the Expo plugin need nothing, but a script or Podfile that names `ViroKit.framework` or `libViroReact.a` by path needs the new ones. The plugin no longer excludes arm64 from simulator builds and removes the exclusion it used to write, so run `expo prebuild` again.
 
 See `CHANGELOG.md` for every change.

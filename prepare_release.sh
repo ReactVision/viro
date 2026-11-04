@@ -113,10 +113,23 @@ else
 fi
 
 echo '========================================================================='
+echo 'Checking the iOS ViroKit slices'
+echo '========================================================================='
+
+# virocore's build replaces one slice of ViroKit.xcframework at a time, so a release can lose
+# the device or the simulator slice without any build failing here.
+for slice in ios-arm64 ios-arm64_x86_64-simulator; do
+    if [ ! -f "ios/dist/ViroRenderer/ViroKit.xcframework/$slice/ViroKit.framework/ViroKit" ]; then
+        echo -e "Missing $slice slice in ios/dist/ViroRenderer/ViroKit.xcframework!" >&2
+        exit 1
+    fi
+done
+
+echo '========================================================================='
 echo 'Checking the iOS bridge archive against its sources'
 echo '========================================================================='
 
-# iOS links ios/dist/lib/libViroReact.a, rebuilt by hand from ViroReact.xcodeproj, and the
+# iOS links ios/dist/lib/ViroReact.xcframework, rebuilt by hand from ViroReact.xcodeproj, and the
 # podspec drops every bridge .mm from the compile when that archive exists. A source that is
 # not in the Xcode target is therefore in the tarball but in no iOS build: 3.0.2 shipped
 # VRTObjectDetectorView that way and <ViroObjectDetector /> failed to mount on every iPhone.

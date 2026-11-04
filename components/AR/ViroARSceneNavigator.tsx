@@ -1005,7 +1005,10 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * Whether this device can record the AR session with `startRecording`, and with
    * `{ depth: true }`, also record depth (iOS with LiDAR, Android with the ARCore Depth API).
    * On Android both answers are false until the AR session has started, so ask
-   * after the first tracking update.
+   * after the first tracking update. On iOS, `{ depth: true }` answers whether the
+   * device has LiDAR, not whether the session is delivering scene depth: depth is
+   * recorded only when `depthCaptureEnabled` is set on the navigator, and otherwise
+   * the recording has none, and its header says so.
    */
   _isRecordingSupported = async (
     options?: ViroRecordingOptions

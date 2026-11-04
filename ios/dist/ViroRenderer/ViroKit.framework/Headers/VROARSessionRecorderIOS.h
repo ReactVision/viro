@@ -118,6 +118,9 @@ private:
     // True from a successful start() until stop(); _status alone cannot tell, since a
     // failed finish leaves it at IOError after the recording has ended.
     bool _running;
+    // True while stop() finishes the video and closes the files (up to 20 s). start() refuses
+    // meanwhile: a new recording would share the folder, counters and sidecar the stop is closing.
+    std::atomic<bool> _stopping;
     std::string _outputDir;
     double _startTimestamp; // ARFrame.timestamp of the first recorded frame, for relative t
 

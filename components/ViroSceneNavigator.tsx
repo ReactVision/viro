@@ -527,26 +527,32 @@ export class ViroSceneNavigator extends React.Component<Props, State> {
       vrModeEnabled = true, // default to true
     } = this.props;
 
+    // The caller's style goes on a View; see ViroARSceneNavigator.
     return (
-      <VRTSceneNavigator
-        ref={(component) => {
-          this._component = component;
-        }}
-        {...this.props}
-        vrModeEnabled={vrModeEnabled}
-        viroAppProps={appProps ?? {}}
-        currentSceneIndex={this.state.currentSceneIndex}
-        style={[styles.container, this.props.style]}
-        hasOnExitViroCallback={this.props.onExitViro != undefined}
-        onExitViro={this._onExitViro}
-      >
-        {items}
-      </VRTSceneNavigator>
+      <View style={[styles.root, this.props.style]}>
+        <VRTSceneNavigator
+          ref={(component) => {
+            this._component = component;
+          }}
+          {...this.props}
+          vrModeEnabled={vrModeEnabled}
+          viroAppProps={appProps ?? {}}
+          currentSceneIndex={this.state.currentSceneIndex}
+          style={styles.container}
+          hasOnExitViroCallback={this.props.onExitViro != undefined}
+          onExitViro={this._onExitViro}
+        >
+          {items}
+        </VRTSceneNavigator>
+      </View>
     );
   }
 }
 
 var styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",

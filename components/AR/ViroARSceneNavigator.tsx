@@ -2327,29 +2327,37 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       ...restProps
     } = this.props;
 
+    // The caller's style goes on a plain View: Viro's native views take
+    // `position` as a 3D vector, and on Android a style `position` reaches that
+    // prop and throws, which a release build answers by tearing React down.
     return (
-      <VRTARSceneNavigator
-        ref={(component) => {
-          this._component = component;
-        }}
-        {...restProps}
-        cloudAnchorProvider={provider ?? cloudAnchorProvider ?? "reactvision"}
-        geospatialAnchorProvider={
-          provider ?? geospatialAnchorProvider ?? "reactvision"
-        }
-        viroAppProps={appProps ?? {}}
-        currentSceneIndex={this.state.currentSceneIndex}
-        style={[styles.container, this.props.style]}
-        key={this.state.internalRemountKey}
-        onTabSwitch={this._onTabSwitch}
-      >
-        {items}
-      </VRTARSceneNavigator>
+      <View style={[styles.root, this.props.style]}>
+        <VRTARSceneNavigator
+          ref={(component) => {
+            this._component = component;
+          }}
+          {...restProps}
+          cloudAnchorProvider={provider ?? cloudAnchorProvider ?? "reactvision"}
+          geospatialAnchorProvider={
+            provider ?? geospatialAnchorProvider ?? "reactvision"
+          }
+          viroAppProps={appProps ?? {}}
+          currentSceneIndex={this.state.currentSceneIndex}
+          style={styles.container}
+          key={this.state.internalRemountKey}
+          onTabSwitch={this._onTabSwitch}
+        >
+          {items}
+        </VRTARSceneNavigator>
+      </View>
     );
   }
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",

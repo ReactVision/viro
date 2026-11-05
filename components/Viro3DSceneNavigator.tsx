@@ -526,20 +526,23 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
     const appProps = withoutRootTag(this.props.viroAppProps);
     this.sceneNavigator.viroAppProps = appProps;
 
+    // The caller's style goes on a View; see ViroARSceneNavigator.
     return (
-      <VRT3DSceneNavigator
-        ref={(component) => {
-          this._component = component;
-        }}
-        {...this.props}
-        viroAppProps={appProps ?? {}}
-        currentSceneIndex={this.state.currentSceneIndex}
-        style={[styles.container, this.props.style]}
-        hasOnExitViroCallback={!!this.props.onExitViro}
-        onExitViro={this._onExitViro}
-      >
-        {items}
-      </VRT3DSceneNavigator>
+      <View style={[styles.root, this.props.style]}>
+        <VRT3DSceneNavigator
+          ref={(component) => {
+            this._component = component;
+          }}
+          {...this.props}
+          viroAppProps={appProps ?? {}}
+          currentSceneIndex={this.state.currentSceneIndex}
+          style={styles.container}
+          hasOnExitViroCallback={!!this.props.onExitViro}
+          onExitViro={this._onExitViro}
+        >
+          {items}
+        </VRT3DSceneNavigator>
+      </View>
     );
   }
 }
@@ -556,6 +559,9 @@ var styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     textAlign: "center",
+  },
+  root: {
+    flex: 1,
   },
   container: {
     flex: 1,

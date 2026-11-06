@@ -8,6 +8,7 @@ import { registerViroAnimations } from "../Web/viroAnimationRegistry";
 export type {
   ViroRegisterableAnimation,
   ViroAnimationDict,
+  ViroAnimationChain,
   ViroAnimationChainDict,
   ViroAnimationProp,
   ViroAnimation,

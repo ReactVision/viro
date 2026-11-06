@@ -91,6 +91,7 @@ type State = {
  * Viro3DSceneNavigator is used to transition between multiple scenes.
  */
 export class Viro3DSceneNavigator extends React.Component<Props, State> {
+  // The native navigator; see ViroARSceneNavigator._component.
   _component: ViroNativeRef = null;
 
   static contextType = ViroUsagePingSuppressed;
@@ -452,7 +453,7 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
   }
 
   _recenterTracking() {
-    Viro3DSceneNavigatorModule.recenterTracking(findNodeHandle(this));
+    Viro3DSceneNavigatorModule.recenterTracking(findNodeHandle(this._component));
   }
 
   _renderSceneStackItems() {
@@ -476,14 +477,14 @@ export class Viro3DSceneNavigator extends React.Component<Props, State> {
 
   async _project(point: Viro3DPoint) {
     return await Viro3DSceneNavigatorModule.project(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       point
     );
   }
 
   async _unproject(point: Viro3DPoint) {
     return await Viro3DSceneNavigatorModule.unproject(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       point
     );
   }

@@ -91,6 +91,7 @@ let warnedDeprecated = false;
  */
 export class ViroSceneNavigator extends React.Component<Props, State> {
   // TODO: type of this component (native component)
+  // The native navigator; see ViroARSceneNavigator._component.
   _component: any;
 
   static contextType = ViroUsagePingSuppressed;
@@ -466,18 +467,18 @@ export class ViroSceneNavigator extends React.Component<Props, State> {
   }
 
   async _project(point: Viro3DPoint) {
-    return await ViroSceneNavigatorModule.project(findNodeHandle(this), point);
+    return await ViroSceneNavigatorModule.project(findNodeHandle(this._component), point);
   }
 
   async _unproject(point: Viro3DPoint) {
     return await ViroSceneNavigatorModule.unproject(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       point
     );
   }
 
   _recenterTracking() {
-    ViroSceneNavigatorModule.recenterTracking(findNodeHandle(this));
+    ViroSceneNavigatorModule.recenterTracking(findNodeHandle(this._component));
   }
 
   _renderSceneStackItems() {

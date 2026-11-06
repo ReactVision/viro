@@ -189,6 +189,7 @@
 - **An Android hit test always settles (`performARHitTestWithPoint`, the ray and position hit tests, the scene hit test).** The renderer held the result listener only weakly, so once the garbage collector took it the promise never settled; a recording that hit-tested every 250 ms lost one about 11 s in on a Pixel 6 Pro. Needs the matching `viro_renderer-release.aar`.
 - **Android `getRecordingStatus()` returns `"Unsupported"` when the AR view cannot be found,** not `"UNSUPPORTED"`, matching every other path on both platforms.
 - **iOS `ViroOrbitCamera` orbits its `focalPoint` when it also has a `position`.** The renderer adds the camera's position to the focal point it is given, so iOS orbited a point offset by `position`. The bridge now passes the focal point relative to `position`, and updates it when either changes, so it stays a world point as on Android.
+- **`ViroAnimationDict` types animation chains (`ViroAnimations`, #600).** An entry may be an animation, the name of a registered one, or an array of these, nested to any depth, as both native parsers read it, so a sequence such as `{ float: [["floatUp", "floatDown"]] }` no longer needs a cast. `ViroAnimationChain`, `ViroAnimationDict` and `ViroRegisterableAnimation` are exported, and a `color` inside a chain is processed like one at the top level; it reached the native side unprocessed.
 
 ## v3.0.3 — 6 October 2026
 

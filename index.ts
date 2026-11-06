@@ -165,6 +165,11 @@ export type {
   ViroMapCameraState,
   ViroMapCameraOptions,
 } from "./components/useViroMapCamera";
+export type {
+  ViroAnimationChain,
+  ViroAnimationDict,
+  ViroRegisterableAnimation,
+} from "./components/Animation/ViroAnimations";
 export type { ViroARCloudAnchorProps } from "./components/AR/ViroARCloudAnchor";
 export type { ViroSharedFrameProps } from "./components/AR/ViroSharedFrame";
 export type {

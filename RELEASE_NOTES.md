@@ -50,6 +50,8 @@
 - **Text sits where its vertical alignment puts it,** and no longer disappears after a front-culled material.
 - **Video:** a paused iOS video stays paused, and Android play and pause reach the player in the order they were made.
 - **Physics runs at real time on every display,** ARCore reports the ambient light again, and a paused AR session stays paused when its options change.
+- **Animation chains type-check:** `registerAnimations` accepts names and nested sequences, as the native side always did, and colors inside a chain are processed.
+- **Android: a `ViroARCamera` no longer crashes the scene as it mounts,** and GLB characters with one skin per mesh animate every part.
 - **Sounds seek to fractional seconds,** `Viro360Image` takes `stereoMode`, shared frames answer `{ success: false }` outside Quest, and calls that do nothing on a platform say so once.
 - **visionOS:** spot light cones and morph targets match the other platforms.
 - ViroKit targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.

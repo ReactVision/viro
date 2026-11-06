@@ -99,7 +99,7 @@ export function ViroQuestEntryPoint() {
   React.useEffect(() => {
     if (!intent) return;
     const t = setTimeout(() => {
-      const tag = findNodeHandle(navRef.current);
+      const tag = findNodeHandle(navRef.current?._component ?? null);
       if (tag != null) VRQuestNavigatorBridge.setViewTag(tag);
     }, 100);
     return () => {

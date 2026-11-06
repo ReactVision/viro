@@ -141,6 +141,7 @@ type Props = ViewProps & {
  * On Meta Quest use ViroXRSceneNavigator instead.
  */
 export class ViroVRSceneNavigator extends React.Component<Props, State> {
+  // The native navigator; see ViroARSceneNavigator._component.
   _component: ViroNativeRef = null;
 
   static contextType = ViroUsagePingSuppressed;
@@ -501,16 +502,16 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
   }
 
   _recenterTracking = () => {
-    ViroSceneNavigatorModule.recenterTracking(findNodeHandle(this));
+    ViroSceneNavigatorModule.recenterTracking(findNodeHandle(this._component));
   };
 
   _project = async (point: Viro3DPoint) => {
-    return await ViroSceneNavigatorModule.project(findNodeHandle(this), point);
+    return await ViroSceneNavigatorModule.project(findNodeHandle(this._component), point);
   };
 
   _unproject = async (point: Viro3DPoint) => {
     return await ViroSceneNavigatorModule.unproject(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       point
     );
   };
@@ -527,7 +528,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
    */
   _takeScreenshot = async (fileName: string, saveToCameraRoll: boolean) => {
     return await VRCapture.takeScreenshot(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       fileName,
       saveToCameraRoll
     );
@@ -545,7 +546,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     onError: (errorCode: number) => void
   ) => {
     VRCapture.startVideoRecording(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       fileName,
       saveToCameraRoll,
       onError
@@ -554,7 +555,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
 
   /** Stops the recording. Resolves `{ success, url, errorCode }`. */
   _stopVideoRecording = async () => {
-    return await VRCapture.stopVideoRecording(findNodeHandle(this));
+    return await VRCapture.stopVideoRecording(findNodeHandle(this._component));
   };
 
   _renderSceneStackItems() {
@@ -621,20 +622,23 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     const appProps = withoutRootTag(this.props.viroAppProps);
     this.sceneNavigator.viroAppProps = appProps;
 
+    // The caller's style goes on a View; see ViroARSceneNavigator.
     return (
-      <VRTVRSceneNavigator
-        ref={(component) => {
-          this._component = component;
-        }}
-        {...this.props}
-        viroAppProps={appProps ?? {}}
-        currentSceneIndex={this.state.currentSceneIndex}
-        style={[styles.container, this.props.style]}
-        hasOnExitViroCallback={this.props.onExitViro != undefined}
-        onExitViro={this._onExitViro}
-      >
-        {items}
-      </VRTVRSceneNavigator>
+      <View style={[styles.root, this.props.style]}>
+        <VRTVRSceneNavigator
+          ref={(component) => {
+            this._component = component;
+          }}
+          {...this.props}
+          viroAppProps={appProps ?? {}}
+          currentSceneIndex={this.state.currentSceneIndex}
+          style={styles.container}
+          hasOnExitViroCallback={this.props.onExitViro != undefined}
+          onExitViro={this._onExitViro}
+        >
+          {items}
+        </VRTVRSceneNavigator>
+      </View>
     );
   }
 }
@@ -651,6 +655,9 @@ var styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     textAlign: "center",
+  },
+  root: {
+    flex: 1,
   },
   container: {
     flex: 1,

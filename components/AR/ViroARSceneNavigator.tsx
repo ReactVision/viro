@@ -382,6 +382,8 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   static _visionOSWarningLogged = false;
   static contextType = ViroUsagePingSuppressed;
   declare context: React.ContextType<typeof ViroUsagePingSuppressed>;
+  // The native navigator. Native calls take its tag, never findNodeHandle(this),
+  // which is the View that wraps it to carry the caller's style.
   _component: ViroNativeRef = null;
 
   constructor(props: Props) {
@@ -450,7 +452,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   componentWillUnmount() {
     // Explicitly trigger native cleanup to prevent memory leaks
     // This ensures ARSession is properly paused and GL resources are released
-    const nodeHandle = findNodeHandle(this);
+    const nodeHandle = findNodeHandle(this._component);
     if (nodeHandle) {
       ViroARSceneNavigatorModule.cleanup(nodeHandle);
     }
@@ -470,7 +472,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     onError: (errorCode: number) => void
   ) => {
     ViroARSceneNavigatorModule.startVideoRecording(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       fileName,
       saveToCameraRoll,
       onError
@@ -485,7 +487,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _stopVideoRecording = async () => {
     return await ViroARSceneNavigatorModule.stopVideoRecording(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -498,7 +500,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _takeScreenshot = async (fileName: string, saveToCameraRoll: boolean) => {
     return await ViroARSceneNavigatorModule.takeScreenshot(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       fileName,
       saveToCameraRoll
     );
@@ -512,7 +514,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _project = async (point: Viro3DPoint) => {
     return await ViroARSceneNavigatorModule.project(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       point
     );
   };
@@ -525,7 +527,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _unproject = async (point: Viro3DPoint) => {
     return await ViroARSceneNavigatorModule.unproject(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       point
     );
   };
@@ -898,7 +900,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       return;
     }
     ViroARSceneNavigatorModule.resetARSession(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       resetTracking,
       removeAnchors
     );
@@ -921,7 +923,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       return;
     }
     ViroARSceneNavigatorModule.setWorldOrigin(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       worldOrigin
     );
   };
@@ -967,13 +969,13 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       NativeModules.VRTARSceneNavigatorModule?.startRecordingWithOptions != null
     ) {
       return await ViroARSceneNavigatorModule.startRecordingWithOptions(
-        findNodeHandle(this),
+        findNodeHandle(this._component),
         outputDir,
         { depth: true }
       );
     }
     return await ViroARSceneNavigatorModule.startRecording(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       outputDir
     );
   };
@@ -988,7 +990,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _stopRecording = async (): Promise<ViroRecordingResult> => {
     const result: ViroRecordingResult | null | undefined =
-      await ViroARSceneNavigatorModule.stopRecording(findNodeHandle(this));
+      await ViroARSceneNavigatorModule.stopRecording(findNodeHandle(this._component));
     return (
       result ?? {
         success: false,
@@ -1013,7 +1015,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _isRecordingSupported = async (
     options?: ViroRecordingOptions
   ): Promise<boolean> => {
-    const nodeHandle = findNodeHandle(this);
+    const nodeHandle = findNodeHandle(this._component);
     if (
       !nodeHandle ||
       NativeModules.VRTARSceneNavigatorModule?.isRecordingSupported == null
@@ -1033,7 +1035,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _getRecordingStatus = async (): Promise<ViroRecordingStatus> => {
     return await ViroARSceneNavigatorModule.getRecordingStatus(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -1042,7 +1044,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     ttlDays: number = 1
   ): Promise<ViroHostCloudAnchorResult> => {
     return await ViroARSceneNavigatorModule.hostCloudAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       anchorId,
       Math.max(1, Math.min(365, ttlDays)) // Clamp to valid range
     );
@@ -1062,7 +1064,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     cloudAnchorId: string
   ): Promise<ViroResolveCloudAnchorResult> => {
     return await ViroARSceneNavigatorModule.resolveCloudAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       cloudAnchorId
     );
   };
@@ -1078,7 +1080,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _getCloudAnchorStatus = async (): Promise<ViroCloudAnchorStatus> => {
     return await ViroARSceneNavigatorModule.getCloudAnchorStatus(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -1088,7 +1090,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _cancelCloudAnchorOperations = () => {
     ViroARSceneNavigatorModule.cancelCloudAnchorOperations(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -1099,7 +1101,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * does not require tapping/placing an anchor first.
    */
   _startScan = () => {
-    ViroARSceneNavigatorModule.rvStartScan(findNodeHandle(this));
+    ViroARSceneNavigatorModule.rvStartScan(findNodeHandle(this._component));
   };
 
   /**
@@ -1113,7 +1115,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _finishScan = async (
     ttlDays: number = 1
   ): Promise<ViroFinishScanResult> => {
-    const nodeHandle = findNodeHandle(this);
+    const nodeHandle = findNodeHandle(this._component);
     const result: ViroFinishScanResult =
       await ViroARSceneNavigatorModule.rvFinishScan(
         nodeHandle,
@@ -1138,7 +1140,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _getScanStatus = async (): Promise<ViroScanStatus> => {
     try {
       return parseScanStatus(
-        await ViroARSceneNavigatorModule.rvGetScanStatus(findNodeHandle(this))
+        await ViroARSceneNavigatorModule.rvGetScanStatus(findNodeHandle(this._component))
       );
     } catch (error) {
       return { available: false, error: String(error) };
@@ -1172,7 +1174,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     try {
       return parseVPSMapLoadResult(
         await ViroARSceneNavigatorModule.rvLoadVPSMap(
-          findNodeHandle(this),
+          findNodeHandle(this._component),
           bytesToBase64(rvmapBytes),
           load
         )
@@ -1188,7 +1190,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * meant for a load that a newer one replaced does nothing. Without it, always.
    */
   _unloadVPSMap = (load: number = 0) => {
-    ViroARSceneNavigatorModule.rvUnloadVPSMap(findNodeHandle(this), load);
+    ViroARSceneNavigatorModule.rvUnloadVPSMap(findNodeHandle(this._component), load);
   };
 
   /**
@@ -1200,7 +1202,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _startVPSServerSession = async (load: number = 0): Promise<ViroVPSMapLoadResult> => {
     try {
       return parseVPSMapLoadResult(
-        await ViroARSceneNavigatorModule.rvStartVPSServerSession(findNodeHandle(this), load)
+        await ViroARSceneNavigatorModule.rvStartVPSServerSession(findNodeHandle(this._component), load)
       );
     } catch (error) {
       return { success: false, error: String(error) };
@@ -1221,7 +1223,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     try {
       return parseVPSMapLoadResult(
         await ViroARSceneNavigatorModule.rvReportVPSServerFix(
-          findNodeHandle(this),
+          findNodeHandle(this._component),
           worldFromCamera,
           mapFromCamera,
           inliers
@@ -1249,7 +1251,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     try {
       return parseVPSMapLoadResult(
         await ViroARSceneNavigatorModule.rvLoadVPSMapMesh(
-          findNodeHandle(this),
+          findNodeHandle(this._component),
           bytesToBase64(rvwmBytes),
           options.occlusion ?? true,
           options.physics ?? true,
@@ -1263,7 +1265,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
 
   /** Removes the mesh loadVPSMapMesh() loaded; `load` works as for unloadVPSMap(). */
   _unloadVPSMapMesh = (load: number = 0) => {
-    ViroARSceneNavigatorModule.rvUnloadVPSMapMesh(findNodeHandle(this), load);
+    ViroARSceneNavigatorModule.rvUnloadVPSMapMesh(findNodeHandle(this._component), load);
   };
 
   /**
@@ -1275,7 +1277,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _captureVPSQueryFrame = async (maxSide: number = 1280): Promise<ViroVPSQueryFrameResult> => {
     try {
       return parseVPSQueryFrame(
-        await ViroARSceneNavigatorModule.rvCaptureVPSQueryFrame(findNodeHandle(this), maxSide)
+        await ViroARSceneNavigatorModule.rvCaptureVPSQueryFrame(findNodeHandle(this._component), maxSide)
       );
     } catch (error) {
       return { success: false, error: String(error) };
@@ -1291,7 +1293,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _getVPSLocalization = async (): Promise<ViroVPSLocalizationResult> => {
     try {
       return parseVPSLocalization(
-        await ViroARSceneNavigatorModule.rvGetVPSLocalization(findNodeHandle(this))
+        await ViroARSceneNavigatorModule.rvGetVPSLocalization(findNodeHandle(this._component))
       );
     } catch (error) {
       return { available: false, error: String(error) };
@@ -1313,7 +1315,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _resetWorldMesh = async (): Promise<boolean> => {
     try {
       return Boolean(
-        await ViroARSceneNavigatorModule.rvResetWorldMesh(findNodeHandle(this))
+        await ViroARSceneNavigatorModule.rvResetWorldMesh(findNodeHandle(this._component))
       );
     } catch {
       return false;
@@ -1331,7 +1333,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _getWorldMeshStats = async (): Promise<ViroWorldMeshStatsResult> => {
     try {
       return parseWorldMeshStats(
-        await ViroARSceneNavigatorModule.rvGetWorldMeshStats(findNodeHandle(this))
+        await ViroARSceneNavigatorModule.rvGetWorldMeshStats(findNodeHandle(this._component))
       );
     } catch (error) {
       return { available: false, reason: String(error) };
@@ -1342,7 +1344,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _getScanDiagnostics = async (): Promise<ViroScanDiagnostics> => {
     try {
       return parseScanDiagnostics(
-        await ViroARSceneNavigatorModule.rvGetScanDiagnostics(findNodeHandle(this))
+        await ViroARSceneNavigatorModule.rvGetScanDiagnostics(findNodeHandle(this._component))
       );
     } catch {
       return { valid: false };
@@ -1382,7 +1384,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       return { success: false, error: SHARED_FRAME_UNSUPPORTED };
     }
     return await ViroARSceneNavigatorModule.rvCreateSharedFrame(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       groupId
     );
   };
@@ -1393,7 +1395,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       return { success: false, error: SHARED_FRAME_UNSUPPORTED };
     }
     return await ViroARSceneNavigatorModule.rvJoinSharedFrame(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       groupId
     );
   };
@@ -1424,7 +1426,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       } as ViroWorldMeshSnapshotResult;
     }
     return await ViroARSceneNavigatorModule.rvSnapshotWorldMeshToFile(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       locationTransform
     );
   };
@@ -1458,7 +1460,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       } as ViroWorldMeshLoadResult;
     }
     return await ViroARSceneNavigatorModule.rvLoadWorldMeshFromFile(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       filePath,
       resolvedTransform
     );
@@ -1476,7 +1478,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _isGeospatialModeSupported =
     async (): Promise<ViroGeospatialSupportResult> => {
       return await ViroARSceneNavigatorModule.isGeospatialModeSupported(
-        findNodeHandle(this)
+        findNodeHandle(this._component)
       );
     };
 
@@ -1491,7 +1493,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _isLocationAccuracyReduced =
     async (): Promise<ViroLocationAccuracyResult> => {
       return await ViroARSceneNavigatorModule.isLocationAccuracyReduced(
-        findNodeHandle(this)
+        findNodeHandle(this._component)
       );
     };
 
@@ -1503,7 +1505,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _setGeospatialModeEnabled = (enabled: boolean) => {
     ViroARSceneNavigatorModule.setGeospatialModeEnabled(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       enabled
     );
   };
@@ -1515,7 +1517,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _getEarthTrackingState = async (): Promise<ViroEarthTrackingStateResult> => {
     return await ViroARSceneNavigatorModule.getEarthTrackingState(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -1526,7 +1528,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _getCameraGeospatialPose = async (): Promise<ViroGeospatialPoseResult> => {
     return await ViroARSceneNavigatorModule.getCameraGeospatialPose(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -1543,7 +1545,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     longitude: number
   ): Promise<ViroVPSAvailabilityResult> => {
     return await ViroARSceneNavigatorModule.checkVPSAvailability(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       latitude,
       longitude
     );
@@ -1566,7 +1568,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     quaternion?: ViroQuaternion
   ): Promise<ViroCreateGeospatialAnchorResult> => {
     return await ViroARSceneNavigatorModule.createGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       latitude,
       longitude,
       altitude,
@@ -1591,7 +1593,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     quaternion?: ViroQuaternion
   ): Promise<ViroCreateGeospatialAnchorResult> => {
     return await ViroARSceneNavigatorModule.createTerrainAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       latitude,
       longitude,
       altitudeAboveTerrain,
@@ -1616,7 +1618,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     quaternion?: ViroQuaternion
   ): Promise<ViroCreateGeospatialAnchorResult> => {
     return await ViroARSceneNavigatorModule.createRooftopAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       latitude,
       longitude,
       altitudeAboveRooftop,
@@ -1631,7 +1633,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _removeGeospatialAnchor = (anchorId: string) => {
     ViroARSceneNavigatorModule.removeGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       anchorId
     );
   };
@@ -1653,7 +1655,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     altitudeMode?: string
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.hostGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       latitude,
       longitude,
       altitude,
@@ -1674,7 +1676,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     quaternion?: ViroQuaternion
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.resolveGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       platformUuid,
       quaternion || [0, 0, 0, 1]
     );
@@ -1686,7 +1688,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _rvGetGeospatialAnchor = async (anchorId: string): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvGetGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       anchorId
     );
   };
@@ -1705,7 +1707,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     limit: number = 50
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvFindNearbyGeospatialAnchors(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       latitude,
       longitude,
       radius,
@@ -1725,7 +1727,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     userAssetId?: string
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvUpdateGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       anchorId,
       sceneAssetId ?? "",
       sceneId ?? "",
@@ -1741,7 +1743,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     appUserId?: string
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvUploadAsset(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       filePath,
       assetType,
       fileName,
@@ -1754,14 +1756,14 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _rvDeleteGeospatialAnchor = async (anchorId: string): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvDeleteGeospatialAnchor(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       anchorId
     );
   };
 
   _rvListGeospatialAnchors = async (limit: number, offset: number): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvListGeospatialAnchors(
-      findNodeHandle(this), limit, offset
+      findNodeHandle(this._component), limit, offset
     );
   };
 
@@ -1770,11 +1772,11 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   // ===========================================================================
 
   _rvGetCloudAnchor = async (anchorId: string): Promise<any> => {
-    return await ViroARSceneNavigatorModule.rvGetCloudAnchor(findNodeHandle(this), anchorId);
+    return await ViroARSceneNavigatorModule.rvGetCloudAnchor(findNodeHandle(this._component), anchorId);
   };
 
   _rvListCloudAnchors = async (limit: number, offset: number): Promise<any> => {
-    return await ViroARSceneNavigatorModule.rvListCloudAnchors(findNodeHandle(this), limit, offset);
+    return await ViroARSceneNavigatorModule.rvListCloudAnchors(findNodeHandle(this._component), limit, offset);
   };
 
   _rvUpdateCloudAnchor = async (
@@ -1784,12 +1786,12 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     isPublic: boolean
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvUpdateCloudAnchor(
-      findNodeHandle(this), anchorId, name, description, isPublic
+      findNodeHandle(this._component), anchorId, name, description, isPublic
     );
   };
 
   _rvDeleteCloudAnchor = async (anchorId: string): Promise<any> => {
-    return await ViroARSceneNavigatorModule.rvDeleteCloudAnchor(findNodeHandle(this), anchorId);
+    return await ViroARSceneNavigatorModule.rvDeleteCloudAnchor(findNodeHandle(this._component), anchorId);
   };
 
   _rvFindNearbyCloudAnchors = async (
@@ -1799,23 +1801,23 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     limit: number
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvFindNearbyCloudAnchors(
-      findNodeHandle(this), latitude, longitude, radius, limit
+      findNodeHandle(this._component), latitude, longitude, radius, limit
     );
   };
 
   _rvGetProject = async (): Promise<any> => {
-    return await ViroARSceneNavigatorModule.rvGetProject(findNodeHandle(this));
+    return await ViroARSceneNavigatorModule.rvGetProject(findNodeHandle(this._component));
   };
 
   _rvGetScene = async (sceneId: string): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvGetScene(
-      findNodeHandle(this), sceneId
+      findNodeHandle(this._component), sceneId
     );
   };
 
   _rvGetSceneAssets = async (sceneId: string): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvGetSceneAssets(
-      findNodeHandle(this), sceneId
+      findNodeHandle(this._component), sceneId
     );
   };
 
@@ -1828,13 +1830,13 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     externalUserId: string
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvAttachAssetToCloudAnchor(
-      findNodeHandle(this), anchorId, fileUrl, fileSize, name, assetType, externalUserId
+      findNodeHandle(this._component), anchorId, fileUrl, fileSize, name, assetType, externalUserId
     );
   };
 
   _rvRemoveAssetFromCloudAnchor = async (anchorId: string, assetId: string): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvRemoveAssetFromCloudAnchor(
-      findNodeHandle(this), anchorId, assetId
+      findNodeHandle(this._component), anchorId, assetId
     );
   };
 
@@ -1849,7 +1851,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     externalUserId: string
   ): Promise<any> => {
     return await ViroARSceneNavigatorModule.rvTrackCloudAnchorResolution(
-      findNodeHandle(this), anchorId, success, confidence, matchCount,
+      findNodeHandle(this._component), anchorId, success, confidence, matchCount,
       inlierCount, processingTimeMs, platform, externalUserId
     );
   };
@@ -1867,7 +1869,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _isSemanticModeSupported = async (): Promise<ViroSemanticSupportResult> => {
     return await ViroARSceneNavigatorModule.isSemanticModeSupported(
-      findNodeHandle(this)
+      findNodeHandle(this._component)
     );
   };
 
@@ -1880,7 +1882,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    */
   _setSemanticModeEnabled = (enabled: boolean) => {
     ViroARSceneNavigatorModule.setSemanticModeEnabled(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       enabled
     );
   };
@@ -1897,7 +1899,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _getSemanticLabelFractions =
     async (): Promise<ViroSemanticLabelFractionsResult> => {
       return await ViroARSceneNavigatorModule.getSemanticLabelFractions(
-        findNodeHandle(this)
+        findNodeHandle(this._component)
       );
     };
 
@@ -1911,7 +1913,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
     label: ViroSemanticLabel
   ): Promise<ViroSemanticLabelFractionResult> => {
     return await ViroARSceneNavigatorModule.getSemanticLabelFraction(
-      findNodeHandle(this),
+      findNodeHandle(this._component),
       label
     );
   };
@@ -1931,7 +1933,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
    * @param prefer - Whether to prefer monocular depth over LiDAR
    */
   _setPreferMonocularDepth = (prefer: boolean) => {
-    const nodeHandle = findNodeHandle(this);
+    const nodeHandle = findNodeHandle(this._component);
     if (!nodeHandle) {
       console.warn(
         "Cannot set monocular depth preference: Component not mounted - ensure ViroARSceneNavigator is rendered and visible"
@@ -1949,7 +1951,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _isPreferMonocularDepth =
     async (): Promise<ViroMonocularDepthPreferenceResult> => {
       try {
-        const nodeHandle = findNodeHandle(this);
+        const nodeHandle = findNodeHandle(this._component);
         if (!nodeHandle) {
           return {
             preferred: false,
@@ -1983,7 +1985,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _isDepthOcclusionSupported =
     async (): Promise<ViroDepthOcclusionSupportResult> => {
       try {
-        const nodeHandle = findNodeHandle(this);
+        const nodeHandle = findNodeHandle(this._component);
         if (!nodeHandle) {
           return {
             supported: false,
@@ -2016,7 +2018,7 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
   _getGeospatialSetupStatus =
     async (): Promise<ViroGeospatialSetupStatusResult> => {
       try {
-        const nodeHandle = findNodeHandle(this);
+        const nodeHandle = findNodeHandle(this._component);
         if (!nodeHandle) {
           return {
             geospatialSupported: false,
@@ -2327,29 +2329,37 @@ export class ViroARSceneNavigator extends React.Component<Props, State> {
       ...restProps
     } = this.props;
 
+    // The caller's style goes on a plain View: Viro's native views take
+    // `position` as a 3D vector, and on Android a style `position` reaches that
+    // prop and throws, which a release build answers by tearing React down.
     return (
-      <VRTARSceneNavigator
-        ref={(component) => {
-          this._component = component;
-        }}
-        {...restProps}
-        cloudAnchorProvider={provider ?? cloudAnchorProvider ?? "reactvision"}
-        geospatialAnchorProvider={
-          provider ?? geospatialAnchorProvider ?? "reactvision"
-        }
-        viroAppProps={appProps ?? {}}
-        currentSceneIndex={this.state.currentSceneIndex}
-        style={[styles.container, this.props.style]}
-        key={this.state.internalRemountKey}
-        onTabSwitch={this._onTabSwitch}
-      >
-        {items}
-      </VRTARSceneNavigator>
+      <View style={[styles.root, this.props.style]}>
+        <VRTARSceneNavigator
+          ref={(component) => {
+            this._component = component;
+          }}
+          {...restProps}
+          cloudAnchorProvider={provider ?? cloudAnchorProvider ?? "reactvision"}
+          geospatialAnchorProvider={
+            provider ?? geospatialAnchorProvider ?? "reactvision"
+          }
+          viroAppProps={appProps ?? {}}
+          currentSceneIndex={this.state.currentSceneIndex}
+          style={styles.container}
+          key={this.state.internalRemountKey}
+          onTabSwitch={this._onTabSwitch}
+        >
+          {items}
+        </VRTARSceneNavigator>
+      </View>
     );
   }
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",

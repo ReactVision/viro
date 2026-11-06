@@ -69,10 +69,17 @@ describe("scene navigator stack", () => {
     expect(Object.keys(nav.state.sceneDictionary)).toEqual([root]);
   });
 
-  it("merges the user's style after the container style", () => {
-    const nav = create({ style: { backgroundColor: "red" } });
-    const { style } = (nav.render() as React.ReactElement<any>).props;
-    expect(style).toEqual([expect.objectContaining({ flex: 1 }), { backgroundColor: "red" }]);
+  it("puts the user's style on a wrapping view, never on the native navigator", () => {
+    const nav = create({ style: { position: "absolute", backgroundColor: "red" } });
+    const wrapper = nav.render() as React.ReactElement<any>;
+    expect(wrapper.type).toBe("View");
+    expect(wrapper.props.style).toEqual([
+      { flex: 1 },
+      { position: "absolute", backgroundColor: "red" },
+    ]);
+    const native = wrapper.props.children as React.ReactElement<any>;
+    expect(native.props.style).toEqual(expect.objectContaining({ flex: 1 }));
+    expect(native.props.style).not.toHaveProperty("position");
   });
 
   it("replace with only the key of the top scene keeps that scene", () => {

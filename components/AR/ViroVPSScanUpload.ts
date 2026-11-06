@@ -63,9 +63,10 @@ export type ViroVPSScanUploadOptions = ViroVPSConnection & {
   meshQuality?: ViroVPSMeshQuality;
   /**
    * Whether Studio keeps the recording once the scan is processed. Default
-   * true. With false it is stored only while it is processed, and deleted
-   * when that ends. The recording's folder stays on the device either way:
-   * only the zip made for the upload is deleted.
+   * false: it is stored only while it is processed, and deleted when that
+   * ends. True keeps it, which merging a location's scans needs, and counts
+   * it toward the team's storage. The recording's folder stays on the device
+   * either way: only the zip made for the upload is deleted.
    */
   keepRecording?: boolean;
   /**

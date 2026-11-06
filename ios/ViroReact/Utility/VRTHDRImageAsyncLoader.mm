@@ -84,12 +84,21 @@
                 return;
             }
 
+            if (error || !data) {
+                NSLog(@"ERROR: Failed to download HDR image: %@", error.localizedDescription);
+                _currentDownloadTask = nil;
+                [self.delegate hdrImageLoaderDidEnd:self hdrTexture:nullptr];
+                return;
+            }
+
             // Persist the in-memory UIImage data onto a temporary file to be processed by renderer.
-            NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-            [formatter setDateFormat:@"HH_mm_ss_sss"];
-            NSString *dateString = [formatter stringFromDate:[NSDate date]];
-            NSString *fileName = [NSString stringWithFormat:@"temp_%@_image.hdr", dateString];
+            NSString *fileName = [NSString stringWithFormat:@"temp_%@_image.hdr", [[NSUUID UUID] UUIDString]];
             NSString *filePath = [self saveImageTempFile:data withName:fileName];
+            if (!filePath) {
+                _currentDownloadTask = nil;
+                [self.delegate hdrImageLoaderDidEnd:self hdrTexture:nullptr];
+                return;
+            }
 
             // Process and generate a hdr texture from the downloaded image file.
             std::string filePathStr = std::string([filePath UTF8String]);
@@ -111,10 +120,10 @@
 
 // Saves the image data in memory to a temporary file with the given file name
 - (NSString *)saveImageTempFile:(NSData *)hdrData withName:(NSString *)name {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [paths objectAtIndex:0];
-    NSString *filePath = [documentsPath stringByAppendingPathComponent:name];
-    [hdrData writeToFile:filePath atomically:YES];
+    NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:name];
+    if (![hdrData writeToFile:filePath atomically:YES]) {
+        return nil;
+    }
     return filePath;
 }
 

@@ -53,6 +53,8 @@ type Props = {
 /**
  * Viro3DObject is a component that is used to render 3D models in the scene.
  */
+let warnedHighAccuracyGaze = false;
+
 export class Viro3DObject extends ViroBase<Props> {
   render() {
     checkMisnamedProps("Viro3DObject", this.props);
@@ -85,9 +87,12 @@ export class Viro3DObject extends ViroBase<Props> {
       this.props.highAccuracyEvents == undefined &&
       this.props.highAccuracyGaze != undefined
     ) {
-      console.warn(
-        "**DEPRECATION WARNING** highAccuracyGaze has been deprecated/renamed to highAccuracyEvents"
-      );
+      if (!warnedHighAccuracyGaze) {
+        warnedHighAccuracyGaze = true;
+        console.warn(
+          "**DEPRECATION WARNING** highAccuracyGaze has been deprecated/renamed to highAccuracyEvents"
+        );
+      }
       highAccuracyEvents = this.props.highAccuracyGaze;
     }
 

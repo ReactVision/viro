@@ -61,7 +61,8 @@
     NSURL *URL = imageSource.request.URL;
     NSString *scheme = URL.scheme.lowercaseString;
     if([scheme isEqualToString:@"file"] || [scheme isEqualToString:@"http"] || [scheme isEqualToString:@"data"] ||  [scheme isEqualToString:@"https"]) {
-        _currentDownloadTask = downloadDataWithURL(URL, ^(NSData *data, NSError *error) {
+        __block NSURLSessionDataTask *thisTask = nil;
+        thisTask = downloadDataWithURL(URL, ^(NSData *data, NSError *error) {
             if (error.code == NSURLErrorCancelled){
                 // If we have cancelled this request, do nothing.
                 // This is because multiple requests would be have been
@@ -71,7 +72,10 @@
                 return;
             }
             
-            _currentDownloadTask = nil;
+            // A newer load may already have replaced the task this block belongs to.
+            if (_currentDownloadTask == thisTask) {
+                _currentDownloadTask = nil;
+            }
             
             if (!error) {
                 UIImage *image = [[UIImage alloc] initWithData:data];
@@ -92,6 +96,7 @@
                 }
             }
         });
+        _currentDownloadTask = thisTask;
     }
     else {
         NSLog(@"ERROR: Attempted to load image with unknown scheme path: %@", URL);

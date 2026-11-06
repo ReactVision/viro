@@ -2,9 +2,9 @@
 #
 # Checks that the iOS bridge archive and the sources agree.
 #
-# iOS links the prebuilt ios/dist/lib/libViroReact.a, which ViroReact.xcodeproj builds from the
-# files in its Sources phase, and ios/ViroReact.podspec keeps every bridge .mm out of the pod's
-# compile when that archive exists. Two things therefore have to hold for a view to exist on iOS:
+# iOS links the prebuilt libViroReact.a in ios/dist/lib/ViroReact.xcframework, which
+# ViroReact.xcodeproj builds from the files in its Sources phase, and ios/ViroReact.podspec keeps
+# every bridge .mm out of the pod's compile when that archive exists. Two things therefore have to hold for a view to exist on iOS:
 #
 #   1. its .mm is in the Xcode target, or no rebuild will ever carry it;
 #   2. its class is in the archive, or the podspec lists it under archive_fallback_sources so it
@@ -17,7 +17,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PBXPROJ=ios/ViroReact.xcodeproj/project.pbxproj
-ARCHIVE=ios/dist/lib/libViroReact.a
+# The device slice, which the podspec reads too.
+ARCHIVE=ios/dist/lib/ViroReact.xcframework/ios-arm64/libViroReact.a
 PODSPEC=ios/ViroReact.podspec
 
 # Two files import headers that exist nowhere in the repository (VRTButton.h, VROTextManager.h),
@@ -57,6 +58,19 @@ while IFS= read -r file; do
     echo "            rebuild the archive from ViroReact.xcodeproj, or list $file in the podspec"
     status=1
 done < <(find ios/ViroReact -type f -name '*Manager.mm' -not -path 'ios/ViroReact/VisionOS/*' | sort)
+
+# Each Xcode build replaces only its own slice, so a stale simulator slice is easy to ship.
+echo "3. the simulator slice defines the same Objective-C classes as the device slice"
+SIM_ARCHIVE=$(ls ios/dist/lib/ViroReact.xcframework/ios-*-simulator/libViroReact.a 2>/dev/null | head -1 || true)
+classes() { xcrun nm -gU -arch arm64 "$1" 2>/dev/null | awk '$3 ~ /^_OBJC_CLASS_\$_/ { print $3 }' | sort -u; }
+if [ -z "$SIM_ARCHIVE" ]; then
+    echo "   MISSING: ios/dist/lib/ViroReact.xcframework has no simulator slice"
+    status=1
+elif ! slice_diff=$(diff <(classes "$ARCHIVE") <(classes "$SIM_ARCHIVE")); then
+    echo "   the slices differ; rebuild both from ViroReact.xcodeproj:"
+    printf '%s\n' "$slice_diff" | sed 's/^/   /'
+    status=1
+fi
 
 if [ $status -eq 0 ]; then
     echo "ok"

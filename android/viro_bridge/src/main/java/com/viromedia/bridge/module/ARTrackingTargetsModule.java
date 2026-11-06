@@ -24,6 +24,7 @@ package com.viromedia.bridge.module;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -124,7 +125,7 @@ public class ARTrackingTargetsModule extends ReactContextBaseJavaModule {
                 if (mReady) {
                     // we don't want to invoke the onComplete in the sync block, so post a Runnable
                     // on this thread to invoke it.
-                    new Handler().post(new Runnable() {
+                    new Handler(Looper.getMainLooper()).post(new Runnable() {
                         @Override
                         public void run() {
                             listener.onComplete(mKey, mARImageTarget);

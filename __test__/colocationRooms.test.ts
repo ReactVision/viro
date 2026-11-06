@@ -388,3 +388,20 @@ describe("region failover", () => {
     });
   });
 });
+
+describe("a request that never answers", () => {
+  it("fails with a timeout instead of waiting forever", async () => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(() => new Promise(() => {})) as any;
+      const pending = lookupColocationRoom(CONFIG, "K7M2QX");
+      await jest.advanceTimersByTimeAsync(31000);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        error: expect.stringMatching(/No answer within/),
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

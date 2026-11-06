@@ -55,4 +55,13 @@ RCT_EXPORT_METHOD(getForwardVectorAsync:(nonnull NSNumber *)viewTag
     });
 }
 
+// No iOS source has a ray of its own: Cardboard aims with the head, and AR with
+// screen taps. Null tells the caller to use the camera's.
+RCT_EXPORT_METHOD(getRayAsync:(nonnull NSNumber *)viewTag
+                  source:(nonnull NSNumber *)source
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject) {
+    resolve(nil);
+}
+
 @end

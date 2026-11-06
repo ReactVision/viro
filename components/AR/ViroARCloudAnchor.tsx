@@ -28,6 +28,18 @@ export type ViroARCloudAnchorProps = {
   /** Fired when localisation fails, times out, or the platform has no cloud anchors. */
   onLocalizeError?: (error: string, state?: ViroCloudAnchorState) => void;
 
+  /**
+   * What the resolve is doing, roughly twice a second while it works. See
+   * `ViroSharedFrameProps.onLocalizeProgress`.
+   */
+  onLocalizeProgress?: (status: { message: string; attempt: number }) => void;
+
+  /**
+   * How many times to re-run a resolve that failed for a recoverable reason.
+   * See `ViroSharedFrameProps.maxAttempts`.
+   */
+  maxAttempts?: number;
+
   /** Rendered only while unlocalised — a "look around" prompt, typically. */
   placeholder?: React.ReactNode;
 
@@ -79,6 +91,8 @@ export class ViroARCloudAnchor extends React.Component<ViroARCloudAnchorProps> {
         arSceneNavigator={this.props.arSceneNavigator}
         onLocalized={this.props.onLocalized}
         onLocalizeError={this.props.onLocalizeError}
+        onLocalizeProgress={this.props.onLocalizeProgress}
+        maxAttempts={this.props.maxAttempts}
         placeholder={this.props.placeholder}
       >
         {this.props.children}

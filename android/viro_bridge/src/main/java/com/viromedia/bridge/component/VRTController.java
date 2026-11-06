@@ -106,6 +106,10 @@ public class VRTController extends VRTComponent {
         mNativeController.getControllerForwardVectorAsync(callback);
     }
 
+    public void getRayAsync(int source, Controller.ControllerRayCallback callback){
+        mNativeController.getControllerRayAsync(source, callback);
+    }
+
     @Override
     public void onPropsSet() {
         super.onPropsSet();

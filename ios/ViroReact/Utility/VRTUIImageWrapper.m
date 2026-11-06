@@ -47,17 +47,17 @@
         return nil;
     }
     
-    __block UIImage *image;
+    UIImage *image;
     if (!RCTIsMainQueue()) {
         // It seems that none of the UIImage loading methods can be guaranteed
         // thread safe, so we'll pick the lesser of two evils here and block rather
         // than run the risk of crashing
         RCTLogWarn(@"Calling [RCTConvert UIImage:] on a background thread is not recommended");
+        __block VRTUIImageWrapper *mainQueueWrapper = nil;
         dispatch_sync(dispatch_get_main_queue(), ^{
-            VRTUIImageWrapper *imageWrapper = [RCTConvert VRTUIImageWrapper:json];
-            image = imageWrapper.image;
+            mainQueueWrapper = [RCTConvert VRTUIImageWrapper:json];
         });
-        return image;
+        return mainQueueWrapper;
     }
     
     NSURL *URL = imageSource.request.URL;
@@ -85,6 +85,11 @@
         return nil;
     }
     
+    if (!image) {
+        RCTLogConvertError(json, @"an image. The image could not be decoded.");
+        return nil;
+    }
+
     CGFloat scale = imageSource.scale;
     if (!scale && imageSource.size.width) {
         // If no scale provided, set scale to image width / source width

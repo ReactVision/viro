@@ -42,8 +42,19 @@ export type ViroRegisterableAnimation = {
   };
 };
 
+/**
+ * What an entry of `registerAnimations` may hold: an animation, the name of
+ * another registered animation, or an array of these. The top-level array runs
+ * its members in parallel; an array inside it runs its members in sequence.
+ * `{ float: [["floatUp", "floatDown"]] }` plays floatUp, then floatDown.
+ */
+export type ViroAnimationChain =
+  | string
+  | ViroRegisterableAnimation
+  | ViroAnimationChain[];
+
 export type ViroAnimationDict = {
-  [key: string]: ViroRegisterableAnimation | ViroRegisterableAnimation[];
+  [key: string]: ViroAnimationChain;
 };
 export type ViroAnimationChainDict = {
   [key: string]: ViroAnimation | ViroAnimation[];
@@ -61,16 +72,26 @@ export type ViroAnimation = {
   interruptible?: boolean;
 };
 
+// Colors go to the native side processed, in a chain as well as at the top level.
+function processAnimationColors(chain: ViroAnimationChain) {
+  if (Array.isArray(chain)) {
+    chain.forEach(processAnimationColors);
+    return;
+  }
+  if (typeof chain === "string") {
+    return;
+  }
+  if (chain.properties && chain.properties.color) {
+    chain.properties.color = processColor(
+      chain.properties.color
+    ) as ProcessedColorValue;
+  }
+}
+
 export class ViroAnimations {
   static registerAnimations(animations: ViroAnimationDict) {
-    for (var key in animations) {
-      if (!Array.isArray(animations[key])) {
-        const animation = animations[key] as ViroRegisterableAnimation;
-        if (animation.properties && animation.properties.color) {
-          var newColor = processColor(animation.properties.color);
-          animation.properties.color = newColor as ProcessedColorValue;
-        }
-      }
+    for (const key in animations) {
+      processAnimationColors(animations[key]);
     }
     if (AnimationManager) {
       AnimationManager.setJSAnimations(animations);

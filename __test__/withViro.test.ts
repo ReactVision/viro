@@ -1,5 +1,10 @@
 import { describe, expect, test } from "@jest/globals";
-import { withDefaultInfoPlist } from "../plugins/withViroIos";
+import {
+  removeExcludedSimulatorArchitectures,
+  withDefaultInfoPlist,
+  withViroTelemetryInfoPlist,
+} from "../plugins/withViroIos";
+import { withViroAndroid } from "../plugins/withViroAndroid";
 import {
   noInfoPlistDefinitionsAppConfigAfter,
   noInfoPlistDefinitionsAppConfigBefore,
@@ -38,4 +43,94 @@ describe("withViro", () => {
   });
 
   // TODO: Testing that withViro updates files correctly (Podfile, Android files, etc.)
+});
+
+describe("telemetry option", () => {
+  const TELEMETRY_META = "com.reactvision.ViroTelemetryEnabled";
+
+  function appConfig(telemetry?: boolean): any {
+    return { name: "app", slug: "app", plugins: [["@reactvision/react-viro", { telemetry }]] };
+  }
+
+  function modRequest(platform: string, modName: string) {
+    return { platform, modName, projectRoot: "/", platformProjectRoot: "/", introspect: false };
+  }
+
+  async function infoPlistAfter(telemetry: boolean | undefined, before: Record<string, unknown>) {
+    const config: any = withViroTelemetryInfoPlist(appConfig(telemetry));
+    const result = await config.mods.ios.infoPlist({
+      ...config,
+      modResults: { ...before },
+      modRequest: modRequest("ios", "infoPlist"),
+    });
+    return result.modResults;
+  }
+
+  async function telemetryMetaAfter(telemetry: boolean | undefined, before: string[]) {
+    const config: any = withViroAndroid(appConfig(telemetry), { telemetry });
+    const manifest = {
+      manifest: {
+        $: {},
+        "uses-permission": [],
+        application: [
+          {
+            $: {},
+            activity: [{ "intent-filter": [{ category: [] }] }],
+            "meta-data": before.map((value) => ({
+              $: { "android:name": TELEMETRY_META, "android:value": value },
+            })),
+          },
+        ],
+      },
+    };
+    const result = await config.mods.android.manifest({
+      ...config,
+      modResults: manifest,
+      modRequest: modRequest("android", "manifest"),
+    });
+    return result.modResults.manifest.application[0]["meta-data"]
+      .filter((meta: any) => meta.$["android:name"] === TELEMETRY_META)
+      .map((meta: any) => meta.$["android:value"]);
+  }
+
+  test("false turns the ping off in Info.plist and the manifest", async () => {
+    expect((await infoPlistAfter(false, {})).ViroTelemetryEnabled).toBe(false);
+    expect(await telemetryMetaAfter(false, ["false"])).toEqual(["false"]);
+  });
+
+  test("true or omitted removes what an earlier prebuild wrote", async () => {
+    for (const telemetry of [true, undefined]) {
+      expect(await infoPlistAfter(telemetry, { ViroTelemetryEnabled: false })).not.toHaveProperty(
+        "ViroTelemetryEnabled"
+      );
+      expect(await telemetryMetaAfter(telemetry, ["false"])).toEqual([]);
+    }
+  });
+});
+
+describe("simulator architectures", () => {
+  const KEY = '"EXCLUDED_ARCHS[sdk=iphonesimulator*]"';
+
+  function projectWith(settings: Record<string, string>[]): any {
+    const section: Record<string, unknown> = {};
+    settings.forEach((buildSettings, index) => {
+      section[`ID${index}`] = { isa: "XCBuildConfiguration", buildSettings };
+      section[`ID${index}_comment`] = "Debug";
+    });
+    return { pbxXCBuildConfigurationSection: () => section };
+  }
+
+  test("removes the arm64 exclusion earlier versions wrote, and keeps any other value", () => {
+    const project = projectWith([
+      { PRODUCT_NAME: "app", [KEY]: '"arm64"' },
+      { PRODUCT_NAME: "app", [KEY]: "arm64" },
+      { PRODUCT_NAME: "app", [KEY]: '"x86_64"' },
+      { PRODUCT_NAME: "app" },
+    ]);
+    const section = removeExcludedSimulatorArchitectures(project).pbxXCBuildConfigurationSection();
+    expect(section.ID0.buildSettings).not.toHaveProperty(KEY);
+    expect(section.ID1.buildSettings).not.toHaveProperty(KEY);
+    expect(section.ID2.buildSettings[KEY]).toBe('"x86_64"');
+    expect(section.ID3.buildSettings).toEqual({ PRODUCT_NAME: "app" });
+  });
 });

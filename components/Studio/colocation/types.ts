@@ -1,6 +1,25 @@
+import type { ViroVPSCredentialsSource } from "../../AR/ViroVPSClient";
+
 type StudioColocationCommonOptions = {
   /** Co-location relay base URL. Defaults to production. */
   relayUrl?: string;
+  /**
+   * Credentials as `<ViroVPS credentials>` takes them, such as the function
+   * createUserTokenCredentials() makes, sent in place of the native credential
+   * (`rvApiKey`, or the host's Studio session) by the co-location calls: the
+   * room's create or lookup, the relay's checks, the pose channel and the
+   * shared state. They are sent for the scene's project in place of their own.
+   * Scene loads, cloud anchors and VPS keep the native credential, so a phone
+   * still needs it to host or resolve the room's anchor.
+   *
+   * A new value does not restart the session, and the next call or reconnect
+   * uses it, with one exception: while a session runs, credentials that become
+   * another createUserTokenCredentials() object, or stop or start being one,
+   * and a clear() of the one in use, fail it with `NOT_AUTHORIZED`, so a
+   * signed-out user's token does not stay in the room. `retryColocation()`
+   * starts it again.
+   */
+  credentials?: ViroVPSCredentialsSource;
   /**
    * How long a device waits, once it has its frame, before it gives up on the
    * room: a host until the channel and the shared state are connected
@@ -26,6 +45,10 @@ export type StudioColocationOptions =
 
 export type StudioColocationErrorCode =
   | "PAID_PLAN_REQUIRED"
+  /** The team's monthly compute spend, which co-location is billed from, is at its limit. */
+  | "COMPUTE_SPEND_LIMIT_REACHED"
+  /** The team has no card for compute time, or a compute invoice is unpaid. */
+  | "COMPUTE_BILLING_REFUSED"
   | "ROOM_NOT_FOUND"
   | "ROOM_FULL"
   | "RELAY_AT_CAPACITY"
@@ -34,6 +57,8 @@ export type StudioColocationErrorCode =
   | "HOST_FAILED"
   | "NOT_AUTHORIZED"
   | "SCENE_TOO_LARGE"
+  /** The scene is placed in an Advanced VPS map, which a co-location frame does not share. */
+  | "SCENE_BOUND_TO_VPS"
   | "UNAVAILABLE"
   /** The channel or the shared state did not connect within `connectTimeoutMs`. */
   | "CONNECT_TIMEOUT"

@@ -77,7 +77,14 @@
         assetID = [imageURL absoluteString];
         results = [PHAsset fetchAssetsWithALAssetURLs:@[imageURL] options:nil];
     } else {
-        assetID = [imageURL.absoluteString substringFromIndex:@"ph://".length];
+        NSString *urlString = imageURL.absoluteString;
+        if (urlString.length < @"ph://".length) {
+            if(self.delegate) {
+                [self.delegate imageLoaderDidEnd:self success:false image:nil];
+            }
+            return;
+        }
+        assetID = [urlString substringFromIndex:@"ph://".length];
         results = [PHAsset fetchAssetsWithLocalIdentifiers:@[assetID] options:nil];
     }
     if (results.count == 0) {

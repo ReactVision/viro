@@ -156,7 +156,7 @@ static NSString *const kWebPrefix = @"http";
     [self resetSound];
 }
 
-- (void)seekToTime:(NSInteger)time {
+- (void)seekToTime:(float)time {
     if (_sound) {
         _sound->seekToTime(time);
     }
@@ -374,7 +374,7 @@ static NSString *const kWebPrefix = @"http";
     [self setNativeProps];
 }
 
-- (void)seekToTime:(NSInteger)time {
+- (void)seekToTime:(float)time {
     [super seekToTime:time];
     if (_player) {
         _player->seekToTime(time);

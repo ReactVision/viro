@@ -1,0 +1,532 @@
+//
+//  VROARSessioniOS.h
+//  ViroKit
+//
+//  Created by Raj Advani on 6/6/17.
+//  Copyright © 2017 Viro Media. All rights reserved.
+//
+//  Permission is hereby granted, free of charge, to any person obtaining
+//  a copy of this software and associated documentation files (the
+//  "Software"), to deal in the Software without restriction, including
+//  without limitation the rights to use, copy, modify, merge, publish,
+//  distribute, sublicense, and/or sell copies of the Software, and to
+//  permit persons to whom the Software is furnished to do so, subject to
+//  the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included
+//  in all copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+//  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+//  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+//  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+//  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+#ifndef VROARSessioniOS_h
+#define VROARSessioniOS_h
+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+#include "VROARSession.h"
+#include "VROARSessionRecorderIOS.h"
+#include "VROViewport.h"
+#include <ARKit/ARKit.h>
+#include <map>
+#include <mutex>
+#include <vector>
+
+#include "VRORenderer.h"
+
+class VRODriver;
+class VROVideoTextureCacheOpenGL;
+class VROTrackingHelper;
+class VROMonocularDepthEstimator;
+@class VROARKitSessionDelegate;
+@class VROCloudAnchorProviderARCore;
+@class VROCloudAnchorProviderReactVision;
+namespace ReactVisionCCA { class RVCCAGeospatialProvider; }
+namespace ReactVisionCCA { class VROVPSLocalizer; }
+
+class API_AVAILABLE(ios(12.0)) VROARSessioniOS : public VROARSession, public std::enable_shared_from_this<VROARSessioniOS> {
+public:
+    
+    VROARSessioniOS(VROTrackingType trackingType,
+                    VROWorldAlignment worldAlignment,
+                    std::shared_ptr<VRODriver> driver);
+    virtual ~VROARSessioniOS();
+    
+    void setTrackingType(VROTrackingType trackingType);
+
+    void run();
+    void pause();
+    bool isReady() const;
+    void resetSession(bool resetTracking, bool removeAnchors);
+    
+    void setScene(std::shared_ptr<VROScene> scene);
+    void setDelegate(std::shared_ptr<VROARSessionDelegate> delegate);
+    bool setAnchorDetection(std::set<VROAnchorDetection> types);
+    void setCloudAnchorProvider(VROCloudAnchorProvider provider);
+
+    void loadARImageDatabase(std::shared_ptr<VROARImageDatabase> arImageDatabase) {
+        // unsupported
+    }
+    
+    void unloadARImageDatabase() {
+        // unsupported
+    }
+
+    void addARImageTarget(std::shared_ptr<VROARImageTarget> target);
+    void removeARImageTarget(std::shared_ptr<VROARImageTarget> target);
+    void addARObjectTarget(std::shared_ptr<VROARObjectTarget> target);
+    void removeARObjectTarget(std::shared_ptr<VROARObjectTarget> target);
+    void addAnchor(std::shared_ptr<VROARAnchor> anchor);
+    void removeAnchor(std::shared_ptr<VROARAnchor> anchor);
+    void hostCloudAnchor(std::shared_ptr<VROARAnchor> anchor,
+                         int ttlDays,
+                         std::function<void(std::shared_ptr<VROARAnchor>)> onSuccess,
+                         std::function<void(std::string error)> onFailure);
+    void resolveCloudAnchor(std::string anchorId,
+                            std::function<void(std::shared_ptr<VROARAnchor> anchor)> onSuccess,
+                            std::function<void(std::string error)> onFailure);
+    bool getCloudAnchorStatus(std::string &message, float &progress) override;
+    
+    std::unique_ptr<VROARFrame> &updateFrame();
+    std::unique_ptr<VROARFrame> &getLastFrame();
+    std::shared_ptr<VROTexture> getCameraBackgroundTexture();
+    std::shared_ptr<VROTexture> getSemanticTexture() override;
+    std::shared_ptr<VROTexture> getSemanticConfidenceTexture() override;
+    
+    void setViewport(VROViewport viewport);
+    void setOrientation(VROCameraOrientation orientation);
+    
+    void setWorldOrigin(VROMatrix4f relativeTransform);
+    void setNumberOfTrackedImages(int numImages);
+    void setAutofocus(bool enabled);
+    bool isCameraAutoFocusEnabled() {
+      // unsupported
+      return false;
+    }
+    void setVideoQuality(VROVideoQuality quality);
+    void setVisionModel(std::shared_ptr<VROVisionModel> visionModel);
+
+    // Occlusion support
+    void setOcclusionMode(VROOcclusionMode mode) override;
+    bool isOcclusionSupported() const override;
+    bool isOcclusionModeSupported(VROOcclusionMode mode) const override;
+
+    // Depth requested for the world mesh or for recording
+    void onWorldMeshEnabled(bool enabled) override;
+    void setDepthCaptureEnabled(bool enabled) override;
+
+    // Monocular depth estimation (for non-LiDAR devices, or as alternative to LiDAR)
+    void setMonocularDepthEnabled(bool enabled);
+    bool isMonocularDepthEnabled() const;
+    bool isMonocularDepthSupported() const;
+    std::shared_ptr<VROMonocularDepthEstimator> getMonocularDepthEstimator() const;
+
+    /*
+     When true, monocular depth estimation will be used even on devices with LiDAR.
+     This allows using the neural network-based depth on all devices for consistency,
+     testing, or to get depth estimates beyond LiDAR's ~5m range.
+     Default is false (LiDAR is preferred when available).
+     */
+    void setPreferMonocularDepth(bool prefer);
+    bool isPreferMonocularDepth() const;
+
+    // Front-camera AR is supplied by an optional external module so that ViroKit
+    // itself never references the ARKit face-tracking / TrueDepth API. Apps that
+    // need it install @reactvision/react-viro-face-tracking, which registers a
+    // provider here. The provider returns a ready-to-run front-camera
+    // ARConfiguration (or nil if the device is unsupported). When no provider is
+    // registered, setFrontCameraEnabled(true) has no effect and AR falls through
+    // to world tracking.
+    typedef ARConfiguration * _Nullable (^VROARFrontCameraConfigProvider)(void);
+    static void setFrontCameraConfigProvider(VROARFrontCameraConfigProvider provider);
+
+    // Enable/disable front-camera AR. Requires a registered config provider
+    // (see setFrontCameraConfigProvider); otherwise it is a no-op. When active,
+    // world tracking, planes, and LiDAR are unavailable.
+    void setFrontCameraEnabled(bool enabled);
+    bool isFrontCameraEnabled() const { return _frontCameraEnabled; }
+
+    // Multiply all monocular depth values by this factor before use.
+    // 1.0 = no change (default). Use < 1.0 if model overestimates distance.
+    void setMonocularDepthScale(float scale);
+
+    // Set the target inference rate (default 5). Thermal state overrides this
+    // downward automatically (Fair→3fps, Serious→2fps, Critical→stop).
+    void setMonocularDepthTargetFPS(int fps);
+
+    /*
+     Set the base URL from which to download the depth model.
+     The full URL will be: baseURL/DepthPro.mlmodelc.zip
+     */
+
+    // Geospatial API
+    void setGeospatialAnchorProvider(VROGeospatialAnchorProvider provider) override;
+    bool isGeospatialModeSupported() const override;
+    void setGeospatialModeEnabled(bool enabled) override;
+    VROEarthTrackingState getEarthTrackingState() const override;
+    VROGeospatialPose getCameraGeospatialPose() const override;
+    bool isLocationAccuracyReduced() const override;
+    void checkVPSAvailability(double latitude, double longitude,
+                              std::function<void(VROVPSAvailability)> callback) override;
+    void createGeospatialAnchor(double latitude, double longitude, double altitude,
+                                VROQuaternion quaternion,
+                                std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
+                                std::function<void(std::string error)> onFailure) override;
+    void resolveGeospatialAnchor(const std::string& platformUuid, VROQuaternion quaternion,
+                                  std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
+                                  std::function<void(std::string error)> onFailure) override;
+    void hostGeospatialAnchor(double latitude, double longitude, double altitude,
+                               const std::string& altitudeMode,
+                               std::function<void(std::string platformUuid)> onSuccess,
+                               std::function<void(std::string error)> onFailure) override;
+    void createTerrainAnchor(double latitude, double longitude, double altitudeAboveTerrain,
+                             VROQuaternion quaternion,
+                             std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
+                             std::function<void(std::string error)> onFailure) override;
+    void createRooftopAnchor(double latitude, double longitude, double altitudeAboveRooftop,
+                             VROQuaternion quaternion,
+                             std::function<void(std::shared_ptr<VROGeospatialAnchor>)> onSuccess,
+                             std::function<void(std::string error)> onFailure) override;
+    void removeGeospatialAnchor(std::shared_ptr<VROGeospatialAnchor> anchor) override;
+    void rvGetGeospatialAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvFindNearbyGeospatialAnchors(double lat, double lng, double radius, int limit,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvUpdateGeospatialAnchor(const std::string& anchorId,
+        const std::string& sceneAssetId, const std::string& sceneId, const std::string& name,
+        const std::string& userAssetId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvUploadAsset(const std::string& filePath, const std::string& assetType,
+        const std::string& fileName, const std::string& appUserId,
+        std::function<void(bool, std::string, std::string, std::string)> callback) override;
+    void rvDeleteGeospatialAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvListGeospatialAnchors(int limit, int offset,
+        std::function<void(bool, std::string, std::string)> callback) override;
+
+    // Cloud anchor management
+    void rvStartScan() override;
+    void rvCancelOperations() override;
+    std::string rvGetScanStatusJson() override;
+    std::string rvGetScanDiagnosticsJson() override;
+    void rvFinishScan(int ttlDays,
+        std::function<void(bool, std::string, std::string, std::string)> callback) override;
+    void rvGetCloudAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvListCloudAnchors(int limit, int offset,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvUpdateCloudAnchor(const std::string& anchorId, const std::string& name,
+        const std::string& description, bool isPublic,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvDeleteCloudAnchor(const std::string& anchorId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvFindNearbyCloudAnchors(double lat, double lng, double radius, int limit,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvAttachAssetToCloudAnchor(const std::string& anchorId, const std::string& fileUrl,
+        int64_t fileSize, const std::string& name, const std::string& assetType,
+        const std::string& externalUserId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvRemoveAssetFromCloudAnchor(const std::string& anchorId, const std::string& assetId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvTrackCloudAnchorResolution(const std::string& anchorId, bool success,
+        double confidence, int matchCount, int inlierCount, int processingTimeMs,
+        const std::string& platform, const std::string& externalUserId,
+        std::function<void(bool, std::string)> callback) override;
+    void rvGetProject(const std::string& projectId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvGetScene(const std::string& sceneId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+    void rvGetSceneAssets(const std::string& sceneId,
+        std::function<void(bool, std::string, std::string)> callback) override;
+
+    // Continuous VPS map localisation against a downloaded .rvmap
+    bool rvLoadVPSMap(const std::string& rvmapBytes) override;
+    void rvUnloadVPSMap() override;
+    bool rvIsVPSMapLoaded() override;
+    std::string rvGetVPSLocalizationJson() override;
+    bool rvGetVPSWorldFromMap(VROMatrix4f &T_world_map) const override;
+    bool rvStartVPSServerSession() override;
+    void rvStopVPSServerSession() override;
+    bool rvReportVPSServerFix(const VROMatrix4f &T_world_cam, const VROMatrix4f &T_map_cam,
+                              int inliers) override;
+
+    // Scene Semantics API
+    bool isSemanticModeSupported() const override;
+    void setSemanticModeEnabled(bool enabled) override;
+    float getSemanticLabelFraction(VROSemanticLabel label) const;
+
+    // AR Session Recording API (see VROARSessionRecorderIOS)
+    bool isRecordingSupported() const override;
+    bool isRecordingDepthSupported() const override;
+    void startRecording(const VROARRecordingConfig &config,
+                         std::function<void()> onSuccess,
+                         std::function<void(std::string error)> onFailure) override;
+    using VROARSession::stopRecording;
+    void stopRecording(std::function<void(const VROARRecordingResult &result)> onStopped) override;
+    VROARRecordingStatus getRecordingStatus() const override;
+
+    /*
+     Internal methods.
+     */
+    void setFrame(ARFrame *frame);
+    std::shared_ptr<VROARAnchor> getAnchorForNative(ARAnchor *anchor);
+    void updateAnchor(std::shared_ptr<VROARAnchor> anchor);
+
+    void addAnchor(ARAnchor *anchor);
+    void updateAnchor(ARAnchor *anchor);
+    void removeAnchor(ARAnchor *anchor);
+
+    /*
+     Get the native ARSession object for anchor creation.
+     */
+    ARSession *getARSession() const { return _session; }
+    ARConfiguration *getSessionConfiguration() const { return _sessionConfiguration; }
+    bool isPaused() const { return _sessionPaused; }
+
+private:
+    
+    /*
+     The ARKit session, configuration, and delegate.
+     */
+    ARSession *_session;
+    ARConfiguration *_sessionConfiguration;
+    VROARKitSessionDelegate *_delegateAR;
+    std::unique_ptr<VROARSessionRecorderIOS> _recorder;
+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300
+    NSMutableSet<ARReferenceImage *> *_arKitImageDetectionSet;
+#endif
+
+    /*
+     Whether or not the session has been paused.
+     */
+    bool _sessionPaused;
+
+    /*
+     Whether the world mesh asked for scene depth (set by onWorldMeshEnabled).
+     */
+    bool _worldMeshDepthNeeded = false;
+
+    /*
+     The ARFrameSemantics (as a raw mask) the session needs: the union of what
+     occlusion, the world mesh and depth capture ask for, limited to what the
+     device supports. This is the only place frameSemantics is decided.
+     */
+    NSUInteger computeNeededFrameSemantics() const;
+
+    /*
+     Set the needed frameSemantics on the world tracking configuration and, if
+     they changed, re-run it (unless paused).
+     */
+    void updateFrameSemantics();
+
+    /*
+     Runs the configuration again so a change to it takes effect, unless the session is
+     paused: run() applies the whole configuration when it resumes.
+     */
+    void rerunIfRunning();
+
+    /*
+     The cloud anchor provider to use for hosting/resolving cloud anchors.
+     */
+    VROCloudAnchorProvider _cloudAnchorProvider = VROCloudAnchorProvider::None;
+
+    /*
+     The ARCore cloud anchor provider instance (for iOS using ARCore SDK).
+     */
+    VROCloudAnchorProviderARCore *_cloudAnchorProviderARCore = nil;
+
+    /*
+     The ReactVision cloud anchor provider instance. Created when Info.plist has
+     RVApiKey and RVProjectId or a VROReactVisionAuth session exists.
+     */
+    VROCloudAnchorProviderReactVision *_cloudAnchorProviderRV = nil;
+
+    /*
+     The ReactVision provider for a request, created here when ReactVision is
+     selected and a key or session now exists, so a sign-in after the scene
+     mounted still gets one. nil with `error` set otherwise, including
+     VROReactVisionAuth::kNoCredentialsError when there is no key and no session.
+     */
+    VROCloudAnchorProviderReactVision *ensureReactVisionProvider(std::string &error);
+
+    /*
+     The ReactVision geospatial provider instance.
+     Active when setGeospatialAnchorProvider(ReactVision) is called.
+     */
+    std::shared_ptr<ReactVisionCCA::RVCCAGeospatialProvider> _geospatialProviderRV;
+    std::string _rvGeoProjectId;
+
+    /*
+     Smooths the raw per-frame hits rvLoadVPSMap()'s loaded map produces into
+     a single pose correction. Created once and never reassigned, because the
+     render thread (per-frame hits) and the bridge (load, unload, polling)
+     both use it; it locks internally. Reset by rvLoadVPSMap() and
+     rvUnloadVPSMap(). Made in the constructor, where VROVPSLocalizer is a
+     complete type: an initializer here instantiates make_shared against the
+     forward declaration above, which older libc++ refuses.
+     */
+    const std::shared_ptr<ReactVisionCCA::VROVPSLocalizer> _vpsLocalizerRV;
+
+    /*
+     Guards the cached VPS state below, written on the render thread and read
+     from the bridge.
+     */
+    std::mutex _vpsStateMutex;
+
+    /*
+     The camera pose (T_world_cam) passed into the most recent
+     updateVPSMapFrame() call, cached so rvGetVPSLocalizationJson() can
+     report a render pose without needing a fresh frame at poll time.
+     */
+    VROMatrix4f _lastVPSCamToWorld;
+    bool        _lastVPSCamToWorldSet = false;
+
+    /*
+     VPS server mode (rvStartVPSServerSession()): the fuser is fed by the
+     backend's fixes, with no map loaded, and the camera pose above is cached
+     every frame instead of only while a map is loaded.
+     */
+    bool  _vpsServerMode     = false;
+
+    /* The most recent raw hit from updateVPSMapFrame()'s onHit, for diagnostics. */
+    bool  _lastVPSHitSet     = false;
+    int   _lastVPSInliers    = 0;
+    float _lastVPSReprojRms  = 0.f;
+
+    /*
+     CLLocationManager delegate for ReactVision geospatial — provides GPS pose
+     when ARCore VPS is not in use.
+     */
+    id _rvLocationDelegate;
+
+    /*
+     True once _rvLocationDelegate has received at least one real
+     didUpdateHeading callback. VROGeospatialPose's own
+     headingAccuracy can't tell "never updated" apart from "updated with a
+     clamped-to-0 accuracy" — both read 0 — so this is tracked separately
+     instead. See VROLocationDelegate.headingValidOut.
+     */
+    BOOL _hasReceivedHeadingFix = NO;
+
+    /*
+     _lastKnownGPSPose.timestamp last pushed into _recorder's pending GPS/
+     heading reading. Lets updateFrame() push only when a
+     genuinely fresh fix has arrived, instead of re-tagging every frame with
+     a stale one. 0 means "never pushed".
+     */
+    double _lastGpsTimestampPushedToRecorder = 0.0;
+
+    /*
+     Last GPS pose received from Core Location (ReactVision provider path).
+     Updated on the main thread; read from any thread via getCameraGeospatialPose().
+     */
+    mutable VROGeospatialPose _lastKnownGPSPose;
+    // Guards _lastKnownGPSPose and _hasReceivedHeadingFix between the
+    // location delegate (main thread) and the AR recorder (render thread).
+    std::mutex _gpsPoseMutex;
+
+    bool _needsGeospatialModeApply = false;
+
+    /*
+     The last computed ARFrame.
+     */
+    std::unique_ptr<VROARFrame> _currentFrame;
+    
+    /*
+     The current viewport and camera orientation.
+     */
+    VROViewport _viewport;
+    VROCameraOrientation _orientation;
+    
+    /*
+     Vector of all anchors that have been added to this session.
+     */
+    std::vector<std::shared_ptr<VROARAnchor>> _anchors;
+    
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300
+    /*
+     Map of ARReferenceImage ObjC objects to astd::shared_ptr<VROARImageTarget>
+     that was used to create the ARReferenceImage.
+     */
+    std::map<ARReferenceImage *, std::shared_ptr<VROARImageTarget>> _arKitReferenceImageMap;
+#endif
+    
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 120000
+    /*
+     Set of ARReferenceObjects to detect
+     */
+    NSMutableSet<ARReferenceObject *> *_arKitObjectDetectionSet;
+
+    /*
+     Map of ARReferenceObject ObjC objects to a std::shared_ptr<VROARObjectTarget>
+     that was used to create the ARReferenceObject.
+     */
+    std::map<ARReferenceObject *, std::shared_ptr<VROARObjectTarget>> _arKitReferenceObjectMap;
+#endif
+    
+    /*
+     Map of ARKit anchors ("native" anchors) to their Viro representation. 
+     Required so we can update VROARAnchors when their ARKit counterparts are
+     updated. Note that not all VROARAnchors have an ARKit counterpart (e.g. 
+     they may be added and maintained by other tracking software).
+     */
+    std::map<std::string, std::shared_ptr<VROARAnchor>> _nativeAnchorMap;
+    
+    /*
+     Background to be assigned to the VROScene.
+     */
+    std::shared_ptr<VROTexture> _background;
+    
+    /*
+     Video texture cache used for transferring camera content to OpenGL.
+     */
+    std::shared_ptr<VROVideoTextureCacheOpenGL> _videoTextureCache;
+
+    /*
+     Fallback 1×1 all-white confidence texture (conf=1.0 everywhere).
+     Returned by getSemanticConfidenceTexture() because the ARCore iOS SDK does not
+     expose a per-pixel confidence image. The result is hard alpha edges (no soft blend)
+     on iOS, identical to the previous discard behaviour.
+     */
+    std::shared_ptr<VROTexture> _defaultConfidenceTexture;
+    
+    /*
+     Update the VROARAnchor with the transforms in the given ARAnchor.
+     */
+    void updateAnchorFromNative(std::shared_ptr<VROARAnchor> vAnchor, ARAnchor *anchor);
+    
+    std::shared_ptr<VROVisionModel> _visionModel;
+
+    /*
+     Monocular depth estimation for non-LiDAR devices (or as alternative to LiDAR).
+     */
+    std::shared_ptr<VROMonocularDepthEstimator> _monocularDepthEstimator;
+    bool _monocularDepthEnabled;
+    bool _preferMonocularDepth;  // When true, use monocular even on LiDAR devices
+    bool _frontCameraEnabled;    // When true and a config provider is registered, use front-camera AR
+    bool _monocularDepthLoading;
+    float _monocularDepthScale;  // Multiplied into depth values (1.0 = no change)
+    int   _monocularDepthTargetFPS;  // 0 = use estimator default
+    std::shared_ptr<VRODriver> _driver;
+
+    void updateTrackingType(VROTrackingType trackingType);
+    void initializeMonocularDepthEstimator(NSString *modelPath);
+
+};
+
+/*
+ Delegate for ARKit's ARSession.
+ */
+API_AVAILABLE(ios(12.0)) @interface VROARKitSessionDelegate : NSObject<ARSessionDelegate> 
+
+- (id)initWithSession:(std::shared_ptr<VROARSessioniOS>)session;
+
+@end
+
+#endif
+#endif /* VROARSessioniOS_h */

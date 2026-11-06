@@ -107,6 +107,11 @@ public class VRTARSceneNavigatorManager extends VRTViroViewGroupManager<VRTARSce
         navigator.setDepthEnabled(enabled);
     }
 
+    @ReactProp(name = "depthCaptureEnabled", defaultBoolean = false)
+    public void setDepthCaptureEnabled(VRTARSceneNavigator navigator, boolean enabled) {
+        navigator.setDepthCaptureEnabled(enabled);
+    }
+
     @ReactProp(name = "semanticDebugEnabled", defaultBoolean = false)
     public void setSemanticDebugEnabled(VRTARSceneNavigator navigator, boolean enabled) {
         navigator.setSemanticDebugEnabled(enabled);

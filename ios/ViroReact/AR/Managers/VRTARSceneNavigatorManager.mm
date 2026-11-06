@@ -47,6 +47,7 @@ RCT_EXPORT_VIEW_PROPERTY(shadowsEnabled, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(multisamplingEnabled, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(occlusionMode, NSString)
 RCT_EXPORT_VIEW_PROPERTY(depthEnabled, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(depthCaptureEnabled, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(depthDebugEnabled, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(monocularDepthScale, float)
 RCT_EXPORT_VIEW_PROPERTY(monocularDepthTargetFPS, int)
@@ -61,8 +62,8 @@ RCT_EXPORT_VIEW_PROPERTY(onWorldMeshUpdated, RCTDirectEventBlock)
 
 - (VRTARSceneNavigator *)view
 {
-    // Install crash fix for Fabric view recycling (protects all Viro components except ARSceneNavigator)
-    // ARSceneNavigator uses +shouldBeRecycled to disable recycling entirely (too heavy at 700MB+)
+    // Install the crash fix for Fabric view unmounting (VRTFabricCrashFix). The navigator itself can be
+    // recycled: prepareForRecycle releases its renderer and AR session and resets _hasCleanedUp.
     [VRTFabricCrashFix installFabricCrashFix];
 
     return [[VRTARSceneNavigator alloc] initWithBridge:self.bridge];

@@ -81,10 +81,20 @@ describe("StudioAnimationSlots", () => {
     );
   });
 
-  it("does not queue behind an asset that has not loaded, since that play never runs", () => {
+  it("lets a later request replace a play while its asset has not loaded", () => {
     const slots = new StudioAnimationSlots();
     slots.request(anim("spin"), false, "local");
-    expect(slots.request(anim("hop"), true, "local")).toBe("start");
+    expect(slots.request(anim("hop"), false, "local")).toBe("start");
+  });
+
+  it("holds the slot for a play requested before its asset loaded, once it loads", () => {
+    const slots = new StudioAnimationSlots();
+    slots.request(anim("spin"), false, "local");
+    expect(slots.request(anim("hop"), true, "local")).toBe("queued");
+
+    const looping = new StudioAnimationSlots();
+    looping.request(anim("idle", { loop: true }), false, "local");
+    expect(looping.request(anim("launch"), true, "local")).toBe("interrupt");
   });
 
   it("forgets everything on reset", () => {

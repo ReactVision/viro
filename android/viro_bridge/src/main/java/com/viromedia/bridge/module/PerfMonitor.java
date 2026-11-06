@@ -21,9 +21,11 @@
 
 package com.viromedia.bridge.module;
 
+import android.app.Activity;
 import android.app.Application;
 
 import com.facebook.react.ReactApplication;
+import com.facebook.react.ReactHost;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.devsupport.interfaces.DevOptionHandler;
@@ -68,7 +70,7 @@ public class PerfMonitor extends ReactContextBaseJavaModule {
     }
 
     public void onOptionSelected() {
-        ViroView view = mView.get();
+        ViroView view = mView != null ? mView.get() : null;
         if (view != null) {
             view.setDebugHUDEnabled(!mIsShowing);
         }
@@ -77,13 +79,17 @@ public class PerfMonitor extends ReactContextBaseJavaModule {
 
     public void setView(ViroView view) {
         if (!mIsInitialized) {
-            Application application = getCurrentActivity().getApplication();
+            Activity activity = getCurrentActivity();
+            Application application = activity != null ? activity.getApplication() : null;
             if (application instanceof ReactApplication) {
                 ReactApplication reactApplication = (ReactApplication) application;
-                DevSupportManager devSupport = reactApplication.getReactHost().getDevSupportManager();
-                devSupport.addCustomDevOption("[Viro] Toggle FPS Display", new PerfOptionHandler(this));
+                ReactHost reactHost = reactApplication.getReactHost();
+                if (reactHost != null) {
+                    DevSupportManager devSupport = reactHost.getDevSupportManager();
+                    devSupport.addCustomDevOption("[Viro] Toggle FPS Display", new PerfOptionHandler(this));
 
-                mIsInitialized = true;
+                    mIsInitialized = true;
+                }
             }
         }
 

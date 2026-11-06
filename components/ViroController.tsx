@@ -30,7 +30,7 @@ import {
   ViroSwipeEvent,
   ViroTouchEvent,
 } from "./Types/ViroEvents";
-import { ViroNativeRef, ViroSource } from "./Types/ViroUtils";
+import { Viro3DPoint, ViroNativeRef, ViroSource } from "./Types/ViroUtils";
 
 const ViroControllerModule = NativeModules.VRTControllerModule;
 
@@ -131,6 +131,17 @@ export class ViroController extends React.Component<Props> {
     return await ViroControllerModule.getForwardVectorAsync(
       findNodeHandle(this)
     );
+  }
+
+  /**
+   * Where the ray that carries `source` last pointed, in world space, or null
+   * when that source has no ray of its own (a head-aimed controller). A click
+   * that hits nothing reports no position, so this says where it was aimed.
+   */
+  async getControllerRayAsync(
+    source: ViroSource
+  ): Promise<{ origin: Viro3DPoint; forward: Viro3DPoint } | null> {
+    return await ViroControllerModule.getRayAsync(findNodeHandle(this), source);
   }
 
   setNativeProps(nativeProps: Props) {

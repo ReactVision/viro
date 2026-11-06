@@ -48,7 +48,7 @@ RCT_EXPORT_VIEW_PROPERTY(onErrorViro, RCTDirectEventBlock)
     return [[VRTSound alloc] initWithBridge:self.bridge];
 }
 
-RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(NSInteger)time)
+RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
 {
     VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSound class], ^(UIView *resolvedView) {
         VRTView *view = (VRTView *)resolvedView;
@@ -80,7 +80,7 @@ RCT_EXPORT_VIEW_PROPERTY(onErrorViro, RCTDirectEventBlock)
     return [[VRTSoundField alloc] initWithBridge:self.bridge];
 }
 
-RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(NSInteger)time)
+RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
 {
     VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSoundField class], ^(UIView *resolvedView) {
         VRTView *view = (VRTView *)resolvedView;
@@ -115,7 +115,7 @@ RCT_EXPORT_VIEW_PROPERTY(onErrorViro, RCTDirectEventBlock)
     return [[VRTSpatialSoundWrapper alloc] initWithBridge:self.bridge];
 }
 
-RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(NSInteger)time)
+RCT_EXPORT_METHOD(seekToTime:(nonnull NSNumber *)reactTag time:(float)time)
 {
     VRTWithViewForTag(self.viewRegistry_DEPRECATED, reactTag, [VRTSpatialSound class], ^(UIView *resolvedView) {
         VRTView *view = (VRTView *)resolvedView;

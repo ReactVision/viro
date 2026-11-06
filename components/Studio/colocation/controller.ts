@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import {
   getColocationPeers,
   getColocationState,
@@ -6,6 +5,7 @@ import {
   leaveColocation,
   setColocationLocalPose,
   VIRO_POSE_INTERVAL_MS,
+  type ViroColocationConfig,
   type ViroColocationPeer,
   type ViroColocationState,
 } from "../../AR/ViroColocation";
@@ -31,8 +31,23 @@ import {
   type ViroReplicationConfig,
   type ViroReplicationRejection,
 } from "../../AR/ViroReplication";
+import {
+  credentialHeaders,
+  isUserTokenCredentials,
+  onUserTokenCleared,
+  readCredentials,
+  renewedToken,
+  USER_TOKEN_REFUSALS,
+} from "../../AR/ViroUserTokens";
+import type {
+  ViroVPSCredentials,
+  ViroVPSCredentialsRequest,
+  ViroVPSCredentialsSource,
+} from "../../AR/ViroVPSClient";
 import type { ViroScanStatus } from "../../Types/ViroEvents";
 import { isQuest } from "../../Utilities/ViroPlatform";
+import { onRoomMoved } from "../../Utilities/VRModuleOpenXR";
+import { showStudioAlert } from "../domain/questAlertStore";
 import { studioApiError } from "../domain/studioApiError";
 import type { StudioSceneResponse } from "../types";
 import { type StudioAuthContext, VRTStudioModule } from "../VRTStudioModule";
@@ -41,6 +56,7 @@ import {
   STUDIO_COLOCATION_ENTITY_LIMIT,
 } from "./budget";
 import {
+  CREDENTIALS_CHANGED_FAILURE,
   errorMessage,
   frameKindUnsupportedFailure,
   metaSharingUnavailableFailure,
@@ -49,6 +65,7 @@ import {
   resolveErrorCode,
   ROOM_PEER_LIMIT,
   roomErrorCode,
+  SCENE_BOUND_TO_VPS_FAILURE,
   type StudioColocationFailure,
 } from "./errors";
 import {
@@ -169,18 +186,20 @@ export const STUDIO_COLOCATION_OFF_FRAME: StudioColocationFrame = {
 
 /**
  * Quest roots a scene in ViroScene (StudioARScene says why), except the scene
- * on screen while a session is set up or shared. The OpenXR session, where a
+ * on screen while a session is set up or shared, and outside a session a scene
+ * that can use the room's planes (`questPlanes`). The OpenXR session, where a
  * Meta shared anchor lives, is attached only to the selected scene, and the
  * Quest navigator sends shared-frame calls to its first ViroARScene child, so
- * a scene under a push must stay ViroScene.
+ * a scene under a push must stay ViroScene while a session runs.
  */
 export function studioSceneRootsInAR(
   frame: Pick<StudioColocationFrame, "phase" | "sceneMount">,
   mount: number,
-  quest: boolean
+  quest: boolean,
+  questPlanes = false
 ): boolean {
   if (!quest) return true;
-  if (frame.phase === "off") return false;
+  if (frame.phase === "off") return questPlanes;
   // A scene renders before it attaches, and only the one being pushed can be
   // newer than the attached scene.
   return frame.sceneMount === null || mount >= frame.sceneMount;
@@ -217,6 +236,8 @@ export type StudioColocationDeps = {
   now: () => number;
   loadScene: (sceneId: string) => Promise<StudioSceneResponse>;
   onNavigationError: (error: unknown) => void;
+  /** Quest: a recentre moved world coordinates against the room. */
+  onRoomMoved: (listener: (move: Mat4) => void) => () => void;
 };
 
 function defaultFrameSourceFor(
@@ -266,7 +287,7 @@ function outsideProjectError(sceneId: string): Error {
 /** As a NAVIGATE on its own reports a scene that failed to load. */
 function reportNavigationError(error: unknown): void {
   console.error("[Studio] Error navigating to scene:", error);
-  Alert.alert("Navigation Error", "Failed to load scene");
+  showStudioAlert("Navigation Error", "Failed to load scene");
 }
 
 const DEFAULT_DEPS: StudioColocationDeps = {
@@ -291,6 +312,7 @@ const DEFAULT_DEPS: StudioColocationDeps = {
   now: () => Date.now(),
   loadScene: loadStudioScene,
   onNavigationError: reportNavigationError,
+  onRoomMoved,
 };
 
 function optionsKey(options: StudioColocationOptions): string {
@@ -298,6 +320,11 @@ function optionsKey(options: StudioColocationOptions): string {
   return options.mode === "host"
     ? `host|${relay}`
     : `join|${options.code.replace(/\s+/g, "").toUpperCase()}|${relay}`;
+}
+
+/** The createUserTokenCredentials() object `credentials` are, one per user, or null. */
+function userTokenOf(credentials: unknown): unknown {
+  return isUserTokenCredentials(credentials) ? credentials : null;
 }
 
 function asFrameKind(value: string | null): StudioColocationFrameKind | null {
@@ -442,6 +469,8 @@ export class StudioColocationController {
   private room: StudioColocationRoom | null = null;
   private announced = false;
   private auth: StudioAuthContext | null = null;
+  /** The createUserTokenCredentials() object this session started with, or null. */
+  private userToken: unknown = null;
   private projectId: string | null = null;
   private relayUrl = STUDIO_COLOCATION_DEFAULT_RELAY_URL;
   private anchorProjectSet = false;
@@ -497,6 +526,10 @@ export class StudioColocationController {
    *
    * The navigator passes `restartFailed: false`: a host re-rendering with an
    * equal value after every state change would otherwise retry in a loop.
+   *
+   * New `credentials` never restart a session, but a running one fails when
+   * their createUserTokenCredentials() object is not the one it started with,
+   * any other value counting as none.
    */
   request(
     options: StudioColocationOptions | null,
@@ -505,6 +538,13 @@ export class StudioColocationController {
     const key = options ? optionsKey(options) : null;
     if (key === this.requestedKey) {
       if (options) this.options = options;
+      if (
+        options &&
+        this.active &&
+        userTokenOf(options.credentials) !== this.userToken
+      ) {
+        this.fail(this.run, CREDENTIALS_CHANGED_FAILURE);
+      }
       if (options && restartFailed && this.state.status === "failed") {
         this.restart();
       }
@@ -557,6 +597,15 @@ export class StudioColocationController {
     this.sceneMount = mount ?? null;
     this.sceneStores = stores ?? null;
     this.sceneHooks = hooks ?? null;
+    // The app changing `sceneId` mid-session, refused as a NAVIGATE there is.
+    // A remount of the same scene is not a change.
+    if (
+      this.active &&
+      sceneData.scene.vps_location_id &&
+      prev?.scene.id !== sceneData.scene.id
+    ) {
+      this.fail(this.run, SCENE_BOUND_TO_VPS_FAILURE);
+    }
     this.noteSceneShown(prev, sceneData);
     this.sharedState?.bindScene(sceneData, this.sceneStores, this.sceneHooks);
     if (this.pendingStart) this.begin();
@@ -574,7 +623,8 @@ export class StudioColocationController {
   /**
    * A NAVIGATE while a session is set up or shared goes through the navigator
    * and into the room, so every device follows. False when no session runs:
-   * the scene then navigates on its own.
+   * the scene then navigates on its own. A scene bound to a VPS location is
+   * not entered while a session runs, and the session fails instead.
    */
   navigate(targetSceneId: string): boolean {
     if (this.frame.phase === "off" || !this.pushScene) return false;
@@ -582,8 +632,16 @@ export class StudioColocationController {
     this.deps.loadScene(targetSceneId).then(
       (sceneData) => {
         if (seq !== this.navigationSeq) return;
-        if (this.inSessionProject(sceneData)) this.enterScene(sceneData, false);
-        else this.deps.onNavigationError(outsideProjectError(targetSceneId));
+        if (!this.inSessionProject(sceneData)) {
+          this.deps.onNavigationError(outsideProjectError(targetSceneId));
+        } else if (
+          sceneData.scene.vps_location_id &&
+          this.frame.phase !== "off"
+        ) {
+          this.fail(this.run, SCENE_BOUND_TO_VPS_FAILURE);
+        } else {
+          this.enterScene(sceneData, false);
+        }
       },
       (error) => {
         if (seq === this.navigationSeq) this.deps.onNavigationError(error);
@@ -701,6 +759,18 @@ export class StudioColocationController {
     this.active = true;
     const run = this.run;
     this.relayUrl = options.relayUrl ?? STUDIO_COLOCATION_DEFAULT_RELAY_URL;
+    this.userToken = userTokenOf(options.credentials);
+    this.cleanups.push(
+      onUserTokenCleared(this.userToken, () =>
+        this.fail(run, CREDENTIALS_CHANGED_FAILURE)
+      )
+    );
+    // The anchor stays in the room, so its world pose moves with a recentre.
+    this.cleanups.push(
+      this.deps.onRoomMoved((move) => {
+        if (this.location) this.setLocation(multiply(move, this.location));
+      })
+    );
     const flow =
       options.mode === "host"
         ? this.host(run, scene)
@@ -712,6 +782,10 @@ export class StudioColocationController {
   }
 
   private async host(run: number, scene: StudioSceneResponse): Promise<void> {
+    // The rooms service refuses it too, but only at createRoom, after the scan.
+    if (scene.scene.vps_location_id) {
+      return this.fail(run, SCENE_BOUND_TO_VPS_FAILURE);
+    }
     if (!this.checkBudget(run, scene)) return;
     const frameKind = this.deps.hostFrameKind();
     const nav = this.getNavigator();
@@ -737,11 +811,7 @@ export class StudioColocationController {
 
     // Before the frame: scanning and hosting take close to a minute, and a
     // refused plan or credential would otherwise surface only at room creation.
-    const probe = await this.deps.probeRelay(
-      this.relayUrl,
-      this.deps.newProbeRoomId(),
-      this.relayHeaders()
-    );
+    const probe = await this.probe(this.deps.newProbeRoomId());
     if (!this.isCurrent(run)) return;
     const refused = probeFailure(probe);
     if (refused) return this.fail(run, refused);
@@ -870,11 +940,7 @@ export class StudioColocationController {
 
     // Before the resolve, which can take a minute of walking: a full room or a
     // relay refusal is known now.
-    const probe = await this.deps.probeRelay(
-      this.relayUrl,
-      this.room.roomId,
-      this.relayHeaders()
-    );
+    const probe = await this.probe(this.room.roomId);
     if (!this.isCurrent(run)) return;
     const refused = probeFailure(probe);
     if (refused) return this.fail(run, refused);
@@ -903,7 +969,12 @@ export class StudioColocationController {
   ): Promise<boolean> {
     const auth = await this.deps.getAuth();
     if (!this.isCurrent(run)) return false;
-    if (auth.mode === "none" || !auth.baseUrl) {
+    // `credentials` stand in for the native credential, whose base URL is
+    // still the rooms' endpoint when it has one.
+    if (
+      (auth.mode === "none" || !auth.baseUrl) &&
+      this.options?.credentials === undefined
+    ) {
       this.fail(run, {
         code: "NOT_AUTHORIZED",
         message: "No ReactVision API key or signed-in session is available.",
@@ -931,6 +1002,8 @@ export class StudioColocationController {
    * the ones the session started with.
    */
   private async reloadAuth(run: number): Promise<boolean> {
+    // Each call that sends `credentials` reads them itself.
+    if (this.options?.credentials !== undefined) return this.isCurrent(run);
     const auth = await this.deps.getAuth();
     if (!this.isCurrent(run)) return false;
     const started = this.auth;
@@ -1088,48 +1161,77 @@ export class StudioColocationController {
     const room = this.room;
     if (!auth || !projectId || !room) return;
 
-    let apiKey: string;
+    let join: ViroColocationConfig;
     let config: ViroReplicationConfig;
-    switch (auth.mode) {
-      case "api_key":
-        apiKey = headerValue(auth.headers, "x-api-key") ?? "";
-        config = {
-          roomId: room.roomId,
-          projectId,
-          endpoint: this.relayUrl,
-          apiKey,
-        };
-        break;
-      case "session":
-        apiKey = "";
-        config = {
-          roomId: room.roomId,
-          projectId,
-          endpoint: this.relayUrl,
-          // Read per connect, so a reconnect after a refresh sends the new token.
-          headers: () => this.deps.getAuth().then((a) => a.headers),
-        };
-        break;
-      case "none":
-        return this.fail(run, {
-          code: "NOT_AUTHORIZED",
-          message: "No ReactVision API key or signed-in session is available.",
-        });
-      default: {
-        const unknown: never = auth.mode;
-        return this.fail(run, {
-          code: "NOT_AUTHORIZED",
-          message: `Unknown credential kind ${String(unknown)}.`,
-        });
+    const credentials = this.options?.credentials;
+    if (credentials !== undefined) {
+      // A createUserTokenCredentials() object goes as it is, so the channel
+      // finds it to renew its token. Any other value is read again at each
+      // use, so a reconnect sends the latest one passed, not this one.
+      const source: ViroVPSCredentialsSource = isUserTokenCredentials(
+        credentials
+      )
+        ? credentials
+        : (request?: ViroVPSCredentialsRequest) =>
+            readCredentials(this.options?.credentials ?? credentials, request);
+      // projectId replaces theirs: the room belongs to the scene's project.
+      join = {
+        roomId: room.roomId,
+        projectId,
+        endpoint: this.relayUrl,
+        credentials: source,
+      };
+      config = {
+        roomId: room.roomId,
+        projectId,
+        endpoint: this.relayUrl,
+        credentials: source,
+      };
+    } else {
+      let apiKey: string;
+      switch (auth.mode) {
+        case "api_key":
+          apiKey = headerValue(auth.headers, "x-api-key") ?? "";
+          config = {
+            roomId: room.roomId,
+            projectId,
+            endpoint: this.relayUrl,
+            apiKey,
+          };
+          break;
+        case "session":
+          apiKey = "";
+          config = {
+            roomId: room.roomId,
+            projectId,
+            endpoint: this.relayUrl,
+            // Read per connect, so a reconnect after a refresh sends the new token.
+            headers: () => this.deps.getAuth().then((a) => a.headers),
+          };
+          break;
+        case "none":
+          return this.fail(run, {
+            code: "NOT_AUTHORIZED",
+            message:
+              "No ReactVision API key or signed-in session is available.",
+          });
+        default: {
+          const unknown: never = auth.mode;
+          return this.fail(run, {
+            code: "NOT_AUTHORIZED",
+            message: `Unknown credential kind ${String(unknown)}.`,
+          });
+        }
       }
+      join = {
+        roomId: room.roomId,
+        apiKey,
+        projectId,
+        endpoint: this.relayUrl,
+      };
     }
     this.channelJoined = true;
-    const joined = await this.deps.joinChannel({
-      roomId: room.roomId,
-      apiKey,
-      projectId,
-      endpoint: this.relayUrl,
-    });
+    const joined = await this.deps.joinChannel(join);
     if (!this.isCurrent(run)) {
       // Left while the join was in flight: the teardown's leave may have run
       // first, and a device stays in a room until told to leave it.
@@ -1312,11 +1414,7 @@ export class StudioColocationController {
     let probe: RelayProbeResult;
     try {
       if (!(await this.reloadAuth(run))) return;
-      probe = await this.deps.probeRelay(
-        this.relayUrl,
-        this.room?.roomId ?? this.deps.newProbeRoomId(),
-        this.relayHeaders()
-      );
+      probe = await this.probe(this.room?.roomId ?? this.deps.newProbeRoomId());
     } catch (e) {
       probe = { ok: false, message: errorMessage(e) };
     }
@@ -1417,8 +1515,13 @@ export class StudioColocationController {
         const sceneData = await this.deps.loadScene(sceneId);
         if (!current()) return;
         // Any peer with the room's credential can write the room's scene.
-        if (this.inSessionProject(sceneData)) this.enterScene(sceneData, true);
-        else this.deps.onNavigationError(outsideProjectError(sceneId));
+        if (!this.inSessionProject(sceneData)) {
+          this.deps.onNavigationError(outsideProjectError(sceneId));
+        } else if (sceneData.scene.vps_location_id) {
+          this.fail(run, SCENE_BOUND_TO_VPS_FAILURE);
+        } else {
+          this.enterScene(sceneData, true);
+        }
         return;
       } catch (e) {
         failure = e;
@@ -1483,6 +1586,7 @@ export class StudioColocationController {
     this.room = null;
     this.announced = false;
     this.auth = null;
+    this.userToken = null;
     this.projectId = null;
     this.location = null;
     this.locationInverse = null;
@@ -1619,6 +1723,14 @@ export class StudioColocationController {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private roomsConfig(): ViroColocationRoomsConfig {
+    const credentials = this.options?.credentials;
+    if (credentials !== undefined) {
+      return {
+        endpoint: this.auth?.baseUrl ?? undefined,
+        credentials,
+        projectId: this.projectId ?? undefined,
+      };
+    }
     return {
       endpoint: this.auth?.baseUrl ?? undefined,
       headers: this.auth?.headers ?? {},
@@ -1626,8 +1738,50 @@ export class StudioColocationController {
     };
   }
 
-  private relayHeaders(): Record<string, string> {
-    return { ...this.auth?.headers, "x-project-id": this.projectId ?? "" };
+  /** The relay's gate for `roomId`, asked with the credentials as they are now. */
+  private async probe(roomId: string): Promise<RelayProbeResult> {
+    const projectId = this.projectId ?? "";
+    const credentials = this.options?.credentials;
+    if (credentials === undefined) {
+      return this.deps.probeRelay(this.relayUrl, roomId, {
+        ...this.auth?.headers,
+        "x-project-id": projectId,
+      });
+    }
+    let read: ViroVPSCredentials;
+    try {
+      read = await readCredentials(credentials);
+    } catch (e) {
+      return {
+        ok: false,
+        code: "CREDENTIALS_UNAVAILABLE",
+        message: `Could not get credentials: ${errorMessage(e)}`,
+      };
+    }
+    const probe = await this.deps.probeRelay(
+      this.relayUrl,
+      roomId,
+      credentialHeaders(read, projectId)
+    );
+    // A refused user token is renewed once, as the room calls do: a host
+    // probes before any of them, and would otherwise send it again at a retry.
+    if (
+      !probe.ok &&
+      probe.status === 401 &&
+      probe.code !== undefined &&
+      USER_TOKEN_REFUSALS.has(probe.code) &&
+      "accessToken" in read
+    ) {
+      const renewed = await renewedToken(credentials, read.accessToken);
+      if (renewed !== undefined) {
+        return this.deps.probeRelay(
+          this.relayUrl,
+          roomId,
+          credentialHeaders({ projectId, accessToken: renewed })
+        );
+      }
+    }
+    return probe;
   }
 
   private toStudioRoom(

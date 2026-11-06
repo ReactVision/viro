@@ -272,6 +272,13 @@ describe("header providers", () => {
     expect(client.state).toBe("failed");
     expect(client.error).toBeDefined();
   });
+
+  it("clears that error when it connects again", () => {
+    client.connect(SESSION);
+    expect(client.error).toBeDefined();
+    client.connect(CONFIG);
+    expect(client.error).toBeUndefined();
+  });
 });
 
 describe("ordering", () => {
@@ -316,6 +323,38 @@ describe("ordering", () => {
 
     expect(s.sent).toEqual([{ op: "resync", sinceSeq: 0 }]);
     expect(client.get("cube")).toBeUndefined();
+  });
+
+  it("asks for a resync at most once a second while gapped deltas keep arriving", () => {
+    const s = connectAndWelcome([], 0);
+    s.sent.length = 0;
+    const gap = (seq: number) =>
+      s.deliver({ t: "delta", ops: [{ kind: "upsert", seq, entity: entity(), by: "x" }] });
+
+    gap(3);
+    gap(4);
+    expect(s.sent).toEqual([{ op: "resync", sinceSeq: 0 }]);
+    jest.advanceTimersByTime(1001);
+    gap(5);
+    expect(s.sent).toHaveLength(2);
+  });
+
+  it("says whether an operation was sent", () => {
+    client.connect(CONFIG);
+    expect(client.set("cube", { x: 1 })).toBe(false);
+    expect(client.claim("cube")).toBe(false);
+    expect(client.release("cube")).toBe(false);
+    expect(client.delete("cube")).toBe(false);
+    expect(client.clear()).toBe(false);
+
+    const s = FakeSocket.last!;
+    s.open();
+    s.deliver({ t: "welcome", you: "me", seq: 0, entities: [] });
+    expect(client.set("cube", { x: 1 })).toBe(true);
+    expect(client.claim("cube")).toBe(true);
+    expect(client.release("cube")).toBe(true);
+    expect(client.delete("cube")).toBe(true);
+    expect(client.clear()).toBe(true);
   });
 
   it("replaces everything on a snapshot", () => {

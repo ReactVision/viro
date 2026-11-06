@@ -53,6 +53,8 @@ export type StudioSharedSceneHooks = {
   playAnimation?: (assetId: string, key: string) => void;
   /** The room is moving this device to another scene. */
   leave?: () => void;
+  /** Assets this device does not render; another device's PLAY at one is skipped. */
+  unrenderedAssetIds?: ReadonlySet<string>;
 };
 
 export type StudioReplicationPort = Pick<
@@ -718,6 +720,7 @@ export class StudioSharedState {
             playAnimation: hooks?.playAnimation,
             sounds: stores.sounds ?? null,
             audioUrls: sceneAudioUrls(sceneData),
+            unrenderedAssetIds: hooks?.unrenderedAssetIds,
           }
         : null
     );

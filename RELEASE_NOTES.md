@@ -53,12 +53,14 @@
 - **Animation chains type-check:** `registerAnimations` accepts names and nested sequences, as the native side always did, and colors inside a chain are processed.
 - **Android: a `ViroARCamera` no longer crashes the scene as it mounts,** and GLB characters with one skin per mesh animate every part.
 - **The world mesh's debug drawing no longer crashes iOS** on a large accumulated mesh.
+- **`Viro3DObject` reads more of glTF:** `KHR_texture_transform`, `KHR_node_visibility`, `KHR_animation_pointer` (node visibility, base color and emissive factors, texture offset, rotation and scale), textures on `TEXCOORD_1` and later sets, and emissive textures. Opaque and masked materials no longer show through where their texture's alpha is low, blended ones no longer hide what is behind them, characters whose rig animates a node above each joint move, skinned parts no longer vanish up close, a GLB with animation pointers no longer fails to load, one with 8-bit indices draws, and skinned GLBs draw on the web.
 - **Sounds seek to fractional seconds,** `Viro360Image` takes `stereoMode`, shared frames answer `{ success: false }` outside Quest, and calls that do nothing on a platform say so once.
 - **visionOS:** spot light cones and morph targets match the other platforms.
 - ViroKit targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.
 
 ### Check when upgrading
 
+- **Emission now shows on physically based materials.** A glTF `emissiveFactor`, or an emissive color on a material with `lightingModel: "PBR"`, was dropped before; a model that relied on that may now glow.
 - **A `style` on a scene navigator now applies.** It was silently dropped before, so check the layout of any navigator you pass one.
 - **`cloudAnchorProvider` and `geospatialAnchorProvider` are honoured** when `provider` is not set. An app that still passes `cloudAnchorProvider="arcore"` now uses ARCore Cloud Anchors and needs a Google Cloud API key; remove the prop or pass `provider` to keep ReactVision's.
 

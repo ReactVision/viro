@@ -3,9 +3,11 @@
  *
  * The navigator's recording calls: stopRecording() hands back what native wrote, and a
  * platform without the native module answers with a failed result instead of undefined;
- * isRecordingSupported() always sends its depth option and answers false without native.
+ * isRecordingSupported() always sends its depth option and answers false without native;
+ * every call goes to the native navigator's tag, not the View that wraps it.
  */
 let mockNativeModules: Record<string, unknown> = {};
+let mockFindNodeHandle: (component: unknown) => number | null = () => 42;
 
 jest.mock("react-native", () => ({
   get NativeModules() {
@@ -13,21 +15,41 @@ jest.mock("react-native", () => ({
   },
   Platform: { OS: "ios", constants: {}, select: (o: any) => o.ios ?? o.default },
   StyleSheet: { create: (s: any) => s },
-  findNodeHandle: () => 42,
+  findNodeHandle: (component: unknown) => mockFindNodeHandle(component),
   requireNativeComponent: () => "VRTARSceneNavigator",
   Text: "Text",
   View: "View",
 }));
 
 // Loaded after the native module is in place: the navigator reads it at import.
-function navigatorWith(nativeModule: Record<string, unknown> | null) {
+function navigatorInstanceWith(nativeModule: Record<string, unknown> | null) {
   mockNativeModules = nativeModule ? { VRTARSceneNavigatorModule: nativeModule } : {};
   let Navigator: any;
   jest.isolateModules(() => {
     Navigator = require("../components/AR/ViroARSceneNavigator").ViroARSceneNavigator;
   });
-  return new Navigator({ initialScene: { scene: () => null } }).arSceneNavigator;
+  return new Navigator({ initialScene: { scene: () => null } });
 }
+
+const navigatorWith = (nativeModule: Record<string, unknown> | null) =>
+  navigatorInstanceWith(nativeModule).arSceneNavigator;
+
+afterEach(() => {
+  mockFindNodeHandle = () => 42;
+});
+
+describe("native view tag", () => {
+  it("startRecording targets the native navigator, not the View carrying the style", async () => {
+    const startRecording = jest.fn(async () => ({ success: true }));
+    const nav = navigatorInstanceWith({ startRecording });
+    const nativeView = { nativeTag: 2278 };
+    nav._component = nativeView;
+    mockFindNodeHandle = (component) =>
+      component === nav ? 2280 : component === nativeView ? 2278 : null;
+    await nav.arSceneNavigator.startRecording("/rec");
+    expect(startRecording).toHaveBeenCalledWith(2278, "/rec");
+  });
+});
 
 describe("stopRecording", () => {
   it("resolves to what native reports once the files are complete", async () => {

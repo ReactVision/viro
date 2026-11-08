@@ -64,6 +64,7 @@ namespace tinygltf {
     class Skin;
     class Animation;
     class AnimationSampler;
+    class AnimationChannel;
     class Buffer;
     class BufferView;
     class Camera;
@@ -128,7 +129,8 @@ private:
     static bool processVertexAttributes(const tinygltf::Model &gModel, std::map<std::string, int> &gAttributes,
                                         std::vector<std::shared_ptr<VROGeometrySource>> &sources,
                                         size_t geoElementIndex,
-                                        std::shared_ptr<VRODriver> driver);
+                                        std::shared_ptr<VRODriver> driver,
+                                        int texcoordSet = 0);
     static void processTangent(std::vector<std::shared_ptr<VROGeometryElement>> &elements,
                                std::vector<std::shared_ptr<VROGeometrySource>> &sources, size_t geoElementIndex);
     static void regenerateTangent(std::vector<VROVector3f> &posArray,
@@ -197,6 +199,14 @@ private:
 
     // Processing of Animation Data
     static bool processAnimations(const tinygltf::Model &gModel);
+
+    // KHR_animation_pointer: rewrite pointers at a node's transform or weights into
+    // ordinary channels (before the model is shared), read the remaining ones, and
+    // once the nodes and materials exist, attach one animation per glTF animation.
+    static void normalizeAnimationPointers(tinygltf::Model &gModel);
+    static bool isPointerChannel(const tinygltf::AnimationChannel &channel);
+    static void processPointerChannels(const tinygltf::Model &gModel);
+    static void attachPointerAnimations(const tinygltf::Model &gModel, std::shared_ptr<VRONode> host);
     static bool processKeyFrameAnimations(const tinygltf::Model &gModel,
                                          std::map<int, std::map<int, std::vector<int>>> &gltfAnimatedNodes);
     // Resample all of a skin's animation channels onto a single common time-grid and merge each

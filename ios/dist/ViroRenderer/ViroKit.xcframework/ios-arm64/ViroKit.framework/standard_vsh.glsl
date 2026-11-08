@@ -32,7 +32,9 @@ in vec3 normal;
 in vec2 texcoord;
 in vec4 tangent;
 in vec4 bone_weights;
-in ivec4 bone_indices;
+// Unsigned: glTF joints are unsigned bytes or shorts, and WebGL refuses an
+// unsigned attribute bound to a signed input. The substrate binds them unsigned.
+in uvec4 bone_indices;
 in vec3 morph_0;
 in vec3 morph_1;
 in vec3 morph_2;

@@ -30,6 +30,11 @@ export function roomErrorCode(
       return "ROOM_NOT_FOUND";
     case "MISSING_API_KEY":
       return "NOT_AUTHORIZED";
+    // Reading `credentials` failed: often the app's backend or the network.
+    case "CREDENTIALS_UNAVAILABLE":
+      return "UNAVAILABLE";
+    case "SCENE_BOUND_TO_VPS":
+      return "SCENE_BOUND_TO_VPS";
   }
   if (status === undefined) return code ? "UNKNOWN" : "UNAVAILABLE";
   if (status === 401 || status === 403) return "NOT_AUTHORIZED";
@@ -52,6 +57,13 @@ export function relayErrorCode(
       return "RELAY_AT_CAPACITY";
     case "PAID_PLAN_REQUIRED":
       return "PAID_PLAN_REQUIRED";
+    case "COMPUTE_SPEND_LIMIT_REACHED":
+      return "COMPUTE_SPEND_LIMIT_REACHED";
+    case "COMPUTE_BILLING_NOT_SET_UP":
+    case "COMPUTE_PAYMENT_FAILED":
+      return "COMPUTE_BILLING_REFUSED";
+    case "SCENE_BOUND_TO_VPS":
+      return "SCENE_BOUND_TO_VPS";
   }
   if (status === undefined) return "UNAVAILABLE";
   if (status === 401 || status === 403) return "NOT_AUTHORIZED";
@@ -123,6 +135,26 @@ export function metaSharingUnavailableFailure(
       "This headset cannot share spatial anchors, which a shared session on Meta Quest needs.",
   };
 }
+
+/**
+ * A scene bound to a VPS location, hosted or entered while a session runs.
+ * Worded as the rooms service's own refusal of such a scene.
+ */
+export const SCENE_BOUND_TO_VPS_FAILURE: StudioColocationFailure = {
+  code: "SCENE_BOUND_TO_VPS",
+  message:
+    "This scene is placed in an Advanced VPS location, so it cannot be shared through a co-location room.",
+};
+
+/**
+ * A running session's `credentials` became another
+ * createUserTokenCredentials() object, or stopped or started being one, or
+ * the one it uses was cleared.
+ */
+export const CREDENTIALS_CHANGED_FAILURE: StudioColocationFailure = {
+  code: "NOT_AUTHORIZED",
+  message: "The co-location credentials changed during the shared session.",
+};
 
 /** The relay refused the host's scene origin write. */
 export function originRejectFailure(

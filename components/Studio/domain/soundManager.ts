@@ -16,6 +16,11 @@ export type StudioSoundEntry = {
   audioAssetId: string;
   url: string;
   position?: [number, number, number];
+  /**
+   * The asset `position` was taken from. Absent when the PLAY named none, or
+   * came from another device on a runtime that does not send it.
+   */
+  targetAssetId?: string;
   volume: number;
   loop: boolean;
 };
@@ -27,6 +32,7 @@ export type StudioSoundCommand =
       audioAssetId: string;
       url: string;
       position?: [number, number, number];
+      targetAssetId?: string;
       volume: number;
       loop: boolean;
       stopOthers: boolean;
@@ -99,6 +105,7 @@ export class StudioSoundManager {
       audioAssetId: string;
       url: string;
       position?: [number, number, number];
+      targetAssetId?: string;
       volume: number;
       loop: boolean;
       stopOthers: boolean;
@@ -119,6 +126,7 @@ export class StudioSoundManager {
       audioAssetId: entry.audioAssetId,
       url: entry.url,
       position: entry.position,
+      targetAssetId: entry.targetAssetId,
       volume: entry.volume,
       loop: entry.loop,
     });

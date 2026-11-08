@@ -37,10 +37,16 @@ import {
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
+import { useViroUsagePing } from "../Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
 } from "../Web/useViroRendererEffects";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
+
+/** Scene navigation is not implemented in this navigator on the web: say so instead of doing nothing. */
+const noNavigationOnWeb = (method: string) => () =>
+  warnUnsupported(`ViroARSceneNavigator's sceneNavigator.${method}`, "the web", "ViroSceneNavigator has scene navigation on the web.");
 
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
 type ArOptions = Partial<
@@ -59,6 +65,7 @@ type ArOptions = Partial<
     | "detectPlanes"
     | "maxPlanes"
     | "renderWhileLimited"
+    | "hideContentWhenLost"
     | "playback"
   >
 >;
@@ -198,6 +205,10 @@ function trackingLabel(state: ViroTrackingState): string {
 }
 
 export function ViroARSceneNavigator(props: Props) {
+  useViroUsagePing("ar", {
+    detect_planes: props.arOptions?.detectPlanes,
+    facing_mode: props.arOptions?.facingMode,
+  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);
@@ -359,11 +370,11 @@ export function ViroARSceneNavigator(props: Props) {
   const SceneComponent = props.initialScene?.scene;
 
   const sceneNavigator = {
-    push: () => {},
-    pop: () => {},
-    popN: () => {},
-    jump: () => {},
-    replace: () => {},
+    push: noNavigationOnWeb("push"),
+    pop: noNavigationOnWeb("pop"),
+    popN: noNavigationOnWeb("popN"),
+    jump: noNavigationOnWeb("jump"),
+    replace: noNavigationOnWeb("replace"),
     viroAppProps: props.viroAppProps ?? {},
   };
 

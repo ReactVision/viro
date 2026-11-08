@@ -18,6 +18,10 @@ export const insertLinesHelper = (
       let index = array.findIndex((str) => {
         return str.includes(target);
       });
+      // Splicing at index -1 would put the text near the start or end of the file
+      if (index === -1) {
+        throw new Error(`Unable to find "${target}" to anchor the inserted lines on.`);
+      }
       // Insert the wanted text around this anchor (i.e. offset / replace options)
       newArray = [
         ...array.slice(0, index + offset),

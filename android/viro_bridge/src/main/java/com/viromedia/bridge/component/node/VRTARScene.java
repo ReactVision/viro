@@ -71,6 +71,7 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
     // Pending occlusion mode to apply when scene is ready
     private ARScene.OcclusionMode mPendingOcclusionMode = null;
     private boolean mPendingFrontCameraEnabled = false;
+    private boolean mPendingDepthCaptureEnabled = false;
     private boolean mSceneDidAppear = false;
 
     public VRTARScene(ReactContext reactContext) {
@@ -178,6 +179,14 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         }
     }
 
+    /** Asks for depth for recording once the scene's native side exists; repeating it is harmless. */
+    public void setDepthCaptureEnabled(boolean enabled) {
+        mPendingDepthCaptureEnabled = enabled;
+        if (mSceneDidAppear && !isTornDown() && mNativeScene instanceof ARScene) {
+            ((ARScene) mNativeScene).setDepthCaptureEnabled(enabled);
+        }
+    }
+
     public void setOcclusionMode(ARScene.OcclusionMode mode) {
         android.util.Log.i("ViroAR", "[OCCLUSION] VRTARScene.setOcclusionMode called with mode: " + mode);
         mPendingOcclusionMode = mode;
@@ -205,6 +214,10 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
             ((ARScene) mNativeScene).setOcclusionMode(mPendingOcclusionMode);
         } else {
             android.util.Log.i("ViroAR", "[OCCLUSION]   No pending occlusion mode to apply");
+        }
+
+        if (mPendingDepthCaptureEnabled && !isTornDown() && mNativeScene instanceof ARScene) {
+            ((ARScene) mNativeScene).setDepthCaptureEnabled(true);
         }
 
         // Apply front camera setting if it was requested before scene was ready

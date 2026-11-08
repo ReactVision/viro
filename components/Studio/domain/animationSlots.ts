@@ -27,7 +27,10 @@ export class StudioAnimationSlots {
     origin: StudioEffectOrigin
   ): StudioAnimationRequest {
     const assetId = anim.target_asset_id;
-    const live = this.live.get(assetId);
+    // A play requested before the asset loaded is held back until it loads and
+    // then runs, so it holds the slot from then on. Until then nothing runs and
+    // a later request simply replaces it.
+    const live = loaded ? this.live.get(assetId) : undefined;
     if (live && live.key !== anim.animation_key) {
       if (!live.loop && !live.interruptible) {
         // Let the running one finish and play this next. The editor runs both
@@ -43,10 +46,10 @@ export class StudioAnimationSlots {
       }
       // A loop never finishes and an interruptible animation is one the author
       // said may be cut short, so this one takes the slot now.
-      this.markLive(anim, loaded, origin);
+      this.markLive(anim, origin);
       return "interrupt";
     }
-    this.markLive(anim, loaded, origin);
+    this.markLive(anim, origin);
     return "start";
   }
 
@@ -81,21 +84,10 @@ export class StudioAnimationSlots {
     this.origins.clear();
   }
 
-  private markLive(
-    anim: StudioAnimation,
-    loaded: boolean,
-    origin: StudioEffectOrigin
-  ) {
+  private markLive(anim: StudioAnimation, origin: StudioEffectOrigin) {
     const assetId = anim.target_asset_id;
     this.started.delete(assetId);
     this.origins.set(assetId, origin);
-    // An asset that has not loaded yet never starts, so it never reports a
-    // finish either. Leaving it out keeps a later trigger from waiting behind
-    // an animation that is not going to run.
-    if (!loaded) {
-      this.live.delete(assetId);
-      return;
-    }
     this.live.set(assetId, {
       key: anim.animation_key,
       loop: anim.loop,

@@ -19,6 +19,9 @@ describe("roomErrorCode", () => {
     [404, "ROOM_NOT_FOUND", "ROOM_NOT_FOUND"],
     [undefined, "INVALID_JOIN_CODE", "ROOM_NOT_FOUND"],
     [undefined, "MISSING_API_KEY", "NOT_AUTHORIZED"],
+    [undefined, "CREDENTIALS_UNAVAILABLE", "UNAVAILABLE"],
+    [401, "APP_USER_TOKEN_EXPIRED", "NOT_AUTHORIZED"],
+    [403, "APP_USER_TOKEN_SCOPE_NOT_ALLOWED", "NOT_AUTHORIZED"],
     [401, "INVALID_SESSION", "NOT_AUTHORIZED"],
     [403, "PROJECT_ACCESS_DENIED", "NOT_AUTHORIZED"],
     [403, undefined, "NOT_AUTHORIZED"],
@@ -29,6 +32,7 @@ describe("roomErrorCode", () => {
     [undefined, "MISSING_PROJECT_ID", "UNKNOWN"],
     [400, "INVALID_SCENE_ID", "UNKNOWN"],
     [409, "TOO_MANY_ROOMS", "UNKNOWN"],
+    [409, "SCENE_BOUND_TO_VPS", "SCENE_BOUND_TO_VPS"],
   ])("maps %s %s to %s", (status, code, expected) => {
     expect(roomErrorCode(status, code)).toBe(expected);
   });
@@ -39,7 +43,15 @@ describe("relayErrorCode", () => {
     [503, "ROOM_FULL", "ROOM_FULL"],
     [503, "RELAY_AT_CAPACITY", "RELAY_AT_CAPACITY"],
     [403, "PAID_PLAN_REQUIRED", "PAID_PLAN_REQUIRED"],
+    [403, "COMPUTE_SPEND_LIMIT_REACHED", "COMPUTE_SPEND_LIMIT_REACHED"],
+    [403, "COMPUTE_BILLING_NOT_SET_UP", "COMPUTE_BILLING_REFUSED"],
+    [403, "COMPUTE_PAYMENT_FAILED", "COMPUTE_BILLING_REFUSED"],
+    [503, "COMPUTE_BILLING_UNAVAILABLE", "UNAVAILABLE"],
     [401, "INVALID_SESSION_FORMAT", "NOT_AUTHORIZED"],
+    [401, "INVALID_APP_USER_TOKEN", "NOT_AUTHORIZED"],
+    [403, "APP_USER_TOKEN_REQUIRED", "NOT_AUTHORIZED"],
+    [403, "APP_USER_TOKEN_NOT_ALLOWED", "NOT_AUTHORIZED"],
+    [undefined, "CREDENTIALS_UNAVAILABLE", "UNAVAILABLE"],
     [403, "PROJECT_ACCESS_DENIED", "NOT_AUTHORIZED"],
     [429, "TOO_MANY_CONNECTIONS", "UNAVAILABLE"],
     [503, "RELAY_DRAINING", "UNAVAILABLE"],
@@ -47,6 +59,7 @@ describe("relayErrorCode", () => {
     [404, "NOT_FOUND", "UNAVAILABLE"],
     [undefined, undefined, "UNAVAILABLE"],
     [400, "INVALID_ROOM_ID", "UNKNOWN"],
+    [409, "SCENE_BOUND_TO_VPS", "SCENE_BOUND_TO_VPS"],
   ])("maps %s %s to %s", (status, code, expected) => {
     expect(relayErrorCode(status, code)).toBe(expected);
   });
@@ -343,6 +356,25 @@ describe("studioColocationIndicatorContent", () => {
         message: "This room is full.",
       })
     ).toMatchObject({ tone: "error", detail: "This room is full." });
+  });
+
+  it("explains a failure by its code, not its message", () => {
+    const unreachable = {
+      status: "failed" as const,
+      code: "UNAVAILABLE" as const,
+      message:
+        "fetch failed: java.net.ConnectException: Failed to connect to /192.168.1.14:8787",
+    };
+    expect(studioColocationIndicatorContent(unreachable)?.detail).toBe(
+      "Failed to reach the co-location service. Check your internet connection."
+    );
+    expect(
+      studioColocationIndicatorContent(
+        { status: "failed", code: "HOST_FAILED", message: "XR_ERROR_X" },
+        null,
+        "headset"
+      )?.detail
+    ).toBe("Failed to share this space.");
   });
 });
 

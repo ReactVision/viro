@@ -25,6 +25,8 @@
 "use strict";
 
 import { NativeModules } from "react-native";
+import type { ViroVPSCredentialsSource } from "./ViroVPSClient";
+import { keepUserTokenFresh, readCredentials } from "./ViroUserTokens";
 
 const { VRTColocationModule } = NativeModules;
 
@@ -71,15 +73,27 @@ export type ViroColocationConfig = {
    */
   roomId: string;
   /**
-   * An empty string is reserved for first-party apps: native then joins with
-   * the internal Studio session (`VRTStudioModule.rvSetStudioSession`), and
-   * fails the join when none is set.
+   * Not needed with `credentials`. An empty string is reserved for first-party
+   * apps: native then joins with the internal Studio session
+   * (`VRTStudioModule.rvSetStudioSession`), and fails the join when none is set.
    */
-  apiKey: string;
-  projectId: string;
+  apiKey?: string;
+  /** Required unless `credentials` are given, which carry it. Replaces theirs. */
+  projectId?: string;
   /** Defaults to the production platform endpoint. */
   endpoint?: string;
-};
+  /**
+   * Credentials as `<ViroVPS credentials>` takes them, in place of `apiKey`.
+   * A user token from createUserTokenCredentials() goes on the handshake as
+   * `Authorization: Bearer` with no `x-api-key`, and while the device is in
+   * the room viro hands the channel a renewed one before it expires, which the
+   * next reconnect sends. Credentials with an `apiKey` join as `apiKey` does.
+   */
+  credentials?: ViroVPSCredentialsSource;
+} & (
+  | { apiKey: string; projectId: string }
+  | { credentials: ViroVPSCredentialsSource }
+);
 
 /**
  * False when ReactVisionCCA is not linked, or the platform has no WebSocket
@@ -90,6 +104,18 @@ export async function isColocationAvailable(): Promise<boolean> {
   return VRTColocationModule.isAvailable();
 }
 
+// Bumped per join and leave. A join overtaken during one of its awaits makes no
+// further native call and starts no renewal.
+let joinSeq = 0;
+let stopRenewal: (() => void) | null = null;
+// True while native may hold a token from a join with credentials.
+let tokenSet = false;
+
+const superseded = (): ViroColocationJoinResult => ({
+  success: false,
+  error: "A later join or leave replaced this one",
+});
+
 /** Join a room. Leaves any room already joined — a device is in one at a time. */
 export async function joinColocation(
   config: ViroColocationConfig
@@ -97,16 +123,77 @@ export async function joinColocation(
   if (!VRTColocationModule?.join) {
     return { success: false, error: "Co-location channel unavailable" };
   }
-  return VRTColocationModule.join(
+  const seq = ++joinSeq;
+  stopRenewal?.();
+  stopRenewal = null;
+  const endpoint = config.endpoint ?? "";
+
+  let apiKey = config.apiKey ?? "";
+  let projectId = config.projectId ?? "";
+  let token: string | undefined;
+  if (config.credentials !== undefined) {
+    try {
+      const credentials = await readCredentials(config.credentials);
+      projectId = config.projectId ?? credentials.projectId;
+      if ("accessToken" in credentials) {
+        apiKey = "";
+        token = credentials.accessToken;
+      } else {
+        apiKey = credentials.apiKey;
+      }
+    } catch (e) {
+      return {
+        success: false,
+        error: `Could not get credentials: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    if (seq !== joinSeq) return superseded();
+  }
+
+  if (token !== undefined) {
+    const canSet = typeof VRTColocationModule.setAccessToken === "function";
+    // Set before the call, so a join or leave that overtakes it clears the token.
+    if (canSet) tokenSet = true;
+    const set = canSet ? await VRTColocationModule.setAccessToken(token) : false;
+    if (set === false) {
+      return {
+        success: false,
+        error: "This native build cannot join with a user token; rebuild with the matching ViroReact",
+      };
+    }
+    if (seq !== joinSeq) return superseded();
+  } else if (tokenSet) {
+    tokenSet = false;
+    await VRTColocationModule.setAccessToken?.("");
+    if (seq !== joinSeq) return superseded();
+  }
+
+  const result: ViroColocationJoinResult = await VRTColocationModule.join(
     config.roomId,
-    config.apiKey,
-    config.projectId,
-    config.endpoint ?? ""
+    apiKey,
+    projectId,
+    endpoint
   );
+  if (
+    result?.success &&
+    token !== undefined &&
+    typeof config.credentials === "function" &&
+    seq === joinSeq
+  ) {
+    stopRenewal = keepUserTokenFresh(config.credentials, token, (next) =>
+      VRTColocationModule.setAccessToken(next)
+    );
+  }
+  return result;
 }
 
 export async function leaveColocation(): Promise<void> {
+  joinSeq++;
+  stopRenewal?.();
+  stopRenewal = null;
+  tokenSet = false;
   if (!VRTColocationModule?.leave) return;
+  // Clears the token native holds as well.
   await VRTColocationModule.leave();
 }
 
@@ -148,6 +235,38 @@ export async function getColocationState(): Promise<{
     state: STATES[raw?.state ?? 0] ?? "idle",
     localPeerId: raw?.localPeerId ?? "",
   };
+}
+
+/**
+ * The device id the native channel sends as x-rv-device, for the replication
+ * socket to send too: the relay bills a device once while either socket is
+ * open. Null without a native channel (web).
+ */
+export async function getColocationDeviceId(): Promise<string | null> {
+  if (!VRTColocationModule?.getDeviceId) return null;
+  try {
+    const id = await VRTColocationModule.getDeviceId();
+    return typeof id === "string" && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+let knownDeviceId: string | null | undefined;
+
+/**
+ * getColocationDeviceId for a socket about to open: synchronous once the id is
+ * known, and when there is no native module to ask, so a client that never
+ * had one connects exactly as it did before.
+ */
+export function colocationDeviceIdNow(): string | null | Promise<string | null> {
+  if (knownDeviceId !== undefined) return knownDeviceId;
+  if (!VRTColocationModule?.getDeviceId) return (knownDeviceId = null);
+  // A null from a failed call is asked again by the next socket.
+  return getColocationDeviceId().then((id) => {
+    if (id !== null) knownDeviceId = id;
+    return id;
+  });
 }
 
 /** Peers currently in the room, excluding this device. */

@@ -154,6 +154,23 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   } = props;
   const { scene, assets, animations, functions } = sceneData;
 
+  // ─── Asset groups ─────────────────────────────────────────────────────────
+  // Tap-to-place assets are held out of the plane wrapper: once placed they live
+  // in world space, and a plane wrapper would re-parent them to the plane. A
+  // scene bound to a VPS location has its plane assets in the location's map
+  // frame, which a browser cannot track, so it renders none, and nothing is
+  // measured from them or played at them.
+  const vpsBound = !!scene.vps_location_id;
+  const { planeAssets, tapToPlaceAssets, vpsMapAssetIds } = useMemo(() => {
+    const placeable = assets.filter(isTapToPlaceAsset);
+    const plane = assets.filter((a) => !a.trigger_image_url && !isTapToPlaceAsset(a));
+    return {
+      planeAssets: vpsBound ? [] : plane,
+      tapToPlaceAssets: placeable,
+      vpsMapAssetIds: new Set(vpsBound ? plane.map((a) => a.id) : []),
+    };
+  }, [assets, vpsBound]);
+
   // ─── Runtime singletons (per scene) ───────────────────────────────────────
   const schedulerRef = useRef<SequenceScheduler | null>(null);
   if (schedulerRef.current === null) schedulerRef.current = new SequenceScheduler();
@@ -243,9 +260,10 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       placementStore: placementStoreRef.current!,
       soundManager: soundManagerRef.current!,
       getAssetPosition,
+      unrenderedAssetIds: vpsMapAssetIds,
       navigate,
     }),
-    [getAssetPosition, apiRequestExecutor, navigate],
+    [getAssetPosition, vpsMapAssetIds, apiRequestExecutor, navigate],
   );
 
   const handleSceneChange = useCallback(
@@ -354,9 +372,15 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   }, [animations, animOverrides, loadedAssetIds, functions, handleSceneChange, runtimeCtx]);
 
   // ─── on_load_function ─────────────────────────────────────────────────────
+  // A scene bound to a VPS location runs it at its first tracking, which a
+  // browser never reaches.
   const onLoadExecutedRef = useRef(false);
   useEffect(() => {
-    if (scene.on_load_function && !onLoadExecutedRef.current) {
+    if (
+      scene.on_load_function &&
+      !onLoadExecutedRef.current &&
+      !scene.vps_location_id
+    ) {
       onLoadExecutedRef.current = true;
       executeOnLoadFunction(
         scene.on_load_function,
@@ -504,8 +528,11 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // which is its world position only outside a plane wrapper — hence the gate,
   // and hence webCapabilities reporting the wrapped case as unsupported.
   const proximityBindings = useMemo(
-    () => sceneData.proximity_bindings ?? [],
-    [sceneData],
+    () =>
+      (sceneData.proximity_bindings ?? []).filter(
+        (b) => !vpsMapAssetIds.has(b.target_asset_id),
+      ),
+    [sceneData, vpsMapAssetIds],
   );
   const proximityTargetIds = useMemo(() => {
     const ids = new Set<string>();
@@ -554,18 +581,6 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   ]);
 
   // ─── Node mapping (image-triggered assets are skipped on web) ─────────────
-  // Tap-to-place assets are held out of the plane wrapper: once placed they live
-  // in world space, and a plane wrapper would re-parent them to the plane.
-  const { planeAssets, tapToPlaceAssets } = useMemo(() => {
-    const placeable = assets.filter(isTapToPlaceAsset);
-    return {
-      planeAssets: assets.filter(
-        (a) => !a.trigger_image_url && !isTapToPlaceAsset(a),
-      ),
-      tapToPlaceAssets: placeable,
-    };
-  }, [assets]);
-
   const buildNodes = useCallback(
     (list: typeof assets) =>
       list

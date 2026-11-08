@@ -1,0 +1,64 @@
+//
+//  VROAtomic.h
+//  ViroKit
+//
+//  Created by Raj Advani on 8/13/18.
+//  Copyright © 2018 Viro Media. All rights reserved.
+//
+//  Permission is hereby granted, free of charge, to any person obtaining
+//  a copy of this software and associated documentation files (the
+//  "Software"), to deal in the Software without restriction, including
+//  without limitation the rights to use, copy, modify, merge, publish,
+//  distribute, sublicense, and/or sell copies of the Software, and to
+//  permit persons to whom the Software is furnished to do so, subject to
+//  the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included
+//  in all copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+//  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+//  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+//  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+//  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+#ifndef VROAtomic_h
+#define VROAtomic_h
+
+#include "VRODefines.h"
+
+#if VRO_PLATFORM_IOS || VRO_PLATFORM_MACOS || VRO_PLATFORM_ANDROID || VRO_PLATFORM_VISION
+#include <atomic>
+
+template <typename T>
+using VROAtomic = std::atomic<T>;
+
+#else
+
+// WebAssembly is single-threaded, so real atomics aren't needed. But call sites
+// use std::atomic's API (.load()/.store()/operator T()/operator=), so we provide
+// a thin non-atomic wrapper with the same surface rather than aliasing to T.
+template <typename T>
+class VROAtomic {
+public:
+    VROAtomic() : _value() {}
+    VROAtomic(const T &value) : _value(value) {}
+    VROAtomic(const VROAtomic<T> &other) : _value(other._value) {}
+
+    VROAtomic<T> &operator=(const T &value) { _value = value; return *this; }
+    VROAtomic<T> &operator=(const VROAtomic<T> &other) { _value = other._value; return *this; }
+
+    operator T() const { return _value; }
+
+    T load() const { return _value; }
+    void store(const T &value) { _value = value; }
+
+private:
+    T _value;
+};
+
+#endif
+
+#endif /* VROAtomic_h */

@@ -17,6 +17,11 @@ export interface StudioSceneMeta {
   physics_world_config: Record<string, unknown> | null;
   created_at: string;
   created_by: StudioSceneCreatedBy | null;
+  /**
+   * The VPS location the scene is bound to: its plane assets are positioned in
+   * that location's map frame (metres, Y up). Absent from older backends.
+   */
+  vps_location_id?: string | null;
 }
 
 export interface StudioProjectMeta {
@@ -374,6 +379,8 @@ export interface StudioSceneResponse {
   /** Absent in responses from backends predating the Variables feature. */
   variables?: StudioSceneVariable[];
   is_free_tier?: boolean;
+  /** Present on a scene bound to a VPS location: the vps-server it tracks with. */
+  vps?: { endpoint: string };
   meta: { request_id: string };
 }
 

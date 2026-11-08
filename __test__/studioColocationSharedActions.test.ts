@@ -787,16 +787,17 @@ describe("shared events", () => {
   it("drops a stale position from an earlier event in the same slot", () => {
     const a = online();
     const b = online();
-    const play = (position?: Vec3) =>
+    const play = (position?: Vec3, targetAssetId?: string) =>
       a.sounds.play({
         audioAssetId: "door-clip",
         url: CLIP,
         position,
+        targetAssetId,
         volume: 1,
         loop: false,
         stopOthers: true,
       });
-    play([0, 1, 0]);
+    play([0, 1, 0], "door");
     for (let i = 0; i < 15; i++) {
       a.shared.emitAnimation("scene-1", "crate", "spin");
       jest.advanceTimersByTime(40);
@@ -806,6 +807,54 @@ describe("shared events", () => {
     const active = b.sounds.getActive();
     expect(active).toHaveLength(1);
     expect(active[0].position).toBeUndefined();
+    expect(active[0].targetAssetId).toBeUndefined();
+  });
+
+  it("carries the asset a sound plays at, so each device places it in that asset's frame", () => {
+    const a = online();
+    const b = online();
+    a.sounds.play({
+      audioAssetId: "door-clip",
+      url: CLIP,
+      position: [0, 1, 0],
+      targetAssetId: "door",
+      volume: 1,
+      loop: true,
+      stopOthers: false,
+    });
+    relay.process();
+    expect(b.sounds.getActive()).toEqual([
+      expect.objectContaining({ position: [0, 1, 0], targetAssetId: "door" }),
+    ]);
+  });
+
+  it("skips another device's PLAY at an asset this device does not render", () => {
+    const a = online();
+    const b = online();
+    b.shared.bindScene(
+      scene(),
+      { sounds: b.sounds },
+      { unrenderedAssetIds: new Set(["door"]) }
+    );
+    const play = (targetAssetId: string) =>
+      a.sounds.play({
+        audioAssetId: "door-clip",
+        url: CLIP,
+        position: [0, 1, 0],
+        targetAssetId,
+        volume: 1,
+        loop: true,
+        stopOthers: false,
+      });
+    play("door");
+    relay.process();
+    expect(b.sounds.getActive()).toEqual([]);
+    jest.advanceTimersByTime(40);
+    play("crate");
+    relay.process();
+    expect(b.sounds.getActive()).toEqual([
+      expect.objectContaining({ targetAssetId: "crate" }),
+    ]);
   });
 
   it("plays only clips the scene's own functions play", () => {

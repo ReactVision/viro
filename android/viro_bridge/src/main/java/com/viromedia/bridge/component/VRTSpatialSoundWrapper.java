@@ -93,7 +93,7 @@ public class VRTSpatialSoundWrapper extends VRTNode {
         mInnerSound.setMaxDistance(maxDistance);
     }
 
-    public void seekToTime(int seconds) {
+    public void seekToTime(float seconds) {
         mInnerSound.seekToTime(seconds);
     }
 

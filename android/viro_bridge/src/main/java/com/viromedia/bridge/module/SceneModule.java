@@ -72,29 +72,33 @@ public class SceneModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(viewTag);
-                if (!(sceneView instanceof VRTScene)) {
-                    throw new IllegalViewOperationException("Invalid view returned when " +
-                            "calling findCollisionsWithRayAsync: expected a ViroScene!");
+                try {
+                    View sceneView = viewResolver.resolveView(viewTag);
+                    if (!(sceneView instanceof VRTScene)) {
+                        throw new IllegalViewOperationException("Invalid view returned when " +
+                                "calling findCollisionsWithRayAsync: expected a ViroScene!");
+                    }
+
+                    float[] fromPosArray = Helper.toFloatArray(fromPos);
+                    float[] toPosArray = Helper.toFloatArray(toPos);
+                    if (fromPosArray.length != 3 || toPosArray.length !=3){
+                        throw new IllegalViewOperationException("Invalid From / To positions or tag " +
+                                "provided for findCollisionsWithRayAsync!");
+                    }
+
+                    String rayCastTag = tag != null ? tag : "";
+                    VRTScene scene = (VRTScene) sceneView;
+                    scene.findCollisionsWithRayAsync(fromPosArray, toPosArray, closest, rayCastTag,
+                            new PhysicsWorld.HitTestListener() {
+                                @Override
+                                public void onComplete(boolean hasHit) {
+                                    promise.resolve(hasHit);
+                                }
+                            });
+
+                } catch (RuntimeException e) {
+                    promise.reject("ERROR", e.getMessage(), e);
                 }
-
-                float[] fromPosArray = Helper.toFloatArray(fromPos);
-                float[] toPosArray = Helper.toFloatArray(toPos);
-                if (fromPosArray.length != 3 || toPosArray.length !=3){
-                    throw new IllegalViewOperationException("Invalid From / To positions or tag " +
-                            "provided for findCollisionsWithRayAsync!");
-                }
-
-                String rayCastTag = tag != null ? tag : "";
-                VRTScene scene = (VRTScene) sceneView;
-                scene.findCollisionsWithRayAsync(fromPosArray, toPosArray, closest, rayCastTag,
-                        new PhysicsWorld.HitTestListener() {
-                            @Override
-                            public void onComplete(boolean hasHit) {
-                                promise.resolve(hasHit);
-                            }
-                        });
-
             }
         });
     }
@@ -111,48 +115,52 @@ public class SceneModule extends ReactContextBaseJavaModule {
         ((FabricUIManager) uiManager).addUIBlock(new com.facebook.react.fabric.interop.UIBlock() {
             @Override
             public void execute(com.facebook.react.fabric.interop.UIBlockViewResolver viewResolver) {
-                View sceneView = viewResolver.resolveView(viewTag);
-                if (!(sceneView instanceof VRTScene)) {
-                    throw new IllegalViewOperationException("Invalid view returned when " +
-                            "calling findCollisionsWithShapeAsync: expected a ViroScene!");
-                }
+                try {
+                    View sceneView = viewResolver.resolveView(viewTag);
+                    if (!(sceneView instanceof VRTScene)) {
+                        throw new IllegalViewOperationException("Invalid view returned when " +
+                                "calling findCollisionsWithShapeAsync: expected a ViroScene!");
+                    }
 
-                float[] fromPosArray = Helper.toFloatArray(fromPos);
-                float[] toPosArray = Helper.toFloatArray(toPos);
-                if (fromPosArray.length != 3 || toPosArray.length !=3){
-                    throw new IllegalViewOperationException("Invalid From / To positions or tag " +
-                            "provided for findCollisionsWithShapeAsync!");
-                }
+                    float[] fromPosArray = Helper.toFloatArray(fromPos);
+                    float[] toPosArray = Helper.toFloatArray(toPos);
+                    if (fromPosArray.length != 3 || toPosArray.length !=3){
+                        throw new IllegalViewOperationException("Invalid From / To positions or tag " +
+                                "provided for findCollisionsWithShapeAsync!");
+                    }
 
-                float[] params = Helper.toFloatArray(paramsArray);
-                String error = PhysicsBody.checkIsValidShapeType(shapeTypeString, params);
-                if (error != null){
-                    throw new IllegalViewOperationException(error);
-                }
+                    float[] params = Helper.toFloatArray(paramsArray);
+                    String error = PhysicsBody.checkIsValidShapeType(shapeTypeString, params);
+                    if (error != null){
+                        throw new IllegalViewOperationException(error);
+                    }
 
-                PhysicsShape shape = null;
-                if (shapeTypeString.equalsIgnoreCase("sphere")) {
-                    shape = new PhysicsShapeSphere(params[0]);
-                }
-                else if (shapeTypeString.equalsIgnoreCase("box")) {
-                    shape = new PhysicsShapeBox(params[0], params[1], params[2]);
-                }
-                else if (shapeTypeString.equalsIgnoreCase("compound")) {
-                    shape = new PhysicsShapeAutoCompound();
-                }
-                else {
-                    throw new JSApplicationCausedNativeException("Invalid shape type [" + shapeTypeString + "]");
-                }
+                    PhysicsShape shape = null;
+                    if (shapeTypeString.equalsIgnoreCase("sphere")) {
+                        shape = new PhysicsShapeSphere(params[0]);
+                    }
+                    else if (shapeTypeString.equalsIgnoreCase("box")) {
+                        shape = new PhysicsShapeBox(params[0], params[1], params[2]);
+                    }
+                    else if (shapeTypeString.equalsIgnoreCase("compound")) {
+                        shape = new PhysicsShapeAutoCompound();
+                    }
+                    else {
+                        throw new JSApplicationCausedNativeException("Invalid shape type [" + shapeTypeString + "]");
+                    }
 
-                String rayCastTag = tag != null ? tag : "";
-                VRTScene scene = (VRTScene) sceneView;
-                scene.findCollisionsWithShapeAsync(fromPosArray, toPosArray, shape, rayCastTag,
-                        new PhysicsWorld.HitTestListener() {
-                            @Override
-                            public void onComplete(boolean hasHit) {
-                                promise.resolve(hasHit);
-                            }
-                        });
+                    String rayCastTag = tag != null ? tag : "";
+                    VRTScene scene = (VRTScene) sceneView;
+                    scene.findCollisionsWithShapeAsync(fromPosArray, toPosArray, shape, rayCastTag,
+                            new PhysicsWorld.HitTestListener() {
+                                @Override
+                                public void onComplete(boolean hasHit) {
+                                    promise.resolve(hasHit);
+                                }
+                            });
+                } catch (RuntimeException e) {
+                    promise.reject("ERROR", e.getMessage(), e);
+                }
             }
         });
     }

@@ -8,6 +8,10 @@ static NSString *const kBaseUrl      = @"https://platform.reactvision.xyz";
 // the database instead of nearest the device. A session on another base URL is
 // pinned only when it brings its own functionRegion.
 static NSString *const kFunctionRegion = @"eu-west-2";
+// Sent as x-rv-capabilities: what this runtime renders that an older one
+// cannot, so the scenes function can refuse such a scene to an older one
+// rather than have it drawn in the wrong place.
+static NSString *const kCapabilities = @"vps";
 static NSString *const kApiKeyKey    = @"RVApiKey";
 static NSString *const kProjectIdKey = @"RVProjectId";
 static const NSTimeInterval kTimeout = 30.0;
@@ -73,12 +77,14 @@ RCT_EXPORT_MODULE(VRTStudio);
         NSString *region = session[@"functionRegion"];
         if (region.length == 0 && [session[@"baseUrl"] isEqualToString:kBaseUrl]) region = kFunctionRegion;
         if (region.length > 0) headers[@"x-region"] = region;
+        headers[@"x-rv-capabilities"] = kCapabilities;
         return @{@"mode": @"session", @"baseUrl": session[@"baseUrl"], @"headers": headers};
     }
     NSString *apiKey = [self readApiKey];
     if (!apiKey) return nil;
     return @{@"mode": @"api_key", @"baseUrl": kBaseUrl,
-             @"headers": @{@"x-api-key": apiKey, @"x-region": kFunctionRegion}};
+             @"headers": @{@"x-api-key": apiKey, @"x-region": kFunctionRegion,
+                           @"x-rv-capabilities": kCapabilities}};
 }
 
 - (void)runGet:(NSString *)url headers:(NSDictionary *)headers resolve:(RCTPromiseResolveBlock)resolve {
@@ -234,8 +240,10 @@ RCT_EXPORT_METHOD(rvGetProjectId:(RCTPromiseResolveBlock)resolve
 RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
                              resolve:(RCTPromiseResolveBlock)resolve
                               reject:(RCTPromiseRejectBlock)reject) {
-    NSString *baseUrl     = [config isKindOfClass:[NSDictionary class]] ? config[@"baseUrl"] : nil;
-    NSString *accessToken = [config isKindOfClass:[NSDictionary class]] ? config[@"accessToken"] : nil;
+    id rawBaseUrl     = [config isKindOfClass:[NSDictionary class]] ? config[@"baseUrl"] : nil;
+    id rawAccessToken = [config isKindOfClass:[NSDictionary class]] ? config[@"accessToken"] : nil;
+    NSString *baseUrl     = [rawBaseUrl isKindOfClass:[NSString class]] ? rawBaseUrl : nil;
+    NSString *accessToken = [rawAccessToken isKindOfClass:[NSString class]] ? rawAccessToken : nil;
     if (baseUrl.length == 0 || accessToken.length == 0) {
         gStudioSession = nil;
         [VROColocationBridge setStudioSessionBaseUrl:nil accessToken:nil clientTag:nil];
@@ -247,7 +255,8 @@ RCT_EXPORT_METHOD(rvSetStudioSession:(id)config
     }
     NSMutableDictionary *snapshot =
         [@{ @"baseUrl": baseUrl, @"accessToken": accessToken } mutableCopy];
-    NSString *clientTag = config[@"clientTag"];
+    id rawClientTag = config[@"clientTag"];
+    NSString *clientTag = [rawClientTag isKindOfClass:[NSString class]] ? rawClientTag : nil;
     if (clientTag.length > 0) snapshot[@"clientTag"] = clientTag;
     NSString *functionRegion = config[@"functionRegion"];
     if ([functionRegion isKindOfClass:[NSString class]] && functionRegion.length > 0) {

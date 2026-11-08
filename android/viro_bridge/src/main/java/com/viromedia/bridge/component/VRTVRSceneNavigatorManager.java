@@ -118,6 +118,21 @@ public class VRTVRSceneNavigatorManager extends VRTViroViewGroupManager<VRTVRSce
         navigator.setHandTrackingEnabled(enabled);
     }
 
+    @ReactProp(name = "handOcclusion", defaultBoolean = false)
+    public void setHandOcclusion(VRTVRSceneNavigator navigator, boolean enabled) {
+        navigator.setHandOcclusionEnabled(enabled);
+    }
+
+    @ReactProp(name = "handOcclusionMode")
+    public void setHandOcclusionMode(VRTVRSceneNavigator navigator, String mode) {
+        navigator.setHandOcclusionMode(mode);
+    }
+
+    @ReactProp(name = "handOcclusionInflateMm", defaultFloat = 2f)
+    public void setHandOcclusionInflateMm(VRTVRSceneNavigator navigator, float mm) {
+        navigator.setHandOcclusionInflateMm(mm);
+    }
+
     @Override
     public Map getExportedCustomDirectEventTypeConstants() {
         return MapBuilder.of(

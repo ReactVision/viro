@@ -1075,6 +1075,13 @@ private:
      given value.
      */
     void setVisibilityRecursive(bool visible);
+
+    /*
+     True if this node or a descendant draws a skinned geometry. Its bounds come from
+     the bind pose, not from where the bones place it, so a frustum test on them can
+     cull a mesh that is in view.
+     */
+    bool hasSkinnedGeometryInSubtree() const;
     
     /*
      Recursively expand the given bounding box by this node's _worldBoundingBox.

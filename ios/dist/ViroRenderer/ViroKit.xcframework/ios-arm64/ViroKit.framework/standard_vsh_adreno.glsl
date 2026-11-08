@@ -26,7 +26,7 @@ in vec3 normal;
 in vec2 texcoord;
 in vec4 tangent;
 in vec4 bone_weights;
-in ivec4 bone_indices;
+in uvec4 bone_indices;
 in vec3 morph_0;
 in vec3 morph_1;
 in vec3 morph_2;
@@ -57,7 +57,7 @@ void main() {
     _geometry_texcoord = texcoord;
     _geometry_tangent = tangent;
     _geometry_bone_weights = bone_weights;
-    _geometry_bone_indices = bone_indices;
+    _geometry_bone_indices = ivec4(bone_indices);
 
     _transforms_model_matrix = model_matrix;
     _transforms_view_matrix = view_matrix;

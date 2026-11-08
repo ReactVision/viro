@@ -232,6 +232,21 @@ public:
     }
 
     /*
+     When true, the alpha of the diffuse color, its texture and the vertex colors is
+     ignored: only the material's transparency and the node's opacity make it see
+     through (glTF alphaMode OPAQUE, where a texture's alpha may hold other data).
+     */
+    void setIgnoresDiffuseAlpha(bool ignores) {
+        if (_ignoresDiffuseAlpha != ignores) {
+            _ignoresDiffuseAlpha = ignores;
+            updateSubstrate();
+        }
+    }
+    bool getIgnoresDiffuseAlpha() const {
+        return _ignoresDiffuseAlpha;
+    }
+
+    /*
      Lighting models.
      */
     void setLightingModel(VROLightingModel model) {
@@ -577,6 +592,11 @@ private:
      Alpha cutoff threshold for Mask transparency mode.
      */
     float _alphaCutoff;
+
+    /*
+     Whether the diffuse alpha is ignored (glTF alphaMode OPAQUE).
+     */
+    bool _ignoresDiffuseAlpha;
     
     /*
      The lighting model to use to compute the interaction between

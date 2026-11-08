@@ -47,6 +47,7 @@ void main() {
     highp vec3 _ambient  = ambient_light_color.xyz;
     highp vec3 _diffuse  = vec3(0, 0, 0);
     highp vec3 _specular = vec3(0, 0, 0);
+    highp vec3 _emissive = material_emissive_color;
 
 #pragma surface_modifier_body
 
@@ -68,7 +69,7 @@ void main() {
     highp vec4 _output_color = vec4(_ambient  * _surface.diffuse_color.xyz +
                                     _diffuse  * _surface.diffuse_color.xyz * _surface.diffuse_intensity +
                                     _specular * _surface.specular_color +
-                                    material_emissive_color,
+                                    _emissive,
                                     _surface.alpha * _surface.diffuse_color.a);
 
     if (material_alpha_cutoff > 0.0 && _output_color.a < material_alpha_cutoff) {

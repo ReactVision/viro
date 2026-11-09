@@ -1,69 +1,22 @@
 # Release Notes
 
-## v3.1.0
+## v3.1.1
 
-**Advanced VPS arrives: scan a place with the phone, then find it again and pin content to it, matched on the device or on the GPU server. Scans can carry the device's depth, so blank walls reconstruct. The world mesh now fuses depth across frames into a room that persists, and Meta Quest gets a headset-native Studio experience with the real hands showing through virtual content.** Renderer binaries are rebuilt on virocore 3.1.0, with Spatial 1.4.0. The web build uses `@reactvision/viro-web-renderer` 1.1.0.
-
-### Advanced VPS
-
-- **`<ViroVPS>` finds a scanned place and keeps tracking it.** `startTracking(id)` takes a known location, `"auto"` searches by GPS and `"visual"` by camera image. Results come through `onLocalized` and `onTrackingState`.
-- **Two ways to localise, behind one prop.** `localization="device"` (the default) downloads the place's map and matches on the phone. `localization="server"` sends camera frames to the GPU server instead, which holds up much better across days and lighting, and needs no map download. `StudioSceneNavigator` takes the same choice as `vpsLocalization`.
-- **`<ViroVPSAnchor>` and the place's mesh.** Content placed in map coordinates, and the scanned mesh (occlusion and physics), follow the map every frame.
-- **Scanning from your app.** `uploadScanRecording(target, outputDir, options?)` zips a recording natively and sends it straight to Storage; on iOS the upload carries on in the background. Studio keeps the recording only while the scan is processed, unless `keepRecording` is true, which merging a location's scans needs. `getScan(scanId)` follows processing. `meshQuality` picks the mesh's detail: `low`, `medium` (the default) or `high`.
-- **Record device depth while scanning (iOS with LiDAR, Android with ARCore Depth).** `startRecording(outputDir, { depth: true })` adds depth frames to the recording; set the navigator's `depthCaptureEnabled` when it mounts so the AR session is not reconfigured mid-scan. The scan upload carries the depth files.
-- **Each scan says how far to trust its mesh:** `scan.quality.mesh_confidence` is `good`, `fair` or `poor`, with reasons for whoever recorded (blank walls, a fast sweep, tracking that jumped). It never decides whether the map is accepted.
-- **VPS calls go to Studio** and need no address or credentials beyond the Studio session or the Expo plugin's `rvApiKey` and `rvProjectId`. Requests time out instead of hanging.
-
-### World mesh
-
-- **The mesh fuses depth frames into a room that persists** on the depth-image and monocular paths, instead of rebuilding from the last frame. `worldMeshConfig` takes `accumulate`, `voxelSize` and `maxMemoryMB`, `sceneNavigator.resetWorldMesh()` starts a new room, and `getWorldMeshStats()` reports `source` (`lidar`, `depth`, `monocular`, `plane`) and `accumulated`.
-- **Android: the world mesh is in the right place,** read from each depth image's own stride, with confidence weighting samples instead of dropping them.
-- **iOS without LiDAR: estimated depth is placed where it was seen,** so fusing it no longer leaves duplicated surfaces.
-- The world mesh types are exported from the package root.
-
-### Meta Quest
-
-- **Studio scenes feel native in the headset.** A menu on the left controller's menu button (or a palm pinch), panels styled after Meta Horizon OS at a quarter of the size, the HUD centred where the wearer looks, and placement along the controller's ray.
-- **The room stays put.** Content on room surfaces, tap-placed models and the co-location frame keep their place when the wearer recentres; `onRoomMoved(listener)` reports a recentre to your app. Plane scenes use the room's planes and pick the one nearest the wearer.
-- **Input behaves like the platform's.** Y goes back as B does, only a trigger or pinch selects, a hand and a controller on one side press once, and a released hand releases its pinch. `ViroController.getControllerRayAsync(source)` says where a ray points.
-- **Hand occlusion in passthrough:** `handOcclusion` on `ViroXRSceneNavigator` and `ViroVRSceneNavigator` lets the wearer's real hands show through virtual content in front of them (off by default; `handOcclusionMode` `"mesh"` or `"capsules"`).
-- **Fewer crashes and leaks:** videos no longer abort the app or leak, a scene's root can change as the headset view starts, and closing a scene logs no OpenXR errors.
-- **Expo plugin:** Quest builds declare minSdkVersion 32, the Horizon OS SDK, a network security config and Meta's recommended activity settings, and no longer declare NFC.
-
-### Web
-
-- **Web AR content stays in the room on iPhone,** and hides while tracking is lost (`hideContentWhenLost` turns that off). From viro-web-renderer 1.1.0.
-
-### visionOS
-
-- **Studio scenes render in the ImmersiveSpace.** They rooted in `ViroARScene`, which renders nothing on visionOS, so a Studio scene was blank. They now root in `ViroScene`, as on Meta Quest, in shared sessions too.
-
-### iOS Simulator
-
-- **Apps using Viro build and run in the iOS Simulator.** ViroKit and the bridge ship as `ViroKit.xcframework` and `ViroReact.xcframework`, each with a simulator slice (arm64 and x86_64) beside the device one.
+**Meta Quest builds pass the Horizon Store's upload check again, and glTF models render as glTF defines them on every platform: metals look metallic without an environment map, visionOS draws a model's normal, metallic-roughness, occlusion and emissive maps, an occlusion map can sit on its own UV set, and mirrored nodes draw their faces.** Renderer binaries are rebuilt on virocore 3.1.1. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
 
 ### Everywhere
 
-- **Every scene navigator sends one usage ping when it mounts,** replacing the device registration Spatial used to do. It carries no API key. Turn it off with `ViroTelemetry.setEnabled(false)` or the Expo plugin's `telemetry: false`. The iOS privacy manifest now ships with the pod.
-- **Co-location:** the replication socket sends a per-device id (`getColocationDeviceId()`), and a join refused for the team's compute billing says so.
-- **A click goes to what is drawn on top,** not always the nearest object, and a click on nothing reaches `ViroController`'s `onClick` again.
-- **Text sits where its vertical alignment puts it,** and no longer disappears after a front-culled material.
-- **Video:** a paused iOS video stays paused, and Android play and pause reach the player in the order they were made.
-- **Physics runs at real time on every display,** ARCore reports the ambient light again, and a paused AR session stays paused when its options change.
-- **Animation chains type-check:** `registerAnimations` accepts names and nested sequences, as the native side always did, and colors inside a chain are processed.
-- **Android: a `ViroARCamera` no longer crashes the scene as it mounts,** and GLB characters with one skin per mesh animate every part.
-- **The world mesh's debug drawing no longer crashes iOS** on a large accumulated mesh.
-- **`Viro3DObject` reads more of glTF:** `KHR_texture_transform`, `KHR_node_visibility`, `KHR_animation_pointer` (node visibility, base color and emissive factors, texture offset, rotation and scale), textures on `TEXCOORD_1` and later sets, and emissive textures. Opaque and masked materials no longer show through where their texture's alpha is low, blended ones no longer hide what is behind them, characters whose rig animates a node above each joint move, skinned parts no longer vanish up close, a GLB with animation pointers no longer fails to load, one with 8-bit indices draws, and skinned GLBs draw on the web.
-- **Sounds seek to fractional seconds,** `Viro360Image` takes `stereoMode`, shared frames answer `{ success: false }` outside Quest, and calls that do nothing on a platform say so once.
-- **visionOS:** spot light cones and morph targets match the other platforms.
-- ViroKit targets iOS 15.1, the minimum the podspec already declared. The unsupported macOS target is gone from the native engine.
+- **Metal surfaces look metallic without an environment map.** The flat ambient light lit them like matte paint.
+- **glTF `normalTexture.scale` and `occlusionTexture.strength` apply,** an occlusion map on `TEXCOORD_1` samples that set (not on visionOS), and mirrored nodes draw their faces.
+
+### Meta Quest
+
+- **Builds pass the Horizon Store's upload check again:** the Expo plugin declares `com.oculus.permission.HAND_TRACKING` beside `horizonos.permission.HAND_TRACKING` (3.0.3 had dropped the old name, which the store requires), and no longer declares `WRITE_EXTERNAL_STORAGE`, which gives a Quest app no storage access and which Meta's review asks to justify.
+
+### visionOS
+
+- **`Viro3DObject` draws a glTF model's normal, metallic-roughness, occlusion and emissive maps.** It drew the base color only, so textured models looked flat.
 
 ### Check when upgrading
 
-- **Emission now shows on physically based materials.** A glTF `emissiveFactor`, or an emissive color on a material with `lightingModel: "PBR"`, was dropped before; a model that relied on that may now glow.
-- **A `style` on a scene navigator now applies.** It was silently dropped before, so check the layout of any navigator you pass one.
-- **`cloudAnchorProvider` and `geospatialAnchorProvider` are honoured** when `provider` is not set. An app that still passes `cloudAnchorProvider="arcore"` now uses ARCore Cloud Anchors and needs a Google Cloud API key; remove the prop or pass `provider` to keep ReactVision's.
-
-- **The iOS binaries moved** to `ios/dist/ViroRenderer/ViroKit.xcframework` and `ios/dist/lib/ViroReact.xcframework`. The podspecs and the Expo plugin need nothing, but a script or Podfile that names `ViroKit.framework` or `libViroReact.a` by path needs the new ones. The plugin no longer excludes arm64 from simulator builds and removes the exclusion it used to write, so run `expo prebuild` again.
-
-See `CHANGELOG.md` for every change.
+- **A metallic model without a `lightingEnvironment` looks darker than in 3.1.0.** This is how glTF and three.js light it; give metallic models an environment map.

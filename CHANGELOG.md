@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## v3.1.1 — 9 November 2026
+
+### Added
+
+- **visionOS: glTF models draw their normal, metallic-roughness, occlusion and emissive maps (virocore 3.1.1).** They drew with their base color only, flat; DamagedHelmet came out as a white silhouette.
+- **An occlusion map on its own UV set (`TEXCOORD_1`, a lightmap) samples that set (virocore 3.1.1).** Not on visionOS, where such a map is left out.
+
+### Changed
+
+- **A Meta Quest build no longer declares `WRITE_EXTERNAL_STORAGE` (Expo plugin).** The plugin removes it with `tools:node="remove"`, whichever library declares it, as it already does `NFC`. A Quest build's minSdk is 32, and from Android 11 the permission gives an app that targets API 30 or later no storage access. Meta's review asks for a reason for every permission an APK declares.
+
+### Fixed
+
+- **A Meta Quest build declares `com.oculus.permission.HAND_TRACKING` again, beside `horizonos.permission.HAND_TRACKING` (Expo plugin).** The Horizon Store refuses an upload that declares the `oculus.software.handtracking` feature without the old name: "The `<uses-permission android:name="com.oculus.permission.HAND_TRACKING" />` attribute is required to support the oculus.software.handtracking feature." 3.0.3 had replaced it with the new name. Horizon OS treats the two as one permission.
+- **Metal surfaces look metallic without an environment map (virocore 3.1.1).** The flat ambient light lit them like matte paint; it now leaves out the share a metal reflects. A metallic model without a `lightingEnvironment` will look darker than in 3.1.0, as glTF and three.js have it.
+- **A glTF `normalTexture.scale` and `occlusionTexture.strength` apply (virocore 3.1.1).**
+- **Mirrored nodes (negative scale) in a GLB draw their faces (virocore 3.1.1).**
+- **visionOS test scene:** the bridge's built-in test scene loads DamagedHelmet when it is in the app bundle, as it does shiba and Soldier.
+
 ## v3.1.0 — 8 November 2026
 
 ### Added

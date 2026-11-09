@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v3.1.1
+
+### Added
+
+- **visionOS: glTF models draw their normal, metallic-roughness, occlusion and emissive maps (virocore 3.1.1).** They drew with their base color only, flat; DamagedHelmet came out as a white silhouette.
+- **An occlusion map on its own UV set (`TEXCOORD_1`, a lightmap) samples that set (virocore 3.1.1).** Not on visionOS, where such a map is left out.
+
+### Fixed
+
+- **Metal surfaces look metallic without an environment map (virocore 3.1.1).** The flat ambient light lit them like matte paint; it now leaves out the share a metal reflects. A metallic model without a `lightingEnvironment` will look darker than in 3.1.0, as glTF and three.js have it.
+- **A glTF `normalTexture.scale` and `occlusionTexture.strength` apply (virocore 3.1.1).**
+- **Mirrored nodes (negative scale) in a GLB draw their faces (virocore 3.1.1).**
+- **visionOS test scene:** the bridge's built-in test scene loads DamagedHelmet when it is in the app bundle, as it does shiba and Soldier.
+
 ## v3.1.0 — 8 November 2026
 
 ### Added

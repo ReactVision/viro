@@ -534,14 +534,17 @@ const withViroManifest = (config: ExpoConfig, props?: ViroConfigurationOptions) 
         });
         const existingPermissions: string[] = (contents.manifest["uses-permission"] || [])
           .map((p: any) => p.$?.["android:name"]);
-        // Horizon OS logs com.oculus.permission.HAND_TRACKING as deprecated and
-        // asks for this name instead. Its runtime logs that warning even when
-        // only this name is declared: its permission check treats the two names
-        // as one and tests the old name first.
-        if (!existingPermissions.includes("horizonos.permission.HAND_TRACKING")) {
-          contents.manifest["uses-permission"].push({
-            $: { "android:name": "horizonos.permission.HAND_TRACKING" },
-          });
+        // Both names: the Horizon Store's upload check refuses an APK that
+        // declares oculus.software.handtracking without the old name, and Horizon
+        // OS asks for the new one. Its runtime treats the two as one permission,
+        // and logs the old name as deprecated whichever is declared.
+        for (const name of [
+          "com.oculus.permission.HAND_TRACKING",
+          "horizonos.permission.HAND_TRACKING",
+        ]) {
+          if (!existingPermissions.includes(name)) {
+            contents.manifest["uses-permission"].push({ $: { "android:name": name } });
+          }
         }
         if (!existingPermissions.includes("com.oculus.permission.EYE_TRACKING")) {
           contents.manifest["uses-permission"].push({
@@ -554,6 +557,14 @@ const withViroManifest = (config: ExpoConfig, props?: ViroConfigurationOptions) 
         if (!existingPermissions.includes("android.permission.NFC")) {
           contents.manifest["uses-permission"].push({
             $: { "android:name": "android.permission.NFC", "tools:node": "remove" },
+          });
+        }
+        // Gives an app targeting API 30+ no storage access, and a Quest build's
+        // minSdk is 32. Media libraries declare it anyway, and the store's
+        // review asks for a reason for every declared permission.
+        if (!existingPermissions.includes("android.permission.WRITE_EXTERNAL_STORAGE")) {
+          contents.manifest["uses-permission"].push({
+            $: { "android:name": "android.permission.WRITE_EXTERNAL_STORAGE", "tools:node": "remove" },
           });
         }
         // Spatial Data / Scene permissions — required for the Meta OpenXR runtime

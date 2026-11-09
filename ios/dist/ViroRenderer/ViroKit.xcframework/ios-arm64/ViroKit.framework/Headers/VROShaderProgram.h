@@ -67,6 +67,7 @@ enum class VROShaderMask {
     Morph_4 = 1024,
     Morph_5 = 2048,
     Morph_6 = 4096,
+    Tex1 = 8192,
 };
 
 class VROShaderModifier;

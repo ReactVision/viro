@@ -45,7 +45,8 @@ public:
         _permissibleContentsMask(permissibleContentsMask),
         _contentsColor({ 1.0, 1.0, 1.0, 1.0 }),
         _intensity(1.0),
-        _hasContentsTransform(false)
+        _hasContentsTransform(false),
+        _texcoordSet(0)
     {}
 
     VROMaterialVisual(VROMaterial &material, int permissibleContentsMask, VROVector4f color) :
@@ -53,7 +54,8 @@ public:
             _permissibleContentsMask(permissibleContentsMask),
             _contentsColor(color),
             _intensity(1.0),
-            _hasContentsTransform(false)
+            _hasContentsTransform(false),
+            _texcoordSet(0)
     {}
     
     /*
@@ -122,6 +124,16 @@ public:
     bool hasContentsTransform() const {
         return _hasContentsTransform;
     }
+
+    /*
+     The set of texture coordinates this visual's texture samples: 0 (the geometry's
+     texcoord source) or 1 (its Texcoord1 source). Only the ambient occlusion visual
+     reads a second set (a glTF occlusion map or lightmap on TEXCOORD_1).
+     */
+    void setTexcoordSet(int set);
+    int getTexcoordSet() const {
+        return _texcoordSet;
+    }
     
     std::shared_ptr<VROTexture> getTexture() const {
         if (_contentsTexture) {
@@ -171,6 +183,7 @@ private:
      */
     VROMatrix4f _contentsTransform;
     bool _hasContentsTransform;
+    int _texcoordSet;
     
 };
 

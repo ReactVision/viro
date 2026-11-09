@@ -51,6 +51,10 @@ enum class VROGeometrySourceSemantic {
     Morph_4,
     Morph_5,
     Morph_6,
+    // A second set of texture coordinates, for a texture that samples its own UV set
+    // (glTF occlusion on TEXCOORD_1, a lightmap). Bound at the EdgeCrease slot, which
+    // no shader reads.
+    Texcoord1,
     Invalid
 };
 

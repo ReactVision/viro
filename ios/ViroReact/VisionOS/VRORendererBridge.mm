@@ -774,6 +774,27 @@ static std::vector<dispatch_block_t> sRenderThreadQueue;
         NSLog(@"[ViroBridge] shiba.glb not found in bundle");
     }
 
+    // ── DamagedHelmet.glb (PBR maps validation) ─────────────────────────────
+    // Base color, normal, metallic-roughness, occlusion and emissive maps: on visionOS
+    // they reach pbr_lighting_fragment_maps. Upper right, facing the viewer.
+    NSString *helmetPath = [[NSBundle mainBundle] pathForResource:@"DamagedHelmet" ofType:@"glb"];
+    if (helmetPath) {
+        auto helmetNode = std::make_shared<VRONode>();
+        scene->getRootNode()->addChildNode(helmetNode);
+        std::string filePath([helmetPath UTF8String]);
+        std::shared_ptr<VRODriver> driver = _driver;
+        VROGLTFLoader::loadGLTFFromResource(filePath, {}, VROResourceType::LocalFile,
+                                            helmetNode, /*isGLB=*/true, driver,
+                                            [](std::shared_ptr<VRONode> node, bool success) {
+            if (success) {
+                node->setScale({0.2f, 0.2f, 0.2f});
+                node->setPosition({0.78f, 0.38f, -1.2f});
+            } else {
+                NSLog(@"[ViroBridge] DamagedHelmet.glb failed to load");
+            }
+        });
+    }
+
     // ── Soldier.glb (skeletal animation validation) ──────────────────────────
     auto soldierNode = std::make_shared<VRONode>();
     scene->getRootNode()->addChildNode(soldierNode);

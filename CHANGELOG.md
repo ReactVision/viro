@@ -6,6 +6,10 @@
 
 - **A Meta Quest build declares `com.oculus.permission.HAND_TRACKING` again, beside `horizonos.permission.HAND_TRACKING` (Expo plugin).** The Horizon Store refuses an upload that declares the `oculus.software.handtracking` feature without the old name: "The `<uses-permission android:name="com.oculus.permission.HAND_TRACKING" />` attribute is required to support the oculus.software.handtracking feature." 3.0.3 had replaced it with the new name. Horizon OS treats the two as one permission.
 
+### Changed
+
+- **A Meta Quest build no longer declares `WRITE_EXTERNAL_STORAGE` (Expo plugin).** The plugin removes it with `tools:node="remove"`, whichever library declares it, as it already does `NFC`. A Quest build's minSdk is 32, and from Android 11 the permission gives an app that targets API 30 or later no storage access. Meta's review asks for a reason for every permission an APK declares.
+
 ## v3.1.0 — 8 November 2026
 
 ### Added

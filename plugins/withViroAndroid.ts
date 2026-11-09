@@ -559,6 +559,14 @@ const withViroManifest = (config: ExpoConfig, props?: ViroConfigurationOptions) 
             $: { "android:name": "android.permission.NFC", "tools:node": "remove" },
           });
         }
+        // Gives an app targeting API 30+ no storage access, and a Quest build's
+        // minSdk is 32. Media libraries declare it anyway, and the store's
+        // review asks for a reason for every declared permission.
+        if (!existingPermissions.includes("android.permission.WRITE_EXTERNAL_STORAGE")) {
+          contents.manifest["uses-permission"].push({
+            $: { "android:name": "android.permission.WRITE_EXTERNAL_STORAGE", "tools:node": "remove" },
+          });
+        }
         // Spatial Data / Scene permissions — required for the Meta OpenXR runtime
         // to expose the scene & spatial-entity extensions (XR_FB_scene,
         // XR_FB_spatial_entity*, XR_FB_scene_capture). Without USE_ANCHOR_API the

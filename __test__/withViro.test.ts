@@ -134,3 +134,46 @@ describe("simulator architectures", () => {
     expect(section.ID3.buildSettings).toEqual({ PRODUCT_NAME: "app" });
   });
 });
+
+describe("Quest permissions", () => {
+  async function permissionsAfter(xRMode: string[]) {
+    const props = { android: { xRMode } };
+    const config: any = withViroAndroid(
+      { name: "app", slug: "app", plugins: [["@reactvision/react-viro", props]] } as any,
+      props as any
+    );
+    const result = await config.mods.android.manifest({
+      ...config,
+      modResults: {
+        manifest: {
+          $: {},
+          "uses-permission": [],
+          application: [{ $: {}, activity: [{ "intent-filter": [{ category: [] }] }] }],
+        },
+      },
+      modRequest: {
+        platform: "android",
+        modName: "manifest",
+        projectRoot: "/",
+        platformProjectRoot: "/",
+        introspect: false,
+      },
+    });
+    return result.modResults.manifest["uses-permission"].map((p: any) => p.$);
+  }
+
+  test("a Quest build declares both hand tracking names and removes WRITE_EXTERNAL_STORAGE", async () => {
+    const permissions = await permissionsAfter(["AR", "QUEST"]);
+    expect(permissions).toContainEqual({ "android:name": "com.oculus.permission.HAND_TRACKING" });
+    expect(permissions).toContainEqual({ "android:name": "horizonos.permission.HAND_TRACKING" });
+    expect(permissions).toContainEqual({
+      "android:name": "android.permission.WRITE_EXTERNAL_STORAGE",
+      "tools:node": "remove",
+    });
+  });
+
+  test("a phone build leaves WRITE_EXTERNAL_STORAGE alone", async () => {
+    const names = (await permissionsAfter(["AR"])).map((p: any) => p["android:name"]);
+    expect(names).not.toContain("android.permission.WRITE_EXTERNAL_STORAGE");
+  });
+});

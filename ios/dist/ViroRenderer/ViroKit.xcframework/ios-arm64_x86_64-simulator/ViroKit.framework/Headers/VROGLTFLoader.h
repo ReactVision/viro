@@ -130,7 +130,8 @@ private:
                                         std::vector<std::shared_ptr<VROGeometrySource>> &sources,
                                         size_t geoElementIndex,
                                         std::shared_ptr<VRODriver> driver,
-                                        int texcoordSet = 0);
+                                        int texcoordSet = 0,
+                                        int texcoord1Set = -1);
     static void processTangent(std::vector<std::shared_ptr<VROGeometryElement>> &elements,
                                std::vector<std::shared_ptr<VROGeometrySource>> &sources, size_t geoElementIndex);
     static void regenerateTangent(std::vector<VROVector3f> &posArray,

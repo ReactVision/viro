@@ -81,7 +81,23 @@ typedef struct {
     matrix_float4x4  texture_transform;
     vector_float3    emissive_color;
     int              ignores_diffuse_alpha;
+
+    // PBR maps (pbr_lighting_fragment_maps): which are bound (VROPBRMap bits), and the
+    // factors glTF scales them by. The emissive map has its own texture transform.
+    int              pbr_maps;
+    float            metalness_intensity;
+    float            roughness_intensity;
+    float            normal_scale;
+    float            ao_strength;
+    matrix_float4x4  emissive_texture_transform;
 } VROMaterialUniforms;
+
+// Bits of VROMaterialUniforms.pbr_maps.
+#define VRO_PBR_MAP_BASE       1
+#define VRO_PBR_MAP_NORMAL     2
+#define VRO_PBR_MAP_METAL_ROUGH 4
+#define VRO_PBR_MAP_AO         8
+#define VRO_PBR_MAP_EMISSIVE   16
 
 typedef struct {
     simd_float3 position;
@@ -1549,6 +1565,8 @@ typedef struct {
     float3 normal;
 
     float3 ambient_color;
+    // The untransformed texture coordinates, for a map with its own transform (emissive).
+    float2 raw_texcoord;
     // Particle instancing: which instance this vertex belongs to, so the fragment
     // stage can index particle_colors. Flat — an instance index must not interpolate.
     uint   instance_id [[ flat ]];
@@ -1599,6 +1617,7 @@ vertex VROPBRLightingVertexOut pbr_lighting_vertex(VRORendererAttributes attribu
     out.surface_position = v_position;
     out.camera_position = view.camera_position;
     out.normal = normalize((_transforms.normal_matrix * float4(_geometry.normal, 0.0)).xyz);
+    out.raw_texcoord = _geometry.texcoord;
     out.ambient_color = lighting.ambient_light_color;
 
     return out;
@@ -1607,6 +1626,11 @@ vertex VROPBRLightingVertexOut pbr_lighting_vertex(VRORendererAttributes attribu
 // Shared body: `albedo` already carries the material colour (from a uniform or a texture).
 static float4 vro_pbr_shade(VROPBRLightingVertexOut in,
                             float4 albedo,
+                            float3 normal,
+                            float metalness,
+                            float roughness,
+                            float ao,
+                            float3 emissive,
                             constant VROMaterialUniforms &material,
                             constant VROSceneLightingUniforms &lighting,
                             depth2d_array<float> shadow_map,
@@ -1620,11 +1644,11 @@ static float4 vro_pbr_shade(VROPBRLightingVertexOut in,
     _surface.specular_texcoord = in.texcoord;
     _surface.shininess = material.shininess;
     // Clamped: a roughness of zero makes the GGX denominator collapse.
-    _surface.roughness = max(material.roughness, 0.06);
-    _surface.metalness = material.metalness;
-    _surface.ao = material.ao;
+    _surface.roughness = max(roughness, 0.06);
+    _surface.metalness = metalness;
+    _surface.ao = ao;
     _surface.alpha = material.alpha;
-    _surface.normal = normalize(in.normal);
+    _surface.normal = normalize(normal);
     _surface.position = in.surface_position;
     _surface.view = normalize(in.camera_position - in.surface_position);
 
@@ -1688,10 +1712,12 @@ static float4 vro_pbr_shade(VROPBRLightingVertexOut in,
 
         ambient = (kD * diffuse_ibl + specular_ibl) * _surface.ao;
     } else {
-        ambient = in.ambient_color * base_color * _surface.ao;
+        // A metal has no diffuse response, and without an environment map nothing to
+        // reflect: only the diffusing share of the surface takes the flat ambient.
+        ambient = in.ambient_color * base_color * (1.0 - _surface.metalness) * _surface.ao;
     }
 
-    return float4(ambient + radiance_out + material.emissive_color, _surface.alpha * _surface.diffuse_color.a);
+    return float4(ambient + radiance_out + emissive, _surface.alpha * _surface.diffuse_color.a);
 }
 
 fragment VROLightingFragmentOut pbr_lighting_fragment_c(VROPBRLightingVertexOut in [[ stage_in ]],
@@ -1703,7 +1729,8 @@ fragment VROLightingFragmentOut pbr_lighting_fragment_c(VROPBRLightingVertexOut 
                                              texturecube<float> irradiance_map [[ texture(5) ]],
                                              texturecube<float> prefiltered_map [[ texture(6) ]],
                                              texture2d<float> brdf_map [[ texture(7) ]]) {
-    const float4 color = vro_pbr_shade(in, material.diffuse_surface_color, material, lighting, shadow_map,
+    const float4 color = vro_pbr_shade(in, material.diffuse_surface_color, in.normal, material.metalness,
+                                      material.roughness, material.ao, material.emissive_color, material, lighting, shadow_map,
                                       irradiance_map, prefiltered_map, brdf_map);
     return VROMakeLightingOut(color, material);
 }
@@ -1719,8 +1746,76 @@ fragment VROLightingFragmentOut pbr_lighting_fragment_t(VROPBRLightingVertexOut 
                                              texturecube<float> prefiltered_map [[ texture(6) ]],
                                              texture2d<float> brdf_map [[ texture(7) ]]) {
     const float4 albedo = diffuse_texture.sample(s, in.texcoord) * material.diffuse_surface_color;
-    const float4 color = vro_pbr_shade(in, albedo, material, lighting, shadow_map,
+    const float4 color = vro_pbr_shade(in, albedo, in.normal, material.metalness, material.roughness,
+                                      material.ao, material.emissive_color, material, lighting, shadow_map,
                                       irradiance_map, prefiltered_map, brdf_map);
+    return VROMakeLightingOut(color, material);
+}
+
+// Tangent frame from screen-space derivatives (no tangent attribute needed): T and B
+// follow +u and +v on the surface. glTF normal maps put +Y toward -v (up in the image),
+// so the map's green is flipped before it is applied.
+static float3x3 vro_cotangent_frame(float3 N, float3 p, float2 uv) {
+    const float3 dp1 = dfdx(p);
+    const float3 dp2 = dfdy(p);
+    const float2 duv1 = dfdx(uv);
+    const float2 duv2 = dfdy(uv);
+    const float3 dp2perp = cross(dp2, N);
+    const float3 dp1perp = cross(N, dp1);
+    const float3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+    const float3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+    const float invmax = rsqrt(max(max(dot(T, T), dot(B, B)), 1e-12));
+    return float3x3(T * invmax, B * invmax, N);
+}
+
+// PBR with glTF's maps: base color, normal (scaled), metallic-roughness (B and G, by the
+// factors), occlusion (R, by its strength) and emissive (by the emissive color, through
+// its own texture transform). A map that is absent is bound to the blank texture and
+// skipped through material.pbr_maps.
+fragment VROLightingFragmentOut pbr_lighting_fragment_maps(VROPBRLightingVertexOut in [[ stage_in ]],
+                                             texture2d<float> diffuse_texture [[ texture(0) ]],
+                                             texture2d<float> normal_map [[ texture(8) ]],
+                                             texture2d<float> metal_rough_map [[ texture(9) ]],
+                                             texture2d<float> ao_map [[ texture(10) ]],
+                                             texture2d<float> emissive_map [[ texture(11) ]],
+                                             constant VROMaterialUniforms &material [[ buffer(2) ]],
+                                             constant VROCustomUniforms &_custom [[ buffer(3) ]],
+                                             constant VROSceneLightingUniforms &lighting [[ buffer(4) ]],
+                                             constant float4 *particle_colors [[ buffer(7) ]],
+                                             depth2d_array<float> shadow_map [[ texture(4) ]],
+                                             texturecube<float> irradiance_map [[ texture(5) ]],
+                                             texturecube<float> prefiltered_map [[ texture(6) ]],
+                                             texture2d<float> brdf_map [[ texture(7) ]]) {
+    const int maps = material.pbr_maps;
+    float4 albedo = material.diffuse_surface_color;
+    if (maps & VRO_PBR_MAP_BASE) {
+        albedo *= diffuse_texture.sample(s, in.texcoord);
+    }
+    float3 N = normalize(in.normal);
+    if (maps & VRO_PBR_MAP_NORMAL) {
+        float3 t = normal_map.sample(s, in.texcoord).xyz * 2.0 - 1.0;
+        t.xy *= material.normal_scale;
+        t.y = -t.y;
+        N = normalize(vro_cotangent_frame(N, in.surface_position, in.texcoord) * t);
+    }
+    float metalness = material.metalness;
+    float roughness = material.roughness;
+    if (maps & VRO_PBR_MAP_METAL_ROUGH) {
+        const float4 mr = metal_rough_map.sample(s, in.texcoord);
+        metalness = mr.b * material.metalness_intensity;
+        roughness = mr.g * material.roughness_intensity;
+    }
+    float ao = material.ao;
+    if (maps & VRO_PBR_MAP_AO) {
+        ao = mix(1.0, ao_map.sample(s, in.texcoord).r, material.ao_strength);
+    }
+    float3 emissive = material.emissive_color;
+    if (maps & VRO_PBR_MAP_EMISSIVE) {
+        const float2 uv = (material.emissive_texture_transform * float4(in.raw_texcoord, 0.0, 1.0)).xy;
+        emissive *= emissive_map.sample(s, uv).rgb;
+    }
+    const float4 color = vro_pbr_shade(in, albedo, N, metalness, roughness, ao, emissive, material, lighting,
+                                      shadow_map, irradiance_map, prefiltered_map, brdf_map);
     return VROMakeLightingOut(color, material);
 }
 

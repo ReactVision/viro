@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **A Meta Quest build declares `com.oculus.permission.HAND_TRACKING` again, beside `horizonos.permission.HAND_TRACKING` (Expo plugin).** The Horizon Store refuses an upload that declares the `oculus.software.handtracking` feature without the old name: "The `<uses-permission android:name="com.oculus.permission.HAND_TRACKING" />` attribute is required to support the oculus.software.handtracking feature." 3.0.3 had replaced it with the new name. Horizon OS treats the two as one permission.
+
 ## v3.1.0 — 8 November 2026
 
 ### Added

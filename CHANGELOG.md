@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **A Studio scene's alert shows its own close button label (`StudioSceneNavigator`).** The button always read OK, whatever the scene's ALERT function set. It now reads `alert_action_button_title`, and OK when that is empty or the backend does not send it.
+
 ## v3.1.1 — 9 November 2026
 
 ### Added

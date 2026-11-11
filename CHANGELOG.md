@@ -4,6 +4,7 @@
 
 ### Added
 
+- **`virtualCamera` on `ViroARSceneNavigator` on web.** Renders an AR scene with no camera, session or permission prompt, from a camera the viewer moves: right or middle drag to look around, shift-drag to pan, the wheel or a pinch to zoom, two fingers to orbit. A primary click or a single finger still reaches the scene as a tap. A floor plane is reported to `ViroARPlane` at `floorY` (default -1), so plane content shows. For previewing an AR scene where there is nothing to track with, such as a desktop browser.
 - **Physics on web.** A scene now switches the physics world on when it mounts, as native creates it on demand, so a `physicsBody` simulates; `physicsWorld.gravity` sets the gravity (default -9.81) and `drawBounds` warns. Before, bodies on web only moved inside Studio scenes.
 - **`onCollision` on web**, delivered to each node with the other body's `viroTag`, the contact point and its normal, as on native.
 - **`applyImpulse`, `applyTorqueImpulse` and `setVelocity` on a node's ref on web.** An impulse is applied at the centre of mass; an offset warns.

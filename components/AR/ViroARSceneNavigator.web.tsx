@@ -43,6 +43,11 @@ import {
   type ViroRendererEffectProps,
 } from "../Web/useViroRendererEffects";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
+import {
+  attachVirtualCamera,
+  floorAnchorFor,
+  type ViroVirtualCameraOptions,
+} from "../Web/viroVirtualCamera";
 
 /** Scene navigation is not implemented in this navigator on the web: say so instead of doing nothing. */
 const noNavigationOnWeb = (method: string) => () =>
@@ -104,6 +109,14 @@ type Props = {
    * so without motion it never leaves "initializing".
    */
   onMotionUnavailable?: (reason: "denied" | "no-events") => void;
+  /**
+   * Render without a camera or tracking, from a camera the viewer moves (right
+   * or middle drag, the wheel, two fingers). For previewing an AR scene where
+   * there is no camera to track with, such as a desktop browser. No session
+   * starts and no permission is asked for; a floor plane is reported to
+   * ViroARPlane unless `floorY` is null.
+   */
+  virtualCamera?: boolean | ViroVirtualCameraOptions;
   [key: string]: any;
 } & ViroRendererEffectProps;
 
@@ -210,6 +223,14 @@ export function ViroARSceneNavigator(props: Props) {
     facing_mode: props.arOptions?.facingMode,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const virtual = props.virtualCamera
+    ? props.virtualCamera === true
+      ? {}
+      : props.virtualCamera
+    : null;
+  const virtualRef = useRef(virtual);
+  virtualRef.current = virtual;
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
@@ -263,6 +284,17 @@ export function ViroARSceneNavigator(props: Props) {
     renderer.resize();
     return () => observer.disconnect();
   }, [renderer]);
+
+  const virtualOn = virtual !== null;
+  useEffect(() => {
+    const container = containerRef.current;
+    const opts = virtualRef.current;
+    if (!renderer || !container || !opts) return;
+    setTracking(ViroTrackingState.Normal);
+    const floorY = opts.floorY === undefined ? -1 : opts.floorY;
+    setAnchors(floorY === null ? [] : [floorAnchorFor(floorY)]);
+    return attachVirtualCamera(renderer.scene, container, opts);
+  }, [renderer, virtualOn]);
 
   const resolveLoadSlam = useCallback((): ViroArSessionOptions["loadSlam"] => {
     if (props.loadSlam) return props.loadSlam;
@@ -379,7 +411,7 @@ export function ViroARSceneNavigator(props: Props) {
   };
 
   return (
-    <div style={containerStyle}>
+    <div ref={containerRef} style={containerStyle}>
       <canvas ref={canvasRef} style={canvasStyle} />
 
       {renderer && rootNode && SceneComponent ? (
@@ -394,7 +426,7 @@ export function ViroARSceneNavigator(props: Props) {
         </ViroRendererContext.Provider>
       ) : null}
 
-      {started ? (
+      {virtual ? null : started ? (
         <div style={statusStyle}>
           {motionMissing && !props.arOptions?.renderWhileLimited
             ? MOTION_MISSING

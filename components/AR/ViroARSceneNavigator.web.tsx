@@ -42,16 +42,21 @@ import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
 } from "../Web/useViroRendererEffects";
-import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import {
   attachVirtualCamera,
   floorAnchorFor,
   type ViroVirtualCameraOptions,
 } from "../Web/viroVirtualCamera";
 
-/** Scene navigation is not implemented in this navigator on the web: say so instead of doing nothing. */
-const noNavigationOnWeb = (method: string) => () =>
-  warnUnsupported(`ViroARSceneNavigator's sceneNavigator.${method}`, "the web", "ViroSceneNavigator has scene navigation on the web.");
+import {
+  jumpToScene,
+  popScenes,
+  pushScene,
+  replaceScene,
+  type WebSceneEntry,
+} from "../Web/webSceneStack";
+
+type SceneEntry = { scene: React.ComponentType<any>; passProps?: Record<string, unknown> };
 
 /** AR capture/tuning knobs forwarded to the ViroArSession. */
 type ArOptions = Partial<
@@ -399,16 +404,23 @@ export function ViroARSceneNavigator(props: Props) {
     }
   }, [props.arOptions?.playback, renderer, rootNode, started, starting, startAR]);
 
-  const SceneComponent = props.initialScene?.scene;
-
+  // Only the top scene is mounted; native keeps the others, but nothing here
+  // can show them while they are covered.
+  const [history, setHistory] = useState<WebSceneEntry[]>(() =>
+    props.initialScene?.scene
+      ? [{ key: "initial", scene: props.initialScene.scene, passProps: (props.initialScene as SceneEntry).passProps }]
+      : [],
+  );
   const sceneNavigator = {
-    push: noNavigationOnWeb("push"),
-    pop: noNavigationOnWeb("pop"),
-    popN: noNavigationOnWeb("popN"),
-    jump: noNavigationOnWeb("jump"),
-    replace: noNavigationOnWeb("replace"),
+    push: (a?: unknown, b?: unknown) => setHistory((h) => pushScene(h, a, b)),
+    replace: (a?: unknown, b?: unknown) => setHistory((h) => replaceScene(h, a, b)),
+    jump: (a?: unknown, b?: unknown) => setHistory((h) => jumpToScene(h, a, b)),
+    pop: () => setHistory((h) => popScenes(h, 1)),
+    popN: (n: number) => setHistory((h) => popScenes(h, n)),
     viroAppProps: props.viroAppProps ?? {},
   };
+  const top = history[history.length - 1];
+  const SceneComponent = top?.scene;
 
   return (
     <div ref={containerRef} style={containerStyle}>
@@ -420,7 +432,12 @@ export function ViroARSceneNavigator(props: Props) {
             value={{ session: sessionRef.current, anchors, trackingState: tracking }}
           >
             <ViroParentNodeContext.Provider value={rootNode}>
-              <SceneComponent sceneNavigator={sceneNavigator} {...props.viroAppProps} />
+              <SceneComponent
+                key={top.key}
+                sceneNavigator={sceneNavigator}
+                {...props.viroAppProps}
+                {...top.passProps}
+              />
             </ViroParentNodeContext.Provider>
           </ViroARContext.Provider>
         </ViroRendererContext.Provider>

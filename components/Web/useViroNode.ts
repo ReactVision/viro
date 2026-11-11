@@ -7,7 +7,7 @@
  * first render — children read it from context and parent themselves correctly
  * even though React runs child effects before parent effects.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import {
   ViroBillboardAxis,
   ViroEventAction,
@@ -19,6 +19,8 @@ import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebConte
 import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
+import { registerCollisionBody } from "./viroCollisions";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -44,6 +46,14 @@ function billboardAxis(behaviors: string): ViroBillboardAxis | null {
 }
 
 type ViroPosition = [number, number, number];
+
+/** What a ref to a node component reaches, as on native (ViroBase). */
+export type ViroWebNodeHandle = {
+  /** Applied at the centre of mass: the web binding takes no offset. */
+  applyImpulse(force: number[], position?: number[]): void;
+  applyTorqueImpulse(torque: number[]): void;
+  setVelocity(velocity: number[]): void;
+};
 
 export interface ViroWebNodeProps {
   position?: [number, number, number];
@@ -78,6 +88,10 @@ export interface ViroWebNodeProps {
   physicsBody?: ViroPhysicsBodyProp;
   /** Name a collision reports this node by. */
   viroTag?: string;
+  /** Called with the other body's viroTag, the contact point and its normal. */
+  onCollision?: (viroTag: string, collidedPoint: ViroPosition, collidedNormal: ViroPosition) => void;
+  /** React 19 passes a function component's ref as a prop. */
+  ref?: Ref<ViroWebNodeHandle>;
   // Events (world-space position, input source id).
   onClick?: (position: ViroPosition, source: number) => void;
   onClickState?: (
@@ -150,14 +164,28 @@ export function useViroNode(
   const opacity = props.opacity ?? 1;
   const visible = props.visible ?? true;
 
+  // Each on its own, as native sends only what changed: re-sending the authored
+  // position whenever opacity or visibility changes would undo a drag.
   useEffect(() => {
     scene.setNodePosition(node, px, py, pz);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, px, py, pz]);
+  useEffect(() => {
     scene.setNodeRotation(node, rx * DEG2RAD, ry * DEG2RAD, rz * DEG2RAD);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, rx, ry, rz]);
+  useEffect(() => {
     scene.setNodeScale(node, sx, sy, sz);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, sx, sy, sz]);
+  useEffect(() => {
     scene.setNodeOpacity(node, opacity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, opacity]);
+  useEffect(() => {
     scene.setNodeVisible(node, visible);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, px, py, pz, rx, ry, rz, sx, sy, sz, opacity, visible]);
+  }, [node, visible]);
 
   // Events: register handlers once, reading the latest props off the ref above,
   // so a changed callback identity does not re-subscribe.
@@ -252,13 +280,43 @@ export function useViroNode(
   // Physics. Keyed on the serialised body so a changed collider re-attaches and
   // an unchanged one does not: rebuilding a rigid body every render would reset
   // its velocity every frame and nothing would ever fall.
+  // The body's renderer tag is a unique key (see viroCollisions.ts); the
+  // viroTag and onCollision are read through it when a collision arrives.
   const physicsKey = props.physicsBody ? JSON.stringify(props.physicsBody) : "";
-  const viroTag = props.viroTag ?? "";
   useEffect(() => {
-    applyPhysicsBody(scene, node, propsRef.current.physicsBody, viroTag);
-    return () => scene.clearPhysicsBody(node);
+    if (!propsRef.current.physicsBody) {
+      scene.clearPhysicsBody(node);
+      return;
+    }
+    const registration = registerCollisionBody(
+      scene,
+      () => propsRef.current.viroTag ?? "",
+      () => propsRef.current.onCollision,
+    );
+    applyPhysicsBody(scene, node, propsRef.current.physicsBody, registration.key);
+    return () => {
+      scene.clearPhysicsBody(node);
+      registration.unregister();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, physicsKey, viroTag]);
+  }, [node, physicsKey]);
+
+  const vec = (v: number[] | undefined): ViroPosition => [v?.[0] ?? 0, v?.[1] ?? 0, v?.[2] ?? 0];
+  useImperativeHandle(
+    props.ref,
+    () => ({
+      applyImpulse: (force, position) => {
+        if (position?.some((c) => c !== 0)) {
+          warnUnsupported("applyImpulse at an offset", "the web", "The impulse is applied at the centre of mass.");
+        }
+        scene.applyPhysicsImpulse(node, vec(force));
+      },
+      applyTorqueImpulse: (torque) => scene.applyPhysicsTorque(node, vec(torque)),
+      setVelocity: (velocity) => scene.setPhysicsVelocity(node, vec(velocity), false),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [node],
+  );
 
   // Animation (declarative ViroAnimation or model animation).
   useViroAnimation(

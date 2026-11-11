@@ -25,6 +25,7 @@ import { ViroARPlane } from "../AR/ViroARPlane.web";
 import { ViroARScene, type ViroARSceneHandle } from "../AR/ViroARScene.web";
 import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
+import { addCollisionListener } from "../Web/viroCollisions";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
@@ -500,7 +501,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       bound.add(b.asset_y_id);
     }
 
-    sceneApi.setCollisionHandler((collision) => {
+    const unsubscribe = addCollisionListener(sceneApi, (collision) => {
       if (!bound.has(collision.tag)) return;
       const handler = createPlacementCollisionHandler(
         collision.tag,
@@ -516,7 +517,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     });
 
     return () => {
-      sceneApi.setCollisionHandler(null);
+      unsubscribe();
       collisionCooldownRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

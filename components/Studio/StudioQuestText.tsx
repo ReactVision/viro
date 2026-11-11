@@ -68,6 +68,13 @@ function estimateQuestTextLines(
   return lines;
 }
 
+/** The width text takes on one unwrapped line, in metres. */
+export function estimateQuestTextWidth(text: string, fontSize: number): number {
+  let em = 0;
+  for (const char of text) em += advanceEm(char);
+  return em * fontSize * 0.01;
+}
+
 /** The height of the box text needs once ViroText has wrapped it, in metres. */
 export function estimateQuestTextHeight(
   text: string,

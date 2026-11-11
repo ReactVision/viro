@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **A Studio scene's alert shows its own close button label (`StudioSceneNavigator`).** The button always read OK, whatever the scene's ALERT function set. It now reads `alert_action_button_title`, and OK when that is empty or the backend does not send it.
+- **The Meta Quest alert panel's button fits its label.** It was a fixed pill sized for OK. It widens with the label and wraps a long one onto more lines, leaving room for the page counter, and Next on the earlier pages of a long message takes the same button.
+
 ## v3.1.1 — 9 November 2026
 
 ### Added

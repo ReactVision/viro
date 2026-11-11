@@ -13,7 +13,10 @@ const rootDir = fileURLToPath(new URL(".", import.meta.url));
  */
 export default defineConfig({
   root: "web-harness",
-  // Two real pages and no client routes, so no SPA fallback: an unknown path
+  // Relative, so the build also works served under a path prefix
+  // (reactviro-mcp serves preview.html under /preview/).
+  base: "./",
+  // Real pages and no client routes, so no SPA fallback: an unknown path
   // is a 404, which the harness's missing-asset fixture relies on (a fallback
   // answers 200 with index.html, and the asset fails for the wrong reason).
   appType: "mpa",
@@ -53,6 +56,7 @@ export default defineConfig({
       input: {
         main: `${rootDir}web-harness/index.html`,
         render: `${rootDir}web-harness/render.html`,
+        preview: `${rootDir}web-harness/preview.html`,
       },
     },
   },

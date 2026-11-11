@@ -3,7 +3,9 @@
 A dev test tool: `index.html` / `main.tsx` render the real Viro web bridge
 (`components/*.web.tsx`) on the WASM renderer, one mode at a time. The mode
 button (top right) cycles through them. `render.html` / `render.tsx` is the
-headless entry reactviro-mcp-server drives; it is not covered here.
+headless entry reactviro-mcp-server drives, and `preview.html` / `preview.tsx`
+the live page its `reactviro_live_preview` tool serves (both share
+`sceneModule.ts`); neither is covered here.
 
 Every mode shares two overlays, sized to read on a phone:
 

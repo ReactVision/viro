@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Viro Live</title>
+    <style>
+      html, body, #root { margin: 0; height: 100%; background: #16161b; overflow: hidden; }
+      body { font: 13px system-ui, -apple-system, sans-serif; color: #e8e8ee; }
+      /* Same reason as render.html: a generated scaffold's root View has
+         flex: 1 and needs a flex parent to fill the page. */
+      #root { display: flex; flex-direction: column; }
+      #root > * { flex: 1 1 auto; min-height: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./preview.tsx"></script>
+  </body>
+</html>

@@ -20,6 +20,7 @@ import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
+import { cameraView, dragFollower, rayAt, releaseVelocity, sub, type DragPlane, type Vec3 } from "./viroDrag";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
@@ -90,6 +91,10 @@ export interface ViroWebNodeProps {
   viroTag?: string;
   /** Called with the other body's viroTag, the contact point and its normal. */
   onCollision?: (viroTag: string, collidedPoint: ViroPosition, collidedNormal: ViroPosition) => void;
+  dragType?: "FixedDistance" | "FixedDistanceOrigin" | "FixedToWorld" | "FixedToPlane";
+  dragPlane?: DragPlane;
+  /** The node's new world position while it is dragged. */
+  onDrag?: (dragToPos: ViroPosition, source: number) => void;
   /** React 19 passes a function component's ref as a prop. */
   ref?: Ref<ViroWebNodeHandle>;
   // Events (world-space position, input source id).
@@ -101,6 +106,26 @@ export interface ViroWebNodeProps {
   ) => void;
   onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;
   animation?: ViroAnimationProp;
+}
+
+/**
+ * The nodes this hook made, by scene and handle, so a press is routed up the
+ * tree as native routes it. The renderer hands a press only to the first node
+ * with clicks enabled, and a node here enables them to be dragged too, so its
+ * clicks go on to the nearest ancestor that takes them, and a press on a
+ * clickable child drags the nearest ancestor with onDrag.
+ */
+type NodeEntry = { parent: ViroHandle; props(): ViroWebNodeProps; startDrag(hit: Vec3): void };
+const nodeEntries = new WeakMap<ViroSceneApi, Map<ViroHandle, NodeEntry>>();
+
+function nearestNode(scene: ViroSceneApi, node: ViroHandle, wants: (p: ViroWebNodeProps) => boolean): NodeEntry | null {
+  const map = nodeEntries.get(scene);
+  let entry = map?.get(node);
+  while (entry) {
+    if (wants(entry.props())) return entry;
+    entry = map!.get(entry.parent);
+  }
+  return null;
 }
 
 export function useViroNode(
@@ -129,12 +154,16 @@ export function useViroNode(
   // identity changes; declared here because the mount effect already needs it.
   const propsRef = useRef(props);
   propsRef.current = props;
+  // Ends a drag in progress; `release` false skips letting a held body go.
+  const endDragRef = useRef<((release?: boolean) => void) | null>(null);
 
   // Node lifecycle: attach to parent on mount; destroy node on unmount.
   useEffect(() => {
     scene.addChildNode(parent, node);
     propsRef.current.onNodeHandle?.(node);
     return () => {
+      // Before the handle is destroyed, which ending the drag would otherwise reach.
+      endDragRef.current?.(false);
       // Handed back before the handle is destroyed: a holder that reads it
       // afterwards is asking the renderer about freed memory.
       propsRef.current.onNodeHandle?.(0);
@@ -187,18 +216,103 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, visible]);
 
+  // Dragging, which native enables with onDrag (dragType defaults to
+  // FixedDistance). The renderer reports a press on the node; the moves are
+  // followed here, on rays from the camera's published view (viroDrag.ts). A
+  // dynamic body is held kinematic while dragged, as virocore's setKinematicDrag
+  // does, and let go with the velocity of its last ~80 ms, so it can be thrown.
+  const bodyKeyRef = useRef("");
+  const heldRef = useRef(false);
+  const startDrag = (hit: Vec3) => {
+    const p = propsRef.current;
+    const view = cameraView(scene);
+    if (!p.onDrag || endDragRef.current) return;
+    if (!view) {
+      warnUnsupported("Dragging nodes (onDrag) outside the desktop preview camera", "the web");
+      return;
+    }
+    const nodeStart = scene.getNodeWorldPosition(node);
+    const parentWorld = scene.getNodeWorldPosition(parent);
+    if (!nodeStart || !parentWorld) return;
+    // A press virocore rerouted to a recently hovered node arrives at the origin;
+    // native grabs such a node at its own position.
+    const grab: Vec3 = hit.every((c) => c === 0) ? nodeStart : hit;
+    const toGrab = sub(grab, view.position);
+    const len = Math.hypot(...toGrab) || 1;
+    const dragType = p.dragType ?? "FixedDistance";
+    const follow = dragFollower(dragType, p.dragPlane, {
+      ray: { origin: view.position, dir: [toGrab[0] / len, toGrab[1] / len, toGrab[2] / len] },
+      hit: grab,
+      node: nodeStart,
+    });
+    if (!follow) {
+      warnUnsupported(`dragType "${dragType}"`, "the web");
+      return;
+    }
+    const body = p.physicsBody;
+    const thrown = !!body && body.enabled !== false && (body.type ?? "").toLowerCase() === "dynamic";
+    heldRef.current = thrown;
+    if (thrown) applyPhysicsBody(scene, node, { ...body, type: "Kinematic", instantVelocity: undefined }, bodyKeyRef.current);
+    const samples: { t: number; p: Vec3 }[] = [{ t: performance.now(), p: nodeStart }];
+    const onMove = (e: PointerEvent) => {
+      const to = follow(rayAt(view, e.clientX, e.clientY));
+      if (!to) return;
+      // Local = world minus the parent's world position: right while nothing above
+      // the node is rotated or scaled, which holds for a plane anchor here.
+      const local = sub(to, parentWorld);
+      scene.setNodePosition(node, local[0], local[1], local[2]);
+      samples.push({ t: performance.now(), p: to });
+      if (samples.length > 12) samples.shift();
+      propsRef.current.onDrag?.(to, 0);
+    };
+    const onUp = () => end();
+    const end = (release = true) => {
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("pointercancel", onUp, true);
+      endDragRef.current = null;
+      heldRef.current = false;
+      if (!release) return;
+      // Measured to the release, not the last move: a pointer held still fires none.
+      const last = samples[samples.length - 1]!;
+      samples.push({ t: performance.now(), p: last.p });
+      const now = propsRef.current.physicsBody;
+      if (thrown && now) {
+        applyPhysicsBody(scene, node, { ...now, instantVelocity: undefined }, bodyKeyRef.current);
+        scene.setPhysicsVelocity(node, releaseVelocity(samples), false);
+      }
+    };
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("pointercancel", onUp, true);
+    endDragRef.current = end;
+  };
+
+  useEffect(() => {
+    let map = nodeEntries.get(scene);
+    if (!map) nodeEntries.set(scene, (map = new Map()));
+    map.set(node, { parent, props: () => propsRef.current, startDrag });
+    return () => {
+      map.delete(node);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node]);
+
   // Events: register handlers once, reading the latest props off the ref above,
   // so a changed callback identity does not re-subscribe.
-  const hasClick = !!(props.onClick || props.onClickState);
+  const hasClick = !!(props.onClick || props.onClickState || props.onDrag);
   const hasHover = !!props.onHover;
   useEffect(() => {
     if (!hasClick && !hasHover) return;
     renderer.setNodeEventHandlers(node, {
       onClick: (clickState, source, position) => {
-        const p = propsRef.current;
-        p.onClickState?.(clickState, position, source);
+        if (clickState === ViroClickState.ClickDown) {
+          nearestNode(scene, node, (p) => !!p.onDrag)?.startDrag(position);
+        }
+        const p = nearestNode(scene, node, (q) => !!(q.onClick || q.onClickState))?.props();
+        p?.onClickState?.(clickState, position, source);
         if (clickState === ViroClickState.Clicked) {
-          p.onClick?.(position, source);
+          p?.onClick?.(position, source);
         }
       },
       onHover: (isHovering, source, position) => {
@@ -293,7 +407,15 @@ export function useViroNode(
       () => propsRef.current.viroTag ?? "",
       () => propsRef.current.onCollision,
     );
-    applyPhysicsBody(scene, node, propsRef.current.physicsBody, registration.key);
+    bodyKeyRef.current = registration.key;
+    const body = propsRef.current.physicsBody;
+    // A body changed mid-drag stays held until the drag lets it go.
+    applyPhysicsBody(
+      scene,
+      node,
+      heldRef.current ? { ...body, type: "Kinematic", instantVelocity: undefined } : body,
+      registration.key,
+    );
     return () => {
       scene.clearPhysicsBody(node);
       registration.unregister();
@@ -301,7 +423,7 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, physicsKey]);
 
-  const vec = (v: number[] | undefined): ViroPosition => [v?.[0] ?? 0, v?.[1] ?? 0, v?.[2] ?? 0];
+  const vec = (v: number[] | undefined): Vec3 => [v?.[0] ?? 0, v?.[1] ?? 0, v?.[2] ?? 0];
   useImperativeHandle(
     props.ref,
     () => ({

@@ -7,9 +7,11 @@
 - **Physics on web.** A scene now switches the physics world on when it mounts, as native creates it on demand, so a `physicsBody` simulates; `physicsWorld.gravity` sets the gravity (default -9.81) and `drawBounds` warns. Before, bodies on web only moved inside Studio scenes.
 - **`onCollision` on web**, delivered to each node with the other body's `viroTag`, the contact point and its normal, as on native.
 - **`applyImpulse`, `applyTorqueImpulse` and `setVelocity` on a node's ref on web.** An impulse is applied at the centre of mass; an offset warns.
+- **Dragging on web with `virtualCamera`.** `onDrag` enables it, with `dragType` `FixedDistance` (the default), `FixedDistanceOrigin`, `FixedToPlane` (with `dragPlane`) or `FixedToWorld` (the horizontal plane through the grabbed point, since there are no detected surfaces). A dynamic body is held kinematic while dragged and thrown with the pointer's velocity when let go. Dragging under a rotated or scaled parent is not exact yet, and live web AR has no drag (it warns).
 
 ### Changed
 
+- **Clicks on web reach the node native would give them to.** A press on a child with no `onClick` goes to its nearest ancestor that has one, and a press on a clickable child drags its nearest ancestor with `onDrag`.
 - **Changing a node's opacity or visibility on web no longer resets its position.** Position, rotation, scale, opacity and visibility are now applied separately, so a dragged or simulated node stays where it is.
 
 ## v3.1.1 — 9 November 2026

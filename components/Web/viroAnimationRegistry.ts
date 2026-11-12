@@ -108,35 +108,18 @@ export function viroAnimationEnd(
   };
 }
 
-/**
- * Run a declarative animation on a node that is at `base`.
- * Returns true if `name` was a registered animation.
- *
- * `loop` replays the same pass. Native starts each pass of a relative
- * animation where the last one ended, which needs the renderer to report the
- * end of a pass; until it does, only a full turn ("+=360") loops the same.
- *
- * `delayMs` is the `animation` prop's own delay. It wins over the registered
- * one, which is how a caller that carries the delay per trigger rather than per
- * registry entry still gets it, and matches the native side, where the prop
- * delay gates the start and the registered one is a second wait on top.
- */
-export function runDeclarativeAnimation(
+/** True when `name` moves the node from wherever it is, so a repeat carries on from the last one. */
+export function isRelativeViroAnimation(name: string): boolean {
+  const p = registry.get(name)?.properties;
+  return !!p && Object.values(p).some((v) => typeof v === "string" && RELATIVE.test(v));
+}
+
+function setAnimated(
   scene: ViroSceneApi,
   node: ViroHandle,
-  name: string,
-  base: ViroBaseTransform,
-  loop: boolean,
-  delayMs?: number,
-): boolean {
-  const def = registry.get(name);
-  const end = viroAnimationEnd(name, base);
-  if (!def || !end) return false;
-
-  const p = def.properties;
-  const delay = delayMs ?? def.delay ?? 0;
-  scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
-
+  p: ViroWebAnimationDef["properties"],
+  end: ViroBaseTransform,
+): void {
   if (p.positionX !== undefined || p.positionY !== undefined || p.positionZ !== undefined) {
     scene.setNodePosition(node, ...end.position);
   }
@@ -154,7 +137,52 @@ export function runDeclarativeAnimation(
   if (p.opacity !== undefined) {
     scene.setNodeOpacity(node, end.opacity);
   }
+}
 
+/** Put a node at `end` now, for the properties `name` animates. */
+export function setViroAnimationEnd(
+  scene: ViroSceneApi,
+  node: ViroHandle,
+  name: string,
+  end: ViroBaseTransform,
+): void {
+  const p = registry.get(name)?.properties;
+  if (p) setAnimated(scene, node, p, end);
+}
+
+export interface ViroAnimationPass {
+  /** Where the pass leaves the node. */
+  end: ViroBaseTransform;
+  /** Delay plus duration. */
+  ms: number;
+}
+
+/**
+ * Run a declarative animation on a node that is at `base`.
+ * Returns null if `name` is not a registered animation.
+ *
+ * `loop` is the renderer's own, which replays the same pass.
+ *
+ * `delayMs` is the `animation` prop's own delay. It wins over the registered
+ * one, which is how a caller that carries the delay per trigger rather than per
+ * registry entry still gets it, and matches the native side, where the prop
+ * delay gates the start and the registered one is a second wait on top.
+ */
+export function runDeclarativeAnimation(
+  scene: ViroSceneApi,
+  node: ViroHandle,
+  name: string,
+  base: ViroBaseTransform,
+  loop: boolean,
+  delayMs?: number,
+): ViroAnimationPass | null {
+  const def = registry.get(name);
+  const end = viroAnimationEnd(name, base);
+  if (!def || !end) return null;
+
+  const delay = delayMs ?? def.delay ?? 0;
+  scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
+  setAnimated(scene, node, def.properties, end);
   scene.commitAnimation();
-  return true;
+  return { end, ms: delay + def.duration };
 }

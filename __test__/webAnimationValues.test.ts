@@ -3,6 +3,7 @@
  * relative operators virocore parses, applied to where the node is.
  */
 import {
+  isRelativeViroAnimation,
   registerViroAnimations,
   viroAnimationEnd,
   type ViroBaseTransform,
@@ -49,5 +50,12 @@ describe("viroAnimationEnd", () => {
 
   test("an unregistered name is not an animation", () => {
     expect(viroAnimationEnd("missing", at())).toBeNull();
+  });
+});
+
+describe("isRelativeViroAnimation", () => {
+  test("is true only when a value is relative", () => {
+    expect(isRelativeViroAnimation("spin")).toBe(true);
+    expect(isRelativeViroAnimation("moveTo")).toBe(false);
   });
 });

@@ -20,6 +20,8 @@ import { addViroExports, compileGeneratedScenes } from "./sceneModule";
 import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
 import { ViroARScene } from "../components/AR/ViroARScene";
 import { ViroImage } from "../components/ViroImage";
+import { ViroScene } from "../components/ViroScene";
+import { countDrawCalls, InspectorProbe, InspectPanel, noteModelResponse, type TriangleBudget } from "./inspector";
 import { qrModules } from "./qr";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
@@ -38,6 +40,8 @@ type PreviewInput = {
   /** Which update of the preview this is, and where a newer one is asked for: the page appends the version it shows. */
   version?: number;
   updatesUrl?: string;
+  /** Per-platform single-model triangle budgets the inspector compares models against. */
+  budgets?: TriangleBudget[];
 };
 
 type SceneInfo = { path: string; renderRequest?: string };
@@ -48,6 +52,8 @@ type SceneInfo = { path: string; renderRequest?: string };
  */
 type PreviewHost = {
   onStatus?(status: { ready: boolean; error: string | null; warnings: string[]; scene?: string }): void;
+  /** The node selected in the inspector, as a sentence for the assistant, or null. */
+  onSelect?(text: string | null): void;
 };
 
 declare global {
@@ -64,6 +70,8 @@ const shot = params.get("shot") === "1";
 const host = window.__PREVIEW_HOST__;
 // Framed by, or running inside, the MCP Apps view.
 const framed = window.parent !== window;
+const inspectable = !liveAR && !shot;
+if (inspectable) countDrawCalls();
 
 type Controls = { reset(): void };
 let cameraControls: Controls | null = null;
@@ -115,6 +123,7 @@ function PreviewARScene(props: any) {
     ViroARScene,
     props,
     ...React.Children.toArray(props.children),
+    createElement(InspectorProbe, { key: "viro-preview-inspector" }),
     gridOn
       ? createElement(ViroImage, {
           key: "viro-preview-grid",
@@ -129,8 +138,12 @@ function PreviewARScene(props: any) {
   );
 }
 
+function PreviewScene(props: any) {
+  return createElement(ViroScene, props, ...React.Children.toArray(props.children), createElement(InspectorProbe, { key: "viro-preview-inspector" }));
+}
+
 if (!liveAR) {
-  addViroExports({ ViroARScene: PreviewARScene });
+  addViroExports({ ViroARScene: PreviewARScene, ViroScene: PreviewScene });
   setARNavigatorDefaults({
     virtualCamera: {
       floorY: FLOOR_Y,
@@ -174,6 +187,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   try {
     const res = await pageFetch(input, init);
     if (!res.ok) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
+    else if (inspectable) noteModelResponse(url, res);
     return res;
   } catch (err) {
     pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
@@ -538,6 +552,7 @@ function Chrome({
   scenes,
   index,
   onSelect,
+  budgets,
 }: {
   title?: string;
   renderRequest?: string;
@@ -546,12 +561,14 @@ function Chrome({
   scenes: SceneInfo[];
   index: number;
   onSelect(i: number): void;
+  budgets?: TriangleBudget[];
 }) {
   const [, tick] = useState(0);
   const [showIssues, setShowIssues] = useState(false);
   const [request, setRequest] = useState<"copied" | "manual" | null>(null);
   const [panel, setPanel] = useState(false);
   const [phone, setPhone] = useState(false);
+  const [inspect, setInspect] = useState(false);
   // "" fills the view.
   const [device, setDevice] = useState("");
   const framedAs = findDevice(device);
@@ -605,6 +622,7 @@ function Chrome({
               style={button}
               onClick={async () => {
                 setPhone(false);
+                setInspect(false);
                 if (renderApi) setPanel((v) => !v);
                 else if (renderRequest) setRequest((await copyText(renderRequest)) ? "copied" : "manual");
               }}
@@ -618,10 +636,25 @@ function Chrome({
               style={button}
               onClick={() => {
                 setPanel(false);
+                setInspect(false);
                 setPhone((v) => !v);
               }}
             >
               On a phone
+            </button>
+          ) : null}
+          {inspectable ? (
+            <button
+              type="button"
+              aria-pressed={inspect}
+              style={button}
+              onClick={() => {
+                setPanel(false);
+                setPhone(false);
+                setInspect((v) => !v);
+              }}
+            >
+              Inspect
             </button>
           ) : null}
           {issues > 0 ? (
@@ -640,6 +673,16 @@ function Chrome({
         />
       ) : null}
       {phone && arUrl ? <PhonePanel url={arUrl} onClose={() => setPhone(false)} /> : null}
+      {inspect ? (
+        <InspectPanel
+          budgets={budgets ?? []}
+          scene={scenes[index]?.path ?? title}
+          onSelection={host?.onSelect ? (text) => host.onSelect!(text) : undefined}
+          styles={{ chip, button }}
+          copy={copyText}
+          onClose={() => setInspect(false)}
+        />
+      ) : null}
       {request && renderRequest ? (
         <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", maxWidth: 520, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontWeight: 600 }}>
@@ -757,6 +800,7 @@ function Preview({ input }: { input: PreviewInput }) {
           scenes={scenes}
           index={index}
           onSelect={select}
+          budgets={input.budgets}
         />
       )}
     </>

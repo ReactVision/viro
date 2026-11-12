@@ -45,14 +45,39 @@ export function addViroExports(extra: Record<string, unknown>): void {
   Object.assign(extraExports, extra);
 }
 
+// Each component the caller's code takes from the module, by the name it took it under.
+const viroNames = new Map<unknown, string>();
+const named = <T>(name: string, value: T): T => {
+  viroNames.set(value, name);
+  return value;
+};
+
 const viroReactModule = new Proxy(ViroWeb as Record<string, unknown>, {
   get(target, prop) {
-    if (typeof prop === "string" && prop in extraExports) return extraExports[prop];
-    if (typeof prop === "string" && prop in target) return target[prop];
+    if (typeof prop === "string" && prop in extraExports) return named(prop, extraExports[prop]);
+    if (typeof prop === "string" && prop in target) return named(prop, target[prop]);
     if (typeof prop === "string") return makeUnsupportedStub(prop);
     return undefined;
   },
 });
+
+/** Where a Viro element was written, as the preview bundler's JSX runtime stamps it on the element's props. */
+export type ViroSource = { name: string; file: string; line: number };
+export const VIRO_SOURCE_PROP = "__viroPreviewSource";
+
+// The preview bundler compiles JSX against this runtime (its jsxImportSource),
+// which passes each element's file and line. Only Viro components are stamped:
+// on anything else the extra prop could reach the DOM.
+const previewJsxRuntime = {
+  Fragment: React.Fragment,
+  jsxDEV(type: any, props: Record<string, unknown>, key: unknown, _isStatic: boolean, source?: { fileName?: string; lineNumber?: number }) {
+    const config: Record<string, unknown> = { ...props };
+    if (key !== undefined) config.key = key;
+    const name = viroNames.get(type);
+    if (name && source?.fileName) config[VIRO_SOURCE_PROP] = { name, file: source.fileName, line: source.lineNumber ?? 0 } satisfies ViroSource;
+    return createElement(type, config);
+  },
+};
 
 // ─── require() shim for the transpiled generated TSX ──────────────────────
 // `assetOverrides` (exact-string keyed on the require() literal) lets a
@@ -65,6 +90,7 @@ function makeRequireShim(assetOverrides: Record<string, string> | undefined) {
     if (specifier === "react") return React;
     if (specifier === "react-native") return ReactNativeWeb;
     if (specifier === "@reactvision/react-viro") return viroReactModule;
+    if (specifier === "@reactvision/react-viro/preview/jsx-dev-runtime") return previewJsxRuntime;
     const override = assetOverrides?.[specifier];
     if (override) return { uri: override };
     const ext = specifier.split(".").pop()?.toLowerCase() ?? "";

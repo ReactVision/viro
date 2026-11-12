@@ -118,6 +118,11 @@ export interface ViroWebNodeProps {
 type NodeEntry = { parent: ViroHandle; props(): ViroWebNodeProps; startDrag(hit: Vec3): void };
 const nodeEntries = new WeakMap<ViroSceneApi, Map<ViroHandle, NodeEntry>>();
 
+/** The nodes this hook has made in `scene`, with their parents and current props, for a host that inspects the scene. */
+export function viroNodeEntries(scene: ViroSceneApi): ReadonlyMap<ViroHandle, { parent: ViroHandle; props(): ViroWebNodeProps }> {
+  return nodeEntries.get(scene) ?? new Map();
+}
+
 function nearestNode(scene: ViroSceneApi, node: ViroHandle, wants: (p: ViroWebNodeProps) => boolean): NodeEntry | null {
   const map = nodeEntries.get(scene);
   let entry = map?.get(node);

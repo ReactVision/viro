@@ -12,12 +12,17 @@
  * compile and runtime errors back to the model.
  */
 import * as React from "react";
-import { createElement, useEffect, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { renderState, pushWarning, markReady, markError } from "./renderState";
 import { addViroExports, compileGeneratedScenes } from "./sceneModule";
 import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
+import { ViroARScene } from "../components/AR/ViroARScene";
+import { ViroImage } from "../components/ViroImage";
+import { ViroScene } from "../components/ViroScene";
+import { countDrawCalls, InspectorProbe, InspectPanel, noteModelResponse, type TriangleBudget } from "./inspector";
+import { qrModules } from "./qr";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
 type PreviewInput = {
@@ -28,8 +33,15 @@ type PreviewInput = {
   renderRequest?: string;
   /** Base URL of the server's routes for starting and listing renders of this scene. */
   renderApi?: string;
+  /** This preview's link for camera AR on a phone. */
+  arUrl?: string;
   /** The scenes the module exports, in order, when there is more than one; each one's render request replaces `renderRequest`. */
   scenes?: SceneInfo[];
+  /** Which update of the preview this is, and where a newer one is asked for: the page appends the version it shows. */
+  version?: number;
+  updatesUrl?: string;
+  /** Per-platform single-model triangle budgets the inspector compares models against. */
+  budgets?: TriangleBudget[];
 };
 
 type SceneInfo = { path: string; renderRequest?: string };
@@ -40,6 +52,10 @@ type SceneInfo = { path: string; renderRequest?: string };
  */
 type PreviewHost = {
   onStatus?(status: { ready: boolean; error: string | null; warnings: string[]; scene?: string }): void;
+  /** The node selected in the inspector, as a sentence for the assistant, or null. */
+  onSelect?(text: string | null): void;
+  /** Opens a link outside the view, which the view's own sandbox may not allow. */
+  openLink?(url: string): void;
 };
 
 declare global {
@@ -51,13 +67,19 @@ declare global {
 
 const params = new URLSearchParams(location.search);
 const liveAR = params.get("ar") === "1";
+// A capture for the agent: the scene alone, from the starting camera, not following updates.
+const shot = params.get("shot") === "1";
 const host = window.__PREVIEW_HOST__;
 // Framed by, or running inside, the MCP Apps view.
 const framed = window.parent !== window;
+const inspectable = !liveAR && !shot;
+if (inspectable) countDrawCalls();
 
 type Controls = { reset(): void };
 let cameraControls: Controls | null = null;
-let currentScene: string | undefined = window.__PREVIEW_INPUT__?.scenes?.[0]?.path;
+let currentScene: string | undefined = (
+  window.__PREVIEW_INPUT__?.scenes?.find((sc) => sc.path === params.get("scene")) ?? window.__PREVIEW_INPUT__?.scenes?.[0]
+)?.path;
 const cameraListeners = new Set<() => void>();
 // The real selector, not the render path's stub: it is composed of web-capable
 // parts and ViroARScene.web feeds it anchor events. Headless renders keep the
@@ -65,9 +87,68 @@ const cameraListeners = new Set<() => void>();
 // a plane and the content would never appear.
 addViroExports({ ViroARPlaneSelector });
 
+// The virtual camera's floor, drawn as a grid so an AR scene has a ground to read depth against.
+const FLOOR_Y = -1;
+let gridOn = true;
+const gridListeners = new Set<() => void>();
+let gridUrl: string | null = null;
+function floorGridUrl(): string {
+  if (gridUrl) return gridUrl;
+  const size = 2048, cells = 40;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext("2d")!;
+  for (let i = 0; i <= cells; i++) {
+    const at = Math.round((i * size) / cells);
+    // Every other line is a whole metre.
+    g.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.16)";
+    g.fillRect(at - 1, 0, 2, size);
+    g.fillRect(0, at - 1, size, 2);
+  }
+  const fade = g.createRadialGradient(size / 2, size / 2, size * 0.15, size / 2, size / 2, size / 2);
+  fade.addColorStop(0, "rgba(0,0,0,1)");
+  fade.addColorStop(1, "rgba(0,0,0,0)");
+  g.globalCompositeOperation = "destination-in";
+  g.fillStyle = fade;
+  g.fillRect(0, 0, size, size);
+  return (gridUrl = canvas.toDataURL("image/png"));
+}
+
+function PreviewARScene(props: any) {
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    const onToggle = () => redraw((n) => n + 1);
+    gridListeners.add(onToggle);
+    return () => void gridListeners.delete(onToggle);
+  }, []);
+  return createElement(
+    ViroARScene,
+    props,
+    ...React.Children.toArray(props.children),
+    createElement(InspectorProbe, { key: "viro-preview-inspector" }),
+    gridOn
+      ? createElement(ViroImage, {
+          key: "viro-preview-grid",
+          source: { uri: floorGridUrl() },
+          // Just under the floor, so content resting on it does not flicker against the lines.
+          position: [0, FLOOR_Y - 0.002, 0],
+          rotation: [-90, 0, 0],
+          width: 20,
+          height: 20,
+        })
+      : null,
+  );
+}
+
+function PreviewScene(props: any) {
+  return createElement(ViroScene, props, ...React.Children.toArray(props.children), createElement(InspectorProbe, { key: "viro-preview-inspector" }));
+}
+
 if (!liveAR) {
+  addViroExports({ ViroARScene: PreviewARScene, ViroScene: PreviewScene });
   setARNavigatorDefaults({
     virtualCamera: {
+      floorY: FLOOR_Y,
       onReady: (c: Controls) => {
         cameraControls = c;
         cameraListeners.forEach((l) => l());
@@ -102,15 +183,18 @@ console.warn = (...args: unknown[]) => {
   consoleWarn(...args);
 };
 const pageFetch = window.fetch.bind(window);
+// Viro's own usage ping. A host's view blocks it, and it is not the scene's to fix.
+const isUsagePing = (url: string) => url.includes("/functions/v1/register-device");
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   const short = url.startsWith("data:") ? "a data: URL" : url.split("?")[0];
   try {
     const res = await pageFetch(input, init);
-    if (!res.ok) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
+    if (!res.ok && !isUsagePing(url)) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
+    else if (res.ok && inspectable) noteModelResponse(url, res);
     return res;
   } catch (err) {
-    pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
+    if (!isUsagePing(url)) pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
     throw err;
   }
 };
@@ -191,19 +275,85 @@ const button: React.CSSProperties = {
   font: "inherit",
   fontWeight: 600,
   pointerEvents: "auto",
+  whiteSpace: "nowrap",
 };
+const oneLine: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
+const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+
+// A native select draws its arrow against the border and is as wide as its longest option;
+// this draws the arrow inside the padding and, where fieldSizing is supported, fits the selected one.
+// With `flex` in its style it fills its row instead.
+function Picker({ style, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const { flex, maxWidth, ...own } = style ?? {};
+  const fills = flex !== undefined;
+  return (
+    <span style={{ position: "relative", display: "inline-flex", minWidth: 0, flex, maxWidth }}>
+      <select
+        {...rest}
+        style={{ ...button, appearance: "none", WebkitAppearance: "none", fieldSizing: fills ? "fixed" : "content", paddingRight: 28, minWidth: 0, textOverflow: "ellipsis", ...own, width: fills ? "100%" : undefined, maxWidth: "100%" } as React.CSSProperties}
+      >
+        {children}
+      </select>
+      <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden style={{ position: "absolute", right: 11, top: "50%", marginTop: -3, pointerEvents: "none" }}>
+        <path d="M1 1l4 4 4-4" fill="none" stroke="#e8e8ee" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
 
 // An AR scene is laid out for a phone held upright; in a wide view the top and
-// bottom of it fall outside the frustum. Frame it like one unless asked not to.
+// bottom of it fall outside the frustum, so the viewer can frame it like a device.
+// Screen sizes in CSS pixels, portrait.
+type Device = { name: string; w: number; h: number };
+const DEVICES: Array<{ group: string; devices: Device[] }> = [
+  {
+    group: "Phones",
+    devices: [
+      { name: "iPhone SE", w: 375, h: 667 },
+      { name: "iPhone 16", w: 393, h: 852 },
+      { name: "iPhone 16 Pro Max", w: 440, h: 956 },
+      { name: "Pixel 9", w: 412, h: 924 },
+      { name: "Pixel 9 Pro", w: 427, h: 952 },
+      { name: "Pixel 10", w: 412, h: 924 },
+      { name: "Galaxy A55", w: 360, h: 800 },
+    ],
+  },
+  {
+    group: "Foldables",
+    devices: [
+      { name: "iPhone Duo", w: 466, h: 678 },
+      { name: "iPhone Duo, open", w: 626, h: 890 },
+      { name: "Pixel 9 Pro Fold", w: 412, h: 922 },
+      { name: "Pixel 9 Pro Fold, open", w: 836, h: 842 },
+      { name: "Galaxy Z Fold 6", w: 412, h: 968 },
+      { name: "Galaxy Z Fold 6, open", w: 744, h: 860 },
+    ],
+  },
+  {
+    group: "Tablets",
+    devices: [
+      { name: "iPad mini", w: 744, h: 1133 },
+      { name: "iPad Pro 13", w: 1032, h: 1376 },
+    ],
+  },
+];
+const findDevice = (name: string) => DEVICES.flatMap((g) => g.devices).find((d) => d.name === name);
 // Measured against #root's parent: the page's body, or the stage of a view
 // that runs this module inside itself.
-const PHONE_ASPECT = 9 / 19.5;
 const frameBox = () => document.getElementById("root")!.parentElement!;
-function applyFraming(phone: boolean) {
+function applyFraming(device: Device | undefined) {
   const el = document.getElementById("root")!;
-  el.style.width = phone ? `min(100%, ${Math.round(frameBox().clientHeight * PHONE_ASPECT)}px)` : "";
-  el.style.margin = phone ? "0 auto" : "";
-  el.style.boxShadow = phone ? "0 0 0 1px rgba(255,255,255,0.14)" : "";
+  const box = frameBox();
+  // Shrunk to fit, never drawn larger than the device.
+  const scale = device ? Math.min(1, box.clientWidth / device.w, box.clientHeight / device.h) : 1;
+  const height = device ? Math.round(device.h * scale) : 0;
+  el.style.width = device ? `${Math.round(device.w * scale)}px` : "";
+  el.style.height = device ? `${height}px` : "";
+  el.style.margin = device ? "0 auto" : "";
+  // Not a transform, which would make #root the containing block of the fixed overlay.
+  el.style.position = device ? "relative" : "";
+  el.style.top = device ? `${Math.floor((box.clientHeight - height) / 2)}px` : "";
+  el.style.boxShadow = device ? "0 0 0 1px rgba(255,255,255,0.14)" : "";
 }
 
 // The page is a sandboxed document, where the async clipboard can be refused;
@@ -238,10 +388,59 @@ type RenderRow = {
   environment_name: string | null;
   error: string | null;
   output_url: string | null;
+  /** The same video through the preview's own server. */
+  video_url?: string | null;
 };
 type Project = { id: string; name: string; environments: { id: string; name: string }[] };
 
 const ACTIVE = new Set(["awaiting_upload", "queued", "processing"]);
+
+// A view can load media from the preview's server only, and a page only over https.
+const videoSrc = (r: RenderRow) =>
+  r.video_url && (host || !r.output_url?.startsWith("https:")) ? r.video_url : r.output_url;
+
+// On a phone the scene opens in camera AR on that phone: a QR code is no use
+// to the device showing it. False when nothing could open the link.
+function openAR(url: string): boolean {
+  if (host?.openLink) host.openLink(url);
+  else if (framed) return !!window.open(url, "_blank");
+  else location.assign(url);
+  return true;
+}
+
+function CloseButton({ onClose }: { onClose(): void }) {
+  return (
+    <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <path d="M4 4l8 8M12 4l-8 8" />
+      </svg>
+    </button>
+  );
+}
+
+function PhonePanel({ url, onClose }: { url: string; onClose(): void }) {
+  const modules = useMemo(() => qrModules(url), [url]);
+  const [copied, setCopied] = useState(false);
+  const n = modules?.length ?? 0;
+  return (
+    <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(280px, 100%)", maxHeight: "85%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, alignItems: "center", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, alignSelf: "stretch" }}>
+        <span style={{ fontWeight: 600 }}>Camera AR on a phone</span>
+        <CloseButton onClose={onClose} />
+      </div>
+      {modules ? (
+        <svg role="img" aria-label="QR code for this preview" viewBox={`-4 -4 ${n + 8} ${n + 8}`} width="180" height="180" shapeRendering="crispEdges" style={{ background: "#fff", borderRadius: 6, flex: "none" }}>
+          <path fill="#000" d={modules.map((row, y) => row.map((dark, x) => (dark ? `M${x} ${y}h1v1h-1z` : "")).join("")).join("")} />
+        </svg>
+      ) : null}
+      <div style={{ opacity: 0.75, fontSize: 12, textAlign: "center" }}>Scan to place the scene through the phone's camera.</div>
+      <div style={{ userSelect: "text", fontFamily: "ui-monospace, monospace", fontSize: 11, wordBreak: "break-all", textAlign: "center" }}>{url}</div>
+      <button type="button" style={button} onClick={async () => setCopied(await copyText(url))}>
+        {copied ? "Copied" : "Copy link"}
+      </button>
+    </div>
+  );
+}
 
 function statusText(r: RenderRow): string {
   if (r.status === "processing") return r.progress != null ? `Rendering ${r.progress}%` : "Rendering";
@@ -270,6 +469,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [fallbacks, setFallbacks] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   const loadRenders = () =>
     api<{ renders: RenderRow[]; remaining: number }>(`${renderApi}/renders`)
@@ -321,7 +521,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
     <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(520px, 100%)", maxHeight: "75%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, boxSizing: "border-box" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontWeight: 600 }}>Render {scene ? sceneLabel(scene) : "in a real space"}</div>
-        <button type="button" style={button} onClick={onClose}>Close</button>
+        <CloseButton onClose={onClose} />
       </div>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         Plays this scene over a recorded real-world environment from your team and makes a video. Billed to your team as compute time.
@@ -330,7 +530,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
       {projects && projects.length === 0 ? <div>Your team has no recorded environments yet.</div> : null}
       {projects && projects.length > 0 ? (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <select value={choice} onChange={(e) => setChoice(e.target.value)} style={{ flex: 1, minWidth: 0, font: "inherit", padding: "5px 6px", borderRadius: 6, background: "#1d1d24", color: "inherit", border: "1px solid rgba(255,255,255,0.18)" }}>
+          <Picker aria-label="Environment" value={choice} onChange={(e) => setChoice(e.target.value)} style={{ flex: 1, fontWeight: 400, borderRadius: 6, background: "#1d1d24", border: "1px solid rgba(255,255,255,0.18)" }}>
             {projects.map((p) => (
               <optgroup key={p.id} label={p.name}>
                 {p.environments.map((env) => (
@@ -338,7 +538,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
                 ))}
               </optgroup>
             ))}
-          </select>
+          </Picker>
           <button type="button" style={{ ...button, opacity: busy || remaining <= 0 || !choice ? 0.5 : 1 }} disabled={busy || remaining <= 0 || !choice} onClick={start}>
             {busy ? "Starting..." : "Start render"}
           </button>
@@ -354,12 +554,19 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
       {fallbacks.length ? <div style={{ color: "#ffd27a", fontSize: 12 }}>Drawn as boxes in the last render: {fallbacks.join(", ")}.</div> : null}
       {renders.map((r) => (
         <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span>{r.scene && scene ? `${sceneLabel(r.scene)} · ` : ""}{r.environment_name ?? "Environment"}</span>
-            <span style={{ color: r.status === "failed" ? "#ff9b9b" : r.status === "completed" ? "#9be7a7" : "#ffd27a" }}>{statusText(r)}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: r.status === "failed" ? "#ff9b9b" : r.status === "completed" ? "#9be7a7" : "#ffd27a" }}>{statusText(r)}</span>
+              {r.output_url ? (
+                <button type="button" style={button} onClick={() => setViewing(viewing === r.id ? null : r.id)}>
+                  {viewing === r.id ? "Hide" : "View"}
+                </button>
+              ) : null}
+            </span>
           </div>
           {r.status === "failed" && r.error ? <div style={{ fontSize: 12, color: "#ff9b9b" }}>{r.error}</div> : null}
-          {r.output_url ? <video src={r.output_url} controls playsInline muted style={{ width: "100%", borderRadius: 6, background: "#000" }} /> : null}
+          {r.output_url && viewing === r.id ? <video src={videoSrc(r) ?? undefined} controls autoPlay playsInline muted style={{ width: "100%", borderRadius: 6, background: "#000" }} /> : null}
         </div>
       ))}
       {renderRequest && !framed ? (
@@ -378,29 +585,38 @@ function Chrome({
   title,
   renderRequest,
   renderApi,
+  arUrl,
   scenes,
   index,
   onSelect,
+  budgets,
 }: {
   title?: string;
   renderRequest?: string;
   renderApi?: string;
+  arUrl?: string;
   scenes: SceneInfo[];
   index: number;
   onSelect(i: number): void;
+  budgets?: TriangleBudget[];
 }) {
   const [, tick] = useState(0);
   const [showIssues, setShowIssues] = useState(false);
   const [request, setRequest] = useState<"copied" | "manual" | null>(null);
   const [panel, setPanel] = useState(false);
-  const [phone, setPhone] = useState(() => frameBox().clientWidth > frameBox().clientHeight);
+  const [phone, setPhone] = useState(false);
+  const [inspect, setInspect] = useState(false);
+  // "" fills the view.
+  const [device, setDevice] = useState("");
+  const framedAs = findDevice(device);
   useEffect(() => {
     if (!cameraControls) return;
-    applyFraming(phone);
-    const observer = new ResizeObserver(() => applyFraming(phone));
+    const frame = () => applyFraming(framedAs);
+    frame();
+    const observer = new ResizeObserver(frame);
     observer.observe(frameBox());
     return () => observer.disconnect();
-  }, [phone, cameraControls]);
+  }, [device, cameraControls]);
   const seen = useRef("");
   useEffect(() => {
     const onCamera = () => tick((n) => n + 1);
@@ -422,31 +638,64 @@ function Chrome({
   const issues = renderState.warnings.length + (renderState.error ? 1 : 0);
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      {/* On a narrow view the name gives way first, then the buttons wrap. */}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ flex: "1 1 0", minWidth: 96, display: "flex" }}>
         {scenes.length > 1 ? (
-          <select
+          <Picker
             aria-label="Scene"
             value={index}
             onChange={(e) => onSelect(Number(e.target.value))}
-            style={{ ...button, fontWeight: 600, maxWidth: "50%" }}
+            style={{ maxWidth: "100%" }}
           >
             {scenes.map((sc, i) => (
               <option key={sc.path} value={i} title={sc.path}>{sceneLabel(sc.path)}</option>
             ))}
-          </select>
-        ) : <div style={chip}>{title ?? "Viro Live"}{liveAR ? " · AR" : ""}</div>}
-        <div style={{ display: "flex", gap: 8 }}>
+          </Picker>
+        ) : <div style={{ ...chip, ...oneLine }}>{title ?? "Viro Live"}{liveAR ? " · AR" : ""}</div>}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {/* Without renderApi the button copies a request for a coding agent, which a chat does not have. */}
           {!liveAR && renderRequest && (renderApi || !framed) ? (
             <button
               type="button"
               style={button}
               onClick={async () => {
+                setPhone(false);
+                setInspect(false);
                 if (renderApi) setPanel((v) => !v);
                 else if (renderRequest) setRequest((await copyText(renderRequest)) ? "copied" : "manual");
               }}
             >
               Render in a real space
+            </button>
+          ) : null}
+          {!liveAR && arUrl ? (
+            <button
+              type="button"
+              style={button}
+              onClick={() => {
+                setPanel(false);
+                setInspect(false);
+                if (touch && openAR(arUrl)) return;
+                setPhone((v) => !v);
+              }}
+            >
+              View in AR
+            </button>
+          ) : null}
+          {inspectable ? (
+            <button
+              type="button"
+              aria-pressed={inspect}
+              style={button}
+              onClick={() => {
+                setPanel(false);
+                setPhone(false);
+                setInspect((v) => !v);
+              }}
+            >
+              Inspect
             </button>
           ) : null}
           {issues > 0 ? (
@@ -462,6 +711,17 @@ function Chrome({
           renderRequest={renderRequest}
           scene={scenes.length > 1 ? scenes[index]?.path : undefined}
           onClose={() => setPanel(false)}
+        />
+      ) : null}
+      {phone && arUrl ? <PhonePanel url={arUrl} onClose={() => setPhone(false)} /> : null}
+      {inspect ? (
+        <InspectPanel
+          budgets={budgets ?? []}
+          scene={scenes[index]?.path ?? title}
+          onSelection={host?.onSelect ? (text) => host.onSelect!(text) : undefined}
+          styles={{ chip, button }}
+          copy={copyText}
+          onClose={() => setInspect(false)}
         />
       ) : null}
       {request && renderRequest ? (
@@ -488,17 +748,38 @@ function Chrome({
           ))}
         </div>
       ) : null}
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
         {cameraControls ? (
-          <div style={{ ...chip, opacity: 0.85 }}>
-            Right-drag: look around · Shift-drag: pan · Scroll: zoom · Click: tap
+          <div style={{ ...chip, ...oneLine, opacity: 0.85 }}>
+            {touch
+              ? "Two fingers: drag to look around, pinch to zoom"
+              : "Right-drag: look around · Shift-drag: pan · Scroll: zoom · Click: tap"}
           </div>
         ) : <span />}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
           {cameraControls ? (
             <>
-              <button type="button" style={button} onClick={() => setPhone((v) => !v)}>
-                {phone ? "Fill width" : "Phone frame"}
+              <Picker aria-label="Device" title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
+                <option value="">Fill view</option>
+                {DEVICES.map((g) => (
+                  <optgroup key={g.group} label={g.group}>
+                    {g.devices.map((d) => (
+                      <option key={d.name} value={d.name}>{d.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Picker>
+              <button
+                type="button"
+                aria-pressed={gridOn}
+                style={{ ...button, opacity: gridOn ? 1 : 0.6 }}
+                onClick={() => {
+                  gridOn = !gridOn;
+                  gridListeners.forEach((l) => l());
+                  tick((n) => n + 1);
+                }}
+              >
+                Grid
               </button>
               <button type="button" style={button} onClick={() => cameraControls?.reset()}>
                 Reset view
@@ -512,15 +793,29 @@ function Chrome({
 }
 
 function Preview({ input }: { input: PreviewInput }) {
-  const [compiled, setCompiled] = useState<React.ComponentType<any>[] | null>(null);
+  // With the version it was compiled from, which keys the mounted scene.
+  const [compiled, setCompiled] = useState<{ apps: React.ComponentType<any>[]; version: number } | null>(null);
   const [index, setIndex] = useState(0);
   // Unresolved imports are reported while the bundle compiles, so they hold for every scene.
   const compileWarnings = useRef<string[]>([]);
+  const shown = useRef<PreviewInput | null>(null);
   useEffect(() => {
+    // An update replaces the running scene, so its status starts over; the scene being looked at stays selected.
+    if (shown.current) {
+      renderState.ready = false;
+      renderState.error = null;
+      renderState.warnings.length = 0;
+      cameraControls = null;
+    }
+    shown.current = input;
+    const at = Math.max(0, (input.scenes ?? []).findIndex((sc) => sc.path === currentScene));
+    currentScene = input.scenes?.[at]?.path;
+    setIndex(at);
     try {
-      setCompiled(compileGeneratedScenes(input.code, input.assetOverrides));
+      setCompiled({ apps: compileGeneratedScenes(input.code, input.assetOverrides), version: input.version ?? 0 });
       compileWarnings.current = [...renderState.warnings];
     } catch (err) {
+      setCompiled(null);
       markError(err);
     }
   }, [input]);
@@ -534,20 +829,65 @@ function Preview({ input }: { input: PreviewInput }) {
     currentScene = scenes[i]?.path;
     setIndex(i);
   };
-  const App = compiled?.[index];
+  const App = compiled?.apps[index];
   return (
     <>
-      {App ? <Scene key={index} App={App} /> : null}
-      <Chrome
-        title={input.title}
-        renderRequest={scenes.length ? scenes[index]?.renderRequest : input.renderRequest}
-        renderApi={input.renderApi}
-        scenes={scenes}
-        index={index}
-        onSelect={select}
-      />
+      {/* Keyed by the update as well: a boundary that caught the last version's crash must not hold the new one. */}
+      {App ? <Scene key={`${compiled!.version}:${index}`} App={App} /> : null}
+      {shot ? null : (
+        <Chrome
+          title={input.title}
+          renderRequest={scenes.length ? scenes[index]?.renderRequest : input.renderRequest}
+          renderApi={input.renderApi}
+          arUrl={input.arUrl}
+          scenes={scenes}
+          index={index}
+          onSelect={select}
+          budgets={input.budgets}
+        />
+      )}
     </>
   );
+}
+
+/**
+ * Asks the server for a version after the one shown. The server holds each
+ * request until there is one, answering 204 when there is none in time.
+ */
+function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => void): () => void {
+  if (!first.updatesUrl) return () => {};
+  const stop = new AbortController();
+  let version = first.version ?? 1;
+  void (async () => {
+    while (!stop.signal.aborted) {
+      const asked = performance.now();
+      let again = 1000;
+      try {
+        // pageFetch: a request the server lets time out is not a failed load to warn about.
+        const res = await pageFetch(`${first.updatesUrl}${version}`, { signal: stop.signal, cache: "no-store" });
+        if (res.status === 404) return;
+        if (res.status === 200) {
+          const next = ((await res.json()) as { input?: PreviewInput }).input;
+          if (next?.code) {
+            version = next.version ?? version + 1;
+            onUpdate(next);
+          }
+        } else if (res.status !== 204) again = 5000;
+      } catch {
+        again = 5000;
+      }
+      // Something in between that answers at once instead of holding the request would otherwise spin.
+      const wait = again - (performance.now() - asked);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
+  })();
+  return () => stop.abort();
+}
+
+function Live({ first }: { first: PreviewInput }) {
+  const [input, setInput] = useState(first);
+  useEffect(() => (shot ? undefined : followUpdates(first, setInput)), [first]);
+  return <Preview input={input} />;
 }
 
 const input = window.__PREVIEW_INPUT__;
@@ -556,5 +896,5 @@ if (!input) {
   markError(new Error("No scene was given to this page."));
   root.render(createElement(Chrome, { scenes: [], index: 0, onSelect: () => {} }));
 } else {
-  root.render(createElement(Preview, { input }));
+  root.render(createElement(Live, { first: input }));
 }

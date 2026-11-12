@@ -277,12 +277,15 @@ const button: React.CSSProperties = {
 
 // A native select draws its arrow against the border and is as wide as its longest option;
 // this draws the arrow inside the padding and, where fieldSizing is supported, fits the selected one.
+// With `flex` in its style it fills its row instead.
 function Picker({ style, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const { flex, maxWidth, ...own } = style ?? {};
+  const fills = flex !== undefined;
   return (
-    <span style={{ position: "relative", display: "inline-flex", minWidth: 0, maxWidth: style?.maxWidth }}>
+    <span style={{ position: "relative", display: "inline-flex", minWidth: 0, flex, maxWidth }}>
       <select
         {...rest}
-        style={{ ...button, appearance: "none", WebkitAppearance: "none", fieldSizing: "content", paddingRight: 28, minWidth: 0, textOverflow: "ellipsis", ...style, maxWidth: "100%" } as React.CSSProperties}
+        style={{ ...button, appearance: "none", WebkitAppearance: "none", fieldSizing: fills ? "fixed" : "content", paddingRight: 28, minWidth: 0, textOverflow: "ellipsis", ...own, width: fills ? "100%" : undefined, maxWidth: "100%" } as React.CSSProperties}
       >
         {children}
       </select>
@@ -513,7 +516,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
       {projects && projects.length === 0 ? <div>Your team has no recorded environments yet.</div> : null}
       {projects && projects.length > 0 ? (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <select value={choice} onChange={(e) => setChoice(e.target.value)} style={{ flex: 1, minWidth: 0, font: "inherit", padding: "5px 6px", borderRadius: 6, background: "#1d1d24", color: "inherit", border: "1px solid rgba(255,255,255,0.18)" }}>
+          <Picker aria-label="Environment" value={choice} onChange={(e) => setChoice(e.target.value)} style={{ flex: 1, fontWeight: 400, borderRadius: 6, background: "#1d1d24", border: "1px solid rgba(255,255,255,0.18)" }}>
             {projects.map((p) => (
               <optgroup key={p.id} label={p.name}>
                 {p.environments.map((env) => (
@@ -521,7 +524,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
                 ))}
               </optgroup>
             ))}
-          </select>
+          </Picker>
           <button type="button" style={{ ...button, opacity: busy || remaining <= 0 || !choice ? 0.5 : 1 }} disabled={busy || remaining <= 0 || !choice} onClick={start}>
             {busy ? "Starting..." : "Start render"}
           </button>

@@ -11,6 +11,11 @@
 - **`applyImpulse`, `applyTorqueImpulse` and `setVelocity` on a node's ref on web.** An impulse is applied at the centre of mass; an offset warns.
 - **Dragging on web with `virtualCamera`.** `onDrag` enables it, with `dragType` `FixedDistance` (the default), `FixedDistanceOrigin`, `FixedToPlane` (with `dragPlane`) or `FixedToWorld` (the horizontal plane through the grabbed point, since there are no detected surfaces). A dynamic body is held kinematic while dragged and thrown with the pointer's velocity when let go. Dragging under a rotated or scaled parent is not exact yet, and live web AR has no drag (it warns).
 
+### Fixed
+
+- **iOS: `ViroSound.preloadSounds` and sounds played by name work (virocore with the fix).** Preloading never loaded anything and its promise never resolved, and a `source={{ name }}` sound stayed silent. The data is now loaded and kept under its key, the promise resolves with `{ result, msg }` as on Android, and a named sound plays from it, firing `onFinish`. A downloaded sound also opens now: its temporary file path was read as a URL with no scheme.
+- **iOS: `ViroSpatialSound` and `ViroSoundField` no longer crash on mount.** The base class's `createSoundWithPath` had been commented out since the first commit, so these two components called a method that did not exist.
+
 ### Changed
 
 - **Clicks on web reach the node native would give them to.** A press on a child with no `onClick` goes to its nearest ancestor that has one, and a press on a clickable child drags its nearest ancestor with `onDrag`.

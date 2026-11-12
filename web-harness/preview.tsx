@@ -181,16 +181,18 @@ console.warn = (...args: unknown[]) => {
   consoleWarn(...args);
 };
 const pageFetch = window.fetch.bind(window);
+// Viro's own usage ping. A host's view blocks it, and it is not the scene's to fix.
+const isUsagePing = (url: string) => url.includes("/functions/v1/register-device");
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   const short = url.startsWith("data:") ? "a data: URL" : url.split("?")[0];
   try {
     const res = await pageFetch(input, init);
-    if (!res.ok) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
-    else if (inspectable) noteModelResponse(url, res);
+    if (!res.ok && !isUsagePing(url)) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
+    else if (res.ok && inspectable) noteModelResponse(url, res);
     return res;
   } catch (err) {
-    pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
+    if (!isUsagePing(url)) pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
     throw err;
   }
 };

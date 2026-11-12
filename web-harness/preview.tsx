@@ -197,16 +197,59 @@ const button: React.CSSProperties = {
 };
 
 // An AR scene is laid out for a phone held upright; in a wide view the top and
-// bottom of it fall outside the frustum. Frame it like one unless asked not to.
+// bottom of it fall outside the frustum. Frame it like a device unless asked not to.
+// Screen sizes in CSS pixels, portrait.
+type Device = { name: string; w: number; h: number };
+const DEVICES: Array<{ group: string; devices: Device[] }> = [
+  {
+    group: "Phones",
+    devices: [
+      { name: "iPhone SE", w: 375, h: 667 },
+      { name: "iPhone 16", w: 393, h: 852 },
+      { name: "iPhone 16 Pro Max", w: 440, h: 956 },
+      { name: "Pixel 9", w: 412, h: 924 },
+      { name: "Pixel 9 Pro", w: 427, h: 952 },
+      { name: "Pixel 10", w: 412, h: 924 },
+      { name: "Galaxy A55", w: 360, h: 800 },
+    ],
+  },
+  {
+    group: "Foldables",
+    devices: [
+      { name: "iPhone Duo", w: 466, h: 678 },
+      { name: "iPhone Duo, open", w: 626, h: 890 },
+      { name: "Pixel 9 Pro Fold", w: 412, h: 922 },
+      { name: "Pixel 9 Pro Fold, open", w: 836, h: 842 },
+      { name: "Galaxy Z Fold 6", w: 412, h: 968 },
+      { name: "Galaxy Z Fold 6, open", w: 744, h: 860 },
+    ],
+  },
+  {
+    group: "Tablets",
+    devices: [
+      { name: "iPad mini", w: 744, h: 1133 },
+      { name: "iPad Pro 13", w: 1032, h: 1376 },
+    ],
+  },
+];
+const DEFAULT_DEVICE = "iPhone 16";
+const findDevice = (name: string) => DEVICES.flatMap((g) => g.devices).find((d) => d.name === name);
 // Measured against #root's parent: the page's body, or the stage of a view
 // that runs this module inside itself.
-const PHONE_ASPECT = 9 / 19.5;
 const frameBox = () => document.getElementById("root")!.parentElement!;
-function applyFraming(phone: boolean) {
+function applyFraming(device: Device | undefined) {
   const el = document.getElementById("root")!;
-  el.style.width = phone ? `min(100%, ${Math.round(frameBox().clientHeight * PHONE_ASPECT)}px)` : "";
-  el.style.margin = phone ? "0 auto" : "";
-  el.style.boxShadow = phone ? "0 0 0 1px rgba(255,255,255,0.14)" : "";
+  const box = frameBox();
+  // Shrunk to fit, never drawn larger than the device.
+  const scale = device ? Math.min(1, box.clientWidth / device.w, box.clientHeight / device.h) : 1;
+  const height = device ? Math.round(device.h * scale) : 0;
+  el.style.width = device ? `${Math.round(device.w * scale)}px` : "";
+  el.style.height = device ? `${height}px` : "";
+  el.style.margin = device ? "0 auto" : "";
+  // Not a transform, which would make #root the containing block of the fixed overlay.
+  el.style.position = device ? "relative" : "";
+  el.style.top = device ? `${Math.floor((box.clientHeight - height) / 2)}px` : "";
+  el.style.boxShadow = device ? "0 0 0 1px rgba(255,255,255,0.14)" : "";
 }
 
 // The page is a sandboxed document, where the async clipboard can be refused;
@@ -408,14 +451,17 @@ function Chrome({
   const [showIssues, setShowIssues] = useState(false);
   const [request, setRequest] = useState<"copied" | "manual" | null>(null);
   const [panel, setPanel] = useState(false);
-  const [phone, setPhone] = useState(() => frameBox().clientWidth > frameBox().clientHeight);
+  // "" fills the view.
+  const [device, setDevice] = useState(() => (frameBox().clientWidth > frameBox().clientHeight ? DEFAULT_DEVICE : ""));
+  const framedAs = findDevice(device);
   useEffect(() => {
     if (!cameraControls) return;
-    applyFraming(phone);
-    const observer = new ResizeObserver(() => applyFraming(phone));
+    const frame = () => applyFraming(framedAs);
+    frame();
+    const observer = new ResizeObserver(frame);
     observer.observe(frameBox());
     return () => observer.disconnect();
-  }, [phone, cameraControls]);
+  }, [device, cameraControls]);
   const seen = useRef("");
   useEffect(() => {
     const onCamera = () => tick((n) => n + 1);
@@ -512,9 +558,16 @@ function Chrome({
         <div style={{ display: "flex", gap: 8 }}>
           {cameraControls ? (
             <>
-              <button type="button" style={button} onClick={() => setPhone((v) => !v)}>
-                {phone ? "Fill width" : "Phone frame"}
-              </button>
+              <select aria-label="Device" title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)} style={button}>
+                <option value="">Fill view</option>
+                {DEVICES.map((g) => (
+                  <optgroup key={g.group} label={g.group}>
+                    {g.devices.map((d) => (
+                      <option key={d.name} value={d.name}>{d.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
               <button type="button" style={button} onClick={() => cameraControls?.reset()}>
                 Reset view
               </button>

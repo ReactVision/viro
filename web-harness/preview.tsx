@@ -284,10 +284,16 @@ type RenderRow = {
   environment_name: string | null;
   error: string | null;
   output_url: string | null;
+  /** The same video through the preview's own server. */
+  video_url?: string | null;
 };
 type Project = { id: string; name: string; environments: { id: string; name: string }[] };
 
 const ACTIVE = new Set(["awaiting_upload", "queued", "processing"]);
+
+// A view can load media from the preview's server only, and a page only over https.
+const videoSrc = (r: RenderRow) =>
+  r.video_url && (host || !r.output_url?.startsWith("https:")) ? r.video_url : r.output_url;
 
 function statusText(r: RenderRow): string {
   if (r.status === "processing") return r.progress != null ? `Rendering ${r.progress}%` : "Rendering";
@@ -417,7 +423,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
             </span>
           </div>
           {r.status === "failed" && r.error ? <div style={{ fontSize: 12, color: "#ff9b9b" }}>{r.error}</div> : null}
-          {r.output_url && viewing === r.id ? <video src={r.output_url} controls autoPlay playsInline muted style={{ width: "100%", borderRadius: 6, background: "#000" }} /> : null}
+          {r.output_url && viewing === r.id ? <video src={videoSrc(r) ?? undefined} controls autoPlay playsInline muted style={{ width: "100%", borderRadius: 6, background: "#000" }} /> : null}
         </div>
       ))}
       {renderRequest && !framed ? (

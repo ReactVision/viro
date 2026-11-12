@@ -44,15 +44,23 @@ RCT_EXPORT_METHOD(preloadSounds:(NSDictionary *)soundDict
                   rejecter:(RCTPromiseRejectBlock)reject) {
     for (id key in soundDict) {
         NSString *path = [self parseImagePath:soundDict[key]];
+        std::string cKeyString = std::string([((NSString *) key) UTF8String]);
         if (path == nil) {
+            // Resolve rather than leave ViroSound.preloadSounds waiting forever.
             RCTLogError(@"Invalid preloaded sound path provided.");
+            if (resolve) {
+                resolve(@{ @"key" : key, @"result" : @(NO), @"msg" : @"Invalid preloaded sound path" });
+            }
             return;
         }
-        std::string cKeyString = std::string([((NSString *) key) UTF8String]);
         std::string cPathString = std::string([((NSString *) path) UTF8String]);
-       // std::shared_ptr<VROSoundDataGVR> data = VROSoundDataGVR::create(cPathString, VROResourceType::URL);
-       // _preloadedSounds[cKeyString] = data;
-        
+
+        // Same split as VRTSound's uri sources: http(s) is downloaded, anything else
+        // (file:// in release builds) is read in place.
+        VROResourceType resourceType = [path hasPrefix:@"http"] ? VROResourceType::URL : VROResourceType::LocalFile;
+        std::shared_ptr<VROSoundDataGVR> data = VROSoundDataGVR::create(cPathString, resourceType);
+        _preloadedSounds[cKeyString] = data;
+
         if (resolve) {
             // Create a finish preloading callback with the promise for notifying Javascript with.
             std::function<void(bool success, std::string msg)> onFinish = [self, cKeyString, resolve](bool success, std::string msg) {
@@ -69,7 +77,8 @@ RCT_EXPORT_METHOD(preloadSounds:(NSDictionary *)soundDict
             // Store a strong reference to the sound delegate callback for the given sound key.
             std::shared_ptr<VROSoundDataDelegateiOS> callback = std::make_shared<VROSoundDataDelegateiOS>(onFinish);
             _preloadCallbacks[cKeyString] = callback;
-         //   data->setDelegate(callback);
+            // Notifies right away if the data finished loading before this line.
+            data->setDelegate(callback);
         }
     }
 }

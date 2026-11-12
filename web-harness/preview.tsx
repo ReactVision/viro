@@ -54,6 +54,8 @@ type PreviewHost = {
   onStatus?(status: { ready: boolean; error: string | null; warnings: string[]; scene?: string }): void;
   /** The node selected in the inspector, as a sentence for the assistant, or null. */
   onSelect?(text: string | null): void;
+  /** Opens a link outside the view, which the view's own sandbox may not allow. */
+  openLink?(url: string): void;
 };
 
 declare global {
@@ -397,6 +399,15 @@ const ACTIVE = new Set(["awaiting_upload", "queued", "processing"]);
 const videoSrc = (r: RenderRow) =>
   r.video_url && (host || !r.output_url?.startsWith("https:")) ? r.video_url : r.output_url;
 
+// On a phone the scene opens in camera AR on that phone: a QR code is no use
+// to the device showing it. False when nothing could open the link.
+function openAR(url: string): boolean {
+  if (host?.openLink) host.openLink(url);
+  else if (framed) return !!window.open(url, "_blank");
+  else location.assign(url);
+  return true;
+}
+
 function CloseButton({ onClose }: { onClose(): void }) {
   return (
     <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
@@ -666,10 +677,11 @@ function Chrome({
               onClick={() => {
                 setPanel(false);
                 setInspect(false);
+                if (touch && openAR(arUrl)) return;
                 setPhone((v) => !v);
               }}
             >
-              On a phone
+              View in AR
             </button>
           ) : null}
           {inspectable ? (

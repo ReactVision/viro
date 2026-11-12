@@ -275,6 +275,24 @@ const button: React.CSSProperties = {
   pointerEvents: "auto",
 };
 
+// A native select draws its arrow against the border and is as wide as its longest option;
+// this draws the arrow inside the padding and, where fieldSizing is supported, fits the selected one.
+function Picker({ style, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span style={{ position: "relative", display: "inline-flex", minWidth: 0, maxWidth: style?.maxWidth }}>
+      <select
+        {...rest}
+        style={{ ...button, appearance: "none", WebkitAppearance: "none", fieldSizing: "content", paddingRight: 28, minWidth: 0, textOverflow: "ellipsis", ...style, maxWidth: "100%" } as React.CSSProperties}
+      >
+        {children}
+      </select>
+      <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden style={{ position: "absolute", right: 11, top: "50%", marginTop: -3, pointerEvents: "none" }}>
+        <path d="M1 1l4 4 4-4" fill="none" stroke="#e8e8ee" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
 // An AR scene is laid out for a phone held upright; in a wide view the top and
 // bottom of it fall outside the frustum, so the viewer can frame it like a device.
 // Screen sizes in CSS pixels, portrait.
@@ -605,16 +623,16 @@ function Chrome({
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start", justifyContent: "space-between" }}>
         {scenes.length > 1 ? (
-          <select
+          <Picker
             aria-label="Scene"
             value={index}
             onChange={(e) => onSelect(Number(e.target.value))}
-            style={{ ...button, fontWeight: 600, maxWidth: "50%" }}
+            style={{ maxWidth: "50%" }}
           >
             {scenes.map((sc, i) => (
               <option key={sc.path} value={i} title={sc.path}>{sceneLabel(sc.path)}</option>
             ))}
-          </select>
+          </Picker>
         ) : <div style={chip}>{title ?? "Viro Live"}{liveAR ? " · AR" : ""}</div>}
         <div style={{ display: "flex", gap: 8 }}>
           {/* Without renderApi the button copies a request for a coding agent, which a chat does not have. */}
@@ -718,7 +736,7 @@ function Chrome({
         <div style={{ display: "flex", gap: 8 }}>
           {cameraControls ? (
             <>
-              <select aria-label="Device" title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)} style={button}>
+              <Picker aria-label="Device" title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
                 <option value="">Fill view</option>
                 {DEVICES.map((g) => (
                   <optgroup key={g.group} label={g.group}>
@@ -727,7 +745,7 @@ function Chrome({
                     ))}
                   </optgroup>
                 ))}
-              </select>
+              </Picker>
               <button
                 type="button"
                 aria-pressed={gridOn}

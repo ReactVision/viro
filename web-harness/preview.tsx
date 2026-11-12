@@ -273,7 +273,10 @@ const button: React.CSSProperties = {
   font: "inherit",
   fontWeight: 600,
   pointerEvents: "auto",
+  whiteSpace: "nowrap",
 };
+const oneLine: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
+const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
 // A native select draws its arrow against the border and is as wide as its longest option;
 // this draws the arrow inside the padding and, where fieldSizing is supported, fits the selected one.
@@ -624,20 +627,23 @@ function Chrome({
   const issues = renderState.warnings.length + (renderState.error ? 1 : 0);
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      {/* On a narrow view the name gives way first, then the buttons wrap. */}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ flex: "1 1 0", minWidth: 96, display: "flex" }}>
         {scenes.length > 1 ? (
           <Picker
             aria-label="Scene"
             value={index}
             onChange={(e) => onSelect(Number(e.target.value))}
-            style={{ maxWidth: "50%" }}
+            style={{ maxWidth: "100%" }}
           >
             {scenes.map((sc, i) => (
               <option key={sc.path} value={i} title={sc.path}>{sceneLabel(sc.path)}</option>
             ))}
           </Picker>
-        ) : <div style={chip}>{title ?? "Viro Live"}{liveAR ? " · AR" : ""}</div>}
-        <div style={{ display: "flex", gap: 8 }}>
+        ) : <div style={{ ...chip, ...oneLine }}>{title ?? "Viro Live"}{liveAR ? " · AR" : ""}</div>}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {/* Without renderApi the button copies a request for a coding agent, which a chat does not have. */}
           {!liveAR && renderRequest && (renderApi || !framed) ? (
             <button
@@ -730,13 +736,15 @@ function Chrome({
           ))}
         </div>
       ) : null}
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
         {cameraControls ? (
-          <div style={{ ...chip, opacity: 0.85 }}>
-            Right-drag: look around · Shift-drag: pan · Scroll: zoom · Click: tap
+          <div style={{ ...chip, ...oneLine, opacity: 0.85 }}>
+            {touch
+              ? "Two fingers: drag to look around, pinch to zoom"
+              : "Right-drag: look around · Shift-drag: pan · Scroll: zoom · Click: tap"}
           </div>
         ) : <span />}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
           {cameraControls ? (
             <>
               <Picker aria-label="Device" title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>

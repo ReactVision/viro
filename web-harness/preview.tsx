@@ -30,6 +30,9 @@ type PreviewInput = {
   renderApi?: string;
   /** The scenes the module exports, in order, when there is more than one; each one's render request replaces `renderRequest`. */
   scenes?: SceneInfo[];
+  /** Which update of the preview this is, and where a newer one is asked for: the page appends the version it shows. */
+  version?: number;
+  updatesUrl?: string;
 };
 
 type SceneInfo = { path: string; renderRequest?: string };
@@ -512,15 +515,29 @@ function Chrome({
 }
 
 function Preview({ input }: { input: PreviewInput }) {
-  const [compiled, setCompiled] = useState<React.ComponentType<any>[] | null>(null);
+  // With the version it was compiled from, which keys the mounted scene.
+  const [compiled, setCompiled] = useState<{ apps: React.ComponentType<any>[]; version: number } | null>(null);
   const [index, setIndex] = useState(0);
   // Unresolved imports are reported while the bundle compiles, so they hold for every scene.
   const compileWarnings = useRef<string[]>([]);
+  const shown = useRef<PreviewInput | null>(null);
   useEffect(() => {
+    // An update replaces the running scene, so its status starts over; the scene being looked at stays selected.
+    if (shown.current) {
+      renderState.ready = false;
+      renderState.error = null;
+      renderState.warnings.length = 0;
+      cameraControls = null;
+    }
+    shown.current = input;
+    const at = Math.max(0, (input.scenes ?? []).findIndex((sc) => sc.path === currentScene));
+    currentScene = input.scenes?.[at]?.path;
+    setIndex(at);
     try {
-      setCompiled(compileGeneratedScenes(input.code, input.assetOverrides));
+      setCompiled({ apps: compileGeneratedScenes(input.code, input.assetOverrides), version: input.version ?? 0 });
       compileWarnings.current = [...renderState.warnings];
     } catch (err) {
+      setCompiled(null);
       markError(err);
     }
   }, [input]);
@@ -534,10 +551,11 @@ function Preview({ input }: { input: PreviewInput }) {
     currentScene = scenes[i]?.path;
     setIndex(i);
   };
-  const App = compiled?.[index];
+  const App = compiled?.apps[index];
   return (
     <>
-      {App ? <Scene key={index} App={App} /> : null}
+      {/* Keyed by the update as well: a boundary that caught the last version's crash must not hold the new one. */}
+      {App ? <Scene key={`${compiled!.version}:${index}`} App={App} /> : null}
       <Chrome
         title={input.title}
         renderRequest={scenes.length ? scenes[index]?.renderRequest : input.renderRequest}
@@ -550,11 +568,51 @@ function Preview({ input }: { input: PreviewInput }) {
   );
 }
 
+/**
+ * Asks the server for a version after the one shown. The server holds each
+ * request until there is one, answering 204 when there is none in time.
+ */
+function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => void): () => void {
+  if (!first.updatesUrl) return () => {};
+  const stop = new AbortController();
+  let version = first.version ?? 1;
+  void (async () => {
+    while (!stop.signal.aborted) {
+      const asked = performance.now();
+      let again = 1000;
+      try {
+        // pageFetch: a request the server lets time out is not a failed load to warn about.
+        const res = await pageFetch(`${first.updatesUrl}${version}`, { signal: stop.signal, cache: "no-store" });
+        if (res.status === 404) return;
+        if (res.status === 200) {
+          const next = ((await res.json()) as { input?: PreviewInput }).input;
+          if (next?.code) {
+            version = next.version ?? version + 1;
+            onUpdate(next);
+          }
+        } else if (res.status !== 204) again = 5000;
+      } catch {
+        again = 5000;
+      }
+      // Something in between that answers at once instead of holding the request would otherwise spin.
+      const wait = again - (performance.now() - asked);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
+  })();
+  return () => stop.abort();
+}
+
+function Live({ first }: { first: PreviewInput }) {
+  const [input, setInput] = useState(first);
+  useEffect(() => followUpdates(first, setInput), [first]);
+  return <Preview input={input} />;
+}
+
 const input = window.__PREVIEW_INPUT__;
 const root = createRoot(document.getElementById("root")!);
 if (!input) {
   markError(new Error("No scene was given to this page."));
   root.render(createElement(Chrome, { scenes: [], index: 0, onSelect: () => {} }));
 } else {
-  root.render(createElement(Preview, { input }));
+  root.render(createElement(Live, { first: input }));
 }

@@ -59,13 +59,17 @@ declare global {
 
 const params = new URLSearchParams(location.search);
 const liveAR = params.get("ar") === "1";
+// A capture for the agent: the scene alone, from the starting camera, not following updates.
+const shot = params.get("shot") === "1";
 const host = window.__PREVIEW_HOST__;
 // Framed by, or running inside, the MCP Apps view.
 const framed = window.parent !== window;
 
 type Controls = { reset(): void };
 let cameraControls: Controls | null = null;
-let currentScene: string | undefined = window.__PREVIEW_INPUT__?.scenes?.[0]?.path;
+let currentScene: string | undefined = (
+  window.__PREVIEW_INPUT__?.scenes?.find((sc) => sc.path === params.get("scene")) ?? window.__PREVIEW_INPUT__?.scenes?.[0]
+)?.path;
 const cameraListeners = new Set<() => void>();
 // The real selector, not the render path's stub: it is composed of web-capable
 // parts and ViroARScene.web feeds it anchor events. Headless renders keep the
@@ -744,15 +748,17 @@ function Preview({ input }: { input: PreviewInput }) {
     <>
       {/* Keyed by the update as well: a boundary that caught the last version's crash must not hold the new one. */}
       {App ? <Scene key={`${compiled!.version}:${index}`} App={App} /> : null}
-      <Chrome
-        title={input.title}
-        renderRequest={scenes.length ? scenes[index]?.renderRequest : input.renderRequest}
-        renderApi={input.renderApi}
-        arUrl={input.arUrl}
-        scenes={scenes}
-        index={index}
-        onSelect={select}
-      />
+      {shot ? null : (
+        <Chrome
+          title={input.title}
+          renderRequest={scenes.length ? scenes[index]?.renderRequest : input.renderRequest}
+          renderApi={input.renderApi}
+          arUrl={input.arUrl}
+          scenes={scenes}
+          index={index}
+          onSelect={select}
+        />
+      )}
     </>
   );
 }
@@ -793,7 +799,7 @@ function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => v
 
 function Live({ first }: { first: PreviewInput }) {
   const [input, setInput] = useState(first);
-  useEffect(() => followUpdates(first, setInput), [first]);
+  useEffect(() => (shot ? undefined : followUpdates(first, setInput)), [first]);
   return <Preview input={input} />;
 }
 

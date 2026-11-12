@@ -1,4 +1,25 @@
-import { ImageSourcePropType, NativeMethods } from "react-native";
+import type {
+  HostInstance,
+  ImageSourcePropType,
+  MeasureInWindowOnSuccessCallback,
+  MeasureLayoutOnSuccessCallback,
+  MeasureOnSuccessCallback,
+} from "react-native";
+
+// React Native 0.88 removed the NativeMethods type. These are the same methods, which the ref
+// of a host component still carries.
+type ViroNativeMethods = {
+  blur(): void;
+  focus(): void;
+  measure(callback: MeasureOnSuccessCallback): void;
+  measureInWindow(callback: MeasureInWindowOnSuccessCallback): void;
+  measureLayout(
+    relativeToNativeComponentRef: HostInstance | number,
+    onSuccess: MeasureLayoutOnSuccessCallback,
+    onFail?: () => void
+  ): void;
+  setNativeProps(nativeProps: object): void;
+};
 
 export type ViroSceneDictionary = {
   [val: string]: ViroScene;
@@ -43,7 +64,7 @@ export type ViroScale = [
 ];
 
 export type ViroNativeRef =
-  | (React.Component<unknown, {}, any> & Readonly<NativeMethods>)
+  | (React.Component<unknown, {}, any> & Readonly<ViroNativeMethods>)
   | null;
 
 export type ViroPhysicsBody = {

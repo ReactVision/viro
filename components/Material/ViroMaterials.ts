@@ -11,15 +11,13 @@
  */
 
 import {
+  AssetRegistry,
   ColorValue,
   ImageResolvedAssetSource,
   NativeModules,
   processColor,
   TurboModuleRegistry,
 } from "react-native";
-
-// @ts-ignore
-import { getAssetByID } from "react-native/Libraries/Image/AssetRegistry";
 
 // @ts-ignore
 import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
@@ -205,7 +203,7 @@ export class ViroMaterials {
           } else {
             var assetType = "unknown";
             if (typeof material[prop] !== "object") {
-              var asset = getAssetByID(material[prop]);
+              var asset = AssetRegistry.getAssetByID(material[prop]);
               if (asset) {
                 assetType = asset.type;
               }

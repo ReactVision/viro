@@ -12,7 +12,7 @@
  * compile and runtime errors back to the model.
  */
 import * as React from "react";
-import { createElement, useEffect, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { renderState, pushWarning, markReady, markError } from "./renderState";
@@ -20,6 +20,7 @@ import { addViroExports, compileGeneratedScenes } from "./sceneModule";
 import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
 import { ViroARScene } from "../components/AR/ViroARScene";
 import { ViroImage } from "../components/ViroImage";
+import { qrModules } from "./qr";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
 type PreviewInput = {
@@ -30,6 +31,8 @@ type PreviewInput = {
   renderRequest?: string;
   /** Base URL of the server's routes for starting and listing renders of this scene. */
   renderApi?: string;
+  /** This preview's link for camera AR on a phone. */
+  arUrl?: string;
   /** The scenes the module exports, in order, when there is more than one; each one's render request replaces `renderRequest`. */
   scenes?: SceneInfo[];
   /** Which update of the preview this is, and where a newer one is asked for: the page appends the version it shows. */
@@ -350,6 +353,40 @@ const ACTIVE = new Set(["awaiting_upload", "queued", "processing"]);
 const videoSrc = (r: RenderRow) =>
   r.video_url && (host || !r.output_url?.startsWith("https:")) ? r.video_url : r.output_url;
 
+function CloseButton({ onClose }: { onClose(): void }) {
+  return (
+    <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <path d="M4 4l8 8M12 4l-8 8" />
+      </svg>
+    </button>
+  );
+}
+
+function PhonePanel({ url, onClose }: { url: string; onClose(): void }) {
+  const modules = useMemo(() => qrModules(url), [url]);
+  const [copied, setCopied] = useState(false);
+  const n = modules?.length ?? 0;
+  return (
+    <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(280px, 100%)", maxHeight: "85%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, alignItems: "center", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, alignSelf: "stretch" }}>
+        <span style={{ fontWeight: 600 }}>Camera AR on a phone</span>
+        <CloseButton onClose={onClose} />
+      </div>
+      {modules ? (
+        <svg role="img" aria-label="QR code for this preview" viewBox={`-4 -4 ${n + 8} ${n + 8}`} width="180" height="180" shapeRendering="crispEdges" style={{ background: "#fff", borderRadius: 6, flex: "none" }}>
+          <path fill="#000" d={modules.map((row, y) => row.map((dark, x) => (dark ? `M${x} ${y}h1v1h-1z` : "")).join("")).join("")} />
+        </svg>
+      ) : null}
+      <div style={{ opacity: 0.75, fontSize: 12, textAlign: "center" }}>Scan to place the scene through the phone's camera.</div>
+      <div style={{ userSelect: "text", fontFamily: "ui-monospace, monospace", fontSize: 11, wordBreak: "break-all", textAlign: "center" }}>{url}</div>
+      <button type="button" style={button} onClick={async () => setCopied(await copyText(url))}>
+        {copied ? "Copied" : "Copy link"}
+      </button>
+    </div>
+  );
+}
+
 function statusText(r: RenderRow): string {
   if (r.status === "processing") return r.progress != null ? `Rendering ${r.progress}%` : "Rendering";
   if (r.status === "queued") return "Queued";
@@ -429,11 +466,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
     <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(520px, 100%)", maxHeight: "75%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, boxSizing: "border-box" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontWeight: 600 }}>Render {scene ? sceneLabel(scene) : "in a real space"}</div>
-        <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
-        </button>
+        <CloseButton onClose={onClose} />
       </div>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         Plays this scene over a recorded real-world environment from your team and makes a video. Billed to your team as compute time.
@@ -497,6 +530,7 @@ function Chrome({
   title,
   renderRequest,
   renderApi,
+  arUrl,
   scenes,
   index,
   onSelect,
@@ -504,6 +538,7 @@ function Chrome({
   title?: string;
   renderRequest?: string;
   renderApi?: string;
+  arUrl?: string;
   scenes: SceneInfo[];
   index: number;
   onSelect(i: number): void;
@@ -512,6 +547,7 @@ function Chrome({
   const [showIssues, setShowIssues] = useState(false);
   const [request, setRequest] = useState<"copied" | "manual" | null>(null);
   const [panel, setPanel] = useState(false);
+  const [phone, setPhone] = useState(false);
   // "" fills the view.
   const [device, setDevice] = useState("");
   const framedAs = findDevice(device);
@@ -564,11 +600,24 @@ function Chrome({
               type="button"
               style={button}
               onClick={async () => {
+                setPhone(false);
                 if (renderApi) setPanel((v) => !v);
                 else if (renderRequest) setRequest((await copyText(renderRequest)) ? "copied" : "manual");
               }}
             >
               Render in a real space
+            </button>
+          ) : null}
+          {!liveAR && arUrl ? (
+            <button
+              type="button"
+              style={button}
+              onClick={() => {
+                setPanel(false);
+                setPhone((v) => !v);
+              }}
+            >
+              On a phone
             </button>
           ) : null}
           {issues > 0 ? (
@@ -586,6 +635,7 @@ function Chrome({
           onClose={() => setPanel(false)}
         />
       ) : null}
+      {phone && arUrl ? <PhonePanel url={arUrl} onClose={() => setPhone(false)} /> : null}
       {request && renderRequest ? (
         <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", maxWidth: 520, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontWeight: 600 }}>
@@ -698,6 +748,7 @@ function Preview({ input }: { input: PreviewInput }) {
         title={input.title}
         renderRequest={scenes.length ? scenes[index]?.renderRequest : input.renderRequest}
         renderApi={input.renderApi}
+        arUrl={input.arUrl}
         scenes={scenes}
         index={index}
         onSelect={select}

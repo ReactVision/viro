@@ -18,6 +18,8 @@ import { createRoot } from "react-dom/client";
 import { renderState, pushWarning, markReady, markError } from "./renderState";
 import { addViroExports, compileGeneratedScenes } from "./sceneModule";
 import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
+import { ViroARScene } from "../components/AR/ViroARScene";
+import { ViroImage } from "../components/ViroImage";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
 type PreviewInput = {
@@ -68,9 +70,63 @@ const cameraListeners = new Set<() => void>();
 // a plane and the content would never appear.
 addViroExports({ ViroARPlaneSelector });
 
+// The virtual camera's floor, drawn as a grid so an AR scene has a ground to read depth against.
+const FLOOR_Y = -1;
+let gridOn = true;
+const gridListeners = new Set<() => void>();
+let gridUrl: string | null = null;
+function floorGridUrl(): string {
+  if (gridUrl) return gridUrl;
+  const size = 2048, cells = 40;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext("2d")!;
+  for (let i = 0; i <= cells; i++) {
+    const at = Math.round((i * size) / cells);
+    // Every other line is a whole metre.
+    g.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.16)";
+    g.fillRect(at - 1, 0, 2, size);
+    g.fillRect(0, at - 1, size, 2);
+  }
+  const fade = g.createRadialGradient(size / 2, size / 2, size * 0.15, size / 2, size / 2, size / 2);
+  fade.addColorStop(0, "rgba(0,0,0,1)");
+  fade.addColorStop(1, "rgba(0,0,0,0)");
+  g.globalCompositeOperation = "destination-in";
+  g.fillStyle = fade;
+  g.fillRect(0, 0, size, size);
+  return (gridUrl = canvas.toDataURL("image/png"));
+}
+
+function PreviewARScene(props: any) {
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    const onToggle = () => redraw((n) => n + 1);
+    gridListeners.add(onToggle);
+    return () => void gridListeners.delete(onToggle);
+  }, []);
+  return createElement(
+    ViroARScene,
+    props,
+    ...React.Children.toArray(props.children),
+    gridOn
+      ? createElement(ViroImage, {
+          key: "viro-preview-grid",
+          source: { uri: floorGridUrl() },
+          // Just under the floor, so content resting on it does not flicker against the lines.
+          position: [0, FLOOR_Y - 0.002, 0],
+          rotation: [-90, 0, 0],
+          width: 20,
+          height: 20,
+        })
+      : null,
+  );
+}
+
 if (!liveAR) {
+  addViroExports({ ViroARScene: PreviewARScene });
   setARNavigatorDefaults({
     virtualCamera: {
+      floorY: FLOOR_Y,
       onReady: (c: Controls) => {
         cameraControls = c;
         cameraListeners.forEach((l) => l());
@@ -197,7 +253,7 @@ const button: React.CSSProperties = {
 };
 
 // An AR scene is laid out for a phone held upright; in a wide view the top and
-// bottom of it fall outside the frustum. Frame it like a device unless asked not to.
+// bottom of it fall outside the frustum, so the viewer can frame it like a device.
 // Screen sizes in CSS pixels, portrait.
 type Device = { name: string; w: number; h: number };
 const DEVICES: Array<{ group: string; devices: Device[] }> = [
@@ -232,7 +288,6 @@ const DEVICES: Array<{ group: string; devices: Device[] }> = [
     ],
   },
 ];
-const DEFAULT_DEVICE = "iPhone 16";
 const findDevice = (name: string) => DEVICES.flatMap((g) => g.devices).find((d) => d.name === name);
 // Measured against #root's parent: the page's body, or the stage of a view
 // that runs this module inside itself.
@@ -458,7 +513,7 @@ function Chrome({
   const [request, setRequest] = useState<"copied" | "manual" | null>(null);
   const [panel, setPanel] = useState(false);
   // "" fills the view.
-  const [device, setDevice] = useState(() => (frameBox().clientWidth > frameBox().clientHeight ? DEFAULT_DEVICE : ""));
+  const [device, setDevice] = useState("");
   const framedAs = findDevice(device);
   useEffect(() => {
     if (!cameraControls) return;
@@ -574,6 +629,18 @@ function Chrome({
                   </optgroup>
                 ))}
               </select>
+              <button
+                type="button"
+                aria-pressed={gridOn}
+                style={{ ...button, opacity: gridOn ? 1 : 0.6 }}
+                onClick={() => {
+                  gridOn = !gridOn;
+                  gridListeners.forEach((l) => l());
+                  tick((n) => n + 1);
+                }}
+              >
+                Grid
+              </button>
               <button type="button" style={button} onClick={() => cameraControls?.reset()}>
                 Reset view
               </button>

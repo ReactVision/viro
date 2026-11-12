@@ -273,6 +273,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [fallbacks, setFallbacks] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   const loadRenders = () =>
     api<{ renders: RenderRow[]; remaining: number }>(`${renderApi}/renders`)
@@ -324,7 +325,11 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
     <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(520px, 100%)", maxHeight: "75%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, boxSizing: "border-box" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontWeight: 600 }}>Render {scene ? sceneLabel(scene) : "in a real space"}</div>
-        <button type="button" style={button} onClick={onClose}>Close</button>
+        <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
       </div>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         Plays this scene over a recorded real-world environment from your team and makes a video. Billed to your team as compute time.
@@ -357,12 +362,19 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
       {fallbacks.length ? <div style={{ color: "#ffd27a", fontSize: 12 }}>Drawn as boxes in the last render: {fallbacks.join(", ")}.</div> : null}
       {renders.map((r) => (
         <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span>{r.scene && scene ? `${sceneLabel(r.scene)} · ` : ""}{r.environment_name ?? "Environment"}</span>
-            <span style={{ color: r.status === "failed" ? "#ff9b9b" : r.status === "completed" ? "#9be7a7" : "#ffd27a" }}>{statusText(r)}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: r.status === "failed" ? "#ff9b9b" : r.status === "completed" ? "#9be7a7" : "#ffd27a" }}>{statusText(r)}</span>
+              {r.output_url ? (
+                <button type="button" style={button} onClick={() => setViewing(viewing === r.id ? null : r.id)}>
+                  {viewing === r.id ? "Hide" : "View"}
+                </button>
+              ) : null}
+            </span>
           </div>
           {r.status === "failed" && r.error ? <div style={{ fontSize: 12, color: "#ff9b9b" }}>{r.error}</div> : null}
-          {r.output_url ? <video src={r.output_url} controls playsInline muted style={{ width: "100%", borderRadius: 6, background: "#000" }} /> : null}
+          {r.output_url && viewing === r.id ? <video src={r.output_url} controls autoPlay playsInline muted style={{ width: "100%", borderRadius: 6, background: "#000" }} /> : null}
         </div>
       ))}
       {renderRequest && !framed ? (

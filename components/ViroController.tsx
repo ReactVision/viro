@@ -45,6 +45,12 @@ type Props = ViroCommonProps &
     controllerVisibility?: boolean;
   };
 
+/**
+ * Every platform takes the same handlers. onClick, onClickState, onFuse, onDrag,
+ * onPinch and onRotate are delivered on iOS, Android and Quest. onTouch, onScroll,
+ * onSwipe and onControllerStatus come from a hand controller and are delivered on
+ * Android and Quest only: no iOS input source produces them.
+ */
 export class ViroController extends React.Component<Props> {
   _component: ViroNativeRef = null;
 

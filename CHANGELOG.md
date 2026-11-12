@@ -14,6 +14,7 @@
 
 ### Changed
 
+- **An Android build without the `AR` xRMode leaves ARCore out (Expo plugin).** With `xRMode` set to `QUEST`, `GVR` or `OVR_MOBILE` only, the plugin no longer adds `:arcore_client` to `app/build.gradle` and `settings.gradle`, the `com.google.ar.core` meta-data or the `com.google.ar.core` `<queries>` entry, and a later prebuild without `AR` removes them. ARCore's own manifest entries go with the AAR. This is how the iOS plugin already treats its ARCore pods. A build that lists `AR` alongside other modes keeps ARCore. `:gvr_common` stays in every build, because the renderer links `libgvr` and audio on Quest runs on GVR audio. `isARSupportedOnDevice` returns `UNSUPPORTED` when ARCore is missing.
 - **Clicks on web reach the node native would give them to.** A press on a child with no `onClick` goes to its nearest ancestor that has one, and a press on a clickable child drags its nearest ancestor with `onDrag`.
 - **Changing a node's opacity or visibility on web no longer resets its position.** Position, rotation, scale, opacity and visibility are now applied separately, so a dragged or simulated node stays where it is.
 

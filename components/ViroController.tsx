@@ -25,7 +25,9 @@ import {
   ViroDragEvent,
   ViroFuseEvent,
   ViroPinchEvent,
+  ViroPinchState,
   ViroRotateEvent,
+  ViroRotateState,
   ViroScrollEvent,
   ViroSwipeEvent,
   ViroTouchEvent,
@@ -43,6 +45,34 @@ type Props = ViroCommonProps &
     ) => void;
     reticleVisibility?: boolean;
     controllerVisibility?: boolean;
+    /**
+     * Fires while a source drags, with the dragged-to world position. Delivered on
+     * iOS, Android and Quest. Setting it enables drag events on the controller
+     * (canDrag).
+     */
+    onDrag?: (dragToPos: Viro3DPoint, source: ViroSource) => void;
+    /**
+     * Fires on a two-finger pinch on the touch screen, with the scale relative to
+     * the start of the gesture. Same payload as a node's onPinch. Delivered on iOS
+     * and Android touch screens; a Quest controller does not pinch. Setting it
+     * enables pinch events on the controller (canPinch).
+     */
+    onPinch?: (
+      pinchState: ViroPinchState,
+      scaleFactor: number,
+      source: ViroSource
+    ) => void;
+    /**
+     * Fires on a two-finger rotation on the touch screen, with the rotation in
+     * degrees since the start of the gesture. Same payload as a node's onRotate.
+     * Delivered on iOS and Android touch screens; a Quest controller does not
+     * rotate. Setting it enables rotate events on the controller (canRotate).
+     */
+    onRotate?: (
+      rotateState: ViroRotateState,
+      rotationFactor: number,
+      source: ViroSource
+    ) => void;
   };
 
 /**

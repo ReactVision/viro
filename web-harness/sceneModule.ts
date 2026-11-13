@@ -38,7 +38,19 @@ function makeUnsupportedStub(name: string) {
   });
 }
 
-const extraExports: Record<string, unknown> = {};
+// A stand-in keeps the scale written for the model it replaces, and a model
+// authored in other units has one that makes a 1 m box a speck or a wall.
+const STAND_IN_SIDE = { min: 0.1, max: 1 };
+function Viro3DObject(props: any) {
+  const scale = props.scale;
+  if (props.source?.uri !== PLACEHOLDER_MODEL_URL || !Array.isArray(scale)) return createElement(ViroWeb.Viro3DObject, props);
+  const side = Math.max(...scale.map((n: number) => Math.abs(n)));
+  if (!(side > 0) || (side >= STAND_IN_SIDE.min && side <= STAND_IN_SIDE.max)) return createElement(ViroWeb.Viro3DObject, props);
+  const fit = Math.min(STAND_IN_SIDE.max, Math.max(STAND_IN_SIDE.min, side)) / side;
+  return createElement(ViroWeb.Viro3DObject, { ...props, scale: scale.map((n: number) => n * fit) });
+}
+
+const extraExports: Record<string, unknown> = { Viro3DObject };
 
 /** Adds names to the `@reactvision/react-viro` the caller's code sees, ahead of the stub fallback. */
 export function addViroExports(extra: Record<string, unknown>): void {

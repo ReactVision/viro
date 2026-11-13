@@ -42,6 +42,8 @@ type PreviewInput = {
   updatesUrl?: string;
   /** Per-platform single-model budgets the inspector compares models against. */
   budgets?: ModelBudget[];
+  /** Root-relative paths of the local assets drawn as stand-ins. */
+  placeholders?: string[];
 };
 
 type SceneInfo = { path: string; renderRequest?: string };
@@ -56,6 +58,8 @@ type PreviewHost = {
   onSelect?(text: string | null): void;
   /** Opens a link outside the view, which the view's own sandbox may not allow. */
   openLink?(url: string): void;
+  /** Stores a file as the local asset at `path`; the preview then updates to show it. Rejects with the reason. */
+  uploadAsset?(path: string, file: Blob): Promise<void>;
 };
 
 type Vec3 = [number, number, number];
@@ -612,6 +616,84 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
   );
 }
 
+// The stand-in a dropped file replaces: the one with its name, else the only one with its extension.
+function placeholderFor(name: string, placeholders: string[]): string | null {
+  const base = (p: string) => p.split("/").pop()!.toLowerCase();
+  const ext = (p: string) => base(p).split(".").pop();
+  const named = placeholders.filter((p) => base(p) === name.toLowerCase());
+  if (named.length) return named.length === 1 ? named[0]! : null;
+  const typed = placeholders.filter((p) => ext(p) === ext(name));
+  return typed.length === 1 ? typed[0]! : null;
+}
+
+function PlaceholderPanel({
+  placeholders,
+  uploads,
+  pending,
+  onFile,
+  onClose,
+}: {
+  placeholders: string[];
+  /** "uploading", "done", or why the upload failed, by path. */
+  uploads: Record<string, string>;
+  /** A dropped file that matched no stand-in by name. */
+  pending: File | null;
+  onFile(path: string, file: File): void;
+  onClose(): void;
+}) {
+  const picker = useRef<HTMLInputElement>(null);
+  const target = useRef("");
+  return (
+    <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(440px, 100%)", maxHeight: "75%", overflow: "auto", display: "flex", flexDirection: "column", gap: 8, boxSizing: "border-box" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <span style={{ fontWeight: 600 }}>Placeholders</span>
+        <CloseButton onClose={onClose} />
+      </div>
+      <div style={{ opacity: 0.8, fontSize: 12 }}>
+        {pending
+          ? `Which file does ${pending.name} replace?`
+          : "These local files were not sent with the code, so a stand-in is drawn for each. Choose the real file, or drop it on the preview."}
+      </div>
+      <input
+        ref={picker}
+        type="file"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(target.current, file);
+          e.target.value = "";
+        }}
+      />
+      {placeholders.map((rel) => {
+        const state = uploads[rel];
+        const busy = state === "uploading";
+        return (
+          <div key={rel} style={{ display: "flex", flexDirection: "column", gap: 4, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span title={rel} style={{ ...oneLine, fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{rel}</span>
+              <button
+                type="button"
+                style={{ ...button, opacity: busy ? 0.5 : 1 }}
+                disabled={busy}
+                onClick={() => {
+                  if (pending) return onFile(rel, pending);
+                  target.current = rel;
+                  picker.current?.click();
+                }}
+              >
+                {busy ? "Uploading..." : pending ? "Replace this" : "Choose file"}
+              </button>
+            </div>
+            {state && !busy ? (
+              <div style={{ fontSize: 12, color: state === "done" ? "#9be7a7" : "#ff9b9b" }}>{state === "done" ? "Uploaded." : state}</div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Chrome({
   title,
   renderRequest,
@@ -621,6 +703,7 @@ function Chrome({
   index,
   onSelect,
   budgets,
+  placeholders = [],
 }: {
   title?: string;
   renderRequest?: string;
@@ -630,6 +713,7 @@ function Chrome({
   index: number;
   onSelect(i: number): void;
   budgets?: ModelBudget[];
+  placeholders?: string[];
 }) {
   const [, tick] = useState(0);
   const [showIssues, setShowIssues] = useState(false);
@@ -637,6 +721,58 @@ function Chrome({
   const [panel, setPanel] = useState(false);
   const [phone, setPhone] = useState(false);
   const [inspect, setInspect] = useState(false);
+  const [assets, setAssets] = useState(false);
+  const [uploads, setUploads] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState<File | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const upload = host?.uploadAsset;
+  const sendFile = async (rel: string, file: File) => {
+    setPending(null);
+    setUploads((u) => ({ ...u, [rel]: "uploading" }));
+    try {
+      await upload!(rel, file);
+      setUploads((u) => ({ ...u, [rel]: "done" }));
+    } catch (e) {
+      setUploads((u) => ({ ...u, [rel]: e instanceof Error ? e.message : String(e) }));
+    }
+  };
+  const placeholdersRef = useRef(placeholders);
+  placeholdersRef.current = placeholders;
+  // A file dropped on a framed document would otherwise replace it.
+  useEffect(() => {
+    if (!upload) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const hasFile = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
+    const onOver = (e: DragEvent) => {
+      if (!hasFile(e)) return;
+      e.preventDefault();
+      setDropping(placeholdersRef.current.length > 0);
+      clearTimeout(timer);
+      // dragover repeats while a file is held over the page, and nothing says when it leaves.
+      timer = setTimeout(() => setDropping(false), 500);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFile(e)) return;
+      e.preventDefault();
+      setDropping(false);
+      const file = e.dataTransfer?.files[0];
+      if (!file || !placeholdersRef.current.length) return;
+      const rel = placeholderFor(file.name, placeholdersRef.current);
+      if (rel) return void sendFile(rel, file);
+      setPending(file);
+      setPanel(false);
+      setPhone(false);
+      setInspect(false);
+      setAssets(true);
+    };
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [upload]);
   // "" fills the view.
   const [device, setDevice] = useState("");
   const framedAs = findDevice(device);
@@ -694,6 +830,7 @@ function Chrome({
               onClick={async () => {
                 setPhone(false);
                 setInspect(false);
+                setAssets(false);
                 if (renderApi) setPanel((v) => !v);
                 else if (renderRequest) setRequest((await copyText(renderRequest)) ? "copied" : "manual");
               }}
@@ -708,6 +845,7 @@ function Chrome({
               onClick={() => {
                 setPanel(false);
                 setInspect(false);
+                setAssets(false);
                 if (touch && openAR(arUrl)) return;
                 setPhone((v) => !v);
               }}
@@ -723,10 +861,27 @@ function Chrome({
               onClick={() => {
                 setPanel(false);
                 setPhone(false);
+                setAssets(false);
                 setInspect((v) => !v);
               }}
             >
               Inspect
+            </button>
+          ) : null}
+          {upload && placeholders.length ? (
+            <button
+              type="button"
+              aria-pressed={assets}
+              style={button}
+              onClick={() => {
+                setPanel(false);
+                setPhone(false);
+                setInspect(false);
+                setPending(null);
+                setAssets((v) => !v);
+              }}
+            >
+              {placeholders.length} placeholder{placeholders.length === 1 ? "" : "s"}
             </button>
           ) : null}
           {issues > 0 ? (
@@ -754,6 +909,23 @@ function Chrome({
           copy={copyText}
           onClose={() => setInspect(false)}
         />
+      ) : null}
+      {assets && upload && placeholders.length ? (
+        <PlaceholderPanel
+          placeholders={placeholders}
+          uploads={uploads}
+          pending={pending}
+          onFile={sendFile}
+          onClose={() => {
+            setAssets(false);
+            setPending(null);
+          }}
+        />
+      ) : null}
+      {dropping ? (
+        <div style={{ ...chip, alignSelf: "center", fontWeight: 600, border: "1px dashed rgba(255,255,255,0.5)", padding: "14px 18px" }}>
+          Drop the file to replace its placeholder
+        </div>
       ) : null}
       {request && renderRequest ? (
         <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", maxWidth: 520, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -875,6 +1047,7 @@ function Preview({ input }: { input: PreviewInput }) {
           index={index}
           onSelect={select}
           budgets={input.budgets}
+          placeholders={input.placeholders}
         />
       )}
     </>

@@ -8,9 +8,11 @@ export interface RenderState {
   ready: boolean;
   error: string | null;
   warnings: string[];
+  /** Models mounted with a real file that have not finished loading. */
+  loading: string[];
 }
 
-export const renderState: RenderState = { ready: false, error: null, warnings: [] };
+export const renderState: RenderState = { ready: false, error: null, warnings: [], loading: [] };
 
 export function pushWarning(message: string): void {
   // Re-renders (e.g. a stub component mounted more than once) would

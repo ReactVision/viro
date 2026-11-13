@@ -4,12 +4,12 @@
  * driver's page) and preview.tsx (the page a developer opens).
  */
 import * as React from "react";
-import { createElement, useEffect } from "react";
+import { createElement, useEffect, useRef, useSyncExternalStore } from "react";
 import * as ReactNativeWeb from "react-native";
 // @ts-expect-error -- @babel/standalone ships no first-party types
 import * as Babel from "@babel/standalone";
 
-import { pushWarning } from "./renderState";
+import { pushWarning, renderState } from "./renderState";
 import { makeCheckerDataUrl, PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import * as ViroWeb from "./viroWebComponents";
 
@@ -38,16 +38,85 @@ function makeUnsupportedStub(name: string) {
   });
 }
 
+// A local model's require() gives a URL marked with its specifier, and
+// Viro3DObject looks the specifier up here when it renders. So a model whose
+// file arrives later is swapped in place, without running the scene again.
+const MODEL_MARK = "#viro-preview-model=";
+const MODEL_RE = /\.(glb|gltf|vrx|obj|fbx)$/i;
+const liveModels = new Map<string, string>();
+const liveListeners = new Set<() => void>();
+let liveVersion = 0;
+const subscribeLive = (fn: () => void) => {
+  liveListeners.add(fn);
+  return () => liveListeners.delete(fn);
+};
+
+/** The URLs local models resolve to now. */
+export function setModelOverrides(overrides: Record<string, string> | undefined): void {
+  liveModels.clear();
+  for (const [specifier, url] of Object.entries(overrides ?? {})) if (MODEL_RE.test(specifier)) liveModels.set(specifier, url);
+  liveVersion++;
+  for (const fn of liveListeners) fn();
+}
+
+const modelName = (specifier: string) => specifier.replace(/^__preview__\//, "");
+
+function resolveModel(source: any): { source: any; name: string | null } {
+  const uri = source?.uri;
+  if (typeof uri !== "string") return { source, name: typeof source === "string" ? source.split(/[?#]/)[0]!.split("/").pop()! : null };
+  const at = uri.indexOf(MODEL_MARK);
+  if (at < 0) return { source, name: uri.split(/[?#]/)[0]!.split("/").pop()! };
+  const specifier = decodeURIComponent(uri.slice(at + MODEL_MARK.length));
+  return { source: { ...source, uri: liveModels.get(specifier) ?? PLACEHOLDER_MODEL_URL }, name: modelName(specifier) };
+}
+
+// Models mounted with a real file that have not finished loading, by name, for the screenshot's wait.
+const loadingModels = new Map<object, string>();
+function syncLoading() {
+  renderState.loading = [...new Set(loadingModels.values())].sort();
+}
+
 // A stand-in keeps the scale written for the model it replaces, and a model
 // authored in other units has one that makes a 1 m box a speck or a wall.
 const STAND_IN_SIDE = { min: 0.1, max: 1 };
-function Viro3DObject(props: any) {
+function Viro3DObject(given: any) {
+  useSyncExternalStore(subscribeLive, () => liveVersion);
+  const { source, name } = resolveModel(given.source);
+  const uri: unknown = source?.uri ?? source;
+  const standIn = uri === PLACEHOLDER_MODEL_URL;
+  const loading = standIn || typeof uri !== "string" ? null : (name ?? uri);
+  const loaded = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!loading) return;
+    const key = {};
+    loadingModels.set(key, loading);
+    syncLoading();
+    loaded.current = () => {
+      if (loadingModels.delete(key)) syncLoading();
+    };
+    return () => loaded.current?.();
+  }, [loading, uri]);
+  let props = { ...given, source };
+  if (loading) {
+    props.onLoadEnd = (...args: unknown[]) => {
+      loaded.current?.();
+      return given.onLoadEnd?.(...args);
+    };
+    props.onError = (...args: unknown[]) => {
+      loaded.current?.();
+      return given.onError?.(...args);
+    };
+  }
   const scale = props.scale;
-  if (props.source?.uri !== PLACEHOLDER_MODEL_URL || !Array.isArray(scale)) return createElement(ViroWeb.Viro3DObject, props);
-  const side = Math.max(...scale.map((n: number) => Math.abs(n)));
-  if (!(side > 0) || (side >= STAND_IN_SIDE.min && side <= STAND_IN_SIDE.max)) return createElement(ViroWeb.Viro3DObject, props);
-  const fit = Math.min(STAND_IN_SIDE.max, Math.max(STAND_IN_SIDE.min, side)) / side;
-  return createElement(ViroWeb.Viro3DObject, { ...props, scale: scale.map((n: number) => n * fit) });
+  if (standIn && Array.isArray(scale)) {
+    const side = Math.max(...scale.map((n: number) => Math.abs(n)));
+    if (side > 0 && (side < STAND_IN_SIDE.min || side > STAND_IN_SIDE.max)) {
+      const fit = Math.min(STAND_IN_SIDE.max, Math.max(STAND_IN_SIDE.min, side)) / side;
+      props = { ...props, scale: scale.map((n: number) => n * fit) };
+    }
+  }
+  // Keyed by the file: a model swapped in gets a node of its own rather than a second model in the stand-in's.
+  return createElement(ViroWeb.Viro3DObject, { ...props, key: typeof uri === "string" ? uri : undefined });
 }
 
 const extraExports: Record<string, unknown> = { Viro3DObject };
@@ -104,9 +173,9 @@ function makeRequireShim(assetOverrides: Record<string, string> | undefined) {
     if (specifier === "@reactvision/react-viro") return viroReactModule;
     if (specifier === "@reactvision/react-viro/preview/jsx-dev-runtime") return previewJsxRuntime;
     const override = assetOverrides?.[specifier];
+    if (MODEL_RE.test(specifier)) return { uri: `${override ?? PLACEHOLDER_MODEL_URL}${MODEL_MARK}${encodeURIComponent(specifier)}` };
     if (override) return { uri: override };
     const ext = specifier.split(".").pop()?.toLowerCase() ?? "";
-    if (["glb", "gltf", "vrx", "obj", "fbx"].includes(ext)) return { uri: PLACEHOLDER_MODEL_URL };
     if (["png", "jpg", "jpeg", "webp"].includes(ext)) return { uri: checkerUrl };
     if (["mp3", "wav", "m4a", "ogg", "mp4", "mov", "webm"].includes(ext)) {
       pushWarning(`Skipped local media asset "${specifier}" — no placeholder audio/video.`);
@@ -133,6 +202,7 @@ export function compileGeneratedScenes(code: string, assetOverrides: Record<stri
     sourceType: "module",
   });
   const js = result.code ?? "";
+  setModelOverrides(assetOverrides);
   const moduleObj: { exports: any } = { exports: {} };
   // Sandboxed exec of caller-supplied code — see file header. `new Function`
   // gives a fresh top-level scope; the only things it can reach are the

@@ -16,7 +16,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { renderState, pushWarning, markReady, markError } from "./renderState";
-import { addViroExports, compileGeneratedScenes } from "./sceneModule";
+import { addViroExports, compileGeneratedScenes, setModelOverrides } from "./sceneModule";
 import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
 import { ViroARScene } from "../components/AR/ViroARScene";
 import { ViroImage } from "../components/ViroImage";
@@ -1191,6 +1191,13 @@ function Chrome({
   );
 }
 
+function onlyModelsChanged(was: PreviewInput, now: PreviewInput): boolean {
+  if (was.code !== now.code || JSON.stringify(was.scenes) !== JSON.stringify(now.scenes)) return false;
+  const a = was.assetOverrides ?? {};
+  const b = now.assetOverrides ?? {};
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].every((k) => a[k] === b[k] || MODEL_RE.test(k));
+}
+
 function Preview({ input }: { input: PreviewInput }) {
   // With the version it was compiled from, which keys the mounted scene.
   const [compiled, setCompiled] = useState<{ apps: React.ComponentType<any>[]; version: number } | null>(null);
@@ -1200,6 +1207,12 @@ function Preview({ input }: { input: PreviewInput }) {
   const shown = useRef<PreviewInput | null>(null);
   useEffect(() => {
     keepModelsOf(input.assetOverrides);
+    // An upload only changes the file a model shows, so the running scene swaps that model in place.
+    if (shown.current && onlyModelsChanged(shown.current, input)) {
+      shown.current = input;
+      setModelOverrides(input.assetOverrides);
+      return;
+    }
     // An update replaces the running scene, so its status starts over; the scene being looked at stays selected.
     if (shown.current) {
       renderState.ready = false;

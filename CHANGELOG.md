@@ -19,6 +19,10 @@
 - **Clicks on web reach the node native would give them to.** A press on a child with no `onClick` goes to its nearest ancestor that has one, and a press on a clickable child drags its nearest ancestor with `onDrag`.
 - **Changing a node's opacity or visibility on web no longer resets its position.** Position, rotation, scale, opacity and visibility are now applied separately, so a dragged or simulated node stays where it is.
 
+### Fixed
+
+- **`ViroObjectDetector` boxes and hit-test positions on iOS line up in a resized window.** They are computed from the AR view's bounds instead of the screen's, so they match the camera feed in a resizable iPhone window and in iPad multitasking (Split View, Slide Over, Stage Manager).
+
 ## v3.1.1 — 9 November 2026
 
 ### Added

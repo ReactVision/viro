@@ -306,6 +306,9 @@ function downloadProgress(): { count: number; done: number; read: number; size: 
   };
 }
 
+// Since when the scene has had a model loading, for the chip's "Preparing" line.
+let loadingSince = 0;
+
 // The total grows as files arrive one at a time, so a bar against it would go backwards: this one only shows activity.
 function ActivityBar() {
   return (
@@ -967,10 +970,12 @@ function Chrome({
         seen.current = key;
         postStatus();
         tick((n) => n + 1);
-      } else if (modelDownloads.size || modelRetries.size || shownDownloads.current) {
+      } else if (modelDownloads.size || modelRetries.size || renderState.loading.length || shownDownloads.current) {
         tick((n) => n + 1);
       }
-      shownDownloads.current = modelDownloads.size + modelRetries.size > 0;
+      if (!renderState.loading.length) loadingSince = 0;
+      else loadingSince ||= performance.now();
+      shownDownloads.current = modelDownloads.size + modelRetries.size + renderState.loading.length > 0;
     }, 300);
     return () => {
       cameraListeners.delete(onCamera);
@@ -981,6 +986,8 @@ function Chrome({
   const issues = renderState.warnings.length + (renderState.error ? 1 : 0);
   const downloads = downloadProgress();
   const downloading = !!downloads && downloads.count > downloads.done;
+  // Parsing a large model takes seconds with nothing downloading; a quick one is not worth a chip.
+  const preparing = !downloading && loadingSince && performance.now() - loadingSince > 1000 ? renderState.loading.length : 0;
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       {/* On a narrow view the name gives way first, then the buttons wrap. */}
@@ -1105,7 +1112,7 @@ function Chrome({
           Drop the file to replace its placeholder
         </div>
       ) : null}
-      {downloads && !dropping ? (
+      {(downloads || preparing) && !dropping ? (
         <div role="status" style={{ ...chip, alignSelf: "center", display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
           {downloading ? (
             <div style={{ fontWeight: 600 }}>
@@ -1113,9 +1120,13 @@ function Chrome({
               {downloads!.done ? ` (${downloads!.done} done)` : ""}:{" "}
               {downloads!.size ? `${megabytes(downloads!.read)} of ${megabytes(downloads!.size)}` : `${megabytes(downloads!.read)} so far`}
             </div>
+          ) : preparing ? (
+            <div style={{ fontWeight: 600 }}>
+              Preparing {preparing} {preparing === 1 ? "model" : "models"}...
+            </div>
           ) : null}
           {downloads?.retrying.length ? <div style={{ color: "#ffd27a" }}>A download failed. Retrying {downloads.retrying.join(", ")}...</div> : null}
-          {downloading ? <ActivityBar /> : null}
+          {downloading || preparing ? <ActivityBar /> : null}
         </div>
       ) : null}
       {waitingSelectors.size && !dropping && !renderState.error ? (
@@ -1298,9 +1309,29 @@ function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => v
   return () => stop.abort();
 }
 
+// Uploads come in bursts, and each one that is not a model runs the scene
+// again, cutting the last run off mid-load: those wait for the burst to end.
+const ASSET_BURST_MS = 1500;
+
 function Live({ first }: { first: PreviewInput }) {
   const [input, setInput] = useState(first);
-  useEffect(() => (shot ? undefined : followUpdates(first, setInput)), [first]);
+  useEffect(() => {
+    if (shot) return;
+    let latest = first;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stop = followUpdates(first, (next) => {
+      const assetsOnly = next.code === latest.code && JSON.stringify(next.scenes) === JSON.stringify(latest.scenes);
+      const wait = assetsOnly && !onlyModelsChanged(latest, next);
+      latest = next;
+      clearTimeout(timer);
+      if (wait) timer = setTimeout(() => setInput(next), ASSET_BURST_MS);
+      else setInput(next);
+    });
+    return () => {
+      clearTimeout(timer);
+      stop();
+    };
+  }, [first]);
   return <Preview input={input} />;
 }
 

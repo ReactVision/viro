@@ -21,7 +21,7 @@ import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
 import { ViroARScene } from "../components/AR/ViroARScene";
 import { ViroImage } from "../components/ViroImage";
 import { ViroScene } from "../components/ViroScene";
-import { InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
+import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
@@ -58,10 +58,16 @@ type PreviewHost = {
   openLink?(url: string): void;
 };
 
+type Vec3 = [number, number, number];
+/** A camera pose for a capture: the starting one, a side of the scene's content, or a position and the point it looks at. */
+type ShotView = "start" | "front" | "back" | "left" | "right" | "top" | { position: Vec3; look_at: Vec3 };
+
 declare global {
   interface Window {
     __PREVIEW_INPUT__?: PreviewInput;
     __PREVIEW_HOST__?: PreviewHost;
+    /** On a capture page: moves the camera and returns where it now is, or null when the scene has no camera to move. */
+    __previewShotView?(view: ShotView): { position: Vec3; look_at: Vec3 } | null;
   }
 }
 
@@ -75,7 +81,7 @@ const framed = window.parent !== window;
 const inspectable = !liveAR && !shot;
 if (inspectable) watchGpu();
 
-type Controls = { reset(): void };
+type Controls = { reset(): void; lookFrom(position: Vec3, target: Vec3): void };
 let cameraControls: Controls | null = null;
 let currentScene: string | undefined = (
   window.__PREVIEW_INPUT__?.scenes?.find((sc) => sc.path === params.get("scene")) ?? window.__PREVIEW_INPUT__?.scenes?.[0]
@@ -86,6 +92,31 @@ const cameraListeners = new Set<() => void>();
 // stub, which draws the children unanchored, because there nothing can select
 // a plane and the content would never appear.
 addViroExports({ ViroARPlaneSelector });
+
+// Unit vectors from the content's centre to the camera.
+const VIEW_FROM: Record<string, Vec3> = { front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0], top: [0, 1, 0] };
+if (shot) {
+  window.__previewShotView = (view) => {
+    if (!cameraControls) return null;
+    if (view === "start") {
+      cameraControls.reset();
+      return { position: [0, 0, 0], look_at: [0, 0, -1] };
+    }
+    let position: Vec3;
+    let look_at: Vec3;
+    if (typeof view === "string") {
+      const from = VIEW_FROM[view];
+      const framing = contentFraming();
+      if (!from || !framing) return null;
+      look_at = framing.center;
+      position = [look_at[0] + from[0] * framing.distance, look_at[1] + from[1] * framing.distance, look_at[2] + from[2] * framing.distance];
+    } else {
+      ({ position, look_at } = view);
+    }
+    cameraControls.lookFrom(position, look_at);
+    return { position, look_at };
+  };
+}
 
 // The virtual camera's floor, drawn as a grid so an AR scene has a ground to read depth against.
 const FLOOR_Y = -1;

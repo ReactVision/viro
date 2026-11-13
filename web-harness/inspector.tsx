@@ -16,6 +16,8 @@ import { VIRO_SOURCE_PROP, type ViroSource } from "./sceneModule";
 
 export type ModelBudget = { label: string; max_triangles: number; max_texture_bytes?: number; max_texture_dimension?: number };
 
+type Vec3 = [number, number, number];
+
 // ─── What the GPU draws ───────────────────────────────────────────────────
 // The renderer reports no statistics, so its WebGL draw calls are counted.
 const counting = { draws: 0, triangles: 0 };
@@ -223,7 +225,7 @@ export function InspectorProbe() {
   return null;
 }
 
-type Row = { handle: ViroHandle; source: ViroSource; depth: number; detail: string; size?: ModelSize | null };
+type Row = { handle: ViroHandle; source: ViroSource; depth: number; detail: string; size?: ModelSize | null; scale: Vec3 };
 
 const basename = (uri: string) => decodeURIComponent(uri.split(/[?#]/)[0]!.split("/").pop() ?? uri);
 const sourceKey = (s: ViroSource) => `${s.name}@${s.file}:${s.line}`;
@@ -265,12 +267,42 @@ function rowsOf(scene: ViroSceneApi): Row[] {
       if (typeof uri === "string" && !uri.startsWith("data:")) detail = uri === PLACEHOLDER_MODEL_URL ? "placeholder" : basename(uri);
       // The stand-in's size says nothing about the model it stands for.
       if (source.name === "Viro3DObject" && typeof uri === "string" && uri !== PLACEHOLDER_MODEL_URL) size = modelSizes.get(uri);
-      rows.push({ handle: h, source, depth, detail, size });
+      const s = props.scale;
+      const scale: Vec3 = Array.isArray(s) && s.length === 3 && s.every((n) => Number.isFinite(n)) ? [s[0], s[1], s[2]] : [1, 1, 1];
+      rows.push({ handle: h, source, depth, detail, size, scale });
       walk(h, depth + 1);
     }
   };
   walk(0, 0);
   return rows;
+}
+
+/**
+ * The centre of the nodes the scene's code made, and how far back a camera
+ * frames them all from. Null before the scene has any.
+ */
+export function contentFraming(): { center: Vec3; distance: number } | null {
+  const scene = inspected?.scene;
+  if (!scene) return null;
+  const rows = rowsOf(scene);
+  // Leaves only: a container's own origin says nothing about where its content is.
+  const leaves = rows.filter((r, i) => (rows[i + 1]?.depth ?? 0) <= r.depth);
+  const points = leaves.map((r) => scene.getNodeWorldPosition(r.handle)).filter((p): p is Vec3 => !!p);
+  if (!points.length) return null;
+  const min: Vec3 = [...points[0]!];
+  const max: Vec3 = [...points[0]!];
+  for (const p of points) {
+    for (let i = 0; i < 3; i++) {
+      min[i] = Math.min(min[i]!, p[i]!);
+      max[i] = Math.max(max[i]!, p[i]!);
+    }
+  }
+  const view = cameraView(scene);
+  const halfField = view ? Math.min(view.cx / view.fx, view.cy / view.fy) : Math.tan(Math.PI / 6);
+  // A node's own size is not known here, so its scale stands in: a node a metre across at that scale fits.
+  const reach = Math.min(5, Math.max(0.3, ...leaves.map((r) => 0.9 * Math.max(...r.scale.map(Math.abs)))));
+  const radius = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 + reach;
+  return { center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2], distance: radius / halfField };
 }
 
 function project(view: CameraView, p: [number, number, number]): { x: number; y: number } | null {

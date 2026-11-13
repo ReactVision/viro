@@ -24,11 +24,16 @@ export type ViroVirtualCameraOptions = {
    * Default -1. `null` reports no plane.
    */
   floorY?: number | null;
-  /** Receives `reset()`, which returns the camera to its starting pose. */
+  /** Receives the camera's controls once it is driving the scene. */
   onReady?: (controls: ViroVirtualCameraControls) => void;
 };
 
-export type ViroVirtualCameraControls = { reset(): void };
+export type ViroVirtualCameraControls = {
+  /** Returns the camera to its starting pose. */
+  reset(): void;
+  /** Puts the camera at `position`, looking at `target`, which it then orbits. */
+  lookFrom(position: Vec3, target: Vec3): void;
+};
 
 const LONG_AXIS_FOV_DEG = 67;
 const MIN_DISTANCE = 0.05;
@@ -128,6 +133,18 @@ export function attachVirtualCamera(
     distance = Math.hypot(home[0], home[1], home[2]) || 1;
     yaw = 0;
     pitch = 0;
+    apply();
+  };
+
+  const lookFrom = (position: Vec3, to: Vec3) => {
+    const back: Vec3 = [position[0] - to[0], position[1] - to[1], position[2] - to[2]];
+    const d = Math.hypot(back[0], back[1], back[2]);
+    if (!(d > 0)) return;
+    target = [...to];
+    distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, d));
+    // The inverse of apply(): back = yaw(pitch([0, 0, distance])).
+    yaw = Math.atan2(back[0], back[2]);
+    pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, -Math.asin(back[1] / d)));
     apply();
   };
 
@@ -243,7 +260,7 @@ export function attachVirtualCamera(
   element.addEventListener("wheel", onWheel, { passive: false });
   element.addEventListener("contextmenu", onContextMenu);
   apply();
-  options.onReady?.({ reset });
+  options.onReady?.({ reset, lookFrom });
 
   return () => {
     setCameraView(scene, null);

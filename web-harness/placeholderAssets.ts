@@ -1,10 +1,13 @@
 /**
- * Placeholder assets shared by main.tsx (the interactive demo) and render.tsx
- * (the headless render entry). render.tsx's require() shim hands these back
- * for any local `require('./assets/...')` in caller-supplied TSX, since the
- * files those paths point to don't exist in this harness.
+ * Placeholder assets shared by main.tsx (the interactive demo) and the pages
+ * that run caller-supplied TSX (render.tsx, preview.tsx). Their require() shim
+ * hands these back for any local `require('./assets/...')`, since the files
+ * those paths point to don't exist in this harness.
  */
-import helmetUrl from "./models/DamagedHelmet.glb?url";
+// Written by scripts/make-harness-placeholder.mjs. A file rather than a data:
+// URL: a page that runs this module inside a host's sandbox may only fetch
+// from this server.
+import boxUrl from "./placeholderBox.glb?url&no-inline";
 
 export function makeCheckerDataUrl(): string {
   const canvas = document.createElement("canvas");
@@ -136,4 +139,5 @@ export function makeAnimatedGifDataUrl(): string {
   return "data:image/gif;base64," + btoa(bin);
 }
 
-export const PLACEHOLDER_MODEL_URL = helmetUrl;
+/** A 1 m checker cube whose orange face, with an arrow pointing up, is the front (+Z). */
+export const PLACEHOLDER_MODEL_URL = boxUrl;

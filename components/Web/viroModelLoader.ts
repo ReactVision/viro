@@ -30,6 +30,11 @@ export function modelFormatFor(url: string, typeHint?: string): ViroModelFormat 
   return ViroModelFormat.GLB; // default: GLB (self-contained binary)
 }
 
+/** A GLB opens with the ASCII magic "glTF". */
+export function isGlb(bytes: Uint8Array): boolean {
+  return bytes.length >= 4 && bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46;
+}
+
 /** Filename the model references a resource by (basename of the URL, no query). */
 export function resourceName(url: string): string {
   return url.split("?")[0].split("/").pop() ?? url;

@@ -24,8 +24,10 @@ import {
   resolveModelSource,
   modelFormatFor,
   fetchModelBytes,
+  isGlb,
   resourceName,
 } from "./Web/viroModelLoader";
+import { ViroModelFormat } from "@reactvision/viro-web-renderer";
 
 type Props = ViroWebNodeProps & {
   source: unknown;
@@ -82,7 +84,8 @@ export function Viro3DObject(props: Props) {
         ),
       ]);
       if (cancelled) return false;
-      return renderer.loadModel(node, bytes, format, resources);
+      // The file's own header wins over `type`, so a GLB given under another type still loads.
+      return renderer.loadModel(node, bytes, isGlb(bytes) ? ViroModelFormat.GLB : format, resources);
     })()
       .then((success) => {
         if (cancelled) return;

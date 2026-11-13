@@ -174,10 +174,9 @@ static NSString *const kWebPrefix = @"http";
         std::shared_ptr<VROSoundData> data = [self getDataForName:name];
         if (data == nullptr) {
             RCTLogError(@"Sound w/ name [%@] was not preloaded", name);
+        } else {
+            [self createSoundWithData:data local:false];
         }
-//        else {
-//            [self createSoundWithData:data local:false];
-//        }
     } else if([_source objectForKey:kUriKey]) {
         NSString *uri = [_source objectForKey:kUriKey];
         if ([uri hasPrefix:kLocalPrefix]) {
@@ -193,25 +192,31 @@ static NSString *const kWebPrefix = @"http";
     
     [self setNativeProps];
 }
-/*
+// The spatial sound and the sound field (VRTSpatialSound, VRTSoundField) are built
+// here, on the driver's GVR audio. VRTSound overrides both with an AVAudioPlayer.
+// The driver returns null where it has no sound support (visionOS).
 - (void)createSoundWithPath:(NSString *)path resourceType:(VROResourceType)resourceType {
     if (_sound) {
         _sound->pause();
     }
-    
+
     _sound = self.driver->newSound(std::string([path UTF8String]), resourceType, self.soundType);
-    _sound->setDelegate(std::make_shared<VROSoundDelegateiOS>(self));
+    if (_sound) {
+        _sound->setDelegate(std::make_shared<VROSoundDelegateiOS>(self));
+    }
 }
 
 - (void)createSoundWithData:(std::shared_ptr<VROSoundData>)data local:(BOOL)local {
     if (_sound) {
         _sound->pause();
     }
-    
+
     _sound = self.driver->newSound(data, self.soundType);
-    _sound->setDelegate(std::make_shared<VROSoundDelegateiOS>(self));
+    if (_sound) {
+        _sound->setDelegate(std::make_shared<VROSoundDelegateiOS>(self));
+    }
 }
-*/
+
 - (std::shared_ptr<VROSoundData>)getDataForName:(NSString *)name {
     VRTSoundModule *soundModule = [self.bridge moduleForClass:[VRTSoundModule class]];
     return [soundModule dataForName:name];
@@ -353,6 +358,10 @@ static NSString *const kWebPrefix = @"http";
         _player->pause();
     }
     _player = self.driver->newAudioPlayer(data);
+    if (!_player) {
+        [self soundDidFail:@"This platform cannot play a preloaded sound"];
+        return;
+    }
     _player->setDelegate(std::make_shared<VROSoundDelegateiOS>(self));
     _player->setup();
 }

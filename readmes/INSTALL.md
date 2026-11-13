@@ -1,6 +1,6 @@
 # Installation instructions
 
-Requires React Native 0.86 with the New Architecture (Fabric). The recommended path is Expo (Dev Client) with the `@reactvision/react-viro` config plugin, which does the native wiring below for you.
+Requires React Native 0.88 (Expo SDK 58) with the New Architecture (Fabric). Apple Vision Pro apps stay on the React Native 0.86 visionOS fork until it is rebased onto 0.88. The recommended path is Expo (Dev Client) with the `@reactvision/react-viro` config plugin, which does the native wiring below for you.
 
 If you are starting a new project, please consider using our [Expo + TypeScript starter kit](https://github.com/ReactVision/expo-starter-kit-typescript) as a basis for your app.
 

@@ -13,6 +13,9 @@
 
 ### Changed
 
+- **Requires Expo SDK 58 and React Native 0.88 on iOS and Android.** `expo` is `>=58.0.0 <59.0.0` and `react-native` is `>=0.88.0 <0.89.0`, with React 19.3. The iOS and Android binaries are rebuilt against 0.88. Apple Vision Pro apps stay on the `@reactvision/react-native-visionos` 0.86 line, which has no 0.88 release yet.
+- **Building the Android bridge from source needs Gradle 9.4.1 and AGP 9**, the versions React Native 0.88 brings. An app that consumes the published package is not affected.
+- **`ViroNativeRef` is now `HostInstance | null`.** React Native 0.88 removed the `NativeMethods` type the ref carried; a host component's ref is a `HostInstance` with the same methods. `ViroCommonProps` leaves out `ViewProps.onClick`, which 0.88 types differently from Viro's.
 - **Clicks on web reach the node native would give them to.** A press on a child with no `onClick` goes to its nearest ancestor that has one, and a press on a clickable child drags its nearest ancestor with `onDrag`.
 - **Changing a node's opacity or visibility on web no longer resets its position.** Position, rotation, scale, opacity and visibility are now applied separately, so a dragged or simulated node stays where it is.
 

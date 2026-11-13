@@ -23,6 +23,7 @@ import { ViroImage } from "../components/ViroImage";
 import { ViroScene } from "../components/ViroScene";
 import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
+import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
 type PreviewInput = {
@@ -233,14 +234,169 @@ console.warn = (...args: unknown[]) => {
   if (text.startsWith("[Viro")) pushWarning(text.slice(0, 500));
   consoleWarn(...args);
 };
+// Model downloads in flight, for the loading chip: bytes read so far and the size the server gave.
+const modelDownloads = new Map<object, { read: number; size: number }>();
+// Downloads waiting to try again, by model name.
+const modelRetries = new Map<object, string>();
+// What finished in this round of loading, so the chip's count and bar do not go backwards as models finish.
+const round = { count: 0, read: 0, size: 0, sized: true, idleSince: 0 };
+const MODEL_RE = /\.(glb|gltf|vrx|obj|fbx)$/i;
+const standInHref = new URL(PLACEHOLDER_MODEL_URL, document.baseURI).href;
+const fileName = (url: string) => url.split(/[?#]/)[0]!.split("/").pop()!;
+
+function trackDownload(res: Response): Response {
+  // A round ends once nothing has downloaded for a moment, not between one model and the next.
+  if (!modelDownloads.size && !modelRetries.size && performance.now() - round.idleSince > 1500) {
+    Object.assign(round, { count: 0, read: 0, size: 0, sized: true });
+  }
+  const entry = { read: 0, size: Number(res.headers.get("content-length")) || 0 };
+  const key = {};
+  modelDownloads.set(key, entry);
+  const finish = (ok: boolean) => {
+    if (!modelDownloads.delete(key)) return;
+    if (ok) {
+      round.count++;
+      round.read += entry.read;
+      // A compressed response's length is less than what is read.
+      round.size += Math.max(entry.size, entry.read);
+      round.sized &&= entry.size > 0;
+    }
+    if (!modelDownloads.size) round.idleSince = performance.now();
+  };
+  const reader = res.body!.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(c) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          finish(true);
+          c.close();
+        } else {
+          entry.read += value.byteLength;
+          c.enqueue(value);
+        }
+      } catch (err) {
+        finish(false);
+        c.error(err);
+      }
+    },
+    cancel(reason) {
+      finish(false);
+      return reader.cancel(reason);
+    },
+  });
+  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
+function downloadProgress(): { count: number; done: number; read: number; size: number; retrying: string[] } | null {
+  if (!modelDownloads.size && !modelRetries.size) return null;
+  let { read, size, sized } = round;
+  for (const d of modelDownloads.values()) {
+    read += d.read;
+    size += Math.max(d.size, d.read);
+    sized &&= d.size > 0;
+  }
+  return {
+    count: round.count + modelDownloads.size,
+    done: round.count,
+    read,
+    // A total only when every download gave one.
+    size: sized ? size : 0,
+    retrying: [...new Set(modelRetries.values())],
+  };
+}
+
+// The total grows as files arrive one at a time, so a bar against it would go backwards: this one only shows activity.
+function ActivityBar() {
+  return (
+    <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+      <div
+        ref={(el) => {
+          if (el && !el.getAnimations().length) {
+            el.animate([{ transform: "translateX(-100%)" }, { transform: "translateX(250%)" }], { duration: 1200, iterations: Infinity, easing: "ease-in-out" });
+          }
+        }}
+        style={{ width: "40%", height: "100%", borderRadius: 2, background: "#e8e8ee" }}
+      />
+    </div>
+  );
+}
+
+const megabytes = (n: number) => `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`;
+
 const pageFetch = window.fetch.bind(window);
 // Viro's own usage ping. A host's view blocks it, and it is not the scene's to fix.
 const isUsagePing = (url: string) => url.includes("/functions/v1/register-device");
+
+type ModelBytes = { res: Response; body: ArrayBuffer | null };
+// One download per model URL: the scene runs again after every update, and a
+// sandboxed page keeps little or nothing in the browser's cache, so each run
+// would fetch every model again. The server gives a replaced upload a new URL,
+// so one URL is always one file. Finished ones are kept while the preview uses them.
+const modelFetches = new Map<string, Promise<ModelBytes>>();
+const keptModels = new Map<string, ModelBytes>();
+let previewAssets = new Set<string>();
+const absolute = (url: string) => {
+  try {
+    return new URL(url, document.baseURI).href;
+  } catch {
+    return url;
+  }
+};
+
+/** Keeps the finished downloads of these assets and drops the rest. */
+function keepModelsOf(assetOverrides: Record<string, string> | undefined) {
+  previewAssets = new Set(Object.values(assetOverrides ?? {}).map(absolute));
+  for (const href of keptModels.keys()) if (!previewAssets.has(href)) keptModels.delete(href);
+}
+
+// A gateway error or a dropped connection (a tunnel or proxy losing the request) is tried again; a refusal is not.
+const RETRY_WAITS_MS = [2000, 5000];
+async function downloadModel(input: RequestInfo | URL, name: string): Promise<ModelBytes> {
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt === RETRY_WAITS_MS.length;
+    try {
+      const res = await pageFetch(input);
+      if (res.status < 500 || last) return { res, body: res.ok && res.body ? await (shot ? res : trackDownload(res)).arrayBuffer() : null };
+    } catch (err) {
+      if (last) throw err;
+    }
+    const key = {};
+    modelRetries.set(key, name);
+    await new Promise((r) => setTimeout(r, RETRY_WAITS_MS[attempt]));
+    modelRetries.delete(key);
+    // The wait is part of this round.
+    round.idleSince = performance.now();
+  }
+}
+
+async function fetchModel(href: string, input: RequestInfo | URL): Promise<Response> {
+  let got = keptModels.get(href);
+  if (!got) {
+    let shared = modelFetches.get(href);
+    if (!shared) {
+      shared = downloadModel(input, fileName(href));
+      modelFetches.set(href, shared);
+      shared.then(
+        (done) => {
+          modelFetches.delete(href);
+          if (done.body && previewAssets.has(href)) keptModels.set(href, done);
+        },
+        () => modelFetches.delete(href),
+      );
+    }
+    got = await shared;
+  }
+  return new Response(got.body, { status: got.res.status, statusText: got.res.statusText, headers: got.res.headers });
+}
+
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   const short = url.startsWith("data:") ? "a data: URL" : url.split("?")[0];
   try {
-    const res = await pageFetch(input, init);
+    const href = new URL(url, document.baseURI).href;
+    const model = !init && !(input instanceof Request) && MODEL_RE.test(url.split(/[?#]/)[0]!) && href !== standInHref;
+    const res = model ? await fetchModel(href, input) : await pageFetch(input, init);
     if (!res.ok && !isUsagePing(url)) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
     else if (res.ok && inspectable) noteModelResponse(url, res);
     return res;
@@ -801,6 +957,7 @@ function Chrome({
     return () => observer.disconnect();
   }, [device, cameraControls]);
   const seen = useRef("");
+  const shownDownloads = useRef(false);
   useEffect(() => {
     const onCamera = () => tick((n) => n + 1);
     cameraListeners.add(onCamera);
@@ -810,7 +967,10 @@ function Chrome({
         seen.current = key;
         postStatus();
         tick((n) => n + 1);
+      } else if (modelDownloads.size || modelRetries.size || shownDownloads.current) {
+        tick((n) => n + 1);
       }
+      shownDownloads.current = modelDownloads.size + modelRetries.size > 0;
     }, 300);
     return () => {
       cameraListeners.delete(onCamera);
@@ -819,6 +979,8 @@ function Chrome({
   }, []);
 
   const issues = renderState.warnings.length + (renderState.error ? 1 : 0);
+  const downloads = downloadProgress();
+  const downloading = !!downloads && downloads.count > downloads.done;
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       {/* On a narrow view the name gives way first, then the buttons wrap. */}
@@ -943,6 +1105,19 @@ function Chrome({
           Drop the file to replace its placeholder
         </div>
       ) : null}
+      {downloads && !dropping ? (
+        <div role="status" style={{ ...chip, alignSelf: "center", display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
+          {downloading ? (
+            <div style={{ fontWeight: 600 }}>
+              Loading {downloads!.count} {downloads!.count === 1 ? "model" : "models"}
+              {downloads!.done ? ` (${downloads!.done} done)` : ""}:{" "}
+              {downloads!.size ? `${megabytes(downloads!.read)} of ${megabytes(downloads!.size)}` : `${megabytes(downloads!.read)} so far`}
+            </div>
+          ) : null}
+          {downloads?.retrying.length ? <div style={{ color: "#ffd27a" }}>A download failed. Retrying {downloads.retrying.join(", ")}...</div> : null}
+          {downloading ? <ActivityBar /> : null}
+        </div>
+      ) : null}
       {waitingSelectors.size && !dropping && !renderState.error ? (
         <div style={{ ...chip, alignSelf: "center", fontWeight: 600 }}>
           {touch ? "Tap" : "Click"} the highlighted surface to place the scene's content
@@ -1024,6 +1199,7 @@ function Preview({ input }: { input: PreviewInput }) {
   const compileWarnings = useRef<string[]>([]);
   const shown = useRef<PreviewInput | null>(null);
   useEffect(() => {
+    keepModelsOf(input.assetOverrides);
     // An update replaces the running scene, so its status starts over; the scene being looked at stays selected.
     if (shown.current) {
       renderState.ready = false;

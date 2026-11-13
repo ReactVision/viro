@@ -4,7 +4,8 @@
  * Asset resolution that survives visionOS.
  */
 
-import { AssetRegistry, Image, NativeModules } from "react-native";
+import { Image, NativeModules } from "react-native";
+import { getAssetByIDFunction } from "./ViroAssetRegistry";
 
 /**
  * `Image.resolveAssetSource` returns `{ uri: "" }` on visionOS.
@@ -38,8 +39,13 @@ export function resolveViroAssetSource(source: any): any {
     return resolved;
   }
 
+  const getAssetByID = getAssetByIDFunction();
+  if (!getAssetByID) {
+    return resolved;
+  }
+
   try {
-    const meta = AssetRegistry.getAssetByID(source);
+    const meta = getAssetByID(source);
     if (!meta) {
       return resolved;
     }

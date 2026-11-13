@@ -11,7 +11,6 @@
  */
 
 import {
-  AssetRegistry,
   ColorValue,
   ImageResolvedAssetSource,
   NativeModules,
@@ -22,6 +21,7 @@ import {
 // @ts-ignore
 import resolveAssetSource from "react-native/Libraries/Image/resolveAssetSource";
 import { ViroSource } from "../Types/ViroUtils";
+import { getAssetByIDFunction } from "../Utilities/ViroAssetRegistry";
 
 var MaterialManager =
   NativeModules.VRTMaterialManager ||
@@ -165,6 +165,19 @@ export type ViroMaterialDict = {
   [key: string]: ViroMaterial;
 };
 
+let warnedNoAssetRegistry = false;
+
+// Once per app run: without a registry every `require()` texture is skipped the same way.
+function warnNoAssetRegistry() {
+  if (warnedNoAssetRegistry) {
+    return;
+  }
+  warnedNoAssetRegistry = true;
+  console.warn(
+    "ViroMaterials: React Native's AssetRegistry is not available, so textures given as require() are skipped"
+  );
+}
+
 export class ViroMaterials {
   static createMaterials(materials: ViroMaterialDict) {
     var result: any = {};
@@ -203,7 +216,12 @@ export class ViroMaterials {
           } else {
             var assetType = "unknown";
             if (typeof material[prop] !== "object") {
-              var asset = AssetRegistry.getAssetByID(material[prop]);
+              const getAssetByID = getAssetByIDFunction();
+              if (!getAssetByID) {
+                warnNoAssetRegistry();
+                continue;
+              }
+              var asset = getAssetByID(material[prop]);
               if (asset) {
                 assetType = asset.type;
               }

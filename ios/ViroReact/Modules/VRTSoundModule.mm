@@ -39,6 +39,17 @@
 }
 
 RCT_EXPORT_MODULE()
+
+// _preloadedSounds and _preloadCallbacks are read by VRTSound on the main thread
+// (dataForName), so every method runs there too.
+- (dispatch_queue_t)methodQueue {
+    return dispatch_get_main_queue();
+}
+
++ (BOOL)requiresMainQueueSetup {
+    return NO;
+}
+
 RCT_EXPORT_METHOD(preloadSounds:(NSDictionary *)soundDict
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
@@ -62,20 +73,38 @@ RCT_EXPORT_METHOD(preloadSounds:(NSDictionary *)soundDict
         _preloadedSounds[cKeyString] = data;
 
         if (resolve) {
-            // Create a finish preloading callback with the promise for notifying Javascript with.
-            std::function<void(bool success, std::string msg)> onFinish = [self, cKeyString, resolve](bool success, std::string msg) {
-                if (_preloadCallbacks.find(cKeyString) != _preloadCallbacks.end()) {
-                    _preloadCallbacks.erase(cKeyString);
+            // Resolves once, on the main thread: a download can finish off main, and
+            // setDelegate notifies at once when the data is already loaded.
+            auto resolved = std::make_shared<bool>(false);
+            auto weakCallback = std::make_shared<std::weak_ptr<VROSoundDataDelegateiOS>>();
+            std::function<void(bool success, std::string msg)> onFinish = [self, cKeyString, resolve, resolved, weakCallback](bool success, std::string msg) {
+                void (^finish)(void) = ^{
+                    if (*resolved) {
+                        return;
+                    }
+                    *resolved = true;
+                    RCTPromiseResolveBlock resolveOnce = resolve;
+                    // Drop this key's callback, unless a later preload of the same key replaced it.
+                    auto it = self->_preloadCallbacks.find(cKeyString);
+                    if (it != self->_preloadCallbacks.end() && it->second == weakCallback->lock()) {
+                        self->_preloadCallbacks.erase(it);
+                    }
+                    resolveOnce(@{
+                                  @"key" : @(cKeyString.c_str()),
+                                  @"result" : @(success),
+                                  @"msg" : @(msg.c_str()),
+                                  });
+                };
+                if ([NSThread isMainThread]) {
+                    finish();
+                } else {
+                    dispatch_async(dispatch_get_main_queue(), finish);
                 }
-                resolve(@{
-                          @"key" : @(cKeyString.c_str()),
-                          @"result" : @(success),
-                          @"msg" : @(msg.c_str()),
-                          });
             };
-            
+
             // Store a strong reference to the sound delegate callback for the given sound key.
             std::shared_ptr<VROSoundDataDelegateiOS> callback = std::make_shared<VROSoundDataDelegateiOS>(onFinish);
+            *weakCallback = callback;
             _preloadCallbacks[cKeyString] = callback;
             // Notifies right away if the data finished loading before this line.
             data->setDelegate(callback);

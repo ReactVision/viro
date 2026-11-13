@@ -11,20 +11,75 @@ import type { ViroHandle, ViroSceneApi, ViroWebRenderer } from "@reactvision/vir
 import { useViroRenderer } from "../components/Web/ViroWebContext";
 import { viroNodeEntries } from "../components/Web/useViroNode";
 import { cameraView, type CameraView } from "../components/Web/viroDrag";
+import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { VIRO_SOURCE_PROP, type ViroSource } from "./sceneModule";
 
-export type TriangleBudget = { label: string; max_triangles: number };
+export type ModelBudget = { label: string; max_triangles: number; max_texture_bytes?: number; max_texture_dimension?: number };
 
 // ─── What the GPU draws ───────────────────────────────────────────────────
 // The renderer reports no statistics, so its WebGL draw calls are counted.
 const counting = { draws: 0, triangles: 0 };
 let lastFrame: { draws: number; triangles: number } | null = null;
 
+// Textures by context, sized from what the renderer allocates for each.
+type TextureSize = { levels: Map<string, number>; mipmapped: boolean; dimension: number };
+const contexts = new Map<WebGL2RenderingContext, Map<WebGLTexture, TextureSize>>();
+
+// Bytes a pixel of a sized internal format; anything else is taken as RGBA8.
+const PIXEL_BYTES: Record<number, number> = {
+  0x1906: 1, 0x1909: 1, 0x8229: 1, // ALPHA, LUMINANCE, R8
+  0x190a: 2, 0x822b: 2, 0x822d: 2, 0x81a5: 2, // LUMINANCE_ALPHA, RG8, R16F, DEPTH_COMPONENT16
+  0x881a: 8, 0x881b: 8, 0x8230: 8, // RGBA16F, RGB16F, RG32F
+  0x8814: 16, 0x8815: 16, // RGBA32F, RGB32F
+};
+// The binding a texture call's target writes to.
+const BINDING: Record<number, number> = { 0x0de1: 0x8069, 0x8513: 0x8514, 0x806f: 0x806a, 0x8c1a: 0x8c1d };
+const bindingOf = (target: number) => (target >= 0x8515 && target <= 0x851a ? 0x8514 : BINDING[target]);
+
+function boundTexture(gl: WebGL2RenderingContext, target: number): TextureSize | null {
+  const binding = bindingOf(target);
+  const texture = binding === undefined ? null : (gl.getParameter(binding) as WebGLTexture | null);
+  if (!texture) return null;
+  let sizes = contexts.get(gl);
+  if (!sizes) contexts.set(gl, (sizes = new Map()));
+  let size = sizes.get(texture);
+  if (!size) sizes.set(texture, (size = { levels: new Map(), mipmapped: false, dimension: 0 }));
+  return size;
+}
+
+function noteLevel(gl: WebGL2RenderingContext, target: number, level: number | string, bytes: number, width: number, height: number): void {
+  const size = boundTexture(gl, target);
+  if (!size || !Number.isFinite(bytes)) return;
+  size.levels.set(`${target}:${level}`, bytes);
+  if (level === 0 || level === "all") size.dimension = Math.max(size.dimension, width, height);
+}
+
+/** Bytes of texture the live renderers hold, and the longest side among them. An estimate: drivers pad and align as they like. */
+function textureMemory(): { bytes: number; dimension: number } {
+  let bytes = 0;
+  let dimension = 0;
+  for (const [gl, sizes] of contexts) {
+    const canvas = gl.canvas as HTMLCanvasElement;
+    if (gl.isContextLost() || canvas.isConnected === false) {
+      contexts.delete(gl);
+      continue;
+    }
+    for (const size of sizes.values()) {
+      let own = 0;
+      for (const b of size.levels.values()) own += b;
+      bytes += size.mipmapped ? (own * 4) / 3 : own;
+      dimension = Math.max(dimension, size.dimension);
+    }
+  }
+  return { bytes, dimension };
+}
+
 const trianglesOf = (mode: number, count: number) =>
   // TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN
   mode === 4 ? Math.floor(count / 3) : mode === 5 || mode === 6 ? Math.max(0, count - 2) : 0;
 
-export function countDrawCalls(): void {
+/** Counts the renderer's draw calls and sizes its textures. Call before the renderer makes its context. */
+export function watchGpu(): void {
   if (typeof WebGL2RenderingContext === "undefined") return;
   const gl = WebGL2RenderingContext.prototype as unknown as Record<string, (...a: number[]) => unknown>;
   // Method name, then the positions of its count and instance-count arguments.
@@ -44,48 +99,112 @@ export function countDrawCalls(): void {
       return original.apply(this, a);
     };
   }
+
+  // Runs after the call it follows, and never fails it.
+  const after = (name: string, note: (gl: WebGL2RenderingContext, a: any[]) => void) => {
+    const original = gl[name];
+    if (typeof original !== "function") return;
+    gl[name] = function (this: unknown, ...a: number[]) {
+      const result = original.apply(this, a);
+      try {
+        note(this as WebGL2RenderingContext, a);
+      } catch {
+        // A size that cannot be read is left out of the estimate.
+      }
+      return result;
+    };
+  };
+  const pixels = (format: number) => PIXEL_BYTES[format] ?? 4;
+  after("texImage2D", (ctx, a) => {
+    // (target, level, internalformat, width, height, border, ...) or (target, level, internalformat, format, type, source).
+    const sized = a.length >= 8;
+    const w = sized ? a[3] : a[5]?.videoWidth || a[5]?.naturalWidth || a[5]?.width || 0;
+    const h = sized ? a[4] : a[5]?.videoHeight || a[5]?.naturalHeight || a[5]?.height || 0;
+    noteLevel(ctx, a[0], a[1], w * h * pixels(a[2]), w, h);
+  });
+  after("texImage3D", (ctx, a) => noteLevel(ctx, a[0], a[1], a[3] * a[4] * a[5] * pixels(a[2]), a[3], a[4]));
+  // Immutable storage holds its whole chain, about a third more than the first level.
+  after("texStorage2D", (ctx, a) => noteLevel(ctx, a[0], "all", a[3] * a[4] * pixels(a[2]) * (a[1] > 1 ? 4 / 3 : 1), a[3], a[4]));
+  after("texStorage3D", (ctx, a) => noteLevel(ctx, a[0], "all", a[3] * a[4] * a[5] * pixels(a[2]) * (a[1] > 1 ? 4 / 3 : 1), a[3], a[4]));
+  after("compressedTexImage2D", (ctx, a) => noteLevel(ctx, a[0], a[1], typeof a[6] === "number" ? a[6] : a[6]?.byteLength ?? 0, a[3], a[4]));
+  after("generateMipmap", (ctx, a) => {
+    const size = boundTexture(ctx, a[0]);
+    if (size) size.mipmapped = true;
+  });
+  after("deleteTexture", (ctx, a) => void contexts.get(ctx)?.delete(a[0]));
 }
 
-// One renderer frame's worth: what was drawn since the last animation frame.
-function sampleFrame() {
-  if (counting.draws) lastFrame = { ...counting };
+// One renderer frame's worth: what was drawn since the last animation frame. True when a frame was drawn.
+function sampleFrame(): boolean {
+  const drew = counting.draws > 0;
+  if (drew) lastFrame = { ...counting };
   counting.draws = counting.triangles = 0;
+  return drew;
 }
 
-// ─── Model triangles ──────────────────────────────────────────────────────
-const modelTriangles = new Map<string, number | null>();
+// ─── Model sizes ──────────────────────────────────────────────────────────
+/** `textureDimension` is 0 when no texture's size could be read. */
+type ModelSize = { triangles: number; textureBytes: number; textureDimension: number };
+const modelSizes = new Map<string, ModelSize | null>();
 
-/** Triangles in a glTF or GLB, counted as reactviro_check_performance_budget counts them: each mesh's TRIANGLES primitives once. */
-function gltfTriangles(buf: ArrayBuffer): number | null {
-  let doc: { meshes?: Array<{ primitives?: Array<{ mode?: number; indices?: number; attributes?: { POSITION?: number } }> }>; accessors?: Array<{ count?: number }> };
+/**
+ * A glTF or GLB measured as reactviro_check_performance_budget measures it: each
+ * mesh's TRIANGLES primitives once, the bytes of its embedded images, and the
+ * longest side among its PNGs (a JPEG's size is not read there either).
+ */
+function gltfSize(buf: ArrayBuffer): ModelSize | null {
+  let doc: {
+    meshes?: Array<{ primitives?: Array<{ mode?: number; indices?: number; attributes?: { POSITION?: number } }> }>;
+    accessors?: Array<{ count?: number }>;
+    images?: Array<{ mimeType?: string; bufferView?: number }>;
+    bufferViews?: Array<{ byteOffset?: number; byteLength?: number }>;
+  };
+  let bin: DataView | null = null;
   try {
     const view = new DataView(buf);
     if (buf.byteLength >= 20 && view.getUint32(0, true) === 0x46546c67) {
       if (view.getUint32(16, true) !== 0x4e4f534a) return null;
-      doc = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, view.getUint32(12, true))));
+      const jsonLength = view.getUint32(12, true);
+      doc = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLength)));
+      const at = 20 + jsonLength;
+      if (at + 8 <= buf.byteLength && view.getUint32(at + 4, true) === 0x004e4942) {
+        bin = new DataView(buf, at + 8, Math.min(view.getUint32(at, true), buf.byteLength - at - 8));
+      }
     } else {
       doc = JSON.parse(new TextDecoder().decode(buf));
     }
   } catch {
     return null;
   }
-  let n = 0;
+  let triangles = 0;
   for (const mesh of doc.meshes ?? []) {
     for (const p of mesh.primitives ?? []) {
       if ((p.mode ?? 4) !== 4) continue;
-      n += Math.floor((doc.accessors?.[p.indices ?? p.attributes?.POSITION ?? -1]?.count ?? 0) / 3);
+      triangles += Math.floor((doc.accessors?.[p.indices ?? p.attributes?.POSITION ?? -1]?.count ?? 0) / 3);
     }
   }
-  return n;
+  let textureBytes = 0;
+  let textureDimension = 0;
+  for (const image of doc.images ?? []) {
+    const view = doc.bufferViews?.[image.bufferView ?? -1];
+    if (!view?.byteLength) continue;
+    textureBytes += view.byteLength;
+    const start = view.byteOffset ?? 0;
+    // A PNG's width and height are at fixed offsets in its first chunk.
+    if (bin && (image.mimeType ?? "").includes("png") && start + 24 <= bin.byteLength && bin.getUint32(start) === 0x89504e47) {
+      textureDimension = Math.max(textureDimension, bin.getUint32(start + 16), bin.getUint32(start + 20));
+    }
+  }
+  return { triangles, textureBytes, textureDimension };
 }
 
-/** Counts a loaded model's triangles from the response the scene fetched it with. */
+/** Measures a loaded model from the response the scene fetched it with. */
 export function noteModelResponse(url: string, res: Response): void {
   if (!res.ok || !/\.(glb|gltf)$/i.test(url.split(/[?#]/)[0]!)) return;
   res
     .clone()
     .arrayBuffer()
-    .then((buf) => modelTriangles.set(url, gltfTriangles(buf)))
+    .then((buf) => modelSizes.set(url, gltfSize(buf)))
     .catch(() => {});
 }
 
@@ -104,11 +223,12 @@ export function InspectorProbe() {
   return null;
 }
 
-type Row = { handle: ViroHandle; source: ViroSource; depth: number; detail: string; triangles?: number | null };
+type Row = { handle: ViroHandle; source: ViroSource; depth: number; detail: string; size?: ModelSize | null };
 
 const basename = (uri: string) => decodeURIComponent(uri.split(/[?#]/)[0]!.split("/").pop() ?? uri);
 const sourceKey = (s: ViroSource) => `${s.name}@${s.file}:${s.line}`;
 const fmt = (n: number) => n.toLocaleString("en-US");
+const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 function rowsOf(scene: ViroSceneApi): Row[] {
   const entries = viroNodeEntries(scene);
@@ -139,12 +259,13 @@ function rowsOf(scene: ViroSceneApi): Row[] {
       const props = entries.get(h)!.props() as Record<string, unknown>;
       const source = sourceOf(h)!;
       let detail = "";
-      let triangles: number | null | undefined;
+      let size: ModelSize | null | undefined;
       if (typeof props.text === "string") detail = `"${props.text.length > 28 ? `${props.text.slice(0, 27)}...` : props.text}"`;
       const uri = typeof props.source === "string" ? props.source : (props.source as { uri?: unknown } | undefined)?.uri;
-      if (typeof uri === "string" && !uri.startsWith("data:")) detail = basename(uri);
-      if (source.name === "Viro3DObject" && typeof uri === "string") triangles = modelTriangles.get(uri);
-      rows.push({ handle: h, source, depth, detail, triangles });
+      if (typeof uri === "string" && !uri.startsWith("data:")) detail = uri === PLACEHOLDER_MODEL_URL ? "placeholder" : basename(uri);
+      // The stand-in's size says nothing about the model it stands for.
+      if (source.name === "Viro3DObject" && typeof uri === "string" && uri !== PLACEHOLDER_MODEL_URL) size = modelSizes.get(uri);
+      rows.push({ handle: h, source, depth, detail, size });
       walk(h, depth + 1);
     }
   };
@@ -167,12 +288,12 @@ function project(view: CameraView, p: [number, number, number]): { x: number; y:
 }
 
 /** The sentence the assistant gets for a selected node. */
-function selectionText(row: Row, at: [number, number, number] | null, budgets: TriangleBudget[], scene: string | undefined): string {
+function selectionText(row: Row, at: [number, number, number] | null, budgets: ModelBudget[], scene: string | undefined): string {
   const where = row.source.file ? ` at ${row.source.file}:${row.source.line}` : "";
   const facts = [
     row.detail ? `showing ${row.detail}` : "",
     at ? `world position [${at.map((n) => n.toFixed(2)).join(", ")}]` : "",
-    row.triangles != null ? `${fmt(row.triangles)} triangles${overBudget(row.triangles, budgets)}` : "",
+    row.size ? `${sizeText(row.size)}${overBudgetText(row.size, budgets)}` : "",
   ].filter(Boolean);
   return (
     `In the Viro Live preview${scene ? ` of ${scene}` : ""}, the developer selected <${row.source.name}>${where}` +
@@ -180,9 +301,25 @@ function selectionText(row: Row, at: [number, number, number] | null, budgets: T
   );
 }
 
-function overBudget(triangles: number, budgets: TriangleBudget[]): string {
-  const over = budgets.filter((b) => triangles > b.max_triangles).map((b) => `${b.label} ${fmt(b.max_triangles)}`);
-  return over.length ? `, over the single-model budget for ${over.join(", ")}` : "";
+const sizeText = (s: ModelSize) =>
+  [`${fmt(s.triangles)} triangles`, s.textureBytes ? `${mb(s.textureBytes)} of textures` : "", s.textureDimension ? `textures up to ${s.textureDimension} px` : ""]
+    .filter(Boolean)
+    .join(", ");
+
+/** What a model exceeds of one platform's single-model budget, as reactviro_check_performance_budget words it. */
+function overBudget(s: ModelSize, b: ModelBudget): string[] {
+  const over: string[] = [];
+  if (s.triangles > b.max_triangles) over.push(`${fmt(s.triangles)} triangles > ${fmt(b.max_triangles)}`);
+  if (b.max_texture_bytes !== undefined && s.textureBytes > b.max_texture_bytes) over.push(`${mb(s.textureBytes)} textures > ${mb(b.max_texture_bytes)}`);
+  if (b.max_texture_dimension !== undefined && s.textureDimension > b.max_texture_dimension) {
+    over.push(`${s.textureDimension} px texture dimension > ${b.max_texture_dimension} px`);
+  }
+  return over;
+}
+
+function overBudgetText(s: ModelSize, budgets: ModelBudget[]): string {
+  const over = budgets.map((b) => ({ b, over: overBudget(s, b) })).filter((x) => x.over.length);
+  return over.length ? `, over the single-model budget for ${over.map((x) => `${x.b.label} (${x.over.join("; ")})`).join(", ")}` : "";
 }
 
 export function InspectPanel({
@@ -193,7 +330,7 @@ export function InspectPanel({
   copy,
   onClose,
 }: {
-  budgets: TriangleBudget[];
+  budgets: ModelBudget[];
   scene: string | undefined;
   /** Null when nothing is selected; undefined where no assistant is listening. */
   onSelection?: (text: string | null) => void;
@@ -202,7 +339,11 @@ export function InspectPanel({
   onClose(): void;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [frame, setFrame] = useState(lastFrame);
+  const [stats, setStats] = useState<{ frame: typeof lastFrame; fps: number | null; textures: { bytes: number; dimension: number } }>({
+    frame: lastFrame,
+    fps: null,
+    textures: { bytes: 0, dimension: 0 },
+  });
   const [selected, setSelected] = useState<{ handle: ViroHandle; key: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const marker = useRef<HTMLDivElement>(null);
@@ -211,10 +352,15 @@ export function InspectPanel({
 
   // The node list is filled from effects as the scene mounts, so it is read again while the panel is open.
   useEffect(() => {
+    let frames = 0;
+    let since = performance.now();
     const read = () => {
       const next = inspected ? rowsOf(inspected.scene) : [];
       setRows(next);
-      setFrame(lastFrame);
+      const now = performance.now();
+      setStats({ frame: lastFrame, fps: now > since ? Math.round((frames * 1000) / (now - since)) : null, textures: textureMemory() });
+      frames = 0;
+      since = now;
       const sel = selectedRef.current;
       // An update remounts the scene with new handles: keep the same element selected if it is still there.
       if (sel && !next.some((r) => r.handle === sel.handle)) {
@@ -226,7 +372,7 @@ export function InspectPanel({
     const timer = setInterval(read, 500);
     let raf = 0;
     const tick = () => {
-      sampleFrame();
+      if (sampleFrame()) frames++;
       const sel = selectedRef.current;
       const el = marker.current;
       const view = inspected && cameraView(inspected.scene);
@@ -259,7 +405,8 @@ export function InspectPanel({
   useEffect(() => () => onSelection?.(null), []);
 
   const { chip, button } = styles;
-  const models = rows.filter((r) => r.triangles != null);
+  const models = rows.filter((r) => r.size);
+  const { frame, fps, textures } = stats;
   return (
     <>
       <div
@@ -274,8 +421,20 @@ export function InspectPanel({
             Close
           </button>
         </div>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          {frame ? `Last frame: ${fmt(frame.draws)} draw calls, ${fmt(frame.triangles)} triangles, including the grid and any shadow passes.` : "Waiting for a frame..."}
+        <div
+          style={{ fontSize: 12, opacity: 0.8 }}
+          title="The frame rate is this browser's. The rest is the last frame, with the grid, shadow passes and render targets counted; texture memory is an estimate."
+        >
+          {frame
+            ? [
+                fps ? `${fps} fps` : "",
+                `${fmt(frame.draws)} draw calls`,
+                `${fmt(frame.triangles)} triangles`,
+                textures.bytes ? `about ${mb(textures.bytes)} of textures, the largest ${fmt(textures.dimension)} px` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "Waiting for a frame..."}
         </div>
         {rows.length === 0 ? <div style={{ opacity: 0.7 }}>No nodes yet.</div> : null}
         <div role="listbox" aria-label="Nodes" style={{ display: "flex", flexDirection: "column" }}>
@@ -301,13 +460,19 @@ export function InspectPanel({
         {models.length ? (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 6, display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
             {models.map((m) => {
-              const over = budgets.filter((b) => m.triangles! > b.max_triangles);
+              const over = budgets.map((b) => ({ b, over: overBudget(m.size!, b) })).filter((x) => x.over.length);
               return (
-                <div key={m.handle} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.detail}</span>
-                  <span style={{ flex: "none", color: over.length ? "#ffd27a" : "#9be7a7" }} title={budgets.map((b) => `${b.label}: ${fmt(b.max_triangles)}`).join("\n")}>
-                    {fmt(m.triangles!)} triangles{over.length ? `, over ${over.map((b) => b.label.split(" (")[0]).join(", ")}` : ""}
-                  </span>
+                <div key={m.handle} style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.detail}</span>
+                    <span style={{ flex: "none", color: over.length ? "#ffd27a" : "#9be7a7" }}>{over.length ? "Over budget" : "Within budgets"}</span>
+                  </div>
+                  <div style={{ opacity: 0.8 }}>{sizeText(m.size!)}</div>
+                  {over.map((x) => (
+                    <div key={x.b.label} style={{ color: "#ffd27a" }}>
+                      {x.b.label}: {x.over.join("; ")}
+                    </div>
+                  ))}
                 </div>
               );
             })}

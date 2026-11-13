@@ -21,7 +21,7 @@ import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
 import { ViroARScene } from "../components/AR/ViroARScene";
 import { ViroImage } from "../components/ViroImage";
 import { ViroScene } from "../components/ViroScene";
-import { countDrawCalls, InspectorProbe, InspectPanel, noteModelResponse, type TriangleBudget } from "./inspector";
+import { InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
 import { setARNavigatorDefaults } from "./viroWebComponents";
 
@@ -40,8 +40,8 @@ type PreviewInput = {
   /** Which update of the preview this is, and where a newer one is asked for: the page appends the version it shows. */
   version?: number;
   updatesUrl?: string;
-  /** Per-platform single-model triangle budgets the inspector compares models against. */
-  budgets?: TriangleBudget[];
+  /** Per-platform single-model budgets the inspector compares models against. */
+  budgets?: ModelBudget[];
 };
 
 type SceneInfo = { path: string; renderRequest?: string };
@@ -73,7 +73,7 @@ const host = window.__PREVIEW_HOST__;
 // Framed by, or running inside, the MCP Apps view.
 const framed = window.parent !== window;
 const inspectable = !liveAR && !shot;
-if (inspectable) countDrawCalls();
+if (inspectable) watchGpu();
 
 type Controls = { reset(): void };
 let cameraControls: Controls | null = null;
@@ -598,7 +598,7 @@ function Chrome({
   scenes: SceneInfo[];
   index: number;
   onSelect(i: number): void;
-  budgets?: TriangleBudget[];
+  budgets?: ModelBudget[];
 }) {
   const [, tick] = useState(0);
   const [showIssues, setShowIssues] = useState(false);

@@ -95,7 +95,23 @@ const cameraListeners = new Set<() => void>();
 // parts and ViroARScene.web feeds it anchor events. Headless renders keep the
 // stub, which draws the children unanchored, because there nothing can select
 // a plane and the content would never appear.
-addViroExports({ ViroARPlaneSelector });
+// Selectors showing a plane to click and none selected: they draw no children until then.
+const waitingSelectors = new Set<ViroARPlaneSelector>();
+class PreviewPlaneSelector extends ViroARPlaneSelector {
+  componentDidMount() {
+    this.componentDidUpdate();
+  }
+  componentDidUpdate() {
+    const { selectedPlaneId, planes } = this.state;
+    const waiting = selectedPlaneId === null && planes.size > 0 && this.props.children != null && !this.props.disableClickSelection;
+    if (waiting) waitingSelectors.add(this);
+    else waitingSelectors.delete(this);
+  }
+  componentWillUnmount() {
+    waitingSelectors.delete(this);
+  }
+}
+addViroExports({ ViroARPlaneSelector: PreviewPlaneSelector });
 
 // Unit vectors from the content's centre to the camera.
 const VIEW_FROM: Record<string, Vec3> = { front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0], top: [0, 1, 0] };
@@ -789,7 +805,7 @@ function Chrome({
     const onCamera = () => tick((n) => n + 1);
     cameraListeners.add(onCamera);
     const timer = setInterval(() => {
-      const key = `${renderState.ready}|${renderState.error}|${renderState.warnings.length}`;
+      const key = `${renderState.ready}|${renderState.error}|${renderState.warnings.length}|${waitingSelectors.size}`;
       if (key !== seen.current) {
         seen.current = key;
         postStatus();
@@ -925,6 +941,11 @@ function Chrome({
       {dropping ? (
         <div style={{ ...chip, alignSelf: "center", fontWeight: 600, border: "1px dashed rgba(255,255,255,0.5)", padding: "14px 18px" }}>
           Drop the file to replace its placeholder
+        </div>
+      ) : null}
+      {waitingSelectors.size && !dropping && !renderState.error ? (
+        <div style={{ ...chip, alignSelf: "center", fontWeight: 600 }}>
+          {touch ? "Tap" : "Click"} the highlighted surface to place the scene's content
         </div>
       ) : null}
       {request && renderRequest ? (

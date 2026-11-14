@@ -27,6 +27,16 @@ const resolveXrModes = (options: ViroConfigurationOptions): string[] => {
   return ["AR", "GVR"];
 };
 
+/**
+ * Only the AR mode runs on ARCore. A build without it (GVR, OVR_MOBILE, or QUEST
+ * on its own) leaves out the ARCore AAR, which also stops ARCore's manifest
+ * entries reaching the app. iOS does the same with its ARCore pods.
+ *
+ * gvr_common stays in every build: the renderer links libgvr, and audio on Quest
+ * runs on GVR audio.
+ */
+export const xrModesUseARCore = (xrModes: string[]): boolean => xrModes.includes("AR");
+
 const withBranchAndroid: ConfigPlugin<ViroConfigurationOptions> = (config, props) => {
   const viroPluginConfig = resolveXrModes(resolveViroOptions(config, props));
   // Directly edit MainApplication.java
@@ -178,7 +188,7 @@ const VIRO_DEPENDENCIES_TAG = "viro-dependencies";
 const LEGACY_DEPENDENCIES_BLOCK =
   /\n[ \t]*\/\/ =+\n[ \t]*\/\/ ViroReact New Architecture \(Fabric\) Dependencies[\s\S]*?\n[ \t]*\/\/ =+/g;
 
-export function applyViroAppBuildGradle(contents: string): string {
+export function applyViroAppBuildGradle(contents: string, includeARCore = true): string {
   // ViroReact New Architecture (Fabric) Dependencies
   const viroNewArchDependencies =
     "\n" +
@@ -186,8 +196,7 @@ export function applyViroAppBuildGradle(contents: string): string {
       VIRO_DEPENDENCIES_TAG,
       `    // ViroReact New Architecture (Fabric) Dependencies
     // https://viro-community.readme.io/docs/installation-instructions
-    implementation project(':gvr_common')
-    implementation project(':arcore_client')
+    implementation project(':gvr_common')${includeARCore ? "\n    implementation project(':arcore_client')" : ""}
     implementation project(path: ':react_viro')
     implementation project(path: ':viro_renderer')
     implementation 'androidx.media3:media3-exoplayer:1.1.1'
@@ -220,9 +229,10 @@ export function applyViroAppBuildGradle(contents: string): string {
   return contents;
 }
 
-const withViroAppBuildGradle = (config: ExpoConfig) =>
+const withViroAppBuildGradle = (config: ExpoConfig, props?: ViroConfigurationOptions) =>
   withAppBuildGradle(config, async (config) => {
-    config.modResults.contents = applyViroAppBuildGradle(config.modResults.contents);
+    const includeARCore = xrModesUseARCore(resolveXrModes(resolveViroOptions(config, props)));
+    config.modResults.contents = applyViroAppBuildGradle(config.modResults.contents, includeARCore);
     return config;
   });
 
@@ -258,7 +268,11 @@ const VIRO_SETTINGS_TAG = "viro-settings";
 const LEGACY_SETTINGS_BLOCK =
   /\n?include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'\n(?:project\(':(?:arcore_client|gvr_common|viro_renderer|react_viro)'\)\.projectDir = [^\n]*\n?)+[ \t]*/g;
 
-export function applyViroSettingsGradle(contents: string, viroAndroidRoot: string): string {
+export function applyViroSettingsGradle(
+  contents: string,
+  viroAndroidRoot: string,
+  includeARCore = true
+): string {
   contents = removeGeneratedBlock(contents, VIRO_SETTINGS_TAG, "//")
     .replace(LEGACY_SETTINGS_BLOCK, "")
     .trimEnd();
@@ -267,8 +281,15 @@ export function applyViroSettingsGradle(contents: string, viroAndroidRoot: strin
     "\n\n" +
     wrapGeneratedBlock(
       VIRO_SETTINGS_TAG,
-      `include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'
-project(':arcore_client').projectDir = new File('${viroAndroidRoot}/arcore_client')
+      `${
+        includeARCore
+          ? "include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'"
+          : "include ':react_viro', ':gvr_common', ':viro_renderer'"
+      }${
+        includeARCore
+          ? `\nproject(':arcore_client').projectDir = new File('${viroAndroidRoot}/arcore_client')`
+          : ""
+      }
 project(':gvr_common').projectDir = new File('${viroAndroidRoot}/gvr_common')
 project(':viro_renderer').projectDir = new File('${viroAndroidRoot}/viro_renderer')
 project(':react_viro').projectDir = new File('${viroAndroidRoot}/react_viro')`,
@@ -278,15 +299,17 @@ project(':react_viro').projectDir = new File('${viroAndroidRoot}/react_viro')`,
   );
 }
 
-const withViroSettingsGradle = (config: ExpoConfig) =>
+const withViroSettingsGradle = (config: ExpoConfig, props?: ViroConfigurationOptions) =>
   withSettingsGradle(config, async (config) => {
+    const includeARCore = xrModesUseARCore(resolveXrModes(resolveViroOptions(config, props)));
     const viroAndroidRoot = resolveViroAndroidRelativePath(
       config.modRequest.projectRoot,
       config.modRequest.platformProjectRoot
     );
     config.modResults.contents = applyViroSettingsGradle(
       config.modResults.contents,
-      viroAndroidRoot
+      viroAndroidRoot,
+      includeARCore
     );
     return config;
   });
@@ -323,14 +346,20 @@ const withViroManifest = (config: ExpoConfig, props?: ViroConfigurationOptions) 
         AndroidConfig.Manifest.addMetaDataItemToMainApplication(metaApplication, name, value);
       };
 
-      setMetaData("com.google.ar.core", "optional");
-
       // Add Google Cloud API key for ARCore Cloud Anchors and Geospatial API if configured
       const pluginOptions = resolveViroOptions(config, props);
 
       // The XR modes are derived from the options here: withBranchAndroid's
       // withDangerousMod runs after the manifest mods.
       const activeXrModes = resolveXrModes(pluginOptions);
+      const usesARCore = xrModesUseARCore(activeXrModes);
+
+      if (usesARCore) {
+        setMetaData("com.google.ar.core", "optional");
+      } else {
+        // Left by an earlier prebuild that had the AR mode.
+        AndroidConfig.Manifest.removeMetaDataItemFromMainApplication(metaApplication, "com.google.ar.core");
+      }
       const questBuild = activeXrModes.includes("QUEST");
       const questFeatures = pluginOptions.android?.questFeatures;
       const questPassthroughCamera = questFeatures?.passthroughCamera !== false;
@@ -423,8 +452,15 @@ const withViroManifest = (config: ExpoConfig, props?: ViroConfigurationOptions) 
       if (!contents.manifest.queries) contents.manifest.queries = [{}];
       const queries = contents.manifest.queries[0];
       if (!queries.package) queries.package = [];
-      if (!queries.package.some((p: any) => p.$?.["android:name"] === "com.google.ar.core")) {
+      const queriesARCore = queries.package.some(
+        (p: any) => p.$?.["android:name"] === "com.google.ar.core"
+      );
+      if (usesARCore && !queriesARCore) {
         queries.package.push({ $: { "android:name": "com.google.ar.core" } });
+      } else if (!usesARCore && queriesARCore) {
+        queries.package = queries.package.filter(
+          (p: any) => p.$?.["android:name"] !== "com.google.ar.core"
+        );
       }
 
       // Other plugins and app.json may declare features too, so entries are merged by name.
@@ -1047,8 +1083,8 @@ export const withViroAndroid: ConfigPlugin<ViroConfigurationOptions> = (
   config = withBranchAndroid(config, props) as typeof config;
   config = withViroProjectBuildGradle(config) as typeof config;
   config = withViroManifest(config, props) as typeof config;
-  config = withViroSettingsGradle(config) as typeof config;
-  config = withViroAppBuildGradle(config) as typeof config;
+  config = withViroSettingsGradle(config, props) as typeof config;
+  config = withViroAppBuildGradle(config, props) as typeof config;
   config = withViroQuestActivity(config, props) as typeof config;
   return config;
 };

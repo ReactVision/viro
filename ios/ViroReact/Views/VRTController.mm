@@ -114,6 +114,53 @@
         self.onFuseViro(@{@"source": @(source)});
     }
 }
+
+// Drag, pinch and rotate carry the same payloads as VRTNode's and as Android's
+// ComponentEventDelegate, so ViroController's handlers read one shape everywhere.
+-(void)setCanDrag:(BOOL)canDrag {
+    _canDrag = canDrag;
+    _eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnDrag, canDrag);
+}
+
+-(void)setCanPinch:(BOOL)canPinch {
+    _canPinch = canPinch;
+    _eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnPinch, canPinch);
+}
+
+-(void)setCanRotate:(BOOL)canRotate {
+    _canRotate = canRotate;
+    _eventDelegate->setEnabledEvent(VROEventDelegate::EventAction::OnRotate, canRotate);
+}
+
+-(void)onDrag:(int)source node:(std::shared_ptr<VRONode>)node posX:(float)x posY:(float)y posZ:(float)z {
+    if (self.onDragViro != nil) {
+        self.onDragViro(@{@"source": @(source),
+                          @"dragToPos": @[@(x), @(y), @(z)]});
+    }
+}
+
+-(void)onPinch:(int)source node:(std::shared_ptr<VRONode>)node scaleFactor:(float)scale
+    pinchState:(VROEventDelegate::PinchState)pinchState {
+    if (self.onPinchViro != nil) {
+        self.onPinchViro(@{@"source": @(source),
+                           @"pinchState": @(pinchState),
+                           @"scaleFactor": @(scale)});
+    }
+}
+
+-(void)onRotate:(int)source node:(std::shared_ptr<VRONode>)node rotationRadians:(float)rotationRadians
+    rotateState:(VROEventDelegate::RotateState)rotateState {
+    if (self.onRotateViro != nil) {
+        self.onRotateViro(@{@"source": @(source),
+                            @"rotateState": @(rotateState),
+                            @"rotationFactor": @(toDegrees(rotationRadians))});
+    }
+}
+
+// Required by VROEventDelegateProtocol; ViroController has no hover event.
+-(void)onHover:(int)source node:(std::shared_ptr<VRONode>)node isHovering:(bool)isHovering
+ hoverLocation:(std::vector<float>)location {
+}
 @end
 
 

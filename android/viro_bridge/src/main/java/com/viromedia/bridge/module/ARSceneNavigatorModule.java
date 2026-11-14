@@ -323,7 +323,13 @@ public class ARSceneNavigatorModule extends ReactContextBaseJavaModule {
 
     @ReactMethod()
     public void isARSupportedOnDevice(final Callback successCallback) {
-        ViroViewARCore.ARCoreAvailability availability = ViroViewARCore.isARSupportedOnDevice(getReactApplicationContext());
+        ViroViewARCore.ARCoreAvailability availability;
+        try {
+            availability = ViroViewARCore.isARSupportedOnDevice(getReactApplicationContext());
+        } catch (NoClassDefFoundError e) {
+            // A build without the AR xRMode (Quest, GVR) leaves the ARCore AAR out.
+            availability = ViroViewARCore.ARCoreAvailability.UNSUPPORTED;
+        }
         successCallback.invoke(availability.toString());
     }
 

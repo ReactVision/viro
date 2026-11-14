@@ -141,6 +141,24 @@ public:
         }
     }
 
+    virtual void onPinch(int source, std::shared_ptr<VRONode> node, float scaleFactor, PinchState pinchState) {
+        passert_thread(__func__);
+
+        std::shared_ptr<VROEventDelegate> delegate = getDelegate();
+        if (delegate != nullptr && delegate->isEventEnabled(VROEventDelegate::EventAction::OnPinch)){
+            delegate->onPinch(source, node, scaleFactor, pinchState);
+        }
+    }
+
+    virtual void onRotate(int source, std::shared_ptr<VRONode> node, float rotationRadians, RotateState rotateState) {
+        passert_thread(__func__);
+
+        std::shared_ptr<VROEventDelegate> delegate = getDelegate();
+        if (delegate != nullptr && delegate->isEventEnabled(VROEventDelegate::EventAction::OnRotate)){
+            delegate->onRotate(source, node, rotationRadians, rotateState);
+        }
+    }
+
     virtual void onFuse(int source, std::shared_ptr<VRONode> node, float timeToFuseRatio) {
         passert_thread(__func__);
         if (_reticle == nullptr) {

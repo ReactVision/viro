@@ -14,12 +14,16 @@
 
 ### Changed
 
+- **Breaking: requires React Native 0.88 and Expo SDK 58; the next release is 3.2.0.** `expo` is `>=58.0.0 <59.0.0` and `react-native` is `>=0.88.0 <0.89.0`, with React 19.3. React Native 0.86 and Expo SDK 57 are no longer supported. The iOS and Android binaries are rebuilt against 0.88. Apple Vision Pro apps stay on `@reactvision/react-viro` 3.1.x until the visionOS fork, `@reactvision/react-native-visionos`, reaches 0.88; it is no longer an optional peer dependency, since its 0.86 line cannot be installed next to `react-native` 0.88.
+- **Building the Android bridge from source needs Gradle 9.4.1 and AGP 9.2.1**, the versions React Native 0.88 brings. An app that consumes the published package is not affected.
+- **`ViroNativeRef` is now `HostInstance | null`.** React Native 0.88 removed the `NativeMethods` type the ref carried; a host component's ref is a `HostInstance` with the same methods. `ViroCommonProps` leaves out `ViewProps.onClick`, which 0.88 types differently from Viro's.
 - **An Android build without the `AR` xRMode leaves ARCore out (Expo plugin).** With `xRMode` set to `QUEST`, `GVR` or `OVR_MOBILE` only, the plugin no longer adds `:arcore_client` to `app/build.gradle` and `settings.gradle`, the `com.google.ar.core` meta-data or the `com.google.ar.core` `<queries>` entry, and a later prebuild without `AR` removes them. ARCore's own manifest entries go with the AAR. This is how the iOS plugin already treats its ARCore pods. A build that lists `AR` alongside other modes keeps ARCore. `:gvr_common` stays in every build, because the renderer links `libgvr` and audio on Quest runs on GVR audio. `isARSupportedOnDevice` returns `UNSUPPORTED` when ARCore is missing.
 - **Clicks on web reach the node native would give them to.** A press on a child with no `onClick` goes to its nearest ancestor that has one, and a press on a clickable child drags its nearest ancestor with `onDrag`.
 - **Changing a node's opacity or visibility on web no longer resets its position.** Position, rotation, scale, opacity and visibility are now applied separately, so a dragged or simulated node stays where it is.
 
 ### Fixed
 
+- **`ViroObjectDetector` boxes and hit-test positions on iOS line up in a resized window.** They are computed from the AR view's bounds instead of the screen's, so they match the camera feed in a resizable iPhone window and in iPad multitasking (Split View, Slide Over, Stage Manager).
 - **iOS: `ViroSound.preloadSounds` and sounds played by name work (virocore with the fix).** Preloading never loaded anything and its promise never resolved, and a `source={{ name }}` sound stayed silent. The data is now loaded and kept under its key, the promise resolves with `{ result, msg }` as on Android, and a named sound plays from it, firing `onFinish`. A downloaded sound also opens now: its temporary file path was read as a URL with no scheme.
 - **iOS: `ViroSpatialSound` and `ViroSoundField` no longer crash on mount.** The base class's `createSoundWithPath` had been commented out since the first commit, so these two components called a method that did not exist.
 

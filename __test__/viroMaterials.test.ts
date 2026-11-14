@@ -3,8 +3,8 @@ jest.mock("react-native", () => ({
   NativeModules: { VRTMaterialManager: { setJSMaterials: (m: unknown) => mockSetJSMaterials(m) } },
   processColor: (c: unknown) => c,
   TurboModuleRegistry: { get: () => null },
+  AssetRegistry: { getAssetByID: () => undefined },
 }));
-jest.mock("react-native/Libraries/Image/AssetRegistry", () => ({ getAssetByID: () => undefined }));
 jest.mock("react-native/Libraries/Image/resolveAssetSource", () => ({
   __esModule: true,
   default: (s: any) => (s && s.uri ? { uri: s.uri, resolved: true } : null),

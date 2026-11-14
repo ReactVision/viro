@@ -1,5 +1,4 @@
 apply plugin: 'com.android.library'
-apply plugin: "kotlin-android"
 apply plugin: "com.facebook.react"
 
 // Check if the new architecture is enabled
@@ -8,7 +7,7 @@ def isNewArchitectureEnabled() {
 }
 
 android {
-    compileSdkVersion 34
+    compileSdk 36
     namespace "com.viromedia.bridge"
 
     buildFeatures {
@@ -16,8 +15,7 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion 24
-        targetSdkVersion 33
+        minSdk 24
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
@@ -30,7 +28,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 

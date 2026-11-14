@@ -71,7 +71,10 @@ public class ImageDownloader {
     public ImageDownloader(Context context) {
         mContext = context;
         mImageMap = new ConcurrentHashMap<>();
-        mExecutorSupplier = new DefaultExecutorSupplier(1);
+        mExecutorSupplier = new DefaultExecutorSupplier(
+                1,
+                DefaultExecutorSupplier.DEFAULT_NUM_IO_BOUND_THREADS,
+                DefaultExecutorSupplier.DEFAULT_NUM_LIGHTWEIGHT_BACKGROUND_THREADS);
 
     }
 

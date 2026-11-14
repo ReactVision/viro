@@ -263,6 +263,8 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
     ARSession *arSession = note.userInfo[@"session"];
     ARFrame   *snapshot  = arSession.currentFrame;
     if (!snapshot) return;
+    // The AR view's size in points, which is not the screen's when the window is resized.
+    CGSize viewport = [note.userInfo[@"viewport"] CGSizeValue];
 
     CFTimeInterval now = CACurrentMediaTime();
     CFTimeInterval minInterval = 1.0 / (double)(_maxFPS > 0 ? _maxFPS : kDefaultMaxFPS);
@@ -310,7 +312,7 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
             NSArray *detections = rawDetections;
             if (rawDetections.count > 0) {
                 ARFrame *fresh = arSession.currentFrame;
-                if (fresh) detections = [ss _addWorldPositions:rawDetections toFrame:fresh];
+                if (fresh) detections = [ss _addWorldPositions:rawDetections toFrame:fresh viewport:viewport];
             }
             ss->_onDetectionViro(@{@"detections": detections});
         });
@@ -411,10 +413,9 @@ static inline VROCenterCrop VROCenterCropCompute(size_t srcW, size_t srcH) {
 // worldPosition uses ARKit hitTest with landscape-converted center coords:
 //   landscape_x = 1 - cy_portrait,  landscape_y = cx_portrait  (inverse of 90° CCW)
 - (NSArray<NSDictionary *> *)_addWorldPositions:(NSArray<NSDictionary *> *)dets
-                                        toFrame:(ARFrame *)frame {
-    if (!dets.count) return dets;
-
-    CGSize vp = [UIScreen mainScreen].bounds.size;
+                                        toFrame:(ARFrame *)frame
+                                       viewport:(CGSize)vp {
+    if (!dets.count || vp.width <= 0 || vp.height <= 0) return dets;
 
     // Map detection boxes to screen pixels using ARKit's own displayTransform.
     //

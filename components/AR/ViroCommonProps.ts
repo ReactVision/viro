@@ -21,7 +21,9 @@ import {
 } from "../Material/ViroMaterials";
 import { NativeSyntheticEvent, ViewProps } from "react-native";
 
-export type ViroCommonProps = ViewProps & {
+// React Native 0.88 gives ViewProps its own onClick, a pointer event handler. Viro's onClick takes
+// (position, source), and intersecting the two would require a handler to satisfy both.
+export type ViroCommonProps = Omit<ViewProps, "onClick"> & {
   target?: string;
 
   pauseUpdates?: boolean;

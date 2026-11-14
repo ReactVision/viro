@@ -5,6 +5,7 @@
  */
 
 import { Image, NativeModules } from "react-native";
+import { getAssetByIDFunction } from "./ViroAssetRegistry";
 
 /**
  * `Image.resolveAssetSource` returns `{ uri: "" }` on visionOS.
@@ -38,10 +39,12 @@ export function resolveViroAssetSource(source: any): any {
     return resolved;
   }
 
+  const getAssetByID = getAssetByIDFunction();
+  if (!getAssetByID) {
+    return resolved;
+  }
+
   try {
-    const {
-      getAssetByID,
-    } = require("@react-native/assets-registry/registry");
     const meta = getAssetByID(source);
     if (!meta) {
       return resolved;

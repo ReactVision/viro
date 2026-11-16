@@ -9,6 +9,7 @@
 - **Breaking: React Native 0.88 and Expo SDK 58.** `react-native` is `>=0.88.0 <0.89.0` and `expo` is `>=58.0.0 <59.0.0`, with React 19.3. React Native 0.86 and Expo SDK 57 stay on 3.1.x.
 - **`ViroController` delivers `onDrag`, `onPinch` and `onRotate` on iOS and Android,** with the same payloads as a node's handlers. Pinch and rotate come from a touch screen, so a Quest controller does not send them.
 - **`ViroNativeRef` is `HostInstance | null`,** since React Native 0.88 removed `NativeMethods`; the methods are the same.
+- **A Studio scene's alert shows its own close button label** instead of always OK, and on Meta Quest the alert's button widens to fit it.
 
 ### iOS
 

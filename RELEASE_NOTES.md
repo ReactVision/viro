@@ -1,22 +1,45 @@
 # Release Notes
 
-## v3.1.1
+## v3.2.0
 
-**Meta Quest builds pass the Horizon Store's upload check again, and glTF models render as glTF defines them on every platform: metals look metallic without an environment map, visionOS draws a model's normal, metallic-roughness, occlusion and emissive maps, an occlusion map can sit on its own UV set, and mirrored nodes draw their faces.** Renderer binaries are rebuilt on virocore 3.1.1. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
+**ViroReact moves to React Native 0.88 and Expo SDK 58, on every platform including Apple Vision Pro, through `@reactvision/react-native-visionos` 0.88.1.** `ViroController` takes the same drag, pinch and rotate handlers on iOS and Android, iOS sounds load by name and preload, and AR scenes on the web gain physics, collisions, scene navigation and a virtual camera for previewing without one. Renderer binaries are rebuilt on virocore 3.2.0. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
 
 ### Everywhere
 
-- **Metal surfaces look metallic without an environment map.** The flat ambient light lit them like matte paint.
-- **glTF `normalTexture.scale` and `occlusionTexture.strength` apply,** an occlusion map on `TEXCOORD_1` samples that set (not on visionOS), and mirrored nodes draw their faces.
+- **Breaking: React Native 0.88 and Expo SDK 58.** `react-native` is `>=0.88.0 <0.89.0` and `expo` is `>=58.0.0 <59.0.0`, with React 19.3. React Native 0.86 and Expo SDK 57 stay on 3.1.x.
+- **`ViroController` delivers `onDrag`, `onPinch` and `onRotate` on iOS and Android,** with the same payloads as a node's handlers. Pinch and rotate come from a touch screen, so a Quest controller does not send them.
+- **`ViroNativeRef` is `HostInstance | null`,** since React Native 0.88 removed `NativeMethods`; the methods are the same.
+- **A Studio scene's alert shows its own close button label** instead of always OK, and on Meta Quest the alert's button widens to fit it.
+
+### iOS
+
+- **`ViroSound.preloadSounds` and sounds played by name work;** the promise resolves with `{ result, msg }` as on Android, and a downloaded sound opens.
+- **`ViroSpatialSound` and `ViroSoundField` no longer crash on mount.**
+- **`ViroObjectDetector` boxes and hit tests line up in a resized window** and in iPad multitasking.
+
+### Android
+
+- **A build without the `AR` xRMode leaves ARCore out (Expo plugin):** a Quest-only app no longer carries `:arcore_client`, its meta-data or its `<queries>` entry.
+- **Building the bridge from source needs Gradle 9.4.1 and AGP 9.2.1.** Apps that consume the published package are not affected.
 
 ### Meta Quest
 
-- **Builds pass the Horizon Store's upload check again:** the Expo plugin declares `com.oculus.permission.HAND_TRACKING` beside `horizonos.permission.HAND_TRACKING` (3.0.3 had dropped the old name, which the store requires), and no longer declares `WRITE_EXTERNAL_STORAGE`, which gives a Quest app no storage access and which Meta's review asks to justify.
+- **A `ViroXRSceneNavigator` scene gets `arSceneNavigator` and live `viroAppProps`,** as on a phone; a scene written for both threw on Quest.
 
 ### visionOS
 
-- **`Viro3DObject` draws a glTF model's normal, metallic-roughness, occlusion and emissive maps.** It drew the base color only, so textured models looked flat.
+- **Runs on React Native 0.88 through `@reactvision/react-native-visionos` 0.88.1,** an optional peer dependency again (`>=0.88.0 <0.89.0`). Generate the `visionos/` folder from `@reactvision/visionos-template` 0.88.1.
+- **The patches the Expo plugin copies apply to Expo SDK 58;** three of the SDK 57 ones failed on install, and a new one lets `react-native-gesture-handler` 3.3.0 build for visionOS.
+
+### Web
+
+- **Physics:** a `physicsBody` simulates, `onCollision` fires with the other body's `viroTag`, and a node's ref takes `applyImpulse`, `applyTorqueImpulse` and `setVelocity`.
+- **`virtualCamera` on `ViroARSceneNavigator`** previews an AR scene with no camera or permission prompt, with a floor plane and dragging.
+- **Scene navigation** (`push`, `replace`, `jump`, `pop`, `popN`) works in `ViroARSceneNavigator`.
+- **Clicks reach the node native would give them to,** and changing opacity or visibility no longer resets a node's position.
 
 ### Check when upgrading
 
-- **A metallic model without a `lightingEnvironment` looks darker than in 3.1.0.** This is how glTF and three.js light it; give metallic models an environment map.
+- **Upgrade React Native and Expo first;** 3.2.0 does not install next to `react-native` 0.86.
+- **On visionOS, regenerate the `visionos/` folder** from `@reactvision/visionos-template` 0.88.1 and install `@reactvision/react-native-visionos@0.88.1`; a 0.86 folder does not build against 0.88.
+- **A `ViroController` that set `onPinch` or `onRotate` now receives them.** The node in the payload is null when the gesture started on nothing that takes it.

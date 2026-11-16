@@ -223,6 +223,11 @@ type Props = ViewProps & {
   visionOSImmersionStyle?: ImmersiveSpaceStyle;
 
   // ── Common ─────────────────────────────────────────────────────────────────
+  /**
+   * Handed to the scene as `arSceneNavigator.viroAppProps` (and `sceneNavigator.viroAppProps`)
+   * on every platform. On Quest the scene runs in VRActivity, a separate React root, and the
+   * props cross the bridge on every change, so a new object reaches the scene there too.
+   */
   viroAppProps?: any;
   hdrEnabled?: boolean;
   pbrEnabled?: boolean;
@@ -459,6 +464,13 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
         }
       };
     }, []);
+
+    // On Quest the scene runs under VRActivity, a separate React root, so viroAppProps cross
+    // over the bridge. Published on every change, as a phone scene sees each new object.
+    const questAppProps = (rest as { viroAppProps?: unknown }).viroAppProps;
+    React.useEffect(() => {
+      if (isQuest) VRQuestNavigatorBridge.setAppProps(questAppProps);
+    }, [questAppProps]);
 
     // On Quest: register the intent (scene + renderer config) then launch VRActivity.
     // Only on mount; renderQuestPanel says why it is not relaunched.

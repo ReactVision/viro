@@ -154,6 +154,67 @@ describe("gradle mods run twice", () => {
   });
 });
 
+describe("ARCore only with the AR xRMode", () => {
+  const gradle = () => ({
+    contents: 'dependencies {\n    implementation("com.facebook.react:react-android")\n}\n',
+    language: "groovy",
+  });
+  const settings = () => ({ contents: "rootProject.name = 'app'\n", language: "groovy" });
+  const queried = (manifest: any) =>
+    names(manifest.manifest.queries?.[0]?.package ?? []).includes("com.google.ar.core");
+  const meta = (manifest: any) => names(manifest.manifest.application[0]["meta-data"]);
+
+  test("a Quest-only build leaves ARCore out and keeps gvr_common", async () => {
+    const options = { android: { xRMode: "QUEST" } };
+    const config: any = withViroAndroid(appConfig(options), options);
+    const app = await runMod(config, "android", "appBuildGradle", gradle());
+    const set = await runMod(config, "android", "settingsGradle", settings(), "/proj/android");
+    const manifest = await runMod(config, "android", "manifest", baseManifest());
+
+    expect(app.contents).not.toContain(":arcore_client");
+    expect(app.contents).toContain("project(':gvr_common')");
+    expect(set.contents).not.toContain("arcore_client");
+    expect(set.contents).toContain("include ':react_viro', ':gvr_common', ':viro_renderer'");
+    expect(meta(manifest)).not.toContain("com.google.ar.core");
+    expect(queried(manifest)).toBe(false);
+  });
+
+  test("a build that also targets phones keeps ARCore", async () => {
+    const options = { android: { xRMode: ["AR", "QUEST"] } };
+    const config: any = withViroAndroid(appConfig(options), options);
+    const app = await runMod(config, "android", "appBuildGradle", gradle());
+    const set = await runMod(config, "android", "settingsGradle", settings(), "/proj/android");
+    const manifest = await runMod(config, "android", "manifest", baseManifest());
+
+    expect(app.contents).toContain("implementation project(':arcore_client')");
+    expect(set.contents).toContain("project(':arcore_client').projectDir");
+    expect(meta(manifest)).toContain("com.google.ar.core");
+    expect(queried(manifest)).toBe(true);
+  });
+
+  test("dropping AR on a later prebuild removes what the earlier one added", async () => {
+    const withAR = { android: { xRMode: ["AR", "GVR"] } };
+    const without = { android: { xRMode: ["GVR"] } };
+    const first: any = withViroAndroid(appConfig(withAR), withAR);
+    const second: any = withViroAndroid(appConfig(without), without);
+
+    const app = await runMod(second, "android", "appBuildGradle", await runMod(first, "android", "appBuildGradle", gradle()));
+    const set = await runMod(
+      second,
+      "android",
+      "settingsGradle",
+      await runMod(first, "android", "settingsGradle", settings(), "/proj/android"),
+      "/proj/android"
+    );
+    const manifest = await runMod(second, "android", "manifest", await runMod(first, "android", "manifest", baseManifest()));
+
+    expect(app.contents).not.toContain("arcore_client");
+    expect(set.contents).not.toContain("arcore_client");
+    expect(meta(manifest)).not.toContain("com.google.ar.core");
+    expect(queried(manifest)).toBe(false);
+  });
+});
+
 describe("Podfile", () => {
   const podfile = [
     "platform :ios, '15.1'",

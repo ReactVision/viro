@@ -47,6 +47,9 @@
 
     /* Module Resolution Options */
     "moduleResolution": "node" /* Specify module resolution strategy: 'node' (Node.js) or 'classic' (TypeScript pre-1.6). */,
+    "paths": {
+      "react-native": ["./node_modules/react-native/types_generated/index.d.ts"]
+    } /* React Native 0.88 publishes its types only through package `exports`, which "node" resolution ignores. */,
     "resolveJsonModule": true,
     "baseUrl": "./" /* Base directory to resolve non-absolute module names. */,
     // "rootDirs": [],                        /* List of root folders whose combined content represents the structure of the project at runtime. */

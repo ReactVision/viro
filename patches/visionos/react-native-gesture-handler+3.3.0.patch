@@ -1,0 +1,16 @@
+diff --git a/node_modules/react-native-gesture-handler/apple/RNGestureHandlerButton.mm b/node_modules/react-native-gesture-handler/apple/RNGestureHandlerButton.mm
+index 994b3d3..d359d50 100644
+--- a/node_modules/react-native-gesture-handler/apple/RNGestureHandlerButton.mm
++++ b/node_modules/react-native-gesture-handler/apple/RNGestureHandlerButton.mm
+@@ -480,7 +480,10 @@ - (void)applyStartAnimationState
+ // Duration of a single frame at the current screen's max refresh rate, in ms.
+ - (NSTimeInterval)minFrameDurationMs
+ {
+-#if !TARGET_OS_OSX
++#if TARGET_OS_VISION
++  // visionOS has no UIScreen to ask; its windows render at 90 Hz.
++  NSInteger maxFps = 90;
++#elif !TARGET_OS_OSX
+   UIScreen *screen = self.window.screen ?: UIScreen.mainScreen;
+   NSInteger maxFps = screen.maximumFramesPerSecond;
+ #else

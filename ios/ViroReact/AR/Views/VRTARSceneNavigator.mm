@@ -436,7 +436,8 @@ static NSString * const kRVWatermarkURL =
     [[NSNotificationCenter defaultCenter]
         postNotificationName:kVROARFrameNotification
                       object:nil
-                    userInfo:@{@"session": nativeSession}];
+                    userInfo:@{@"session": nativeSession,
+                               @"viewport": [NSValue valueWithCGSize:viewAR.bounds.size]}];
 }
 
 - (void)startVideoRecording:(NSString *)fileName

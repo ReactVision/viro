@@ -87,6 +87,12 @@ type Props = ViewProps & {
 
   viroAppProps?: any; // TODO: what is the type of this?
   /**
+   * @internal Also hand each scene the navigator as `arSceneNavigator`. Set by
+   * ViroQuestEntryPoint: a ViroXRSceneNavigator scene is written once for phones and
+   * Quest, and on a phone it reads `arSceneNavigator`.
+   */
+  exposeArSceneNavigator?: boolean;
+  /**
    * Renderer settings that can be used to enable or disable various
    * renderer capabilities and algorithms.
    */
@@ -506,12 +512,12 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
   };
 
   _project = async (point: Viro3DPoint) => {
-    return await ViroSceneNavigatorModule.project(findNodeHandle(this._component), point);
+    return await ViroSceneNavigatorModule.project(findNodeHandle(this._component) ?? null, point);
   };
 
   _unproject = async (point: Viro3DPoint) => {
     return await ViroSceneNavigatorModule.unproject(
-      findNodeHandle(this._component),
+      findNodeHandle(this._component) ?? null,
       point
     );
   };
@@ -528,7 +534,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
    */
   _takeScreenshot = async (fileName: string, saveToCameraRoll: boolean) => {
     return await VRCapture.takeScreenshot(
-      findNodeHandle(this._component),
+      findNodeHandle(this._component) ?? null,
       fileName,
       saveToCameraRoll
     );
@@ -546,7 +552,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
     onError: (errorCode: number) => void
   ) => {
     VRCapture.startVideoRecording(
-      findNodeHandle(this._component),
+      findNodeHandle(this._component) ?? null,
       fileName,
       saveToCameraRoll,
       onError
@@ -555,7 +561,7 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
 
   /** Stops the recording. Resolves `{ success, url, errorCode }`. */
   _stopVideoRecording = async () => {
-    return await VRCapture.stopVideoRecording(findNodeHandle(this._component));
+    return await VRCapture.stopVideoRecording(findNodeHandle(this._component) ?? null);
   };
 
   _renderSceneStackItems() {
@@ -569,6 +575,9 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
         <Scene
           key={sceneDictionary[scene].tag}
           sceneNavigator={this.sceneNavigator}
+          {...(this.props.exposeArSceneNavigator
+            ? { arSceneNavigator: this.sceneNavigator }
+            : null)}
           {...props}
         />
       );

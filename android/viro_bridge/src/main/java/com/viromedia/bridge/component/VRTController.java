@@ -37,6 +37,9 @@ public class VRTController extends VRTComponent {
     protected final static boolean DEFAULT_CAN_SWIPE = false;
     protected final static boolean DEFAULT_CAN_FUSE = false;
     protected final static boolean DEFAULT_CAN_GET_CONTROLLER_STATUS = false;
+    protected final static boolean DEFAULT_CAN_DRAG = false;
+    protected final static boolean DEFAULT_CAN_PINCH = false;
+    protected final static boolean DEFAULT_CAN_ROTATE = false;
     protected final static boolean DEFAULT_RETICLE_VISIBILITY = true;
     protected final static boolean DEFAULT_CONTROLLER_VISIBILITY = true;
     private Controller mNativeController = null;
@@ -100,6 +103,18 @@ public class VRTController extends VRTComponent {
 
     protected void setCanGetControllerStatus(boolean canGetControllerStatus){
         mEventDelegateJni.setEventEnabled(EventDelegate.EventAction.ON_CONTROLLER_STATUS, canGetControllerStatus);
+    }
+
+    protected void setCanDrag(boolean canDrag){
+        mEventDelegateJni.setEventEnabled(EventDelegate.EventAction.ON_DRAG, canDrag);
+    }
+
+    protected void setCanPinch(boolean canPinch){
+        mEventDelegateJni.setEventEnabled(EventDelegate.EventAction.ON_PINCH, canPinch);
+    }
+
+    protected void setCanRotate(boolean canRotate){
+        mEventDelegateJni.setEventEnabled(EventDelegate.EventAction.ON_ROTATE, canRotate);
     }
 
     public void getForwardVectorAsync(Controller.ControllerJniCallback callback){

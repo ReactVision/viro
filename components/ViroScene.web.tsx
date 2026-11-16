@@ -6,13 +6,16 @@
 import * as React from "react";
 
 import { useViroToneMapping } from "./Web/useViroToneMapping";
+import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
 
 export function ViroScene(props: {
   children?: React.ReactNode;
   /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
   toneMappingEnabled?: boolean;
+  physicsWorld?: ViroPhysicsWorldProp;
   [key: string]: any;
 }) {
   useViroToneMapping(props.toneMappingEnabled);
+  useViroPhysicsWorld(props.physicsWorld);
   return <>{props.children}</>;
 }

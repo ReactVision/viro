@@ -34,6 +34,7 @@ import {
   ViroARTrackingReasonConstants,
 } from "../ViroConstants";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
+import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
 
 /** The declarative anchor shape passed to onAnchor* (mirrors ViroAnchor). */
 export type ViroWebAnchor = {
@@ -55,6 +56,7 @@ type Props = {
   onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
   /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
   toneMappingEnabled?: boolean;
+  physicsWorld?: ViroPhysicsWorldProp;
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -96,6 +98,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   const { session, anchors, trackingState } = useViroAR();
   const renderer = useViroRenderer();
   useViroToneMapping(props.toneMappingEnabled);
+  useViroPhysicsWorld(props.physicsWorld);
 
   // Read latest callbacks from a ref so effects don't re-run on identity change.
   const propsRef = useRef(props);

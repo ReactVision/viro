@@ -757,7 +757,7 @@ export function executeFunctionWithRelations(
       s ? interpolateDisplayTemplate(s, (name) => store?.get(name)) : "";
     const title = fill(alert.alert_title);
     const message = fill(alert.alert_message);
-    showStudioAlert(title, message);
+    showStudioAlert(title, message, alert.alert_action_button_title);
   } else if (fn.function_type === "ANIMATION") {
     const anim = fn.scene_animation;
     if (!anim || !onAnimationTrigger) return;

@@ -13,7 +13,11 @@ import {
   QUEST_PANEL_SCALE,
 } from "./domain/questHeadLockedTransform";
 import { QUEST_PANEL_TEXT, questRoundedRect } from "./questPanelStyle";
-import { estimateQuestTextHeight, StudioQuestText } from "./StudioQuestText";
+import {
+  estimateQuestTextHeight,
+  estimateQuestTextWidth,
+  StudioQuestText,
+} from "./StudioQuestText";
 
 const PANEL_WIDTH_M = 2;
 const TEXT_WIDTH_M = 1.8;
@@ -22,6 +26,10 @@ const TITLE_GAP_M = 0.04;
 const BUTTON_GAP_M = 0.1;
 const BUTTON_WIDTH_M = 0.5;
 const BUTTON_HEIGHT_M = 0.22;
+const BUTTON_PADDING_X_M = 0.06;
+const BUTTON_PADDING_Y_M = 0.05;
+// Leaves room beside the button for the page counter.
+const MAX_BUTTON_WIDTH_M = TEXT_WIDTH_M - 0.5;
 const CORNER_RADIUS_M = 0.1;
 const TITLE_FONT_SIZE = 22;
 const MESSAGE_FONT_SIZE = 16;
@@ -32,14 +40,12 @@ const COUNTER_FONT_SIZE = 11;
 // reaches about 14° above and below where the wearer looks.
 const MAX_PANEL_HEIGHT_M = 2.4;
 
-const BUTTON_OUTLINE = questRoundedRect(
-  BUTTON_WIDTH_M,
-  BUTTON_HEIGHT_M,
-  BUTTON_HEIGHT_M / 2
-);
-
 type QuestAlertLayout = {
   titleHeight: number;
+  /** Fits the alert's own label, which wraps once it is wider than the
+   * maximum. "Next" on earlier pages takes the same button. */
+  buttonWidth: number;
+  buttonHeight: number;
   pages: string[];
   messageHeights: number[];
   /** Unscaled, and the same for every page, so nothing placed below the panel
@@ -49,16 +55,34 @@ type QuestAlertLayout = {
 
 export function questAlertLayout(
   title: string | null,
-  message: string
+  message: string,
+  buttonLabel: string
 ): QuestAlertLayout {
   const titleHeight = title
     ? estimateQuestTextHeight(title, TEXT_WIDTH_M, TITLE_FONT_SIZE)
     : 0;
+  const buttonWidth = Math.min(
+    MAX_BUTTON_WIDTH_M,
+    Math.max(
+      BUTTON_WIDTH_M,
+      estimateQuestTextWidth(buttonLabel, BUTTON_FONT_SIZE) +
+        2 * BUTTON_PADDING_X_M
+    )
+  );
+  const buttonHeight = Math.max(
+    BUTTON_HEIGHT_M,
+    estimateQuestTextHeight(
+      buttonLabel,
+      buttonWidth - 2 * BUTTON_PADDING_X_M,
+      BUTTON_FONT_SIZE
+    ) +
+      2 * BUTTON_PADDING_Y_M
+  );
   const chrome =
     2 * PADDING_M +
     (title ? titleHeight + TITLE_GAP_M : 0) +
     BUTTON_GAP_M +
-    BUTTON_HEIGHT_M;
+    buttonHeight;
   const messageHeightOf = (text: string) =>
     estimateQuestTextHeight(text, TEXT_WIDTH_M, MESSAGE_FONT_SIZE);
 
@@ -66,6 +90,8 @@ export function questAlertLayout(
   if (chrome + messageHeight <= MAX_PANEL_HEIGHT_M) {
     return {
       titleHeight,
+      buttonWidth,
+      buttonHeight,
       pages: [message],
       messageHeights: [messageHeight],
       panelHeight: chrome + messageHeight,
@@ -87,6 +113,8 @@ export function questAlertLayout(
   pages.push(page);
   return {
     titleHeight,
+    buttonWidth,
+    buttonHeight,
     pages,
     messageHeights: pages.map(messageHeightOf),
     panelHeight: MAX_PANEL_HEIGHT_M,
@@ -102,9 +130,10 @@ type Props = {
 /**
  * Quest-only in-scene replacement for Alert.alert (invisible in the VR
  * compositor), drawn as a Meta Horizon OS dialog: a rounded dark card and a
- * blue OK button, which a trigger or pinch presses, as tapping "OK" dismisses
- * the native dialog on phones. B closes it too. A message too long for one
- * panel is shown a page at a time, and the button reads Next until the last.
+ * blue button carrying the alert's label, which a trigger or pinch presses, as
+ * tapping it dismisses the native dialog on phones. B closes it too. A message
+ * too long for one panel is shown a page at a time, and the button reads Next
+ * until the last.
  */
 export function StudioQuestAlertOverlay({ cameraPose }: Props) {
   const [, forceUpdate] = useState(0);
@@ -141,13 +170,19 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
 
   const title = questAlertStore.title();
   const message = questAlertStore.message() ?? "";
+  const alertButtonLabel = questAlertStore.buttonLabel();
   const layout = useMemo(
-    () => questAlertLayout(title, message),
-    [title, message]
+    () => questAlertLayout(title, message, alertButtonLabel),
+    [title, message, alertButtonLabel]
   );
+  const { buttonWidth, buttonHeight } = layout;
   const panelOutline = useMemo(
     () => questRoundedRect(PANEL_WIDTH_M, layout.panelHeight, CORNER_RADIUS_M),
     [layout.panelHeight]
+  );
+  const buttonOutline = useMemo(
+    () => questRoundedRect(buttonWidth, buttonHeight, BUTTON_HEIGHT_M / 2),
+    [buttonWidth, buttonHeight]
   );
 
   if (!active || !cameraPose) return null;
@@ -189,10 +224,11 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
   const titleY = top - titleHeight / 2;
   const messageTop = top - (title ? titleHeight + TITLE_GAP_M : 0);
   const messageY = messageTop - messageHeight / 2;
-  const buttonY = -layout.panelHeight / 2 + PADDING_M + BUTTON_HEIGHT_M / 2;
-  const buttonX = TEXT_WIDTH_M / 2 - BUTTON_WIDTH_M / 2;
-  const buttonLabel = lastPage ? "OK" : "Next";
-  const counterWidth = TEXT_WIDTH_M - BUTTON_WIDTH_M - 0.1;
+  const buttonY = -layout.panelHeight / 2 + PADDING_M + buttonHeight / 2;
+  const buttonX = TEXT_WIDTH_M / 2 - buttonWidth / 2;
+  const buttonLabel = lastPage ? alertButtonLabel : "Next";
+  const buttonTextWidth = buttonWidth - 2 * BUTTON_PADDING_X_M;
+  const counterWidth = TEXT_WIDTH_M - buttonWidth - 0.1;
   const counter = `${shownPage + 1} of ${pageCount}`;
   const textStyle = {
     fontFamily: "sans-serif",
@@ -262,7 +298,7 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
       )}
       <ViroPolygon
         position={[buttonX, buttonY, -0.005]}
-        vertices={BUTTON_OUTLINE}
+        vertices={buttonOutline}
         holes={[]}
         materials={[
           hoverSources.size > 0
@@ -276,10 +312,10 @@ export function StudioQuestAlertOverlay({ cameraPose }: Props) {
       <StudioQuestText
         text={buttonLabel}
         position={[buttonX, buttonY, 0]}
-        width={BUTTON_WIDTH_M}
+        width={buttonTextWidth}
         height={estimateQuestTextHeight(
           buttonLabel,
-          BUTTON_WIDTH_M,
+          buttonTextWidth,
           BUTTON_FONT_SIZE
         )}
         fontSize={BUTTON_FONT_SIZE}

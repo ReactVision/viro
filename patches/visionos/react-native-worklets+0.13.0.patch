@@ -1,9 +1,9 @@
 diff --git a/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm b/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm
-index b93cd2c..8238cb5 100644
+index c064030..7befe5e 100644
 --- a/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm
 +++ b/node_modules/react-native-worklets/apple/worklets/apple/AnimationFrameQueue.mm
-@@ -39,9 +39,11 @@ - (instancetype)init
-   AssertJavaScriptQueue();
+@@ -47,9 +47,11 @@ - (instancetype)init
+       "AnimationFrameQueue must be created on the JavaScript queue or the main queue");
    if constexpr (worklets::StaticFeatureFlags::getFlag("IOS_DYNAMIC_FRAMERATE_ENABLED")) {
      bool supportsProMotion = false;
 -#if !TARGET_OS_OSX

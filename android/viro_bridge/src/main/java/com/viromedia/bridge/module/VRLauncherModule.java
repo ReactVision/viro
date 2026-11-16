@@ -63,15 +63,12 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
                     // dangerouslyForceOverride replaces the C++ provider, so all uncached
                     // reads now go through this provider. The Expo app uses ReactHost
                     // (bridgeless API) but dangerouslyForceOverride resets the JVM and C++
-                    // caches. We must return true for the three New Architecture flags so
+                    // caches. We must return true for enableBridgelessArchitecture so
                     // that ReactActivityDelegate.onCreate() and ReactDelegate.loadApp() /
                     // onHostResume() take the bridgeless path instead of the old-arch path.
+                    // The Fabric and TurboModule flags no longer exist: both are always on.
                     @Override
                     public boolean enableBridgelessArchitecture() { return true; }
-                    @Override
-                    public boolean enableFabricRenderer() { return true; }
-                    @Override
-                    public boolean useTurboModules() { return true; }
                 }
             );
         } catch (Exception ignored) {}

@@ -12,7 +12,12 @@
 import { useEffect } from "react";
 import type { ViroHandle } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroRenderer } from "./ViroWebContext";
-import { runDeclarativeAnimation, type ViroBaseTransform } from "./viroAnimationRegistry";
+import {
+  isRelativeViroAnimation,
+  runDeclarativeAnimation,
+  setViroAnimationEnd,
+  type ViroBaseTransform,
+} from "./viroAnimationRegistry";
 
 export interface ViroAnimationProp {
   name?: string;
@@ -42,14 +47,41 @@ export function useViroAnimation(
   useEffect(() => {
     if (!ready || !animation) return;
 
+    // A looping relative animation ("+=90") starts each pass where the last one
+    // ended, as on native. The renderer's loop replays the first pass, and it
+    // does not report the end of a pass that is not looping, so the passes are
+    // timed here.
+    const chained = !!loop && !!name && isRelativeViroAnimation(name);
+    let frame = 0;
+    const play = (from: ViroBaseTransform): boolean => {
+      if (!name) return false;
+      const pass = runDeclarativeAnimation(scene, node, name, from, !!loop && !chained, delay);
+      if (!pass) return false;
+      if (chained) {
+        const endsAt = performance.now() + pass.ms;
+        const tick = () => {
+          if (performance.now() < endsAt) {
+            frame = requestAnimationFrame(tick);
+            return;
+          }
+          // The renderer may not have drawn the pass's last step yet.
+          setViroAnimationEnd(scene, node, name, pass.end);
+          animation.onFinish?.();
+          play(pass.end);
+        };
+        frame = requestAnimationFrame(tick);
+      }
+      return true;
+    };
+
     renderer.setNodeAnimationHandlers(node, {
       onStart: animation.onStart,
-      onFinish: animation.onFinish,
+      onFinish: chained ? undefined : animation.onFinish,
     });
 
     if (run !== false) {
       // Try a registered declarative animation first, then a model animation.
-      if (!name || !runDeclarativeAnimation(scene, node, name, base, !!loop, delay)) {
+      if (!play(base)) {
         let animName = name;
         if (!animName || animName === "*") {
           animName = scene.getAnimationKeys(node)[0];
@@ -63,6 +95,7 @@ export function useViroAnimation(
     }
 
     return () => {
+      cancelAnimationFrame(frame);
       renderer.clearNodeAnimationHandlers(node);
       scene.stopAnimation(node, false);
     };

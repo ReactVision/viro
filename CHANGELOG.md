@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Android: a release build with R8 minification no longer fails on missing classes.** The GVR SDK Viro bundles references protobuf and VR logging classes it does not ship, and R8 stopped the build on them (`Missing classes detected while running R8`). Viro's consumer rules now tell R8 to ignore them. Expo SDK 58 turns minification on in its Android template (`android.enableMinifyInReleaseBuilds`), so an app on that template hit this on its first release build. Nothing changes at runtime: the classes are missing with or without R8.
+
 ## v3.2.0 — 15 November 2026
 
 ### Added

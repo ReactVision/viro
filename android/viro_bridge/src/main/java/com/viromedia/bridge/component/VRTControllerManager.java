@@ -80,6 +80,21 @@ public class VRTControllerManager extends VRTViroViewGroupManager<VRTController>
         view.setCanFuse(canFuse);
     }
 
+    @ReactProp(name = "canDrag", defaultBoolean = VRTController.DEFAULT_CAN_DRAG)
+    public void setCanDrag(VRTController view, boolean canDrag) {
+        view.setCanDrag(canDrag);
+    }
+
+    @ReactProp(name = "canPinch", defaultBoolean = VRTController.DEFAULT_CAN_PINCH)
+    public void setCanPinch(VRTController view, boolean canPinch) {
+        view.setCanPinch(canPinch);
+    }
+
+    @ReactProp(name = "canRotate", defaultBoolean = VRTController.DEFAULT_CAN_ROTATE)
+    public void setCanRotate(VRTController view, boolean canRotate) {
+        view.setCanRotate(canRotate);
+    }
+
     @ReactProp(name = "canGetControllerStatus", defaultBoolean = VRTController.DEFAULT_CAN_GET_CONTROLLER_STATUS)
     public void setCanGetControllerStatus(VRTController view, boolean canGetControllerStatus) {
         view.setCanGetControllerStatus(canGetControllerStatus);
@@ -95,6 +110,8 @@ public class VRTControllerManager extends VRTViroViewGroupManager<VRTController>
         events.put(ViroEvents.ON_SCROLL, MapBuilder.of("registrationName", ViroEvents.ON_SCROLL));
         events.put(ViroEvents.ON_FUSE, MapBuilder.of("registrationName", ViroEvents.ON_FUSE));
         events.put(ViroEvents.ON_DRAG, MapBuilder.of("registrationName", ViroEvents.ON_DRAG));
+        events.put(ViroEvents.ON_PINCH, MapBuilder.of("registrationName", ViroEvents.ON_PINCH));
+        events.put(ViroEvents.ON_ROTATE, MapBuilder.of("registrationName", ViroEvents.ON_ROTATE));
         events.put(ViroEvents.ON_CONTROLLER_STATUS, MapBuilder.of("registrationName", ViroEvents.ON_CONTROLLER_STATUS));
 
         return events;

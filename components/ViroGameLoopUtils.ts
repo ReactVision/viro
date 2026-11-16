@@ -22,6 +22,11 @@
 import { findNodeHandle, UIManager } from "react-native";
 import type React from "react";
 
+// React Native 0.88 types the command id as a number only. The managers declare these commands by
+// name, so the name goes through unchanged.
+const dispatchCommand = (handle: number, name: string, args: number[]) =>
+  UIManager.dispatchViewManagerCommand(handle, name as unknown as number, args);
+
 export const ViroGameLoopUtils = {
   /**
    * Set the node's position without going through React state.
@@ -34,7 +39,7 @@ export const ViroGameLoopUtils = {
   ): void {
     const handle = findNodeHandle(nodeRef.current);
     if (handle == null) return;
-    UIManager.dispatchViewManagerCommand(handle, "setPosition", position);
+    dispatchCommand(handle, "setPosition", position);
   },
 
   /**
@@ -46,7 +51,7 @@ export const ViroGameLoopUtils = {
   ): void {
     const handle = findNodeHandle(nodeRef.current);
     if (handle == null) return;
-    UIManager.dispatchViewManagerCommand(handle, "setRotationEuler", rotation);
+    dispatchCommand(handle, "setRotationEuler", rotation);
   },
 
   /**
@@ -58,6 +63,6 @@ export const ViroGameLoopUtils = {
   ): void {
     const handle = findNodeHandle(nodeRef.current);
     if (handle == null) return;
-    UIManager.dispatchViewManagerCommand(handle, "setScale", scale);
+    dispatchCommand(handle, "setScale", scale);
   },
 };

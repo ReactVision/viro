@@ -14,7 +14,16 @@ import { webRendererOptions } from "./wasmOptions";
 
 // tinyvio, built through platforms/slam's drop-in C API and served from
 // public/. Rebuild with tinyvio's scripts/build_slam_wasm.sh.
-const SLAM_SCRIPT_URL = "/tinyvio-slam.js";
+// Resolved against the document's base, so a page served under a path prefix
+// (preview.html behind `<base href>`) still finds it.
+const slamScriptUrl = () => new URL("tinyvio-slam.js", document.baseURI).href;
+
+let navigatorDefaults: Record<string, unknown> = {};
+
+/** Props every AR navigator the caller's code mounts gets, under its own. */
+export function setARNavigatorDefaults(defaults: Record<string, unknown>): void {
+  navigatorDefaults = defaults;
+}
 
 export { Viro360Image } from "../components/Viro360Image";
 export { Viro360Video } from "../components/Viro360Video";
@@ -57,6 +66,9 @@ export { ViroVideo } from "../components/ViroVideo";
 export { ViroARPlane } from "../components/AR/ViroARPlane";
 export { ViroARScene } from "../components/AR/ViroARScene";
 export { ViroMaterials } from "../components/Material/ViroMaterials";
+// Plain values, not components: left to the require shim's stub they would be
+// truthy functions, so `isQuest ? <Quest/> : <Phone/>` would take the Quest branch.
+export { isQuest, isWeb, hasOpenXRSupport } from "../components/Utilities/ViroPlatform";
 export { ViroAnimations } from "../components/Animation/ViroAnimations";
 
 // ─── Navigators: wrapped, not re-exported directly ────────────────────────
@@ -138,7 +150,8 @@ export function ViroARSceneNavigator(props: any) {
   // missing build rather than a missing prop.
   return createElement(_ViroARSceneNavigatorRaw, {
     webRendererOptions,
-    slamScriptUrl: SLAM_SCRIPT_URL,
+    slamScriptUrl: slamScriptUrl(),
+    ...navigatorDefaults,
     ...props,
     // After the caller's props, not before: a scene rendered over a recording
     // is rendered over that recording, whatever its own JSX asked for.

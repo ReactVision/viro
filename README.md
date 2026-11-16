@@ -29,7 +29,7 @@ ViroReact is MIT licensed and free forever.
 | iOS (ARKit)          | ✅ | Deployment target 15.1 |
 | Android (ARCore)     | ✅ | |
 | Meta Horizon OS      | ✅ | Quest 2 / Pro / 3 / 3S through OpenXR; mixed reality on Quest 3 / 3S |
-| Apple visionOS       | ✅ | Needs the optional `@reactvision/react-native-visionos` peer; deployment target 26.0 |
+| Apple visionOS       | ✅ | Stays on `@reactvision/react-viro` 3.1.x (React Native 0.86 visionOS fork) until the fork reaches 0.88; deployment target 26.0 |
 | Web (WebGL2 / WASM)  | ✅ | Needs the optional `@reactvision/viro-web-renderer` peer |
 
 On Meta Quest, `StudioSceneNavigator` renders with HDR off, because the HDR composite hides the passthrough layer there. PBR needs HDR, so a material with the `PBR` lighting model, which Studio materials and glTF models use by default, is shaded as `Blinn`: its roughness, metalness and ambient occlusion map have no effect, and a Studio scene looks flatter than it does on a phone.

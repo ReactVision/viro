@@ -2611,7 +2611,7 @@
 				);
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../Examples/node_modules/react-native/React/**",
-					"$(inherited)/**",
+					"$(inherited)",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				MACH_O_TYPE = staticlib;
@@ -2643,7 +2643,7 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../Examples/node_modules/react-native/React/**",
-					"$(inherited)/**",
+					"$(inherited)",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				MACH_O_TYPE = staticlib;

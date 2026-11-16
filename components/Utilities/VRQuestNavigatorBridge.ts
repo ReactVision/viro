@@ -91,6 +91,13 @@ const _viewTagListeners = new Set<(tag: number | null) => void>();
 // a crash is an event, not state a late subscriber should see again.
 const _questErrorListeners = new Set<(error: Error) => void>();
 
+// ── App props ────────────────────────────────────────────────────────────────
+// ViroXRSceneNavigator's `viroAppProps`, published on every panel-side render so a
+// Quest scene reads the same live object a phone scene reads from
+// `arSceneNavigator.viroAppProps`. State, not an event: replayed on subscribe.
+let _appProps: any = undefined;
+const _appPropsListeners = new Set<(props: any) => void>();
+
 export const VRQuestNavigatorBridge = {
   // ── Called by ViroXRSceneNavigator when mounting on Quest ──────────────────
 
@@ -183,6 +190,28 @@ export const VRQuestNavigatorBridge = {
   /** Called by ViroQuestEntryPoint's error boundary when a Quest scene throws. */
   reportQuestError(error: Error): void {
     _questErrorListeners.forEach((l) => l(error));
+  },
+
+  // ── App props (viroAppProps) ──────────────────────────────────────────────
+
+  /** Called by ViroXRSceneNavigator on Quest whenever its `viroAppProps` changes. */
+  setAppProps(props: any): void {
+    if (props === _appProps) return;
+    _appProps = props;
+    _appPropsListeners.forEach((l) => l(props));
+  },
+
+  getAppProps(): any {
+    return _appProps;
+  },
+
+  /** Called by ViroQuestEntryPoint. Fires immediately with the current value. */
+  onAppProps(cb: (props: any) => void): () => void {
+    _appPropsListeners.add(cb);
+    cb(_appProps);
+    return () => {
+      _appPropsListeners.delete(cb);
+    };
   },
 
   /** Called by StudioSceneNavigator (panel side) to relay into its onError prop. */

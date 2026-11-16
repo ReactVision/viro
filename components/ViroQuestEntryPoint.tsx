@@ -53,6 +53,10 @@ export function ViroQuestEntryPoint() {
 
   React.useEffect(() => VRQuestNavigatorBridge.onIntent(setIntent), []);
 
+  // The panel's viroAppProps, kept live: the panel re-renders, the scene sees the new object.
+  const [appProps, setAppProps] = React.useState<any>(() => VRQuestNavigatorBridge.getAppProps());
+  React.useEffect(() => VRQuestNavigatorBridge.onAppProps(setAppProps), []);
+
   // VRActivity also ends without exitVRScene(), when the wearer quits from the
   // system menu or Horizon OS brings the panel forward, and its surface unmounts
   // either way.
@@ -129,6 +133,8 @@ export function ViroQuestEntryPoint() {
           key={intent.intentKey}
           initialScene={initialScene}
           {...rendererConfig}
+          viroAppProps={appProps}
+          exposeArSceneNavigator
           style={StyleSheet.absoluteFill}
         />
       </StudioSceneErrorBoundary>

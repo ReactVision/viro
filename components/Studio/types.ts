@@ -189,6 +189,8 @@ export interface StudioSceneFunction {
     id: string;
     alert_title: string | null;
     alert_message: string | null;
+    // Absent from payloads served before the field was added.
+    alert_action_button_title?: string | null;
   } | null;
   scene_animation: {
     id: string;

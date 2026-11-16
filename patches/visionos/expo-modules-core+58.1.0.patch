@@ -1,13 +1,93 @@
+diff --git a/node_modules/expo-modules-core/build/EventEmitter.js b/node_modules/expo-modules-core/build/EventEmitter.js
+index 96dee93..e3101a8 100644
+--- a/node_modules/expo-modules-core/build/EventEmitter.js
++++ b/node_modules/expo-modules-core/build/EventEmitter.js
+@@ -1,6 +1,6 @@
+ 'use client';
+ import { ensureNativeModulesAreInstalled } from './ensureNativeModulesAreInstalled';
+ ensureNativeModulesAreInstalled();
+-export const EventEmitter = globalThis.expo.EventEmitter;
++export const EventEmitter = globalThis.expo?.EventEmitter;
+ 
+ //# sourceMappingURL=EventEmitter.js.map
+diff --git a/node_modules/expo-modules-core/build/NativeModule.js b/node_modules/expo-modules-core/build/NativeModule.js
+index c3aa73f..a861a10 100644
+--- a/node_modules/expo-modules-core/build/NativeModule.js
++++ b/node_modules/expo-modules-core/build/NativeModule.js
+@@ -1,6 +1,6 @@
+ 'use client';
+ import { ensureNativeModulesAreInstalled } from './ensureNativeModulesAreInstalled';
+ ensureNativeModulesAreInstalled();
+-export const NativeModule = globalThis.expo.NativeModule;
++export const NativeModule = globalThis.expo?.NativeModule;
+ 
+ //# sourceMappingURL=NativeModule.js.map
+diff --git a/node_modules/expo-modules-core/build/SharedObject.js b/node_modules/expo-modules-core/build/SharedObject.js
+index 41c9f15..b7a1c9a 100644
+--- a/node_modules/expo-modules-core/build/SharedObject.js
++++ b/node_modules/expo-modules-core/build/SharedObject.js
+@@ -1,6 +1,6 @@
+ 'use client';
+ import { ensureNativeModulesAreInstalled } from './ensureNativeModulesAreInstalled';
+ ensureNativeModulesAreInstalled();
+-export const SharedObject = globalThis.expo.SharedObject;
++export const SharedObject = globalThis.expo?.SharedObject;
+ 
+ //# sourceMappingURL=SharedObject.js.map
+diff --git a/node_modules/expo-modules-core/build/SharedRef.js b/node_modules/expo-modules-core/build/SharedRef.js
+index c9ea5cc..8e9b6c2 100644
+--- a/node_modules/expo-modules-core/build/SharedRef.js
++++ b/node_modules/expo-modules-core/build/SharedRef.js
+@@ -1,6 +1,6 @@
+ 'use client';
+ import { ensureNativeModulesAreInstalled } from './ensureNativeModulesAreInstalled';
+ ensureNativeModulesAreInstalled();
+-export const SharedRef = globalThis.expo.SharedRef;
++export const SharedRef = globalThis.expo?.SharedRef;
+ 
+ //# sourceMappingURL=SharedRef.js.map
+diff --git a/node_modules/expo-modules-core/build/requireNativeModule.js b/node_modules/expo-modules-core/build/requireNativeModule.js
+index 887b885..63b6490 100644
+--- a/node_modules/expo-modules-core/build/requireNativeModule.js
++++ b/node_modules/expo-modules-core/build/requireNativeModule.js
+@@ -13,7 +13,26 @@ import { ensureNativeModulesAreInstalled } from './ensureNativeModulesAreInstall
+  */ export function requireNativeModule(moduleName) {
+     const nativeModule = requireOptionalNativeModule(moduleName);
+     if (!nativeModule) {
+-        throw new Error(`Cannot find native module '${moduleName}'`);
++        // Only when the Expo module system itself is absent, which means visionOS: its Podfile
++        // installs React Native and Viro and no Expo pods, so a module-level requireNativeModule
++        // would take the JS runtime down at import. With Expo linked this still throws (see
++        // src/requireNativeModule.ts for why expo-asset depends on that).
++        if (globalThis.expo != null) {
++            throw new Error(`Cannot find native module '${moduleName}'`);
++        }
++        if (__DEV__) {
++            console.warn(`Native module '${moduleName}' not found — ExpoModulesCore may not be linked. Using empty stub.`);
++        }
++        // A plain function, never an arrow: callers also `new` these properties.
++        return new Proxy({}, {
++            get(_, prop) {
++                if (typeof prop !== 'string')
++                    return undefined;
++                return function (..._args) {
++                    return null;
++                };
++            },
++        });
+     }
+     return nativeModule;
+ }
 diff --git a/node_modules/expo-modules-core/src/EventEmitter.ts b/node_modules/expo-modules-core/src/EventEmitter.ts
-index 86119d9..870edbe 100644
+index b452b53..132b666 100644
 --- a/node_modules/expo-modules-core/src/EventEmitter.ts
 +++ b/node_modules/expo-modules-core/src/EventEmitter.ts
-@@ -19,4 +19,4 @@ export interface EventSubscription {
+@@ -18,4 +18,4 @@ export interface EventSubscription {
  
  export type EventEmitter<TEventsMap extends EventsMap = Record<never, never>> =
-   typeof ExpoGlobal.EventEmitter<TEventsMap>;
--export const EventEmitter: typeof ExpoGlobal.EventEmitter = globalThis.expo.EventEmitter;
-+export const EventEmitter: typeof ExpoGlobal.EventEmitter = globalThis.expo?.EventEmitter;
+   ExpoEventEmitter<TEventsMap>;
+-export const EventEmitter = globalThis.expo.EventEmitter;
++export const EventEmitter = globalThis.expo?.EventEmitter;
 diff --git a/node_modules/expo-modules-core/src/NativeModule.ts b/node_modules/expo-modules-core/src/NativeModule.ts
 index 4a93938..cc2b477 100644
 --- a/node_modules/expo-modules-core/src/NativeModule.ts
@@ -39,7 +119,7 @@ index 2a7e8bd..ab9ca02 100644
 -export const SharedRef: typeof ExpoGlobal.SharedRef = globalThis.expo.SharedRef;
 +export const SharedRef: typeof ExpoGlobal.SharedRef = globalThis.expo?.SharedRef;
 diff --git a/node_modules/expo-modules-core/src/requireNativeModule.ts b/node_modules/expo-modules-core/src/requireNativeModule.ts
-index 22fc31e..98ba7b7 100644
+index 81266f1..0870c0a 100644
 --- a/node_modules/expo-modules-core/src/requireNativeModule.ts
 +++ b/node_modules/expo-modules-core/src/requireNativeModule.ts
 @@ -17,7 +17,37 @@ export function requireNativeModule<ModuleType = any>(moduleName: string): Modul

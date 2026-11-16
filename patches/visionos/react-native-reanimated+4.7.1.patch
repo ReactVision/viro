@@ -1,8 +1,8 @@
 diff --git a/node_modules/react-native-reanimated/apple/reanimated/apple/keyboardObserver/REAKeyboardEventObserver.mm b/node_modules/react-native-reanimated/apple/reanimated/apple/keyboardObserver/REAKeyboardEventObserver.mm
-index 2c64474..d670c89 100644
+index a5e916f..9c81a85 100644
 --- a/node_modules/react-native-reanimated/apple/reanimated/apple/keyboardObserver/REAKeyboardEventObserver.mm
 +++ b/node_modules/react-native-reanimated/apple/reanimated/apple/keyboardObserver/REAKeyboardEventObserver.mm
-@@ -196,8 +196,13 @@ - (void)keyboardWillChangeFrame:(NSNotification *)notification
+@@ -209,8 +209,13 @@ - (void)keyboardWillChangeFrame:(NSNotification *)notification
     to the window coordinate space in order to support Slide Over and Stage Manager on
     iPadOS.
     */

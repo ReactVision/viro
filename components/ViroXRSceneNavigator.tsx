@@ -460,6 +460,13 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       };
     }, []);
 
+    // On Quest the scene runs under VRActivity, a separate React root, so viroAppProps cross
+    // over the bridge. Published on every change, as a phone scene sees each new object.
+    const questAppProps = (rest as { viroAppProps?: unknown }).viroAppProps;
+    React.useEffect(() => {
+      if (isQuest) VRQuestNavigatorBridge.setAppProps(questAppProps);
+    }, [questAppProps]);
+
     // On Quest: register the intent (scene + renderer config) then launch VRActivity.
     // Only on mount; renderQuestPanel says why it is not relaunched.
     React.useEffect(() => {

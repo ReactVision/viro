@@ -87,6 +87,12 @@ type Props = ViewProps & {
 
   viroAppProps?: any; // TODO: what is the type of this?
   /**
+   * @internal Also hand each scene the navigator as `arSceneNavigator`. Set by
+   * ViroQuestEntryPoint: a ViroXRSceneNavigator scene is written once for phones and
+   * Quest, and on a phone it reads `arSceneNavigator`.
+   */
+  exposeArSceneNavigator?: boolean;
+  /**
    * Renderer settings that can be used to enable or disable various
    * renderer capabilities and algorithms.
    */
@@ -569,6 +575,9 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
         <Scene
           key={sceneDictionary[scene].tag}
           sceneNavigator={this.sceneNavigator}
+          {...(this.props.exposeArSceneNavigator
+            ? { arSceneNavigator: this.sceneNavigator }
+            : null)}
           {...props}
         />
       );

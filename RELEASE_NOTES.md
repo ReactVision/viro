@@ -21,6 +21,10 @@
 - **A build without the `AR` xRMode leaves ARCore out (Expo plugin):** a Quest-only app no longer carries `:arcore_client`, its meta-data or its `<queries>` entry.
 - **Building the bridge from source needs Gradle 9.4.1 and AGP 9.2.1.** Apps that consume the published package are not affected.
 
+### Meta Quest
+
+- **A `ViroXRSceneNavigator` scene gets `arSceneNavigator` and live `viroAppProps`,** as on a phone; a scene written for both threw on Quest.
+
 ### visionOS
 
 - **Runs on React Native 0.88 through `@reactvision/react-native-visionos` 0.88.1,** an optional peer dependency again (`>=0.88.0 <0.89.0`). Generate the `visionos/` folder from `@reactvision/visionos-template` 0.88.1.

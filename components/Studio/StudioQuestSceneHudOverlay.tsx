@@ -117,12 +117,14 @@ export function StudioQuestSceneHudOverlay({
   );
   const alertTitle = alertShown ? questAlertStore.title() : null;
   const alertMessage = alertShown ? questAlertStore.message() : null;
+  const alertButtonLabel = questAlertStore.buttonLabel();
   const alertPanelHeight = React.useMemo(
     () =>
       alertMessage === null
         ? 0
-        : questAlertLayout(alertTitle, alertMessage).panelHeight,
-    [alertTitle, alertMessage]
+        : questAlertLayout(alertTitle, alertMessage, alertButtonLabel)
+            .panelHeight,
+    [alertTitle, alertMessage, alertButtonLabel]
   );
 
   const poseRef = React.useRef(cameraPose);

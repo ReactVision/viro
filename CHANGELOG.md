@@ -23,6 +23,8 @@
 
 ### Fixed
 
+- **A Studio scene's alert shows its own close button label (`StudioSceneNavigator`).** The button always read OK, whatever the scene's ALERT function set. It now reads `alert_action_button_title`, and OK when that is empty or the backend does not send it.
+- **The Meta Quest alert panel's button fits its label.** It was a fixed pill sized for OK. It widens with the label and wraps a long one onto more lines, leaving room for the page counter, and Next on the earlier pages of a long message takes the same button.
 - **`ViroObjectDetector` boxes and hit-test positions on iOS line up in a resized window.** They are computed from the AR view's bounds instead of the screen's, so they match the camera feed in a resizable iPhone window and in iPad multitasking (Split View, Slide Over, Stage Manager).
 - **iOS: `ViroSound.preloadSounds` and sounds played by name work (virocore with the fix).** Preloading never loaded anything and its promise never resolved, and a `source={{ name }}` sound stayed silent. The data is now loaded and kept under its key, the promise resolves with `{ result, msg }` as on Android, and a named sound plays from it, firing `onFinish`. A downloaded sound also opens now: its temporary file path was read as a URL with no scheme.
 - **iOS: `ViroSpatialSound` and `ViroSoundField` no longer crash on mount.** The base class's `createSoundWithPath` had been commented out since the first commit, so these two components called a method that did not exist.

@@ -7,7 +7,9 @@
  *
  * It also provides a claim registry so multiple auto-matching <ViroARPlane>s
  * don't bind to the same detected plane, and exposes performARHitTestWithPoint
- * via ref (ray-vs-plane in the session).
+ * via ref: ray-vs-plane in the session, or against the virtual camera's planes
+ * within their extent when there is no session. onCameraARHitTest runs the same
+ * test from the middle of the view every frame.
  *
  * MVP scope: plane anchors only (slam has no image/object anchors).
  */
@@ -21,7 +23,6 @@ import {
 import {
   ViroTrackingState,
   type ArPlaneAnchor,
-  type ArHitResult,
 } from "@reactvision/viro-web-renderer";
 import {
   useViroAR,
@@ -35,6 +36,11 @@ import {
 } from "../ViroConstants";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
+import { cameraView, rayAt } from "../Web/viroDrag";
+import { hitTestPlanes, toViroHit, type ViroPlaneHit } from "../Web/viroPlaneHitTest";
+import { cameraBasis } from "../Web/viroMath";
+import { quatToEuler } from "../Studio/colocation/frameMath";
+import type { ViroCameraARHitTest } from "../Types/ViroEvents";
 
 /** The declarative anchor shape passed to onAnchor* (mirrors ViroAnchor). */
 export type ViroWebAnchor = {
@@ -54,6 +60,7 @@ type Props = {
   onAnchorFound?: (anchor: ViroWebAnchor) => void;
   onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
   onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
+  onCameraARHitTest?: (event: ViroCameraARHitTest) => void;
   /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
   toneMappingEnabled?: boolean;
   physicsWorld?: ViroPhysicsWorldProp;
@@ -63,7 +70,7 @@ type Props = {
 
 export type ViroARSceneHandle = {
   /** Ray-vs-plane hit test from a screen point (device pixels, top-left origin). */
-  performARHitTestWithPoint: (x: number, y: number) => Promise<ArHitResult[]>;
+  performARHitTestWithPoint: (x: number, y: number) => Promise<ViroPlaneHit[]>;
 };
 
 export function anchorToViro(p: ArPlaneAnchor): ViroWebAnchor {
@@ -152,17 +159,47 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
     },
   }).current;
 
+  const anchorsRef = useRef(anchors);
+  anchorsRef.current = anchors;
+  const hitAt = (x: number, y: number): ViroPlaneHit[] => {
+    const { width, height } = renderer.canvasSize;
+    if (session) {
+      return session.hitTest(x, y, width, height).map((h) => toViroHit(h, anchorsRef.current.find((a) => a.id === h.anchorId), false));
+    }
+    const view = cameraView(renderer.scene);
+    if (!view || !width || !height) return [];
+    const rect = view.element.getBoundingClientRect();
+    const ray = rayAt(view, rect.left + (x * rect.width) / width, rect.top + (y * rect.height) / height);
+    return hitTestPlanes(ray, anchorsRef.current);
+  };
+  const hitAtRef = useRef(hitAt);
+  hitAtRef.current = hitAt;
+
   useImperativeHandle(
     ref,
     () => ({
-      performARHitTestWithPoint: async (x: number, y: number) => {
-        if (!session) return [];
-        const { width, height } = renderer.canvasSize;
-        return session.hitTest(x, y, width, height);
-      },
+      performARHitTestWithPoint: async (x: number, y: number) => hitAtRef.current(x, y),
     }),
-    [session, renderer],
+    [],
   );
+
+  const wantsCameraHits = !!props.onCameraARHitTest;
+  useEffect(() => {
+    if (!wantsCameraHits) return;
+    let frame = requestAnimationFrame(function tick() {
+      frame = requestAnimationFrame(tick);
+      const view = session ? null : cameraView(renderer.scene);
+      const pose = session ? session.cameraPose : view && { position: view.position, quaternion: view.orientation };
+      if (!pose) return;
+      const { width, height } = renderer.canvasSize;
+      const { forward, up } = cameraBasis(pose.quaternion);
+      propsRef.current.onCameraARHitTest?.({
+        hitTestResults: hitAtRef.current(width / 2, height / 2),
+        cameraOrientation: { position: [...pose.position], rotation: quatToEuler(pose.quaternion), forward, up },
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [wantsCameraHits, session, renderer]);
 
   return (
     <ViroARPlaneClaimsContext.Provider value={claims}>

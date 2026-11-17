@@ -13,7 +13,7 @@
  * and those are stopped in the capture phase so virocore never sees them as
  * touches.
  */
-import { ViroTrackingState, type ViroHandle, type ViroSceneApi } from "@reactvision/viro-web-renderer";
+import { ViroTrackingState, type ArPlaneAnchor, type ViroHandle, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { setCameraView, type CameraView } from "./viroDrag";
 import { onSceneCameraChange, sceneCameraActive } from "./viroSceneCameras";
 
@@ -28,6 +28,8 @@ export type ViroVirtualCameraOptions = {
    * Default -1. `null` reports no plane.
    */
   floorY?: number | null;
+  /** Planes reported as detected anchors in place of the floor; `floorY` is then ignored. */
+  planes?: ArPlaneAnchor[];
   /** Receives the camera's controls once it is driving the scene. */
   onReady?: (controls: ViroVirtualCameraControls) => void;
 };
@@ -77,6 +79,13 @@ export function floorAnchorFor(floorY: number) {
     alignment: "HorizontalUpward" as const,
     confidence: 1,
   };
+}
+
+/** The anchors a virtual camera's scene sees. */
+export function virtualAnchors(options: ViroVirtualCameraOptions): ArPlaneAnchor[] {
+  if (options.planes) return options.planes;
+  const floorY = options.floorY === undefined ? -1 : options.floorY;
+  return floorY === null ? [] : [floorAnchorFor(floorY)];
 }
 
 /** Where the orbit's pose goes. */
@@ -130,7 +139,7 @@ export function attachVirtualCamera3D(
   scene: ViroSceneApi,
   root: ViroHandle,
   element: HTMLElement,
-  options: Omit<ViroVirtualCameraOptions, "floorY"> = {},
+  options: Omit<ViroVirtualCameraOptions, "floorY" | "planes"> = {},
 ): () => void {
   const node = scene.createNode();
   scene.setNodeCamera(node);
@@ -164,7 +173,7 @@ export function attachVirtualCamera3D(
 function attachOrbit(
   scene: ViroSceneApi,
   element: HTMLElement,
-  options: Omit<ViroVirtualCameraOptions, "floorY">,
+  options: Omit<ViroVirtualCameraOptions, "floorY" | "planes">,
   sink: CameraSink,
   // Hands over a function that republishes the view, for a sink whose driving() changes.
   watch?: (refresh: () => void) => void,

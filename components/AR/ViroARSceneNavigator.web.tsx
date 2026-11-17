@@ -44,7 +44,7 @@ import {
 } from "../Web/useViroRendererEffects";
 import {
   attachVirtualCamera,
-  floorAnchorFor,
+  virtualAnchors,
   type ViroVirtualCameraOptions,
 } from "../Web/viroVirtualCamera";
 
@@ -296,10 +296,15 @@ export function ViroARSceneNavigator(props: Props) {
     const opts = virtualRef.current;
     if (!renderer || !container || !opts) return;
     setTracking(ViroTrackingState.Normal);
-    const floorY = opts.floorY === undefined ? -1 : opts.floorY;
-    setAnchors(floorY === null ? [] : [floorAnchorFor(floorY)]);
     return attachVirtualCamera(renderer.scene, container, opts);
   }, [renderer, virtualOn]);
+
+  const virtualPlanes = virtual?.planes;
+  const virtualFloorY = virtual?.floorY;
+  useEffect(() => {
+    const opts = virtualRef.current;
+    if (renderer && opts) setAnchors(virtualAnchors(opts));
+  }, [renderer, virtualOn, virtualPlanes, virtualFloorY]);
 
   const resolveLoadSlam = useCallback((): ViroArSessionOptions["loadSlam"] => {
     if (props.loadSlam) return props.loadSlam;

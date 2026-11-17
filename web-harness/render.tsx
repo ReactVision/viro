@@ -14,6 +14,7 @@
  *       Rendered through the existing StudioSceneNavigator.web path — no code
  *       execution, sceneData is plain JSON.
  *   - { kind: "tsx", code: string, navigatorType: "AR" | "VR" | "3D", assetOverrides? }
+ *       Code that mounts no navigator is mounted in navigatorType's.
  *       The TSX (e.g. straight out of reactviro_generate_scene) is transpiled
  *       in-browser (Babel standalone) and executed against the curated
  *       `@reactvision/react-viro` shim in viroWebComponents.ts. Components
@@ -40,7 +41,7 @@ import { webRendererOptions } from "./wasmOptions";
 const SLAM_SCRIPT_URL = "/tinyvio-slam.js";
 import { StudioSceneNavigator } from "../components/Studio/StudioSceneNavigator";
 import type { ArPlaybackFrame, ViroArSession } from "@reactvision/viro-web-renderer";
-import { setPlaybackSource } from "./viroWebComponents";
+import { setPlaybackSource, Viro3DSceneNavigator, ViroARSceneNavigator } from "./viroWebComponents";
 import type { StudioSceneResponse } from "../components/Studio/types";
 
 type RenderInput =
@@ -102,12 +103,24 @@ declare global {
   }
 }
 
-function TsxRoot({ code, assetOverrides }: { code: string; assetOverrides?: Record<string, string> }) {
+// A mounted navigator: a JSX tag or createElement call, not a type import or a mention.
+const NAVIGATOR_RE = /<\s*Viro(AR|VR|3D|XR)?SceneNavigator\b|createElement\(\s*Viro(AR|VR|3D|XR)?SceneNavigator\b/;
+
+/** A scene component mounted in the navigator it needs, for code whose default export is the scene itself. */
+function inNavigator(Scene: React.ComponentType<any>, navigatorType: "AR" | "VR" | "3D"): React.ComponentType<any> {
+  const Navigator = navigatorType === "AR" ? ViroARSceneNavigator : Viro3DSceneNavigator;
+  return function SceneEntry() {
+    return createElement(Navigator, { autofocus: true, initialScene: { scene: Scene } });
+  };
+}
+
+function TsxRoot({ code, assetOverrides, navigatorType }: { code: string; assetOverrides?: Record<string, string>; navigatorType: "AR" | "VR" | "3D" }) {
   const [App, setApp] = useState<React.ComponentType<any> | null>(null);
 
   useEffect(() => {
     try {
-      const Compiled = compileGeneratedScene(code, assetOverrides);
+      const Scene = compileGeneratedScene(code, assetOverrides);
+      const Compiled = NAVIGATOR_RE.test(code) ? Scene : inNavigator(Scene, navigatorType);
       // setApp(Compiled) would be misread as a useState *updater* function
       // (React calls it with prevState instead of storing it) — wrap it so
       // the component itself, not its first invocation's return value, ends
@@ -230,7 +243,7 @@ if (!input) {
       },
     );
     createRoot(document.getElementById("root")!).render(
-      createElement(TsxRoot, { code: input.scene, assetOverrides: input.assetOverrides }),
+      createElement(TsxRoot, { code: input.scene, assetOverrides: input.assetOverrides, navigatorType: "AR" }),
     );
   } else {
     createRoot(document.getElementById("root")!).render(
@@ -255,6 +268,6 @@ if (!input) {
     );
   }
   createRoot(document.getElementById("root")!).render(
-    createElement(TsxRoot, { code: input.code, assetOverrides: input.assetOverrides }),
+    createElement(TsxRoot, { code: input.code, assetOverrides: input.assetOverrides, navigatorType: input.navigatorType }),
   );
 }

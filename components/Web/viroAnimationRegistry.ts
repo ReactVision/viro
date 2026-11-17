@@ -1,11 +1,14 @@
 /**
  * Web registry for declarative ViroAnimations (transform/opacity keyframes).
- * ViroAnimations.web.createAnimations() stores definitions here; the bridge
+ * ViroAnimations.web.registerAnimations() stores definitions here; the bridge
  * resolves an `animation` name against this registry and, if found, runs a
- * transaction (begin → set target props → commit) so the renderer interpolates.
+ * transaction (begin → set target props → commit) for each animation in it so
+ * the renderer interpolates. Chains run as native parses them
+ * (VRTAnimationManager): a registered array runs its members in parallel, any
+ * array inside one or behind a name runs them in sequence.
  *
- * MVP scope: position/scale/rotation (per-axis) + opacity. color/material/
- * translate/animation-chains are follow-ups.
+ * Scope: position/scale/rotation (per-axis) + opacity. color/material/translate
+ * are follow-ups.
  */
 import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
 import { ViroEasing } from "@reactvision/viro-web-renderer";
@@ -19,18 +22,46 @@ export interface ViroWebAnimationDef {
   properties: Record<string, number | string | undefined>;
 }
 
-const registry = new Map<string, ViroWebAnimationDef>();
+/** An animation, the name of a registered one, or an array of these. */
+export type ViroWebAnimationEntry = ViroWebAnimationDef | string | ViroWebAnimationEntry[];
+
+const registry = new Map<string, ViroWebAnimationEntry>();
 
 export function registerViroAnimations(
-  animations: Record<string, ViroWebAnimationDef>,
+  animations: Record<string, ViroWebAnimationEntry>,
 ): void {
   for (const name of Object.keys(animations)) {
     registry.set(name, animations[name]);
   }
 }
 
+const isDef = (entry: unknown): entry is ViroWebAnimationDef =>
+  !!entry && typeof entry === "object" && !Array.isArray(entry) && "properties" in entry;
+
 export function getViroAnimationDef(name: string): ViroWebAnimationDef | undefined {
-  return registry.get(name);
+  const entry = registry.get(name);
+  return isDef(entry) ? entry : undefined;
+}
+
+/** A registered animation as it runs: one animation, or a chain of them in sequence or in parallel. */
+export type ViroAnimationExec = { def: ViroWebAnimationDef } | { serial: boolean; items: ViroAnimationExec[] };
+
+function parseEntry(entry: unknown, serial: boolean, names: ReadonlySet<string>): ViroAnimationExec | null {
+  if (typeof entry === "string") {
+    // A name that leads back to itself would never end.
+    if (names.has(entry)) return null;
+    return parseEntry(registry.get(entry), true, new Set([...names, entry]));
+  }
+  if (Array.isArray(entry)) {
+    const items = entry.map((e) => parseEntry(e, true, names)).filter((e): e is ViroAnimationExec => !!e);
+    return items.length ? { serial, items } : null;
+  }
+  return isDef(entry) ? { def: entry } : null;
+}
+
+/** `name` as it runs, or null when it is not a registered animation. */
+export function resolveViroAnimation(name: string): ViroAnimationExec | null {
+  return parseEntry(registry.get(name), false, new Set([name]));
 }
 
 export interface ViroBaseTransform {
@@ -84,8 +115,12 @@ export function viroAnimationEnd(
   name: string,
   from: ViroBaseTransform,
 ): ViroBaseTransform | null {
-  const p = registry.get(name)?.properties;
-  if (!p) return null;
+  const def = getViroAnimationDef(name);
+  return def ? endOf(def, from) : null;
+}
+
+function endOf(def: ViroWebAnimationDef, from: ViroBaseTransform): ViroBaseTransform {
+  const p = def.properties;
   // The renderer animates from the angle it holds, which is within one turn.
   const rotation = from.rotation.map(wrap360);
   return {
@@ -110,8 +145,12 @@ export function viroAnimationEnd(
 
 /** True when `name` moves the node from wherever it is, so a repeat carries on from the last one. */
 export function isRelativeViroAnimation(name: string): boolean {
-  const p = registry.get(name)?.properties;
-  return !!p && Object.values(p).some((v) => typeof v === "string" && RELATIVE.test(v));
+  const def = getViroAnimationDef(name);
+  return !!def && isRelativeDef(def);
+}
+
+export function isRelativeDef(def: ViroWebAnimationDef): boolean {
+  return Object.values(def.properties).some((v) => typeof v === "string" && RELATIVE.test(v));
 }
 
 function setAnimated(
@@ -139,50 +178,71 @@ function setAnimated(
   }
 }
 
-/** Put a node at `end` now, for the properties `name` animates. */
-export function setViroAnimationEnd(
-  scene: ViroSceneApi,
-  node: ViroHandle,
-  name: string,
-  end: ViroBaseTransform,
-): void {
-  const p = registry.get(name)?.properties;
-  if (p) setAnimated(scene, node, p, end);
+/** One animation of a pass: when it starts (ms into the pass), and where it takes the node from and to. */
+export interface ViroAnimationStep {
+  at: number;
+  def: ViroWebAnimationDef;
+  from: ViroBaseTransform;
+  end: ViroBaseTransform;
 }
 
-export interface ViroAnimationPass {
-  /** Where the pass leaves the node. */
-  end: ViroBaseTransform;
-  /** Delay plus duration. */
-  ms: number;
+const pick = (a: number[], b: number[], base: number[]) => a.map((v, i) => (b[i] !== base[i] ? b[i]! : v));
+
+/**
+ * Lays out one pass of `exec` from `from`, starting `at` ms in: pushes each
+ * animation's step onto `steps` and returns where the pass leaves the node and
+ * how long it takes. Members of a parallel chain each take the properties they
+ * change; one that changes the same property as another wins by order.
+ */
+export function planViroAnimation(
+  exec: ViroAnimationExec,
+  from: ViroBaseTransform,
+  steps: ViroAnimationStep[],
+  at = 0,
+): { end: ViroBaseTransform; ms: number } {
+  if ("def" in exec) {
+    const end = endOf(exec.def, from);
+    steps.push({ at, def: exec.def, from, end });
+    return { end, ms: (exec.def.delay ?? 0) + exec.def.duration };
+  }
+  if (exec.serial) {
+    let end = from;
+    let ms = 0;
+    for (const item of exec.items) {
+      const r = planViroAnimation(item, end, steps, at + ms);
+      end = r.end;
+      ms += r.ms;
+    }
+    return { end, ms };
+  }
+  let end = from;
+  let ms = 0;
+  for (const item of exec.items) {
+    const r = planViroAnimation(item, from, steps, at);
+    end = {
+      position: pick(end.position, r.end.position, from.position) as ViroBaseTransform["position"],
+      rotation: pick(end.rotation, r.end.rotation, from.rotation) as ViroBaseTransform["rotation"],
+      scale: pick(end.scale, r.end.scale, from.scale) as ViroBaseTransform["scale"],
+      opacity: r.end.opacity !== from.opacity ? r.end.opacity : end.opacity,
+    };
+    ms = Math.max(ms, r.ms);
+  }
+  return { end, ms };
 }
 
 /**
- * Run a declarative animation on a node that is at `base`.
- * Returns null if `name` is not a registered animation.
- *
- * `loop` is the renderer's own, which replays the same pass.
- *
- * `delayMs` is the `animation` prop's own delay. It wins over the registered
- * one, which is how a caller that carries the delay per trigger rather than per
- * registry entry still gets it, and matches the native side, where the prop
- * delay gates the start and the registered one is a second wait on top.
+ * Starts a step. The node is put at the step's start first: the renderer may
+ * not have drawn the last step's end yet. `loop` is the renderer's own, which
+ * replays the step from where it started.
  */
-export function runDeclarativeAnimation(
-  scene: ViroSceneApi,
-  node: ViroHandle,
-  name: string,
-  base: ViroBaseTransform,
-  loop: boolean,
-  delayMs?: number,
-): ViroAnimationPass | null {
-  const def = registry.get(name);
-  const end = viroAnimationEnd(name, base);
-  if (!def || !end) return null;
-
-  const delay = delayMs ?? def.delay ?? 0;
-  scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
-  setAnimated(scene, node, def.properties, end);
+export function startViroAnimationStep(scene: ViroSceneApi, node: ViroHandle, step: ViroAnimationStep, loop = false): void {
+  setAnimated(scene, node, step.def.properties, step.from);
+  scene.beginAnimation(node, step.def.duration / 1000, (step.def.delay ?? 0) / 1000, loop, easingValue(step.def.easing));
+  setAnimated(scene, node, step.def.properties, step.end);
   scene.commitAnimation();
-  return { end, ms: delay + def.duration };
+}
+
+/** Puts the node at a step's end now. */
+export function finishViroAnimationStep(scene: ViroSceneApi, node: ViroHandle, step: ViroAnimationStep): void {
+  setAnimated(scene, node, step.def.properties, step.end);
 }

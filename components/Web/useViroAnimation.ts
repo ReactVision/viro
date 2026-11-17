@@ -13,9 +13,12 @@ import { useEffect } from "react";
 import type { ViroHandle } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroRenderer } from "./ViroWebContext";
 import {
-  isRelativeViroAnimation,
-  runDeclarativeAnimation,
-  setViroAnimationEnd,
+  finishViroAnimationStep,
+  isRelativeDef,
+  planViroAnimation,
+  resolveViroAnimation,
+  startViroAnimationStep,
+  type ViroAnimationStep,
   type ViroBaseTransform,
 } from "./viroAnimationRegistry";
 
@@ -23,7 +26,7 @@ export interface ViroAnimationProp {
   name?: string;
   run?: boolean;
   loop?: boolean;
-  /** Milliseconds to wait before the first value, per trigger. */
+  /** Milliseconds to wait before each pass, as native waits before starting. */
   delay?: number;
   onStart?: () => void;
   onFinish?: () => void;
@@ -46,57 +49,72 @@ export function useViroAnimation(
 
   useEffect(() => {
     if (!ready || !animation) return;
+    const exec = name ? resolveViroAnimation(name) : null;
 
-    // A looping relative animation ("+=90") starts each pass where the last one
-    // ended, as on native. The renderer's loop replays the first pass, and it
-    // does not report the end of a pass that is not looping, so the passes are
-    // timed here.
-    const chained = !!loop && !!name && isRelativeViroAnimation(name);
-    let frame = 0;
-    const play = (from: ViroBaseTransform): boolean => {
-      if (!name) return false;
-      const pass = runDeclarativeAnimation(scene, node, name, from, !!loop && !chained, delay);
-      if (!pass) return false;
-      if (chained) {
-        const endsAt = performance.now() + pass.ms;
-        const tick = () => {
-          if (performance.now() < endsAt) {
-            frame = requestAnimationFrame(tick);
-            return;
-          }
-          // The renderer may not have drawn the pass's last step yet.
-          setViroAnimationEnd(scene, node, name, pass.end);
-          animation.onFinish?.();
-          play(pass.end);
-        };
-        frame = requestAnimationFrame(tick);
+    if (!exec) {
+      // A model's own animation, whose start and end the renderer reports.
+      renderer.setNodeAnimationHandlers(node, { onStart: animation.onStart, onFinish: animation.onFinish });
+      if (run !== false) {
+        const animName = !name || name === "*" ? scene.getAnimationKeys(node)[0] : name;
+        if (animName) scene.startAnimation(node, animName, !!loop);
+      } else {
+        scene.pauseAnimation(node);
       }
-      return true;
-    };
-
-    renderer.setNodeAnimationHandlers(node, {
-      onStart: animation.onStart,
-      onFinish: chained ? undefined : animation.onFinish,
-    });
-
-    if (run !== false) {
-      // Try a registered declarative animation first, then a model animation.
-      if (!play(base)) {
-        let animName = name;
-        if (!animName || animName === "*") {
-          animName = scene.getAnimationKeys(node)[0];
-        }
-        if (animName) {
-          scene.startAnimation(node, animName, !!loop);
-        }
-      }
-    } else {
-      scene.pauseAnimation(node);
+      return () => {
+        renderer.clearNodeAnimationHandlers(node);
+        scene.stopAnimation(node, false);
+      };
     }
+    if (run === false) return;
+
+    // The renderer reports neither the start nor the end of a declarative
+    // animation, so passes are timed here. As on native, each pass fires
+    // onStart and onFinish, and a loop starts the next pass where the last
+    // ended, after the prop's delay again.
+    const queue: { at: number; run: () => void }[] = [];
+    let frame = 0;
+    const tick = () => {
+      frame = 0;
+      const now = performance.now();
+      while (queue.length && queue[0]!.at <= now) queue.shift()!.run();
+      if (queue.length && !frame) frame = requestAnimationFrame(tick);
+    };
+    const after = (ms: number, then: () => void) => {
+      const at = performance.now() + ms;
+      const i = queue.findIndex((q) => q.at > at);
+      queue.splice(i < 0 ? queue.length : i, 0, { at, run: then });
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
+    // One animation looping to fixed values: the renderer's own loop replays it
+    // from the start, which native would not, but which the web has always shown.
+    const replay = !!loop && "def" in exec && !isRelativeDef(exec.def);
+
+    const pass = (from: ViroBaseTransform) => {
+      const steps: ViroAnimationStep[] = [];
+      const { end, ms } = planViroAnimation(exec, from, steps);
+      animation.onStart?.();
+      for (const step of steps) after(step.at, () => startViroAnimationStep(scene, node, step, replay));
+      if (replay) {
+        const each = () => {
+          animation.onFinish?.();
+          animation.onStart?.();
+          after(ms, each);
+        };
+        after(ms, each);
+        return;
+      }
+      after(ms, () => {
+        // The renderer may not have drawn the last steps' ends yet.
+        for (const step of steps) finishViroAnimationStep(scene, node, step);
+        animation.onFinish?.();
+        if (loop) after(delay ?? 0, () => pass(end));
+      });
+    };
+    after(delay ?? 0, () => pass(base));
 
     return () => {
       cancelAnimationFrame(frame);
-      renderer.clearNodeAnimationHandlers(node);
+      queue.length = 0;
       scene.stopAnimation(node, false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

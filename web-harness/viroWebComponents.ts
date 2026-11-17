@@ -19,10 +19,16 @@ import { webRendererOptions } from "./wasmOptions";
 const slamScriptUrl = () => new URL("tinyvio-slam.js", document.baseURI).href;
 
 let navigatorDefaults: Record<string, unknown> = {};
+let navigator3DDefaults: Record<string, unknown> = {};
 
 /** Props every AR navigator the caller's code mounts gets, under its own. */
 export function setARNavigatorDefaults(defaults: Record<string, unknown>): void {
   navigatorDefaults = defaults;
+}
+
+/** Props every 3D (and VR, drawn as 3D) navigator the caller's code mounts gets, under its own. */
+export function set3DNavigatorDefaults(defaults: Record<string, unknown>): void {
+  navigator3DDefaults = defaults;
 }
 
 export { Viro360Image } from "../components/Viro360Image";
@@ -85,7 +91,7 @@ import { ViroScene as _SceneForVR } from "../components/ViroScene";
 
 export function Viro3DSceneNavigator(props: any) {
   if (usePlaybackRefusal("Viro3DSceneNavigator")) return null;
-  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
+  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 // A recording to drive the AR session from, when one was supplied. Caller TSX
@@ -176,7 +182,7 @@ export function ViroVRSceneNavigator(props: any) {
     );
   }, [refused]);
   if (refused) return null;
-  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
+  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 export function ViroVRScene(props: any) {

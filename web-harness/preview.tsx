@@ -3,9 +3,9 @@
  * runtime as render.tsx, kept running and interactive instead of screenshotted.
  *
  * Input arrives as `window.__PREVIEW_INPUT__`, set by an inline script the
- * serving page puts ahead of this module. An AR scene is shown from a virtual
- * camera the viewer moves (see viroVirtualCamera.ts) unless the URL has `?ar=1`,
- * which starts real web AR on a phone instead.
+ * serving page puts ahead of this module. A scene is shown from a virtual
+ * camera the viewer moves (see viroVirtualCamera.ts), an AR scene unless the URL
+ * has `?ar=1`, which starts real web AR on a phone instead.
  *
  * The status is posted to the parent window as `{ type: "reactviro-preview" }`
  * messages, so a host that frames this page (an MCP Apps view) can report
@@ -24,7 +24,7 @@ import { ViroScene } from "../components/ViroScene";
 import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
-import { setARNavigatorDefaults } from "./viroWebComponents";
+import { set3DNavigatorDefaults, setARNavigatorDefaults } from "./viroWebComponents";
 
 type PreviewInput = {
   code: string;
@@ -200,17 +200,14 @@ function PreviewScene(props: any) {
 
 if (!liveAR) {
   addViroExports({ ViroARScene: PreviewARScene, ViroScene: PreviewScene });
-  setARNavigatorDefaults({
-    virtualCamera: {
-      floorY: FLOOR_Y,
-      onReady: (c: Controls) => {
-        if (keptPose) c.lookFrom(keptPose.position, keptPose.target);
-        keptPose = null;
-        cameraControls = c;
-        cameraListeners.forEach((l) => l());
-      },
-    },
-  });
+  const onCameraReady = (c: Controls) => {
+    if (keptPose) c.lookFrom(keptPose.position, keptPose.target);
+    keptPose = null;
+    cameraControls = c;
+    cameraListeners.forEach((l) => l());
+  };
+  setARNavigatorDefaults({ virtualCamera: { floorY: FLOOR_Y, onReady: onCameraReady } });
+  set3DNavigatorDefaults({ virtualCamera: { onReady: onCameraReady } });
 }
 
 // Emscripten reports an abort only on the console, and the canvas just stops
@@ -1183,18 +1180,21 @@ function Chrome({
                   </optgroup>
                 ))}
               </Picker>
-              <button
-                type="button"
-                aria-pressed={gridOn}
-                style={{ ...button, opacity: gridOn ? 1 : 0.6 }}
-                onClick={() => {
-                  gridOn = !gridOn;
-                  gridListeners.forEach((l) => l());
-                  tick((n) => n + 1);
-                }}
-              >
-                Grid
-              </button>
+              {/* The grid is the AR floor's, drawn only in an AR scene, which listens for it. */}
+              {gridListeners.size ? (
+                <button
+                  type="button"
+                  aria-pressed={gridOn}
+                  style={{ ...button, opacity: gridOn ? 1 : 0.6 }}
+                  onClick={() => {
+                    gridOn = !gridOn;
+                    gridListeners.forEach((l) => l());
+                    tick((n) => n + 1);
+                  }}
+                >
+                  Grid
+                </button>
+              ) : null}
               <button type="button" style={button} onClick={() => cameraControls?.reset()}>
                 Reset view
               </button>

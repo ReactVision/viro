@@ -8,7 +8,7 @@
  * the whole scene — components like ViroARPlaneSelector/ViroARImageMarker/
  * ViroSpotLight-adjacent AR helpers don't have a web port yet.
  */
-import { createElement, useEffect } from "react";
+import { createElement, useEffect, useSyncExternalStore } from "react";
 import { markError, pushWarning } from "./renderState";
 import { webRendererOptions } from "./wasmOptions";
 
@@ -24,7 +24,13 @@ let navigator3DDefaults: Record<string, unknown> = {};
 /** Props every AR navigator the caller's code mounts gets, under its own. */
 export function setARNavigatorDefaults(defaults: Record<string, unknown>): void {
   navigatorDefaults = defaults;
+  navigatorDefaultsListeners.forEach((l) => l());
 }
+const navigatorDefaultsListeners = new Set<() => void>();
+const onNavigatorDefaults = (l: () => void) => {
+  navigatorDefaultsListeners.add(l);
+  return () => void navigatorDefaultsListeners.delete(l);
+};
 
 /** Props every 3D (and VR, drawn as 3D) navigator the caller's code mounts gets, under its own. */
 export function set3DNavigatorDefaults(defaults: Record<string, unknown>): void {
@@ -136,6 +142,7 @@ function usePlaybackRefusal(navigator: string): boolean {
 let navigatorsMounted = 0;
 
 export function ViroARSceneNavigator(props: any) {
+  const defaults = useSyncExternalStore(onNavigatorDefaults, () => navigatorDefaults);
   useEffect(() => {
     navigatorsMounted += 1;
     if (navigatorsMounted > 1) {
@@ -157,7 +164,7 @@ export function ViroARSceneNavigator(props: any) {
   return createElement(_ViroARSceneNavigatorRaw, {
     webRendererOptions,
     slamScriptUrl: slamScriptUrl(),
-    ...navigatorDefaults,
+    ...defaults,
     ...props,
     // After the caller's props, not before: a scene rendered over a recording
     // is rendered over that recording, whatever its own JSX asked for.

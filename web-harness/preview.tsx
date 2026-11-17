@@ -12,6 +12,7 @@
  * compile and runtime errors back to the model.
  */
 import * as React from "react";
+import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -20,6 +21,10 @@ import { addViroExports, compileGeneratedScenes, setModelOverrides } from "./sce
 import { ViroARPlaneSelector } from "../components/AR/ViroARPlaneSelector";
 import { ViroARScene } from "../components/AR/ViroARScene";
 import { ViroImage } from "../components/ViroImage";
+import { ViroBox } from "../components/ViroBox";
+import { ViroNode } from "../components/ViroNode";
+import { ViroQuad } from "../components/ViroQuad";
+import { ViroMaterials } from "../components/Material/ViroMaterials";
 import { ViroScene } from "../components/ViroScene";
 import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
@@ -144,7 +149,8 @@ if (shot) {
 // The virtual camera's floor, drawn as a grid so an AR scene has a ground to read depth against.
 const FLOOR_Y = -1;
 let gridOn = true;
-const gridListeners = new Set<() => void>();
+// Mounted AR scenes, which redraw when the grid or the surroundings change.
+const arSceneListeners = new Set<() => void>();
 let gridUrl: string | null = null;
 function floorGridUrl(): string {
   if (gridUrl) return gridUrl;
@@ -168,18 +174,216 @@ function floorGridUrl(): string {
   return (gridUrl = canvas.toDataURL("image/png"));
 }
 
+// What the AR scene stands in: the planes it detects and hit-tests, and the shapes drawn for them.
+// Lengths are metres. A room's back wall is `back` ahead of the start pose (which looks down -Z),
+// its other two walls are `width` apart, and it runs `depth` toward the camera, open on that side.
+// A piece is a box: `at` is the middle of its bottom face, with y measured up from the floor,
+// and a `surface` reports its top as a plane, as a phone would detect a table top.
+type Piece = { at: Vec3; size: Vec3; color: string; surface?: boolean };
+type Room = {
+  label: string;
+  walls?: { width: number; depth: number; height: number; back: number };
+  // Without walls, the floor's width and depth, centred 2 m ahead.
+  open?: [number, number];
+  floor?: string;
+  wall?: string;
+  pieces?: Piece[];
+};
+const WOOD = "#7a6650", DARK_WOOD = "#6e5a46", SCREEN = "#141518", BLACK = "#2d3036";
+const legs = (x: number, z: number, w: number, d: number, h: number, color: string): Piece[] =>
+  [-1, 1].flatMap((sx) => [-1, 1].map((sz) => ({ at: [x + sx * (w / 2 - 0.04), 0, z + sz * (d / 2 - 0.04)] as Vec3, size: [0.04, h, 0.04] as Vec3, color })));
+const ROOM_5M = { width: 5, depth: 5, height: 2.6, back: -3.5 };
+const ROOMS: Record<string, Room> = {
+  floor: { label: "Empty" },
+  room: { label: "Empty room", walls: ROOM_5M },
+  table: {
+    label: "Table",
+    walls: ROOM_5M,
+    pieces: [{ at: [0, 0.71, -1.5], size: [1.2, 0.04, 0.8], color: WOOD, surface: true }, ...legs(0, -1.5, 1.2, 0.8, 0.71, "#4a3d30")],
+  },
+  living: {
+    label: "Living room",
+    walls: { width: 6, depth: 5.5, height: 2.7, back: -4 },
+    floor: "#4a3f35",
+    wall: "#423e3b",
+    pieces: [
+      { at: [0, 0, -2.1], size: [2.4, 0.01, 1.6], color: "#4f4352" },
+      { at: [0, 0, -3.75], size: [1.8, 0.5, 0.45], color: DARK_WOOD, surface: true },
+      { at: [0, 0.5, -3.85], size: [1.3, 0.75, 0.06], color: SCREEN },
+      { at: [0, 0, -2.1], size: [1.1, 0.4, 0.6], color: WOOD, surface: true },
+      // Sofa against the left wall, facing the room.
+      { at: [-2.45, 0, -2.1], size: [0.9, 0.45, 2.1], color: "#566779", surface: true },
+      { at: [-2.85, 0.45, -2.1], size: [0.2, 0.45, 2.1], color: "#566779" },
+      { at: [-2.45, 0.45, -3.075], size: [0.9, 0.2, 0.15], color: "#566779" },
+      { at: [-2.45, 0.45, -1.125], size: [0.9, 0.2, 0.15], color: "#566779" },
+      { at: [2.3, 0, -2.3], size: [0.8, 0.42, 0.8], color: "#7d5f4b", surface: true },
+      { at: [2.65, 0.42, -2.3], size: [0.15, 0.4, 0.8], color: "#7d5f4b" },
+      { at: [2.55, 0, -3.6], size: [0.04, 1.5, 0.04], color: BLACK },
+      { at: [2.55, 1.5, -3.6], size: [0.35, 0.3, 0.35], color: "#d9cbb0" },
+    ],
+  },
+  kitchen: {
+    label: "Kitchen",
+    walls: ROOM_5M,
+    floor: "#3b3e42",
+    wall: "#44494e",
+    pieces: [
+      { at: [-0.4, 0, -3.2], size: [3.2, 0.86, 0.6], color: "#c9c4ba" },
+      { at: [-0.4, 0.86, -3.18], size: [3.24, 0.04, 0.64], color: "#5c5853", surface: true },
+      { at: [-0.4, 1.45, -3.32], size: [3.2, 0.7, 0.35], color: "#c9c4ba" },
+      { at: [1.75, 0, -3.15], size: [0.75, 1.85, 0.7], color: "#b9bec3", surface: true },
+      { at: [0, 0, -1.5], size: [1.6, 0.86, 0.9], color: "#4e5f6e" },
+      { at: [0, 0.86, -1.5], size: [1.7, 0.04, 1.0], color: "#5c5853", surface: true },
+      { at: [-0.4, 0, -0.75], size: [0.35, 0.65, 0.35], color: BLACK },
+      { at: [0.4, 0, -0.75], size: [0.35, 0.65, 0.35], color: BLACK },
+    ],
+  },
+  office: {
+    label: "Office",
+    walls: { width: 4.5, depth: 5, height: 2.6, back: -3.5 },
+    floor: "#34373c",
+    wall: "#3c4048",
+    pieces: [
+      { at: [0, 0.72, -3.1], size: [1.5, 0.04, 0.75], color: WOOD, surface: true },
+      { at: [-0.72, 0, -3.1], size: [0.04, 0.72, 0.7], color: "#5d4d3d" },
+      { at: [0.72, 0, -3.1], size: [0.04, 0.72, 0.7], color: "#5d4d3d" },
+      { at: [0, 0.76, -3.3], size: [0.08, 0.15, 0.08], color: BLACK },
+      { at: [0, 0.91, -3.3], size: [0.62, 0.37, 0.03], color: SCREEN },
+      { at: [0, 1.5, -3.37], size: [1.0, 0.03, 0.25], color: WOOD, surface: true },
+      { at: [0.45, 0, -2.4], size: [0.48, 0.46, 0.48], color: BLACK },
+      { at: [0.45, 0.46, -2.17], size: [0.46, 0.5, 0.05], color: BLACK },
+      // Bookcase against the right wall, open toward the room, with five shelves.
+      { at: [2.23, 0, -2.1], size: [0.03, 2.0, 1.0], color: DARK_WOOD },
+      { at: [2.07, 0, -2.585], size: [0.33, 2.0, 0.03], color: DARK_WOOD },
+      { at: [2.07, 0, -1.615], size: [0.33, 2.0, 0.03], color: DARK_WOOD },
+      ...[0.02, 0.46, 0.9, 1.34, 1.78].map((y): Piece => ({ at: [2.07, y, -2.1], size: [0.33, 0.025, 0.94], color: DARK_WOOD, surface: true })),
+      { at: [2.07, 1.975, -2.1], size: [0.33, 0.025, 1.0], color: DARK_WOOD },
+    ],
+  },
+  hallway: {
+    label: "Hallway",
+    walls: { width: 1.5, depth: 7.5, height: 2.5, back: -6 },
+    floor: "#4a3c31",
+    wall: "#3d3d43",
+    pieces: [
+      { at: [-0.57, 0.76, -2.5], size: [0.3, 0.04, 1.0], color: WOOD, surface: true },
+      ...legs(-0.57, -2.5, 0.3, 1.0, 0.76, "#4a3d30"),
+      { at: [0, 0, -5.98], size: [0.9, 2.05, 0.04], color: "#5b4636" },
+      { at: [0.735, 1.0, -3.5], size: [0.02, 0.5, 0.7], color: "#8a7a5a" },
+    ],
+  },
+  patio: {
+    label: "Patio",
+    open: [12, 12],
+    floor: "#45464a",
+    pieces: [
+      { at: [-1.6, 0.4, -2.5], size: [1.6, 0.05, 0.45], color: WOOD, surface: true },
+      { at: [-2.3, 0, -2.5], size: [0.08, 0.4, 0.4], color: "#3a3c40" },
+      { at: [-0.9, 0, -2.5], size: [0.08, 0.4, 0.4], color: "#3a3c40" },
+      { at: [1.8, 0, -3.0], size: [1.2, 0.5, 1.2], color: "#6b6863" },
+      { at: [1.8, 0.5, -3.0], size: [1.1, 0.01, 1.1], color: "#3f5f37", surface: true },
+      // Three steps up to a raised platform.
+      ...[0, 1, 2].map((i): Piece => ({ at: [0, 0, -4.55 - i * 0.3], size: [2.4, 0.17 * (i + 1), 0.3], color: "#5a5b5f", surface: true })),
+      { at: [0, 0, -6.5], size: [2.4, 0.68, 2.4], color: "#5a5b5f", surface: true },
+    ],
+  },
+};
+type Surroundings = keyof typeof ROOMS;
+let surroundings: Surroundings = "floor";
+
+function plane(id: string, center: Vec3, normal: Vec3, rotation: Vec3, width: number, height: number): ArPlaneAnchor {
+  const alignment = normal[1] > 0.5 ? "HorizontalUpward" : "Vertical";
+  return { id, center, normal, rotation, width, height, alignment, confidence: 1 };
+}
+function roomPlanes(room: Room): ArPlaneAnchor[] | undefined {
+  const planes: ArPlaneAnchor[] = [];
+  if (room.walls) {
+    const { width, depth, height, back } = room.walls;
+    const midZ = back + depth / 2, wallY = FLOOR_Y + height / 2;
+    // A wall's normal is its local Y, as on a phone; its height runs along local X on the side walls.
+    planes.push(
+      plane("viro-virtual-floor", [0, FLOOR_Y, midZ], [0, 1, 0], [0, 0, 0], width, depth),
+      plane("viro-virtual-wall-back", [0, wallY, back], [0, 0, 1], [90, 0, 0], width, height),
+      plane("viro-virtual-wall-left", [-width / 2, wallY, midZ], [1, 0, 0], [0, 0, -90], height, depth),
+      plane("viro-virtual-wall-right", [width / 2, wallY, midZ], [-1, 0, 0], [0, 0, 90], height, depth),
+    );
+  } else if (room.open) {
+    planes.push(plane("viro-virtual-floor", [0, FLOOR_Y, -2], [0, 1, 0], [0, 0, 0], room.open[0], room.open[1]));
+  } else {
+    return undefined;
+  }
+  (room.pieces ?? []).forEach((p, i) => {
+    if (p.surface) planes.push(plane(`viro-virtual-surface-${i}`, [p.at[0], FLOOR_Y + p.at[1] + p.size[1], p.at[2]], [0, 1, 0], [0, 0, 0], p.size[0], p.size[2]));
+  });
+  return planes;
+}
+const ROOM_PLANES = Object.fromEntries(Object.entries(ROOMS).map(([k, r]) => [k, roomPlanes(r)]));
+
+// Shapes are unlit, so a box's sides are drawn darker than its top to read as solid.
+const registered = new Set<string>();
+function material(color: string, shade = 1): string {
+  const rgb = [1, 3, 5].map((i) => Math.round(parseInt(color.slice(i, i + 2), 16) * shade));
+  const hex = `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  const name = `viro-preview-${hex.slice(1)}`;
+  if (!registered.has(name)) {
+    ViroMaterials.createMaterials({ [name]: { lightingModel: "Constant", diffuseColor: hex } });
+    registered.add(name);
+  }
+  return name;
+}
+
+// Each surface sits a few millimetres behind its plane, so a plane overlay or content resting on it does not flicker.
+const INSET = 0.004;
+function block(key: string, p: Piece): React.ReactNode {
+  const [w, h0, d] = p.size;
+  const h = Math.max(0.002, h0 - INSET);
+  const face = (k: string, position: Vec3, rotation: Vec3, width: number, height: number, shade: number) =>
+    createElement(ViroQuad, { key: k, position, rotation, width, height, materials: [material(p.color, shade)] });
+  return createElement(
+    ViroNode,
+    { key, position: [p.at[0], FLOOR_Y + p.at[1], p.at[2]] },
+    face("top", [0, h, 0], [-90, 0, 0], w, d, 1),
+    face("front", [0, h / 2, d / 2], [0, 0, 0], w, h, 0.72),
+    face("back", [0, h / 2, -d / 2], [0, 180, 0], w, h, 0.72),
+    face("right", [w / 2, h / 2, 0], [0, 90, 0], d, h, 0.84),
+    face("left", [-w / 2, h / 2, 0], [0, -90, 0], d, h, 0.84),
+  );
+}
+
+function surroundingsShapes(key: Surroundings): React.ReactNode[] {
+  const room = ROOMS[key]!;
+  const floor = room.floor ?? "#24272e", wall = room.wall ?? "#33373f";
+  const shapes: React.ReactNode[] = [];
+  if (room.walls) {
+    const { width, depth, height, back } = room.walls;
+    const midZ = back + depth / 2, wallY = FLOOR_Y + height / 2;
+    // Quads face their room side only, so walls drop out of the way of a camera orbiting outside.
+    shapes.push(
+      createElement(ViroQuad, { key: "floor", position: [0, FLOOR_Y - INSET, midZ], rotation: [-90, 0, 0], width, height: depth, materials: [material(floor)] }),
+      createElement(ViroQuad, { key: "back", position: [0, wallY, back - INSET], width, height, materials: [material(wall)] }),
+      createElement(ViroQuad, { key: "left", position: [-width / 2 - INSET, wallY, midZ], rotation: [0, 90, 0], width: depth, height, materials: [material(wall, 0.85)] }),
+      createElement(ViroQuad, { key: "right", position: [width / 2 + INSET, wallY, midZ], rotation: [0, -90, 0], width: depth, height, materials: [material(wall, 0.85)] }),
+    );
+  } else if (room.open) {
+    shapes.push(createElement(ViroQuad, { key: "floor", position: [0, FLOOR_Y - INSET, -2], rotation: [-90, 0, 0], width: room.open[0], height: room.open[1], materials: [material(floor)] }));
+  }
+  (room.pieces ?? []).forEach((p, i) => shapes.push(block(`piece-${i}`, p)));
+  return shapes.length ? [createElement(ViroNode, { key: `viro-preview-surroundings-${key}` }, ...shapes)] : [];
+}
+
 function PreviewARScene(props: any) {
   const [, redraw] = useState(0);
   useEffect(() => {
-    const onToggle = () => redraw((n) => n + 1);
-    gridListeners.add(onToggle);
-    return () => void gridListeners.delete(onToggle);
+    const onChange = () => redraw((n) => n + 1);
+    arSceneListeners.add(onChange);
+    return () => void arSceneListeners.delete(onChange);
   }, []);
   return createElement(
     ViroARScene,
     props,
     ...React.Children.toArray(props.children),
     createElement(InspectorProbe, { key: "viro-preview-inspector" }),
+    ...surroundingsShapes(surroundings),
     gridOn
       ? createElement(ViroImage, {
           key: "viro-preview-grid",
@@ -198,6 +402,7 @@ function PreviewScene(props: any) {
   return createElement(ViroScene, props, ...React.Children.toArray(props.children), createElement(InspectorProbe, { key: "viro-preview-inspector" }));
 }
 
+let applyARDefaults = () => {};
 if (!liveAR) {
   addViroExports({ ViroARScene: PreviewARScene, ViroScene: PreviewScene });
   const onCameraReady = (c: Controls) => {
@@ -206,7 +411,9 @@ if (!liveAR) {
     cameraControls = c;
     cameraListeners.forEach((l) => l());
   };
-  setARNavigatorDefaults({ virtualCamera: { floorY: FLOOR_Y, onReady: onCameraReady } });
+  applyARDefaults = () =>
+    setARNavigatorDefaults({ virtualCamera: { floorY: FLOOR_Y, planes: ROOM_PLANES[surroundings], onReady: onCameraReady } });
+  applyARDefaults();
   set3DNavigatorDefaults({ virtualCamera: { onReady: onCameraReady } });
 }
 
@@ -1180,15 +1387,31 @@ function Chrome({
                   </optgroup>
                 ))}
               </Picker>
-              {/* The grid is the AR floor's, drawn only in an AR scene, which listens for it. */}
-              {gridListeners.size ? (
+              {/* The grid and the surroundings are the AR camera's, offered only while an AR scene listens for them. */}
+              {arSceneListeners.size ? (
+                <Picker
+                  aria-label="Surroundings"
+                  value={surroundings}
+                  onChange={(e) => {
+                    surroundings = e.target.value;
+                    applyARDefaults();
+                    arSceneListeners.forEach((l) => l());
+                    tick((n) => n + 1);
+                  }}
+                >
+                  {Object.entries(ROOMS).map(([k, r]) => (
+                    <option key={k} value={k}>{r.label}</option>
+                  ))}
+                </Picker>
+              ) : null}
+              {arSceneListeners.size ? (
                 <button
                   type="button"
                   aria-pressed={gridOn}
                   style={{ ...button, opacity: gridOn ? 1 : 0.6 }}
                   onClick={() => {
                     gridOn = !gridOn;
-                    gridListeners.forEach((l) => l());
+                    arSceneListeners.forEach((l) => l());
                     tick((n) => n + 1);
                   }}
                 >

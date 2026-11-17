@@ -47,6 +47,28 @@ static NSString *const kVRTTrackingStateReason = @"reason";
 
 static NSString *const kPointCloudKey = @"pointCloud";
 
+static const NSTimeInterval kRootAnchorRetrySeconds = 1.0;
+static const int kRootAnchorMaxAttempts = 3;
+
+/*
+ A direct child of the scene is anchored so it follows ARKit's corrections to its map:
+ anchor node -> correction node -> the child. The correction node undoes the anchor's
+ starting pose, so the child keeps its own position, animations and drag in scene
+ coordinates and only the change in the anchor's pose moves it.
+ */
+@interface VRTRootAnchor : NSObject
+@property (nonatomic, weak) VRTNode *nodeView;
+@property (nonatomic, assign) int attempts;
+@property (nonatomic, assign) BOOL cancelled;
+@end
+
+@implementation VRTRootAnchor {
+    std::shared_ptr<VROARNode> _anchorNode;
+}
+- (std::shared_ptr<VROARNode>)anchorNode { return _anchorNode; }
+- (void)setAnchorNode:(std::shared_ptr<VROARNode>)anchorNode { _anchorNode = anchorNode; }
+@end
+
 @implementation VRTARScene {
     std::shared_ptr<VROARScene> _vroArScene;
     std::shared_ptr<VROARSceneDelegateiOS> _sceneDelegate;
@@ -56,12 +78,15 @@ static NSString *const kPointCloudKey = @"pointCloud";
     std::shared_ptr<VROSurface> _pointCloudParticleSurface;
     std::set<VROAnchorDetection> _nativeDetectionTypes;
     BOOL _hasCleanedUp;
+    BOOL _trackingNormal;
+    NSMapTable<VRTNode *, VRTRootAnchor *> *_rootAnchors;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge {
     self = [super initWithBridge:bridge]; // Invokes initSceneController
     if (self) {
         _loader = [[VRTImageAsyncLoader alloc] initWithDelegate:self];
+        _rootAnchors = [NSMapTable weakToStrongObjectsMapTable];
         _sceneDelegate = std::make_shared<VROARSceneDelegateiOS>(self);
         _vroArScene->initDeclarativeSession();
         _vroArScene->setDelegate(_sceneDelegate);
@@ -106,6 +131,7 @@ static NSString *const kPointCloudKey = @"pointCloud";
 #pragma mark VROARSceneDelegateProtocol Implementation
 
 - (void)onTrackingUpdated:(VROARTrackingState)state withReason:(VROARTrackingStateReason)reason {
+    _trackingNormal = (state == VROARTrackingState::Normal);
     if (self.onTrackingUpdatedViro) {
         self.onTrackingUpdatedViro(@{kVRTTrackingState : @((int)state),
                                      kVRTTrackingStateReason : @((int)reason)});
@@ -237,6 +263,90 @@ static NSString *const kPointCloudKey = @"pointCloud";
     });
 }
 
+#pragma mark - Root node anchoring
+
+- (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex {
+    [super insertReactSubview:view atIndex:atIndex];
+    if (![view isKindOfClass:[VRTNode class]]) {
+        return;
+    }
+    VRTNode *nodeView = (VRTNode *)view;
+    // Anchors and VPS anchors place themselves.
+    if (!nodeView.node || std::dynamic_pointer_cast<VROARNode>(nodeView.node)
+            || std::dynamic_pointer_cast<VROVPSAnchorNode>(nodeView.node)) {
+        return;
+    }
+    VRTRootAnchor *rootAnchor = [[VRTRootAnchor alloc] init];
+    rootAnchor.nodeView = nodeView;
+    [_rootAnchors setObject:rootAnchor forKey:nodeView];
+    [self tryAnchoringRootNode:rootAnchor];
+}
+
+- (void)removeReactSubview:(UIView *)subview {
+    VRTRootAnchor *rootAnchor = [subview isKindOfClass:[VRTNode class]]
+        ? [_rootAnchors objectForKey:(VRTNode *)subview] : nil;
+    if (rootAnchor) {
+        rootAnchor.cancelled = YES;
+        [_rootAnchors removeObjectForKey:(VRTNode *)subview];
+        std::shared_ptr<VROARNode> anchorNode = rootAnchor.anchorNode;
+        if (anchorNode) {
+            std::shared_ptr<VROARSessioniOS> session = [self arSessioniOS];
+            if (session) {
+                session->removeAnchoredNode(anchorNode);
+            }
+            anchorNode->removeFromParentNode();
+            rootAnchor.anchorNode = nullptr;
+        }
+    }
+    [super removeReactSubview:subview];
+}
+
+- (std::shared_ptr<VROARSessioniOS>)arSessioniOS {
+    if (!_vroArScene) {
+        return nullptr;
+    }
+    return std::dynamic_pointer_cast<VROARSessioniOS>(_vroArScene->getARSession());
+}
+
+- (void)tryAnchoringRootNode:(VRTRootAnchor *)rootAnchor {
+    VRTNode *nodeView = rootAnchor.nodeView;
+    if (rootAnchor.cancelled || _hasCleanedUp || !nodeView || !nodeView.node) {
+        return;
+    }
+    std::shared_ptr<VRONode> node = nodeView.node;
+    std::shared_ptr<VRONode> parent = node->getParentNode();
+    if (!parent) {
+        return;
+    }
+
+    // Waiting for a session and for NORMAL tracking does not spend a try.
+    std::shared_ptr<VROARSessioniOS> session = [self arSessioniOS];
+    if (session && _trackingNormal) {
+        VROVector3f position = node->getPosition();
+        std::shared_ptr<VROARNode> anchorNode = session->createAnchoredNode(position);
+        if (anchorNode) {
+            std::shared_ptr<VRONode> correction = std::make_shared<VRONode>();
+            correction->setPosition(position.scale(-1));
+            node->removeFromParentNode();
+            parent->addChildNode(anchorNode);
+            anchorNode->addChildNode(correction);
+            correction->addChildNode(node);
+            rootAnchor.anchorNode = anchorNode;
+            return;
+        }
+        rootAnchor.attempts++;
+        if (rootAnchor.attempts >= kRootAnchorMaxAttempts) {
+            return;
+        }
+    }
+
+    __weak VRTARScene *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kRootAnchorRetrySeconds * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [weakSelf tryAnchoringRootNode:rootAnchor];
+    });
+}
+
 - (void)willMoveToSuperview:(UIView *)newSuperview {
     // If newSuperview is nil, the view is being removed
     if (newSuperview == nil) {
@@ -254,6 +364,20 @@ static NSString *const kPointCloudKey = @"pointCloud";
     
     // Clean up AR-specific resources before removing from superview
     @try {
+        // The session outlives this scene, so its anchors go with it.
+        std::shared_ptr<VROARSessioniOS> session = [self arSessioniOS];
+        for (VRTRootAnchor *rootAnchor in [_rootAnchors objectEnumerator]) {
+            rootAnchor.cancelled = YES;
+            std::shared_ptr<VROARNode> anchorNode = rootAnchor.anchorNode;
+            if (anchorNode) {
+                if (session) {
+                    session->removeAnchoredNode(anchorNode);
+                }
+                rootAnchor.anchorNode = nullptr;
+            }
+        }
+        [_rootAnchors removeAllObjects];
+
         if (_vroArScene) {
             // Reset point cloud surface
             _vroArScene->resetPointCloudSurface();

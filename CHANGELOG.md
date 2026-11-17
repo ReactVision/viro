@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Android: a node placed at the root of an AR scene no longer floats free when ARCore is slow to start tracking.** Viro anchors each direct child of `ViroARScene` to an ARCore anchor so it stays put as ARCore refines its map, retrying once a second up to three times. ARCore cannot make an anchor before it tracks, so when tracking took more than about three seconds to start (a dim room, a covered camera, fast motion), all three tries failed and the node stayed unanchored for the session, drifting or jumping as tracking settled. Viro now waits for the scene's tracking to be NORMAL before it tries, so the node anchors once tracking starts. A position set on the node during that wait is now the one it anchors at; before, a retry put the node back at the position it was mounted with.
+
 ## v3.2.0 — 15 November 2026
 
 ### Added

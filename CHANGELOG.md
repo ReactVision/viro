@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Android: content can follow a cloud anchor resolved with the `reactvision` provider.** `resolveCloudAnchor()` returned a fixed position that nothing updated, so after ARCore shifted its world (typically after the app came back from the background and ARCore relocalised) content placed there drifted away from the real spot. The resolved anchor is now an ARCore anchor (virocore): `onAnchorUpdated` on `ViroARScene` reports it under the result's `anchor.anchorId`, and children of `<ViroARPlane anchorId={anchor.anchorId}>` move with it. Content placed from `anchor.position` alone still does not move. iOS is unchanged.
 - **Android: an AR scene method called while its screen is hidden no longer crashes.** A tab switch or a screen pushed on top tears the AR scene down without unmounting it, and a call still queued, such as a `getCameraGeospatialPose` poll, reached the torn-down scene and crashed with SIGSEGV. The navigator now skips a torn-down scene, so the call answers `AR scene not available`, and virocore's `ARScene` answers instead of crashing when it is called after dispose.
 
 ## v3.2.0 — 15 November 2026

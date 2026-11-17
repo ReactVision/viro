@@ -4,7 +4,7 @@
  */
 import type { ViroCollision, ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { addCollisionListener, registerCollisionBody } from "../components/Web/viroCollisions";
-import { dragFollower, rayAt, releaseVelocity, type CameraView, type Vec3 } from "../components/Web/viroDrag";
+import { dragFollower, parentSpace, rayAt, releaseVelocity, type CameraView, type Vec3 } from "../components/Web/viroDrag";
 
 const element = { getBoundingClientRect: () => ({ left: 10, top: 20 }) } as unknown as HTMLElement;
 const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 100, fy: 100, cx: 50, cy: 50, element };
@@ -41,6 +41,14 @@ describe("web dragging", () => {
     close(onto({ origin: [0, 0, 0], dir: [0, -Math.SQRT1_2, -Math.SQRT1_2] })!, [0, -1, -1]);
     const still = dragFollower("FixedToPlane", { planePoint: [0, -1, 0] }, start)!;
     close(still({ origin: [0, 0, 0], dir: [1, 0, 0] })!, [0, 0.5, -1]);
+  });
+
+  it("puts a dragged point in a turned and scaled parent's own space", () => {
+    // A parent at [1, 0, 0], turned 90 degrees about Y and scaled 2: its x axis points along world -Z.
+    const toLocal = parentSpace([1, 0, 0], [1, 0, -2], [1, 2, 0], [3, 0, 0])!;
+    close(toLocal([1, 0, -2]), [1, 0, 0]);
+    close(toLocal([3, 2, 0]), [0, 1, 1]);
+    expect(parentSpace([0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 0, 1])).toBeNull();
   });
 
   it("has no follower for an unknown dragType", () => {

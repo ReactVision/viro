@@ -137,6 +137,26 @@ export function dragFollower(
   }
 }
 
+const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+/**
+ * Turns a world point into a parent's own space, given the world positions of
+ * the parent's origin and of the points one unit along its x, y and z axes.
+ * Null when the axes are flat (a zero scale).
+ */
+export function parentSpace(origin: Vec3, x: Vec3, y: Vec3, z: Vec3): ((world: Vec3) => Vec3) | null {
+  const a = sub(x, origin);
+  const b = sub(y, origin);
+  const c = sub(z, origin);
+  const det = dot(a, cross(b, c));
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const rows = [cross(b, c), cross(c, a), cross(a, b)];
+  return (world) => {
+    const d = sub(world, origin);
+    return [dot(rows[0]!, d) / det, dot(rows[1]!, d) / det, dot(rows[2]!, d) / det];
+  };
+}
+
 /** Velocity over the last ~80 ms of samples, for the throw when a dragged body is let go. */
 export function releaseVelocity(samples: { t: number; p: Vec3 }[], maxSpeed = 10): Vec3 {
   const last = samples[samples.length - 1];

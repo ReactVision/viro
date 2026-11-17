@@ -20,7 +20,7 @@ import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
-import { cameraView, dragFollower, rayAt, releaseVelocity, sub, type DragPlane, type Vec3 } from "./viroDrag";
+import { cameraView, dragFollower, parentSpace, rayAt, releaseVelocity, sub, type DragPlane, type Vec3 } from "./viroDrag";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
@@ -228,6 +228,29 @@ export function useViroNode(
   // does, and let go with the velocity of its last ~80 ms, so it can be thrown.
   const bodyKeyRef = useRef("");
   const heldRef = useRef(false);
+  // Empty children of the parent at its origin and one metre along each axis.
+  // The renderer reads back a node's world position but not its rotation or
+  // scale, so their positions are how a drag finds the parent's space.
+  const probesRef = useRef<ViroHandle[] | null>(null);
+  const draggable = !!props.onDrag;
+  useEffect(() => {
+    if (!draggable) return;
+    const probes = ([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]] as Vec3[]).map(([x, y, z]) => {
+      const probe = scene.createNode();
+      scene.setNodePosition(probe, x, y, z);
+      scene.addChildNode(parent, probe);
+      return probe;
+    });
+    probesRef.current = probes;
+    return () => {
+      probesRef.current = null;
+      for (const probe of probes) {
+        scene.removeNodeFromParent(probe);
+        scene.destroyNode(probe);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggable]);
   const startDrag = (hit: Vec3) => {
     const p = propsRef.current;
     const view = cameraView(scene);
@@ -262,9 +285,11 @@ export function useViroNode(
     const onMove = (e: PointerEvent) => {
       const to = follow(rayAt(view, e.clientX, e.clientY));
       if (!to) return;
-      // Local = world minus the parent's world position: right while nothing above
-      // the node is rotated or scaled, which holds for a plane anchor here.
-      const local = sub(to, parentWorld);
+      // Read on every move, since the parent may itself be moving. Until the
+      // probes have been drawn, the parent is taken as neither turned nor scaled.
+      const at = probesRef.current?.map((probe) => scene.getNodeWorldPosition(probe));
+      const toLocal = at && at.every(Boolean) ? parentSpace(at[0]!, at[1]!, at[2]!, at[3]!) : null;
+      const local = toLocal ? toLocal(to) : sub(to, parentWorld);
       scene.setNodePosition(node, local[0], local[1], local[2]);
       samples.push({ t: performance.now(), p: to });
       if (samples.length > 12) samples.shift();

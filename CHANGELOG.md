@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Android: an AR scene method called while its screen is hidden no longer crashes.** A tab switch or a screen pushed on top tears the AR scene down without unmounting it, and a call still queued, such as a `getCameraGeospatialPose` poll, reached the torn-down scene and crashed with SIGSEGV. The navigator now skips a torn-down scene, so the call answers `AR scene not available`, and virocore's `ARScene` answers instead of crashing when it is called after dispose.
+
 ## v3.2.0 — 15 November 2026
 
 ### Added

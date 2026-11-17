@@ -242,7 +242,8 @@ public class VRTVRSceneNavigator extends VRT3DSceneNavigator {
     private ARScene getCurrentARScene() {
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
-            if (child instanceof VRTARScene) {
+            // Torn-down scenes are skipped for the reason in VRTARSceneNavigator.getCurrentARScene.
+            if (child instanceof VRTARScene && !((VRTARScene) child).isTornDown()) {
                 return (ARScene) ((VRTARScene) child).getNativeScene();
             }
         }

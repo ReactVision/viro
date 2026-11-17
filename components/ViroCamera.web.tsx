@@ -7,6 +7,7 @@ import * as React from "react";
 import { useEffect } from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroScene, ViroParentNodeContext } from "./Web/ViroWebContext";
+import { setSceneCameraActive } from "./Web/viroSceneCameras";
 
 type Props = ViroWebNodeProps & {
   active?: boolean;
@@ -27,7 +28,10 @@ export function ViroCamera(props: Props) {
   }, [scene, node]);
 
   useEffect(() => {
-    if (active) scene.setActiveCameraNode(node);
+    if (!active) return;
+    scene.setActiveCameraNode(node);
+    setSceneCameraActive(scene, node, true);
+    return () => setSceneCameraActive(scene, node, false);
   }, [scene, node, active]);
 
   // Order matters only in that the camera must exist first, which the effect

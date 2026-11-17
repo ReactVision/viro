@@ -25,6 +25,7 @@ import {
   type ViroRendererEffectProps,
 } from "./Web/useViroRendererEffects";
 import { warnUnsupported } from "./Utilities/ViroUnsupported";
+import { attachVirtualCamera3D, type ViroVirtualCameraOptions } from "./Web/viroVirtualCamera";
 
 /** Scene navigation is not implemented in this navigator on the web: say so instead of doing nothing. */
 const noNavigationOnWeb = (method: string) => () =>
@@ -39,6 +40,12 @@ type Props = {
    * assetBaseUrl. Omit for direct-ESM hosting where the package self-resolves.
    */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
+  /**
+   * Web only: the mouse or two fingers move the point of view (see
+   * viroVirtualCamera.ts), until the scene makes one of its own ViroCameras
+   * the point of view.
+   */
+  virtualCamera?: boolean | Omit<ViroVirtualCameraOptions, "floorY">;
   [key: string]: any;
 } & ViroRendererEffectProps;
 
@@ -63,6 +70,10 @@ export function Viro3DSceneNavigator(props: Props) {
     shadows_enabled: props.shadowsEnabled,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const virtual = props.virtualCamera ? (props.virtualCamera === true ? {} : props.virtualCamera) : null;
+  const virtualRef = useRef(virtual);
+  virtualRef.current = virtual;
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
@@ -106,6 +117,14 @@ export function Viro3DSceneNavigator(props: Props) {
     return () => observer.disconnect();
   }, [renderer]);
 
+  const virtualOn = virtual !== null;
+  useEffect(() => {
+    const container = containerRef.current;
+    const opts = virtualRef.current;
+    if (!renderer || !rootNode || !container || !opts) return;
+    return attachVirtualCamera3D(renderer.scene, rootNode, container, opts);
+  }, [renderer, rootNode, virtualOn]);
+
   // Minimal sceneNavigator surface so scenes can mount; navigation is not implemented here yet.
   const sceneNavigator = {
     push: noNavigationOnWeb("push"),
@@ -119,7 +138,7 @@ export function Viro3DSceneNavigator(props: Props) {
   const SceneComponent = props.initialScene?.scene;
 
   return (
-    <div style={containerStyle}>
+    <div ref={containerRef} style={containerStyle}>
       <canvas ref={canvasRef} style={canvasStyle} />
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>

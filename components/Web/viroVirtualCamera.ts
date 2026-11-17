@@ -3,6 +3,9 @@
  * device pose when an AR scene is previewed without a camera or tracking (a
  * desktop browser). The pose goes to virocore through the same `arSetPose` a
  * live session feeds, so the scene renders exactly as it would at that pose.
+ * A 3D scene gets the same controls on a camera node of its own
+ * (attachVirtualCamera3D), which stands aside while the scene makes one of its
+ * own ViroCameras the point of view.
  *
  * Input that belongs to the scene is left alone: a primary-button press or a
  * single finger is a tap or drag on the content, as on a phone. Only
@@ -10,8 +13,9 @@
  * and those are stopped in the capture phase so virocore never sees them as
  * touches.
  */
-import { ViroTrackingState, type ViroSceneApi } from "@reactvision/viro-web-renderer";
+import { ViroTrackingState, type ViroHandle, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { setCameraView, type CameraView } from "./viroDrag";
+import { onSceneCameraChange, sceneCameraActive } from "./viroSceneCameras";
 
 type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
@@ -75,6 +79,16 @@ export function floorAnchorFor(floorY: number) {
   };
 }
 
+/** Where the orbit's pose goes. */
+type CameraSink = {
+  /** The focal length, in CSS pixels, of a view `w` by `h`. */
+  size(w: number, h: number): number;
+  pose(position: Vec3, orientation: Quat, pitch: number, yaw: number): void;
+  /** False while something else is the point of view: input and the published view then stand aside. */
+  driving(): boolean;
+  detach(): void;
+};
+
 /**
  * Starts driving the AR camera from `element`'s input. The starting pose is the
  * session origin looking down -Z, which is where a phone's camera is when a
@@ -85,6 +99,76 @@ export function attachVirtualCamera(
   element: HTMLElement,
   options: ViroVirtualCameraOptions = {},
 ): () => void {
+  // Until initAR() the scene draws through its default camera and ignores
+  // injected poses; a live session calls it when it starts.
+  scene.initAR();
+  return attachOrbit(scene, element, options, {
+    size(w, h) {
+      // A phone camera's long axis spans about 67 degrees (ARKit's 1920x1440
+      // format has fx near 1440), and a phone held upright shows all of it
+      // vertically. The session's 60-degree default cuts off content a device shows.
+      const f = Math.max(w, h) / 2 / Math.tan((LONG_AXIS_FOV_DEG * Math.PI) / 360);
+      if (scene.arSetCameraIntrinsics(f, f, w / 2, h / 2, w, h)) return f;
+      scene.arSetCameraImageSize(w, h);
+      // The image-size path projects through a fixed 60-degree vertical field of view.
+      return h / 2 / Math.tan(Math.PI / 6);
+    },
+    pose(p, q) {
+      scene.arSetPose(q[0], q[1], q[2], q[3], p[0], p[1], p[2], ViroTrackingState.Normal);
+    },
+    driving: () => true,
+    detach() {},
+  });
+}
+
+/**
+ * Starts driving a 3D scene's point of view from `element`'s input, through a
+ * camera node of its own under `root`. Same controls and starting pose as
+ * attachVirtualCamera. Returns a detach function.
+ */
+export function attachVirtualCamera3D(
+  scene: ViroSceneApi,
+  root: ViroHandle,
+  element: HTMLElement,
+  options: Omit<ViroVirtualCameraOptions, "floorY"> = {},
+): () => void {
+  const node = scene.createNode();
+  scene.setNodeCamera(node);
+  scene.addChildNode(root, node);
+  let yielded = sceneCameraActive(scene);
+  if (!yielded) scene.setActiveCameraNode(node);
+  let onChange: (() => void) | null = null;
+  const stop = onSceneCameraChange(scene, () => {
+    yielded = sceneCameraActive(scene);
+    if (!yielded) scene.setActiveCameraNode(node);
+    onChange?.();
+  });
+  const detach = attachOrbit(scene, element, options, {
+    // The renderer's default: 90 degrees across the view's longer side.
+    size: (w, h) => Math.max(w, h) / 2,
+    pose(p, _q, pitch, yaw) {
+      scene.setNodePosition(node, p[0], p[1], p[2]);
+      // virocore turns about X, then Y, then Z: pitch, then yaw.
+      scene.setNodeRotation(node, pitch, yaw, 0);
+    },
+    driving: () => !yielded,
+    detach() {
+      stop();
+      scene.removeNodeFromParent(node);
+      scene.destroyNode(node);
+    },
+  }, (refresh) => (onChange = refresh));
+  return detach;
+}
+
+function attachOrbit(
+  scene: ViroSceneApi,
+  element: HTMLElement,
+  options: Omit<ViroVirtualCameraOptions, "floorY">,
+  sink: CameraSink,
+  // Hands over a function that republishes the view, for a sink whose driving() changes.
+  watch?: (refresh: () => void) => void,
+): () => void {
   const home = options.target ?? [0, 0, -1];
   let target: Vec3 = [...home];
   // The origin sits `distance` behind the target along +Z: start there.
@@ -92,27 +176,16 @@ export function attachVirtualCamera(
   let yaw = 0;
   let pitch = 0;
 
-  // Until initAR() the scene draws through its default camera and ignores
-  // injected poses; a live session calls it when it starts.
-  scene.initAR();
   // Published for dragging, which has to cast its own rays: the renderer cannot report the camera.
   const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element };
-  setCameraView(scene, view);
+  const publish = () => setCameraView(scene, sink.driving() ? view : null);
+  publish();
+  watch?.(publish);
   const sizeCamera = () => {
     const w = Math.max(1, Math.round(element.clientWidth));
     const h = Math.max(1, Math.round(element.clientHeight));
-    // A phone camera's long axis spans about 67 degrees (ARKit's 1920x1440
-    // format has fx near 1440), and a phone held upright shows all of it
-    // vertically. The session's 60-degree default cuts off content a device shows.
-    const f = Math.max(w, h) / 2 / Math.tan((LONG_AXIS_FOV_DEG * Math.PI) / 360);
-    if (scene.arSetCameraIntrinsics(f, f, w / 2, h / 2, w, h)) {
-      Object.assign(view, { fx: f, fy: f, cx: w / 2, cy: h / 2 });
-    } else {
-      scene.arSetCameraImageSize(w, h);
-      // The image-size path projects through a fixed 60-degree vertical field of view.
-      const f60 = h / 2 / Math.tan(Math.PI / 6);
-      Object.assign(view, { fx: f60, fy: f60, cx: w / 2, cy: h / 2 });
-    }
+    const f = sink.size(w, h);
+    Object.assign(view, { fx: f, fy: f, cx: w / 2, cy: h / 2 });
   };
   sizeCamera();
   const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(sizeCamera);
@@ -123,11 +196,7 @@ export function attachVirtualCamera(
     const back = rotate(q, [0, 0, distance]);
     view.orientation = q;
     view.position = [target[0] + back[0], target[1] + back[1], target[2] + back[2]];
-    scene.arSetPose(
-      q[0], q[1], q[2], q[3],
-      view.position[0], view.position[1], view.position[2],
-      ViroTrackingState.Normal,
-    );
+    sink.pose(view.position, q, pitch, yaw);
   };
 
   const reset = () => {
@@ -190,6 +259,7 @@ export function attachVirtualCamera(
   };
 
   const onDown = (e: PointerEvent) => {
+    if (!sink.driving()) return;
     if (e.pointerType === "touch") {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.size === 2) {
@@ -251,6 +321,7 @@ export function attachVirtualCamera(
   };
 
   const onWheel = (e: WheelEvent) => {
+    if (!sink.driving()) return;
     dolly(Math.exp(e.deltaY * 0.0015));
     e.preventDefault();
   };
@@ -264,10 +335,11 @@ export function attachVirtualCamera(
   element.addEventListener("wheel", onWheel, { passive: false });
   element.addEventListener("contextmenu", onContextMenu);
   apply();
-  options.onReady?.({ reset, lookFrom, pose });
+  if (sink.driving()) options.onReady?.({ reset, lookFrom, pose });
 
   return () => {
     setCameraView(scene, null);
+    sink.detach();
     resizeObserver?.disconnect();
     element.removeEventListener("pointerdown", onDown, true);
     element.removeEventListener("pointermove", onMove, true);

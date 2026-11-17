@@ -86,8 +86,10 @@ const framed = window.parent !== window;
 const inspectable = !liveAR && !shot;
 if (inspectable) watchGpu();
 
-type Controls = { reset(): void; lookFrom(position: Vec3, target: Vec3): void };
+type Controls = { reset(): void; lookFrom(position: Vec3, target: Vec3): void; pose(): { position: Vec3; target: Vec3 } };
 let cameraControls: Controls | null = null;
+// Where the developer had moved the camera, put back on the scene an update remounts.
+let keptPose: { position: Vec3; target: Vec3 } | null = null;
 let currentScene: string | undefined = (
   window.__PREVIEW_INPUT__?.scenes?.find((sc) => sc.path === params.get("scene")) ?? window.__PREVIEW_INPUT__?.scenes?.[0]
 )?.path;
@@ -202,6 +204,8 @@ if (!liveAR) {
     virtualCamera: {
       floorY: FLOOR_Y,
       onReady: (c: Controls) => {
+        if (keptPose) c.lookFrom(keptPose.position, keptPose.target);
+        keptPose = null;
         cameraControls = c;
         cameraListeners.forEach((l) => l());
       },
@@ -1229,6 +1233,7 @@ function Preview({ input }: { input: PreviewInput }) {
       renderState.ready = false;
       renderState.error = null;
       renderState.warnings.length = 0;
+      keptPose = cameraControls?.pose() ?? keptPose;
       cameraControls = null;
     }
     shown.current = input;
@@ -1249,6 +1254,7 @@ function Preview({ input }: { input: PreviewInput }) {
     renderState.ready = false;
     renderState.error = null;
     renderState.warnings.splice(0, renderState.warnings.length, ...compileWarnings.current);
+    keptPose = null;
     cameraControls = null;
     currentScene = scenes[i]?.path;
     setIndex(i);

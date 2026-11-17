@@ -33,6 +33,8 @@ export type ViroVirtualCameraControls = {
   reset(): void;
   /** Puts the camera at `position`, looking at `target`, which it then orbits. */
   lookFrom(position: Vec3, target: Vec3): void;
+  /** Where the camera is and the point it orbits; `lookFrom` with these puts it back. */
+  pose(): { position: Vec3; target: Vec3 };
 };
 
 const LONG_AXIS_FOV_DEG = 67;
@@ -148,6 +150,8 @@ export function attachVirtualCamera(
     apply();
   };
 
+  const pose = () => ({ position: [...view.position] as Vec3, target: [...target] as Vec3 });
+
   const orbit = (dx: number, dy: number) => {
     const scale = Math.PI / Math.max(element.clientHeight, 1);
     yaw -= dx * scale;
@@ -260,7 +264,7 @@ export function attachVirtualCamera(
   element.addEventListener("wheel", onWheel, { passive: false });
   element.addEventListener("contextmenu", onContextMenu);
   apply();
-  options.onReady?.({ reset, lookFrom });
+  options.onReady?.({ reset, lookFrom, pose });
 
   return () => {
     setCameraView(scene, null);

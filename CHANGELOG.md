@@ -6,6 +6,10 @@
 
 - **iOS: content placed at the root of an AR scene now stays put as ARKit refines its map.** Android has always anchored each direct child of `ViroARScene` to a native anchor; iOS anchored nothing, so placed content (a tapped pin, a scene's objects) kept its raw world position and shifted against the room when ARKit corrected its tracking. Each direct child is now anchored with an ARKit anchor once tracking is NORMAL, retried up to three times. The child keeps its own position: it sits under a node that applies only the change in the anchor's pose, so `position`, animations, drag and physics work in scene coordinates as before. Anchors, markers, planes and `ViroVPSAnchor` are left alone. Needs virocore with `VROARSessioniOS::createAnchoredNode`.
 
+### Changed
+
+- **`ViroARScene.createAnchoredNode` documents what it returns.** It creates a native anchor at a hit result and returns its id and starting transform. Nothing can be attached to that anchor yet; the doc no longer suggests it holds content. To keep placed content in place, render it as a direct child of `ViroARScene`.
+
 ## v3.2.0 — 15 November 2026
 
 ### Added

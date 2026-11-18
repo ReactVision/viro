@@ -13,9 +13,11 @@ import { useEffect } from "react";
 import type { ViroHandle } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroRenderer } from "./ViroWebContext";
 import {
+  forgetViroAnimationState,
   isRelativeViroAnimation,
   runDeclarativeAnimation,
   setViroAnimationEnd,
+  viroAnimationCurrent,
   type ViroBaseTransform,
 } from "./viroAnimationRegistry";
 
@@ -43,6 +45,12 @@ export function useViroAnimation(
   const loop = animation?.loop;
   const delay = animation?.delay;
   const baseKey = `${base.position.join()}|${base.rotation.join()}|${base.scale.join()}|${base.opacity}`;
+
+  // Before the effect below, so a pass after an authored change starts from it.
+  useEffect(() => {
+    forgetViroAnimationState(node);
+    return () => forgetViroAnimationState(node);
+  }, [node, baseKey]);
 
   useEffect(() => {
     if (!ready || !animation) return;
@@ -88,7 +96,8 @@ export function useViroAnimation(
 
     if (run !== false) {
       // Try a registered declarative animation first, then a model animation.
-      if (play(base)) {
+      // A relative value carries on from where the node is, as on native.
+      if (play(viroAnimationCurrent(node, base))) {
         renderer.setNodeAnimationHandlers(node, {
           onFinish: loop && !chained ? animation.onFinish : undefined,
         });

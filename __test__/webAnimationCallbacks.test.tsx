@@ -47,8 +47,14 @@ const base: ViroBaseTransform = {
   opacity: 1,
 };
 
-function Probe({ animation }: { animation: ViroAnimationProp }) {
-  useViroAnimation(7, animation, base, true);
+function Probe({
+  animation,
+  at = base,
+}: {
+  animation: ViroAnimationProp;
+  at?: ViroBaseTransform;
+}) {
+  useViroAnimation(7, animation, at, true);
   return null;
 }
 
@@ -63,6 +69,7 @@ function mount(animation: ViroAnimationProp) {
 beforeAll(() =>
   registerViroAnimations({
     rise: { duration: 500, properties: { positionY: "+=1" } },
+    riseEased: { duration: 1000, easing: "EaseInEaseOut", properties: { positionY: "+=1" } },
     pulse: { duration: 500, properties: { scaleX: 2 } },
   }),
 );
@@ -125,6 +132,41 @@ describe("useViroAnimation callbacks", () => {
     const tree = mount({ name: "Clip", run: true, onStart, onFinish });
     expect(mockScene.startAnimation).toHaveBeenCalledWith(7, "Clip", false);
     expect(mockRenderer.setNodeAnimationHandlers).toHaveBeenCalledWith(7, { onStart, onFinish });
+    act(() => tree.unmount());
+  });
+});
+
+describe("useViroAnimation and relative values", () => {
+  const lastY = () => {
+    const calls = mockScene.setNodePosition.mock.calls;
+    return calls[calls.length - 1][2];
+  };
+
+  test("a repeat carries on from where the last pass left the node", () => {
+    const tree = mount({ name: "rise", run: true });
+    expect(lastY()).toBe(1);
+    act(() => jest.advanceTimersByTime(600));
+    act(() => tree.update(<Probe animation={{ name: "rise", run: false }} />));
+    act(() => tree.update(<Probe animation={{ name: "rise", run: true }} />));
+    expect(lastY()).toBe(2);
+    act(() => tree.unmount());
+  });
+
+  test("an interrupted pass carries on from the point its curve reached", () => {
+    const tree = mount({ name: "riseEased", run: true });
+    // EaseInEaseOut at t = 0.25 is 2 * 0.25^2 = 0.125.
+    act(() => jest.advanceTimersByTime(250));
+    act(() => tree.update(<Probe animation={{ name: "rise", run: true }} />));
+    expect(lastY()).toBeCloseTo(1.125);
+    act(() => tree.unmount());
+  });
+
+  test("an authored change starts over from the new transform", () => {
+    const tree = mount({ name: "rise", run: true });
+    act(() => jest.advanceTimersByTime(600));
+    const moved: ViroBaseTransform = { ...base, position: [0, 5, 0] };
+    act(() => tree.update(<Probe animation={{ name: "rise", run: true }} at={moved} />));
+    expect(lastY()).toBe(6);
     act(() => tree.unmount());
   });
 });

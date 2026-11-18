@@ -160,7 +160,8 @@ export interface ViroAnimationPass {
 }
 
 /**
- * Run a declarative animation on a node that is at `base`.
+ * Run a declarative animation on a node that is at `base`, and record it as the
+ * node's latest pass.
  * Returns null if `name` is not a registered animation.
  *
  * `loop` is the renderer's own, which replays the same pass.
@@ -186,5 +187,89 @@ export function runDeclarativeAnimation(
   scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
   setAnimated(scene, node, def.properties, end);
   scene.commitAnimation();
+  passes.set(node, {
+    // As viroAnimationEnd reads it: the renderer holds an angle within one turn.
+    from: { ...base, rotation: base.rotation.map(wrap360) as [number, number, number] },
+    end,
+    startsAt: performance.now() + delay,
+    durationMs: def.duration,
+    easing: def.easing,
+    loop,
+  });
   return { end, ms: delay + def.duration, delayMs: delay };
+}
+
+// ─── Where a node is ─────────────────────────────────────────────────────────
+//
+// virocore starts a relative value ("+=0.5") from the value the node holds when
+// the pass begins. The renderer exposes no read of a node's local transform, so
+// the latest pass on each node is kept here and the node's value is worked out
+// from it: its end once it has finished, or the point the timing curve has
+// reached if the next pass interrupts it.
+
+interface ViroAnimationPassRecord {
+  from: ViroBaseTransform;
+  end: ViroBaseTransform;
+  startsAt: number;
+  durationMs: number;
+  easing?: string;
+  /** Replayed by the renderer from `from` every cycle. */
+  loop: boolean;
+}
+
+const passes = new Map<ViroHandle, ViroAnimationPassRecord>();
+
+/** virocore's VROTimingFunction curves, which the renderer animates with. */
+function eased(easing: string | undefined, t: number): number {
+  switch (easing) {
+    case "EaseIn":
+      return t <= 0.5 ? 2 * t * t : t;
+    case "EaseOut":
+      return t <= 0.5 ? t : 2 * (t - 0.5) * (1 - (t - 0.5)) + 0.5;
+    case "EaseInEaseOut":
+      return t <= 0.5 ? 2 * t * t : 2 * (t - 0.5) * (1 - (t - 0.5)) + 0.5;
+    case "Bounce":
+      if (t < 0.5) return t / 0.45;
+      if (t < 0.67) return 0.5 / 0.45 - (t - 0.5) / 0.85;
+      return 0.5 / 0.45 - (0.67 - 0.5) / 0.85 + (t - 0.67) / 3.3;
+    case "PowerDecel":
+      return 1 - (1 - t) ** 2;
+    default:
+      return t;
+  }
+}
+
+function lerp(a: number, b: number, k: number): number {
+  return a + (b - a) * k;
+}
+
+function lerpTransform(a: ViroBaseTransform, b: ViroBaseTransform, k: number): ViroBaseTransform {
+  const v = (x: number[], y: number[]) =>
+    x.map((xi, i) => lerp(xi, y[i]!, k)) as [number, number, number];
+  return {
+    position: v(a.position, b.position),
+    rotation: v(a.rotation, b.rotation),
+    scale: v(a.scale, b.scale),
+    opacity: lerp(a.opacity, b.opacity, k),
+  };
+}
+
+/**
+ * Where `node` is now, as far as its declarative passes go: `base` until it has
+ * run one, then wherever the latest one has taken it.
+ */
+export function viroAnimationCurrent(node: ViroHandle, base: ViroBaseTransform): ViroBaseTransform {
+  const pass = passes.get(node);
+  if (!pass) return base;
+  const elapsed = performance.now() - pass.startsAt;
+  if (elapsed <= 0) return pass.from;
+  if (pass.durationMs <= 0) return pass.end;
+  if (!pass.loop && elapsed >= pass.durationMs) return pass.end;
+  const t = pass.loop ? (elapsed % pass.durationMs) / pass.durationMs : elapsed / pass.durationMs;
+  return lerpTransform(pass.from, pass.end, eased(pass.easing, t));
+}
+
+/** Forget a node's passes: its authored transform changed, or it is gone. */
+export function forgetViroAnimationState(node: ViroHandle): void {
+  passes.delete(node);
 }

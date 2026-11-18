@@ -32,6 +32,7 @@ import { ViroAmbientLight } from "../ViroAmbientLight.web";
 import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
 import { ViroARScene, type ViroARSceneHandle } from "../AR/ViroARScene.web";
+import { ViroTrackingState } from "@reactvision/viro-web-renderer";
 import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
 import { addCollisionListener } from "../Web/viroCollisions";
@@ -51,6 +52,7 @@ import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
+import { TRACKING_GATE_FALLBACK_MS } from "./domain/trackingGate";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
 import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
@@ -524,7 +526,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Tap to place ─────────────────────────────────────────────────────────
   // The AR session is the only thing that knows where the camera is, and the
   // scene handle is the only thing that can hit-test a screen point.
-  const { session } = useViroAR();
+  const { session, trackingState, playback } = useViroAR();
   const arSceneRef = useRef<ViroARSceneHandle | null>(null);
 
   const placeAtScreenPoint = useCallback(
@@ -743,6 +745,27 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
   const usePlane = usesPlaneWrapper(scene.plane_detection as string, mode);
 
+  // ─── Tracking-readiness gate (AR, plane_detection=NONE only) ──────────────
+  // The native host's rule: NONE assets sit at fixed scene-root coordinates, so
+  // mounted before the session has a pose they ride its settling. They wait for
+  // the first Normal; the camera and tap-to-place do not. A replayed recording
+  // has no settling, and holding its assets would start their loads only as the
+  // render driver starts stepping frames.
+  const [trackingReady, setTrackingReady] = useState(
+    () =>
+      mode !== "ar" ||
+      !!playback ||
+      ((scene.plane_detection as string) ?? "NONE").toUpperCase() !== "NONE",
+  );
+  useEffect(() => {
+    if (trackingState === ViroTrackingState.Normal) setTrackingReady(true);
+  }, [trackingState]);
+  useEffect(() => {
+    if (trackingReady) return;
+    const timer = setTimeout(() => setTrackingReady(true), TRACKING_GATE_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [trackingReady]);
+
   // ─── Rig scale from the room (AR only) ────────────────────────────────────
   // The native host's rule (studioLightScale): only a dim room pulls the rig
   // below authored.
@@ -771,7 +794,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const children = (
     <>
       <StudioLightRig ref={lightRigRef} />
-      {body}
+      {trackingReady && body}
       {/* At scene root: a placed asset is in world space, and the plane wrapper
           would re-parent it to the plane it happened to be tapped on. */}
       {renderedPlacements}

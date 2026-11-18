@@ -51,7 +51,10 @@ jest.mock("../components/Web/ViroWebContext", () => {
     setCollisionHandler: () => {},
   };
   return {
-    useViroAR: () => ({ session: mockSession }),
+    useViroAR: () => ({
+      session: mockSession,
+      trackingState: require("@reactvision/viro-web-renderer").ViroTrackingState.Normal,
+    }),
     useViroScene: () => sceneApi,
   };
 });

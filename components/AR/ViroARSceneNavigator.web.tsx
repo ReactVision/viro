@@ -429,7 +429,12 @@ export function ViroARSceneNavigator(props: Props) {
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>
           <ViroARContext.Provider
-            value={{ session: sessionRef.current, anchors, trackingState: tracking }}
+            value={{
+              session: sessionRef.current,
+              anchors,
+              trackingState: tracking,
+              playback: !!props.arOptions?.playback,
+            }}
           >
             <ViroParentNodeContext.Provider value={rootNode}>
               {/* Under both names, as the Quest and visionOS hosts do: native

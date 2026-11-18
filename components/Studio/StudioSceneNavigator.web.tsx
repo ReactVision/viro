@@ -31,6 +31,7 @@ import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
 import { StudioColocationIndicator } from "./StudioColocationIndicator.web";
+import { StudioWebAlertOverlay } from "./StudioWebAlertOverlay";
 import { studioColocationStore } from "./domain/colocationStore";
 import type {
   StudioColocationOptions,
@@ -145,6 +146,7 @@ export interface StudioSceneNavigatorWebProps {
 
 type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
   sceneNavigator?: unknown;
+  arSceneNavigator?: unknown;
 };
 
 /**
@@ -155,7 +157,11 @@ type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
  * on first load, and a 29 MB model was fetched twice, doubling peak heap. The
  * props now travel through `viroAppProps`, which both navigators spread onto it.
  */
-function StudioSceneRoot({ sceneNavigator: _sceneNavigator, ...props }: StudioSceneRootProps) {
+function StudioSceneRoot({
+  sceneNavigator: _sceneNavigator,
+  arSceneNavigator: _arSceneNavigator,
+  ...props
+}: StudioSceneRootProps) {
   return <StudioARScene key={props.sceneData?.scene.id} {...props} />;
 }
 const STUDIO_SCENE = { scene: StudioSceneRoot };
@@ -293,9 +299,21 @@ export const StudioSceneNavigator = forwardRef<
 
   const [sceneData, setSceneData] = useState<StudioSceneResponse | undefined>(injectedSceneData);
   const [error, setError] = useState<Error | null>(null);
+  // The placement overlay covers the player, AR navigator's Start button
+  // included, so it waits for the session the button starts.
+  const [arStarted, setArStarted] = useState(false);
+  const handleSessionReady = useCallback(
+    (session: any) => {
+      setArStarted(true);
+      onSessionReady?.(session);
+    },
+    [onSessionReady],
+  );
 
   const onSceneLoadedRef = useRef(onSceneLoaded);
   onSceneLoadedRef.current = onSceneLoaded;
+  const onSceneChangeRef = useRef(onSceneChange);
+  onSceneChangeRef.current = onSceneChange;
 
   const onColocationStateChangeRef = useRef(onColocationStateChange);
   onColocationStateChangeRef.current = onColocationStateChange;
@@ -387,8 +405,13 @@ export const StudioSceneNavigator = forwardRef<
         console.warn("[Studio web] navigate ignored: no loadScene provided");
         return;
       }
+      // The handler returns before its own onSceneChange call when the host
+      // injects navigate, so the callback fires here, once the scene is in.
       loadScene(targetSceneId)
-        .then((data) => applyScene(data))
+        .then((data) => {
+          applyScene(data);
+          onSceneChangeRef.current?.(data.scene.id, data.scene.name ?? data.scene.id);
+        })
         .catch((err) => onError?.(err instanceof Error ? err : new Error(String(err))));
     },
     [loadScene, applyScene, onError],
@@ -472,7 +495,7 @@ export const StudioSceneNavigator = forwardRef<
           webRendererOptions={rendererOptions}
           slamScriptUrl={slamScriptUrl}
           arOptions={{ detectPlanes: true, ...arOptions }}
-          onSessionReady={onSessionReady}
+          onSessionReady={handleSessionReady}
           onMotionUnavailable={onMotionUnavailable}
           {...STUDIO_RENDERER_EFFECTS}
         />
@@ -489,7 +512,7 @@ export const StudioSceneNavigator = forwardRef<
           <StudioRecordingIndicator />
         </div>
       )}
-      {resolvedMode === "ar" && (
+      {resolvedMode === "ar" && arStarted && (
         <StudioPlacementOverlay
           store={placementStore}
           apiRef={placementApiRef}
@@ -506,6 +529,7 @@ export const StudioSceneNavigator = forwardRef<
           <StudioColocationIndicator />
         </div>
       )}
+      <StudioWebAlertOverlay />
     </div>
   );
 });

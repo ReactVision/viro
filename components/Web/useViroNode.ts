@@ -20,7 +20,17 @@ import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
-import { cameraView, dragFollower, parentSpace, rayAt, releaseVelocity, sub, type DragPlane, type Vec3 } from "./viroDrag";
+import {
+  cameraView,
+  dragFollower,
+  parentSpace,
+  rayAt,
+  releaseVelocity,
+  screenPointOf,
+  sub,
+  type DragPlane,
+  type Vec3,
+} from "./viroDrag";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
@@ -229,8 +239,9 @@ export function useViroNode(
   }, [node, selectable]);
 
   // Dragging, which native enables with onDrag (dragType defaults to
-  // FixedDistance). The renderer reports a press on the node; the moves are
-  // followed here, on rays from the camera's published view (viroDrag.ts). A
+  // FixedDistance). The renderer reports a press on the node; the drag is
+  // followed here, on rays from the camera's published view (viroDrag.ts),
+  // every frame as native does, so carrying the phone carries the node. A
   // dynamic body is held kinematic while dragged, as virocore's setKinematicDrag
   // does, and let go with the velocity of its last ~80 ms, so it can be thrown.
   const bodyKeyRef = useRef("");
@@ -263,7 +274,7 @@ export function useViroNode(
     const view = cameraView(scene);
     if (!p.onDrag || endDragRef.current) return;
     if (!view) {
-      warnUnsupported("Dragging nodes (onDrag) outside the desktop preview camera", "the web");
+      warnUnsupported("Dragging nodes (onDrag) under a ViroCamera or ViroOrbitCamera", "the web");
       return;
     }
     const nodeStart = scene.getNodeWorldPosition(node);
@@ -272,11 +283,12 @@ export function useViroNode(
     // A press virocore rerouted to a recently hovered node arrives at the origin;
     // native grabs such a node at its own position.
     const grab: Vec3 = hit.every((c) => c === 0) ? nodeStart : hit;
-    const toGrab = sub(grab, view.position);
+    const cameraAt = [...view.position] as Vec3;
+    const toGrab = sub(grab, cameraAt);
     const len = Math.hypot(...toGrab) || 1;
     const dragType = p.dragType ?? "FixedDistance";
     const follow = dragFollower(dragType, p.dragPlane, {
-      ray: { origin: view.position, dir: [toGrab[0] / len, toGrab[1] / len, toGrab[2] / len] },
+      ray: { origin: cameraAt, dir: [toGrab[0] / len, toGrab[1] / len, toGrab[2] / len] },
       hit: grab,
       node: nodeStart,
     });
@@ -289,8 +301,13 @@ export function useViroNode(
     heldRef.current = thrown;
     if (thrown) applyPhysicsBody(scene, node, { ...body, type: "Kinematic", instantVelocity: undefined }, bodyKeyRef.current);
     const samples: { t: number; p: Vec3 }[] = [{ t: performance.now(), p: nodeStart }];
-    const onMove = (e: PointerEvent) => {
-      const to = follow(rayAt(view, e.clientX, e.clientY));
+    let pointer = screenPointOf(view, grab);
+    let notified = nodeStart;
+    let frame = 0;
+    const step = () => {
+      frame = requestAnimationFrame(step);
+      if (!pointer) return;
+      const to = follow(rayAt(view, pointer.x, pointer.y));
       if (!to) return;
       // Read on every move, since the parent may itself be moving. Until the
       // probes have been drawn, the parent is taken as neither turned nor scaled.
@@ -300,10 +317,17 @@ export function useViroNode(
       scene.setNodePosition(node, local[0], local[1], local[2]);
       samples.push({ t: performance.now(), p: to });
       if (samples.length > 12) samples.shift();
+      // Native's ON_DRAG_DISTANCE_THRESHOLD.
+      if (Math.hypot(...sub(to, notified)) < 0.01) return;
+      notified = to;
       propsRef.current.onDrag?.(to, 0);
+    };
+    const onMove = (e: PointerEvent) => {
+      pointer = { x: e.clientX, y: e.clientY };
     };
     const onUp = () => end();
     const end = (release = true) => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMove, true);
       window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("pointercancel", onUp, true);
@@ -322,6 +346,7 @@ export function useViroNode(
     window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerup", onUp, true);
     window.addEventListener("pointercancel", onUp, true);
+    frame = requestAnimationFrame(step);
     endDragRef.current = end;
   };
 

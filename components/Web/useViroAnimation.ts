@@ -14,10 +14,13 @@ import type { ViroHandle } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroRenderer } from "./ViroWebContext";
 import {
   finishViroAnimationStep,
+  forgetViroAnimationState,
   isRelativeDef,
   planViroAnimation,
+  recordViroAnimationPass,
   resolveViroAnimation,
   startViroAnimationStep,
+  viroAnimationCurrent,
   type ViroAnimationStep,
   type ViroBaseTransform,
 } from "./viroAnimationRegistry";
@@ -47,6 +50,12 @@ export function useViroAnimation(
   const delay = animation?.delay;
   const baseKey = `${base.position.join()}|${base.rotation.join()}|${base.scale.join()}|${base.opacity}`;
 
+  // Before the effect below, so a pass after an authored change starts from it.
+  useEffect(() => {
+    forgetViroAnimationState(node);
+    return () => forgetViroAnimationState(node);
+  }, [node, baseKey]);
+
   useEffect(() => {
     if (!ready || !animation) return;
     const exec = name ? resolveViroAnimation(name) : null;
@@ -54,13 +63,20 @@ export function useViroAnimation(
     if (!exec) {
       // A model's own animation, whose start and end the renderer reports.
       renderer.setNodeAnimationHandlers(node, { onStart: animation.onStart, onFinish: animation.onFinish });
+      let clipTimer: ReturnType<typeof setTimeout> | undefined;
       if (run !== false) {
         const animName = !name || name === "*" ? scene.getAnimationKeys(node)[0] : name;
-        if (animName) scene.startAnimation(node, animName, !!loop);
+        if (animName) {
+          // The renderer takes no delay for a model's own animation.
+          const startClip = () => scene.startAnimation(node, animName, !!loop);
+          if (delay && delay > 0) clipTimer = setTimeout(startClip, delay);
+          else startClip();
+        }
       } else {
         scene.pauseAnimation(node);
       }
       return () => {
+        clearTimeout(clipTimer);
         renderer.clearNodeAnimationHandlers(node);
         scene.stopAnimation(node, false);
       };
@@ -92,8 +108,12 @@ export function useViroAnimation(
     const pass = (from: ViroBaseTransform) => {
       const steps: ViroAnimationStep[] = [];
       const { end, ms } = planViroAnimation(exec, from, steps);
+      recordViroAnimationPass(node, steps, replay);
       animation.onStart?.();
-      for (const step of steps) after(step.at, () => startViroAnimationStep(scene, node, step, replay));
+      for (const step of steps) {
+        if (step.at > 0) after(step.at, () => startViroAnimationStep(scene, node, step, replay));
+        else startViroAnimationStep(scene, node, step, replay);
+      }
       if (replay) {
         const each = () => {
           animation.onFinish?.();
@@ -110,7 +130,10 @@ export function useViroAnimation(
         if (loop) after(delay ?? 0, () => pass(end));
       });
     };
-    after(delay ?? 0, () => pass(base));
+    // A relative value carries on from where the node is, as on native.
+    const first = () => pass(viroAnimationCurrent(node, base));
+    if (delay && delay > 0) after(delay, first);
+    else first();
 
     return () => {
       cancelAnimationFrame(frame);

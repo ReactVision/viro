@@ -84,6 +84,7 @@ import {
   type StudioSoundEntry,
 } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
+import { TRACKING_GATE_FALLBACK_MS } from "./domain/trackingGate";
 import { questAlertStore } from "./domain/questAlertStore";
 import { isSelectClick } from "./domain/questInput";
 import {
@@ -284,10 +285,6 @@ function projectAlongRay(
   ];
 }
 
-// AR only: if world tracking never reaches NORMAL (feature-poor room, covered
-// camera), reveal content anyway after this window so it is never withheld
-// indefinitely. Tunable; most sessions reach NORMAL within ~1-3s.
-const TRACKING_GATE_FALLBACK_MS = 6000;
 // How long a Quest plane scene waits for a plane before placing its assets as
 // a NONE scene does. Granted, the room model's planes arrive within a second.
 const QUEST_PLANE_WAIT_MS = 3000;
@@ -1578,8 +1575,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // ─── Rig scale from the room ──────────────────────────────────────────────
   // The estimate arrives on every rendered frame, so it goes to the rig's own
   // component rather than into state here, where a render rebuilds every asset
-  // node, and only once it has moved enough to see. Quest and web never call
-  // this and render the rig as authored.
+  // node, and only once it has moved enough to see. Quest never calls this and
+  // renders the rig as authored; the web host estimates from the camera feed.
   const lightRigRef = useRef<StudioLightRigHandle | null>(null);
   const lightScaleRef = useRef(1);
 

@@ -246,3 +246,109 @@ export function startViroAnimationStep(scene: ViroSceneApi, node: ViroHandle, st
 export function finishViroAnimationStep(scene: ViroSceneApi, node: ViroHandle, step: ViroAnimationStep): void {
   setAnimated(scene, node, step.def.properties, step.end);
 }
+
+// ─── Where a node is ─────────────────────────────────────────────────────────
+//
+// virocore starts a relative value ("+=0.5") from the value the node holds when
+// the pass begins. The renderer exposes no read of a node's local transform, so
+// the steps of the latest pass on each node are kept here and the node's value
+// is worked out from them: each step's end once it has finished, or the point
+// its timing curve has reached if the next pass interrupts it.
+
+interface ViroAnimationStepRecord {
+  from: ViroBaseTransform;
+  end: ViroBaseTransform;
+  startsAt: number;
+  durationMs: number;
+  easing?: string;
+  /** Replayed by the renderer from `from` every cycle. */
+  loop: boolean;
+}
+
+const passes = new Map<ViroHandle, ViroAnimationStepRecord[]>();
+
+/** Records the steps of a pass that starts now. */
+export function recordViroAnimationPass(node: ViroHandle, steps: readonly ViroAnimationStep[], loop: boolean): void {
+  const now = performance.now();
+  passes.set(
+    node,
+    steps.map((step) => ({
+      // As endOf reads it: the renderer holds an angle within one turn.
+      from: { ...step.from, rotation: step.from.rotation.map(wrap360) as [number, number, number] },
+      end: step.end,
+      startsAt: now + step.at + (step.def.delay ?? 0),
+      durationMs: step.def.duration,
+      easing: step.def.easing,
+      loop,
+    })),
+  );
+}
+
+/** virocore's VROTimingFunction curves, which the renderer animates with. */
+function eased(easing: string | undefined, t: number): number {
+  switch (easing) {
+    case "EaseIn":
+      return t <= 0.5 ? 2 * t * t : t;
+    case "EaseOut":
+      return t <= 0.5 ? t : 2 * (t - 0.5) * (1 - (t - 0.5)) + 0.5;
+    case "EaseInEaseOut":
+      return t <= 0.5 ? 2 * t * t : 2 * (t - 0.5) * (1 - (t - 0.5)) + 0.5;
+    case "Bounce":
+      if (t < 0.5) return t / 0.45;
+      if (t < 0.67) return 0.5 / 0.45 - (t - 0.5) / 0.85;
+      return 0.5 / 0.45 - (0.67 - 0.5) / 0.85 + (t - 0.67) / 3.3;
+    case "PowerDecel":
+      return 1 - (1 - t) ** 2;
+    default:
+      return t;
+  }
+}
+
+function lerp(a: number, b: number, k: number): number {
+  return a + (b - a) * k;
+}
+
+function stepValue(step: ViroAnimationStepRecord, now: number): ViroBaseTransform {
+  const elapsed = now - step.startsAt;
+  if (step.durationMs <= 0) return step.end;
+  if (!step.loop && elapsed >= step.durationMs) return step.end;
+  const k = eased(step.easing, step.loop ? (elapsed % step.durationMs) / step.durationMs : elapsed / step.durationMs);
+  const v = (x: number[], y: number[]) => x.map((xi, i) => lerp(xi, y[i]!, k)) as [number, number, number];
+  return {
+    position: v(step.from.position, step.end.position),
+    rotation: v(step.from.rotation, step.end.rotation),
+    scale: v(step.from.scale, step.end.scale),
+    opacity: lerp(step.from.opacity, step.end.opacity, k),
+  };
+}
+
+/**
+ * Where `node` is now, as far as its declarative passes go: `base` until it has
+ * run one, then wherever the latest one has taken it. A step that has started
+ * owns the values it changes, and a later step wins, as planViroAnimation lays
+ * them out.
+ */
+export function viroAnimationCurrent(node: ViroHandle, base: ViroBaseTransform): ViroBaseTransform {
+  const steps = passes.get(node);
+  if (!steps?.length) return base;
+  const now = performance.now();
+  let at = steps[0]!.from;
+  for (const step of steps) {
+    if (now <= step.startsAt) continue;
+    const v = stepValue(step, now);
+    const take = (cur: number[], key: "position" | "rotation" | "scale") =>
+      cur.map((c, i) => (step.end[key][i] !== step.from[key][i] ? v[key][i]! : c)) as [number, number, number];
+    at = {
+      position: take(at.position, "position"),
+      rotation: take(at.rotation, "rotation"),
+      scale: take(at.scale, "scale"),
+      opacity: step.end.opacity !== step.from.opacity ? v.opacity : at.opacity,
+    };
+  }
+  return at;
+}
+
+/** Forget a node's passes: its authored transform changed, or it is gone. */
+export function forgetViroAnimationState(node: ViroHandle): void {
+  passes.delete(node);
+}

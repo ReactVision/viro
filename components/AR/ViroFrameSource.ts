@@ -25,7 +25,7 @@
 "use strict";
 
 import { ViroCloudAnchorState } from "../Types/ViroEvents";
-import { isQuest, isVisionOS } from "../Utilities/ViroPlatform";
+import { isQuest, isVisionOS, isWeb } from "../Utilities/ViroPlatform";
 import { parseLocationTransform } from "./ViroLocationFrame";
 
 /** Whether a source can run at all on the device it finds itself on. */
@@ -362,6 +362,12 @@ function cloudAnchorSupport(): ViroFrameSupport {
       ok: false,
       reason:
         "visionOS builds exclude the AR subsystem, and passthrough camera access needs an enterprise entitlement.",
+    };
+  }
+  if (isWeb) {
+    return {
+      ok: false,
+      reason: "The web AR tracker cannot host or resolve cloud anchors.",
     };
   }
   return { ok: true };

@@ -5,12 +5,13 @@
  *
  * The AudioListener follows the AR session's tracked camera, so panning is
  * relative to where the user actually is. Outside an AR session there is no pose
- * to follow and it stays at the origin. Autoplay may be blocked until a user
- * gesture.
+ * to follow and it stays at the origin. Playback the browser holds back until a
+ * user gesture starts at that gesture (see viroMedia).
  */
 import { useEffect, useRef } from "react";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import { getAudioContext, trackAudioListener } from "./Web/viroAudio";
+import { playWhenAllowed, resumeAudioWhenAllowed } from "./Web/viroMedia";
 import { useViroAR } from "./Web/ViroWebContext";
 
 type Props = {
@@ -119,15 +120,14 @@ export function ViroSpatialSound(props: Props): null {
     const a = audioRef.current;
     if (!a) return;
     a.loop = props.loop ?? false;
-    a.muted = props.muted ?? false;
     if (gainRef.current) gainRef.current.gain.value = props.volume ?? 1;
     if (props.paused ?? false) {
+      a.muted = props.muted ?? false;
       a.pause();
-    } else {
-      const ctx = getAudioContext();
-      if (ctx.state === "suspended") void ctx.resume();
-      a.play().catch((err) => propsRef.current.onError?.(err));
+      return;
     }
+    resumeAudioWhenAllowed(getAudioContext());
+    return playWhenAllowed(a, props.muted ?? false, (err) => propsRef.current.onError?.(err));
   }, [props.paused, props.loop, props.muted, props.volume, url]);
 
   return null;

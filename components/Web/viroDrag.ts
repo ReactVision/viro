@@ -3,11 +3,11 @@
  *
  * The renderer reports where a press hit a node but has no drag events and no
  * way to read the camera back, so whatever drives the camera publishes its view
- * here (the virtual camera does; the live phone session does not yet, and there
- * dragging stays unsupported), and a drag turns pointer positions into world
- * rays itself.
+ * here (the AR session, the desktop virtual camera, and the 3D navigators'
+ * default camera), and a drag turns pointer positions into world rays itself.
  */
-import type { ViroSceneApi } from "@reactvision/viro-web-renderer";
+import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
+import { sceneCameraActive } from "./viroSceneCameras";
 
 export type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
@@ -30,8 +30,76 @@ export function setCameraView(scene: ViroSceneApi, view: CameraView | null): voi
   else views.delete(scene);
 }
 
+/** Null while a ViroCamera or ViroOrbitCamera is the point of view: its pose is not published. */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
+  if (sceneCameraActive(scene)) return null;
   return views.get(scene) ?? null;
+}
+
+/** virocore's default camera: at the origin, looking down -Z, 90 degrees across the longer axis (kFovMonoMajor). */
+export function defaultCameraView(element: HTMLElement): CameraView {
+  const focal = () => Math.max(element.clientWidth, element.clientHeight, 1) / 2;
+  return {
+    position: [0, 0, 0],
+    orientation: [0, 0, 0, 1],
+    element,
+    get fx() {
+      return focal();
+    },
+    get fy() {
+      return focal();
+    },
+    get cx() {
+      return element.clientWidth / 2;
+    },
+    get cy() {
+      return element.clientHeight / 2;
+    },
+  };
+}
+
+type Frustum = { l: number; r: number; t: number; b: number };
+
+/**
+ * The AR session's camera, read fresh on every access. The frustum is the one
+ * the session's own hit test casts through, which matches what the renderer
+ * draws with; the session keeps it private, and without it this falls back to
+ * the renderer's 60-degree vertical default.
+ */
+export function sessionCameraView(session: ViroArSession, element: HTMLElement): CameraView {
+  const frustum = (): Frustum & { w: number; h: number } => {
+    const w = Math.max(element.clientWidth, 1);
+    const h = Math.max(element.clientHeight, 1);
+    const at = (session as unknown as { frustumAt?: (w: number, h: number) => Frustum }).frustumAt;
+    if (typeof at === "function") return { w, h, ...at.call(session, w, h) };
+    const t = Math.tan(Math.PI / 6);
+    return { w, h, l: t * (w / h), r: t * (w / h), t, b: t };
+  };
+  return {
+    element,
+    get position() {
+      return session.cameraPose.position as Vec3;
+    },
+    get orientation() {
+      return session.cameraPose.quaternion;
+    },
+    get fx() {
+      const f = frustum();
+      return f.w / (f.l + f.r);
+    },
+    get fy() {
+      const f = frustum();
+      return f.h / (f.t + f.b);
+    },
+    get cx() {
+      const f = frustum();
+      return (f.l * f.w) / (f.l + f.r);
+    },
+    get cy() {
+      const f = frustum();
+      return (f.t * f.h) / (f.t + f.b);
+    },
+  };
 }
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -54,6 +122,18 @@ export function rayAt(view: CameraView, clientX: number, clientY: number): { ori
   const local: Vec3 = [(clientX - rect.left - view.cx) / view.fx, -(clientY - rect.top - view.cy) / view.fy, -1];
   const d = rotate(view.orientation, local);
   return { origin: view.position, dir: scale(d, 1 / length(d)) };
+}
+
+/** Where a world point appears in client coordinates: rayAt's inverse. Null behind the camera. */
+export function screenPointOf(view: CameraView, world: Vec3): { x: number; y: number } | null {
+  const [x, y, z, w] = view.orientation;
+  const local = rotate([-x, -y, -z, w], sub(world, view.position));
+  if (local[2] >= 0) return null;
+  const rect = view.element.getBoundingClientRect();
+  return {
+    x: rect.left + view.cx + (view.fx * local[0]) / -local[2],
+    y: rect.top + view.cy - (view.fy * local[1]) / -local[2],
+  };
 }
 
 function hitPlane(ray: { origin: Vec3; dir: Vec3 }, point: Vec3, normal: Vec3): Vec3 | null {

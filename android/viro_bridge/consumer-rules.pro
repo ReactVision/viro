@@ -22,3 +22,15 @@
 -keepclasseswithmembernames,includedescriptorclasses class com.viromedia.bridge.** {
     native <methods>;
 }
+
+# The bundled GVR SDK (sdk-common) carries VR logging protos whose generated
+# code references protobuf and logging classes the SDK does not ship. They are
+# missing with or without R8, so this changes nothing at runtime; without it,
+# R8 stops the release build on the missing classes.
+-dontwarn com.google.common.logging.Vr$**
+-dontwarn com.google.protobuf.CodedOutputStream
+-dontwarn com.google.protobuf.GeneratedMessageLite
+-dontwarn com.google.protobuf.MessageLite
+-dontwarn com.google.protobuf.Parser
+-dontwarn com.google.protobuf.nano.NanoEnumValue
+-dontwarn logs.proto.wireless.performance.mobile.MemoryMetric$**

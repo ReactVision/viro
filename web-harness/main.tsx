@@ -800,7 +800,7 @@ function App() {
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <button style={toggle} onClick={next}>
-        {`Modo: ${MODE_LABEL[mode]} →`}
+        {`Mode: ${MODE_LABEL[mode]} →`}
       </button>
       <HarnessPanels />
       {mode === "3d" && (
@@ -863,10 +863,10 @@ function App() {
               📸 Foto
             </button>
             <button style={overlayBtn} onClick={onStartRec}>
-              ⏺ Grabar
+              ⏺ Record
             </button>
             <button style={overlayBtn} onClick={onStopRec}>
-              ⏹ Detener
+              ⏹ Stop
             </button>
             {captureMsg && (
               <span style={{ color: "#fff", font: "500 12px system-ui", opacity: 0.8 }}>

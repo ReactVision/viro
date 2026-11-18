@@ -73,6 +73,8 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
     private boolean mPendingFrontCameraEnabled = false;
     private boolean mPendingDepthCaptureEnabled = false;
     private boolean mSceneDidAppear = false;
+    // Written from ARCore's tracking callback, read by node anchor retries.
+    private volatile boolean mTrackingNormal = false;
 
     public VRTARScene(ReactContext reactContext) {
         super(reactContext);
@@ -226,10 +228,15 @@ public class VRTARScene extends VRTScene implements ARScene.Listener {
         }
     }
 
+    public boolean isTrackingNormal() {
+        return mTrackingNormal;
+    }
+
     // -- ARSceneDelegate Implementation --
 
     @Override
     public void onTrackingUpdated(ARScene.TrackingState state, ARScene.TrackingStateReason reason) {
+        mTrackingNormal = state == ARScene.TrackingState.NORMAL;
         WritableMap returnMap = Arguments.createMap();
         returnMap.putInt("state", state.getId());
         returnMap.putInt("reason", reason.getId());

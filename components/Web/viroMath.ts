@@ -66,3 +66,17 @@ export function multiplyQuats(a: Quat, b: Quat): Quat {
 export function conjugateQuat(q: Quat): Quat {
   return [-q[0], -q[1], -q[2], q[3]];
 }
+
+/** virocore's VROQuaternion::toEuler, in degrees: the inverse of quatFromEulerDegrees. */
+export function quatToEulerDegrees(q: Quat): Vec3 {
+  const [x, y, z, w] = q;
+  const deg = 180 / Math.PI;
+  const test = 2 * (y * w - x * z);
+  if (Math.abs(test - 1) < 1e-6) return [0, 90, -2 * Math.atan2(x, w) * deg];
+  if (Math.abs(test + 1) < 1e-6) return [0, -90, 2 * Math.atan2(x, w) * deg];
+  return [
+    Math.atan2(2 * (y * z + x * w), -x * x - y * y + z * z + w * w) * deg,
+    Math.asin(Math.max(-1, Math.min(1, test))) * deg,
+    Math.atan2(2 * (x * y + z * w), x * x - y * y - z * z + w * w) * deg,
+  ];
+}

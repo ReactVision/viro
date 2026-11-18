@@ -4,18 +4,46 @@
  * under that root. Scene-level props (background, camera) are follow-ups.
  */
 import * as React from "react";
+import { forwardRef, useImperativeHandle } from "react";
 
 import { useViroToneMapping } from "./Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
+import {
+  cameraOrientationAsync,
+  useViroCameraTransform,
+  type ViroWebCameraOrientation,
+  type ViroWebCameraTransform,
+} from "./Web/viroCameraTransform";
+import { useViroScene } from "./Web/ViroWebContext";
+import type { Vec3 } from "./Web/viroMath";
 
-export function ViroScene(props: {
-  children?: React.ReactNode;
-  /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
-  toneMappingEnabled?: boolean;
-  physicsWorld?: ViroPhysicsWorldProp;
-  [key: string]: any;
-}) {
+export type ViroSceneHandle = {
+  getCameraOrientationAsync: () => Promise<ViroWebCameraOrientation>;
+  getCameraPositionAsync: () => Promise<Vec3>;
+};
+
+export const ViroScene = forwardRef<
+  ViroSceneHandle,
+  {
+    children?: React.ReactNode;
+    /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
+    toneMappingEnabled?: boolean;
+    physicsWorld?: ViroPhysicsWorldProp;
+    onCameraTransformUpdate?: (transform: ViroWebCameraTransform) => void;
+    [key: string]: any;
+  }
+>(function ViroScene(props, ref) {
+  const scene = useViroScene();
   useViroToneMapping(props.toneMappingEnabled);
   useViroPhysicsWorld(props.physicsWorld);
+  useViroCameraTransform(props.onCameraTransformUpdate);
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCameraOrientationAsync: () => cameraOrientationAsync(scene),
+      getCameraPositionAsync: async () => (await cameraOrientationAsync(scene)).position,
+    }),
+    [scene],
+  );
   return <>{props.children}</>;
-}
+});

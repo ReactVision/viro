@@ -33,8 +33,12 @@ export function setCameraView(scene: ViroSceneApi, view: CameraView | null): voi
 
 /** Null while a ViroCamera or ViroOrbitCamera is the point of view: its pose is not published. */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
-  if ((customCameras.get(scene) ?? 0) > 0) return null;
+  if (customCameraActive(scene)) return null;
   return views.get(scene) ?? null;
+}
+
+export function customCameraActive(scene: ViroSceneApi): boolean {
+  return (customCameras.get(scene) ?? 0) > 0;
 }
 
 /** Marks a camera component as the point of view until the returned release. */

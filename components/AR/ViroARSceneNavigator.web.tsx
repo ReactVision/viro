@@ -38,6 +38,7 @@ import {
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
 import { sessionCameraView, setCameraView } from "../Web/viroDrag";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { useViroUsagePing } from "../Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
@@ -428,6 +429,31 @@ export function ViroARSceneNavigator(props: Props) {
     jump: (a?: unknown, b?: unknown) => setHistory((h) => jumpToScene(h, a, b)),
     pop: () => setHistory((h) => popScenes(h, 1)),
     popN: (n: number) => setHistory((h) => popScenes(h, n)),
+    // Restarting the tracker is the only reset it has: a new world origin at the
+    // camera, and its planes gone with the old one.
+    resetARSession: (resetTracking?: boolean, removeAnchors?: boolean) => {
+      const session = sessionRef.current;
+      if (!session || !started || props.arOptions?.playback) return;
+      if (!resetTracking) {
+        if (removeAnchors) {
+          warnUnsupported(
+            "resetARSession with removeAnchors but not resetTracking",
+            "the web",
+            "The tracker keeps its planes until tracking is reset.",
+          );
+        }
+        return;
+      }
+      session.stop();
+      setAnchors([]);
+      setTracking(ViroTrackingState.Unavailable);
+      session.start().catch(() => {
+        // onError has reported it and marked the session stopped.
+        if (sessionRef.current === session) sessionRef.current = null;
+      });
+    },
+    setWorldOrigin: () =>
+      warnUnsupported("setWorldOrigin", "the web", "The web tracker cannot move its world origin."),
     viroAppProps: props.viroAppProps ?? {},
   };
   const top = history[history.length - 1];

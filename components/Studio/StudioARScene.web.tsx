@@ -33,6 +33,7 @@ import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
 import { ViroARScene, type ViroARSceneHandle } from "../AR/ViroARScene.web";
 import { ViroTrackingState } from "@reactvision/viro-web-renderer";
+import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
 import { addCollisionListener } from "../Web/viroCollisions";
@@ -105,21 +106,16 @@ export type StudioPlacementApi = {
 };
 
 /**
- * The surface a tap lands on, or null when it lands on nothing usable.
- *
- * Nearest wins. The web tracker reports a plane hit with a normal and a
- * distance and nothing else, so unlike the native pick there is no anchor type
- * to prefer — the nearest real surface in front of the user is the whole rule.
+ * The surface a tap lands on, or null: the native host's rule. Hits come
+ * nearest first, and a hit inside a plane's detected rectangle beats one on its
+ * extension.
  */
-function pickBestHit(
-  results: { position: Vec3; distance: number }[],
-): { position: Vec3 } | null {
-  let best: { position: Vec3; distance: number } | null = null;
-  for (const hit of results) {
-    if (!Number.isFinite(hit.distance) || hit.distance <= 0) continue;
-    if (!best || hit.distance < best.distance) best = hit;
+function pickBestHit(results: ViroARHitTestResult[]): { position: Vec3 } | null {
+  for (const type of ["ExistingPlaneUsingExtent", "ExistingPlane"]) {
+    const hit = results.find((r) => r.type === type);
+    if (hit) return { position: hit.transform.position as Vec3 };
   }
-  return best;
+  return null;
 }
 
 export interface StudioApiRequestExecutorLike {
@@ -540,7 +536,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       const activeId = store?.activeAssetId();
       if (!store || !activeId || !arSceneRef.current) return "miss";
 
-      let results: { position: Vec3; distance: number }[] = [];
+      let results: ViroARHitTestResult[] = [];
       try {
         results = await arSceneRef.current.performARHitTestWithPoint(x, y);
       } catch {

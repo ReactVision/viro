@@ -37,6 +37,7 @@ import {
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
+import { useViroContextRestore } from "../Web/useViroContextRestore";
 import { sessionCameraView, setCameraView } from "../Web/viroDrag";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { useViroUsagePing } from "../Utilities/ViroUsagePing";
@@ -252,6 +253,13 @@ export function ViroARSceneNavigator(props: Props) {
   const motionMissingRef = useRef(false);
   const [anchors, setAnchors] = useState<ArPlaneAnchor[]>([]);
 
+  const generation = useViroContextRestore(renderer, () => {
+    setRenderer(null);
+    setRootNode(0);
+    // The camera needs a new start, from a tap as before (or on its own for playback).
+    setStarted(false);
+    setStarting(false);
+  });
   useEffect(() => {
     let cancelled = false;
     let created: ViroWebRenderer | null = null;
@@ -280,7 +288,7 @@ export function ViroARSceneNavigator(props: Props) {
       created?.dispose();
       resetMaterialCache();
     };
-  }, []);
+  }, [generation]);
 
   // Keep the renderer's viewport in sync with the canvas size.
   useEffect(() => {

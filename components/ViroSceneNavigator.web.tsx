@@ -26,6 +26,7 @@ import {
   ViroParentNodeContext,
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
+import { useViroContextRestore } from "./Web/useViroContextRestore";
 import { defaultCameraView, setCameraView } from "./Web/viroDrag";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 
@@ -94,6 +95,10 @@ export function ViroSceneNavigator(props: Props) {
   });
 
   // Renderer bootstrap — identical to Viro3DSceneNavigator.web.
+  const generation = useViroContextRestore(renderer, () => {
+    setRenderer(null);
+    setRootNode(0);
+  });
   useEffect(() => {
     let cancelled = false;
     let created: ViroWebRenderer | null = null;
@@ -119,7 +124,7 @@ export function ViroSceneNavigator(props: Props) {
       created?.dispose();
       resetMaterialCache();
     };
-  }, []);
+  }, [generation]);
 
   // What dragging casts its rays through, until a camera component takes over.
   useEffect(() => {

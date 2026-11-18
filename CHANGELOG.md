@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## v3.2.1 — 17 November 2026
 
 ### Fixed
 
@@ -9,6 +9,11 @@
 - **Android: content can follow a cloud anchor resolved with the `reactvision` provider.** `resolveCloudAnchor()` returned a fixed position that nothing updated, so after ARCore shifted its world (typically after the app came back from the background and ARCore relocalised) content placed there drifted away from the real spot. The resolved anchor is now an ARCore anchor (virocore): `onAnchorUpdated` on `ViroARScene` reports it under the result's `anchor.anchorId`, and children of `<ViroARPlane anchorId={anchor.anchorId}>` move with it. Content placed from `anchor.position` alone still does not move. iOS is unchanged. The resolve result's `anchor.anchorId` is now the ARCore anchor's id; its `cloudAnchorId` is unchanged.
 - **Android: an AR scene method called while its screen is hidden no longer crashes.** A tab switch or a screen pushed on top tears the AR scene down without unmounting it, and a call still queued, such as a `getCameraGeospatialPose` poll, reached the torn-down scene and crashed with SIGSEGV. The navigator now skips a torn-down scene, so the call answers `AR scene not available`, and virocore's `ARScene` answers instead of crashing when it is called after dispose.
 - **iOS: content placed at the root of an AR scene now stays put as ARKit refines its map.** Android has always anchored each direct child of `ViroARScene` to a native anchor; iOS anchored nothing, so placed content (a tapped pin, a scene's objects) kept its raw world position and shifted against the room when ARKit corrected its tracking. Each direct child is now anchored with an ARKit anchor once tracking is NORMAL, retried up to three times. The child keeps its own position: it sits under a node that applies only the change in the anchor's pose, so `position`, animations, drag and physics work in scene coordinates as before. Anchors, markers, planes and `ViroVPSAnchor` are left alone. Needs virocore with `VROARSessioniOS::createAnchoredNode`. A child not yet attached to the scene when it mounts waits for it instead of staying unanchored.
+
+- **Android: tracking no longer flickers on phones that could not sustain Viro's camera config (virocore 3.2.1, #568).** On some mid-range phones (a Galaxy A56) `onTrackingUpdated` alternated between UNAVAILABLE and NORMAL about ten times a second and no plane lasted, while plain ARCore apps tracked on the same phone. The camera config is now capped at 1920×1080 at 30 fps (Viro took the largest CPU image the phone offered), a paused plane is kept instead of removed, and UNAVAILABLE reaches `onTrackingUpdated` after about 200 ms; NORMAL is still reported at once.
+- **A tap on a moving node fires `onClick` (virocore 3.2.1).** A touch was hit-tested again at release, so a tap on a node that moved during the press (an animation, physics, the camera) sent `onClickState` down and up but no `onClick`. A short tap that barely moved now completes the click on the pressed node. Android touches were affected; on iOS only the long-press path was.
+- **A node faded by its parent's `opacity` no longer hides translucent content behind it (virocore 3.2.1).** Children of a node with `opacity` below 1 were drawn as opaque and wrote depth, so text or other faded objects behind them disappeared.
+- **iOS: `ViroARObjectMarker` fires when its object is detected (virocore 3.2.1).** Object anchors were dropped on every current iOS version, so an object marker never fired. An object target whose `.arobject` fails to load is now skipped with a warning instead of crashing the app.
 
 ### Changed
 

@@ -160,3 +160,30 @@ describe("StudioSceneNavigator (web) and onVpsStateChange", () => {
     expect(onVpsStateChange).not.toHaveBeenCalled();
   });
 });
+
+describe("StudioSceneNavigator (web) and onSceneChange", () => {
+  it("fires once a NAVIGATION target has loaded", async () => {
+    const next = {
+      scene: { id: "scene-2", name: "Two", plane_detection: "AUTOMATIC" },
+      assets: [],
+    } as unknown as StudioSceneResponse;
+    const loadScene = jest.fn(async () => next);
+    const onSceneChange = jest.fn();
+    act(() => {
+      TestRenderer.create(
+        <StudioSceneNavigator
+          sceneData={scene("AUTOMATIC")}
+          loadScene={loadScene}
+          onSceneChange={onSceneChange}
+        />
+      );
+    });
+
+    const { navigate } = arNavigatorProps[arNavigatorProps.length - 1].viroAppProps;
+    await act(async () => navigate("scene-2"));
+
+    expect(loadScene).toHaveBeenCalledWith("scene-2");
+    expect(onSceneChange).toHaveBeenCalledTimes(1);
+    expect(onSceneChange).toHaveBeenCalledWith("scene-2", "Two");
+  });
+});

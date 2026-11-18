@@ -297,6 +297,8 @@ export const StudioSceneNavigator = forwardRef<
 
   const onSceneLoadedRef = useRef(onSceneLoaded);
   onSceneLoadedRef.current = onSceneLoaded;
+  const onSceneChangeRef = useRef(onSceneChange);
+  onSceneChangeRef.current = onSceneChange;
 
   const onColocationStateChangeRef = useRef(onColocationStateChange);
   onColocationStateChangeRef.current = onColocationStateChange;
@@ -388,8 +390,13 @@ export const StudioSceneNavigator = forwardRef<
         console.warn("[Studio web] navigate ignored: no loadScene provided");
         return;
       }
+      // The handler returns before its own onSceneChange call when the host
+      // injects navigate, so the callback fires here, once the scene is in.
       loadScene(targetSceneId)
-        .then((data) => applyScene(data))
+        .then((data) => {
+          applyScene(data);
+          onSceneChangeRef.current?.(data.scene.id, data.scene.name ?? data.scene.id);
+        })
         .catch((err) => onError?.(err instanceof Error ? err : new Error(String(err))));
     },
     [loadScene, applyScene, onError],

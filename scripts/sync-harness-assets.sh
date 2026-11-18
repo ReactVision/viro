@@ -9,6 +9,7 @@
 # the only way to notice was to compare binaries by hand.
 #
 #   web-harness/wasm/    <- viro-web.{js,wasm,data}   from viro-web-renderer
+#                           Roboto-*.ttf              from viro-web-renderer
 #   web-harness/public/  <- tinyvio-slam.{js,wasm}    from tinyvio
 #
 # Override either source with VIRO_WEB_RENDERER=/path or TINYVIO=/path.
@@ -49,6 +50,12 @@ echo "renderer  <- $RENDERER/wasm"
 for f in viro-web.js viro-web.wasm viro-web.data; do
   copy_or_warn "$RENDERER/wasm/$f" "$WASM_DIR" \
     "cd ../virocore/wasm && ./build_web.sh && cd ../../viro-web-renderer && npm run copy-wasm"
+done
+
+# The faces text fetches on demand (wasmOptions.ts maps them to asset URLs).
+for f in "$RENDERER"/wasm/Roboto-*.ttf; do
+  [ -f "$f" ] && copy_or_warn "$f" "$WASM_DIR" \
+    "cd ../viro-web-renderer && npm run copy-wasm"
 done
 
 echo "tracking  <- $TINYVIO/web/slam"

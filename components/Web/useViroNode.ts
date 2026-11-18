@@ -367,7 +367,8 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, hasClick, hasHover]);
 
-  // Materials (first material applied to the geometry; MVP scope).
+  // Materials (first material applied to the geometry; MVP scope), again on
+  // each rebuild, since a rebuilt geometry starts from its own materials.
   const materialsKey = Array.isArray(props.materials)
     ? props.materials.join(",")
     : props.materials ?? "";
@@ -380,7 +381,7 @@ export function useViroNode(
       scene.setGeometryMaterial(geo, material);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, materialsKey]);
+  }, [node, materialsKey, geometryKey]);
 
   // Shader overrides. Separate from `materials` above because that one needs the
   // geometry handle this hook created, and a loaded model has none: its geometry

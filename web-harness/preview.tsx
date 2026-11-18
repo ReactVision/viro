@@ -174,22 +174,47 @@ function floorGridUrl(): string {
   return (gridUrl = canvas.toDataURL("image/png"));
 }
 
+// Resolved against this module, not the document: inside a host's view the document is the view's.
+const ROOMS_DIR = "../rooms/";
+const roomFileUrl = (file: string) => new URL(ROOMS_DIR + file, import.meta.url).href;
+const roomFiles = (name: string) => ({ glb: roomFileUrl(`${name}.glb`), planes: roomFileUrl(`${name}.planes.json`) });
+
 // What the AR scene stands in: the planes it detects and hit-tests, and the room drawn around them.
-// Empty is the virtual camera's own floor plane. A room is a GLB in vendor/rooms (served beside this
-// harness) with the planes listed in its `.planes.json`; its origin is on the floor where the camera
-// starts, and the floor is at `floorY`.
-type Room = { label: string; model?: { file: string }; floorY?: number };
+// Empty is the virtual camera's own floor plane. A room is a GLB with the planes listed in its planes
+// file. A built-in one is in vendor/rooms (served beside this harness), with its origin on the floor
+// where the camera starts and the floor at `floorY`. A scan is a captured mesh of a real place, listed by
+// the server at `renderApi`, with its origin where its recording started, which is where the camera
+// starts; its planes file gives `floorY`.
+type Room = { label: string; model?: { glb: string; planes: string }; floorY?: number; scan?: boolean };
 const ROOMS: Record<string, Room> = {
   floor: { label: "Empty" },
-  living: { label: "Living room", model: { file: "living-room" }, floorY: -1.5 },
-  office: { label: "Office", model: { file: "office" }, floorY: -1.5 },
+  living: { label: "Living room", model: roomFiles("living-room"), floorY: -1.5 },
+  office: { label: "Office", model: roomFiles("office"), floorY: -1.5 },
 };
 type Surroundings = keyof typeof ROOMS;
 let surroundings: Surroundings = "floor";
 
-// Resolved against this module, not the document: inside a host's view the document is the view's.
-const ROOMS_DIR = "../rooms/";
-const roomFileUrl = (file: string) => new URL(ROOMS_DIR + file, import.meta.url).href;
+type ScanRow = { id: string; kind: "scan" | "merge"; location_name: string; created_at: string };
+let scansRequested = false;
+function loadScans(renderApi: string, onLoaded: () => void): void {
+  if (scansRequested) return;
+  scansRequested = true;
+  // Optional: without the route, or once the sign-in has expired, the picker just has no scans.
+  pageFetch(`${renderApi}/scans`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((body: { scans: ScanRow[] } | null) => {
+      for (const s of body?.scans ?? []) {
+        const date = new Date(s.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        ROOMS[`scan:${s.id}`] = {
+          label: `${s.location_name}${s.kind === "merge" ? " (merged)" : ""}, ${date}`,
+          model: { glb: `${renderApi}/scans/${s.id}/mesh.glb`, planes: `${renderApi}/scans/${s.id}/planes.json` },
+          scan: true,
+        };
+      }
+      onLoaded();
+    })
+    .catch(() => {});
+}
 
 // A room file's plane: `polygon` is in the plane's own X and Z, and its local Y is the normal.
 type RoomFilePlane = {
@@ -218,7 +243,7 @@ function roomFilePlanes(planes: RoomFilePlane[], origin: Vec3): ArPlaneAnchor[] 
     };
   });
 }
-const roomOrigin = (room: Room): Vec3 => [0, room.floorY ?? FLOOR_Y, 0];
+const roomOrigin = (room: Room): Vec3 => (room.scan ? [0, 0, 0] : [0, room.floorY ?? FLOOR_Y, 0]);
 // A model room's planes, once its list has loaded.
 const modelRoomPlanes = new Map<Surroundings, ArPlaneAnchor[]>();
 function surroundingsPlanes(key: Surroundings): ArPlaneAnchor[] | undefined {
@@ -227,11 +252,14 @@ function surroundingsPlanes(key: Surroundings): ArPlaneAnchor[] | undefined {
 function loadRoomPlanes(key: Surroundings): void {
   const room = ROOMS[key]!;
   if (!room.model || modelRoomPlanes.has(key)) return;
-  fetch(roomFileUrl(`${room.model.file}.planes.json`))
+  fetch(room.model.planes)
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-    .then((body: { planes: RoomFilePlane[] }) => {
+    .then((body: { planes: RoomFilePlane[]; floorY?: number }) => {
+      if (body.floorY !== undefined) room.floorY = body.floorY;
       modelRoomPlanes.set(key, roomFilePlanes(body.planes, roomOrigin(room)));
-      if (surroundings === key) applyARDefaults();
+      if (surroundings !== key) return;
+      applyARDefaults();
+      arSceneListeners.forEach((l) => l());
     })
     .catch((e) => pushWarning(`The ${room.label} surfaces did not load: ${e instanceof Error ? e.message : String(e)}`));
 }
@@ -241,7 +269,7 @@ function surroundingsShapes(key: Surroundings): React.ReactNode[] {
   if (!room.model) return [];
   // Drawn with depth, so it hides content behind its furniture, which a phone without depth sensing does not.
   // Taps pass through it: its furniture's bounding boxes cover the planes and the content placed on them.
-  return [createElement(Viro3DObject, { key: `viro-preview-surroundings-${key}`, source: { uri: roomFileUrl(`${room.model.file}.glb`) }, type: "GLB", position: roomOrigin(room), ignoreEventHandling: true })];
+  return [createElement(Viro3DObject, { key: `viro-preview-surroundings-${key}`, source: { uri: room.model.glb }, type: "GLB", position: roomOrigin(room), ignoreEventHandling: true })];
 }
 
 function PreviewARScene(props: any) {
@@ -981,6 +1009,9 @@ function Chrome({
   const [uploads, setUploads] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<File | null>(null);
   const [dropping, setDropping] = useState(false);
+  useEffect(() => {
+    if (renderApi) loadScans(renderApi, () => tick((n) => n + 1));
+  }, [renderApi]);
   const upload = host?.uploadAsset;
   const sendFile = async (rel: string, file: File) => {
     setPending(null);
@@ -1273,9 +1304,16 @@ function Chrome({
                     tick((n) => n + 1);
                   }}
                 >
-                  {Object.entries(ROOMS).map(([k, r]) => (
+                  {Object.entries(ROOMS).filter(([, r]) => !r.scan).map(([k, r]) => (
                     <option key={k} value={k}>{r.label}</option>
                   ))}
+                  {Object.values(ROOMS).some((r) => r.scan) ? (
+                    <optgroup label="Your scans">
+                      {Object.entries(ROOMS).filter(([, r]) => r.scan).map(([k, r]) => (
+                        <option key={k} value={k}>{r.label}</option>
+                      ))}
+                    </optgroup>
+                  ) : null}
                 </Picker>
               ) : null}
               {arSceneListeners.size ? (

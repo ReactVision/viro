@@ -42,6 +42,8 @@ function fakeScene(effects = true) {
     setMaterialWritesToDepthBuffer: record("setMaterialWritesToDepthBuffer"),
     setMaterialReadsFromDepthBuffer: record("setMaterialReadsFromDepthBuffer"),
     addMaterialShaderModifier: record("addMaterialShaderModifier"),
+    setMaterialShaderUniformFloat: record("setMaterialShaderUniformFloat"),
+    setMaterialShaderUniformVec3: record("setMaterialShaderUniformVec3"),
     destroyMaterial: record("destroyMaterial"),
     ...(effects && {
       supportsMaterialEffects: true,
@@ -204,3 +206,19 @@ describe("alpha, bloom, colour write mask and chroma key on the web", () => {
   });
 });
 
+describe("a material's own uniforms on the web", () => {
+  test("Studio's list, with the time uniform its shaders read, is set at creation", () => {
+    const { calls } = build({
+      lightingModel: "Constant",
+      shaderModifiers: { surface: { uniforms: "uniform float time;", body: "_surface.alpha = time;" } },
+      materialUniforms: [{ name: "tint", type: "vec3", value: [1, 0, 0] }],
+    } as MaterialConfig);
+    expect(calls.setMaterialShaderUniformVec3).toEqual([[1, "tint", 1, 0, 0]]);
+    expect(calls.setMaterialShaderUniformFloat).toEqual([[1, "time", 0]]);
+  });
+
+  test("the map form under shaderUniforms is read too, as native reads it", () => {
+    const { calls } = buildDef({ shaderUniforms: { strength: { type: "float", value: 0.4 } } });
+    expect(calls.setMaterialShaderUniformFloat).toEqual([[1, "strength", 0.4]]);
+  });
+});

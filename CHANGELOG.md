@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Android: a release build with R8 minification no longer fails on missing classes.** The GVR SDK Viro bundles references protobuf and VR logging classes it does not ship, and R8 stopped the build on them (`Missing classes detected while running R8`). Viro's consumer rules now tell R8 to ignore them. Expo SDK 58 turns minification on in its Android template (`android.enableMinifyInReleaseBuilds`), so an app on that template hit this on its first release build. Nothing changes at runtime: the classes are missing with or without R8.
+- **Android: a node placed at the root of an AR scene no longer floats free when ARCore is slow to start tracking.** Viro anchors each direct child of `ViroARScene` to an ARCore anchor so it stays put as ARCore refines its map, retrying once a second up to three times. ARCore cannot make an anchor before it tracks, so when tracking took more than about three seconds to start (a dim room, a covered camera, fast motion), all three tries failed and the node stayed unanchored for the session, drifting or jumping as tracking settled. Viro now waits for the scene's tracking to be NORMAL before it tries, so the node anchors once tracking starts. A position set on the node during that wait is now the one it anchors at; before, a retry put the node back at the position it was mounted with.
 
 ## v3.2.0 — 15 November 2026
 

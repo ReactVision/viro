@@ -111,6 +111,9 @@ public class VRTNode extends VRTComponent {
     private static final int MAX_ANCHORING_ATTEMPTS = 3;
 
     private static final class AnchorAttempt {
+        private static final int ANCHORED = 0;
+        private static final int FAILED = 1;
+        private static final int WAITING_FOR_TRACKING = 2;
 
         private int mAttempt;
         private Vector mPosition;
@@ -142,11 +145,14 @@ public class VRTNode extends VRTComponent {
                 }
                 return;
             }
-            boolean success = anchorNode(node, mPosition);
-            ++mAttempt;
+            int result = anchorNode(node, mPosition);
+            // Waiting for tracking does not spend a try: otherwise a slow tracking start
+            // used up every try and the node floated for the rest of the session.
+            if (result != WAITING_FOR_TRACKING) {
+                ++mAttempt;
+            }
 
-            if (!success) {
-                // On failure, try again after a delay
+            if (result != ANCHORED) {
                 mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -166,15 +172,16 @@ public class VRTNode extends VRTComponent {
          * we try again later.
          *
          * @param position The position at which to anchor the node.
-         * @return True if anchoring succeeded, or the scene cannot anchor and no retry is needed.
+         * @return ANCHORED if anchoring succeeded or the scene cannot anchor and no retry is
+         *         needed, WAITING_FOR_TRACKING if the scene is not tracking yet, else FAILED.
          */
-        private boolean anchorNode(final VRTNode node, final Vector position) {
+        private int anchorNode(final VRTNode node, final Vector position) {
             if (DEBUG_ANCHORING) {
                 Log.i(TAG, "Anchoring node " + node + " [attempt " + mAttempt + "]");
             }
 
             if (node == null || node.isTornDown() || node.getParent() == null) {
-                return false;
+                return FAILED;
             }
 
             // Guard against the parent AR scene being torn down while this retry is
@@ -189,17 +196,17 @@ public class VRTNode extends VRTComponent {
             // here — the Java Scene object is never nulled on teardown, only its ref.
             final ViewParent parent = node.getParent();
             if (!(parent instanceof VRTARScene) || ((VRTARScene) parent).isTornDown()) {
-                return false;
+                return FAILED;
             }
             final ARScene scene = (ARScene) ((VRTARScene) parent).getNativeScene();
             if (scene == null || scene.getNativeRef() == 0) {
-                return false;
+                return FAILED;
             }
             if (node.mViroContext == null) {
                 if (DEBUG_ANCHORING) {
                     Log.i(TAG, "   Delaying anchoring: ViroContext is null");
                 }
-                return false;
+                return FAILED;
             }
             // Only ARCore makes world anchors. createAnchoredNode always returns null for
             // a scene in an OpenXR view, so the node keeps its plain position, which the
@@ -208,7 +215,13 @@ public class VRTNode extends VRTComponent {
             if (navigator instanceof VRT3DSceneNavigator
                     && ((VRT3DSceneNavigator) navigator).getViroView() instanceof ViroViewOpenXR) {
                 node.mNodeJni.setPosition(position);
-                return true;
+                return ANCHORED;
+            }
+
+            // ARCore cannot make an anchor before it tracks. Every new scene reports its
+            // first NORMAL, so waiting here cannot miss tracking that has already started.
+            if (!((VRTARScene) parent).isTrackingNormal()) {
+                return WAITING_FOR_TRACKING;
             }
 
             node.mAnchor = scene.createAnchoredNode(position);
@@ -223,7 +236,7 @@ public class VRTNode extends VRTComponent {
                 node.mAnchor.addChildNode(node.mNodeJni);
                 node.mNodeJni.setPosition(new Vector(0, 0, 0));
 
-                return true;
+                return ANCHORED;
             } else {
                 // Anchor failed: simply set the node to the position and try again later
                 if (DEBUG_ANCHORING) {
@@ -231,7 +244,7 @@ public class VRTNode extends VRTComponent {
                 }
                 node.mNodeJni.setPosition(position);
 
-                return false;
+                return FAILED;
             }
         }
 
@@ -843,6 +856,10 @@ public class VRTNode extends VRTComponent {
             }
         } else {
             mNodeJni.setPosition(vPosition);
+            // A pending attempt anchors at its own position, which would undo this move.
+            if (mAnchorAttempt != null) {
+                mAnchorAttempt.setPosition(vPosition);
+            }
         }
     }
 

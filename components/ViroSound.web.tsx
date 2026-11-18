@@ -1,12 +1,11 @@
 /**
  * Web implementation of ViroSound — non-spatial audio playback via an
- * `<audio>` element. Scene-level (renders no node).
- *
- * Browser autoplay policies may block playback until a user gesture; the play()
- * rejection is surfaced via onError.
+ * `<audio>` element. Scene-level (renders no node). Playback the browser holds
+ * back until a user gesture starts at that gesture (see viroMedia).
  */
 import { useEffect, useRef } from "react";
 import { resolveImageSource } from "./Web/viroImageLoader";
+import { playWhenAllowed } from "./Web/viroMedia";
 
 export type ViroSoundProps = {
   source: unknown;
@@ -49,10 +48,13 @@ export function ViroSound(props: ViroSoundProps): null {
     const a = audioRef.current;
     if (!a) return;
     a.loop = props.loop ?? false;
-    a.muted = props.muted ?? false;
     a.volume = props.volume ?? 1;
-    if (props.paused ?? false) a.pause();
-    else a.play().catch((err) => propsRef.current.onError?.(err));
+    if (props.paused ?? false) {
+      a.muted = props.muted ?? false;
+      a.pause();
+      return;
+    }
+    return playWhenAllowed(a, props.muted ?? false, (err) => propsRef.current.onError?.(err));
   }, [props.paused, props.loop, props.muted, props.volume, url]);
 
   return null;

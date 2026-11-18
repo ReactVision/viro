@@ -217,6 +217,20 @@ export interface ViroARSupportResponse {
 
 export function isARSupportedOnDevice() {
   return new Promise<ViroARSupportResponse>((resolve, reject) => {
+    if (Platform.OS === "web") {
+      // What web AR needs before it asks for anything: a secure context, a
+      // camera API and motion events. Whether the device has an IMU is only
+      // known once events arrive, so a desktop browser can pass this and then
+      // report missing motion when AR starts.
+      resolve({
+        isARSupported:
+          typeof window !== "undefined" &&
+          window.isSecureContext === true &&
+          typeof navigator.mediaDevices?.getUserMedia === "function" &&
+          typeof DeviceMotionEvent !== "undefined",
+      });
+      return;
+    }
     if (Platform.OS == "ios") {
       if (!NativeModules.VRTARUtils) { resolve({ isARSupported: false }); return; }
       NativeModules.VRTARUtils.isARSupported(

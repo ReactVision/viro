@@ -58,6 +58,20 @@ export function webUnsupportedFeatures(
     features.push("manual plane selection");
   }
 
+  // The web drag follower needs a published camera view, which only the
+  // navigator's desktop virtual camera gives, and this host never enables it.
+  if (assets.some((a) => a.is_draggable)) features.push("dragging");
+
+  // The host passes no navigator into the dispatch, so both functions skip.
+  const functionTypes = new Set(sceneData.functions.map((f) => f.function_type));
+  if (functionTypes.has("TAKE_PHOTO")) features.push("photo capture");
+  if (functionTypes.has("RECORD_VIDEO")) features.push("video recording");
+
+  // The tracker has no depth or person segmentation. Without a camera feed (3d)
+  // there is nothing to occlude.
+  const occlusion = (sceneData.project?.occlusion_mode ?? "NONE").toUpperCase();
+  if (mode === "ar" && occlusion !== "NONE") features.push("occlusion");
+
   // A bound scene's plane assets are in its VPS location's map frame, which a
   // browser cannot track.
   if (scene.vps_location_id) features.push("VPS location");

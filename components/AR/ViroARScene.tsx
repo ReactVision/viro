@@ -399,20 +399,20 @@ export class ViroARScene extends ViroBase<Props, State> {
   };
 
   /**
-   * Create an AR anchor at the location of a hit test result.
+   * Create a native AR anchor at the location of a hit test result and return
+   * its id and starting transform.
    *
-   * This method creates a persistent AR anchor that will be tracked by the
-   * AR system. The anchor can be used to place virtual content that stays
-   * in place as the user moves around.
-   *
-   * The returned node reference can be passed to a ViroARNode component
-   * to attach 3D content (though ViroARNode is optional and not yet implemented).
+   * Nothing can be attached to this anchor: no component takes the returned
+   * reference, and its transform is not updated afterwards. To keep placed
+   * content in place, render it as a direct child of `ViroARScene` at the hit
+   * position; Viro anchors each direct child to a native anchor once tracking
+   * is normal.
    *
    * Note: Hit test results are only valid for 30 seconds. Call this method
    * soon after performing the hit test.
    *
    * @param hitResult The hit test result to create an anchor from
-   * @returns Promise resolving to an AR node reference, or null if failed
+   * @returns Promise resolving to the anchor's reference, or null if failed
    *
    * @example
    * ```tsx
@@ -424,8 +424,6 @@ export class ViroARScene extends ViroBase<Props, State> {
    *   const nodeRef = await arSceneRef.current.createAnchoredNode(results[0]);
    *
    *   if (nodeRef) {
-   *     // Store reference for later use
-   *     setAnchoredNodeRef(nodeRef);
    *     console.log('Anchor created:', nodeRef.anchorId);
    *   }
    * }

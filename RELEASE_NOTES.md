@@ -1,45 +1,29 @@
 # Release Notes
 
-## v3.2.0
+## v3.2.1
 
-**ViroReact moves to React Native 0.88 and Expo SDK 58, on every platform including Apple Vision Pro, through `@reactvision/react-native-visionos` 0.88.1.** `ViroController` takes the same drag, pinch and rotate handlers on iOS and Android, iOS sounds load by name and preload, and AR scenes on the web gain physics, collisions, scene navigation and a virtual camera for previewing without one. Renderer binaries are rebuilt on virocore 3.2.0. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
+**Placed content stays put: every direct child of `ViroARScene` is anchored on iOS as it already was on Android, and on Android it now waits for tracking instead of giving up. Tracking no longer flickers on phones such as the Galaxy A56, Android release builds with R8 pass, and an AR scene hidden by a tab switch no longer crashes on a queued call.** Renderer binaries are rebuilt on virocore 3.2.1. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
 
 ### Everywhere
 
-- **Breaking: React Native 0.88 and Expo SDK 58.** `react-native` is `>=0.88.0 <0.89.0` and `expo` is `>=58.0.0 <59.0.0`, with React 19.3. React Native 0.86 and Expo SDK 57 stay on 3.1.x.
-- **`ViroController` delivers `onDrag`, `onPinch` and `onRotate` on iOS and Android,** with the same payloads as a node's handlers. Pinch and rotate come from a touch screen, so a Quest controller does not send them.
-- **`ViroNativeRef` is `HostInstance | null`,** since React Native 0.88 removed `NativeMethods`; the methods are the same.
-- **A Studio scene's alert shows its own close button label** instead of always OK, and on Meta Quest the alert's button widens to fit it.
+- **A tap on a moving node fires `onClick`.** A node that moved during the press (an animation, physics, the camera) got `onClickState` but no `onClick`.
+- **A node faded by its parent's `opacity` no longer hides translucent content behind it,** such as text or another faded object.
 
 ### iOS
 
-- **`ViroSound.preloadSounds` and sounds played by name work;** the promise resolves with `{ result, msg }` as on Android, and a downloaded sound opens.
-- **`ViroSpatialSound` and `ViroSoundField` no longer crash on mount.**
-- **`ViroObjectDetector` boxes and hit tests line up in a resized window** and in iPad multitasking.
+- **Content placed at the root of an AR scene stays put as ARKit refines its map.** Each direct child of `ViroARScene` is anchored with an ARKit anchor once tracking is NORMAL, as on Android; its `position`, animations, drag and physics keep working in scene coordinates. Anchors, markers, planes and `ViroVPSAnchor` are left alone.
+- **`ViroARObjectMarker` fires when its object is detected,** and an `.arobject` that fails to load is skipped with a warning instead of crashing the app.
 
 ### Android
 
-- **A build without the `AR` xRMode leaves ARCore out (Expo plugin):** a Quest-only app no longer carries `:arcore_client`, its meta-data or its `<queries>` entry.
-- **Building the bridge from source needs Gradle 9.4.1 and AGP 9.2.1.** Apps that consume the published package are not affected.
-
-### Meta Quest
-
-- **A `ViroXRSceneNavigator` scene gets `arSceneNavigator` and live `viroAppProps`,** as on a phone; a scene written for both threw on Quest.
-
-### visionOS
-
-- **Runs on React Native 0.88 through `@reactvision/react-native-visionos` 0.88.1,** an optional peer dependency again (`>=0.88.0 <0.89.0`). Generate the `visionos/` folder from `@reactvision/visionos-template` 0.88.1.
-- **The patches the Expo plugin copies apply to Expo SDK 58;** three of the SDK 57 ones failed on install, and a new one lets `react-native-gesture-handler` 3.3.0 build for visionOS.
-
-### Web
-
-- **Physics:** a `physicsBody` simulates, `onCollision` fires with the other body's `viroTag`, and a node's ref takes `applyImpulse`, `applyTorqueImpulse` and `setVelocity`.
-- **`virtualCamera` on `ViroARSceneNavigator`** previews an AR scene with no camera or permission prompt, with a floor plane and dragging.
-- **Scene navigation** (`push`, `replace`, `jump`, `pop`, `popN`) works in `ViroARSceneNavigator`.
-- **Clicks reach the node native would give them to,** and changing opacity or visibility no longer resets a node's position.
+- **Tracking no longer flickers on phones that could not sustain Viro's camera config (#568).** The camera config is capped at 1920×1080 at 30 fps, a paused plane is kept instead of removed, and UNAVAILABLE reaches `onTrackingUpdated` after about 200 ms.
+- **A node at the root of an AR scene anchors once tracking starts,** however long that takes; before, a slow start used up its three tries and it floated for the session.
+- **A release build with R8 minification passes:** Viro's consumer rules ignore the classes the bundled GVR SDK references but does not ship.
+- **An AR scene method called while its screen is hidden answers `AR scene not available`** instead of crashing.
+- **Content can follow a cloud anchor resolved with the `reactvision` provider:** the result is an ARCore anchor that `onAnchorUpdated` reports and `<ViroARPlane anchorId>` children follow.
 
 ### Check when upgrading
 
-- **Upgrade React Native and Expo first;** 3.2.0 does not install next to `react-native` 0.86.
-- **On visionOS, regenerate the `visionos/` folder** from `@reactvision/visionos-template` 0.88.1 and install `@reactvision/react-native-visionos@0.88.1`; a 0.86 folder does not build against 0.88.
-- **A `ViroController` that set `onPinch` or `onRotate` now receives them.** The node in the payload is null when the gesture started on nothing that takes it.
+- **Android: a `reactvision` resolve result's `anchor.anchorId` is now the ARCore anchor's id;** `cloudAnchorId` is unchanged. An app that stored the old `anchorId` sees a different value.
+- **Android: UNAVAILABLE from `onTrackingUpdated` arrives about 200 ms after tracking drops,** not on the first frame.
+- **`ViroARScene.createAnchoredNode` returns an anchor nothing can be attached to;** to keep placed content in place, render it as a direct child of `ViroARScene`.

@@ -576,7 +576,10 @@ public class VRTARSceneNavigator extends VRT3DSceneNavigator {
                 break;
             }
         }
-        if (currentScene != null) {
+        // A detach (tab switch, screen pushed on top) tears the scene down and zeroes its
+        // native ref while the view stays a child until React drops it. Handing that
+        // ARScene to a queued module call made the JNI dereference null (SIGSEGV).
+        if (currentScene != null && !currentScene.isTornDown()) {
             return (ARScene) currentScene.getNativeScene();
         }
         return null;

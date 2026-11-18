@@ -2,34 +2,14 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Dimensions, PixelRatio } from "react-native";
 import { ViroMaterials } from "../../Material/ViroMaterials";
 import { StudioAsset } from "../types";
-import {
-  materialConfigNeedsViewportUniforms,
-  parseMaterialConfig,
-  studioMaterialName,
-} from "./materialConfig";
-
-function computeViewportPayload(assets: StudioAsset[]): {
-  key: string;
-  names: string[];
-} {
-  const names: string[] = [];
-  for (const asset of assets) {
-    if (asset.asset_type_name !== "3D-MODEL") continue;
-    if (asset.material_config == null) continue;
-    const config = parseMaterialConfig(asset.material_config);
-    if (!config || !materialConfigNeedsViewportUniforms(config)) continue;
-    names.push(studioMaterialName(asset.id));
-  }
-  names.sort();
-  return { key: names.join("|"), names };
-}
+import { studioViewportUniformMaterials } from "./materialConfig";
 
 /**
  * Pushes _rf_vpw / _rf_vph (physical pixel dimensions) to materials that sample the camera
  * feed via gl_FragCoord. Called on mount and whenever the screen dimensions change.
  */
 export function useStudioShaderViewportUniforms(assets: StudioAsset[]): void {
-  const payload = useMemo(() => computeViewportPayload(assets), [assets]);
+  const payload = useMemo(() => studioViewportUniformMaterials(assets), [assets]);
 
   const pushViewport = useCallback(() => {
     if (payload.names.length === 0) return;

@@ -1,6 +1,7 @@
 /**
  * Studio material_config parsing and Viro material definition building.
  */
+import type { StudioAsset } from "../types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -204,6 +205,23 @@ function normalizeShaderModifiersForViro(
 
 export function studioMaterialName(assetId: string): string {
   return `studio_${assetId}`;
+}
+
+/** The registered materials whose shaders read _rf_vpw/_rf_vph, sorted. */
+export function studioViewportUniformMaterials(assets: StudioAsset[]): {
+  key: string;
+  names: string[];
+} {
+  const names: string[] = [];
+  for (const asset of assets) {
+    if (asset.asset_type_name !== "3D-MODEL") continue;
+    if (asset.material_config == null) continue;
+    const config = parseMaterialConfig(asset.material_config);
+    if (!config || !materialConfigNeedsViewportUniforms(config)) continue;
+    names.push(studioMaterialName(asset.id));
+  }
+  names.sort();
+  return { key: names.join("|"), names };
 }
 
 /**

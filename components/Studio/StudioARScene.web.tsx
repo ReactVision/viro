@@ -29,6 +29,7 @@ import { addCollisionListener } from "../Web/viroCollisions";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
+import { StudioAnimationSlots } from "./domain/animationSlots";
 import { createNode, type StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import { studioAssetPosition } from "./domain/assetPosition";
 import {
@@ -42,6 +43,8 @@ import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
+import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
 import { webUnsupportedFeatures, usesPlaneWrapper } from "./domain/webCapabilities";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
@@ -63,7 +66,12 @@ import type {
   ViroAnimationProp,
 } from "./types";
 
-type AnimOverride = { key: string; run: boolean };
+type AnimOverride = {
+  key: string;
+  run: boolean;
+  /** Set on the single update that replaces a still-running animation. */
+  interrupting?: boolean;
+};
 
 /** Native's throttle: the pose updates every frame, the distances need not. */
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
@@ -281,6 +289,9 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     registerStudioMaterialsForAssets(assets);
     materialsRegisteredRef.current = true;
   }
+
+  useStudioShaderTimeUniforms(assets);
+  useStudioShaderViewportUniforms(assets);
   const registeredKeyRef = useRef<string | null>(null);
   const animationsKey = animations.map((a) => a.animation_key).join(",");
   if (animations.length > 0 && registeredKeyRef.current !== animationsKey) {
@@ -291,6 +302,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Animation runtime state ──────────────────────────────────────────────
   const [animOverrides, setAnimOverrides] = useState<Record<string, AnimOverride>>({});
   const [loadedAssetIds, setLoadedAssetIds] = useState<Record<string, true>>({});
+  const animationSlotsRef = useRef<StudioAnimationSlots | null>(null);
+  if (animationSlotsRef.current === null) {
+    animationSlotsRef.current = new StudioAnimationSlots();
+  }
+  const loadedAssetIdsRef = useRef(loadedAssetIds);
+  loadedAssetIdsRef.current = loadedAssetIds;
 
   // Through a ref, so a host passing a fresh arrow each render does not rebuild
   // every node.
@@ -313,20 +330,78 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     };
   }, []);
 
-  const triggerAnimation = useCallback((targetAssetId: string, animationKey: string) => {
-    setAnimOverrides((prev) => ({ ...prev, [targetAssetId]: { key: animationKey, run: false } }));
-    const handle = requestAnimationFrame(() => {
-      triggerHandlesRef.current.delete(handle);
-      setAnimOverrides((prev) => {
-        const current = prev[targetAssetId];
-        if (!current || current.key !== animationKey || current.run) return prev;
-        return { ...prev, [targetAssetId]: { key: animationKey, run: true } };
+  // The native host's slot rules (see StudioAnimationSlots). There is no shared
+  // session on the web, so every play is "local".
+  const triggerAnimation = useCallback(
+    (targetAssetId: string, animationKey: string) => {
+      const requested = animations.find(
+        (a) => a.target_asset_id === targetAssetId && a.animation_key === animationKey,
+      );
+      if (!requested) return;
+
+      const play = animationSlotsRef.current!.request(
+        requested,
+        !!loadedAssetIdsRef.current[targetAssetId],
+        "local",
+      );
+      if (play === "queued") return;
+      if (play === "interrupt") {
+        // One update with `run` still true: the web hook restarts on a name
+        // change, and a false half would only pause the running one.
+        setAnimOverrides((prev) => ({
+          ...prev,
+          [targetAssetId]: { key: animationKey, run: true, interrupting: true },
+        }));
+        return;
+      }
+
+      // The animation prop is edge-triggered on false→true, so a re-trigger of
+      // the same key goes false first and true on the next frame.
+      setAnimOverrides((prev) => ({ ...prev, [targetAssetId]: { key: animationKey, run: false } }));
+      const handle = requestAnimationFrame(() => {
+        triggerHandlesRef.current.delete(handle);
+        setAnimOverrides((prev) => {
+          const current = prev[targetAssetId];
+          if (!current || current.key !== animationKey || current.run) return prev;
+          return { ...prev, [targetAssetId]: { key: animationKey, run: true } };
+        });
       });
-    });
-    triggerHandlesRef.current.add(handle);
-  }, []);
+      triggerHandlesRef.current.add(handle);
+    },
+    [animations],
+  );
   const triggerAnimationRef = useRef(triggerAnimation);
   triggerAnimationRef.current = triggerAnimation;
+
+  const runAnimationFunction = useCallback(
+    (fnId: string) =>
+      executeOnLoadFunction(
+        fnId,
+        functions,
+        undefined,
+        animations,
+        (id, key) => triggerAnimationRef.current(id, key),
+        handleSceneChange,
+        runtimeCtx,
+      ),
+    [functions, animations, handleSceneChange, runtimeCtx],
+  );
+
+  const handleAnimationFinished = useCallback(
+    (assetId: string, anim: StudioAnimation) => {
+      // A loop reports a finish at every cycle boundary but never ends, and the
+      // editor fires on_finish only when an animation ends.
+      if (anim.loop) return;
+      const slots = animationSlotsRef.current!;
+      if (slots.finish(assetId) && anim.on_finish_function) {
+        runAnimationFunction(anim.on_finish_function);
+      }
+      // After on_finish, so an animation it chains holds the slot first.
+      const next = slots.next(assetId);
+      if (next) triggerAnimationRef.current(assetId, next.key);
+    },
+    [runAnimationFunction],
+  );
 
   const animationStates = useMemo<Record<string, ViroAnimationProp>>(() => {
     const states: Record<string, ViroAnimationProp> = {};
@@ -349,28 +424,29 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         activeAnim = anims[0];
         run = false;
       }
-      const runOnLoad = (fnId: string) =>
-        executeOnLoadFunction(
-          fnId,
-          functions,
-          undefined,
-          animations,
-          (id, key) => triggerAnimationRef.current(id, key),
-          handleSceneChange,
-          runtimeCtx,
-        );
       states[assetId] = {
-        name: activeAnim.animation_key,
+        // A model clip is looked up in the model by its embedded name.
+        name:
+          activeAnim.animation_source === "MODEL_CLIP" && activeAnim.clip_name
+            ? activeAnim.clip_name
+            : activeAnim.animation_key,
         run,
         loop: activeAnim.loop,
-        interruptible: activeAnim.interruptible,
+        interruptible: activeAnim.interruptible || !!override?.interrupting,
         delay: activeAnim.delay_ms ?? 0,
-        onStart: activeAnim.on_start_function ? () => runOnLoad(activeAnim.on_start_function!) : undefined,
-        onFinish: activeAnim.on_finish_function ? () => runOnLoad(activeAnim.on_finish_function!) : undefined,
+        onStart: activeAnim.on_start_function
+          ? () => {
+              // Once per play: a loop reports a start on every cycle.
+              if (!animationSlotsRef.current!.runsOnStart(assetId)) return;
+              runAnimationFunction(activeAnim.on_start_function!);
+            }
+          : undefined,
+        // Always wired: it also releases an animation queued behind this one.
+        onFinish: () => handleAnimationFinished(assetId, activeAnim),
       };
     }
     return states;
-  }, [animations, animOverrides, loadedAssetIds, functions, handleSceneChange, runtimeCtx]);
+  }, [animations, animOverrides, loadedAssetIds, runAnimationFunction, handleAnimationFinished]);
 
   // ─── on_load_function ─────────────────────────────────────────────────────
   // A scene bound to a VPS location runs it at its first tracking, which a

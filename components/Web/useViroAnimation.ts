@@ -63,6 +63,7 @@ export function useViroAnimation(
     // which does report each cycle's end.
     const chained = !!loop && !!name && isRelativeViroAnimation(name);
     let frame = 0;
+    let clipTimer: ReturnType<typeof setTimeout> | undefined;
     const play = (from: ViroBaseTransform): boolean => {
       if (!name) return false;
       const pass = runDeclarativeAnimation(scene, node, name, from, !!loop && !chained, delay);
@@ -106,12 +107,12 @@ export function useViroAnimation(
           onStart: animation.onStart,
           onFinish: animation.onFinish,
         });
-        let animName = name;
-        if (!animName || animName === "*") {
-          animName = scene.getAnimationKeys(node)[0];
-        }
+        const animName = !name || name === "*" ? scene.getAnimationKeys(node)[0] : name;
         if (animName) {
-          scene.startAnimation(node, animName, !!loop);
+          // The renderer takes no delay for a model's own animation.
+          const startClip = () => scene.startAnimation(node, animName, !!loop);
+          if (delay && delay > 0) clipTimer = setTimeout(startClip, delay);
+          else startClip();
         }
       }
     } else {
@@ -120,6 +121,7 @@ export function useViroAnimation(
 
     return () => {
       cancelAnimationFrame(frame);
+      clearTimeout(clipTimer);
       renderer.clearNodeAnimationHandlers(node);
       scene.stopAnimation(node, false);
     };

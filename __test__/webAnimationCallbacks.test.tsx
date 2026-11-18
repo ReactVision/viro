@@ -134,6 +134,21 @@ describe("useViroAnimation callbacks", () => {
     expect(mockRenderer.setNodeAnimationHandlers).toHaveBeenCalledWith(7, { onStart, onFinish });
     act(() => tree.unmount());
   });
+
+  test("a model animation waits out its delay, and a stop inside it cancels the start", () => {
+    const tree = mount({ name: "Clip", run: true, delay: 300 });
+    act(() => jest.advanceTimersByTime(250));
+    expect(mockScene.startAnimation).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(100));
+    expect(mockScene.startAnimation).toHaveBeenCalledWith(7, "Clip", false);
+    act(() => tree.unmount());
+
+    mockScene.startAnimation.mockClear();
+    const stopped = mount({ name: "Clip", run: true, delay: 300 });
+    act(() => stopped.unmount());
+    act(() => jest.advanceTimersByTime(500));
+    expect(mockScene.startAnimation).not.toHaveBeenCalled();
+  });
 });
 
 describe("useViroAnimation and relative values", () => {

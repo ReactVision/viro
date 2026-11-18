@@ -4,8 +4,8 @@
  * the component tree via context. Scenes render their children as C-API-backed
  * nodes rather than native views.
  *
- * MVP scope: renders the initial scene; multi-scene push/pop navigation is a
- * follow-up (the API surface is stubbed so scenes can mount).
+ * Only the top scene of the navigation stack is mounted; native keeps the
+ * others, but nothing here can show them while they are covered.
  */
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -24,14 +24,16 @@ import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
 } from "./Web/useViroRendererEffects";
-import { warnUnsupported } from "./Utilities/ViroUnsupported";
-
-/** Scene navigation is not implemented in this navigator on the web: say so instead of doing nothing. */
-const noNavigationOnWeb = (method: string) => () =>
-  warnUnsupported(`Viro3DSceneNavigator's sceneNavigator.${method}`, "the web", "ViroSceneNavigator has scene navigation on the web.");
+import {
+  jumpToScene,
+  popScenes,
+  pushScene,
+  replaceScene,
+  type WebSceneEntry,
+} from "./Web/webSceneStack";
 
 type Props = {
-  initialScene: { scene: React.ComponentType<any> };
+  initialScene: { scene: React.ComponentType<any>; passProps?: Record<string, unknown> };
   viroAppProps?: any;
   /**
    * How to load the WASM renderer assets. Required under bundlers that rewrite
@@ -106,17 +108,21 @@ export function Viro3DSceneNavigator(props: Props) {
     return () => observer.disconnect();
   }, [renderer]);
 
-  // Minimal sceneNavigator surface so scenes can mount; navigation is not implemented here yet.
+  const [history, setHistory] = useState<WebSceneEntry[]>(() =>
+    props.initialScene?.scene
+      ? [{ key: "initial", scene: props.initialScene.scene, passProps: props.initialScene.passProps }]
+      : [],
+  );
   const sceneNavigator = {
-    push: noNavigationOnWeb("push"),
-    pop: noNavigationOnWeb("pop"),
-    popN: noNavigationOnWeb("popN"),
-    jump: noNavigationOnWeb("jump"),
-    replace: noNavigationOnWeb("replace"),
+    push: (a?: unknown, b?: unknown) => setHistory((h) => pushScene(h, a, b)),
+    replace: (a?: unknown, b?: unknown) => setHistory((h) => replaceScene(h, a, b)),
+    jump: (a?: unknown, b?: unknown) => setHistory((h) => jumpToScene(h, a, b)),
+    pop: () => setHistory((h) => popScenes(h, 1)),
+    popN: (n: number) => setHistory((h) => popScenes(h, n)),
     viroAppProps: props.viroAppProps ?? {},
   };
-
-  const SceneComponent = props.initialScene?.scene;
+  const top = history[history.length - 1];
+  const SceneComponent = top?.scene;
 
   return (
     <div style={containerStyle}>
@@ -124,7 +130,12 @@ export function Viro3DSceneNavigator(props: Props) {
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>
           <ViroParentNodeContext.Provider value={rootNode}>
-            <SceneComponent sceneNavigator={sceneNavigator} {...props.viroAppProps} />
+            <SceneComponent
+              key={top.key}
+              sceneNavigator={sceneNavigator}
+              {...props.viroAppProps}
+              {...top.passProps}
+            />
           </ViroParentNodeContext.Provider>
         </ViroRendererContext.Provider>
       ) : null}

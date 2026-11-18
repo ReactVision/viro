@@ -30,6 +30,9 @@ jest.mock("../components/Studio/StudioRecordingIndicator.web", () => ({
 jest.mock("../components/Studio/StudioColocationIndicator.web", () => ({
   StudioColocationIndicator: () => null,
 }));
+jest.mock("../components/Studio/StudioWebAlertOverlay", () => ({
+  StudioWebAlertOverlay: () => null,
+}));
 
 import * as React from "react";
 import { act } from "react";

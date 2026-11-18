@@ -15,6 +15,7 @@
  *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
  *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
  *    reports them through `onUnsupported` so the caller can warn.
+ *  - ALERT draws through StudioWebAlertOverlay, which the navigator mounts.
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 import * as React from "react";

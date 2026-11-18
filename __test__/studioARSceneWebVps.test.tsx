@@ -76,9 +76,9 @@ import TestRenderer, {
   type ReactTestInstance,
   type ReactTestRenderer,
 } from "react-test-renderer";
-import { Alert } from "react-native";
 import { StudioARScene } from "../components/Studio/StudioARScene.web";
 import { StudioPlacementStore } from "../components/Studio/domain/placementStore";
+import { questAlertStore } from "../components/Studio/domain/questAlertStore";
 import { evaluateProximityBindings } from "../components/Studio/domain/proximityBindingsRuntime";
 import { executeOnLoadFunction } from "../components/Studio/domain/sceneNavigationHandler";
 import type {
@@ -242,7 +242,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   onLoadSpy.mockClear();
   evaluateSpy.mockClear();
-  (Alert.alert as jest.Mock).mockClear();
+  questAlertStore.reset();
   jest.spyOn(console, "log").mockImplementation(() => {});
   jest.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -286,7 +286,8 @@ describe("StudioARScene (web) and a scene bound to a VPS location", () => {
         (n) => n.type === "ViroSpatialSound" || n.type === "ViroSound"
       )
     ).toHaveLength(0);
-    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    // On the web the alert goes to the overlay's store, not Alert.alert.
+    expect(questAlertStore.isActive()).toBe(true);
   });
 
   it("leaves an unbound scene's plane assets, on_load, proximity and sounds alone", () => {

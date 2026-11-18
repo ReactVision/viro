@@ -31,6 +31,7 @@ import { StudioVariableStore } from "./domain/variableStore";
 import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
 import { StudioColocationIndicator } from "./StudioColocationIndicator.web";
+import { StudioWebAlertOverlay } from "./StudioWebAlertOverlay";
 import { studioColocationStore } from "./domain/colocationStore";
 import type {
   StudioColocationOptions,
@@ -506,6 +507,7 @@ export const StudioSceneNavigator = forwardRef<
           <StudioColocationIndicator />
         </div>
       )}
+      <StudioWebAlertOverlay />
     </div>
   );
 });

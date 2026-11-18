@@ -21,7 +21,7 @@ import { buildViroMaterialDefinition } from "../components/Studio/domain/materia
 import type { MaterialConfig } from "../components/Studio/domain/materialConfig";
 
 /** Records the C API calls a material build makes, standing in for the WASM module. */
-function fakeScene() {
+function fakeScene(effects = true) {
   const calls: Record<string, unknown[][]> = {};
   const record =
     (name: string) =>
@@ -43,6 +43,13 @@ function fakeScene() {
     setMaterialReadsFromDepthBuffer: record("setMaterialReadsFromDepthBuffer"),
     addMaterialShaderModifier: record("addMaterialShaderModifier"),
     destroyMaterial: record("destroyMaterial"),
+    ...(effects && {
+      supportsMaterialEffects: true,
+      setMaterialAlpha: record("setMaterialAlpha"),
+      setMaterialBloomThreshold: record("setMaterialBloomThreshold"),
+      setMaterialColorWriteMask: record("setMaterialColorWriteMask"),
+      setMaterialChromaKey: record("setMaterialChromaKey"),
+    }),
   };
   return { scene, calls };
 }
@@ -67,8 +74,12 @@ afterAll(() => {
 });
 
 function build(config: MaterialConfig, name = NAME) {
-  const { scene, calls } = fakeScene();
-  registerViroMaterials({ [name]: buildViroMaterialDefinition(config) });
+  return buildDef(buildViroMaterialDefinition(config), name);
+}
+
+function buildDef(def: Record<string, unknown>, name = NAME, effects = true) {
+  const { scene, calls } = fakeScene(effects);
+  registerViroMaterials({ [name]: def });
   const handle = createMaterialFromRegistry(scene as never, name);
   return { handle, calls };
 }
@@ -142,3 +153,54 @@ describe("a Studio material_config reaching the web C API", () => {
     expect(calls.setMaterialDiffuseColor).toBeUndefined();
   });
 });
+
+describe("alpha, bloom, colour write mask and chroma key on the web", () => {
+  test("a translucent material stops writing depth unless the config says otherwise", () => {
+    const { calls } = build({ lightingModel: "PBR", alpha: 0.5, blendMode: "Alpha" });
+    expect(calls.setMaterialAlpha?.[0]?.[1]).toBe(0.5);
+    expect(calls.setMaterialWritesToDepthBuffer).toEqual([[1, false]]);
+    deleteViroMaterials([NAME]);
+
+    const authored = build({ lightingModel: "PBR", alpha: 0.5, writesToDepthBuffer: true });
+    expect(authored.calls.setMaterialWritesToDepthBuffer).toEqual([[1, true]]);
+    deleteViroMaterials([NAME]);
+
+    const opaque = build({ lightingModel: "PBR", alpha: 1 });
+    expect(opaque.calls.setMaterialAlpha?.[0]?.[1]).toBe(1);
+    expect(opaque.calls.setMaterialWritesToDepthBuffer).toBeUndefined();
+  });
+
+  test("reads the bloom threshold, the mask names and the chroma key colour as native does", () => {
+    const { calls } = buildDef({
+      bloomThreshold: 0.2,
+      colorWriteMask: ["Red", "alpha"],
+      chromaKeyFilteringColor: "#00ff00",
+    });
+    expect(calls.setMaterialBloomThreshold?.[0]?.[1]).toBe(0.2);
+    expect(calls.setMaterialColorWriteMask?.[0]?.[1]).toBe(9);
+    expect(calls.setMaterialChromaKey).toHaveLength(1);
+    expect(calls.setMaterialAlpha).toBeUndefined();
+  });
+
+  test("Studio's null bloom threshold writes nothing", () => {
+    const { calls } = build({ lightingModel: "PBR", bloomThreshold: null });
+    expect(calls.setMaterialBloomThreshold).toBeUndefined();
+  });
+
+  test("an older renderer still builds the material, and says what it dropped", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    // An alpha of 1 draws the same there, so it is not worth a warning.
+    buildDef({ lightingModel: "PBR", alpha: 1 }, NAME, false);
+    expect(warn).not.toHaveBeenCalled();
+    deleteViroMaterials([NAME]);
+
+    const { handle, calls } = buildDef({ lightingModel: "PBR", alpha: 0.5, shininess: 3 }, NAME, false);
+    expect(handle).toBe(1);
+    expect(calls.setMaterialShininess?.[0]?.[1]).toBe(3);
+    // Opaque there, so it keeps writing depth.
+    expect(calls.setMaterialWritesToDepthBuffer).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("alpha"));
+    warn.mockRestore();
+  });
+});
+

@@ -5,7 +5,8 @@
  * components resolve them by name to build materials through the C API.
  *
  * Supports color, lighting model, scalar properties (shininess/fresnel/
- * roughness/metalness/cull/blend/depth), and textures (diffuse + PBR maps).
+ * roughness/metalness/cull/blend/depth/alpha/bloom), colour write mask, chroma
+ * key, and textures (diffuse + PBR maps).
  * Textures load asynchronously and are applied when ready.
  */
 import type { ViroSceneApi, ViroHandle, ViroShaderEntryPoint } from "@reactvision/viro-web-renderer";
@@ -18,6 +19,7 @@ import {
   ViroTextureChannel,
 } from "@reactvision/viro-web-renderer";
 import type { ViroShaderModifier, ViroShaderModifiers } from "../Material/ViroMaterials";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { parseColorToRGBA } from "./viroColor";
 import { loadImageRGBA, resolveImageSource } from "./viroImageLoader";
 
@@ -102,6 +104,48 @@ function blendModeValue(mode?: string): ViroBlendMode | undefined {
     case "Multiply": return ViroBlendMode.Multiply;
     case "Screen": return ViroBlendMode.Screen;
     default: return undefined;
+  }
+}
+
+// VROColorMask's bits. Not ViroColorWriteMask, which renderer 1.1.1 does not export.
+const COLOR_WRITE_MASKS: Record<string, number> = { none: 0, red: 1, green: 2, blue: 4, alpha: 8, all: 15 };
+
+// Names are ORed together, case-insensitively, as VRTMaterialManager reads them.
+function colorWriteMaskValue(names: unknown): number | undefined {
+  if (!Array.isArray(names)) return undefined;
+  return names.reduce<number>((mask, name) => mask | (COLOR_WRITE_MASKS[String(name).toLowerCase()] ?? 0), 0);
+}
+
+// Alpha, bloom threshold, colour write mask and chroma key, which renderer
+// 1.1.1 and earlier cannot set.
+function applyEffects(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  const alpha = typeof def.alpha === "number" ? def.alpha : undefined;
+  const bloom = typeof def.bloomThreshold === "number" ? def.bloomThreshold : undefined;
+  const mask = colorWriteMaskValue(def.colorWriteMask);
+  const chroma = def.chromaKeyFilteringColor as string | number | null | undefined;
+  if (alpha === undefined && bloom === undefined && mask === undefined && chroma == null) return;
+  if (typeof scene.setMaterialAlpha !== "function" || scene.supportsMaterialEffects === false) {
+    // Native's defaults would draw the same, so only a value that differs is worth a warning.
+    const differs = (alpha ?? 1) < 1 || (bloom ?? -1) >= 0 || (mask ?? 15) !== 15 || chroma != null;
+    if (differs) warnUnsupported(
+      "Material alpha, bloomThreshold, colorWriteMask and chromaKeyFilteringColor",
+      "this build of the web renderer",
+      "Update @reactvision/viro-web-renderer.",
+    );
+    return;
+  }
+  if (alpha !== undefined) {
+    scene.setMaterialAlpha(material, alpha);
+    // As on native: a translucent material that still writes depth hides its own far faces.
+    if (alpha < 1 && typeof def.writesToDepthBuffer !== "boolean") {
+      scene.setMaterialWritesToDepthBuffer(material, false);
+    }
+  }
+  if (bloom !== undefined) scene.setMaterialBloomThreshold(material, bloom);
+  if (mask !== undefined) scene.setMaterialColorWriteMask(material, mask);
+  if (chroma != null) {
+    const [r, g, b] = parseColorToRGBA(chroma);
+    scene.setMaterialChromaKey(material, { r, g, b });
   }
 }
 
@@ -233,6 +277,7 @@ export function createMaterialFromRegistry(
   if (cull !== undefined) scene.setMaterialCullMode(material, cull);
   const blend = blendModeValue(def.blendMode as string | undefined);
   if (blend !== undefined) scene.setMaterialBlendMode(material, blend);
+  applyEffects(scene, material, def);
 
   applyTextures(scene, material, def);
   applyShaderModifiers(scene, material, def);

@@ -39,6 +39,7 @@
 #include "VRORenderer.h"
 
 class VRODriver;
+class VROARNode;
 class VROVideoTextureCacheOpenGL;
 class VROTrackingHelper;
 class VROMonocularDepthEstimator;
@@ -284,6 +285,14 @@ public:
      Get the native ARSession object for anchor creation.
      */
     ARSession *getARSession() const { return _session; }
+
+    /*
+     Anchor a new node at a world position, so that ARKit's corrections to its map move
+     the node. The node is not added to the scene. Returns null when there is no session.
+     removeAnchoredNode removes the anchor from ARKit and stops the updates.
+     */
+    std::shared_ptr<VROARNode> createAnchoredNode(VROVector3f position);
+    void removeAnchoredNode(std::shared_ptr<VROARNode> node);
     ARConfiguration *getSessionConfiguration() const { return _sessionConfiguration; }
     bool isPaused() const { return _sessionPaused; }
 

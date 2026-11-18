@@ -47,41 +47,56 @@ export function useViroAnimation(
   useEffect(() => {
     if (!ready || !animation) return;
 
-    // A looping relative animation ("+=90") starts each pass where the last one
-    // ended, as on native. The renderer's loop replays the first pass, and it
-    // does not report the end of a pass that is not looping, so the passes are
-    // timed here.
+    // The renderer reports neither the start of a declarative pass nor the end
+    // of one that is not looping: its transaction callback cannot tell an end
+    // from a stop. Both are timed here. A looping relative animation ("+=90")
+    // starts each pass where the last one ended, as on native, so its passes
+    // are chained here too; a looping absolute one is replayed by the renderer,
+    // which does report each cycle's end.
     const chained = !!loop && !!name && isRelativeViroAnimation(name);
     let frame = 0;
     const play = (from: ViroBaseTransform): boolean => {
       if (!name) return false;
       const pass = runDeclarativeAnimation(scene, node, name, from, !!loop && !chained, delay);
       if (!pass) return false;
-      if (chained) {
-        const endsAt = performance.now() + pass.ms;
-        const tick = () => {
-          if (performance.now() < endsAt) {
-            frame = requestAnimationFrame(tick);
-            return;
-          }
-          // The renderer may not have drawn the pass's last step yet.
-          setViroAnimationEnd(scene, node, name, pass.end);
-          animation.onFinish?.();
-          play(pass.end);
-        };
-        frame = requestAnimationFrame(tick);
-      }
+      const now = performance.now();
+      const startsAt = now + pass.delayMs;
+      const endsAt = now + pass.ms;
+      let started = false;
+      const tick = () => {
+        const t = performance.now();
+        if (!started && t >= startsAt) {
+          started = true;
+          animation.onStart?.();
+        }
+        if (loop && !chained) {
+          if (!started) frame = requestAnimationFrame(tick);
+          return;
+        }
+        if (t < endsAt) {
+          frame = requestAnimationFrame(tick);
+          return;
+        }
+        // The renderer may not have drawn the pass's last step yet.
+        setViroAnimationEnd(scene, node, name, pass.end);
+        animation.onFinish?.();
+        if (chained) play(pass.end);
+      };
+      frame = requestAnimationFrame(tick);
       return true;
     };
 
-    renderer.setNodeAnimationHandlers(node, {
-      onStart: animation.onStart,
-      onFinish: chained ? undefined : animation.onFinish,
-    });
-
     if (run !== false) {
       // Try a registered declarative animation first, then a model animation.
-      if (!play(base)) {
+      if (play(base)) {
+        renderer.setNodeAnimationHandlers(node, {
+          onFinish: loop && !chained ? animation.onFinish : undefined,
+        });
+      } else {
+        renderer.setNodeAnimationHandlers(node, {
+          onStart: animation.onStart,
+          onFinish: animation.onFinish,
+        });
         let animName = name;
         if (!animName || animName === "*") {
           animName = scene.getAnimationKeys(node)[0];

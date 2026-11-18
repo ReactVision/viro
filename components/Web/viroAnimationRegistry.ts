@@ -155,6 +155,8 @@ export interface ViroAnimationPass {
   end: ViroBaseTransform;
   /** Delay plus duration. */
   ms: number;
+  /** The delay alone: when the pass starts moving. */
+  delayMs: number;
 }
 
 /**
@@ -184,5 +186,5 @@ export function runDeclarativeAnimation(
   scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
   setAnimated(scene, node, def.properties, end);
   scene.commitAnimation();
-  return { end, ms: delay + def.duration };
+  return { end, ms: delay + def.duration, delayMs: delay };
 }

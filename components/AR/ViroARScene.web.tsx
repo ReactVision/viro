@@ -35,6 +35,7 @@ import {
 } from "../ViroConstants";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
+import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
 
 /** The declarative anchor shape passed to onAnchor* (mirrors ViroAnchor). */
 export type ViroWebAnchor = {
@@ -54,6 +55,8 @@ type Props = {
   onAnchorFound?: (anchor: ViroWebAnchor) => void;
   onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
   onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
+  /** Estimated from the camera feed a few times a second; see viroLightEstimate. */
+  onAmbientLightUpdate?: (light: ViroWebAmbientLight) => void;
   /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
   toneMappingEnabled?: boolean;
   physicsWorld?: ViroPhysicsWorldProp;
@@ -99,6 +102,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   const renderer = useViroRenderer();
   useViroToneMapping(props.toneMappingEnabled);
   useViroPhysicsWorld(props.physicsWorld);
+  useViroLightEstimate(session, props.onAmbientLightUpdate);
 
   // Read latest callbacks from a ref so effects don't re-run on identity change.
   const propsRef = useRef(props);

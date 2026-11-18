@@ -19,7 +19,15 @@
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 import * as React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ViroAmbientLight } from "../ViroAmbientLight.web";
 import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
@@ -60,6 +68,8 @@ import {
   STUDIO_AMBIENT_INTENSITY,
   STUDIO_DIRECTIONAL_DIRECTION,
   STUDIO_DIRECTIONAL_INTENSITY,
+  STUDIO_LIGHT_SCALE_STEP,
+  studioLightScale,
 } from "./domain/studioLighting";
 import type {
   StudioAnimation,
@@ -131,6 +141,27 @@ interface Props {
   /** Told when an asset's model, image or video fails to load. */
   onAssetError?: StudioAssetErrorHandler;
 }
+
+type StudioLightRigHandle = { setScale: (scale: number) => void };
+
+/**
+ * The scene's two lights, scaled together by the room's light. Its own
+ * component, so an estimate re-renders two lights rather than the scene.
+ */
+const StudioLightRig = forwardRef<StudioLightRigHandle>(function StudioLightRig(_props, ref) {
+  const [scale, setScale] = useState(1);
+  useImperativeHandle(ref, () => ({ setScale }), []);
+  return (
+    <>
+      <ViroAmbientLight color="#ffffff" intensity={STUDIO_AMBIENT_INTENSITY * scale} />
+      <ViroDirectionalLight
+        color="#ffffff"
+        intensity={STUDIO_DIRECTIONAL_INTENSITY * scale}
+        direction={STUDIO_DIRECTIONAL_DIRECTION}
+      />
+    </>
+  );
+});
 
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 export const StudioARScene: React.FC<Props> = (props) => {
@@ -712,6 +743,18 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
   const usePlane = usesPlaneWrapper(scene.plane_detection as string, mode);
 
+  // ─── Rig scale from the room (AR only) ────────────────────────────────────
+  // The native host's rule (studioLightScale): only a dim room pulls the rig
+  // below authored.
+  const lightRigRef = useRef<StudioLightRigHandle | null>(null);
+  const lightScaleRef = useRef(1);
+  const handleAmbientLightUpdate = useCallback((light: { intensity: number }) => {
+    const scale = studioLightScale(light?.intensity);
+    if (Math.abs(scale - lightScaleRef.current) < STUDIO_LIGHT_SCALE_STEP) return;
+    lightScaleRef.current = scale;
+    lightRigRef.current?.setScale(scale);
+  }, []);
+
   const body = usePlane ? (
     <ViroARPlane
       minHeight={0.1}
@@ -727,12 +770,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
 
   const children = (
     <>
-      <ViroAmbientLight color="#ffffff" intensity={STUDIO_AMBIENT_INTENSITY} />
-      <ViroDirectionalLight
-        color="#ffffff"
-        intensity={STUDIO_DIRECTIONAL_INTENSITY}
-        direction={STUDIO_DIRECTIONAL_DIRECTION}
-      />
+      <StudioLightRig ref={lightRigRef} />
       {body}
       {/* At scene root: a placed asset is in world space, and the plane wrapper
           would re-parent it to the plane it happened to be tapped on. */}
@@ -755,7 +793,11 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     // line StudioARScene draws natively.
     <ViroScene toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}>{children}</ViroScene>
   ) : (
-    <ViroARScene ref={arSceneRef} toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}>
+    <ViroARScene
+      ref={arSceneRef}
+      toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}
+      onAmbientLightUpdate={handleAmbientLightUpdate}
+    >
       {children}
     </ViroARScene>
   );

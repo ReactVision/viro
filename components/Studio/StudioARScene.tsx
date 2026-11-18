@@ -1578,8 +1578,8 @@ const StudioARSceneInner: React.FC<StudioARSceneInnerProps> = (props) => {
   // ─── Rig scale from the room ──────────────────────────────────────────────
   // The estimate arrives on every rendered frame, so it goes to the rig's own
   // component rather than into state here, where a render rebuilds every asset
-  // node, and only once it has moved enough to see. Quest and web never call
-  // this and render the rig as authored.
+  // node, and only once it has moved enough to see. Quest never calls this and
+  // renders the rig as authored; the web host estimates from the camera feed.
   const lightRigRef = useRef<StudioLightRigHandle | null>(null);
   const lightScaleRef = useRef(1);
 

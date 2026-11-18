@@ -146,6 +146,7 @@ export interface StudioSceneNavigatorWebProps {
 
 type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
   sceneNavigator?: unknown;
+  arSceneNavigator?: unknown;
 };
 
 /**
@@ -156,7 +157,11 @@ type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
  * on first load, and a 29 MB model was fetched twice, doubling peak heap. The
  * props now travel through `viroAppProps`, which both navigators spread onto it.
  */
-function StudioSceneRoot({ sceneNavigator: _sceneNavigator, ...props }: StudioSceneRootProps) {
+function StudioSceneRoot({
+  sceneNavigator: _sceneNavigator,
+  arSceneNavigator: _arSceneNavigator,
+  ...props
+}: StudioSceneRootProps) {
   return <StudioARScene key={props.sceneData?.scene.id} {...props} />;
 }
 const STUDIO_SCENE = { scene: StudioSceneRoot };

@@ -432,9 +432,14 @@ export function ViroARSceneNavigator(props: Props) {
             value={{ session: sessionRef.current, anchors, trackingState: tracking }}
           >
             <ViroParentNodeContext.Provider value={rootNode}>
+              {/* Under both names, as the Quest and visionOS hosts do: native
+                  scenes reach for `arSceneNavigator`. The methods the web
+                  cannot run stay absent rather than stubbed, because callers
+                  feature-test them (`nav?.resolveCloudAnchor`). */}
               <SceneComponent
                 key={top.key}
                 sceneNavigator={sceneNavigator}
+                arSceneNavigator={sceneNavigator}
                 {...props.viroAppProps}
                 {...top.passProps}
               />

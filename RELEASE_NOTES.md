@@ -2,7 +2,7 @@
 
 ## v3.2.1
 
-**Placed content stays put: every direct child of `ViroARScene` is anchored on iOS as it already was on Android, and on Android it now waits for tracking instead of giving up. Tracking no longer flickers on phones such as the Galaxy A56, Android release builds with R8 pass, and an AR scene hidden by a tab switch no longer crashes on a queued call.** Renderer binaries are rebuilt on virocore 3.2.1. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
+**Placed content stays put: every direct child of `ViroARScene` is anchored on iOS as it already was on Android, and on Android it now waits for tracking instead of giving up. Tracking no longer flickers on phones such as the Galaxy A56, cloud anchors host on a slow uplink, Android release builds with R8 pass, and an AR scene hidden by a tab switch no longer crashes on a queued call.** Renderer binaries are rebuilt on virocore 3.2.1, with Spatial 1.5.0. The web build uses `@reactvision/viro-web-renderer` 1.1.1.
 
 ### Everywhere
 
@@ -20,7 +20,12 @@
 - **A node at the root of an AR scene anchors once tracking starts,** however long that takes; before, a slow start used up its three tries and it floated for the session.
 - **A release build with R8 minification passes:** Viro's consumer rules ignore the classes the bundled GVR SDK references but does not ship.
 - **An AR scene method called while its screen is hidden answers `AR scene not available`** instead of crashing.
+- **Hosting a cloud anchor with the `reactvision` provider no longer fails on a slow uplink:** the upload timeout grows with its size, up to 140 s (Spatial 1.5.0).
 - **Content can follow a cloud anchor resolved with the `reactvision` provider:** the result is an ARCore anchor that `onAnchorUpdated` reports and `<ViroARPlane anchorId>` children follow.
+
+### Platform
+
+- **Cloud anchor resolve reports are accurate:** real match and inlier counts, and why a resolve failed or was cancelled (Spatial 1.5.0).
 
 ### Check when upgrading
 

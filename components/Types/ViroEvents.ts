@@ -372,8 +372,8 @@ export type ViroARHitTestResult = {
 };
 
 /**
- * Reference to an AR node created from a hit test result.
- * Used to track anchored nodes and access their properties.
+ * What `ViroARScene.createAnchoredNode` returns for the anchor it made. Nothing
+ * can be attached to it, and the transform is the one at creation.
  */
 export type ViroARNodeReference = {
   /** Unique identifier for the node */
@@ -385,7 +385,7 @@ export type ViroARNodeReference = {
   /** ID of the associated AR anchor */
   anchorId?: string;
 
-  /** Current transform of the anchored node */
+  /** Transform of the anchor when it was created */
   transform?: {
     position: Viro3DPoint;
     rotation: ViroRotation;

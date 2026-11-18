@@ -35,3 +35,34 @@ export function cameraBasis(quaternion: Quat): { forward: Vec3; up: Vec3 } {
     up: rotateByQuaternion(quaternion, CAMERA_UP),
   };
 }
+
+/** virocore's Euler-to-quaternion (VROQuaternion::set): Z·Y·X, angles in degrees. */
+export function quatFromEulerDegrees(euler: readonly number[]): Quat {
+  const half = Math.PI / 360;
+  const r = (euler[0] ?? 0) * half;
+  const p = (euler[1] ?? 0) * half;
+  const y = (euler[2] ?? 0) * half;
+  const [sr, cr, sp, cp, sy, cy] = [Math.sin(r), Math.cos(r), Math.sin(p), Math.cos(p), Math.sin(y), Math.cos(y)];
+  return [
+    sr * cp * cy - cr * sp * sy,
+    cr * sp * cy + sr * cp * sy,
+    cr * cp * sy - sr * sp * cy,
+    cr * cp * cy + sr * sp * sy,
+  ];
+}
+
+/** a·b: rotate by b, then by a. */
+export function multiplyQuats(a: Quat, b: Quat): Quat {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+
+export function conjugateQuat(q: Quat): Quat {
+  return [-q[0], -q[1], -q[2], q[3]];
+}

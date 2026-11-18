@@ -26,6 +26,7 @@ import {
   ViroParentNodeContext,
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
+import { defaultCameraView, setCameraView } from "./Web/viroDrag";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 
 type SceneDescriptor = { scene: React.ComponentType<any>; passProps?: any };
@@ -119,6 +120,14 @@ export function ViroSceneNavigator(props: Props) {
       resetMaterialCache();
     };
   }, []);
+
+  // What dragging casts its rays through, until a camera component takes over.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!renderer || !canvas) return;
+    setCameraView(renderer.scene, defaultCameraView(canvas));
+    return () => setCameraView(renderer.scene, null);
+  }, [renderer]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

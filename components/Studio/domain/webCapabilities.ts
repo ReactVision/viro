@@ -58,10 +58,6 @@ export function webUnsupportedFeatures(
     features.push("manual plane selection");
   }
 
-  // The web drag follower needs a published camera view, which only the
-  // navigator's desktop virtual camera gives, and this host never enables it.
-  if (assets.some((a) => a.is_draggable)) features.push("dragging");
-
   // The host passes no navigator into the dispatch, so both functions skip.
   const functionTypes = new Set(sceneData.functions.map((f) => f.function_type));
   if (functionTypes.has("TAKE_PHOTO")) features.push("photo capture");

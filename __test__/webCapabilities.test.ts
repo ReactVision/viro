@@ -95,10 +95,10 @@ describe("webUnsupportedFeatures", () => {
     ).toEqual(["manual plane selection"]);
   });
 
-  test("reports dragging, which this host never enables", () => {
+  test("does not report dragging", () => {
     expect(
       webUnsupportedFeatures(sceneData({ assets: [asset({ is_draggable: true })] })),
-    ).toEqual(["dragging"]);
+    ).toEqual([]);
   });
 
   test("reports photo and video functions, which get no navigator here", () => {

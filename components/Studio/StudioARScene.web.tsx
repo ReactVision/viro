@@ -52,6 +52,11 @@ import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
+import {
+  dragSurfaceFromAnchor,
+  isSameDragSurface,
+  type DragSurface,
+} from "./domain/dragConfiguration";
 import { TRACKING_GATE_FALLBACK_MS } from "./domain/trackingGate";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
 import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
@@ -691,6 +696,28 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     runtimeCtx,
   ]);
 
+  // ─── Drag surface ─────────────────────────────────────────────────────────
+  // As natively: a FixedToPlane drag slides along the plane its asset's anchor
+  // found, not along an axis guessed from plane_direction.
+  const hasPlaneDrag = useMemo(
+    () => mode === "ar" && planeAssets.some((asset) => asset.is_draggable),
+    [mode, planeAssets],
+  );
+  const [dragSurface, setDragSurface] = useState<DragSurface | null>(null);
+  const trackDragSurface = useCallback(
+    (anchor: { position?: Vec3; rotation?: Vec3 }) => {
+      if (!hasPlaneDrag || !anchor?.position || !anchor?.rotation) return;
+      const next = dragSurfaceFromAnchor(anchor.position, anchor.rotation);
+      // A plane mostly refines by sliding within itself; keep the same object
+      // then, or every update rebuilds the asset nodes.
+      setDragSurface((prev) => (prev && isSameDragSurface(prev, next) ? prev : next));
+    },
+    [hasPlaneDrag],
+  );
+  useEffect(() => {
+    setDragSurface(null);
+  }, [scene.id]);
+
   // ─── Node mapping (image-triggered assets are skipped on web) ─────────────
   const buildNodes = useCallback(
     (list: typeof assets) =>
@@ -711,7 +738,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
             runtimeCtx,
             undefined, // registerProximityTarget: native reads a component ref
             undefined, // onGaze: no eye gaze on web
-            null, // dragSurface
+            dragSurface,
             proximityTargetIds.has(asset.id)
               ? registerProximityNode
               : undefined,
@@ -729,6 +756,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       proximityTargetIds,
       registerProximityNode,
       onAssetErrorStable,
+      dragSurface,
     ],
   );
 
@@ -783,7 +811,11 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       minHeight={0.1}
       minWidth={0.1}
       alignment={planeAlignment}
-      onAnchorFound={() => onPlaneDetected?.()}
+      onAnchorFound={(anchor) => {
+        trackDragSurface(anchor);
+        onPlaneDetected?.();
+      }}
+      onAnchorUpdated={trackDragSurface}
     >
       {renderedAssets}
     </ViroARPlane>

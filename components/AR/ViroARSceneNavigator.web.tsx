@@ -37,6 +37,7 @@ import {
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
+import { sessionCameraView, setCameraView } from "../Web/viroDrag";
 import { useViroUsagePing } from "../Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
@@ -391,6 +392,16 @@ export function ViroARSceneNavigator(props: Props) {
     props.onSessionReady,
     props.onMotionUnavailable,
   ]);
+
+  // What dragging casts its rays through once the session runs; the virtual
+  // camera publishes its own.
+  useEffect(() => {
+    const session = sessionRef.current;
+    const canvas = canvasRef.current;
+    if (!started || !renderer || !session || !canvas) return;
+    setCameraView(renderer.scene, sessionCameraView(session, canvas));
+    return () => setCameraView(renderer.scene, null);
+  }, [started, renderer]);
 
   // Replay starts on its own. The button exists to satisfy a browser that will
   // not open a camera without a gesture; there is no camera here, and a preview

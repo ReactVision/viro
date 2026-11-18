@@ -315,13 +315,11 @@ static const int kRootAnchorMaxAttempts = 3;
     }
     std::shared_ptr<VRONode> node = nodeView.node;
     std::shared_ptr<VRONode> parent = node->getParentNode();
-    if (!parent) {
-        return;
-    }
 
-    // Waiting for a session and for NORMAL tracking does not spend a try.
+    // Waiting for the node to be in the scene, for a session and for NORMAL tracking
+    // does not spend a try. A node not yet attached used to end the attempts for good.
     std::shared_ptr<VROARSessioniOS> session = [self arSessioniOS];
-    if (session && _trackingNormal) {
+    if (parent && session && _trackingNormal) {
         VROVector3f position = node->getPosition();
         std::shared_ptr<VROARNode> anchorNode = session->createAnchoredNode(position);
         if (anchorNode) {

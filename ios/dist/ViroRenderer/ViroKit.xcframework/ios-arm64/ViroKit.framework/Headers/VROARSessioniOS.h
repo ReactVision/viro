@@ -485,6 +485,12 @@ private:
      they may be added and maintained by other tracking software).
      */
     std::map<std::string, std::shared_ptr<VROARAnchor>> _nativeAnchorMap;
+
+    /*
+     The ARKit anchors made by createAnchoredNode, by id, so removeAnchoredNode can
+     remove one without a current frame (none while the session is paused).
+     */
+    NSMutableDictionary<NSString *, ARAnchor *> *_anchoredNodeAnchors;
     
     /*
      Background to be assigned to the VROScene.

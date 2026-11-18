@@ -187,3 +187,34 @@ describe("StudioSceneNavigator (web) and onSceneChange", () => {
     expect(onSceneChange).toHaveBeenCalledWith("scene-2", "Two");
   });
 });
+
+describe("StudioSceneNavigator (web) and tap-to-place", () => {
+  it("leaves the AR start button uncovered until the session has started", () => {
+    const placed = {
+      id: "cube",
+      name: "Cube",
+      asset_type_name: "3D-MODEL",
+      tap_to_place: true,
+      tap_to_place_order: 0,
+      trigger_image_url: null,
+    };
+    const data = { scene: { id: "scene-1", plane_detection: "NONE" }, assets: [placed] } as unknown as StudioSceneResponse;
+    const onSessionReady = jest.fn();
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <StudioSceneNavigator sceneData={data} mode="ar" onSessionReady={onSessionReady} />
+      );
+    });
+    const latest = () => arNavigatorProps[arNavigatorProps.length - 1];
+    act(() => latest().viroAppProps.placementStore.seed([placed]));
+    const tapSurfaces = () => tree.root.findAll((n) => n.type === "div" && !!n.props.onPointerUp);
+    expect(tapSurfaces()).toHaveLength(0);
+
+    const session = {};
+    act(() => latest().onSessionReady(session));
+    expect(tapSurfaces()).toHaveLength(1);
+    expect(onSessionReady).toHaveBeenCalledWith(session);
+    act(() => tree.unmount());
+  });
+});

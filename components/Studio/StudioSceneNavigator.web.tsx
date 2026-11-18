@@ -299,6 +299,16 @@ export const StudioSceneNavigator = forwardRef<
 
   const [sceneData, setSceneData] = useState<StudioSceneResponse | undefined>(injectedSceneData);
   const [error, setError] = useState<Error | null>(null);
+  // The placement overlay covers the player, AR navigator's Start button
+  // included, so it waits for the session the button starts.
+  const [arStarted, setArStarted] = useState(false);
+  const handleSessionReady = useCallback(
+    (session: any) => {
+      setArStarted(true);
+      onSessionReady?.(session);
+    },
+    [onSessionReady],
+  );
 
   const onSceneLoadedRef = useRef(onSceneLoaded);
   onSceneLoadedRef.current = onSceneLoaded;
@@ -485,7 +495,7 @@ export const StudioSceneNavigator = forwardRef<
           webRendererOptions={rendererOptions}
           slamScriptUrl={slamScriptUrl}
           arOptions={{ detectPlanes: true, ...arOptions }}
-          onSessionReady={onSessionReady}
+          onSessionReady={handleSessionReady}
           onMotionUnavailable={onMotionUnavailable}
           {...STUDIO_RENDERER_EFFECTS}
         />
@@ -502,7 +512,7 @@ export const StudioSceneNavigator = forwardRef<
           <StudioRecordingIndicator />
         </div>
       )}
-      {resolvedMode === "ar" && (
+      {resolvedMode === "ar" && arStarted && (
         <StudioPlacementOverlay
           store={placementStore}
           apiRef={placementApiRef}

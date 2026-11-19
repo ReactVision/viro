@@ -1,11 +1,14 @@
 /**
  * Web registry for declarative ViroAnimations (transform/opacity keyframes).
- * ViroAnimations.web.createAnimations() stores definitions here; the bridge
+ * ViroAnimations.web.registerAnimations() stores definitions here; the bridge
  * resolves an `animation` name against this registry and, if found, runs a
- * transaction (begin → set target props → commit) so the renderer interpolates.
+ * transaction (begin → set target props → commit) for each animation in it so
+ * the renderer interpolates. Chains run as native parses them
+ * (VRTAnimationManager): a registered array runs its members in parallel, any
+ * array inside one or behind a name runs them in sequence.
  *
  * Scope: position/scale/rotation (per-axis), opacity, color and material.
- * Animation chains are a follow-up.
+ * translate is a follow-up.
  */
 import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
 import { ViroEasing } from "@reactvision/viro-web-renderer";
@@ -21,23 +24,51 @@ export interface ViroWebAnimationDef {
   properties: Record<string, number | string | undefined>;
 }
 
-/** The properties a pass sets on the node's material rather than the node. */
+/** An animation, the name of a registered one, or an array of these. */
+export type ViroWebAnimationEntry = ViroWebAnimationDef | string | ViroWebAnimationEntry[];
+
+const registry = new Map<string, ViroWebAnimationEntry>();
+
+/** The properties a step sets on the node's material rather than the node. */
 function animatesMaterial(p: ViroWebAnimationDef["properties"]): boolean {
   return p.color !== undefined || typeof p.material === "string";
 }
 
-const registry = new Map<string, ViroWebAnimationDef>();
-
 export function registerViroAnimations(
-  animations: Record<string, ViroWebAnimationDef>,
+  animations: Record<string, ViroWebAnimationEntry>,
 ): void {
   for (const name of Object.keys(animations)) {
     registry.set(name, animations[name]);
   }
 }
 
+const isDef = (entry: unknown): entry is ViroWebAnimationDef =>
+  !!entry && typeof entry === "object" && !Array.isArray(entry) && "properties" in entry;
+
 export function getViroAnimationDef(name: string): ViroWebAnimationDef | undefined {
-  return registry.get(name);
+  const entry = registry.get(name);
+  return isDef(entry) ? entry : undefined;
+}
+
+/** A registered animation as it runs: one animation, or a chain of them in sequence or in parallel. */
+export type ViroAnimationExec = { def: ViroWebAnimationDef } | { serial: boolean; items: ViroAnimationExec[] };
+
+function parseEntry(entry: unknown, serial: boolean, names: ReadonlySet<string>): ViroAnimationExec | null {
+  if (typeof entry === "string") {
+    // A name that leads back to itself would never end.
+    if (names.has(entry)) return null;
+    return parseEntry(registry.get(entry), true, new Set([...names, entry]));
+  }
+  if (Array.isArray(entry)) {
+    const items = entry.map((e) => parseEntry(e, true, names)).filter((e): e is ViroAnimationExec => !!e);
+    return items.length ? { serial, items } : null;
+  }
+  return isDef(entry) ? { def: entry } : null;
+}
+
+/** `name` as it runs, or null when it is not a registered animation. */
+export function resolveViroAnimation(name: string): ViroAnimationExec | null {
+  return parseEntry(registry.get(name), false, new Set([name]));
 }
 
 export interface ViroBaseTransform {
@@ -91,8 +122,12 @@ export function viroAnimationEnd(
   name: string,
   from: ViroBaseTransform,
 ): ViroBaseTransform | null {
-  const p = registry.get(name)?.properties;
-  if (!p) return null;
+  const def = getViroAnimationDef(name);
+  return def ? endOf(def, from) : null;
+}
+
+function endOf(def: ViroWebAnimationDef, from: ViroBaseTransform): ViroBaseTransform {
+  const p = def.properties;
   // The renderer animates from the angle it holds, which is within one turn.
   const rotation = from.rotation.map(wrap360);
   return {
@@ -117,8 +152,12 @@ export function viroAnimationEnd(
 
 /** True when `name` moves the node from wherever it is, so a repeat carries on from the last one. */
 export function isRelativeViroAnimation(name: string): boolean {
-  const p = registry.get(name)?.properties;
-  return !!p && Object.values(p).some((v) => typeof v === "string" && RELATIVE.test(v));
+  const def = getViroAnimationDef(name);
+  return !!def && isRelativeDef(def);
+}
+
+export function isRelativeDef(def: ViroWebAnimationDef): boolean {
+  return Object.values(def.properties).some((v) => typeof v === "string" && RELATIVE.test(v));
 }
 
 function setAnimated(
@@ -146,60 +185,79 @@ function setAnimated(
   }
 }
 
-/** Put a node at `end` now, for the properties `name` animates. */
-export function setViroAnimationEnd(
-  scene: ViroSceneApi,
-  node: ViroHandle,
-  name: string,
-  end: ViroBaseTransform,
-): void {
-  const p = registry.get(name)?.properties;
-  if (p) setAnimated(scene, node, p, end);
+/** One animation of a pass: when it starts (ms into the pass), and where it takes the node from and to. */
+export interface ViroAnimationStep {
+  at: number;
+  def: ViroWebAnimationDef;
+  from: ViroBaseTransform;
+  end: ViroBaseTransform;
 }
 
-export interface ViroAnimationPass {
-  /** Where the pass leaves the node. */
-  end: ViroBaseTransform;
-  /** Delay plus duration. */
-  ms: number;
-  /** The delay alone: when the pass starts moving. */
-  delayMs: number;
+const pick = (a: number[], b: number[], base: number[]) => a.map((v, i) => (b[i] !== base[i] ? b[i]! : v));
+
+/**
+ * Lays out one pass of `exec` from `from`, starting `at` ms in: pushes each
+ * animation's step onto `steps` and returns where the pass leaves the node and
+ * how long it takes. Members of a parallel chain each take the properties they
+ * change; one that changes the same property as another wins by order.
+ */
+export function planViroAnimation(
+  exec: ViroAnimationExec,
+  from: ViroBaseTransform,
+  steps: ViroAnimationStep[],
+  at = 0,
+): { end: ViroBaseTransform; ms: number } {
+  if ("def" in exec) {
+    const end = endOf(exec.def, from);
+    steps.push({ at, def: exec.def, from, end });
+    return { end, ms: (exec.def.delay ?? 0) + exec.def.duration };
+  }
+  if (exec.serial) {
+    let end = from;
+    let ms = 0;
+    for (const item of exec.items) {
+      const r = planViroAnimation(item, end, steps, at + ms);
+      end = r.end;
+      ms += r.ms;
+    }
+    return { end, ms };
+  }
+  let end = from;
+  let ms = 0;
+  for (const item of exec.items) {
+    const r = planViroAnimation(item, from, steps, at);
+    end = {
+      position: pick(end.position, r.end.position, from.position) as ViroBaseTransform["position"],
+      rotation: pick(end.rotation, r.end.rotation, from.rotation) as ViroBaseTransform["rotation"],
+      scale: pick(end.scale, r.end.scale, from.scale) as ViroBaseTransform["scale"],
+      opacity: r.end.opacity !== from.opacity ? r.end.opacity : end.opacity,
+    };
+    ms = Math.max(ms, r.ms);
+  }
+  return { end, ms };
 }
 
 /**
- * Run a declarative animation on a node that is at `base`, and record it as the
- * node's latest pass.
- * Returns null if `name` is not a registered animation.
- *
- * `loop` is the renderer's own, which replays the same pass.
+ * Starts a step. The node is put at the step's start first: the renderer may
+ * not have drawn the last step's end yet. `loop` is the renderer's own, which
+ * replays the step from where it started.
  *
  * `ownMaterial` returns the node's own material for `color` and `material`,
  * as native changes the node's geometry's materials; 0 where it draws nothing
  * itself (a loaded model, as on native for a glTF).
- *
- * `delayMs` is the `animation` prop's own delay. It wins over the registered
- * one, which is how a caller that carries the delay per trigger rather than per
- * registry entry still gets it, and matches the native side, where the prop
- * delay gates the start and the registered one is a second wait on top.
  */
-export function runDeclarativeAnimation(
+export function startViroAnimationStep(
   scene: ViroSceneApi,
   node: ViroHandle,
-  name: string,
-  base: ViroBaseTransform,
-  loop: boolean,
-  delayMs?: number,
+  step: ViroAnimationStep,
+  loop = false,
   ownMaterial?: () => ViroHandle,
-): ViroAnimationPass | null {
-  const def = registry.get(name);
-  const end = viroAnimationEnd(name, base);
-  if (!def || !end) return null;
-
-  const delay = delayMs ?? def.delay ?? 0;
-  const p = def.properties;
+): void {
+  const p = step.def.properties;
   const material = animatesMaterial(p) ? ownMaterial?.() ?? 0 : 0;
-  scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
-  setAnimated(scene, node, p, end);
+  setAnimated(scene, node, p, step.from);
+  scene.beginAnimation(node, step.def.duration / 1000, (step.def.delay ?? 0) / 1000, loop, easingValue(step.def.easing));
+  setAnimated(scene, node, p, step.end);
   if (material) {
     // As native's animateMaterial then animateColor: `color` wins over the
     // material's colour.
@@ -210,27 +268,22 @@ export function runDeclarativeAnimation(
     }
   }
   scene.commitAnimation();
-  passes.set(node, {
-    // As viroAnimationEnd reads it: the renderer holds an angle within one turn.
-    from: { ...base, rotation: base.rotation.map(wrap360) as [number, number, number] },
-    end,
-    startsAt: performance.now() + delay,
-    durationMs: def.duration,
-    easing: def.easing,
-    loop,
-  });
-  return { end, ms: delay + def.duration, delayMs: delay };
+}
+
+/** Puts the node at a step's end now. */
+export function finishViroAnimationStep(scene: ViroSceneApi, node: ViroHandle, step: ViroAnimationStep): void {
+  setAnimated(scene, node, step.def.properties, step.end);
 }
 
 // ─── Where a node is ─────────────────────────────────────────────────────────
 //
 // virocore starts a relative value ("+=0.5") from the value the node holds when
 // the pass begins. The renderer exposes no read of a node's local transform, so
-// the latest pass on each node is kept here and the node's value is worked out
-// from it: its end once it has finished, or the point the timing curve has
-// reached if the next pass interrupts it.
+// the steps of the latest pass on each node are kept here and the node's value
+// is worked out from them: each step's end once it has finished, or the point
+// its timing curve has reached if the next pass interrupts it.
 
-interface ViroAnimationPassRecord {
+interface ViroAnimationStepRecord {
   from: ViroBaseTransform;
   end: ViroBaseTransform;
   startsAt: number;
@@ -238,11 +291,29 @@ interface ViroAnimationPassRecord {
   easing?: string;
   /** Replayed by the renderer from `from` every cycle. */
   loop: boolean;
-  /** Set while the pass is paused. */
-  pausedAt?: number;
 }
 
-const passes = new Map<ViroHandle, ViroAnimationPassRecord>();
+const passes = new Map<ViroHandle, ViroAnimationStepRecord[]>();
+// When each paused node's pass was paused.
+const pausedAt = new Map<ViroHandle, number>();
+
+/** Records the steps of a pass that starts now. */
+export function recordViroAnimationPass(node: ViroHandle, steps: readonly ViroAnimationStep[], loop: boolean): void {
+  const now = performance.now();
+  pausedAt.delete(node);
+  passes.set(
+    node,
+    steps.map((step) => ({
+      // As endOf reads it: the renderer holds an angle within one turn.
+      from: { ...step.from, rotation: step.from.rotation.map(wrap360) as [number, number, number] },
+      end: step.end,
+      startsAt: now + step.at + (step.def.delay ?? 0),
+      durationMs: step.def.duration,
+      easing: step.def.easing,
+      loop,
+    })),
+  );
+}
 
 /** virocore's VROTimingFunction curves, which the renderer animates with. */
 function eased(easing: string | undefined, t: number): number {
@@ -268,46 +339,61 @@ function lerp(a: number, b: number, k: number): number {
   return a + (b - a) * k;
 }
 
-function lerpTransform(a: ViroBaseTransform, b: ViroBaseTransform, k: number): ViroBaseTransform {
-  const v = (x: number[], y: number[]) =>
-    x.map((xi, i) => lerp(xi, y[i]!, k)) as [number, number, number];
+function stepValue(step: ViroAnimationStepRecord, now: number): ViroBaseTransform {
+  const elapsed = now - step.startsAt;
+  if (step.durationMs <= 0) return step.end;
+  if (!step.loop && elapsed >= step.durationMs) return step.end;
+  const k = eased(step.easing, step.loop ? (elapsed % step.durationMs) / step.durationMs : elapsed / step.durationMs);
+  const v = (x: number[], y: number[]) => x.map((xi, i) => lerp(xi, y[i]!, k)) as [number, number, number];
   return {
-    position: v(a.position, b.position),
-    rotation: v(a.rotation, b.rotation),
-    scale: v(a.scale, b.scale),
-    opacity: lerp(a.opacity, b.opacity, k),
+    position: v(step.from.position, step.end.position),
+    rotation: v(step.from.rotation, step.end.rotation),
+    scale: v(step.from.scale, step.end.scale),
+    opacity: lerp(step.from.opacity, step.end.opacity, k),
   };
 }
 
 /**
  * Where `node` is now, as far as its declarative passes go: `base` until it has
- * run one, then wherever the latest one has taken it.
+ * run one, then wherever the latest one has taken it. A step that has started
+ * owns the values it changes, and a later step wins, as planViroAnimation lays
+ * them out.
  */
 export function viroAnimationCurrent(node: ViroHandle, base: ViroBaseTransform): ViroBaseTransform {
-  const pass = passes.get(node);
-  if (!pass) return base;
-  const elapsed = (pass.pausedAt ?? performance.now()) - pass.startsAt;
-  if (elapsed <= 0) return pass.from;
-  if (pass.durationMs <= 0) return pass.end;
-  if (!pass.loop && elapsed >= pass.durationMs) return pass.end;
-  const t = pass.loop ? (elapsed % pass.durationMs) / pass.durationMs : elapsed / pass.durationMs;
-  return lerpTransform(pass.from, pass.end, eased(pass.easing, t));
+  const steps = passes.get(node);
+  if (!steps?.length) return base;
+  const now = pausedAt.get(node) ?? performance.now();
+  let at = steps[0]!.from;
+  for (const step of steps) {
+    if (now <= step.startsAt) continue;
+    const v = stepValue(step, now);
+    const take = (cur: number[], key: "position" | "rotation" | "scale") =>
+      cur.map((c, i) => (step.end[key][i] !== step.from[key][i] ? v[key][i]! : c)) as [number, number, number];
+    at = {
+      position: take(at.position, "position"),
+      rotation: take(at.rotation, "rotation"),
+      scale: take(at.scale, "scale"),
+      opacity: step.end.opacity !== step.from.opacity ? v.opacity : at.opacity,
+    };
+  }
+  return at;
 }
 
 /** Holds a node's latest pass where it is, for viroAnimationCurrent, until resumed. */
 export function pauseViroAnimationPass(node: ViroHandle): void {
-  const pass = passes.get(node);
-  if (pass && pass.pausedAt === undefined) pass.pausedAt = performance.now();
+  if (passes.has(node) && !pausedAt.has(node)) pausedAt.set(node, performance.now());
 }
 
 export function resumeViroAnimationPass(node: ViroHandle): void {
-  const pass = passes.get(node);
-  if (!pass || pass.pausedAt === undefined) return;
-  pass.startsAt += performance.now() - pass.pausedAt;
-  pass.pausedAt = undefined;
+  const at = pausedAt.get(node);
+  if (at === undefined) return;
+  pausedAt.delete(node);
+  const shift = performance.now() - at;
+  for (const step of passes.get(node) ?? []) step.startsAt += shift;
 }
 
 /** Forget a node's passes: its authored transform changed, or it is gone. */
 export function forgetViroAnimationState(node: ViroHandle): void {
   passes.delete(node);
+  pausedAt.delete(node);
 }

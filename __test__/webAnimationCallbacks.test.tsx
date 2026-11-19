@@ -73,6 +73,7 @@ beforeAll(() =>
     rise: { duration: 500, properties: { positionY: "+=1" } },
     riseEased: { duration: 1000, easing: "EaseInEaseOut", properties: { positionY: "+=1" } },
     pulse: { duration: 500, properties: { scaleX: 2 } },
+    riseTwice: [["rise", "rise"]],
   }),
 );
 
@@ -102,9 +103,7 @@ describe("useViroAnimation callbacks", () => {
     expect(onFinish).toHaveBeenCalledTimes(1);
 
     // Not left to the renderer too, or a fixed renderer would report it twice.
-    expect(mockRenderer.setNodeAnimationHandlers).toHaveBeenCalledWith(7, {
-      onFinish: undefined,
-    });
+    expect(mockRenderer.setNodeAnimationHandlers).not.toHaveBeenCalled();
     act(() => tree.unmount());
   });
 
@@ -117,14 +116,14 @@ describe("useViroAnimation callbacks", () => {
     expect(onFinish).not.toHaveBeenCalled();
   });
 
-  test("an absolute loop leaves each cycle's end to the renderer", () => {
+  test("an absolute loop reports each cycle's start and end, as native does", () => {
     const onStart = jest.fn();
     const onFinish = jest.fn();
     const tree = mount({ name: "pulse", run: true, loop: true, onStart, onFinish });
-    act(() => jest.advanceTimersByTime(2000));
-    expect(onStart).toHaveBeenCalledTimes(1);
-    expect(onFinish).not.toHaveBeenCalled();
-    expect(mockRenderer.setNodeAnimationHandlers).toHaveBeenCalledWith(7, { onFinish });
+    act(() => jest.advanceTimersByTime(1100));
+    expect(onFinish).toHaveBeenCalledTimes(2);
+    expect(onStart).toHaveBeenCalledTimes(3);
+    expect(mockRenderer.setNodeAnimationHandlers).not.toHaveBeenCalled();
     act(() => tree.unmount());
   });
 
@@ -234,6 +233,14 @@ describe("useViroAnimation and relative values", () => {
     act(() => jest.advanceTimersByTime(250));
     act(() => tree.update(<Probe animation={{ name: "rise", run: true }} />));
     expect(lastY()).toBeCloseTo(1.125);
+    act(() => tree.unmount());
+  });
+
+  test("an interrupted chain carries on from the step it was in", () => {
+    const tree = mount({ name: "riseTwice", run: true });
+    act(() => jest.advanceTimersByTime(750));
+    act(() => tree.update(<Probe animation={{ name: "rise", run: true }} />));
+    expect(lastY()).toBeCloseTo(2.5);
     act(() => tree.unmount());
   });
 

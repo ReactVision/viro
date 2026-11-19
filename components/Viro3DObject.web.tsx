@@ -54,7 +54,14 @@ export function Viro3DObject(props: Props) {
   const [loaded, setLoaded] = useState(false);
   // `loaded` is the hook's contentReady: the model's own animations and any
   // shader override both need its subtree to exist first.
-  const node = useViroNode(props, undefined, loaded);
+  //
+  // A model draws nothing itself, so `materials` reaches it as native's iOS
+  // bridge sends it, merged into the model's own materials through its
+  // subtree, ahead of the shader overrides. Only the first applies, as there.
+  const firstMaterial = Array.isArray(props.materials) ? props.materials[0] : props.materials;
+  const overrides = props.shaderOverrides === undefined ? [] : ([] as string[]).concat(props.shaderOverrides);
+  const shaderOverrides = firstMaterial ? [firstMaterial, ...overrides] : props.shaderOverrides;
+  const node = useViroNode({ ...props, shaderOverrides }, undefined, loaded);
   const renderer = useViroRenderer();
 
   const url = resolveModelSource(props.source);

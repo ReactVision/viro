@@ -89,7 +89,7 @@ export function attachVirtualCamera(
   // injected poses; a live session calls it when it starts.
   scene.initAR();
   // Published for dragging, which has to cast its own rays: the renderer cannot report the camera.
-  const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element };
+  const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element, ar: true };
   setCameraView(scene, view);
   const sizeCamera = () => {
     const w = Math.max(1, Math.round(element.clientWidth));

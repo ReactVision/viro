@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { ViroSceneApi } from "@reactvision/viro-web-renderer";
-import { cameraView, customCameraActive } from "./viroDrag";
+import { cameraView, sceneCameraUnreadable } from "./viroDrag";
 import { cameraBasis, quatToEulerDegrees, type Vec3 } from "./viroMath";
 import { useViroScene } from "./ViroWebContext";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
@@ -16,7 +16,7 @@ export type ViroWebCameraOrientation = { position: Vec3; rotation: Vec3; forward
 /** The onCameraTransformUpdate payload, with the deprecated `cameraTransform` key native still sends. */
 export type ViroWebCameraTransform = ViroWebCameraOrientation & { cameraTransform: ViroWebCameraOrientation };
 
-const UNKNOWN_CAMERA = "The camera of a ViroCamera or ViroOrbitCamera (onCameraTransformUpdate, getCameraOrientationAsync)";
+const UNKNOWN_CAMERA = "The camera of an orthographic ViroCamera or ViroOrbitCamera, or of either on an older web renderer (onCameraTransformUpdate, getCameraOrientationAsync)";
 
 export function cameraOrientation(scene: ViroSceneApi): ViroWebCameraOrientation | null {
   const view = cameraView(scene);
@@ -29,7 +29,7 @@ export function cameraOrientation(scene: ViroSceneApi): ViroWebCameraOrientation
 export async function cameraOrientationAsync(scene: ViroSceneApi): Promise<ViroWebCameraOrientation> {
   const now = cameraOrientation(scene);
   if (now) return now;
-  if (customCameraActive(scene)) warnUnsupported(UNKNOWN_CAMERA, "the web");
+  if (sceneCameraUnreadable(scene)) warnUnsupported(UNKNOWN_CAMERA, "the web");
   // Also before an AR session has started: there is no camera pose yet.
   throw new Error("The camera's orientation is not known yet.");
 }
@@ -49,7 +49,7 @@ export function useViroCameraTransform(onUpdate: ((transform: ViroWebCameraTrans
       frame = requestAnimationFrame(step);
       const now = cameraOrientation(scene);
       if (!now) {
-        if (customCameraActive(scene)) warnUnsupported(UNKNOWN_CAMERA, "the web");
+        if (sceneCameraUnreadable(scene)) warnUnsupported(UNKNOWN_CAMERA, "the web");
         return;
       }
       const values = [...now.position, ...now.forward, ...now.up];

@@ -178,7 +178,8 @@ const TRANSFORM_DISTANCE_FILTER = 0.01;
 function drawnParentSpace(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3) => Vec3) | null {
   if (typeof scene.getNodeWorldTransform !== "function") return null;
   const p = scene.getNodeWorldTransform(parent);
-  if (!p || p.scale.every((c) => c === 0)) return null;
+  // All zero before it is drawn; any zero is a flattened parent with no inverse.
+  if (!p || p.scale.some((c) => c === 0)) return null;
   const inverse = conjugateQuat(quatFromEulerDegrees(p.rotation));
   return (world) => {
     const local = rotateByQuaternion(inverse, sub(world, p.position));

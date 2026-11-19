@@ -108,6 +108,19 @@ describe("animation chains", () => {
     expect(r.ms).toBe(800);
   });
 
+  test("members turning different axes together each head for both, since the renderer sets the whole rotation", () => {
+    registerViroAnimations({
+      turnX: { duration: 500, properties: { rotateX: 90 } },
+      turnY: { duration: 500, properties: { rotateY: 45 } },
+      turnBoth: ["turnX", "turnY"],
+    });
+    const steps: ViroAnimationStep[] = [];
+    const r = planViroAnimation(resolveViroAnimation("turnBoth")!, at(), steps);
+    expect(r.end.rotation).toEqual([90, 45, 0]);
+    expect(steps.map((s) => s.end.rotation)).toEqual([[90, 45, 0], [90, 45, 0]]);
+    expect(steps.map((s) => s.from.rotation)).toEqual([[0, 0, 0], [0, 0, 0]]);
+  });
+
   test("a chain that names itself is not an animation", () => {
     expect(resolveViroAnimation("loopy")).toBeNull();
   });

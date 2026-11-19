@@ -224,8 +224,11 @@ export function planViroAnimation(
   }
   let end = from;
   let ms = 0;
+  const members: { first: number; last: number; end: ViroBaseTransform }[] = [];
   for (const item of exec.items) {
+    const first = steps.length;
     const r = planViroAnimation(item, from, steps, at);
+    members.push({ first, last: steps.length, end: r.end });
     end = {
       position: pick(end.position, r.end.position, from.position) as ViroBaseTransform["position"],
       rotation: pick(end.rotation, r.end.rotation, from.rotation) as ViroBaseTransform["rotation"],
@@ -234,12 +237,40 @@ export function planViroAnimation(
     };
     ms = Math.max(ms, r.ms);
   }
+  // The renderer sets a whole position, rotation or scale, so members animating
+  // different axes of one would undo each other. Each step carries the group's
+  // target on the axes its own member leaves; a step starting later starts there.
+  for (const m of members) {
+    for (let i = m.first; i < m.last; i++) {
+      const s = steps[i]!;
+      const keep = (key: "position" | "rotation" | "scale", v: number[], later: boolean) =>
+        v.map((c, k) => (m.end[key][k] === from[key][k] ? (later ? end[key][k]! : c) : c));
+      const later = s.at > at;
+      steps[i] = {
+        ...s,
+        from: {
+          ...s.from,
+          position: keep("position", s.from.position, later) as ViroBaseTransform["position"],
+          rotation: keep("rotation", s.from.rotation, later) as ViroBaseTransform["rotation"],
+          scale: keep("scale", s.from.scale, later) as ViroBaseTransform["scale"],
+        },
+        end: {
+          ...s.end,
+          position: keep("position", s.end.position, true) as ViroBaseTransform["position"],
+          rotation: keep("rotation", s.end.rotation, true) as ViroBaseTransform["rotation"],
+          scale: keep("scale", s.end.scale, true) as ViroBaseTransform["scale"],
+        },
+      };
+    }
+  }
   return { end, ms };
 }
 
 /**
- * Starts a step. The node is put at the step's start first: the renderer may
- * not have drawn the last step's end yet. `loop` is the renderer's own, which
+ * Starts a step. A step after the first is put at its start first: the
+ * renderer may not have drawn the last step's end yet. The first animates from
+ * wherever the node is, as native does, which a drag or setNativeProps may
+ * have moved. `loop` is the renderer's own, which
  * replays the step from where it started.
  *
  * `ownMaterial` returns the node's own material for `color` and `material`,
@@ -255,7 +286,7 @@ export function startViroAnimationStep(
 ): void {
   const p = step.def.properties;
   const material = animatesMaterial(p) ? ownMaterial?.() ?? 0 : 0;
-  setAnimated(scene, node, p, step.from);
+  if (step.at > 0) setAnimated(scene, node, p, step.from);
   scene.beginAnimation(node, step.def.duration / 1000, (step.def.delay ?? 0) / 1000, loop, easingValue(step.def.easing));
   setAnimated(scene, node, p, step.end);
   if (material) {

@@ -18,7 +18,7 @@
  * follow-up.
  */
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ViroWebRenderer,
   ViroArSession,
@@ -39,6 +39,7 @@ import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
 import { useViroContextRestore } from "../Web/useViroContextRestore";
 import { sessionCameraView, setCameraView } from "../Web/viroDrag";
+import { projectPoint, requireScene, unprojectPoint } from "../Web/viroProjection";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { useViroUsagePing } from "../Utilities/ViroUsagePing";
 import {
@@ -462,8 +463,11 @@ export function ViroARSceneNavigator(props: Props) {
     },
     setWorldOrigin: () =>
       warnUnsupported("setWorldOrigin", "the web", "The web tracker cannot move its world origin."),
+    project: async (point: number[]) => projectPoint(requireScene(renderer), point),
+    unproject: async (point: number[]) => unprojectPoint(requireScene(renderer), point),
     viroAppProps: props.viroAppProps ?? {},
   };
+  useImperativeHandle(props.ref, () => ({ arSceneNavigator: sceneNavigator, sceneNavigator }));
   const top = history[history.length - 1];
   const SceneComponent = top?.scene;
 

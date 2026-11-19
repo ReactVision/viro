@@ -40,6 +40,7 @@ import {
   type ViroWebCameraTransform,
 } from "../Web/viroCameraTransform";
 import type { Vec3 } from "../Web/viroMath";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 
 /** The declarative anchor shape passed to onAnchor* (mirrors ViroAnchor). */
@@ -198,6 +199,15 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
           fromCamera((c) => [position[0] - c[0], position[1] - c[1], position[2] - c[2]]),
         getCameraOrientationAsync: () => cameraOrientationAsync(renderer.scene),
         getCameraPositionAsync: async () => (await cameraOrientationAsync(renderer.scene)).position,
+        // Null is what native resolves when the anchor cannot be made.
+        createAnchoredNode: async () => {
+          warnUnsupported(
+            "ViroARScene.createAnchoredNode",
+            "the web",
+            "The web tracker cannot anchor to a hit result; place content at the hit result's position instead.",
+          );
+          return null;
+        },
       };
     },
     [session, renderer],

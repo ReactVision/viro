@@ -7,6 +7,7 @@ import { cameraOrientation, cameraOrientationAsync } from "../components/Web/vir
 import { holdCustomCamera, setCameraView, type CameraView } from "../components/Web/viroDrag";
 import { hitTestPlanes } from "../components/Web/viroHitTest";
 import { quatFromEulerDegrees, quatToEulerDegrees } from "../components/Web/viroMath";
+import { projectPoint, unprojectPoint } from "../components/Web/viroProjection";
 
 const close = (a: number[], b: number[]) => a.forEach((v, i) => expect(v).toBeCloseTo(b[i]!, 5));
 
@@ -85,5 +86,41 @@ describe("AR hit tests", () => {
   it("stops at maxDistance and ignores planes behind the ray", () => {
     expect(hitTestPlanes([floor, wall], [0, 0, 0], [0, -1, -2], 2)).toHaveLength(0);
     expect(hitTestPlanes([floor], [0, 0, 0], [0, 1, 0])).toHaveLength(0);
+  });
+});
+
+describe("navigator project and unproject", () => {
+  const turned = (): ViroSceneApi => {
+    const scene = {} as ViroSceneApi;
+    setCameraView(scene, {
+      position: [1, 1.5, 0],
+      orientation: quatFromEulerDegrees([0, -90, 0]),
+      fx: 400,
+      fy: 400,
+      cx: 300,
+      cy: 200,
+      element: {} as HTMLElement,
+    });
+    return scene;
+  };
+
+  it("projects a point ahead of a turned camera to the view's centre, with +Y up the screen", () => {
+    const scene = turned();
+    close(projectPoint(scene, [3, 1.5, 0]).screenPosition, [300, 200]);
+    close(projectPoint(scene, [3, 2, 0]).screenPosition, [300, 100]);
+  });
+
+  it("unprojects along the ray, from the near plane at depth 0 to the far plane at 1", () => {
+    const scene = turned();
+    close(unprojectPoint(scene, [300, 200, 0]).position, [1.02, 1.5, 0]);
+    close(unprojectPoint(scene, [300, 200, 1]).position, [51.01, 1.5, 0]);
+    const back = unprojectPoint(scene, [...projectPoint(scene, [3, 2, 0.5]).screenPosition, 0.5]).position;
+    // Same ray from the camera as the point that was projected.
+    const ray = [back[0] - 1, back[1] - 1.5, back[2] - 0];
+    close([ray[1] / ray[0], ray[2] / ray[0]], [0.25, 0.25]);
+  });
+
+  it("rejects while no camera is known", () => {
+    expect(() => projectPoint({} as ViroSceneApi, [0, 0, -1])).toThrow("camera's pose");
   });
 });

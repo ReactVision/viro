@@ -9,13 +9,12 @@
  *
  * VR-specific surface has no web counterpart and is a graceful no-op:
  * `vrModeEnabled`, `onExitViro`, and `recenterTracking` do nothing on web
- * (there is no headset target). `project`/`unproject` are provided by the
- * renderer where available.
+ * (there is no headset target).
  *
  * Copyright © 2026 ReactVision. All rights reserved.
  */
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ViroWebRenderer,
   type ViroHandle,
@@ -28,6 +27,7 @@ import {
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 import { useViroContextRestore } from "./Web/useViroContextRestore";
 import { defaultCameraView, setCameraView } from "./Web/viroDrag";
+import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 
 type SceneDescriptor = { scene: React.ComponentType<any>; passProps?: any };
@@ -87,6 +87,8 @@ export function ViroSceneNavigator(props: Props) {
   useViroUsagePing("scene");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
+  const rendererRef = useRef(renderer);
+  rendererRef.current = renderer;
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
 
   const [stack, setStack] = useState<Stack>(() => {
@@ -196,13 +198,13 @@ export function ViroSceneNavigator(props: Props) {
       });
     },
     recenterTracking: () => {}, // no VR recenter on web
-    project: async (point: [number, number, number]) =>
-      (renderer as any)?.project?.(point) ?? point,
-    unproject: async (point: [number, number, number]) =>
-      (renderer as any)?.unproject?.(point) ?? point,
+    // Through a ref: this object is made once, before the renderer exists.
+    project: async (point: number[]) => projectPoint(requireScene(rendererRef.current), point),
+    unproject: async (point: number[]) => unprojectPoint(requireScene(rendererRef.current), point),
     viroAppProps: props.viroAppProps ?? {},
   });
   sceneNavigatorRef.current.viroAppProps = props.viroAppProps ?? {};
+  useImperativeHandle(props.ref, () => ({ sceneNavigator: sceneNavigatorRef.current }), []);
 
   const topKey = stack.history[stack.history.length - 1];
   const descriptor = stack.dict[topKey];

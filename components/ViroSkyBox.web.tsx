@@ -5,7 +5,8 @@
  * nothing if any face fails to load.
  */
 import { useEffect } from "react";
-import { useViroScene } from "./Web/ViroWebContext";
+import { useViroParentNode, useViroScene } from "./Web/ViroWebContext";
+import { setViroBackgroundCube } from "./Web/viroBackground";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
 import { parseColorToRGBA } from "./Web/viroColor";
 
@@ -30,6 +31,7 @@ const FACE_ORDER: (keyof CubeSource)[] = ["px", "nx", "py", "ny", "pz", "nz"];
 
 export function ViroSkyBox(props: Props): null {
   const scene = useViroScene();
+  const parent = useViroParentNode();
   const src = props.source;
   const key = src ? FACE_ORDER.map((f) => resolveImageSource(src[f]) ?? "").join("|") : "";
   const color = !src && props.color != null ? props.color : null;
@@ -39,9 +41,9 @@ export function ViroSkyBox(props: Props): null {
     if (color === null) return;
     const face = new Uint8Array(parseColorToRGBA(color).map((c) => Math.round(c * 255)));
     const texture = scene.createTextureCubeRGBA({ px: face, nx: face, py: face, ny: face, pz: face, nz: face }, 1, 1);
-    scene.setBackgroundCube(texture);
+    setViroBackgroundCube(scene, parent, texture);
     return () => scene.destroyTexture(texture);
-  }, [scene, color]);
+  }, [scene, parent, color]);
 
   useEffect(() => {
     if (!src) return;
@@ -66,7 +68,7 @@ export function ViroSkyBox(props: Props): null {
           width,
           height,
         );
-        scene.setBackgroundCube(texture);
+        setViroBackgroundCube(scene, parent, texture);
         props.onLoadEnd?.();
       })
       .catch((err) => {

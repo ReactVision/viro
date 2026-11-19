@@ -30,6 +30,7 @@ import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchG
 import { qrModules } from "./qr";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { set3DNavigatorDefaults, setARNavigatorDefaults } from "./viroWebComponents";
+import { ViroTelemetry } from "../components/Utilities/ViroUsagePing";
 
 type PreviewInput = {
   code: string;
@@ -436,9 +437,11 @@ function ActivityBar() {
 
 const megabytes = (n: number) => `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`;
 
+// A preview is not an app install, so it sends no register-device ping, here
+// or on a phone that opens the page outside the host's view.
+ViroTelemetry.setEnabled(false);
+
 const pageFetch = window.fetch.bind(window);
-// Viro's own usage ping. A host's view blocks it, and it is not the scene's to fix.
-const isUsagePing = (url: string) => url.includes("/functions/v1/register-device");
 
 type ModelBytes = { res: Response; body: ArrayBuffer | null };
 // One download per model URL: the scene runs again after every update, and a
@@ -509,11 +512,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const href = new URL(url, document.baseURI).href;
     const model = !init && !(input instanceof Request) && MODEL_RE.test(url.split(/[?#]/)[0]!) && href !== standInHref;
     const res = model ? await fetchModel(href, input) : await pageFetch(input, init);
-    if (!res.ok && !isUsagePing(url)) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
+    if (!res.ok) pushWarning(`Failed to load ${short}: HTTP ${res.status}.`);
     else if (res.ok && inspectable) noteModelResponse(url, res);
     return res;
   } catch (err) {
-    if (!isUsagePing(url)) pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
+    pushWarning(`Failed to load ${short}: ${err instanceof Error ? err.message : String(err)}.`);
     throw err;
   }
 };

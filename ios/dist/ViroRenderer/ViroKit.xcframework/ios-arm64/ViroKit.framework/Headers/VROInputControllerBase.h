@@ -149,6 +149,12 @@ public:
      */
     void onControllerStatus(int source, VROEventDelegate::ControllerStatus status);
     void onButtonEvent(int source, VROEventDelegate::ClickState clickAction);
+    /*
+     Ends this source's press without completing a click: its node hears ClickUp
+     and never Clicked, and a drag it started ends. For a touch that turns into a
+     two-finger gesture after the first finger already pressed.
+     */
+    void cancelButtonEvent(int source);
     void onTouchpadEvent(int source, VROEventDelegate::TouchState touchAction, float lastKnownX, float lastKnownY);
     
     /*

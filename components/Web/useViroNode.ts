@@ -20,7 +20,17 @@ import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
-import { cameraView, dragFollower, rayAt, releaseVelocity, sub, type DragPlane, type Vec3 } from "./viroDrag";
+import {
+  cameraView,
+  dragFollower,
+  parentSpace,
+  rayAt,
+  releaseVelocity,
+  screenPointOf,
+  sub,
+  type DragPlane,
+  type Vec3,
+} from "./viroDrag";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
@@ -54,7 +64,18 @@ export type ViroWebNodeHandle = {
   applyImpulse(force: number[], position?: number[]): void;
   applyTorqueImpulse(torque: number[]): void;
   setVelocity(velocity: number[]): void;
+  /** Last frame's world transform, rotation in degrees. */
+  getTransformAsync(): Promise<{ position: ViroPosition; rotation: ViroPosition; scale: ViroPosition }>;
+  getBoundingBoxAsync(): Promise<{
+    boundingBox: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
+  }>;
+  /** Native has this on Viro3DObject only; on the web any node answers. */
+  getMorphTargets(): Promise<{ targets: string[] }>;
+  /** Applies position, rotation, scale, opacity and visible until the props next change them. */
+  setNativeProps(nativeProps: Partial<ViroWebNodeProps>): void;
 };
+
+type ViroFuseProp = (() => void) | ((source: number) => void) | { callback: (source: number) => void; timeToFuse?: number };
 
 export interface ViroWebNodeProps {
   position?: [number, number, number];
@@ -105,6 +126,11 @@ export interface ViroWebNodeProps {
     source: number,
   ) => void;
   onHover?: (isHovering: boolean, position: ViroPosition, source: number) => void;
+  onPinch?: (pinchState: number, scaleFactor: number, source: number) => void;
+  /** rotationFactor in degrees, counterclockwise, as native reports it. */
+  onRotate?: (rotateState: number, rotationFactor: number, source: number) => void;
+  /** Fires once the screen centre has rested on the node for timeToFuse ms (default 2000). */
+  onFuse?: ViroFuseProp;
   animation?: ViroAnimationProp;
 }
 
@@ -115,12 +141,26 @@ export interface ViroWebNodeProps {
  * clicks go on to the nearest ancestor that takes them, and a press on a
  * clickable child drags the nearest ancestor with onDrag.
  */
-type NodeEntry = { parent: ViroHandle; props(): ViroWebNodeProps; startDrag(hit: Vec3): void };
+type NodeEntry = { parent: ViroHandle; props(): ViroWebNodeProps; startDrag(hit: Vec3): void; endDrag(): void };
 const nodeEntries = new WeakMap<ViroSceneApi, Map<ViroHandle, NodeEntry>>();
 
 /** The nodes this hook has made in `scene`, with their parents and current props, for a host that inspects the scene. */
 export function viroNodeEntries(scene: ViroSceneApi): ReadonlyMap<ViroHandle, { parent: ViroHandle; props(): ViroWebNodeProps }> {
   return nodeEntries.get(scene) ?? new Map();
+}
+
+/**
+ * Turns a world point into `parent`'s local space, from the transforms of the
+ * nodes this hook made above it. Taken once per drag: a node animated without
+ * its props is read at its authored transform.
+ */
+function worldToLocalIn(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3) => Vec3) | null {
+  const origin = scene.getNodeWorldPosition(parent);
+  if (!origin) return null;
+  const map = nodeEntries.get(scene);
+  const ancestors: ViroWebNodeProps[] = [];
+  for (let entry = map?.get(parent); entry; entry = map!.get(entry.parent)) ancestors.push(entry.props());
+  return parentSpace(origin, ancestors);
 }
 
 function nearestNode(scene: ViroSceneApi, node: ViroHandle, wants: (p: ViroWebNodeProps) => boolean): NodeEntry | null {
@@ -222,8 +262,9 @@ export function useViroNode(
   }, [node, visible]);
 
   // Dragging, which native enables with onDrag (dragType defaults to
-  // FixedDistance). The renderer reports a press on the node; the moves are
-  // followed here, on rays from the camera's published view (viroDrag.ts). A
+  // FixedDistance). The renderer reports a press on the node; the drag is
+  // followed here, on rays from the camera's published view (viroDrag.ts),
+  // every frame as native does, so carrying the phone carries the node. A
   // dynamic body is held kinematic while dragged, as virocore's setKinematicDrag
   // does, and let go with the velocity of its last ~80 ms, so it can be thrown.
   const bodyKeyRef = useRef("");
@@ -233,20 +274,21 @@ export function useViroNode(
     const view = cameraView(scene);
     if (!p.onDrag || endDragRef.current) return;
     if (!view) {
-      warnUnsupported("Dragging nodes (onDrag) outside the desktop preview camera", "the web");
+      warnUnsupported("Dragging nodes (onDrag) under a ViroCamera or ViroOrbitCamera", "the web");
       return;
     }
     const nodeStart = scene.getNodeWorldPosition(node);
-    const parentWorld = scene.getNodeWorldPosition(parent);
-    if (!nodeStart || !parentWorld) return;
+    const toLocal = worldToLocalIn(scene, parent);
+    if (!nodeStart || !toLocal) return;
     // A press virocore rerouted to a recently hovered node arrives at the origin;
     // native grabs such a node at its own position.
     const grab: Vec3 = hit.every((c) => c === 0) ? nodeStart : hit;
-    const toGrab = sub(grab, view.position);
+    const cameraAt = [...view.position] as Vec3;
+    const toGrab = sub(grab, cameraAt);
     const len = Math.hypot(...toGrab) || 1;
     const dragType = p.dragType ?? "FixedDistance";
     const follow = dragFollower(dragType, p.dragPlane, {
-      ray: { origin: view.position, dir: [toGrab[0] / len, toGrab[1] / len, toGrab[2] / len] },
+      ray: { origin: cameraAt, dir: [toGrab[0] / len, toGrab[1] / len, toGrab[2] / len] },
       hit: grab,
       node: nodeStart,
     });
@@ -259,19 +301,29 @@ export function useViroNode(
     heldRef.current = thrown;
     if (thrown) applyPhysicsBody(scene, node, { ...body, type: "Kinematic", instantVelocity: undefined }, bodyKeyRef.current);
     const samples: { t: number; p: Vec3 }[] = [{ t: performance.now(), p: nodeStart }];
-    const onMove = (e: PointerEvent) => {
-      const to = follow(rayAt(view, e.clientX, e.clientY));
+    let pointer = screenPointOf(view, grab);
+    let notified = nodeStart;
+    let frame = 0;
+    const step = () => {
+      frame = requestAnimationFrame(step);
+      if (!pointer) return;
+      const to = follow(rayAt(view, pointer.x, pointer.y));
       if (!to) return;
-      // Local = world minus the parent's world position: right while nothing above
-      // the node is rotated or scaled, which holds for a plane anchor here.
-      const local = sub(to, parentWorld);
+      const local = toLocal(to);
       scene.setNodePosition(node, local[0], local[1], local[2]);
       samples.push({ t: performance.now(), p: to });
       if (samples.length > 12) samples.shift();
+      // Native's ON_DRAG_DISTANCE_THRESHOLD.
+      if (Math.hypot(...sub(to, notified)) < 0.01) return;
+      notified = to;
       propsRef.current.onDrag?.(to, 0);
+    };
+    const onMove = (e: PointerEvent) => {
+      pointer = { x: e.clientX, y: e.clientY };
     };
     const onUp = () => end();
     const end = (release = true) => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMove, true);
       window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("pointercancel", onUp, true);
@@ -290,13 +342,14 @@ export function useViroNode(
     window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerup", onUp, true);
     window.addEventListener("pointercancel", onUp, true);
+    frame = requestAnimationFrame(step);
     endDragRef.current = end;
   };
 
   useEffect(() => {
     let map = nodeEntries.get(scene);
     if (!map) nodeEntries.set(scene, (map = new Map()));
-    map.set(node, { parent, props: () => propsRef.current, startDrag });
+    map.set(node, { parent, props: () => propsRef.current, startDrag, endDrag: () => endDragRef.current?.() });
     return () => {
       map.delete(node);
     };
@@ -307,12 +360,20 @@ export function useViroNode(
   // so a changed callback identity does not re-subscribe.
   const hasClick = !!(props.onClick || props.onClickState || props.onDrag);
   const hasHover = !!props.onHover;
+  const hasPinch = !!props.onPinch;
+  const hasRotate = !!props.onRotate;
+  const hasFuse = !!props.onFuse;
+  const timeToFuse = typeof props.onFuse === "object" ? props.onFuse.timeToFuse : undefined;
   useEffect(() => {
-    if (!hasClick && !hasHover) return;
+    if (!hasClick && !hasHover && !hasPinch && !hasRotate && !hasFuse) return;
     renderer.setNodeEventHandlers(node, {
       onClick: (clickState, source, position) => {
         if (clickState === ViroClickState.ClickDown) {
           nearestNode(scene, node, (p) => !!p.onDrag)?.startDrag(position);
+        } else if (clickState === ViroClickState.ClickUp) {
+          // A release has already ended the drag; this is for a press a second
+          // finger cancelled, which the drag's pointer listeners never see.
+          nearestNode(scene, node, (p) => !!p.onDrag)?.endDrag();
         }
         const p = nearestNode(scene, node, (q) => !!(q.onClick || q.onClickState))?.props();
         p?.onClickState?.(clickState, position, source);
@@ -323,14 +384,35 @@ export function useViroNode(
       onHover: (isHovering, source, position) => {
         propsRef.current.onHover?.(isHovering, position, source);
       },
+      onPinch: (state, scale, source) => propsRef.current.onPinch?.(state, scale, source),
+      onRotate: (state, radians, source) => propsRef.current.onRotate?.(state, radians / DEG2RAD, source),
+      onFuse: (source) => {
+        const fuse = propsRef.current.onFuse;
+        if (typeof fuse === "function") fuse(source);
+        else fuse?.callback?.(source);
+      },
     });
     if (hasClick) scene.setNodeEventEnabled(node, ViroEventAction.Click, true);
     if (hasHover) scene.setNodeEventEnabled(node, ViroEventAction.Hover, true);
+    if (hasPinch || hasRotate || hasFuse) {
+      // Literal ids, not ViroEventAction's members: renderer 1.1.1 has none of them.
+      if (scene.supportsGestures !== true) {
+        warnUnsupported("onPinch, onRotate and onFuse", "this build of the web renderer", "Update @reactvision/viro-web-renderer.");
+      }
+      if (hasPinch) scene.setNodeEventEnabled(node, 10, true);
+      if (hasRotate) scene.setNodeEventEnabled(node, 11, true);
+      if (hasFuse) scene.setNodeEventEnabled(node, 9, true);
+    }
     return () => renderer.clearNodeEventHandlers(node);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, hasClick, hasHover]);
+  }, [node, hasClick, hasHover, hasPinch, hasRotate, hasFuse]);
+  useEffect(() => {
+    if (hasFuse && typeof scene.setNodeTimeToFuse === "function") scene.setNodeTimeToFuse(node, timeToFuse ?? 2000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, hasFuse, timeToFuse]);
 
-  // Materials (first material applied to the geometry; MVP scope).
+  // Materials (first material applied to the geometry; MVP scope), again on
+  // each rebuild, since a rebuilt geometry starts from its own materials.
   const materialsKey = Array.isArray(props.materials)
     ? props.materials.join(",")
     : props.materials ?? "";
@@ -343,7 +425,7 @@ export function useViroNode(
       scene.setGeometryMaterial(geo, material);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, materialsKey]);
+  }, [node, materialsKey, geometryKey]);
 
   // Shader overrides. Separate from `materials` above because that one needs the
   // geometry handle this hook created, and a loaded model has none: its geometry
@@ -440,6 +522,32 @@ export function useViroNode(
       },
       applyTorqueImpulse: (torque) => scene.applyPhysicsTorque(node, vec(torque)),
       setVelocity: (velocity) => scene.setPhysicsVelocity(node, vec(velocity), false),
+      getTransformAsync: async () => {
+        const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(node) : null;
+        if (!t) throw new Error("[Viro web] getTransformAsync needs a newer @reactvision/viro-web-renderer");
+        return t;
+      },
+      getBoundingBoxAsync: async () => {
+        const boundingBox = typeof scene.getNodeBoundingBox === "function" ? scene.getNodeBoundingBox(node) : null;
+        if (!boundingBox) throw new Error("[Viro web] getBoundingBoxAsync needs a newer @reactvision/viro-web-renderer");
+        return { boundingBox };
+      },
+      getMorphTargets: async () => ({ targets: scene.getMorphTargetKeys(node) }),
+      setNativeProps: (nativeProps) => {
+        const { position: p, rotation: r, scale: sc, opacity: o, visible: v, ...rest } = nativeProps;
+        if (p) scene.setNodePosition(node, p[0], p[1], p[2]);
+        if (r) scene.setNodeRotation(node, r[0] * DEG2RAD, r[1] * DEG2RAD, r[2] * DEG2RAD);
+        if (sc) scene.setNodeScale(node, sc[0], sc[1], sc[2]);
+        if (o !== undefined) scene.setNodeOpacity(node, o);
+        if (v !== undefined) scene.setNodeVisible(node, v);
+        if (Object.keys(rest).length) {
+          warnUnsupported(
+            "setNativeProps beyond position, rotation, scale, opacity and visible",
+            "the web",
+            "Pass the others as props.",
+          );
+        }
+      },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [node],

@@ -34,3 +34,9 @@
 -dontwarn com.google.protobuf.Parser
 -dontwarn com.google.protobuf.nano.NanoEnumValue
 -dontwarn logs.proto.wireless.performance.mobile.MemoryMetric$**
+
+# GVR's native library (libgvr.so) looks classes up by name: VrParamsProviderJni,
+# GvrApi$PoseTracker, ExternalSurfaceManager and others. Only the ones marked
+# @UsedByNative are kept by GVR's own rules, so R8 could remove the rest from a
+# minified VR build. Kept whole; the cost is that GVR is not shrunk.
+-keep class com.google.vr.** { *; }

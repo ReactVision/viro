@@ -1,12 +1,12 @@
 /**
- * Web implementation of ViroSound — non-spatial audio playback via an
- * `<audio>` element. Scene-level (renders no node).
- *
- * Browser autoplay policies may block playback until a user gesture; the play()
- * rejection is surfaced via onError.
+ * Web implementation of ViroSound — non-spatial audio through Web Audio (see
+ * viroAudioBuffer). Scene-level (renders no node). Playback the browser holds
+ * back until a user gesture starts at that gesture (see viroMedia).
  */
 import { useEffect, useRef } from "react";
 import { resolveImageSource } from "./Web/viroImageLoader";
+import { getAudioContext } from "./Web/viroAudio";
+import { createBufferSound, type BufferSound } from "./Web/viroAudioBuffer";
 
 export type ViroSoundProps = {
   source: unknown;
@@ -21,38 +21,44 @@ export type ViroSoundProps = {
 
 export function ViroSound(props: ViroSoundProps): null {
   const url = resolveImageSource(props.source);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const soundRef = useRef<BufferSound | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
 
   useEffect(() => {
     if (!url) return;
-    const audio = new Audio(url);
-    audio.crossOrigin = "anonymous";
-    audioRef.current = audio;
-
-    const onEnded = () => propsRef.current.onFinish?.();
-    const onErr = () => propsRef.current.onError?.(new Error(`audio failed: ${url}`));
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onErr);
-
+    const ctx = getAudioContext();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    const sound = createBufferSound(
+      url,
+      gain,
+      () => propsRef.current.onFinish?.(),
+      (err) => propsRef.current.onError?.(err),
+    );
+    gainRef.current = gain;
+    soundRef.current = sound;
     return () => {
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onErr);
-      audio.pause();
-      audio.src = "";
-      audioRef.current = null;
+      sound.dispose();
+      gain.disconnect();
+      gainRef.current = null;
+      soundRef.current = null;
     };
   }, [url]);
 
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.loop = props.loop ?? false;
-    a.muted = props.muted ?? false;
-    a.volume = props.volume ?? 1;
-    if (props.paused ?? false) a.pause();
-    else a.play().catch((err) => propsRef.current.onError?.(err));
+    if (gainRef.current) gainRef.current.gain.value = props.muted ? 0 : (props.volume ?? 1);
+  }, [props.muted, props.volume, url]);
+
+  useEffect(() => {
+    soundRef.current?.setLoop(props.loop ?? false);
+  }, [props.loop, url]);
+
+  // Any prop change starts a finished sound again unless paused, as native does.
+  useEffect(() => {
+    if (props.paused) soundRef.current?.pause();
+    else soundRef.current?.play();
   }, [props.paused, props.loop, props.muted, props.volume, url]);
 
   return null;

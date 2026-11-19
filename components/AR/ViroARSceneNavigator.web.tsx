@@ -37,6 +37,9 @@ import {
 } from "../Web/ViroWebContext";
 import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
+import { useViroContextRestore } from "../Web/useViroContextRestore";
+import { sessionCameraView, setCameraView } from "../Web/viroDrag";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { useViroUsagePing } from "../Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
@@ -250,6 +253,13 @@ export function ViroARSceneNavigator(props: Props) {
   const motionMissingRef = useRef(false);
   const [anchors, setAnchors] = useState<ArPlaneAnchor[]>([]);
 
+  const generation = useViroContextRestore(renderer, () => {
+    setRenderer(null);
+    setRootNode(0);
+    // The camera needs a new start, from a tap as before (or on its own for playback).
+    setStarted(false);
+    setStarting(false);
+  });
   useEffect(() => {
     let cancelled = false;
     let created: ViroWebRenderer | null = null;
@@ -278,7 +288,7 @@ export function ViroARSceneNavigator(props: Props) {
       created?.dispose();
       resetMaterialCache();
     };
-  }, []);
+  }, [generation]);
 
   // Keep the renderer's viewport in sync with the canvas size.
   useEffect(() => {
@@ -392,6 +402,16 @@ export function ViroARSceneNavigator(props: Props) {
     props.onMotionUnavailable,
   ]);
 
+  // What dragging casts its rays through once the session runs; the virtual
+  // camera publishes its own.
+  useEffect(() => {
+    const session = sessionRef.current;
+    const canvas = canvasRef.current;
+    if (!started || !renderer || !session || !canvas) return;
+    setCameraView(renderer.scene, sessionCameraView(session, canvas));
+    return () => setCameraView(renderer.scene, null);
+  }, [started, renderer]);
+
   // Replay starts on its own. The button exists to satisfy a browser that will
   // not open a camera without a gesture; there is no camera here, and a preview
   // that waits for a click nobody is there to make would simply never render.
@@ -417,6 +437,31 @@ export function ViroARSceneNavigator(props: Props) {
     jump: (a?: unknown, b?: unknown) => setHistory((h) => jumpToScene(h, a, b)),
     pop: () => setHistory((h) => popScenes(h, 1)),
     popN: (n: number) => setHistory((h) => popScenes(h, n)),
+    // Restarting the tracker is the only reset it has: a new world origin at the
+    // camera, and its planes gone with the old one.
+    resetARSession: (resetTracking?: boolean, removeAnchors?: boolean) => {
+      const session = sessionRef.current;
+      if (!session || !started || props.arOptions?.playback) return;
+      if (!resetTracking) {
+        if (removeAnchors) {
+          warnUnsupported(
+            "resetARSession with removeAnchors but not resetTracking",
+            "the web",
+            "The tracker keeps its planes until tracking is reset.",
+          );
+        }
+        return;
+      }
+      session.stop();
+      setAnchors([]);
+      setTracking(ViroTrackingState.Unavailable);
+      session.start().catch(() => {
+        // onError has reported it and marked the session stopped.
+        if (sessionRef.current === session) sessionRef.current = null;
+      });
+    },
+    setWorldOrigin: () =>
+      warnUnsupported("setWorldOrigin", "the web", "The web tracker cannot move its world origin."),
     viroAppProps: props.viroAppProps ?? {},
   };
   const top = history[history.length - 1];
@@ -429,12 +474,22 @@ export function ViroARSceneNavigator(props: Props) {
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>
           <ViroARContext.Provider
-            value={{ session: sessionRef.current, anchors, trackingState: tracking }}
+            value={{
+              session: sessionRef.current,
+              anchors,
+              trackingState: tracking,
+              playback: !!props.arOptions?.playback,
+            }}
           >
             <ViroParentNodeContext.Provider value={rootNode}>
+              {/* Under both names, as the Quest and visionOS hosts do: native
+                  scenes reach for `arSceneNavigator`. The methods the web
+                  cannot run stay absent rather than stubbed, because callers
+                  feature-test them (`nav?.resolveCloudAnchor`). */}
               <SceneComponent
                 key={top.key}
                 sceneNavigator={sceneNavigator}
+                arSceneNavigator={sceneNavigator}
                 {...props.viroAppProps}
                 {...top.passProps}
               />

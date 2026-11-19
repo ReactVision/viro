@@ -1,14 +1,9 @@
 /**
  * Web implementation of ViroVideo — a surface textured with a playing
- * `<video>`. Each decoded frame is drawn to a canvas, uploaded as a texture and
- * applied to the surface's material (unlit). Reuses the per-frame upload pattern
- * from the AR camera background.
+ * `<video>`, each decoded frame uploaded into the surface's (unlit) material.
  *
  * MVP scope: source, width/height, paused, loop, muted, volume, onFinish/onError.
  * `stereoMode`, `resizeMode`, `onUpdateTime`, buffering events are follow-ups.
- *
- * Perf note: this recreates a texture per frame (same tradeoff as the AR camera
- * feed). A `viroUpdateTexture` C API would let it reuse one GL texture.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,6 +15,7 @@ import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
+import { playWhenAllowed, streamVideoTexture } from "./Web/viroMedia";
 
 type Props = ViroWebNodeProps & {
   source: unknown;
@@ -33,16 +29,6 @@ type Props = ViroWebNodeProps & {
   onError?: (error: unknown) => void;
   [key: string]: any;
 };
-
-// requestVideoFrameCallback isn't in every TS DOM lib; access it via a cast.
-function requestVideoFrame(video: HTMLVideoElement, cb: () => void): number | null {
-  const fn = (video as any).requestVideoFrameCallback;
-  return typeof fn === "function" ? fn.call(video, cb) : null;
-}
-function cancelVideoFrame(video: HTMLVideoElement, id: number): void {
-  const fn = (video as any).cancelVideoFrameCallback;
-  if (typeof fn === "function") fn.call(video, id);
-}
 
 export function ViroVideo(props: Props): null {
   const scene = useViroScene();
@@ -84,46 +70,19 @@ export function ViroVideo(props: Props): null {
     video.playsInline = true;
     videoRef.current = video;
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
     const material = scene.createMaterial();
     scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
-    let currentTex = 0;
-    let rafId = 0;
-    let vfcId = 0;
-    let cancelled = false;
-
-    const uploadFrame = () => {
-      if (cancelled || !ctx) return;
+    let appliedGeometry: ViroHandle = 0;
+    const stopTexture = streamVideoTexture(scene, video, (texture, changed) => {
+      if (changed) scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
       // Read per frame rather than capturing: the surface is rebuilt when the
       // video's aspect ratio arrives, which replaces the handle.
       const geo = geometryRef.current;
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-      if (geo && w > 0 && h > 0 && video.readyState >= video.HAVE_CURRENT_DATA) {
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width = w;
-          canvas.height = h;
-        }
-        ctx.drawImage(video, 0, 0, w, h);
-        const rgba = ctx.getImageData(0, 0, w, h).data;
-        // Upload as-is (top-first), matching ViroImage's orientation.
-        const tex = scene.createTextureRGBA(new Uint8Array(rgba), w, h, true);
-        scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, tex);
+      if (geo && geo !== appliedGeometry) {
         scene.setGeometryMaterial(geo, material);
-        if (currentTex) scene.destroyTexture(currentTex);
-        currentTex = tex;
+        appliedGeometry = geo;
       }
-      scheduleNext();
-    };
-
-    const scheduleNext = () => {
-      if (cancelled) return;
-      const id = requestVideoFrame(video, uploadFrame);
-      if (id != null) vfcId = id;
-      else rafId = requestAnimationFrame(uploadFrame);
-    };
+    });
 
     const onEnded = () => propsRef.current.onFinish?.();
     const onErr = () => propsRef.current.onError?.(new Error(`video failed: ${url}`));
@@ -136,19 +95,14 @@ export function ViroVideo(props: Props): null {
     video.addEventListener("error", onErr);
     video.addEventListener("loadedmetadata", onMetadata);
 
-    scheduleNext();
-
     return () => {
-      cancelled = true;
-      if (rafId) cancelAnimationFrame(rafId);
-      if (vfcId) cancelVideoFrame(video, vfcId);
+      stopTexture();
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onErr);
       video.removeEventListener("loadedmetadata", onMetadata);
       video.pause();
       video.src = "";
       videoRef.current = null;
-      if (currentTex) scene.destroyTexture(currentTex);
       scene.destroyMaterial(material);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,13 +113,13 @@ export function ViroVideo(props: Props): null {
     const v = videoRef.current;
     if (!v) return;
     v.loop = props.loop ?? false;
-    v.muted = props.muted ?? false;
     if (props.volume != null) v.volume = props.volume;
     if (props.paused ?? false) {
+      v.muted = props.muted ?? false;
       v.pause();
-    } else {
-      v.play().catch((err) => propsRef.current.onError?.(err));
+      return;
     }
+    return playWhenAllowed(v, props.muted ?? false, (err) => propsRef.current.onError?.(err));
   }, [props.paused, props.loop, props.muted, props.volume, url]);
 
   return null;

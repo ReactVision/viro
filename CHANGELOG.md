@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## v3.2.2 — 18 November 2026
+
+### Added
+
+- **Web: the web runtime matches native in many more places (`*.web.tsx`, Studio's web host).** Needs `@reactvision/viro-web-renderer` 1.2.0, now the peer range.
+  - **Gestures:** `onPinch`, `onRotate` and `onFuse`; drag in live AR and the 3D navigators, following the node every frame in its parent's space, with `FixedToPlane` in the Studio host. A press that a second finger cancels ends its drag.
+  - **Node refs:** `getTransformAsync`, `getBoundingBoxAsync`, `getMorphTargets`, and `setNativeProps` for transform, opacity and visibility.
+  - **Text:** `ViroText` takes `fontWeight`, `fontStyle`, `extrusionDepth` and `outerStroke`.
+  - **Materials:** alpha, bloom threshold, colour write mask and chroma key; alpha under 1 turns depth writing off unless the material sets it, as on native.
+  - **AR:** an ambient light estimate from the camera feed (`onAmbientLightUpdate`), which also scales Studio's light rig; `onCameraTransformUpdate`, `getCameraOrientationAsync` and `getCameraPositionAsync`; hit tests return `ViroARHitTestResult`, with `performARHitTestWithRay`, `performARHitTestWithWorldPoints` and `performARHitTestWithPosition`; `resetARSession(true, …)` restarts tracking.
+  - **Navigation:** `Viro3DSceneNavigator` supports `push`, `pop`, `popN`, `jump` and `replace`, and AR scenes get the navigator as `arSceneNavigator` too.
+  - **Animation:** a declarative animation's `onStart` and `onFinish` fire, a relative animation starts from where the node is, and model clips honour `delay`.
+  - **Capabilities:** `webCapabilities` lists what the web host drops; cloud anchors report themselves unsupported, and `isARSupportedOnDevice` answers from what the browser offers.
+  - **Studio web host:** animations follow the native host's rules, `ALERT` functions show in a dialog over the canvas, `onSceneChange` fires once a navigation has loaded, a `NONE` scene's assets wait for tracking, and tap-to-place waits for the AR session.
+
+### Fixed
+
+- **Android: a minified GVR / VR build keeps the classes `libgvr.so` looks up by name.** GVR's own rules keep only the classes marked `@UsedByNative`, while its native library also finds `VrParamsProviderJni`, `GvrApi$PoseTracker`, `ExternalSurfaceManager` and others by name, which R8 could remove. Viro's consumer rules now keep `com.google.vr.**`. Expo SDK 58 turns R8 on for release builds by default, so a VR app upgrading to it would minify GVR without opting in. AR-only apps were not affected.
+- **Web: sounds mix with video on iOS.** They play from decoded buffers on one AudioContext; on iOS WebKit a sound beside a video with sound went quiet. Media the browser holds back plays at the first gesture, and the page asks for a playback audio session.
+- **Web: a lost WebGL context recovers.** When it comes back, the navigators create a new renderer and mount the scene again; live AR shows its Start button again.
+
+### Changed
+
+- **The `@reactvision/viro-web-renderer` peer range is `^1.2.0`.** The web components compile against its new API; on an older renderer at runtime, styled text, material effects, two-finger gestures and node reads fall back with a warning.
+
 ## v3.2.1 — 17 November 2026
 
 ### Fixed

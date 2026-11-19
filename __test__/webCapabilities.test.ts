@@ -95,6 +95,33 @@ describe("webUnsupportedFeatures", () => {
     ).toEqual(["manual plane selection"]);
   });
 
+  test("does not report dragging", () => {
+    expect(
+      webUnsupportedFeatures(sceneData({ assets: [asset({ is_draggable: true })] })),
+    ).toEqual([]);
+  });
+
+  test("reports photo and video functions, which get no navigator here", () => {
+    expect(
+      webUnsupportedFeatures(
+        sceneData({
+          functions: [
+            { function_type: "TAKE_PHOTO" },
+            { function_type: "RECORD_VIDEO" },
+            { function_type: "ALERT" },
+          ],
+        }),
+      ),
+    ).toEqual(["photo capture", "video recording"]);
+  });
+
+  test("reports occlusion in AR only", () => {
+    const scene = sceneData({ project: { id: "p1", occlusion_mode: "PEOPLEONLY" } });
+    expect(webUnsupportedFeatures(scene, "ar")).toEqual(["occlusion"]);
+    // No camera feed in 3d, so there is nothing to occlude.
+    expect(webUnsupportedFeatures(scene, "3d")).toEqual([]);
+  });
+
   test("reports a VPS-bound scene, whose plane assets are not rendered", () => {
     expect(
       webUnsupportedFeatures(

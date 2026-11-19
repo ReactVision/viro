@@ -7,6 +7,7 @@ import * as React from "react";
 import { useEffect } from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroScene, ViroParentNodeContext } from "./Web/ViroWebContext";
+import { holdCustomCamera } from "./Web/viroDrag";
 
 type Props = ViroWebNodeProps & {
   active?: boolean;
@@ -29,6 +30,7 @@ export function ViroCamera(props: Props) {
   useEffect(() => {
     if (active) scene.setActiveCameraNode(node);
   }, [scene, node, active]);
+  useEffect(() => (active ? holdCustomCamera(scene) : undefined), [scene, active]);
 
   // Order matters only in that the camera must exist first, which the effect
   // above guarantees — effects run in declaration order.

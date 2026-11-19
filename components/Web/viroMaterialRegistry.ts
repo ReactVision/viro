@@ -5,7 +5,8 @@
  * components resolve them by name to build materials through the C API.
  *
  * Supports color, lighting model, scalar properties (shininess/fresnel/
- * roughness/metalness/cull/blend/depth), and textures (diffuse + PBR maps).
+ * roughness/metalness/cull/blend/depth/alpha/bloom), colour write mask, chroma
+ * key, and textures (diffuse + PBR maps).
  * Textures load asynchronously and are applied when ready.
  */
 import type { ViroSceneApi, ViroHandle, ViroShaderEntryPoint } from "@reactvision/viro-web-renderer";
@@ -18,6 +19,7 @@ import {
   ViroTextureChannel,
 } from "@reactvision/viro-web-renderer";
 import type { ViroShaderModifier, ViroShaderModifiers } from "../Material/ViroMaterials";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { parseColorToRGBA } from "./viroColor";
 import { loadImageRGBA, resolveImageSource } from "./viroImageLoader";
 
@@ -105,6 +107,48 @@ function blendModeValue(mode?: string): ViroBlendMode | undefined {
   }
 }
 
+// VROColorMask's bits. Not ViroColorWriteMask, which renderer 1.1.1 does not export.
+const COLOR_WRITE_MASKS: Record<string, number> = { none: 0, red: 1, green: 2, blue: 4, alpha: 8, all: 15 };
+
+// Names are ORed together, case-insensitively, as VRTMaterialManager reads them.
+function colorWriteMaskValue(names: unknown): number | undefined {
+  if (!Array.isArray(names)) return undefined;
+  return names.reduce<number>((mask, name) => mask | (COLOR_WRITE_MASKS[String(name).toLowerCase()] ?? 0), 0);
+}
+
+// Alpha, bloom threshold, colour write mask and chroma key, which renderer
+// 1.1.1 and earlier cannot set.
+function applyEffects(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  const alpha = typeof def.alpha === "number" ? def.alpha : undefined;
+  const bloom = typeof def.bloomThreshold === "number" ? def.bloomThreshold : undefined;
+  const mask = colorWriteMaskValue(def.colorWriteMask);
+  const chroma = def.chromaKeyFilteringColor as string | number | null | undefined;
+  if (alpha === undefined && bloom === undefined && mask === undefined && chroma == null) return;
+  if (typeof scene.setMaterialAlpha !== "function" || scene.supportsMaterialEffects === false) {
+    // Native's defaults would draw the same, so only a value that differs is worth a warning.
+    const differs = (alpha ?? 1) < 1 || (bloom ?? -1) >= 0 || (mask ?? 15) !== 15 || chroma != null;
+    if (differs) warnUnsupported(
+      "Material alpha, bloomThreshold, colorWriteMask and chromaKeyFilteringColor",
+      "this build of the web renderer",
+      "Update @reactvision/viro-web-renderer.",
+    );
+    return;
+  }
+  if (alpha !== undefined) {
+    scene.setMaterialAlpha(material, alpha);
+    // As on native: a translucent material that still writes depth hides its own far faces.
+    if (alpha < 1 && typeof def.writesToDepthBuffer !== "boolean") {
+      scene.setMaterialWritesToDepthBuffer(material, false);
+    }
+  }
+  if (bloom !== undefined) scene.setMaterialBloomThreshold(material, bloom);
+  if (mask !== undefined) scene.setMaterialColorWriteMask(material, mask);
+  if (chroma != null) {
+    const [r, g, b] = parseColorToRGBA(chroma);
+    scene.setMaterialChromaKey(material, { r, g, b });
+  }
+}
+
 function wrapValue(mode?: string): ViroWrapMode {
   switch (mode) {
     case "Repeat": return ViroWrapMode.Repeat;
@@ -188,6 +232,100 @@ function applyTextures(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMa
   }
 }
 
+type ViroUniformType = "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D";
+
+function setMaterialUniform(
+  scene: ViroSceneApi,
+  material: ViroHandle,
+  uniformName: string,
+  uniformType: ViroUniformType,
+  value: unknown,
+): void {
+  switch (uniformType) {
+    case "float": {
+      const n = Number(value);
+      if (Number.isNaN(n)) {
+        console.warn(`[Viro web] shader uniform: "float" value for "${uniformName}" is not a number`);
+        break;
+      }
+      scene.setMaterialShaderUniformFloat(material, uniformName, n);
+      break;
+    }
+    case "vec2": {
+      const v = value as number[];
+      if (!Array.isArray(v) || v.length < 2 || v.slice(0, 2).some((n) => typeof n !== "number")) {
+        console.warn(`[Viro web] shader uniform: "vec2" value for "${uniformName}" must be a 2-element number array`);
+        break;
+      }
+      scene.setMaterialShaderUniformVec2(material, uniformName, v[0]!, v[1]!);
+      break;
+    }
+    case "vec3": {
+      const v = value as number[];
+      if (!Array.isArray(v) || v.length < 3 || v.slice(0, 3).some((n) => typeof n !== "number")) {
+        console.warn(`[Viro web] shader uniform: "vec3" value for "${uniformName}" must be a 3-element number array`);
+        break;
+      }
+      scene.setMaterialShaderUniformVec3(material, uniformName, v[0]!, v[1]!, v[2]!);
+      break;
+    }
+    case "vec4": {
+      const v = value as number[];
+      if (!Array.isArray(v) || v.length < 4 || v.slice(0, 4).some((n) => typeof n !== "number")) {
+        console.warn(`[Viro web] shader uniform: "vec4" value for "${uniformName}" must be a 4-element number array`);
+        break;
+      }
+      scene.setMaterialShaderUniformVec4(material, uniformName, v[0]!, v[1]!, v[2]!, v[3]!);
+      break;
+    }
+    case "mat4": {
+      const v = value as number[];
+      if (!Array.isArray(v) || v.length !== 16 || v.some((n) => typeof n !== "number")) {
+        console.warn(`[Viro web] shader uniform: "mat4" value for "${uniformName}" must be a 16-element number array`);
+        break;
+      }
+      scene.setMaterialShaderUniformMat4(material, uniformName, v);
+      break;
+    }
+    case "sampler2D": {
+      const url = resolveImageSource(value);
+      if (!url) {
+        console.warn(`[Viro web] shader uniform: couldn't resolve an image source for sampler2D "${uniformName}"`);
+        break;
+      }
+      loadImageRGBA(url)
+        .then((img) => {
+          const tex = scene.createTextureRGBA(img.pixels, img.width, img.height, true);
+          scene.setMaterialShaderUniformTexture(material, uniformName, tex);
+        })
+        .catch((err) => console.warn(`[Viro web] shader uniform: sampler2D "${uniformName}" failed:`, err));
+      break;
+    }
+    default:
+      console.warn(`[Viro web] shader uniform: uniformType "${uniformType}" isn't supported on any platform (no VROMaterial uniform map for it)`);
+      break;
+  }
+}
+
+// A material's own uniforms, as the native managers read them at creation:
+// `materialUniforms` or `shaderUniforms`, a [{name, type, value}] list or a
+// {name: {type, value}} map.
+function applyUniforms(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  for (const key of ["materialUniforms", "shaderUniforms"]) {
+    const uniforms = def[key];
+    const entries = Array.isArray(uniforms)
+      ? uniforms.map((u) => [u?.name, u] as const)
+      : uniforms && typeof uniforms === "object"
+        ? Object.entries(uniforms as Record<string, unknown>)
+        : [];
+    for (const [name, u] of entries) {
+      const uniform = u as { type?: ViroUniformType; value?: unknown } | null;
+      if (typeof name !== "string" || !uniform?.type || uniform.value === undefined) continue;
+      setMaterialUniform(scene, material, name, uniform.type, uniform.value);
+    }
+  }
+}
+
 /**
  * Build a native material from a registered definition and return its handle,
  * or 0 if the name isn't registered. Textures apply asynchronously.
@@ -233,9 +371,11 @@ export function createMaterialFromRegistry(
   if (cull !== undefined) scene.setMaterialCullMode(material, cull);
   const blend = blendModeValue(def.blendMode as string | undefined);
   if (blend !== undefined) scene.setMaterialBlendMode(material, blend);
+  applyEffects(scene, material, def);
 
   applyTextures(scene, material, def);
   applyShaderModifiers(scene, material, def);
+  applyUniforms(scene, material, def);
   handleCache.set(name, material);
   return material;
 }
@@ -264,7 +404,7 @@ export function getSharedMaterialHandle(scene: ViroSceneApi, name: string): Viro
 export function updateMaterialShaderUniform(
   materialName: string,
   uniformName: string,
-  uniformType: "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D",
+  uniformType: ViroUniformType,
   value: unknown,
 ): void {
   const material = handleCache.get(materialName);
@@ -278,68 +418,5 @@ export function updateMaterialShaderUniform(
     return;
   }
 
-  switch (uniformType) {
-    case "float": {
-      const n = Number(value);
-      if (Number.isNaN(n)) {
-        console.warn(`[Viro web] updateShaderUniform: "float" value for "${uniformName}" is not a number`);
-        break;
-      }
-      scene.setMaterialShaderUniformFloat(material, uniformName, n);
-      break;
-    }
-    case "vec2": {
-      const v = value as number[];
-      if (!Array.isArray(v) || v.length < 2 || v.slice(0, 2).some((n) => typeof n !== "number")) {
-        console.warn(`[Viro web] updateShaderUniform: "vec2" value for "${uniformName}" must be a 2-element number array`);
-        break;
-      }
-      scene.setMaterialShaderUniformVec2(material, uniformName, v[0]!, v[1]!);
-      break;
-    }
-    case "vec3": {
-      const v = value as number[];
-      if (!Array.isArray(v) || v.length < 3 || v.slice(0, 3).some((n) => typeof n !== "number")) {
-        console.warn(`[Viro web] updateShaderUniform: "vec3" value for "${uniformName}" must be a 3-element number array`);
-        break;
-      }
-      scene.setMaterialShaderUniformVec3(material, uniformName, v[0]!, v[1]!, v[2]!);
-      break;
-    }
-    case "vec4": {
-      const v = value as number[];
-      if (!Array.isArray(v) || v.length < 4 || v.slice(0, 4).some((n) => typeof n !== "number")) {
-        console.warn(`[Viro web] updateShaderUniform: "vec4" value for "${uniformName}" must be a 4-element number array`);
-        break;
-      }
-      scene.setMaterialShaderUniformVec4(material, uniformName, v[0]!, v[1]!, v[2]!, v[3]!);
-      break;
-    }
-    case "mat4": {
-      const v = value as number[];
-      if (!Array.isArray(v) || v.length !== 16 || v.some((n) => typeof n !== "number")) {
-        console.warn(`[Viro web] updateShaderUniform: "mat4" value for "${uniformName}" must be a 16-element number array`);
-        break;
-      }
-      scene.setMaterialShaderUniformMat4(material, uniformName, v);
-      break;
-    }
-    case "sampler2D": {
-      const url = resolveImageSource(value);
-      if (!url) {
-        console.warn(`[Viro web] updateShaderUniform: couldn't resolve an image source for sampler2D "${uniformName}"`);
-        break;
-      }
-      loadImageRGBA(url)
-        .then((img) => {
-          const tex = scene.createTextureRGBA(img.pixels, img.width, img.height, true);
-          scene.setMaterialShaderUniformTexture(material, uniformName, tex);
-        })
-        .catch((err) => console.warn(`[Viro web] updateShaderUniform: sampler2D "${uniformName}" failed:`, err));
-      break;
-    }
-    default:
-      console.warn(`[Viro web] updateShaderUniform: uniformType "${uniformType}" isn't supported on any platform (no VROMaterial uniform map for it)`);
-      break;
-  }
+  setMaterialUniform(scene, material, uniformName, uniformType, value);
 }

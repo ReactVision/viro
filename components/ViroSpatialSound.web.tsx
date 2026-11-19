@@ -5,12 +5,14 @@
  *
  * The AudioListener follows the AR session's tracked camera, so panning is
  * relative to where the user actually is. Outside an AR session there is no pose
- * to follow and it stays at the origin. Autoplay may be blocked until a user
- * gesture.
+ * to follow and it stays at the origin. Played through Web Audio (see
+ * viroAudioBuffer); playback the browser holds back until a user gesture starts
+ * at that gesture (see viroMedia).
  */
 import { useEffect, useRef } from "react";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import { getAudioContext, trackAudioListener } from "./Web/viroAudio";
+import { createBufferSound, type BufferSound } from "./Web/viroAudioBuffer";
 import { useViroAR } from "./Web/ViroWebContext";
 
 type Props = {
@@ -62,7 +64,7 @@ export function ViroSpatialSound(props: Props): null {
     return trackAudioListener(session);
   }, [session]);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const soundRef = useRef<BufferSound | null>(null);
   const pannerRef = useRef<PannerNode | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const propsRef = useRef(props);
@@ -71,11 +73,6 @@ export function ViroSpatialSound(props: Props): null {
   useEffect(() => {
     if (!url) return;
     const ctx = getAudioContext();
-    const audio = new Audio(url);
-    audio.crossOrigin = "anonymous";
-    audioRef.current = audio;
-
-    const src = ctx.createMediaElementSource(audio);
     const panner = ctx.createPanner();
     panner.panningModel = "HRTF";
     panner.distanceModel = distanceModel(propsRef.current.rolloffModel);
@@ -84,25 +81,22 @@ export function ViroSpatialSound(props: Props): null {
     if (propsRef.current.rolloffModel === "None") panner.rolloffFactor = 0;
     setPannerPosition(panner, px, py, pz);
     const gain = ctx.createGain();
-    gain.gain.value = propsRef.current.volume ?? 1;
-    src.connect(panner).connect(gain).connect(ctx.destination);
+    panner.connect(gain).connect(ctx.destination);
+    const sound = createBufferSound(
+      url,
+      panner,
+      () => propsRef.current.onFinish?.(),
+      (err) => propsRef.current.onError?.(err),
+    );
+    soundRef.current = sound;
     pannerRef.current = panner;
     gainRef.current = gain;
 
-    const onEnded = () => propsRef.current.onFinish?.();
-    const onErr = () => propsRef.current.onError?.(new Error(`audio failed: ${url}`));
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onErr);
-
     return () => {
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onErr);
-      audio.pause();
-      audio.src = "";
-      src.disconnect();
+      sound.dispose();
       panner.disconnect();
       gain.disconnect();
-      audioRef.current = null;
+      soundRef.current = null;
       pannerRef.current = null;
       gainRef.current = null;
     };
@@ -114,20 +108,18 @@ export function ViroSpatialSound(props: Props): null {
     if (pannerRef.current) setPannerPosition(pannerRef.current, px, py, pz);
   }, [px, py, pz]);
 
-  // Playback controls.
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.loop = props.loop ?? false;
-    a.muted = props.muted ?? false;
-    if (gainRef.current) gainRef.current.gain.value = props.volume ?? 1;
-    if (props.paused ?? false) {
-      a.pause();
-    } else {
-      const ctx = getAudioContext();
-      if (ctx.state === "suspended") void ctx.resume();
-      a.play().catch((err) => propsRef.current.onError?.(err));
-    }
+    if (gainRef.current) gainRef.current.gain.value = props.muted ? 0 : (props.volume ?? 1);
+  }, [props.muted, props.volume, url]);
+
+  useEffect(() => {
+    soundRef.current?.setLoop(props.loop ?? false);
+  }, [props.loop, url]);
+
+  // Any prop change starts a finished sound again unless paused, as native does.
+  useEffect(() => {
+    if (props.paused) soundRef.current?.pause();
+    else soundRef.current?.play();
   }, [props.paused, props.loop, props.muted, props.volume, url]);
 
   return null;

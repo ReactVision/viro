@@ -7,7 +7,9 @@
  *
  * It also provides a claim registry so multiple auto-matching <ViroARPlane>s
  * don't bind to the same detected plane, and exposes native's hit tests and
- * camera reads via ref.
+ * camera reads via ref: against the session's planes, or the virtual camera's
+ * when there is no session. onCameraARHitTest runs the point test from the
+ * middle of the view every frame.
  *
  * MVP scope: plane anchors only (slam has no image/object anchors).
  */
@@ -33,16 +35,18 @@ import { useViroToneMapping } from "../Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
 import { useViroSceneEvents } from "../Web/useViroNode";
 import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
-import { hitTestPlanes, planeHitResult } from "../Web/viroHitTest";
+import { cameraView, rayAt } from "../Web/viroDrag";
+import { hitTestPlanes, planeHitResult, type ViroPlaneHit } from "../Web/viroHitTest";
 import {
+  cameraOrientation,
   cameraOrientationAsync,
   useViroCameraTransform,
   type ViroWebCameraOrientation,
   type ViroWebCameraTransform,
 } from "../Web/viroCameraTransform";
 import type { Vec3 } from "../Web/viroMath";
+import type { ViroCameraARHitTest } from "../Types/ViroEvents";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
-import type { ViroARHitTestResult } from "../Types/ViroEvents";
 
 /** The declarative anchor shape passed to onAnchor* (mirrors ViroAnchor). */
 export type ViroWebAnchor = {
@@ -67,6 +71,7 @@ type Props = {
   onAnchorFound?: (anchor: ViroWebAnchor) => void;
   onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
   onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
+  onCameraARHitTest?: (event: ViroCameraARHitTest) => void;
   /** Estimated from the camera feed a few times a second; see viroLightEstimate. */
   onAmbientLightUpdate?: (light: ViroWebAmbientLight) => void;
   onCameraTransformUpdate?: (transform: ViroWebCameraTransform) => void;
@@ -79,13 +84,13 @@ type Props = {
 
 export type ViroARSceneHandle = {
   /** From a screen point in the canvas's device pixels, top-left origin. */
-  performARHitTestWithPoint: (x: number, y: number) => Promise<ViroARHitTestResult[]>;
+  performARHitTestWithPoint: (x: number, y: number) => Promise<ViroPlaneHit[]>;
   /** Along a direction from the camera. */
-  performARHitTestWithRay: (ray: Vec3) => Promise<ViroARHitTestResult[]>;
+  performARHitTestWithRay: (ray: Vec3) => Promise<ViroPlaneHit[]>;
   /** Between two world points. */
-  performARHitTestWithWorldPoints: (origin: Vec3, destination: Vec3) => Promise<ViroARHitTestResult[]>;
+  performARHitTestWithWorldPoints: (origin: Vec3, destination: Vec3) => Promise<ViroPlaneHit[]>;
   /** From the camera toward a world point. */
-  performARHitTestWithPosition: (position: Vec3) => Promise<ViroARHitTestResult[]>;
+  performARHitTestWithPosition: (position: Vec3) => Promise<ViroPlaneHit[]>;
   getCameraOrientationAsync: () => Promise<ViroWebCameraOrientation>;
   getCameraPositionAsync: () => Promise<Vec3>;
 };
@@ -198,47 +203,72 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
     },
   }).current;
 
+  const anchorsRef = useRef(anchors);
+  anchorsRef.current = anchors;
+  const planes = () => (session ? session.getPlanes().filter(detects) : anchorsRef.current);
+  const hitAt = (x: number, y: number): ViroPlaneHit[] => {
+    const { width, height } = renderer.canvasSize;
+    if (session) {
+      const byId = new Map(planes().map((p) => [p.id, p]));
+      return session.hitTest(x, y, width, height).flatMap((hit) => {
+        const plane = byId.get(hit.anchorId);
+        return plane ? [{ ...planeHitResult(plane, hit.position, hit.distance), ...hit }] : [];
+      });
+    }
+    const view = cameraView(renderer.scene);
+    if (!view || !width || !height) return [];
+    const rect = view.element.getBoundingClientRect();
+    const ray = rayAt(view, rect.left + (x * rect.width) / width, rect.top + (y * rect.height) / height);
+    return hitTestPlanes(anchorsRef.current, ray.origin, ray.dir);
+  };
+  const fromCamera = (toward: (camera: Vec3) => Vec3): ViroPlaneHit[] => {
+    const camera = cameraOrientation(renderer.scene)?.position;
+    return camera ? hitTestPlanes(planes(), camera, toward(camera)) : [];
+  };
+  const hitsRef = useRef({ hitAt, fromCamera, planes });
+  hitsRef.current = { hitAt, fromCamera, planes };
+
   useImperativeHandle(
     ref,
-    () => {
-      const planes = () => (session ? session.getPlanes().filter(detects) : []);
-      const fromCamera = (toward: (camera: Vec3) => Vec3) => {
-        if (!session) return [];
-        const camera = session.cameraPose.position as Vec3;
-        return hitTestPlanes(planes(), camera, toward(camera));
-      };
-      return {
-        performARHitTestWithPoint: async (x: number, y: number) => {
-          if (!session) return [];
-          const { width, height } = renderer.canvasSize;
-          const byId = new Map(planes().map((p) => [p.id, p]));
-          return session.hitTest(x, y, width, height).flatMap((hit) => {
-            const plane = byId.get(hit.anchorId);
-            return plane ? [planeHitResult(plane, hit.position as Vec3)] : [];
-          });
-        },
-        performARHitTestWithRay: async (ray: Vec3) => fromCamera(() => ray),
-        performARHitTestWithWorldPoints: async (origin: Vec3, destination: Vec3) => {
-          const dir: Vec3 = [destination[0] - origin[0], destination[1] - origin[1], destination[2] - origin[2]];
-          return hitTestPlanes(planes(), origin, dir, Math.hypot(...dir));
-        },
-        performARHitTestWithPosition: async (position: Vec3) =>
-          fromCamera((c) => [position[0] - c[0], position[1] - c[1], position[2] - c[2]]),
-        getCameraOrientationAsync: () => cameraOrientationAsync(renderer.scene),
-        getCameraPositionAsync: async () => (await cameraOrientationAsync(renderer.scene)).position,
-        // Null is what native resolves when the anchor cannot be made.
-        createAnchoredNode: async () => {
-          warnUnsupported(
-            "ViroARScene.createAnchoredNode",
-            "the web",
-            "The web tracker cannot anchor to a hit result; place content at the hit result's position instead.",
-          );
-          return null;
-        },
-      };
-    },
-    [session, renderer, detects],
+    () => ({
+      performARHitTestWithPoint: async (x: number, y: number) => hitsRef.current.hitAt(x, y),
+      performARHitTestWithRay: async (ray: Vec3) => hitsRef.current.fromCamera(() => ray),
+      performARHitTestWithWorldPoints: async (origin: Vec3, destination: Vec3) => {
+        const dir: Vec3 = [destination[0] - origin[0], destination[1] - origin[1], destination[2] - origin[2]];
+        return hitTestPlanes(hitsRef.current.planes(), origin, dir, Math.hypot(...dir));
+      },
+      performARHitTestWithPosition: async (position: Vec3) =>
+        hitsRef.current.fromCamera((c) => [position[0] - c[0], position[1] - c[1], position[2] - c[2]]),
+      getCameraOrientationAsync: () => cameraOrientationAsync(renderer.scene),
+      getCameraPositionAsync: async () => (await cameraOrientationAsync(renderer.scene)).position,
+      // Null is what native resolves when the anchor cannot be made.
+      createAnchoredNode: async () => {
+        warnUnsupported(
+          "ViroARScene.createAnchoredNode",
+          "the web",
+          "The web tracker cannot anchor to a hit result; place content at the hit result's position instead.",
+        );
+        return null;
+      },
+    }),
+    [renderer],
   );
+
+  const wantsCameraHits = !!props.onCameraARHitTest;
+  useEffect(() => {
+    if (!wantsCameraHits) return;
+    let frame = requestAnimationFrame(function tick() {
+      frame = requestAnimationFrame(tick);
+      const camera = cameraOrientation(renderer.scene);
+      if (!camera) return;
+      const { width, height } = renderer.canvasSize;
+      propsRef.current.onCameraARHitTest?.({
+        hitTestResults: hitsRef.current.hitAt(width / 2, height / 2),
+        cameraOrientation: camera,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [wantsCameraHits, renderer]);
 
   return (
     <ViroARContext.Provider value={filteredAR}>

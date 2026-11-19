@@ -10,7 +10,7 @@
  * and those are stopped in the capture phase so virocore never sees them as
  * touches.
  */
-import { ViroTrackingState, type ViroSceneApi } from "@reactvision/viro-web-renderer";
+import { ViroTrackingState, type ArPlaneAnchor, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { setCameraView, type CameraView } from "./viroDrag";
 
 type Vec3 = [number, number, number];
@@ -24,6 +24,8 @@ export type ViroVirtualCameraOptions = {
    * Default -1. `null` reports no plane.
    */
   floorY?: number | null;
+  /** Planes reported as detected anchors in place of the floor; `floorY` is then ignored. */
+  planes?: ArPlaneAnchor[];
   /** Receives `reset()`, which returns the camera to its starting pose. */
   onReady?: (controls: ViroVirtualCameraControls) => void;
 };
@@ -66,6 +68,13 @@ export function floorAnchorFor(floorY: number) {
     alignment: "HorizontalUpward" as const,
     confidence: 1,
   };
+}
+
+/** The anchors a virtual camera's scene sees. */
+export function virtualAnchors(options: ViroVirtualCameraOptions): ArPlaneAnchor[] {
+  if (options.planes) return options.planes;
+  const floorY = options.floorY === undefined ? -1 : options.floorY;
+  return floorY === null ? [] : [floorAnchorFor(floorY)];
 }
 
 /**

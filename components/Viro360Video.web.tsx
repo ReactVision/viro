@@ -11,6 +11,7 @@ import { useViroParentNode, useViroScene } from "./Web/ViroWebContext";
 import { setViroBackgroundRotation, setViroBackgroundSphere } from "./Web/viroBackground";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import {
+  applyStereoMode,
   forwardMediaEvents,
   playWhenAllowed,
   seekMedia,
@@ -54,7 +55,10 @@ export function Viro360Video(props: Props): null {
     const stopEvents = forwardMediaEvents(video, () => propsRef.current);
 
     const stopTexture = streamVideoTexture(scene, video, (texture, changed) => {
-      if (changed) setViroBackgroundSphere(scene, parent, texture);
+      if (changed) {
+        applyStereoMode(scene, texture, propsRef.current.stereoMode);
+        setViroBackgroundSphere(scene, parent, texture);
+      }
     });
 
     const onEnded = () => propsRef.current.onFinish?.();
@@ -74,7 +78,7 @@ export function Viro360Video(props: Props): null {
       videoRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [url, props.stereoMode]);
 
   // Live playback controls + rotation.
   useEffect(() => {
@@ -88,7 +92,7 @@ export function Viro360Video(props: Props): null {
       return;
     }
     return playWhenAllowed(v, props.muted ?? false, (err) => propsRef.current.onError?.(err));
-  }, [props.paused, props.loop, props.muted, props.volume, url]);
+  }, [props.paused, props.loop, props.muted, props.volume, url, props.stereoMode]);
 
   useEffect(() => {
     setViroBackgroundRotation(scene, parent, [rx, ry, rz]);

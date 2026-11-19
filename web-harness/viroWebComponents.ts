@@ -137,6 +137,7 @@ export { ViroSharedFrame } from "../components/AR/ViroSharedFrame";
 import { Viro3DSceneNavigator as _Viro3DSceneNavigatorRaw } from "../components/Viro3DSceneNavigator";
 import { ViroARSceneNavigator as _ViroARSceneNavigatorRaw } from "../components/AR/ViroARSceneNavigator";
 import { ViroScene as _SceneForVR } from "../components/ViroScene";
+import { ViroVRSceneNavigator as _ViroVRSceneNavigatorRaw } from "../components/ViroVRSceneNavigator";
 import { ViroSceneNavigator as _ViroSceneNavigatorRaw } from "../components/ViroSceneNavigator";
 
 export function Viro3DSceneNavigator(props: any) {
@@ -239,19 +240,11 @@ export function ViroARSceneNavigator(props: any) {
   });
 }
 
-// There's no web navigator/scene for VR yet — fall back to the 3D ones and
-// say so via a warning, rather than failing a VR-flavored generated scaffold
-// outright. Both aliases keep the same prop surface as their 3D originals.
+// The library renders VR scenes through the 3D navigator in mono; this only
+// adds the injected renderer options and the 3D navigator's defaults.
 export function ViroVRSceneNavigator(props: any) {
-  const refused = usePlaybackRefusal("ViroVRSceneNavigator");
-  useEffect(() => {
-    if (refused) return;
-    pushWarning(
-      '"ViroVRSceneNavigator" has no web implementation yet — rendered via Viro3DSceneNavigator.',
-    );
-  }, [refused]);
-  if (refused) return null;
-  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
+  if (usePlaybackRefusal("ViroVRSceneNavigator")) return null;
+  return createElement(_ViroVRSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 export function ViroVRScene(props: any) {

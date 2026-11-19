@@ -21,13 +21,14 @@ export interface ViroWebLightProps {
   castsShadow?: boolean;
   /** Masks against a node's lightReceivingBitMask; both must intersect to light. */
   influenceBitMask?: number;
-  /** Shadow tuning. No orthographicPosition: VROLight has no setter for it. */
   shadowOpacity?: number;
   shadowMapSize?: number;
   shadowBias?: number;
   shadowNearZ?: number;
   shadowFarZ?: number;
   shadowOrthographicSize?: number;
+  /** A directional light's position, which its shadow map is centred on; wins over position, as on native. */
+  shadowOrthographicPosition?: [number, number, number];
 }
 
 type LightEntry = { type: ViroLightType; parent: ViroHandle; props(): ViroWebLightProps };
@@ -77,9 +78,13 @@ export function useViroLight(type: ViroLightType, props: ViroWebLightProps): Vir
     shadowNearZ,
     shadowFarZ,
     shadowOrthographicSize,
+    shadowOrthographicPosition,
   } = props;
+  // Only a directional light has it on native; spot and omni lights ignore it.
+  const resolvedPosition =
+    type === ViroLightType.Directional ? (shadowOrthographicPosition ?? position) : position;
   const dirKey = direction ? direction.join(",") : "";
-  const posKey = position ? position.join(",") : "";
+  const posKey = resolvedPosition ? resolvedPosition.join(",") : "";
 
   useEffect(() => {
     if (color !== undefined) {
@@ -89,7 +94,9 @@ export function useViroLight(type: ViroLightType, props: ViroWebLightProps): Vir
     if (intensity !== undefined) scene.setLightIntensity(light, intensity);
     if (temperature !== undefined) scene.setLightTemperature(light, temperature);
     if (direction) scene.setLightDirection(light, direction[0], direction[1], direction[2]);
-    if (position) scene.setLightPosition(light, position[0], position[1], position[2]);
+    if (resolvedPosition) {
+      scene.setLightPosition(light, resolvedPosition[0], resolvedPosition[1], resolvedPosition[2]);
+    }
     if (attenuationStartDistance !== undefined && attenuationEndDistance !== undefined) {
       scene.setLightAttenuation(light, attenuationStartDistance, attenuationEndDistance);
     }

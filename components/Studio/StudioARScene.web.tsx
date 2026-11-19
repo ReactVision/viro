@@ -37,6 +37,7 @@ import { ViroTrackingState } from "@reactvision/viro-web-renderer";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
+import { cameraOrientation } from "../Web/viroCameraTransform";
 import { addCollisionListener } from "../Web/viroCollisions";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
@@ -640,9 +641,8 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
 
   // ─── Proximity bindings ───────────────────────────────────────────────────
   // Fires a function when the user comes within `distance` of an asset. The
-  // camera side is the tracked pose; the asset side is its authored position,
-  // which is its world position only outside a plane wrapper — hence the gate,
-  // and hence webCapabilities reporting the wrapped case as unsupported.
+  // camera side is the tracked pose, or without a session (3d, a virtual
+  // camera) the view the navigator publishes.
   const proximityBindings = useMemo(
     () =>
       (sceneData.proximity_bindings ?? []).filter(
@@ -665,7 +665,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const proximityLive = proximityBindings.length > 0;
 
   useEffect(() => {
-    if (!proximityLive || !session) return;
+    if (!proximityLive) return;
     let handle = 0;
     let last = 0;
     const step = () => {
@@ -673,8 +673,10 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       const now = Date.now();
       if (now - last < PROXIMITY_EVAL_INTERVAL_MS) return;
       last = now;
+      const cameraPosition = session ? session.cameraPose.position : cameraOrientation(sceneApi)?.position;
+      if (!cameraPosition) return;
       evaluateProximityBindings({
-        cameraPosition: session.cameraPose.position,
+        cameraPosition,
         bindings: proximityBindings,
         getTargetWorldPosition: getAssetPosition,
         stateRef: proximityStateRef,
@@ -689,6 +691,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   }, [
     proximityLive,
     session,
+    sceneApi,
     proximityBindings,
     getAssetPosition,
     animations,

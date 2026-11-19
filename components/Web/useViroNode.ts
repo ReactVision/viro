@@ -171,14 +171,27 @@ function worldToLocalIn(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3)
 // Native's kTransformDelegateDistanceFilter, in metres.
 const TRANSFORM_DISTANCE_FILTER = 0.01;
 
+/**
+ * World to `parent`'s space from its last drawn transform, which follows
+ * animations and physics; null before it is drawn or on a renderer without the read.
+ */
+function drawnParentSpace(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3) => Vec3) | null {
+  if (typeof scene.getNodeWorldTransform !== "function") return null;
+  const p = scene.getNodeWorldTransform(parent);
+  if (!p || p.scale.every((c) => c === 0)) return null;
+  const inverse = conjugateQuat(quatFromEulerDegrees(p.rotation));
+  return (world) => {
+    const local = rotateByQuaternion(inverse, sub(world, p.position));
+    return [local[0] / p.scale[0], local[1] / p.scale[1], local[2] / p.scale[2]];
+  };
+}
+
 /** The node's last drawn position in its parent's space, or null before it has been drawn. */
 function localPosition(scene: ViroSceneApi, node: ViroHandle, parent: ViroHandle): Vec3 | null {
   const t = scene.getNodeWorldTransform(node);
   if (!t || t.scale.every((c) => c === 0)) return null;
-  const p = scene.getNodeWorldTransform(parent);
-  if (!p || p.scale.every((c) => c === 0)) return t.position;
-  const local = rotateByQuaternion(conjugateQuat(quatFromEulerDegrees(p.rotation)), sub(t.position, p.position));
-  return [local[0] / p.scale[0], local[1] / p.scale[1], local[2] / p.scale[2]];
+  const toLocal = drawnParentSpace(scene, parent);
+  return toLocal ? toLocal(t.position) : t.position;
 }
 
 /** False while the node or any node above it is hidden, as native's shouldAppear. */
@@ -431,7 +444,9 @@ export function useViroNode(
       if (!pointer) return;
       const to = follow(rayAt(view, pointer.x, pointer.y));
       if (!to) return;
-      const local = toLocal(to);
+      // Each frame, since the parent may itself be moving; the authored props
+      // stand in on a renderer that cannot read its drawn transform.
+      const local = (drawnParentSpace(scene, parent) ?? toLocal)(to);
       scene.setNodePosition(node, local[0], local[1], local[2]);
       samples.push({ t: performance.now(), p: to });
       if (samples.length > 12) samples.shift();

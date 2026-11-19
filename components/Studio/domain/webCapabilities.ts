@@ -54,11 +54,6 @@ export function webUnsupportedFeatures(
     features.push("tap to place");
   }
 
-  // The host passes no navigator into the dispatch, so both functions skip.
-  const functionTypes = new Set(sceneData.functions.map((f) => f.function_type));
-  if (functionTypes.has("TAKE_PHOTO")) features.push("photo capture");
-  if (functionTypes.has("RECORD_VIDEO")) features.push("video recording");
-
   // The tracker has no depth or person segmentation. Without a camera feed (3d)
   // there is nothing to occlude.
   const occlusion = (sceneData.project?.occlusion_mode ?? "NONE").toUpperCase();

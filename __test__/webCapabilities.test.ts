@@ -100,18 +100,14 @@ describe("webUnsupportedFeatures", () => {
     ).toEqual([]);
   });
 
-  test("reports photo and video functions, which get no navigator here", () => {
+  test("does not report photo and video functions, which capture the canvas", () => {
     expect(
       webUnsupportedFeatures(
         sceneData({
-          functions: [
-            { function_type: "TAKE_PHOTO" },
-            { function_type: "RECORD_VIDEO" },
-            { function_type: "ALERT" },
-          ],
+          functions: [{ function_type: "TAKE_PHOTO" }, { function_type: "RECORD_VIDEO" }],
         }),
       ),
-    ).toEqual(["photo capture", "video recording"]);
+    ).toEqual([]);
   });
 
   test("reports occlusion in AR only", () => {

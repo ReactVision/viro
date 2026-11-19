@@ -12,6 +12,8 @@ type Point2 = [number, number];
 type Props = ViroWebNodeProps & {
   vertices: Point2[];
   holes?: Point2[][];
+  /** Draw only the shadows that fall on it (a shadow-catching floor). */
+  arShadowReceiver?: boolean;
   children?: React.ReactNode;
   [key: string]: any;
 };

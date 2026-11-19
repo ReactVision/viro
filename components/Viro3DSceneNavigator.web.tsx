@@ -22,6 +22,7 @@ import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 import { useViroContextRestore } from "./Web/useViroContextRestore";
 import { defaultCameraView, installDefaultCamera, setCameraView } from "./Web/viroDrag";
 import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
+import { useViroWebCapture } from "./Web/viroCapture";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
@@ -75,6 +76,7 @@ export function Viro3DSceneNavigator(props: Props) {
     shadows_enabled: props.shadowsEnabled,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const capture = useViroWebCapture(canvasRef);
   const containerRef = useRef<HTMLDivElement>(null);
   const virtual = props.virtualCamera ? (props.virtualCamera === true ? {} : props.virtualCamera) : null;
   const virtualRef = useRef(virtual);
@@ -160,6 +162,9 @@ export function Viro3DSceneNavigator(props: Props) {
     recenterTracking: () => {},
     project: async (point: number[]) => projectPoint(requireScene(renderer), point),
     unproject: async (point: number[]) => unprojectPoint(requireScene(renderer), point),
+    takeScreenshot: capture.takeScreenshot,
+    startVideoRecording: capture.startVideoRecording,
+    stopVideoRecording: capture.stopVideoRecording,
     viroAppProps: props.viroAppProps ?? {},
   };
   useImperativeHandle(props.ref, () => ({ sceneNavigator }));

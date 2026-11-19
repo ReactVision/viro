@@ -13,6 +13,7 @@
  * React renderer, which this package has no dev dependency for.
  */
 import {
+  applyARShadow,
   registerViroMaterials,
   createMaterialFromRegistry,
   deleteViroMaterials,
@@ -220,5 +221,16 @@ describe("a material's own uniforms on the web", () => {
   test("the map form under shaderUniforms is read too, as native reads it", () => {
     const { calls } = buildDef({ shaderUniforms: { strength: { type: "float", value: 0.4 } } });
     expect(calls.setMaterialShaderUniformFloat).toEqual([[1, "strength", 0.4]]);
+  });
+});
+
+describe("arShadowReceiver on the web", () => {
+  test("gives the material VROARShadow's lighting, depth and three modifiers", () => {
+    const { scene, calls } = fakeScene();
+    applyARShadow(scene as never, 7);
+    expect(calls.setMaterialLightingModel).toEqual([[7, 4]]);
+    expect(calls.setMaterialWritesToDepthBuffer).toEqual([[7, false]]);
+    expect(calls.addMaterialShaderModifier?.map((c) => c[1])).toEqual(["surface", "lightingModel", "fragment"]);
+    expect(calls.addMaterialShaderModifier?.[2]?.[2]).toContain("_output_color = vec4(0, 0, 0, 0);");
   });
 });

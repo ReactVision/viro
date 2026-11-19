@@ -13,6 +13,8 @@ type Props = ViroWebNodeProps & {
   height?: number;
   /** [u0, v0, u1, v1], the part of the texture the quad shows. */
   uvCoordinates?: number[];
+  /** Draw only the shadows that fall on it (a shadow-catching floor). */
+  arShadowReceiver?: boolean;
   children?: React.ReactNode;
   [key: string]: any;
 };

@@ -16,7 +16,7 @@ import {
   type ViroSceneApi,
 } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
-import { createMaterialFromRegistry, createOwnMaterial } from "./viroMaterialRegistry";
+import { applyARShadow, createMaterialFromRegistry, createOwnMaterial } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, offsetImpulse, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
@@ -87,6 +87,8 @@ export interface ViroWebNodeProps {
   /** Taps and hit tests pass through this node and its whole subtree, loaded model content included. */
   ignoreEventHandling?: boolean;
   materials?: string | string[];
+  /** ViroQuad and ViroPolygon only, as natively. */
+  arShadowReceiver?: boolean;
   // Registered material names merged onto whatever this node draws, subtree
   // included. The path a Studio `material_config` takes, and the only one that
   // reaches a loaded model — see the effect below.
@@ -595,6 +597,26 @@ export function useViroNode(
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, materialsKey, geometryKey]);
+
+  // arShadowReceiver (ViroQuad, ViroPolygon): the node's own copy, after the
+  // effect above has put the shared one back, since the modifiers would
+  // otherwise reach every node using the name.
+  const arShadowReceiver = props.arShadowReceiver === true;
+  const wasShadowReceiver = useRef(false);
+  useEffect(() => {
+    if (arShadowReceiver) {
+      const material = ownMaterial();
+      if (material) applyARShadow(scene, material);
+    } else if (wasShadowReceiver.current) {
+      dropOwnMaterial();
+      const geo = geometryRef.current;
+      const shared = geo && materialsKey ? createMaterialFromRegistry(scene, materialsKey.split(",")[0]) : 0;
+      if (shared) scene.setGeometryMaterial(geo, shared);
+      else ownMaterial();
+    }
+    wasShadowReceiver.current = arShadowReceiver;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, materialsKey, geometryKey, arShadowReceiver]);
 
   // Shader overrides. Separate from `materials` above because that one needs the
   // geometry handle this hook created, and a loaded model has none: its geometry

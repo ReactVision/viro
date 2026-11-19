@@ -351,6 +351,35 @@ export function createMaterialFromRegistry(
   return material;
 }
 
+// VROARShadow.cpp, verbatim: the surface draws black at the strength of the
+// shadow falling on it, less the ambient light, and nothing elsewhere.
+const AR_SHADOW_MODIFIERS: [ViroShaderEntryPoint, string][] = [
+  ["surface", "highp float totalShadow = 0.0;"],
+  ["lightingModel", "totalShadow += (1.0 - _lightingContribution.visibility);"],
+  [
+    "fragment",
+    [
+      "if (totalShadow != 0.0) {",
+      "    highp float ambient_brightness = dot(_ambient.rgb, vec3(0.2126, 0.7152, 0.0722));",
+      "    _output_color = vec4(0, 0, 0, max(min(1.0, totalShadow) - ambient_brightness, 0.0));",
+      "} else {",
+      "    _output_color = vec4(0, 0, 0, 0);",
+      "}",
+    ].join("\n"),
+  ],
+];
+
+/**
+ * VROARShadow::apply on a node's own material (arShadowReceiver). Native also
+ * stops the material casting shadows; the web API has no setter for that.
+ */
+export function applyARShadow(scene: ViroSceneApi, material: ViroHandle) {
+  // PBR so the ambient term includes irradiance, as native chooses.
+  scene.setMaterialLightingModel(material, ViroLightingModel.PhysicallyBased);
+  scene.setMaterialWritesToDepthBuffer(material, false);
+  for (const [entryPoint, code] of AR_SHADOW_MODIFIERS) scene.addMaterialShaderModifier(material, entryPoint, code);
+}
+
 /**
  * A material for one node alone, built like the shared one for `name` (or
  * virocore's default without a name), so animating its colour does not

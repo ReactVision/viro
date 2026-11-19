@@ -92,6 +92,8 @@ export interface StudioSceneNavigatorWebProps {
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
   onPlaneDetected?: () => void;
+  /** MANUAL plane detection: the viewer picked a plane. */
+  onPlaneSelected?: () => void;
   onUnsupported?: (features: string[]) => void;
   /**
    * Render the REC pill while a RECORD_VIDEO toggle is running. Default true,
@@ -282,6 +284,7 @@ export const StudioSceneNavigator = forwardRef<
     onSceneChange,
     onSceneLoaded,
     onPlaneDetected,
+    onPlaneSelected,
     onUnsupported,
     noAssetsMessage,
     loadingView,
@@ -464,6 +467,7 @@ export const StudioSceneNavigator = forwardRef<
     onReady: onSceneReady,
     onSceneChange,
     onPlaneDetected,
+    onPlaneSelected,
     onUnsupported,
     onAssetError,
     noAssetsMessage,

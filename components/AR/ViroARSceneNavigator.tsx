@@ -357,8 +357,7 @@ type Props = ViewProps & {
   /**
    * The current scene's tracking updates, as its `ViroARScene`'s own
    * `onTrackingUpdated` receives them, without the scene having to pass them
-   * up. Scenes not on top of the stack are not reported. iOS and Android
-   * only; the web navigator does not relay it.
+   * up. Scenes not on top of the stack are not reported.
    */
   onTrackingUpdated?: (
     state: ViroTrackingState,

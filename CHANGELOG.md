@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## v3.2.2 — 18 November 2026
 
 ### Added
 
@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **Android: a minified GVR / VR build keeps the classes `libgvr.so` looks up by name.** GVR's own rules keep only the classes marked `@UsedByNative`, while its native library also finds `VrParamsProviderJni`, `GvrApi$PoseTracker`, `ExternalSurfaceManager` and others by name, which R8 could remove. Viro's consumer rules now keep `com.google.vr.**`. Expo SDK 58 turns R8 on for release builds by default, so a VR app upgrading to it would minify GVR without opting in. AR-only apps were not affected.
 - **Web: sounds mix with video on iOS.** They play from decoded buffers on one AudioContext; on iOS WebKit a sound beside a video with sound went quiet. Media the browser holds back plays at the first gesture, and the page asks for a playback audio session.
 - **Web: a lost WebGL context recovers.** When it comes back, the navigators create a new renderer and mount the scene again; live AR shows its Start button again.
 

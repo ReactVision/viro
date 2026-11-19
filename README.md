@@ -48,6 +48,10 @@ For Expo projects, the easiest way to start is to clone the official starter kit
 
 For step-by-step setup instructions, including platform-specific permissions and build configuration, see the full installation guide in the docs: <https://viro-community.readme.io/docs/installation-instructions>
 
+### Android release builds (Expo SDK 58)
+
+Expo SDK 58 turns R8 code shrinking on for Android release builds (`android.enableMinifyInReleaseBuilds`). Viro ships the R8 rules its native libraries need, and `@reactvision/react-viro-onnx` 1.0.3 or newer ships the ones ONNX Runtime needs. Before shipping, build a minified release APK and open it on a device: R8 problems show up only there, as a crash at launch or when a feature first runs.
+
 ## MCP Server
 
 If you're building AR, VR or XR apps with ViroReact, our MCP server is the fastest way to get moving. Think of it as a living guide to ViroReact, always current, that plugs straight into the tools you already use.

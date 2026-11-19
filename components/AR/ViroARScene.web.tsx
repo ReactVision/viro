@@ -44,7 +44,7 @@ import {
   type ViroWebCameraOrientation,
   type ViroWebCameraTransform,
 } from "../Web/viroCameraTransform";
-import type { Vec3 } from "../Web/viroMath";
+import { cameraBasis, quatToEulerDegrees, type Quat, type Vec3 } from "../Web/viroMath";
 import type { ViroCameraARHitTest } from "../Types/ViroEvents";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
@@ -221,12 +221,18 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
     const ray = rayAt(view, rect.left + (x * rect.width) / width, rect.top + (y * rect.height) / height);
     return hitTestPlanes(anchorsRef.current, ray.origin, ray.dir);
   };
+  // A session's pose even under a ViroCamera, whose view the web cannot read in AR.
+  const cameraNow = (): ViroWebCameraOrientation | null => {
+    if (!session) return cameraOrientation(renderer.scene);
+    const q = session.cameraPose.quaternion as Quat;
+    return { position: [...session.cameraPose.position] as Vec3, rotation: quatToEulerDegrees(q), ...cameraBasis(q) };
+  };
   const fromCamera = (toward: (camera: Vec3) => Vec3): ViroPlaneHit[] => {
-    const camera = cameraOrientation(renderer.scene)?.position;
+    const camera = cameraNow()?.position;
     return camera ? hitTestPlanes(planes(), camera, toward(camera)) : [];
   };
-  const hitsRef = useRef({ hitAt, fromCamera, planes });
-  hitsRef.current = { hitAt, fromCamera, planes };
+  const hitsRef = useRef({ hitAt, fromCamera, planes, cameraNow });
+  hitsRef.current = { hitAt, fromCamera, planes, cameraNow };
 
   useImperativeHandle(
     ref,
@@ -259,7 +265,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
     if (!wantsCameraHits) return;
     let frame = requestAnimationFrame(function tick() {
       frame = requestAnimationFrame(tick);
-      const camera = cameraOrientation(renderer.scene);
+      const camera = hitsRef.current.cameraNow();
       if (!camera) return;
       const { width, height } = renderer.canvasSize;
       propsRef.current.onCameraARHitTest?.({

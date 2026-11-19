@@ -24,6 +24,7 @@ import {
   resolveModelSource,
   modelFormatFor,
   fetchModelBytes,
+  inlineGltfExternals,
   isGlb,
   resourceName,
 } from "./Web/viroModelLoader";
@@ -85,7 +86,13 @@ export function Viro3DObject(props: Props) {
       ]);
       if (cancelled) return false;
       // The file's own header wins over `type`, so a GLB given under another type still loads.
-      return renderer.loadModel(node, bytes, isGlb(bytes) ? ViroModelFormat.GLB : format, resources);
+      const loadAs = isGlb(bytes) ? ViroModelFormat.GLB : format;
+      if (loadAs === ViroModelFormat.GLTF) {
+        const inlined = await inlineGltfExternals(bytes, url, resources);
+        if (cancelled) return false;
+        return renderer.loadModel(node, inlined, loadAs);
+      }
+      return renderer.loadModel(node, bytes, loadAs, resources);
     })()
       .then((success) => {
         if (cancelled) return;

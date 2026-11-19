@@ -21,9 +21,16 @@ import * as ViroWeb from "./viroWebComponents";
 // called at module scope) by turning any property access into a no-op.
 function makeUnsupportedStub(name: string) {
   function Stub(props: any) {
-    useEffect(() => {
-      pushWarning(`"${name}" has no web implementation yet — rendering children only.`);
-    }, []);
+    try {
+      useEffect(() => {
+        pushWarning(`"${name}" has no web implementation yet — rendering children only.`);
+      }, []);
+    } catch {
+      // Called as a plain function (a helper or an event handler), where there
+      // is no render for the hook to run in.
+      pushWarning(`"${name}" has no web implementation yet; the call returned nothing.`);
+      return undefined;
+    }
     return props?.children ? createElement(React.Fragment, null, props.children) : null;
   }
   Stub.displayName = `Unsupported(${name})`;

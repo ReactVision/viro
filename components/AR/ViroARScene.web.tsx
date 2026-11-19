@@ -2,7 +2,7 @@
  * Web implementation of ViroARScene. Renders its children under the scene root
  * (provided by ViroARSceneNavigator.web) and bridges the AR session's plane
  * stream + tracking state to the declarative callbacks:
- *   - onTrackingUpdated       when the tracking state changes
+ *   - onTrackingUpdated       when the tracking state or its reason changes
  *   - onAnchorFound/Updated/Removed  as slam planes appear/move/disappear
  *
  * It also provides a claim registry so multiple auto-matching <ViroARPlane>s
@@ -16,19 +16,19 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
 } from "react";
-import { ViroTrackingState, type ArPlaneAnchor } from "@reactvision/viro-web-renderer";
+import { type ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import {
   useViroAR,
   useViroRenderer,
+  ViroARContext,
   ViroARPlaneClaimsContext,
   type ViroARPlaneClaims,
 } from "../Web/ViroWebContext";
-import {
-  ViroTrackingStateConstants,
-  ViroARTrackingReasonConstants,
-} from "../ViroConstants";
+import { ViroTrackingStateConstants } from "../ViroConstants";
+import { trackingReasonToConstant, trackingStateToConstant } from "../Web/viroTracking";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
 import { useViroSceneEvents } from "../Web/useViroNode";
@@ -59,6 +59,11 @@ export type ViroWebAnchor = {
 
 type Props = {
   onTrackingUpdated?: (state: number, reason: number) => void;
+  /** @deprecated on native too; fires once, the first time tracking is Limited or Normal. */
+  onTrackingInitialized?: () => void;
+  onPlatformUpdate?: (info: { platform: string; headset: string; controller: string }) => void;
+  /** "planesHorizontal" and/or "planesVertical"; default both. */
+  anchorDetectionTypes?: string[] | string;
   onAnchorFound?: (anchor: ViroWebAnchor) => void;
   onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
   onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
@@ -99,22 +104,19 @@ export function anchorToViro(p: ArPlaneAnchor): ViroWebAnchor {
   };
 }
 
-function trackingStateToConstant(state: ViroTrackingState): number {
-  switch (state) {
-    case ViroTrackingState.Normal:
-      return ViroTrackingStateConstants.TRACKING_NORMAL;
-    case ViroTrackingState.Limited:
-      return ViroTrackingStateConstants.TRACKING_LIMITED;
-    default:
-      return ViroTrackingStateConstants.TRACKING_UNAVAILABLE;
-  }
+/** Native's anchorDetectionTypes as a plane filter; unknown names detect nothing, as on iOS. */
+export function detectsPlane(types: string[] | string | undefined, plane: ArPlaneAnchor): boolean {
+  const list = typeof types === "string" ? [types] : types ?? ["planesHorizontal", "planesVertical"];
+  const wanted = plane.alignment === "Vertical" ? "planesvertical" : "planeshorizontal";
+  return list.some((t) => t.toLowerCase() === wanted);
 }
 
 export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARScene(
   props,
   ref,
 ) {
-  const { session, anchors, trackingState } = useViroAR();
+  const ar = useViroAR();
+  const { session, trackingState, trackingReason } = ar;
   const renderer = useViroRenderer();
   useViroToneMapping(props.toneMappingEnabled);
   useViroPhysicsWorld(props.physicsWorld);
@@ -126,13 +128,35 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   const propsRef = useRef(props);
   propsRef.current = props;
 
-  // Tracking state → onTrackingUpdated.
+  // Tracking state → onTrackingUpdated, and onTrackingInitialized the first
+  // time it is Limited or Normal (native's rule).
+  const state = trackingStateToConstant(trackingState);
+  const reason = trackingReasonToConstant(trackingReason);
+  const initializedRef = useRef(false);
   useEffect(() => {
-    propsRef.current.onTrackingUpdated?.(
-      trackingStateToConstant(trackingState),
-      ViroARTrackingReasonConstants.TRACKING_REASON_NONE,
-    );
-  }, [trackingState]);
+    propsRef.current.onTrackingUpdated?.(state, reason);
+    if (!initializedRef.current && state !== ViroTrackingStateConstants.TRACKING_UNAVAILABLE) {
+      initializedRef.current = true;
+      propsRef.current.onTrackingInitialized?.();
+    }
+  }, [state, reason]);
+
+  // What iOS reports for an AR view; Android's AR navigator sends nothing.
+  const wantsPlatform = !!props.onPlatformUpdate;
+  useEffect(() => {
+    if (wantsPlatform) propsRef.current.onPlatformUpdate?.({ platform: "ar", headset: "mobile", controller: "screen" });
+  }, [wantsPlatform]);
+
+  // Native's detection types decide which planes the session finds at all, so
+  // children and hit tests see the filtered set too.
+  const detectionKey = JSON.stringify(props.anchorDetectionTypes ?? null);
+  const detects = useMemo(() => {
+    const types = props.anchorDetectionTypes;
+    return (plane: ArPlaneAnchor) => detectsPlane(types, plane);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionKey]);
+  const anchors = useMemo(() => ar.anchors.filter(detects), [ar.anchors, detects]);
+  const filteredAR = useMemo(() => ({ ...ar, anchors }), [ar, anchors]);
 
   // Plane set diff → onAnchorFound / onAnchorUpdated / onAnchorRemoved.
   const knownRef = useRef<Map<string, ArPlaneAnchor>>(new Map());
@@ -177,25 +201,26 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   useImperativeHandle(
     ref,
     () => {
+      const planes = () => (session ? session.getPlanes().filter(detects) : []);
       const fromCamera = (toward: (camera: Vec3) => Vec3) => {
         if (!session) return [];
         const camera = session.cameraPose.position as Vec3;
-        return hitTestPlanes(session.getPlanes(), camera, toward(camera));
+        return hitTestPlanes(planes(), camera, toward(camera));
       };
       return {
         performARHitTestWithPoint: async (x: number, y: number) => {
           if (!session) return [];
           const { width, height } = renderer.canvasSize;
-          const planes = new Map(session.getPlanes().map((p) => [p.id, p]));
+          const byId = new Map(planes().map((p) => [p.id, p]));
           return session.hitTest(x, y, width, height).flatMap((hit) => {
-            const plane = planes.get(hit.anchorId);
+            const plane = byId.get(hit.anchorId);
             return plane ? [planeHitResult(plane, hit.position as Vec3)] : [];
           });
         },
         performARHitTestWithRay: async (ray: Vec3) => fromCamera(() => ray),
         performARHitTestWithWorldPoints: async (origin: Vec3, destination: Vec3) => {
           const dir: Vec3 = [destination[0] - origin[0], destination[1] - origin[1], destination[2] - origin[2]];
-          return session ? hitTestPlanes(session.getPlanes(), origin, dir, Math.hypot(...dir)) : [];
+          return hitTestPlanes(planes(), origin, dir, Math.hypot(...dir));
         },
         performARHitTestWithPosition: async (position: Vec3) =>
           fromCamera((c) => [position[0] - c[0], position[1] - c[1], position[2] - c[2]]),
@@ -212,12 +237,14 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
         },
       };
     },
-    [session, renderer],
+    [session, renderer, detects],
   );
 
   return (
-    <ViroARPlaneClaimsContext.Provider value={claims}>
-      {props.children}
-    </ViroARPlaneClaimsContext.Provider>
+    <ViroARContext.Provider value={filteredAR}>
+      <ViroARPlaneClaimsContext.Provider value={claims}>
+        {props.children}
+      </ViroARPlaneClaimsContext.Provider>
+    </ViroARContext.Provider>
   );
 });

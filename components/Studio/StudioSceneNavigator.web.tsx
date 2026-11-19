@@ -32,6 +32,7 @@ import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
 import { StudioColocationIndicator } from "./StudioColocationIndicator.web";
 import { StudioWebAlertOverlay } from "./StudioWebAlertOverlay";
+import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
 import { createViroWebCapture, type ViroWebCapture } from "../Web/viroCapture";
 import type { ViroCaptureResult } from "../Utilities/VRModuleOpenXR";
 import { studioColocationStore } from "./domain/colocationStore";
@@ -128,7 +129,12 @@ export interface StudioSceneNavigatorWebProps {
   onMotionUnavailable?: (reason: "denied" | "no-events") => void;
   noAssetsMessage?: string;
   loadingView?: React.ReactNode;
-  renderError?: (error: Error) => React.ReactNode;
+  /**
+   * UI for a failed scene load, a renderer abort or a caught render error, as on
+   * native. `retry` refetches after a failed load and re-mounts the scene
+   * otherwise.
+   */
+  renderError?: (error: Error, retry: () => void) => React.ReactNode;
   /**
    * Accepted for parity with native. No web frame source can align a browser
    * with a device's space, so a value reports `failed` with
@@ -323,6 +329,7 @@ export const StudioSceneNavigator = forwardRef<
 
   const [sceneData, setSceneData] = useState<StudioSceneResponse | undefined>(injectedSceneData);
   const [error, setError] = useState<Error | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   // Read at capture time, since NAVIGATION can move to another team's scene.
   const freeTierRef = useRef(false);
@@ -432,7 +439,7 @@ export const StudioSceneNavigator = forwardRef<
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneId, injectedSceneData]);
+  }, [sceneId, injectedSceneData, loadAttempt]);
 
   // NAVIGATION seam: fetch the target scene and re-render.
   const navigate = useCallback(
@@ -478,7 +485,13 @@ export const StudioSceneNavigator = forwardRef<
   );
   const getPlacementName = (assetId: string) => placementNames.get(assetId) ?? null;
 
-  if (error && renderError) return <>{renderError(error)}</>;
+  if (error && renderError) {
+    const retry = () => {
+      setError(null);
+      if (!sceneData) setLoadAttempt((n) => n + 1);
+    };
+    return <>{renderError(error, retry)}</>;
+  }
   if (!sceneData) return <>{loadingView ?? null}</>;
 
   const resolvedMode = mode ?? (isARScene(sceneData) ? "ar" : "3d");
@@ -515,53 +528,55 @@ export const StudioSceneNavigator = forwardRef<
   };
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", position: "relative" }}
-    >
-      {resolvedMode === "ar" ? (
-        <ViroARSceneNavigator
-          initialScene={STUDIO_SCENE}
-          viroAppProps={sceneProps}
-          webRendererOptions={rendererOptions}
-          slamScriptUrl={slamScriptUrl}
-          arOptions={{ detectPlanes: true, ...arOptions }}
-          onSessionReady={handleSessionReady}
-          onMotionUnavailable={onMotionUnavailable}
-          {...STUDIO_RENDERER_EFFECTS}
-        />
-      ) : (
-        <Viro3DSceneNavigator
-          initialScene={STUDIO_SCENE}
-          viroAppProps={sceneProps}
-          webRendererOptions={rendererOptions}
-          {...STUDIO_RENDERER_EFFECTS}
-        />
-      )}
-      {recordingIndicator && (
-        <div style={{ ...overlay, top: 52 }}>
-          <StudioRecordingIndicator />
-        </div>
-      )}
-      {resolvedMode === "ar" && arStarted && (
-        <StudioPlacementOverlay
-          store={placementStore}
-          apiRef={placementApiRef}
-          getName={getPlacementName}
-        />
-      )}
-      {placementIndicator && (
-        <div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
-          <StudioPlacementIndicator />
-        </div>
-      )}
-      {colocationIndicator && (
-        <div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
-          <StudioColocationIndicator />
-        </div>
-      )}
-      <StudioWebAlertOverlay />
-    </div>
+    <StudioSceneErrorBoundary sceneId={sceneData.scene.id} onError={onError} renderError={renderError}>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "100%", position: "relative" }}
+      >
+        {resolvedMode === "ar" ? (
+          <ViroARSceneNavigator
+            initialScene={STUDIO_SCENE}
+            viroAppProps={sceneProps}
+            webRendererOptions={rendererOptions}
+            slamScriptUrl={slamScriptUrl}
+            arOptions={{ detectPlanes: true, ...arOptions }}
+            onSessionReady={handleSessionReady}
+            onMotionUnavailable={onMotionUnavailable}
+            {...STUDIO_RENDERER_EFFECTS}
+          />
+        ) : (
+          <Viro3DSceneNavigator
+            initialScene={STUDIO_SCENE}
+            viroAppProps={sceneProps}
+            webRendererOptions={rendererOptions}
+            {...STUDIO_RENDERER_EFFECTS}
+          />
+        )}
+        {recordingIndicator && (
+          <div style={{ ...overlay, top: 52 }}>
+            <StudioRecordingIndicator />
+          </div>
+        )}
+        {resolvedMode === "ar" && arStarted && (
+          <StudioPlacementOverlay
+            store={placementStore}
+            apiRef={placementApiRef}
+            getName={getPlacementName}
+          />
+        )}
+        {placementIndicator && (
+          <div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
+            <StudioPlacementIndicator />
+          </div>
+        )}
+        {colocationIndicator && (
+          <div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
+            <StudioColocationIndicator />
+          </div>
+        )}
+        <StudioWebAlertOverlay />
+      </div>
+    </StudioSceneErrorBoundary>
   );
 });
 

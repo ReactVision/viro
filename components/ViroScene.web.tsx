@@ -15,6 +15,7 @@ import {
   type ViroWebCameraTransform,
 } from "./Web/viroCameraTransform";
 import { useViroScene } from "./Web/ViroWebContext";
+import { useViroSceneEvents } from "./Web/useViroNode";
 import type { Vec3 } from "./Web/viroMath";
 
 export type ViroSceneHandle = {
@@ -37,6 +38,7 @@ export const ViroScene = forwardRef<
   useViroToneMapping(props.toneMappingEnabled);
   useViroPhysicsWorld(props.physicsWorld);
   useViroCameraTransform(props.onCameraTransformUpdate);
+  useViroSceneEvents(props);
   useImperativeHandle(
     ref,
     () => ({

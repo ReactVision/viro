@@ -20,6 +20,7 @@ import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, offsetImpulse, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
+import { conjugateQuat, quatFromEulerDegrees, rotateByQuaternion } from "./viroMath";
 import {
   cameraView,
   dragFollower,
@@ -116,6 +117,8 @@ export interface ViroWebNodeProps {
   dragPlane?: DragPlane;
   /** The node's new world position while it is dragged. */
   onDrag?: (dragToPos: ViroPosition, source: number) => void;
+  /** The node's position in its parent, each time it has moved 1 cm (native's filter). */
+  onTransformUpdate?: (position: ViroPosition) => void;
   /** React 19 passes a function component's ref as a prop. */
   ref?: Ref<ViroWebNodeHandle>;
   // Events (world-space position, input source id).
@@ -163,6 +166,19 @@ function worldToLocalIn(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3)
   return parentSpace(origin, ancestors);
 }
 
+// Native's kTransformDelegateDistanceFilter, in metres.
+const TRANSFORM_DISTANCE_FILTER = 0.01;
+
+/** The node's last drawn position in its parent's space, or null before it has been drawn. */
+function localPosition(scene: ViroSceneApi, node: ViroHandle, parent: ViroHandle): Vec3 | null {
+  const t = scene.getNodeWorldTransform(node);
+  if (!t || t.scale.every((c) => c === 0)) return null;
+  const p = scene.getNodeWorldTransform(parent);
+  if (!p || p.scale.every((c) => c === 0)) return t.position;
+  const local = rotateByQuaternion(conjugateQuat(quatFromEulerDegrees(p.rotation)), sub(t.position, p.position));
+  return [local[0] / p.scale[0], local[1] / p.scale[1], local[2] / p.scale[2]];
+}
+
 /** False while the node or any node above it is hidden, as native's shouldAppear. */
 function effectivelyVisible(scene: ViroSceneApi, node: ViroHandle): boolean {
   const map = nodeEntries.get(scene);
@@ -172,14 +188,87 @@ function effectivelyVisible(scene: ViroSceneApi, node: ViroHandle): boolean {
   return true;
 }
 
+/** Scene roots with a scene's own handlers (useViroSceneEvents), where a routed event ends. */
+const sceneRootEntries = new WeakMap<ViroSceneApi, Map<ViroHandle, NodeEntry>>();
+
 function nearestNode(scene: ViroSceneApi, node: ViroHandle, wants: (p: ViroWebNodeProps) => boolean): NodeEntry | null {
   const map = nodeEntries.get(scene);
-  let entry = map?.get(node);
+  let handle = node;
+  let entry = map?.get(handle);
   while (entry) {
     if (wants(entry.props())) return entry;
-    entry = map!.get(entry.parent);
+    handle = entry.parent;
+    entry = map!.get(handle);
   }
-  return null;
+  const root = sceneRootEntries.get(scene)?.get(handle);
+  return root && wants(root.props()) ? root : null;
+}
+
+type ViroSceneEventProps = Pick<ViroWebNodeProps, "onClick" | "onClickState" | "onHover" | "onPinch" | "onRotate" | "onFuse" | "onDrag">;
+
+/**
+ * A scene's own onClick, onClickState, onHover, onPinch, onRotate and onFuse.
+ * Native gives them to the scene root, which virocore hands a hit on the
+ * background and any event no node below it takes; a click a node took only
+ * for its drag reaches them through nearestNode, as it bubbles on native.
+ */
+export function useViroSceneEvents(props: ViroSceneEventProps): void {
+  const scene = useViroScene();
+  const renderer = useViroRenderer();
+  const root = useViroParentNode();
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
+  useEffect(() => {
+    let map = sceneRootEntries.get(scene);
+    if (!map) sceneRootEntries.set(scene, (map = new Map()));
+    // No onDrag: the root does not move.
+    map.set(root, { parent: 0, props: () => ({ ...propsRef.current, onDrag: undefined }), startDrag: () => {}, endDrag: () => {} });
+    return () => {
+      map.delete(root);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root]);
+
+  const hasClick = !!(props.onClick || props.onClickState);
+  const hasHover = !!props.onHover;
+  const hasPinch = !!props.onPinch;
+  const hasRotate = !!props.onRotate;
+  const hasFuse = !!props.onFuse;
+  useEffect(() => {
+    if (!hasClick && !hasHover && !hasPinch && !hasRotate && !hasFuse) return;
+    renderer.setNodeEventHandlers(root, {
+      onClick: (clickState, source, position) => {
+        const p = propsRef.current;
+        p.onClickState?.(clickState, position, source);
+        if (clickState === ViroClickState.Clicked) p.onClick?.(position, source);
+      },
+      onHover: (isHovering, source, position) => propsRef.current.onHover?.(isHovering, position, source),
+      onPinch: (state, scale, source) => propsRef.current.onPinch?.(state, scale, source),
+      onRotate: (state, radians, source) => propsRef.current.onRotate?.(state, radians / DEG2RAD, source),
+      onFuse: (source) => {
+        const fuse = propsRef.current.onFuse;
+        if (typeof fuse === "function") fuse(source);
+        else fuse?.callback?.(source);
+      },
+    });
+    if (hasClick) scene.setNodeEventEnabled(root, ViroEventAction.Click, true);
+    if (hasHover) scene.setNodeEventEnabled(root, ViroEventAction.Hover, true);
+    if (hasPinch) scene.setNodeEventEnabled(root, 10, true);
+    if (hasRotate) scene.setNodeEventEnabled(root, 11, true);
+    if (hasFuse) scene.setNodeEventEnabled(root, 9, true);
+    return () => {
+      renderer.clearNodeEventHandlers(root);
+      scene.setNodeEventEnabled(root, ViroEventAction.Click, false);
+      scene.setNodeEventEnabled(root, ViroEventAction.Hover, false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root, hasClick, hasHover, hasPinch, hasRotate, hasFuse]);
+
+  const hasDrag = !!props.onDrag;
+  useEffect(() => {
+    if (hasDrag) warnUnsupported("onDrag on ViroScene and ViroARScene", "the web");
+  }, [hasDrag]);
 }
 
 export function useViroNode(
@@ -564,6 +653,26 @@ export function useViroNode(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, physicsKey, shown]);
+
+  // onTransformUpdate. Native's transform delegate reports however the node
+  // moved (props, animation, physics, drag), so the drawn transform is polled.
+  const wantsTransform = !!props.onTransformUpdate;
+  useEffect(() => {
+    if (!wantsTransform || typeof scene.getNodeWorldTransform !== "function") return;
+    let frame = 0;
+    let last: Vec3 | null = null;
+    const step = () => {
+      frame = requestAnimationFrame(step);
+      const position = localPosition(scene, node, parent);
+      if (!position) return;
+      if (last && Math.hypot(...sub(position, last)) < TRANSFORM_DISTANCE_FILTER) return;
+      last = position;
+      propsRef.current.onTransformUpdate?.(position);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, wantsTransform]);
 
   const vec = (v: number[] | undefined): Vec3 => [v?.[0] ?? 0, v?.[1] ?? 0, v?.[2] ?? 0];
   useImperativeHandle(

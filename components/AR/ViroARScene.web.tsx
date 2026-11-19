@@ -31,6 +31,7 @@ import {
 } from "../ViroConstants";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
+import { useViroSceneEvents } from "../Web/useViroNode";
 import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
 import { hitTestPlanes, planeHitResult } from "../Web/viroHitTest";
 import {
@@ -119,6 +120,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   useViroPhysicsWorld(props.physicsWorld);
   useViroLightEstimate(session, props.onAmbientLightUpdate);
   useViroCameraTransform(props.onCameraTransformUpdate);
+  useViroSceneEvents(props);
 
   // Read latest callbacks from a ref so effects don't re-run on identity change.
   const propsRef = useRef(props);

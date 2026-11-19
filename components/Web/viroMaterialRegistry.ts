@@ -351,6 +351,22 @@ export function createMaterialFromRegistry(
   return material;
 }
 
+/**
+ * Every name in a materials prop, as native applies it: a box with six takes
+ * one per face and a ViroGeometry one per submesh. A renderer without the
+ * array setter (1.2.0), or a name that is not registered, leaves the first
+ * one alone, as before. False when not even that applied.
+ */
+export function applyRegistryMaterials(scene: ViroSceneApi, geometry: ViroHandle, names: string[]): boolean {
+  if (names.length > 1 && typeof scene.setGeometryMaterials === "function") {
+    const handles = names.map((name) => createMaterialFromRegistry(scene, name));
+    if (handles.every(Boolean) && scene.setGeometryMaterials(geometry, handles)) return true;
+  }
+  const first = names[0] ? createMaterialFromRegistry(scene, names[0]) : 0;
+  if (first) scene.setGeometryMaterial(geometry, first);
+  return !!first;
+}
+
 // VROARShadow.cpp, verbatim: the surface draws black at the strength of the
 // shadow falling on it, less the ambient light, and nothing elsewhere.
 const AR_SHADOW_MODIFIERS: [ViroShaderEntryPoint, string][] = [

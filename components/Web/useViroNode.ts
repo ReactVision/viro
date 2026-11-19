@@ -16,7 +16,12 @@ import {
   type ViroSceneApi,
 } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
-import { applyARShadow, createMaterialFromRegistry, createOwnMaterial } from "./viroMaterialRegistry";
+import {
+  applyARShadow,
+  applyRegistryMaterials,
+  createMaterialFromRegistry,
+  createOwnMaterial,
+} from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, offsetImpulse, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
@@ -557,8 +562,8 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, hasFuse, timeToFuse]);
 
-  // Materials (first material applied to the geometry; MVP scope), again on
-  // each rebuild, since a rebuilt geometry starts from its own materials.
+  // Materials, again on each rebuild, since a rebuilt geometry starts from its
+  // own materials.
   const materialsKey = Array.isArray(props.materials)
     ? props.materials.join(",")
     : props.materials ?? "";
@@ -590,11 +595,7 @@ export function useViroNode(
     dropOwnMaterial();
     const geo = geometryRef.current;
     if (!geo || !materialsKey) return;
-    const firstName = materialsKey.split(",")[0];
-    const material = createMaterialFromRegistry(scene, firstName);
-    if (material) {
-      scene.setGeometryMaterial(geo, material);
-    }
+    applyRegistryMaterials(scene, geo, materialsKey.split(","));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, materialsKey, geometryKey]);
 
@@ -610,9 +611,8 @@ export function useViroNode(
     } else if (wasShadowReceiver.current) {
       dropOwnMaterial();
       const geo = geometryRef.current;
-      const shared = geo && materialsKey ? createMaterialFromRegistry(scene, materialsKey.split(",")[0]) : 0;
-      if (shared) scene.setGeometryMaterial(geo, shared);
-      else ownMaterial();
+      const restored = !!geo && !!materialsKey && applyRegistryMaterials(scene, geo, materialsKey.split(","));
+      if (!restored) ownMaterial();
     }
     wasShadowReceiver.current = arShadowReceiver;
     // eslint-disable-next-line react-hooks/exhaustive-deps

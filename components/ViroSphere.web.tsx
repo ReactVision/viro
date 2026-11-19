@@ -1,6 +1,6 @@
 /**
  * Web implementation of ViroSphere — a node with sphere geometry.
- * Segment counts use the renderer default; radius is read on mount.
+ * Segment counts use the renderer default; a new radius rebuilds it.
  */
 import * as React from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
@@ -17,7 +17,7 @@ type Props = ViroWebNodeProps & {
 
 export function ViroSphere(props: Props) {
   const radius = props.radius ?? 1;
-  const node = useViroNode(props, (scene) => scene.createSphere(radius));
+  const node = useViroNode(props, (scene) => scene.createSphere(radius), true, radius);
   return (
     <ViroParentNodeContext.Provider value={node}>
       {props.children}

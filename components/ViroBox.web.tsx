@@ -1,6 +1,6 @@
 /**
- * Web implementation of ViroBox — a node with box geometry. Dimensions are read
- * on mount; live dimension changes (rebuilding geometry) are a follow-up.
+ * Web implementation of ViroBox: a node with box geometry, rebuilt when a
+ * dimension changes, as native's setters do.
  */
 import * as React from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
@@ -19,7 +19,12 @@ export function ViroBox(props: Props) {
   const height = props.height ?? 1;
   const length = props.length ?? 1;
 
-  const node = useViroNode(props, (scene) => scene.createBox(width, height, length));
+  const node = useViroNode(
+    props,
+    (scene) => scene.createBox(width, height, length),
+    true,
+    `${width}x${height}x${length}`,
+  );
 
   return (
     <ViroParentNodeContext.Provider value={node}>

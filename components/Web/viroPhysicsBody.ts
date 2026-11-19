@@ -31,6 +31,8 @@ export interface ViroPhysicsBodyProp {
   useGravity?: boolean;
   /** Consumed once by the next physics step; see applyPhysicsBody. */
   instantVelocity?: number[];
+  /** Reasserted every frame, as native's `velocity`. */
+  velocity?: number[];
   [key: string]: unknown;
 }
 
@@ -43,6 +45,8 @@ function bodyType(type?: string): ViroPhysicsBodyType {
 }
 
 const vec3 = (a: number[] | undefined, i: number) => a?.[i] ?? 0;
+
+const AUTO_COMPOUND = 1 as ViroPhysicsShapeType;
 
 /**
  * The shape as the C API takes it: a type and a flat param list.
@@ -82,10 +86,11 @@ export function resolveShape(
         vec3(child.position, 2),
       );
     }
-    // No parts is the inferred compound virocore has always meant by the tag,
-    // so let it infer rather than sending an empty explicit one.
+    // No parts is virocore's AutoCompound (1, which the renderer's enum lacks):
+    // one part per child geometry, as native builds it. Infer is a single box
+    // around the node's own geometry, and a 1 m one when it has none.
     if (params.length < VIRO_COMPOUND_CHILD_STRIDE) {
-      return { type: ViroPhysicsShapeType.Infer, params: [] };
+      return { type: AUTO_COMPOUND, params: [] };
     }
     return { type: ViroPhysicsShapeType.Compound, params };
   }
@@ -127,4 +132,22 @@ export function applyPhysicsBody(
     const v = body.instantVelocity;
     scene.setPhysicsVelocity(node, [vec3(v, 0), vec3(v, 1), vec3(v, 2)], false);
   }
+  if (body.velocity) {
+    const v = body.velocity;
+    scene.setPhysicsVelocity(node, [vec3(v, 0), vec3(v, 1), vec3(v, 2)], true);
+  }
+}
+
+/**
+ * Bullet's applyImpulse(impulse, offset) as the two calls the web binding has:
+ * the impulse through the centre of mass, plus offset x impulse as a torque
+ * impulse. `offset` is from the centre of mass, in world axes.
+ */
+export function offsetImpulse(
+  impulse: [number, number, number],
+  offset: [number, number, number],
+): { central: [number, number, number]; torque: [number, number, number] } {
+  const [ix, iy, iz] = impulse;
+  const [ox, oy, oz] = offset;
+  return { central: impulse, torque: [oy * iz - oz * iy, oz * ix - ox * iz, ox * iy - oy * ix] };
 }

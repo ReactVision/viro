@@ -18,7 +18,7 @@ import {
 import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
 import { createMaterialFromRegistry } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
-import { applyPhysicsBody, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
+import { applyPhysicsBody, offsetImpulse, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
 import {
   cameraView,
@@ -60,7 +60,7 @@ type ViroPosition = [number, number, number];
 
 /** What a ref to a node component reaches, as on native (ViroBase). */
 export type ViroWebNodeHandle = {
-  /** Applied at the centre of mass: the web binding takes no offset. */
+  /** `position` is from the centre of mass, in world axes, as Bullet takes it. */
   applyImpulse(force: number[], position?: number[]): void;
   applyTorqueImpulse(torque: number[]): void;
   setVelocity(velocity: number[]): void;
@@ -163,6 +163,15 @@ function worldToLocalIn(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3)
   return parentSpace(origin, ancestors);
 }
 
+/** False while the node or any node above it is hidden, as native's shouldAppear. */
+function effectivelyVisible(scene: ViroSceneApi, node: ViroHandle): boolean {
+  const map = nodeEntries.get(scene);
+  for (let entry = map?.get(node); entry; entry = map!.get(entry.parent)) {
+    if (entry.props().visible === false) return false;
+  }
+  return true;
+}
+
 function nearestNode(scene: ViroSceneApi, node: ViroHandle, wants: (p: ViroWebNodeProps) => boolean): NodeEntry | null {
   const map = nodeEntries.get(scene);
   let entry = map?.get(node);
@@ -202,6 +211,11 @@ export function useViroNode(
   // identity changes; declared here because the mount effect already needs it.
   const propsRef = useRef(props);
   propsRef.current = props;
+  // `visible` as a ref's setNativeProps last set it, until the prop next changes.
+  const nativeVisibleRef = useRef<boolean | undefined>(undefined);
+  // Whether the node's body is in the world (see the physics block); a drag
+  // released while hidden leaves it out.
+  const shownRef = useRef<boolean | null>(null);
   // Ends a drag in progress; `release` false skips letting a held body go.
   const endDragRef = useRef<((release?: boolean) => void) | null>(null);
 
@@ -260,6 +274,7 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, opacity]);
   useEffect(() => {
+    nativeVisibleRef.current = undefined;
     scene.setNodeVisible(node, visible);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, visible]);
@@ -337,7 +352,7 @@ export function useViroNode(
       const last = samples[samples.length - 1]!;
       samples.push({ t: performance.now(), p: last.p });
       const now = propsRef.current.physicsBody;
-      if (thrown && now) {
+      if (thrown && now && shownRef.current === true) {
         applyPhysicsBody(scene, node, { ...now, instantVelocity: undefined }, bodyKeyRef.current);
         scene.setPhysicsVelocity(node, releaseVelocity(samples), false);
       }
@@ -352,7 +367,13 @@ export function useViroNode(
   useEffect(() => {
     let map = nodeEntries.get(scene);
     if (!map) nodeEntries.set(scene, (map = new Map()));
-    map.set(node, { parent, props: () => propsRef.current, startDrag, endDrag: () => endDragRef.current?.() });
+    map.set(node, {
+      parent,
+      props: () =>
+        nativeVisibleRef.current === undefined ? propsRef.current : { ...propsRef.current, visible: nativeVisibleRef.current },
+      startDrag,
+      endDrag: () => endDragRef.current?.(),
+    });
     return () => {
       map.delete(node);
     };
@@ -486,9 +507,37 @@ export function useViroNode(
   // its velocity every frame and nothing would ever fall.
   // The body's renderer tag is a unique key (see viroCollisions.ts); the
   // viroTag and onCollision are read through it when a collision arrives.
+  //
+  // A hidden body, its own `visible` or an ancestor's, is out of the world, as
+  // native stops simulating it; shown again, it starts from where its node is.
+  // An ancestor's visibility reaches no prop here, so it is polled while there
+  // is a body. The first read waits out the commit: parents register after
+  // their children, so until then a hidden parent is not known to be hidden.
   const physicsKey = props.physicsBody ? JSON.stringify(props.physicsBody) : "";
+  const [shown, setShown] = useState<boolean | null>(null);
+  shownRef.current = shown;
   useEffect(() => {
-    if (!propsRef.current.physicsBody) {
+    if (!physicsKey) return;
+    let frame = 0;
+    let stopped = false;
+    const step = () => {
+      if (stopped) return;
+      frame = requestAnimationFrame(step);
+      setShown(effectivelyVisible(scene, node));
+    };
+    queueMicrotask(step);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(frame);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, !!physicsKey]);
+  // instantVelocity is a launch, sent as native sends it: when its value
+  // changes, not again when another field changes or the node reappears.
+  const launchedRef = useRef("");
+  useEffect(() => {
+    if (!propsRef.current.physicsBody) launchedRef.current = "";
+    if (!propsRef.current.physicsBody || shown !== true) {
       scene.clearPhysicsBody(node);
       return;
     }
@@ -498,7 +547,10 @@ export function useViroNode(
       () => propsRef.current.onCollision,
     );
     bodyKeyRef.current = registration.key;
-    const body = propsRef.current.physicsBody;
+    const launch = JSON.stringify(propsRef.current.physicsBody.instantVelocity ?? null);
+    const launched = launchedRef.current === launch;
+    launchedRef.current = launch;
+    const body = launched ? { ...propsRef.current.physicsBody, instantVelocity: undefined } : propsRef.current.physicsBody;
     // A body changed mid-drag stays held until the drag lets it go.
     applyPhysicsBody(
       scene,
@@ -511,17 +563,16 @@ export function useViroNode(
       registration.unregister();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, physicsKey]);
+  }, [node, physicsKey, shown]);
 
   const vec = (v: number[] | undefined): Vec3 => [v?.[0] ?? 0, v?.[1] ?? 0, v?.[2] ?? 0];
   useImperativeHandle(
     props.ref,
     () => ({
       applyImpulse: (force, position) => {
-        if (position?.some((c) => c !== 0)) {
-          warnUnsupported("applyImpulse at an offset", "the web", "The impulse is applied at the centre of mass.");
-        }
-        scene.applyPhysicsImpulse(node, vec(force));
+        const { central, torque } = offsetImpulse(vec(force), vec(position));
+        scene.applyPhysicsImpulse(node, central);
+        if (torque.some((c) => c !== 0)) scene.applyPhysicsTorque(node, torque);
       },
       applyTorqueImpulse: (torque) => scene.applyPhysicsTorque(node, vec(torque)),
       setVelocity: (velocity) => scene.setPhysicsVelocity(node, vec(velocity), false),
@@ -542,7 +593,10 @@ export function useViroNode(
         if (r) scene.setNodeRotation(node, r[0] * DEG2RAD, r[1] * DEG2RAD, r[2] * DEG2RAD);
         if (sc) scene.setNodeScale(node, sc[0], sc[1], sc[2]);
         if (o !== undefined) scene.setNodeOpacity(node, o);
-        if (v !== undefined) scene.setNodeVisible(node, v);
+        if (v !== undefined) {
+          nativeVisibleRef.current = v;
+          scene.setNodeVisible(node, v);
+        }
         if (Object.keys(rest).length) {
           warnUnsupported(
             "setNativeProps beyond position, rotation, scale, opacity and visible",

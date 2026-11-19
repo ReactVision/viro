@@ -618,9 +618,8 @@ export function useViroNode(
   useEffect(() => {
     if (!overrideKey || !contentReady) return;
     // Each name re-merges from the materials the node drew before any override
-    // and replaces them, so with several the last one wins. That is what the
-    // native bridges do too, which is the point: the merge keeps the model's own
-    // colours and textures on both surfaces.
+    // and replaces them, so with several the last one wins, as on native. The
+    // model keeps whatever the material does not set.
     for (const name of overrideKey.split(",")) {
       const material = createMaterialFromRegistry(scene, name);
       if (material) scene.applyShaderOverride(node, material);

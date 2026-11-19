@@ -1,11 +1,13 @@
 /**
  * Web implementation of ViroSkyBox — sets the scene background to a cube map
- * from six images (`source` = { px, nx, py, ny, pz, nz }). Scene-level (renders
- * no node). Falls back to nothing if any face fails to load.
+ * from six images (`source` = { px, nx, py, ny, pz, nz }), or to a solid
+ * `color` when there is no source. Scene-level (renders no node). Falls back to
+ * nothing if any face fails to load.
  */
 import { useEffect } from "react";
 import { useViroScene } from "./Web/ViroWebContext";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
+import { parseColorToRGBA } from "./Web/viroColor";
 
 type CubeSource = {
   px: unknown;
@@ -18,6 +20,7 @@ type CubeSource = {
 
 type Props = {
   source?: Partial<CubeSource>;
+  color?: string | number;
   onLoadEnd?: () => void;
   onError?: (error: unknown) => void;
   [key: string]: any;
@@ -29,6 +32,16 @@ export function ViroSkyBox(props: Props): null {
   const scene = useViroScene();
   const src = props.source;
   const key = src ? FACE_ORDER.map((f) => resolveImageSource(src[f]) ?? "").join("|") : "";
+  const color = !src && props.color != null ? props.color : null;
+
+  // The wasm's background takes a cube texture only, so the colour is a 1x1 one.
+  useEffect(() => {
+    if (color === null) return;
+    const face = new Uint8Array(parseColorToRGBA(color).map((c) => Math.round(c * 255)));
+    const texture = scene.createTextureCubeRGBA({ px: face, nx: face, py: face, ny: face, pz: face, nz: face }, 1, 1);
+    scene.setBackgroundCube(texture);
+    return () => scene.destroyTexture(texture);
+  }, [scene, color]);
 
   useEffect(() => {
     if (!src) return;

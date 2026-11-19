@@ -39,6 +39,7 @@ import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
 import { cameraOrientation } from "../Web/viroCameraTransform";
 import { addCollisionListener } from "../Web/viroCollisions";
+import type { ViroWebCapture } from "../Web/viroCapture";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
@@ -147,6 +148,8 @@ interface Props {
   placementStore?: StudioPlacementStore;
   /** Told when an asset's model, image or video fails to load. */
   onAssetError?: StudioAssetErrorHandler;
+  /** What TAKE_PHOTO and RECORD_VIDEO capture through, in the navigator's shape. */
+  capture?: Pick<ViroWebCapture, "takeScreenshot" | "startVideoRecording" | "stopVideoRecording">;
 }
 
 type StudioLightRigHandle = { setScale: (scale: number) => void };
@@ -200,6 +203,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     placementApiRef,
     placementStore,
     onAssetError,
+    capture,
   } = props;
   const { scene, assets, animations, functions } = sceneData;
 
@@ -418,13 +422,13 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       executeOnLoadFunction(
         fnId,
         functions,
-        undefined,
+        capture,
         animations,
         (id, key) => triggerAnimationRef.current(id, key),
         handleSceneChange,
         runtimeCtx,
       ),
-    [functions, animations, handleSceneChange, runtimeCtx],
+    [functions, capture, animations, handleSceneChange, runtimeCtx],
   );
 
   const handleAnimationFinished = useCallback(
@@ -502,7 +506,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       executeOnLoadFunction(
         scene.on_load_function,
         functions,
-        undefined,
+        capture,
         animations,
         (id, key) => triggerAnimationRef.current(id, key),
         handleSceneChange,
@@ -622,7 +626,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       const handler = createPlacementCollisionHandler(
         collision.tag,
         bindingsByPairKey,
-        undefined,
+        capture,
         animations,
         collisionCooldownRef,
         (id, key) => triggerAnimationRef.current(id, key),
@@ -637,7 +641,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       collisionCooldownRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id, collisionBindings, bindingsByPairKey, animations, handleSceneChange, runtimeCtx]);
+  }, [scene.id, collisionBindings, bindingsByPairKey, capture, animations, handleSceneChange, runtimeCtx]);
 
   // ─── Proximity bindings ───────────────────────────────────────────────────
   // Fires a function when the user comes within `distance` of an asset. The
@@ -680,6 +684,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         bindings: proximityBindings,
         getTargetWorldPosition: getAssetPosition,
         stateRef: proximityStateRef,
+        sceneNavigator: capture,
         animations,
         onSceneChange: handleSceneChange,
         onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
@@ -694,6 +699,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     sceneApi,
     proximityBindings,
     getAssetPosition,
+    capture,
     animations,
     handleSceneChange,
     runtimeCtx,
@@ -728,7 +734,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         .map((asset) =>
           createNode(
             asset,
-            undefined, // sceneNavigator: web navigates via runtimeCtx.navigate
+            capture, // only captures: web navigates via runtimeCtx.navigate
             animations,
             scene,
             (id, key) => triggerAnimationRef.current(id, key),
@@ -750,6 +756,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         )
         .filter(Boolean) as React.ReactElement[],
     [
+      capture,
       animations,
       scene,
       animationStates,

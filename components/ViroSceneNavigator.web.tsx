@@ -28,6 +28,7 @@ import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 import { useViroContextRestore } from "./Web/useViroContextRestore";
 import { defaultCameraView, installDefaultCamera, setCameraView } from "./Web/viroDrag";
 import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
+import { useViroWebCapture } from "./Web/viroCapture";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 
 type SceneDescriptor = { scene: React.ComponentType<any>; passProps?: any };
@@ -86,6 +87,7 @@ function resolveArgs(
 export function ViroSceneNavigator(props: Props) {
   useViroUsagePing("scene");
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const capture = useViroWebCapture(canvasRef);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   const rendererRef = useRef(renderer);
   rendererRef.current = renderer;
@@ -203,6 +205,9 @@ export function ViroSceneNavigator(props: Props) {
     // Through a ref: this object is made once, before the renderer exists.
     project: async (point: number[]) => projectPoint(requireScene(rendererRef.current), point),
     unproject: async (point: number[]) => unprojectPoint(requireScene(rendererRef.current), point),
+    takeScreenshot: capture.takeScreenshot,
+    startVideoRecording: capture.startVideoRecording,
+    stopVideoRecording: capture.stopVideoRecording,
     viroAppProps: props.viroAppProps ?? {},
   });
   sceneNavigatorRef.current.viroAppProps = props.viroAppProps ?? {};

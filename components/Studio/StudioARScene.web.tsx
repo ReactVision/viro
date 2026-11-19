@@ -585,8 +585,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
 
   useEffect(() => {
     const enabled = physicsWorldConfig?.enabled === true;
+    // Scene Settings' "draw bounds". A renderer without it (1.2.0) draws none.
+    const canDrawBounds = typeof sceneApi.setPhysicsDebugDraw === "function";
+    if (canDrawBounds) sceneApi.setPhysicsDebugDraw(enabled && physicsWorldConfig?.drawBounds === true);
     sceneApi.setPhysicsWorld(enabled, physicsWorldConfig?.gravity ?? [0, -9.81, 0]);
     return () => {
+      if (canDrawBounds) sceneApi.setPhysicsDebugDraw(false);
       sceneApi.setPhysicsWorld(false, [0, -9.81, 0]);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

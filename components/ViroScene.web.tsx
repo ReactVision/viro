@@ -7,7 +7,7 @@ import * as React from "react";
 import { forwardRef, useImperativeHandle } from "react";
 
 import { useViroToneMapping } from "./Web/useViroToneMapping";
-import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
+import { collisionQueries, useViroPhysicsWorld, type ViroCollisionQueries, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
 import {
   cameraOrientationAsync,
   useViroCameraTransform,
@@ -18,7 +18,7 @@ import { useViroScene } from "./Web/ViroWebContext";
 import { useViroSceneEvents } from "./Web/useViroNode";
 import type { Vec3 } from "./Web/viroMath";
 
-export type ViroSceneHandle = {
+export type ViroSceneHandle = ViroCollisionQueries & {
   getCameraOrientationAsync: () => Promise<ViroWebCameraOrientation>;
   getCameraPositionAsync: () => Promise<Vec3>;
 };
@@ -44,6 +44,7 @@ export const ViroScene = forwardRef<
     () => ({
       getCameraOrientationAsync: () => cameraOrientationAsync(scene),
       getCameraPositionAsync: async () => (await cameraOrientationAsync(scene)).position,
+      ...collisionQueries(scene),
     }),
     [scene],
   );

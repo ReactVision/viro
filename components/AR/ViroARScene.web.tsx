@@ -32,7 +32,12 @@ import {
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import { trackingReasonToConstant, trackingStateToConstant } from "../Web/viroTracking";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
-import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
+import {
+  collisionQueries,
+  useViroPhysicsWorld,
+  type ViroCollisionQueries,
+  type ViroPhysicsWorldProp,
+} from "../Web/useViroPhysicsWorld";
 import { useViroSceneEvents } from "../Web/useViroNode";
 import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
 import { cameraView, rayAt } from "../Web/viroDrag";
@@ -93,7 +98,7 @@ export type ViroARSceneHandle = {
   performARHitTestWithPosition: (position: Vec3) => Promise<ViroPlaneHit[]>;
   getCameraOrientationAsync: () => Promise<ViroWebCameraOrientation>;
   getCameraPositionAsync: () => Promise<Vec3>;
-};
+} & ViroCollisionQueries;
 
 export function anchorToViro(p: ArPlaneAnchor): ViroWebAnchor {
   return {
@@ -247,6 +252,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
         hitsRef.current.fromCamera((c) => [position[0] - c[0], position[1] - c[1], position[2] - c[2]]),
       getCameraOrientationAsync: () => cameraOrientationAsync(renderer.scene),
       getCameraPositionAsync: async () => (await cameraOrientationAsync(renderer.scene)).position,
+      ...collisionQueries(renderer.scene),
       // Null is what native resolves when the anchor cannot be made.
       createAnchoredNode: async () => {
         warnUnsupported(

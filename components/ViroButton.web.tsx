@@ -17,6 +17,8 @@ type Props = {
   width?: number;
   height?: number;
   onClick?: (position: [number, number, number], source: number) => void;
+  onHover?: (isHovering: boolean, position: [number, number, number], source: number) => void;
+  onClickState?: (clickState: number, position: [number, number, number], source: number) => void;
   [key: string]: any;
 };
 
@@ -34,9 +36,14 @@ export function ViroButton(props: Props) {
     <ViroImage
       {...props}
       source={source}
-      onHover={(isHovering) => setHovering(isHovering)}
-      onClickState={(clickState) => {
+      onHover={(isHovering, position, source) => {
+        setHovering(isHovering);
+        // Native forwards the start of a hover only.
+        if (isHovering) props.onHover?.(isHovering, position, source);
+      }}
+      onClickState={(clickState, position, source) => {
         setPressed(clickState === ViroClickState.ClickDown);
+        props.onClickState?.(clickState, position, source);
       }}
       onClick={props.onClick}
     />

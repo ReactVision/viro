@@ -346,6 +346,47 @@ export function createMaterialFromRegistry(
     console.warn(`[Viro web] material "${name}" is not registered`);
     return 0;
   }
+  const material = buildMaterial(scene, def);
+  handleCache.set(name, material);
+  return material;
+}
+
+/**
+ * A material for one node alone, built like the shared one for `name` (or
+ * virocore's default without a name), so animating its colour does not
+ * recolour every node that shares the name. The caller destroys it.
+ */
+export function createOwnMaterial(scene: ViroSceneApi, name?: string): ViroHandle {
+  const def = name ? registry.get(name) : undefined;
+  return def ? buildMaterial(scene, def) : scene.createMaterial();
+}
+
+/**
+ * What native's `material` animation carries from material `name` onto a
+ * node's own: the diffuse texture if it has one, else the diffuse colour
+ * (animated when called inside a transaction), and the lighting model. The
+ * other properties native copies are copied where `name` sets them.
+ */
+export function applyMaterialAnimationTarget(scene: ViroSceneApi, material: ViroHandle, name: string): boolean {
+  const def = registry.get(name);
+  if (!def) return false;
+  if (resolveImageSource(def.diffuseTexture)) {
+    applyTextures(scene, material, { diffuseTexture: def.diffuseTexture, wrapS: def.wrapS, wrapT: def.wrapT } as ViroWebMaterialDef);
+  } else {
+    const [r, g, b, a] = parseColorToRGBA(def.diffuseColor ?? "#ffffff");
+    scene.setMaterialDiffuseColor(material, r, g, b, a);
+  }
+  scene.setMaterialLightingModel(material, lightingModelValue(def.lightingModel));
+  if (typeof def.shininess === "number") scene.setMaterialShininess(material, def.shininess);
+  if (typeof def.fresnelExponent === "number") scene.setMaterialFresnelExponent(material, def.fresnelExponent);
+  const cull = cullModeValue(def.cullMode as string | undefined);
+  if (cull !== undefined) scene.setMaterialCullMode(material, cull);
+  if (typeof def.writesToDepthBuffer === "boolean") scene.setMaterialWritesToDepthBuffer(material, def.writesToDepthBuffer);
+  if (typeof def.readsFromDepthBuffer === "boolean") scene.setMaterialReadsFromDepthBuffer(material, def.readsFromDepthBuffer);
+  return true;
+}
+
+function buildMaterial(scene: ViroSceneApi, def: ViroWebMaterialDef): ViroHandle {
   const material = scene.createMaterial();
   scene.setMaterialLightingModel(material, lightingModelValue(def.lightingModel));
 
@@ -376,7 +417,6 @@ export function createMaterialFromRegistry(
   applyTextures(scene, material, def);
   applyShaderModifiers(scene, material, def);
   applyUniforms(scene, material, def);
-  handleCache.set(name, material);
   return material;
 }
 

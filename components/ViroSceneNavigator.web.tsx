@@ -26,7 +26,7 @@ import {
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 import { useViroContextRestore } from "./Web/useViroContextRestore";
-import { defaultCameraView, setCameraView } from "./Web/viroDrag";
+import { defaultCameraView, installDefaultCamera, setCameraView } from "./Web/viroDrag";
 import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 
@@ -135,6 +135,8 @@ export function ViroSceneNavigator(props: Props) {
     setCameraView(renderer.scene, defaultCameraView(canvas));
     return () => setCameraView(renderer.scene, null);
   }, [renderer]);
+  // What a released ViroCamera returns to.
+  useEffect(() => (renderer && rootNode ? installDefaultCamera(renderer.scene, rootNode) : undefined), [renderer, rootNode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

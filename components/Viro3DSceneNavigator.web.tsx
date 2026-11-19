@@ -20,7 +20,7 @@ import {
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 import { useViroContextRestore } from "./Web/useViroContextRestore";
-import { defaultCameraView, setCameraView } from "./Web/viroDrag";
+import { defaultCameraView, installDefaultCamera, setCameraView } from "./Web/viroDrag";
 import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 import {
@@ -123,6 +123,8 @@ export function Viro3DSceneNavigator(props: Props) {
     setCameraView(renderer.scene, defaultCameraView(canvas));
     return () => setCameraView(renderer.scene, null);
   }, [renderer, virtualOn]);
+  // What a released ViroCamera returns to.
+  useEffect(() => (renderer && rootNode ? installDefaultCamera(renderer.scene, rootNode) : undefined), [renderer, rootNode]);
 
   // Keep the renderer's viewport in sync with the canvas size (fixes aspect
   // distortion on layout/window resize). ResizeObserver catches container

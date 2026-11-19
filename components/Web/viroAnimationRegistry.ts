@@ -7,11 +7,13 @@
  * (VRTAnimationManager): a registered array runs its members in parallel, any
  * array inside one or behind a name runs them in sequence.
  *
- * Scope: position/scale/rotation (per-axis) + opacity. color/material/translate
- * are follow-ups.
+ * Scope: position/scale/rotation (per-axis), opacity, color and material.
+ * translate is a follow-up.
  */
 import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
 import { ViroEasing } from "@reactvision/viro-web-renderer";
+import { parseColorToRGBA } from "./viroColor";
+import { applyMaterialAnimationTarget } from "./viroMaterialRegistry";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -26,6 +28,11 @@ export interface ViroWebAnimationDef {
 export type ViroWebAnimationEntry = ViroWebAnimationDef | string | ViroWebAnimationEntry[];
 
 const registry = new Map<string, ViroWebAnimationEntry>();
+
+/** The properties a step sets on the node's material rather than the node. */
+function animatesMaterial(p: ViroWebAnimationDef["properties"]): boolean {
+  return p.color !== undefined || typeof p.material === "string";
+}
 
 export function registerViroAnimations(
   animations: Record<string, ViroWebAnimationEntry>,
@@ -234,11 +241,32 @@ export function planViroAnimation(
  * Starts a step. The node is put at the step's start first: the renderer may
  * not have drawn the last step's end yet. `loop` is the renderer's own, which
  * replays the step from where it started.
+ *
+ * `ownMaterial` returns the node's own material for `color` and `material`,
+ * as native changes the node's geometry's materials; 0 where it draws nothing
+ * itself (a loaded model, as on native for a glTF).
  */
-export function startViroAnimationStep(scene: ViroSceneApi, node: ViroHandle, step: ViroAnimationStep, loop = false): void {
-  setAnimated(scene, node, step.def.properties, step.from);
+export function startViroAnimationStep(
+  scene: ViroSceneApi,
+  node: ViroHandle,
+  step: ViroAnimationStep,
+  loop = false,
+  ownMaterial?: () => ViroHandle,
+): void {
+  const p = step.def.properties;
+  const material = animatesMaterial(p) ? ownMaterial?.() ?? 0 : 0;
+  setAnimated(scene, node, p, step.from);
   scene.beginAnimation(node, step.def.duration / 1000, (step.def.delay ?? 0) / 1000, loop, easingValue(step.def.easing));
-  setAnimated(scene, node, step.def.properties, step.end);
+  setAnimated(scene, node, p, step.end);
+  if (material) {
+    // As native's animateMaterial then animateColor: `color` wins over the
+    // material's colour.
+    if (typeof p.material === "string") applyMaterialAnimationTarget(scene, material, p.material);
+    if (p.color !== undefined) {
+      const [r, g, b, a] = parseColorToRGBA(p.color);
+      scene.setMaterialDiffuseColor(material, r, g, b, a);
+    }
+  }
   scene.commitAnimation();
 }
 
@@ -266,10 +294,13 @@ interface ViroAnimationStepRecord {
 }
 
 const passes = new Map<ViroHandle, ViroAnimationStepRecord[]>();
+// When each paused node's pass was paused.
+const pausedAt = new Map<ViroHandle, number>();
 
 /** Records the steps of a pass that starts now. */
 export function recordViroAnimationPass(node: ViroHandle, steps: readonly ViroAnimationStep[], loop: boolean): void {
   const now = performance.now();
+  pausedAt.delete(node);
   passes.set(
     node,
     steps.map((step) => ({
@@ -331,7 +362,7 @@ function stepValue(step: ViroAnimationStepRecord, now: number): ViroBaseTransfor
 export function viroAnimationCurrent(node: ViroHandle, base: ViroBaseTransform): ViroBaseTransform {
   const steps = passes.get(node);
   if (!steps?.length) return base;
-  const now = performance.now();
+  const now = pausedAt.get(node) ?? performance.now();
   let at = steps[0]!.from;
   for (const step of steps) {
     if (now <= step.startsAt) continue;
@@ -348,7 +379,21 @@ export function viroAnimationCurrent(node: ViroHandle, base: ViroBaseTransform):
   return at;
 }
 
+/** Holds a node's latest pass where it is, for viroAnimationCurrent, until resumed. */
+export function pauseViroAnimationPass(node: ViroHandle): void {
+  if (passes.has(node) && !pausedAt.has(node)) pausedAt.set(node, performance.now());
+}
+
+export function resumeViroAnimationPass(node: ViroHandle): void {
+  const at = pausedAt.get(node);
+  if (at === undefined) return;
+  pausedAt.delete(node);
+  const shift = performance.now() - at;
+  for (const step of passes.get(node) ?? []) step.startsAt += shift;
+}
+
 /** Forget a node's passes: its authored transform changed, or it is gone. */
 export function forgetViroAnimationState(node: ViroHandle): void {
   passes.delete(node);
+  pausedAt.delete(node);
 }

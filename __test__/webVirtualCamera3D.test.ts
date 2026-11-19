@@ -5,7 +5,7 @@
  */
 import type { ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { cameraView } from "../components/Web/viroDrag";
-import { setSceneCameraActive } from "../components/Web/viroSceneCameras";
+import { activateSceneCamera } from "../components/Web/viroSceneCameras";
 import { attachVirtualCamera3D } from "../components/Web/viroVirtualCamera";
 
 function fakeScene() {
@@ -52,10 +52,10 @@ describe("attachVirtualCamera3D", () => {
   it("stands aside while the scene's own camera is active, and takes over again after", () => {
     const { scene, calls } = fakeScene();
     const detach = attachVirtualCamera3D(scene, 1, element);
-    setSceneCameraActive(scene, 7, true);
+    const release = activateSceneCamera(scene, 7);
     expect(cameraView(scene)).toBeNull();
     calls.length = 0;
-    setSceneCameraActive(scene, 7, false);
+    release();
     expect(calls).toEqual(["active 100"]);
     expect(cameraView(scene)).not.toBeNull();
     detach();
@@ -63,7 +63,7 @@ describe("attachVirtualCamera3D", () => {
 
   it("starts aside when the scene's camera is already active", () => {
     const { scene, calls } = fakeScene();
-    setSceneCameraActive(scene, 7, true);
+    activateSceneCamera(scene, 7);
     const ready = jest.fn();
     const detach = attachVirtualCamera3D(scene, 1, element, { onReady: ready });
     expect(calls).not.toContain("active 100");

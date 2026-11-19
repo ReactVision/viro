@@ -168,6 +168,9 @@ export function ViroImage(props: Props) {
     },
     true,
     `${surfaceWidth}x${surfaceHeight}|${uvKey}`,
+    undefined,
+    undefined,
+    false,
   );
 
   const url = resolveImageSource(props.source);

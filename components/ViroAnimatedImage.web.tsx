@@ -92,6 +92,9 @@ export function ViroAnimatedImage(props: Props): null {
     },
     true,
     `${width}x${height}`,
+    undefined,
+    undefined,
+    false,
   );
 
   const propsRef = useRef(props);

@@ -51,6 +51,31 @@ export function quatFromEulerDegrees(euler: readonly number[]): Quat {
   ];
 }
 
+/**
+ * The Euler angles, degrees in virocore's order, that turn a camera at `from`
+ * to look at `to` with no roll: forward (-Z) under Y·X is
+ * (-cos(pitch)·sin(yaw), sin(pitch), -cos(pitch)·cos(yaw)).
+ */
+export function lookAtEulerDegrees(from: readonly number[], to: readonly number[]): Vec3 {
+  const d = [to[0]! - from[0]!, to[1]! - from[1]!, to[2]! - from[2]!];
+  const len = Math.hypot(d[0]!, d[1]!, d[2]!) || 1;
+  const [nx, ny, nz] = [d[0]! / len, d[1]! / len, d[2]! / len];
+  const deg = 180 / Math.PI;
+  return [Math.asin(Math.max(-1, Math.min(1, ny))) * deg, Math.atan2(-nx, -nz) * deg, 0];
+}
+
+/** a·b: rotate by b, then by a. */
+export function multiplyQuats(a: Quat, b: Quat): Quat {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+
 export function conjugateQuat(q: Quat): Quat {
   return [-q[0], -q[1], -q[2], q[3]];
 }

@@ -93,8 +93,10 @@ type CameraSink = {
   /** The focal length, in CSS pixels, of a view `w` by `h`. */
   size(w: number, h: number): number;
   pose(position: Vec3, orientation: Quat, pitch: number, yaw: number): void;
-  /** False while something else is the point of view: input and the published view then stand aside. */
+  /** False while something else is the point of view: input then stands aside. */
   driving(): boolean;
+  /** An AR pose, which turns whatever camera draws (see CameraView.ar). */
+  ar?: true;
   detach(): void;
 };
 
@@ -126,6 +128,7 @@ export function attachVirtualCamera(
       scene.arSetPose(q[0], q[1], q[2], q[3], p[0], p[1], p[2], ViroTrackingState.Normal);
     },
     driving: () => true,
+    ar: true,
     detach() {},
   });
 }
@@ -146,11 +149,9 @@ export function attachVirtualCamera3D(
   scene.addChildNode(root, node);
   let yielded = sceneCameraActive(scene);
   if (!yielded) scene.setActiveCameraNode(node);
-  let onChange: (() => void) | null = null;
   const stop = onSceneCameraChange(scene, () => {
     yielded = sceneCameraActive(scene);
     if (!yielded) scene.setActiveCameraNode(node);
-    onChange?.();
   });
   const detach = attachOrbit(scene, element, options, {
     // The renderer's default: 90 degrees across the view's longer side.
@@ -166,7 +167,7 @@ export function attachVirtualCamera3D(
       scene.removeNodeFromParent(node);
       scene.destroyNode(node);
     },
-  }, (refresh) => (onChange = refresh));
+  });
   return detach;
 }
 
@@ -175,8 +176,6 @@ function attachOrbit(
   element: HTMLElement,
   options: Omit<ViroVirtualCameraOptions, "floorY" | "planes">,
   sink: CameraSink,
-  // Hands over a function that republishes the view, for a sink whose driving() changes.
-  watch?: (refresh: () => void) => void,
 ): () => void {
   const home = options.target ?? [0, 0, -1];
   let target: Vec3 = [...home];
@@ -185,11 +184,11 @@ function attachOrbit(
   let yaw = 0;
   let pitch = 0;
 
-  // Published for dragging, which has to cast its own rays: the renderer cannot report the camera.
-  const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element };
-  const publish = () => setCameraView(scene, sink.driving() ? view : null);
-  publish();
-  watch?.(publish);
+  // Published for dragging, which has to cast its own rays. Kept while a scene
+  // camera draws: cameraView then reads that camera's pose and takes only the
+  // element from this view.
+  const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element, ...(sink.ar ? { ar: true as const } : {}) };
+  setCameraView(scene, view);
   const sizeCamera = () => {
     const w = Math.max(1, Math.round(element.clientWidth));
     const h = Math.max(1, Math.round(element.clientHeight));

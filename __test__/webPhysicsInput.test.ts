@@ -8,6 +8,7 @@ import {
   cameraView,
   defaultCameraView,
   dragFollower,
+  activateSceneCamera,
   parentSpace,
   rayAt,
   releaseVelocity,
@@ -17,7 +18,6 @@ import {
   type CameraView,
   type Vec3,
 } from "../components/Web/viroDrag";
-import { setSceneCameraActive } from "../components/Web/viroSceneCameras";
 import { quatFromEulerDegrees, rotateByQuaternion } from "../components/Web/viroMath";
 import { dragSurfaceFromAnchor } from "../components/Studio/domain/dragConfiguration";
 
@@ -107,13 +107,17 @@ describe("web drag camera views", () => {
     close(rayAt(live, 60, 540).origin, [0, 1, 0]);
   });
 
-  it("publishes nothing while a camera component is the point of view", () => {
-    const scene = {} as ViroSceneApi;
+  it("publishes a camera component's pose while it is the point of view", () => {
+    const scene = {
+      setActiveCameraNode: () => {},
+      getNodeWorldTransform: () => ({ position: [1, 2, 3], rotation: [0, 90, 0], scale: [1, 1, 1] }),
+    } as unknown as ViroSceneApi;
     setCameraView(scene, view);
-    setSceneCameraActive(scene, 1, true);
-    expect(cameraView(scene)).toBeNull();
-    setSceneCameraActive(scene, 1, false);
-    setSceneCameraActive(scene, 1, false);
+    const release = activateSceneCamera(scene, 5);
+    close(cameraView(scene)!.position, [1, 2, 3]);
+    close(cameraView(scene)!.orientation, quatFromEulerDegrees([0, 90, 0]));
+    release();
+    release();
     expect(cameraView(scene)).toBe(view);
   });
 

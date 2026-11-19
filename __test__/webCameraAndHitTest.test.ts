@@ -4,10 +4,9 @@
  */
 import type { ArPlaneAnchor, ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { cameraOrientation, cameraOrientationAsync } from "../components/Web/viroCameraTransform";
-import { setCameraView, type CameraView } from "../components/Web/viroDrag";
-import { setSceneCameraActive } from "../components/Web/viroSceneCameras";
+import { activateSceneCamera, installDefaultCamera, setCameraView, setSceneCameraOrthographic, type CameraView } from "../components/Web/viroDrag";
 import { hitTestPlanes } from "../components/Web/viroHitTest";
-import { quatFromEulerDegrees, quatToEulerDegrees } from "../components/Web/viroMath";
+import { cameraBasis, lookAtEulerDegrees, quatFromEulerDegrees, quatToEulerDegrees } from "../components/Web/viroMath";
 import { projectPoint, unprojectPoint } from "../components/Web/viroProjection";
 
 const close = (a: number[], b: number[]) => a.forEach((v, i) => expect(v).toBeCloseTo(b[i]!, 5));
@@ -41,12 +40,75 @@ describe("camera reads", () => {
   it("rejects where no camera is known", async () => {
     const scene = {} as ViroSceneApi;
     await expect(cameraOrientationAsync(scene)).rejects.toThrow();
+  });
+
+  it("reads a camera component's drawn pose, and the default camera once it is released", async () => {
+    let drawn = false;
+    const scene = {
+      setActiveCameraNode: jest.fn(),
+      createNode: () => 99,
+      setNodeCamera: () => {},
+      addChildNode: () => {},
+      getNodeWorldTransform: () =>
+        drawn ? { position: [0, 4, -3], rotation: [-90, 0, 0], scale: [1, 1, 1] } : { position: [0, 0, 0], rotation: [0, 0, 0], scale: [0, 0, 0] },
+    } as unknown as ViroSceneApi;
+    setCameraView(scene, { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element: { clientWidth: 2, clientHeight: 2 } as HTMLElement });
+    installDefaultCamera(scene, 1);
+    const release = activateSceneCamera(scene, 7);
+    expect(scene.setActiveCameraNode).toHaveBeenLastCalledWith(7);
+    // Not drawn yet: unknown rather than the origin.
+    await expect(cameraOrientationAsync(scene)).rejects.toThrow();
+    drawn = true;
+    const now = await cameraOrientationAsync(scene);
+    close(now.position, [0, 4, -3]);
+    close(now.forward, [0, -1, 0]);
+    release();
+    expect(scene.setActiveCameraNode).toHaveBeenLastCalledWith(99);
+    await expect(cameraOrientationAsync(scene)).resolves.toMatchObject({ position: [0, 0, 0] });
+  });
+
+  it("goes to the default camera, not an earlier one, when the drawing camera is released", () => {
+    const scene = { setActiveCameraNode: jest.fn(), createNode: () => 99, setNodeCamera: () => {}, addChildNode: () => {} } as unknown as ViroSceneApi;
+    installDefaultCamera(scene, 1);
+    const releaseA = activateSceneCamera(scene, 7);
+    const releaseB = activateSceneCamera(scene, 8);
+    releaseA();
+    expect(scene.setActiveCameraNode).toHaveBeenLastCalledWith(8);
+    releaseB();
+    expect(scene.setActiveCameraNode).toHaveBeenLastCalledWith(99);
+  });
+
+  it("does not report an orthographic camera component", async () => {
+    const scene = {
+      setActiveCameraNode: () => {},
+      getNodeWorldTransform: () => ({ position: [0, 1, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }),
+    } as unknown as ViroSceneApi;
     setCameraView(scene, { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element: {} as HTMLElement });
-    setSceneCameraActive(scene, 1, true);
+    activateSceneCamera(scene, 7);
+    setSceneCameraOrthographic(scene, 7, true);
     jest.spyOn(console, "warn").mockImplementation(() => {});
     await expect(cameraOrientationAsync(scene)).rejects.toThrow();
-    setSceneCameraActive(scene, 1, false);
+  });
+
+  it("keeps refusing a camera component's read in AR, where the session turns the camera", async () => {
+    const scene = {
+      setActiveCameraNode: () => {},
+      getNodeWorldTransform: () => ({ position: [0, 1, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }),
+    } as unknown as ViroSceneApi;
+    setCameraView(scene, { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element: {} as HTMLElement, ar: true });
+    const release = activateSceneCamera(scene, 7);
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(cameraOrientationAsync(scene)).rejects.toThrow();
+    release();
     await expect(cameraOrientationAsync(scene)).resolves.toMatchObject({ position: [0, 0, 0] });
+  });
+
+  it("aims an orbit camera at its focal point", () => {
+    for (const [from, to] of [[[3, 4, 5], [0, 0, 0]], [[2, 1, 0], [0.8, -0.4, -3]], [[3, 0, 0], [0, 0, 0]], [[0, 0, 3], [0, 0, 0]]]) {
+      const d = to!.map((v, i) => v - from![i]!);
+      const n = Math.hypot(...d);
+      close(cameraBasis(quatFromEulerDegrees(lookAtEulerDegrees(from!, to!))).forward, d.map((v) => v / n));
+    }
   });
 });
 

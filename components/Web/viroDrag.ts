@@ -7,7 +7,10 @@
  * default camera), and a drag turns pointer positions into world rays itself.
  */
 import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
-import { sceneCameraActive } from "./viroSceneCameras";
+import { quatFromEulerDegrees } from "./viroMath";
+import { activeSceneCamera, sceneCameraOrthographic } from "./viroSceneCameras";
+
+export { activateSceneCamera, installDefaultCamera, setSceneCameraOrthographic } from "./viroSceneCameras";
 
 export type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
@@ -21,6 +24,8 @@ export type CameraView = {
   cx: number;
   cy: number;
   element: HTMLElement;
+  /** An AR pose (a session, or the desktop stand-in): it turns whatever camera draws, so a camera node's own pose is not the view. */
+  ar?: true;
 };
 
 const views = new WeakMap<ViroSceneApi, CameraView>();
@@ -30,10 +35,35 @@ export function setCameraView(scene: ViroSceneApi, view: CameraView | null): voi
   else views.delete(scene);
 }
 
-/** Null while a ViroCamera or ViroOrbitCamera is the point of view: its pose is not published. */
+/**
+ * The camera the scene draws from. Under a ViroCamera or ViroOrbitCamera that
+ * is the camera node's last drawn pose, with the default camera's field of
+ * view, which is the one virocore gives it; null while that pose is not known
+ * yet, on a renderer without the read, and under an orthographic projection.
+ */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
-  if (sceneCameraActive(scene)) return null;
-  return views.get(scene) ?? null;
+  const base = views.get(scene) ?? null;
+  const active = activeSceneCamera(scene);
+  if (!active) return base;
+  if (!base || base.ar || sceneCameraOrthographic(scene, active)) return null;
+  const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(active) : null;
+  // All zero until the node has been drawn once.
+  if (!t || t.scale.every((c) => c === 0)) return null;
+  const view = defaultCameraView(base.element);
+  view.position = t.position;
+  view.orientation = quatFromEulerDegrees(t.rotation);
+  return view;
+}
+
+/** True while a camera component draws whose pose the web cannot report: orthographic, in AR, or on a renderer without the read. */
+export function sceneCameraUnreadable(scene: ViroSceneApi): boolean {
+  const active = activeSceneCamera(scene);
+  if (!active) return false;
+  return (
+    sceneCameraOrthographic(scene, active) ||
+    !!views.get(scene)?.ar ||
+    typeof scene.getNodeWorldTransform !== "function"
+  );
 }
 
 /** virocore's default camera: at the origin, looking down -Z, 90 degrees across the longer axis (kFovMonoMajor). */
@@ -77,6 +107,7 @@ export function sessionCameraView(session: ViroArSession, element: HTMLElement):
   };
   return {
     element,
+    ar: true,
     get position() {
       return session.cameraPose.position as Vec3;
     },

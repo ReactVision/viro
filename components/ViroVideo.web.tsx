@@ -3,8 +3,8 @@
  * `<video>`, each decoded frame uploaded into the surface's (unlit) material.
  *
  * MVP scope: source, width/height, paused, loop, muted, volume, onFinish/onError,
- * onBufferStart/End, onUpdateTime and the ref's seekToTime. `stereoMode` and
- * `resizeMode` are follow-ups.
+ * onBufferStart/End, onUpdateTime, stereoMode and the ref's seekToTime.
+ * `resizeMode` is a follow-up.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +17,7 @@ import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import {
+  applyStereoMode,
   forwardMediaEvents,
   playWhenAllowed,
   seekMedia,
@@ -85,7 +86,10 @@ export function ViroVideo(props: Props): null {
     scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
     let appliedGeometry: ViroHandle = 0;
     const stopTexture = streamVideoTexture(scene, video, (texture, changed) => {
-      if (changed) scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
+      if (changed) {
+        applyStereoMode(scene, texture, propsRef.current.stereoMode);
+        scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
+      }
       // Read per frame rather than capturing: the surface is rebuilt when the
       // video's aspect ratio arrives, which replaces the handle.
       const geo = geometryRef.current;
@@ -118,7 +122,7 @@ export function ViroVideo(props: Props): null {
       scene.destroyMaterial(material);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [url, props.stereoMode]);
 
   // Live playback controls applied to the current <video>.
   useEffect(() => {
@@ -132,7 +136,7 @@ export function ViroVideo(props: Props): null {
       return;
     }
     return playWhenAllowed(v, props.muted ?? false, (err) => propsRef.current.onError?.(err));
-  }, [props.paused, props.loop, props.muted, props.volume, url]);
+  }, [props.paused, props.loop, props.muted, props.volume, url, props.stereoMode]);
 
   return null;
 }

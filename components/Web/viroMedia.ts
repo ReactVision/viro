@@ -6,7 +6,7 @@
  * for that gesture instead of failing; a video meanwhile plays muted, which every
  * browser allows, so its picture runs, and gets its sound on the gesture.
  */
-import type { ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
+import type { ViroHandle, ViroSceneApi, ViroStereoMode } from "@reactvision/viro-web-renderer";
 
 type Wanted = { muted: boolean; onError?: (error: unknown) => void };
 
@@ -220,4 +220,23 @@ export function streamVideoTexture(
     if (current) scene.destroyTexture(current);
     if (source && source !== current) scene.destroyTexture(source);
   };
+}
+
+let warnedStereo = false;
+
+/**
+ * Native's stereoMode: an image or video holding both eyes' pictures shows the
+ * left eye's half, as on a phone. Call it before the texture goes on a material.
+ */
+export function applyStereoMode(scene: ViroSceneApi, texture: ViroHandle, mode: string | undefined): void {
+  if (!mode || mode.toLowerCase() === "none") return;
+  // An unknown mode shows the whole image, as on native, with no warning.
+  if (typeof scene.setTextureStereoMode === "function") {
+    scene.setTextureStereoMode(texture, mode as ViroStereoMode);
+    return;
+  }
+  if (!warnedStereo) {
+    warnedStereo = true;
+    console.warn(`[Viro web] stereoMode "${mode}" is not supported by this renderer; showing the whole image.`);
+  }
 }

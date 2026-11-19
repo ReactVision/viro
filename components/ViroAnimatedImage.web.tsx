@@ -13,14 +13,13 @@
  *
  * As on native, `loop` (default true) decides whether the animation repeats,
  * whatever the file's own loop count, a delay of 0 plays as 100 ms, and paused
- * holds the current frame. Scope: source, width/height (rebuilt on change),
- * transform props, paused, loop, onLoadStart/onLoadEnd/onError.
- * `placeholderSource`, `resizeMode`, `stereoMode` are follow-ups, matching
- * ViroImage.
+ * holds the current frame. The surface is sized, cropped and given a
+ * placeholder by ViroImage's rules, as native's VRTAnimatedImage extends
+ * VRTImage. Native draws no stereoMode here, so neither does this.
  *
  * Copyright © 2026 ReactVision. All rights reserved.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ViroLightingModel,
   ViroTextureChannel,
@@ -28,8 +27,10 @@ import {
   type ViroHandle,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
+import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
+import { resolveSurface, useImagePlaceholder } from "./ViroImage.web";
 
 // ImageDecoder is missing from this TypeScript's DOM lib.
 type DecodedFrame = {
@@ -68,6 +69,10 @@ type Props = ViroWebNodeProps & {
   source: unknown;
   width?: number;
   height?: number;
+  resizeMode?: "ScaleToFill" | "ScaleToFit" | "StretchToFill";
+  imageClipMode?: "None" | "ClipToBounds";
+  placeholderSource?: unknown;
+  style?: { width?: number; height?: number } & Record<string, unknown>;
   paused?: boolean;
   loop?: boolean;
   onLoadStart?: () => void;
@@ -78,24 +83,38 @@ type Props = ViroWebNodeProps & {
 
 export function ViroAnimatedImage(props: Props): null {
   const scene = useViroScene();
-  const width = props.width ?? 1;
-  const height = props.height ?? 1;
+  const slot = useViroFlexSlot();
+  const widthProp = slot?.width ?? props.width ?? props.style?.width;
+  const heightProp = slot?.height ?? props.height ?? props.style?.height;
+  // The first frame's aspect, which only the load can supply.
+  const [aspect, setAspect] = useState<number | null>(null);
+  const { width, height, uv } = resolveSurface(
+    widthProp ?? 1,
+    heightProp ?? 1,
+    widthProp !== undefined || heightProp !== undefined,
+    props.resizeMode ?? "StretchToFill",
+    props.resizeMode !== undefined,
+    aspect,
+    props.imageClipMode ?? "ClipToBounds",
+  );
   const url = resolveImageSource(props.source);
 
   const geometryRef = useRef<ViroHandle>(0);
+  const geometryKey = `${width}x${height}|${uv.join(",")}`;
   useViroNode(
     props,
     (s) => {
-      const geo = s.createSurface(width, height);
+      const geo = s.createSurfaceUV(width, height, uv[0], uv[1], uv[2], uv[3]);
       geometryRef.current = geo;
       return geo;
     },
     true,
-    `${width}x${height}`,
+    geometryKey,
     undefined,
     undefined,
     false,
   );
+  const imageShownRef = useImagePlaceholder(props, url, geometryRef, geometryKey);
 
   const propsRef = useRef(props);
   propsRef.current = props;
@@ -133,6 +152,7 @@ export function ViroAnimatedImage(props: Props): null {
     const img = new Image();
 
     const upload = (frame: CanvasImageSource & TexImageSource, w: number, h: number) => {
+      if (!texture && w > 0 && h > 0) setAspect(w / h);
       if (source) {
         if (scene.updateTextureFromSource(source, frame) && texture !== source) {
           texture = source;
@@ -153,6 +173,7 @@ export function ViroAnimatedImage(props: Props): null {
       const geo = geometryRef.current;
       if (texture && geo && geo !== appliedGeometry) {
         scene.setGeometryMaterial(geo, material);
+        imageShownRef.current = true;
         appliedGeometry = geo;
       }
       rafId = requestAnimationFrame(applyToGeometry);

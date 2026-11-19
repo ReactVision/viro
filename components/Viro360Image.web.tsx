@@ -8,6 +8,7 @@ import type { ViroHandle, ViroWebRenderer } from "@reactvision/viro-web-renderer
 import { useViroParentNode, useViroRenderer, useViroScene } from "./Web/ViroWebContext";
 import { removeViroBackground, setViroBackgroundRotation, setViroBackgroundSphere } from "./Web/viroBackground";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
+import { applyStereoMode } from "./Web/viroMedia";
 
 let hdrFiles = 0;
 
@@ -44,6 +45,8 @@ export function Viro360Image(props: Props): null {
   const parent = useViroParentNode();
   const url = resolveImageSource(props.source);
   const isHdr = !!props.isHdr;
+  // steroMode is native's misspelled alias, read when stereoMode is absent.
+  const stereoMode: string | undefined = props.stereoMode ?? props.steroMode;
   const [rx, ry, rz] = props.rotation ?? [0, 0, 0];
 
   useEffect(() => {
@@ -61,6 +64,7 @@ export function Viro360Image(props: Props): null {
           return;
         }
         texture = loaded;
+        applyStereoMode(scene, texture, stereoMode);
         setViroBackgroundSphere(scene, parent, texture);
         setViroBackgroundRotation(scene, parent, [rx, ry, rz]);
         props.onLoadEnd?.();
@@ -73,7 +77,7 @@ export function Viro360Image(props: Props): null {
       if (texture) scene.destroyTexture(texture);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, isHdr, rx, ry, rz]);
+  }, [url, isHdr, rx, ry, rz, stereoMode]);
 
   // On unmount only: a changed source replaces the background, as on native.
   useEffect(() => () => removeViroBackground(scene, parent), [scene, parent]);

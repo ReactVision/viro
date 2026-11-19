@@ -9,7 +9,7 @@
  * fits the box. See `resolveSurface`.
  *
  * MVP scope: `source`, `width`/`height` (via style or props), `resizeMode`,
- * `imageClipMode`, load callbacks. `placeholderSource`, `stereoMode`, `mipmap`
+ * `imageClipMode`, `placeholderSource`, `stereoMode`, load callbacks. `mipmap`
  * and `format` are follow-ups.
  */
 import * as React from "react";
@@ -19,11 +19,13 @@ import {
   ViroTextureChannel,
   ViroBlendMode,
   type ViroHandle,
+  type ViroSceneApi,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { evictImage, loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
+import { applyStereoMode } from "./Web/viroMedia";
 
 type ResizeMode = "ScaleToFill" | "ScaleToFit" | "StretchToFill";
 type ClipMode = "None" | "ClipToBounds";
@@ -34,6 +36,8 @@ type Props = ViroWebNodeProps & {
   height?: number;
   resizeMode?: ResizeMode;
   imageClipMode?: ClipMode;
+  placeholderSource?: unknown;
+  stereoMode?: string;
   style?: { width?: number; height?: number } & Record<string, unknown>;
   onLoadStart?: () => void;
   onLoadEnd?: () => void;
@@ -126,6 +130,69 @@ export function resolveSurface(
   }
 }
 
+// Constant-lit and alpha-blended, so an image shows unlit with its transparency.
+function createImageMaterial(scene: ViroSceneApi): ViroHandle {
+  const material = scene.createMaterial();
+  scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
+  scene.setMaterialBlendMode(material, ViroBlendMode.Alpha);
+  // Blended, so no depth write: virocore defaults it on and only discards under
+  // an alpha cutoff, so a fully transparent border still wrote depth and punched
+  // a hole in whatever was drawn behind it after it.
+  scene.setMaterialWritesToDepthBuffer(material, false);
+  return material;
+}
+
+/**
+ * Native's placeholder, for ViroImage and ViroAnimatedImage: until the image is
+ * on the surface it shows `placeholderSource` (or native's misspelled
+ * `placeHolderSource`), and nothing at all without one. The image's own load
+ * sets the returned ref the moment its texture goes on, so a placeholder that
+ * arrives later stays off.
+ */
+export function useImagePlaceholder(
+  props: { placeholderSource?: unknown; placeHolderSource?: unknown },
+  url: string | undefined,
+  geometryRef: React.RefObject<ViroHandle>,
+  geometryKey: string,
+): React.RefObject<boolean> {
+  const scene = useViroScene();
+  const imageShownRef = useRef(false);
+  const placeholderUrl = resolveImageSource(props.placeholderSource ?? props.placeHolderSource);
+
+  useEffect(() => {
+    imageShownRef.current = false;
+  }, [url]);
+
+  useEffect(() => {
+    const geo = geometryRef.current;
+    if (!geo || !url || imageShownRef.current) return;
+    let cancelled = false;
+    let texture: ViroHandle = 0;
+    const material = createImageMaterial(scene);
+    if (placeholderUrl) {
+      loadImageRGBA(placeholderUrl)
+        .then((img) => {
+          if (cancelled || imageShownRef.current) return;
+          texture = scene.createTextureRGBA(img.pixels, img.width, img.height, true);
+          scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
+          scene.setGeometryMaterial(geo, material);
+        })
+        .catch(() => {});
+    } else {
+      scene.setMaterialAlpha(material, 0);
+      scene.setGeometryMaterial(geo, material);
+    }
+    return () => {
+      cancelled = true;
+      scene.destroyMaterial(material);
+      if (texture) scene.destroyTexture(texture);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, placeholderUrl, geometryKey]);
+
+  return imageShownRef;
+}
+
 export function ViroImage(props: Props) {
   const scene = useViroScene();
 
@@ -157,6 +224,7 @@ export function ViroImage(props: Props) {
   const uvKey = uv.join(",");
 
   const geometryRef = useRef<ViroHandle>(0);
+  const geometryKey = `${surfaceWidth}x${surfaceHeight}|${uvKey}`;
   // Keyed on the resolved size so the surface is rebuilt once the picture lands
   // and the height stops being a guess.
   useViroNode(
@@ -167,13 +235,14 @@ export function ViroImage(props: Props) {
       return geo;
     },
     true,
-    `${surfaceWidth}x${surfaceHeight}|${uvKey}`,
+    geometryKey,
     undefined,
     undefined,
     false,
   );
 
   const url = resolveImageSource(props.source);
+  const imageShownRef = useImagePlaceholder(props, url, geometryRef, geometryKey);
   const materialRef = useRef<ViroHandle>(0);
   const textureRef = useRef<ViroHandle>(0);
 
@@ -193,15 +262,11 @@ export function ViroImage(props: Props) {
       .then((img) => {
         if (cancelled) return;
         const texture = scene.createTextureRGBA(img.pixels, img.width, img.height, true);
-        const material = scene.createMaterial();
-        scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
-        scene.setMaterialBlendMode(material, ViroBlendMode.Alpha);
-        // Blended, so no depth write: virocore defaults it on and only discards under
-        // an alpha cutoff, so a fully transparent border still wrote depth and punched
-        // a hole in whatever was drawn behind it after it.
-        scene.setMaterialWritesToDepthBuffer(material, false);
+        applyStereoMode(scene, texture, propsRef.current.stereoMode);
+        const material = createImageMaterial(scene);
         scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
         scene.setGeometryMaterial(geo, material);
+        imageShownRef.current = true;
         textureRef.current = texture;
         materialRef.current = material;
         // Rebuilds the surface on the first pass, and is a no-op on the second.
@@ -224,7 +289,7 @@ export function ViroImage(props: Props) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, surfaceWidth, surfaceHeight, uvKey]);
+  }, [url, surfaceWidth, surfaceHeight, uvKey, props.stereoMode]);
 
   return null;
 }

@@ -6,8 +6,8 @@
  *
  * Web adaptations vs native:
  *  - Root is ViroARScene (AR via slam) in `mode="ar"`, else ViroScene (3D).
- *  - AUTOMATIC/MANUAL plane detection → wrap plane assets in ViroARPlane (slam).
- *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
+ *  - AUTOMATIC plane detection wraps plane assets in ViroARPlane; MANUAL in
+ *    ViroARPlaneSelector, which the viewer taps, as natively.
  *  - Tap-to-place runs off the AR session's hit test rather than a native one,
  *    and the navigator supplies the tap surface.
  *  - Physics and collision triggers run here: Bullet is compiled into the web
@@ -31,6 +31,7 @@ import {
 import { ViroAmbientLight } from "../ViroAmbientLight.web";
 import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
+import { ViroARPlaneSelector } from "../AR/ViroARPlaneSelector";
 import { ViroARScene, type ViroARSceneHandle } from "../AR/ViroARScene.web";
 import { ViroTrackingState } from "@reactvision/viro-web-renderer";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
@@ -133,6 +134,8 @@ interface Props {
   onReady?: () => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onPlaneDetected?: () => void;
+  /** MANUAL plane detection: the viewer picked the plane the assets stand on. */
+  onPlaneSelected?: () => void;
   /** Reports scene features that won't render on web (for a capability warning). */
   onUnsupported?: (features: string[]) => void;
   noAssetsMessage?: string;
@@ -189,6 +192,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     onReady,
     onSceneChange,
     onPlaneDetected,
+    onPlaneSelected,
     onUnsupported,
     noAssetsMessage,
     variableStore,
@@ -768,6 +772,34 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Plane wrapping (AR mode only) ────────────────────────────────────────
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
   const usePlane = usesPlaneWrapper(scene.plane_detection as string, mode);
+  const manual = usePlane && ((scene.plane_detection as string) ?? "").toUpperCase() === "MANUAL";
+
+  // MANUAL: the selector learns of planes only through the scene's anchor
+  // callbacks, and the drag surface follows the plane picked, as natively.
+  const planeSelectorRef = useRef<InstanceType<typeof ViroARPlaneSelector> | null>(null);
+  const selectedAnchorIdRef = useRef<string | null>(null);
+  const handleSelectorPlaneDetected = useCallback(() => {
+    onPlaneDetected?.();
+    return true;
+  }, [onPlaneDetected]);
+  const handlePlaneSelected = useCallback(
+    (plane: any) => {
+      selectedAnchorIdRef.current = plane?.anchorId ?? null;
+      trackDragSurface(plane);
+      onPlaneSelected?.();
+    },
+    [trackDragSurface, onPlaneSelected],
+  );
+  const selectorAnchorProps = manual
+    ? {
+        onAnchorFound: (a: any) => planeSelectorRef.current?.handleAnchorFound(a),
+        onAnchorUpdated: (a: any) => {
+          planeSelectorRef.current?.handleAnchorUpdated(a);
+          if (a?.anchorId === selectedAnchorIdRef.current) trackDragSurface(a);
+        },
+        onAnchorRemoved: (a: any) => a && planeSelectorRef.current?.handleAnchorRemoved(a),
+      }
+    : null;
 
   // ─── Tracking-readiness gate (AR, plane_detection=NONE only) ──────────────
   // The native host's rule: NONE assets sit at fixed scene-root coordinates, so
@@ -802,7 +834,18 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     lightRigRef.current?.setScale(scale);
   }, []);
 
-  const body = usePlane ? (
+  const body = manual ? (
+    <ViroARPlaneSelector
+      ref={planeSelectorRef}
+      minHeight={0.1}
+      minWidth={0.1}
+      alignment={planeAlignment}
+      onPlaneDetected={handleSelectorPlaneDetected}
+      onPlaneSelected={handlePlaneSelected}
+    >
+      {renderedAssets}
+    </ViroARPlaneSelector>
+  ) : usePlane ? (
     <ViroARPlane
       minHeight={0.1}
       minWidth={0.1}
@@ -848,6 +891,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       ref={arSceneRef}
       toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}
       onAmbientLightUpdate={handleAmbientLightUpdate}
+      {...selectorAnchorProps}
     >
       {children}
     </ViroARScene>

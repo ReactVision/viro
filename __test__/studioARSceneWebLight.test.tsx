@@ -22,6 +22,9 @@ jest.mock("../components/ViroDirectionalLight.web", () => ({
 jest.mock("../components/AR/ViroARPlane.web", () => ({
   ViroARPlane: "ViroARPlane",
 }));
+jest.mock("../components/AR/ViroARPlaneSelector", () => ({
+  ViroARPlaneSelector: "ViroARPlaneSelector",
+}));
 jest.mock("../components/AR/ViroARScene.web", () => ({
   ViroARScene: "ViroARScene",
 }));

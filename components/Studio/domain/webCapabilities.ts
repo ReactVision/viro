@@ -54,10 +54,6 @@ export function webUnsupportedFeatures(
     features.push("tap to place");
   }
 
-  if (((scene.plane_detection as string) ?? "").toUpperCase() === "MANUAL") {
-    features.push("manual plane selection");
-  }
-
   // The host passes no navigator into the dispatch, so both functions skip.
   const functionTypes = new Set(sceneData.functions.map((f) => f.function_type));
   if (functionTypes.has("TAKE_PHOTO")) features.push("photo capture");

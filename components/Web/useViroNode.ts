@@ -16,7 +16,7 @@ import {
   type ViroSceneApi,
 } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroParentNode, useViroRenderer } from "./ViroWebContext";
-import { createMaterialFromRegistry } from "./viroMaterialRegistry";
+import { createMaterialFromRegistry, createOwnMaterial } from "./viroMaterialRegistry";
 import { useViroAnimation, type ViroAnimationProp } from "./useViroAnimation";
 import { applyPhysicsBody, offsetImpulse, type ViroPhysicsBodyProp } from "./viroPhysicsBody";
 import { registerCollisionBody } from "./viroCollisions";
@@ -287,6 +287,9 @@ export function useViroNode(
   // A component's own ref methods, beside the node's (a video's seekToTime).
   // Read once per node, so they should reach changing state through refs.
   extraRefMethods?: Record<string, (...args: any[]) => unknown>,
+  // False for a component that dresses its geometry with materials of its own
+  // (an image, video or text): a color or material animation would replace them.
+  materialAnimatable: boolean = true,
 ): ViroHandle {
   const scene = useViroScene();
   const renderer = useViroRenderer();
@@ -529,7 +532,32 @@ export function useViroNode(
   const materialsKey = Array.isArray(props.materials)
     ? props.materials.join(",")
     : props.materials ?? "";
+  // A color or material animation changes the node's own copy, made on first
+  // use: named materials are shared, so changing one would recolour every node
+  // that uses the name. Dropped when the materials change, as native's
+  // materials prop replaces an animated material.
+  const ownMaterialRef = useRef<{ geo: ViroHandle; material: ViroHandle } | null>(null);
+  const dropOwnMaterial = () => {
+    if (ownMaterialRef.current) scene.destroyMaterial(ownMaterialRef.current.material);
+    ownMaterialRef.current = null;
+  };
+  const ownMaterial = (): ViroHandle => {
+    const geo = geometryRef.current;
+    if (!materialAnimatable) {
+      warnUnsupported("color and material animations on images, videos and text", "the web");
+      return 0;
+    }
+    if (!geo) return 0;
+    if (ownMaterialRef.current?.geo === geo) return ownMaterialRef.current.material;
+    dropOwnMaterial();
+    const material = createOwnMaterial(scene, materialsKey.split(",")[0] || undefined);
+    scene.setGeometryMaterial(geo, material);
+    ownMaterialRef.current = { geo, material };
+    return material;
+  };
+  useEffect(() => dropOwnMaterial, []);
   useEffect(() => {
+    dropOwnMaterial();
     const geo = geometryRef.current;
     if (!geo || !materialsKey) return;
     const firstName = materialsKey.split(",")[0];
@@ -726,6 +754,7 @@ export function useViroNode(
     props.animation,
     { position: [px, py, pz], rotation: [rx, ry, rz], scale: [sx, sy, sz], opacity },
     contentReady,
+    ownMaterial,
   );
 
   return node;

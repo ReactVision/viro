@@ -4,11 +4,13 @@
  * resolves an `animation` name against this registry and, if found, runs a
  * transaction (begin → set target props → commit) so the renderer interpolates.
  *
- * MVP scope: position/scale/rotation (per-axis) + opacity. color/material/
- * translate/animation-chains are follow-ups.
+ * Scope: position/scale/rotation (per-axis), opacity, color and material.
+ * Animation chains are a follow-up.
  */
 import type { ViroSceneApi, ViroHandle } from "@reactvision/viro-web-renderer";
 import { ViroEasing } from "@reactvision/viro-web-renderer";
+import { parseColorToRGBA } from "./viroColor";
+import { applyMaterialAnimationTarget } from "./viroMaterialRegistry";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -17,6 +19,11 @@ export interface ViroWebAnimationDef {
   delay?: number; // ms
   easing?: string;
   properties: Record<string, number | string | undefined>;
+}
+
+/** The properties a pass sets on the node's material rather than the node. */
+function animatesMaterial(p: ViroWebAnimationDef["properties"]): boolean {
+  return p.color !== undefined || typeof p.material === "string";
 }
 
 const registry = new Map<string, ViroWebAnimationDef>();
@@ -166,6 +173,10 @@ export interface ViroAnimationPass {
  *
  * `loop` is the renderer's own, which replays the same pass.
  *
+ * `ownMaterial` returns the node's own material for `color` and `material`,
+ * as native changes the node's geometry's materials; 0 where it draws nothing
+ * itself (a loaded model, as on native for a glTF).
+ *
  * `delayMs` is the `animation` prop's own delay. It wins over the registered
  * one, which is how a caller that carries the delay per trigger rather than per
  * registry entry still gets it, and matches the native side, where the prop
@@ -178,14 +189,26 @@ export function runDeclarativeAnimation(
   base: ViroBaseTransform,
   loop: boolean,
   delayMs?: number,
+  ownMaterial?: () => ViroHandle,
 ): ViroAnimationPass | null {
   const def = registry.get(name);
   const end = viroAnimationEnd(name, base);
   if (!def || !end) return null;
 
   const delay = delayMs ?? def.delay ?? 0;
+  const p = def.properties;
+  const material = animatesMaterial(p) ? ownMaterial?.() ?? 0 : 0;
   scene.beginAnimation(node, def.duration / 1000, delay / 1000, loop, easingValue(def.easing));
-  setAnimated(scene, node, def.properties, end);
+  setAnimated(scene, node, p, end);
+  if (material) {
+    // As native's animateMaterial then animateColor: `color` wins over the
+    // material's colour.
+    if (typeof p.material === "string") applyMaterialAnimationTarget(scene, material, p.material);
+    if (p.color !== undefined) {
+      const [r, g, b, a] = parseColorToRGBA(p.color);
+      scene.setMaterialDiffuseColor(material, r, g, b, a);
+    }
+  }
   scene.commitAnimation();
   passes.set(node, {
     // As viroAnimationEnd reads it: the renderer holds an angle within one turn.
@@ -215,6 +238,8 @@ interface ViroAnimationPassRecord {
   easing?: string;
   /** Replayed by the renderer from `from` every cycle. */
   loop: boolean;
+  /** Set while the pass is paused. */
+  pausedAt?: number;
 }
 
 const passes = new Map<ViroHandle, ViroAnimationPassRecord>();
@@ -261,12 +286,25 @@ function lerpTransform(a: ViroBaseTransform, b: ViroBaseTransform, k: number): V
 export function viroAnimationCurrent(node: ViroHandle, base: ViroBaseTransform): ViroBaseTransform {
   const pass = passes.get(node);
   if (!pass) return base;
-  const elapsed = performance.now() - pass.startsAt;
+  const elapsed = (pass.pausedAt ?? performance.now()) - pass.startsAt;
   if (elapsed <= 0) return pass.from;
   if (pass.durationMs <= 0) return pass.end;
   if (!pass.loop && elapsed >= pass.durationMs) return pass.end;
   const t = pass.loop ? (elapsed % pass.durationMs) / pass.durationMs : elapsed / pass.durationMs;
   return lerpTransform(pass.from, pass.end, eased(pass.easing, t));
+}
+
+/** Holds a node's latest pass where it is, for viroAnimationCurrent, until resumed. */
+export function pauseViroAnimationPass(node: ViroHandle): void {
+  const pass = passes.get(node);
+  if (pass && pass.pausedAt === undefined) pass.pausedAt = performance.now();
+}
+
+export function resumeViroAnimationPass(node: ViroHandle): void {
+  const pass = passes.get(node);
+  if (!pass || pass.pausedAt === undefined) return;
+  pass.startsAt += performance.now() - pass.pausedAt;
+  pass.pausedAt = undefined;
 }
 
 /** Forget a node's passes: its authored transform changed, or it is gone. */

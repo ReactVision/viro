@@ -64,6 +64,7 @@ export function ViroVideo(props: Props): null {
     sizePropSet ? `${width}x${height}` : aspect,
     undefined,
     { seekToTime: (seconds: number) => seekMedia(videoRef.current, seconds) },
+    false,
   );
 
   const propsRef = useRef(props);

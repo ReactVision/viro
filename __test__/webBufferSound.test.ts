@@ -46,7 +46,7 @@ let mockFetchOk = true;
   arrayBuffer: async () => new ArrayBuffer(4),
 }));
 
-import { createBufferSound } from "../components/Web/viroAudioBuffer";
+import { createBufferSound, preloadSound, unloadSound } from "../components/Web/viroAudioBuffer";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const output = {} as AudioNode;
@@ -143,5 +143,45 @@ describe("createBufferSound", () => {
         message: expect.stringContaining("missing.mp3"),
       })
     );
+  });
+
+  it("seeks a playing sound, and a paused one starts from the seek", async () => {
+    const sound = createBufferSound("a.mp3", output, jest.fn(), jest.fn());
+    sound.play();
+    await flush();
+    ctx.currentTime = 2;
+    sound.seek(7);
+    expect(sources[0].stopped).toBe(true);
+    expect(sources[1].started).toEqual([7]);
+    sound.pause();
+    sound.seek(12);
+    expect(sources).toHaveLength(2);
+    sound.play();
+    expect(sources[2].started).toEqual([10]);
+  });
+
+  it("plays a preloaded sound by its name without fetching it again", async () => {
+    const fetchMock = (globalThis as any).fetch as jest.Mock;
+    await expect(preloadSound("click", "click.mp3")).resolves.toEqual({ result: true });
+    fetchMock.mockClear();
+    createBufferSound("click", output, jest.fn(), jest.fn()).play();
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sources).toHaveLength(1);
+
+    unloadSound("click");
+    createBufferSound("click", output, jest.fn(), jest.fn());
+    expect(fetchMock).toHaveBeenCalledWith("click");
+  });
+
+  it("reports a preload that fails and keeps nothing under its name", async () => {
+    mockFetchOk = false;
+    const result = await preloadSound("gone", "gone.mp3");
+    expect(result.result).toBe(false);
+    mockFetchOk = true;
+    const fetchMock = (globalThis as any).fetch as jest.Mock;
+    fetchMock.mockClear();
+    createBufferSound("gone", output, jest.fn(), jest.fn());
+    expect(fetchMock).toHaveBeenCalledWith("gone");
   });
 });

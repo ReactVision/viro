@@ -3,14 +3,21 @@
  * scene background sphere, each decoded frame uploaded into the sphere's texture.
  * Scene-level (renders no node).
  *
- * MVP scope: source, paused, loop, muted, volume, rotation, onFinish/onError.
+ * MVP scope: source, paused, loop, muted, volume, rotation, onFinish/onError,
+ * onBufferStart/End, onUpdateTime and the ref's seekToTime.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef } from "react";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
-import { playWhenAllowed, streamVideoTexture } from "./Web/viroMedia";
+import {
+  forwardMediaEvents,
+  playWhenAllowed,
+  seekMedia,
+  streamVideoTexture,
+  type ViroMediaEventProps,
+} from "./Web/viroMedia";
 
-type Props = {
+type Props = ViroMediaEventProps & {
   source: unknown;
   paused?: boolean;
   loop?: boolean;
@@ -30,6 +37,9 @@ export function Viro360Video(props: Props): null {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  useImperativeHandle(props.ref, () => ({
+    seekToTime: (seconds: number) => seekMedia(videoRef.current, seconds),
+  }), []);
 
   useEffect(() => {
     if (!url) return;
@@ -39,6 +49,7 @@ export function Viro360Video(props: Props): null {
     video.crossOrigin = "anonymous";
     video.playsInline = true;
     videoRef.current = video;
+    const stopEvents = forwardMediaEvents(video, () => propsRef.current);
 
     const stopTexture = streamVideoTexture(scene, video, (texture, changed) => {
       if (changed) scene.setBackgroundSphere(texture);
@@ -53,6 +64,7 @@ export function Viro360Video(props: Props): null {
 
     return () => {
       stopTexture();
+      stopEvents();
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onErr);
       video.pause();

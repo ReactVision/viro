@@ -168,12 +168,15 @@ export function useViroNode(
   // it: its embedded animations, and the shader-override merge. A node whose
   // geometry this hook builds is ready on mount, hence the default.
   contentReady: boolean = true,
-  // When provided, the geometry is rebuilt whenever this key changes (e.g. text
-  // re-shapes). Omit for static geometry (box/sphere/surface) — built once.
+  // When provided, the geometry is rebuilt whenever this key changes (a new
+  // size, text that re-shapes). Without it the geometry is built once.
   geometryKey?: string | number,
   // Factory for the underlying node (default `createNode`). Override for special
   // node types, e.g. portal scenes (`createPortalScene`).
   createNodeFn?: (scene: ViroSceneApi) => ViroHandle,
+  // A component's own ref methods, beside the node's (a video's seekToTime).
+  // Read once per node, so they should reach changing state through refs.
+  extraRefMethods?: Record<string, (...args: any[]) => unknown>,
 ): ViroHandle {
   const scene = useViroScene();
   const renderer = useViroRenderer();
@@ -568,6 +571,7 @@ export function useViroNode(
           );
         }
       },
+      ...extraRefMethods,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [node],

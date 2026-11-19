@@ -23,7 +23,7 @@ import {
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
-import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
+import { evictImage, loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
 
 type ResizeMode = "ScaleToFill" | "ScaleToFit" | "StretchToFill";
 type ClipMode = "None" | "ClipToBounds";
@@ -225,3 +225,9 @@ export function ViroImage(props: Props) {
 
   return null;
 }
+
+// Native does this on Android only, where images are cached by URL; the web caches by URL too.
+ViroImage.evictFromCache = (imageSource: unknown) => {
+  const url = resolveImageSource(imageSource);
+  if (url) evictImage(url);
+};

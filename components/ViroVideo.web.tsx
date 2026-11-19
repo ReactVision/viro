@@ -2,8 +2,9 @@
  * Web implementation of ViroVideo — a surface textured with a playing
  * `<video>`, each decoded frame uploaded into the surface's (unlit) material.
  *
- * MVP scope: source, width/height, paused, loop, muted, volume, onFinish/onError.
- * `stereoMode`, `resizeMode`, `onUpdateTime`, buffering events are follow-ups.
+ * MVP scope: source, width/height, paused, loop, muted, volume, onFinish/onError,
+ * onBufferStart/End, onUpdateTime and the ref's seekToTime. `stereoMode` and
+ * `resizeMode` are follow-ups.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -15,9 +16,15 @@ import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
-import { playWhenAllowed, streamVideoTexture } from "./Web/viroMedia";
+import {
+  forwardMediaEvents,
+  playWhenAllowed,
+  seekMedia,
+  streamVideoTexture,
+  type ViroMediaEventProps,
+} from "./Web/viroMedia";
 
-type Props = ViroWebNodeProps & {
+type Props = ViroWebNodeProps & ViroMediaEventProps & {
   source: unknown;
   width?: number;
   height?: number;
@@ -45,6 +52,7 @@ export function ViroVideo(props: Props): null {
   const height = slot?.height ?? props.height ?? (sizePropSet ? 1 : width / aspect);
 
   const geometryRef = useRef<ViroHandle>(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   useViroNode(
     props,
     (s) => {
@@ -53,10 +61,11 @@ export function ViroVideo(props: Props): null {
       return geo;
     },
     true,
-    sizePropSet ? undefined : aspect
+    sizePropSet ? `${width}x${height}` : aspect,
+    undefined,
+    { seekToTime: (seconds: number) => seekMedia(videoRef.current, seconds) },
   );
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -69,6 +78,7 @@ export function ViroVideo(props: Props): null {
     video.crossOrigin = "anonymous";
     video.playsInline = true;
     videoRef.current = video;
+    const stopEvents = forwardMediaEvents(video, () => propsRef.current);
 
     const material = scene.createMaterial();
     scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
@@ -97,6 +107,7 @@ export function ViroVideo(props: Props): null {
 
     return () => {
       stopTexture();
+      stopEvents();
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onErr);
       video.removeEventListener("loadedmetadata", onMetadata);

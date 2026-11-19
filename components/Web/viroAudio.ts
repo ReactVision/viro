@@ -18,9 +18,9 @@ export function getAudioContext(): AudioContext {
   return ctx;
 }
 
-/** Anything that can say where the camera is. The AR session is the implementor. */
+/** Anything that can say where the camera is: the AR session, or the camera a navigator publishes. Null while unknown. */
 export interface ViroAudioListenerSource {
-  readonly cameraPose: { position: Vec3; quaternion: Quat };
+  readonly cameraPose: { position: Vec3; quaternion: Quat } | null;
 }
 
 function setListenerPose(listener: AudioListener, position: Vec3, quaternion: Quat): void {
@@ -65,11 +65,8 @@ export function trackAudioListener(source: ViroAudioListenerSource): () => void 
   listenerSources.add(source);
   if (rafId === null) {
     const step = () => {
-      const current = listenerSources.values().next().value;
-      if (current) {
-        const { position, quaternion } = current.cameraPose;
-        setListenerPose(getAudioContext().listener, position, quaternion);
-      }
+      const pose = listenerSources.values().next().value?.cameraPose;
+      if (pose) setListenerPose(getAudioContext().listener, pose.position, pose.quaternion);
       rafId = requestAnimationFrame(step);
     };
     rafId = requestAnimationFrame(step);

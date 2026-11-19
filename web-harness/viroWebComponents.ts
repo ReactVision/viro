@@ -99,6 +99,7 @@ export {
   polarToCartesianActual,
   requestRequiredPermissions,
 } from "../components/Utilities/ViroUtils";
+export { StreamingAudioManager } from "../components/Utilities/StreamingAudioManager";
 export { useViroTrackingReady } from "../components/hooks/useViroTrackingReady";
 export { useFixedUpdate, useGameLoop, useLateUpdate } from "../components/hooks/useGameLoop";
 export { useAnySourceHover } from "../components/Utilities/useAnySourceHover";

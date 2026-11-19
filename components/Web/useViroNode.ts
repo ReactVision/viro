@@ -84,6 +84,8 @@ export interface ViroWebNodeProps {
   scale?: [number, number, number];
   opacity?: number;
   visible?: boolean;
+  /** Taps and hit tests pass through this node and its whole subtree, loaded model content included. */
+  ignoreEventHandling?: boolean;
   materials?: string | string[];
   // Registered material names merged onto whatever this node draws, subtree
   // included. The path a Studio `material_config` takes, and the only one that
@@ -346,6 +348,7 @@ export function useViroNode(
   const [sx, sy, sz] = props.scale ?? [1, 1, 1];
   const opacity = props.opacity ?? 1;
   const visible = props.visible ?? true;
+  const selectable = !props.ignoreEventHandling;
 
   // Each on its own, as native sends only what changed: re-sending the authored
   // position whenever opacity or visibility changes would undo a drag.
@@ -370,6 +373,15 @@ export function useViroNode(
     scene.setNodeVisible(node, visible);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, visible]);
+  useEffect(() => {
+    // Renderers before 1.2.0 have no setNodeSelectable; calling it would throw for every node.
+    if (typeof scene.setNodeSelectable !== "function") {
+      if (!selectable) warnUnsupported("ignoreEventHandling with viro-web-renderer before 1.2.0", "the web");
+      return;
+    }
+    scene.setNodeSelectable(node, selectable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, selectable]);
 
   // Dragging, which native enables with onDrag (dragType defaults to
   // FixedDistance). The renderer reports a press on the node; the drag is

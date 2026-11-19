@@ -33,7 +33,7 @@ const onNavigatorDefaults = (l: () => void) => {
   return () => void navigatorDefaultsListeners.delete(l);
 };
 
-/** Props every 3D (and VR, drawn as 3D) navigator the caller's code mounts gets, under its own. */
+/** Props every 3D, VR (drawn as 3D) and ViroSceneNavigator the caller's code mounts gets, under its own. */
 export function set3DNavigatorDefaults(defaults: Record<string, unknown>): void {
   navigator3DDefaults = defaults;
 }
@@ -146,7 +146,7 @@ export function Viro3DSceneNavigator(props: any) {
 
 export function ViroSceneNavigator(props: any) {
   if (usePlaybackRefusal("ViroSceneNavigator")) return null;
-  return createElement(_ViroSceneNavigatorRaw, { webRendererOptions, ...props });
+  return createElement(_ViroSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 // The library's own file needs PermissionsAndroid, which react-native-web does

@@ -12,13 +12,21 @@ import {
   ViroPhysicsShapeType,
   VIRO_COMPOUND_CHILD_STRIDE,
   type ViroHandle,
+  type ViroPhysicsForce,
   type ViroSceneApi,
 } from "@reactvision/viro-web-renderer";
+import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 export interface ViroPhysicsShapeProp {
   type?: string;
   params?: number[];
   children?: { type?: string; params?: number[]; position?: number[] }[];
+}
+
+export interface ViroForceProp {
+  value?: number[];
+  /** From the body's centre; the centre when absent. */
+  position?: number[];
 }
 
 export interface ViroPhysicsBodyProp {
@@ -33,6 +41,9 @@ export interface ViroPhysicsBodyProp {
   instantVelocity?: number[];
   /** Reasserted every frame, as native's `velocity`. */
   velocity?: number[];
+  /** One force or a list, each applied on every step until it changes. */
+  force?: ViroForceProp | ViroForceProp[];
+  torque?: number[];
   [key: string]: unknown;
 }
 
@@ -136,6 +147,33 @@ export function applyPhysicsBody(
     const v = body.velocity;
     scene.setPhysicsVelocity(node, [vec3(v, 0), vec3(v, 1), vec3(v, 2)], true);
   }
+
+  // After setPhysicsBody, which starts a body with no forces.
+  if (body.force != null || body.torque != null) {
+    const { forces, torque } = physicsForces(body);
+    if (typeof scene.setPhysicsForces !== "function" || !scene.setPhysicsForces(node, forces, torque)) {
+      warnUnsupported("physicsBody force and torque", "this version of the web renderer");
+    }
+  }
+}
+
+/** `force` and `torque` as native reads them; a force without a 3-value `value` is left out. */
+export function physicsForces(body: ViroPhysicsBodyProp): {
+  forces: ViroPhysicsForce[];
+  torque: [number, number, number];
+} {
+  const list = body.force == null ? [] : Array.isArray(body.force) ? body.force : [body.force];
+  const forces: ViroPhysicsForce[] = [];
+  for (const f of list) {
+    if (!f || f.value?.length !== 3) continue;
+    const position = f.position?.length === 3 ? f.position : undefined;
+    forces.push({
+      value: [vec3(f.value, 0), vec3(f.value, 1), vec3(f.value, 2)],
+      position: position ? [vec3(position, 0), vec3(position, 1), vec3(position, 2)] : undefined,
+    });
+  }
+  const t = body.torque?.length === 3 ? body.torque : undefined;
+  return { forces, torque: t ? [vec3(t, 0), vec3(t, 1), vec3(t, 2)] : [0, 0, 0] };
 }
 
 /**

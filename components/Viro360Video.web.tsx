@@ -7,7 +7,8 @@
  * onBufferStart/End, onUpdateTime and the ref's seekToTime.
  */
 import { useEffect, useImperativeHandle, useRef } from "react";
-import { useViroScene } from "./Web/ViroWebContext";
+import { useViroParentNode, useViroScene } from "./Web/ViroWebContext";
+import { setViroBackgroundRotation, setViroBackgroundSphere } from "./Web/viroBackground";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import {
   forwardMediaEvents,
@@ -31,6 +32,7 @@ type Props = ViroMediaEventProps & {
 
 export function Viro360Video(props: Props): null {
   const scene = useViroScene();
+  const parent = useViroParentNode();
   const url = resolveImageSource(props.source);
   const [rx, ry, rz] = props.rotation ?? [0, 0, 0];
 
@@ -52,7 +54,7 @@ export function Viro360Video(props: Props): null {
     const stopEvents = forwardMediaEvents(video, () => propsRef.current);
 
     const stopTexture = streamVideoTexture(scene, video, (texture, changed) => {
-      if (changed) scene.setBackgroundSphere(texture);
+      if (changed) setViroBackgroundSphere(scene, parent, texture);
     });
 
     const onEnded = () => propsRef.current.onFinish?.();
@@ -60,7 +62,7 @@ export function Viro360Video(props: Props): null {
     video.addEventListener("ended", onEnded);
     video.addEventListener("error", onErr);
 
-    scene.setBackgroundRotation((rx * Math.PI) / 180, (ry * Math.PI) / 180, (rz * Math.PI) / 180);
+    setViroBackgroundRotation(scene, parent, [rx, ry, rz]);
 
     return () => {
       stopTexture();
@@ -89,8 +91,8 @@ export function Viro360Video(props: Props): null {
   }, [props.paused, props.loop, props.muted, props.volume, url]);
 
   useEffect(() => {
-    scene.setBackgroundRotation((rx * Math.PI) / 180, (ry * Math.PI) / 180, (rz * Math.PI) / 180);
-  }, [scene, rx, ry, rz]);
+    setViroBackgroundRotation(scene, parent, [rx, ry, rz]);
+  }, [scene, parent, rx, ry, rz]);
 
   return null;
 }

@@ -5,7 +5,8 @@
  */
 import { useEffect } from "react";
 import type { ViroHandle, ViroWebRenderer } from "@reactvision/viro-web-renderer";
-import { useViroRenderer, useViroScene } from "./Web/ViroWebContext";
+import { useViroParentNode, useViroRenderer, useViroScene } from "./Web/ViroWebContext";
+import { removeViroBackground, setViroBackgroundRotation, setViroBackgroundSphere } from "./Web/viroBackground";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
 
 let hdrFiles = 0;
@@ -40,6 +41,7 @@ type Props = {
 export function Viro360Image(props: Props): null {
   const scene = useViroScene();
   const renderer = useViroRenderer();
+  const parent = useViroParentNode();
   const url = resolveImageSource(props.source);
   const isHdr = !!props.isHdr;
   const [rx, ry, rz] = props.rotation ?? [0, 0, 0];
@@ -59,8 +61,8 @@ export function Viro360Image(props: Props): null {
           return;
         }
         texture = loaded;
-        scene.setBackgroundSphere(texture);
-        scene.setBackgroundRotation((rx * Math.PI) / 180, (ry * Math.PI) / 180, (rz * Math.PI) / 180);
+        setViroBackgroundSphere(scene, parent, texture);
+        setViroBackgroundRotation(scene, parent, [rx, ry, rz]);
         props.onLoadEnd?.();
       })
       .catch((err) => {
@@ -72,6 +74,9 @@ export function Viro360Image(props: Props): null {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, isHdr, rx, ry, rz]);
+
+  // On unmount only: a changed source replaces the background, as on native.
+  useEffect(() => () => removeViroBackground(scene, parent), [scene, parent]);
 
   return null;
 }

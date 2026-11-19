@@ -24,8 +24,10 @@ import {
   resolveModelSource,
   modelFormatFor,
   fetchModelBytes,
+  inlineGltfExternals,
   resourceName,
 } from "./Web/viroModelLoader";
+import { ViroModelFormat } from "@reactvision/viro-web-renderer";
 
 type Props = ViroWebNodeProps & {
   source: unknown;
@@ -82,6 +84,11 @@ export function Viro3DObject(props: Props) {
         ),
       ]);
       if (cancelled) return false;
+      if (format === ViroModelFormat.GLTF) {
+        const inlined = await inlineGltfExternals(bytes, url, resources);
+        if (cancelled) return false;
+        return renderer.loadModel(node, inlined, format);
+      }
       return renderer.loadModel(node, bytes, format, resources);
     })()
       .then((success) => {

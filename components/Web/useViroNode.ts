@@ -24,7 +24,6 @@ import { conjugateQuat, quatFromEulerDegrees, rotateByQuaternion } from "./viroM
 import {
   cameraView,
   dragFollower,
-  parentSpace,
   rayAt,
   releaseVelocity,
   screenPointOf,
@@ -157,14 +156,28 @@ export function viroNodeEntries(scene: ViroSceneApi): ReadonlyMap<ViroHandle, { 
 // Native's kTransformDelegateDistanceFilter, in metres.
 const TRANSFORM_DISTANCE_FILTER = 0.01;
 
+/**
+ * World to `parent`'s space from its last drawn transform, which follows
+ * animations and physics; null before it is drawn or on a renderer without the read.
+ */
+function drawnParentSpace(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3) => Vec3) | null {
+  if (typeof scene.getNodeWorldTransform !== "function") return null;
+  const p = scene.getNodeWorldTransform(parent);
+  // All zero before it is drawn; any zero is a flattened parent with no inverse.
+  if (!p || p.scale.some((c) => c === 0)) return null;
+  const inverse = conjugateQuat(quatFromEulerDegrees(p.rotation));
+  return (world) => {
+    const local = rotateByQuaternion(inverse, sub(world, p.position));
+    return [local[0] / p.scale[0], local[1] / p.scale[1], local[2] / p.scale[2]];
+  };
+}
+
 /** The node's last drawn position in its parent's space, or null before it has been drawn. */
 function localPosition(scene: ViroSceneApi, node: ViroHandle, parent: ViroHandle): Vec3 | null {
   const t = scene.getNodeWorldTransform(node);
   if (!t || t.scale.every((c) => c === 0)) return null;
-  const p = scene.getNodeWorldTransform(parent);
-  if (!p || p.scale.every((c) => c === 0)) return t.position;
-  const local = rotateByQuaternion(conjugateQuat(quatFromEulerDegrees(p.rotation)), sub(t.position, p.position));
-  return [local[0] / p.scale[0], local[1] / p.scale[1], local[2] / p.scale[2]];
+  const toLocal = drawnParentSpace(scene, parent);
+  return toLocal ? toLocal(t.position) : t.position;
 }
 
 /** False while the node or any node above it is hidden, as native's shouldAppear. */
@@ -360,6 +373,11 @@ export function useViroNode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, visible]);
   useEffect(() => {
+    // Renderers before 1.2.0 have no setNodeSelectable; calling it would throw for every node.
+    if (typeof scene.setNodeSelectable !== "function") {
+      if (!selectable) warnUnsupported("ignoreEventHandling with viro-web-renderer before 1.2.0", "the web");
+      return;
+    }
     scene.setNodeSelectable(node, selectable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, selectable]);
@@ -372,29 +390,6 @@ export function useViroNode(
   // does, and let go with the velocity of its last ~80 ms, so it can be thrown.
   const bodyKeyRef = useRef("");
   const heldRef = useRef(false);
-  // Empty children of the parent at its origin and one metre along each axis.
-  // The renderer reads back a node's world position but not its rotation or
-  // scale, so their positions are how a drag finds the parent's space.
-  const probesRef = useRef<ViroHandle[] | null>(null);
-  const draggable = !!props.onDrag;
-  useEffect(() => {
-    if (!draggable) return;
-    const probes = ([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]] as Vec3[]).map(([x, y, z]) => {
-      const probe = scene.createNode();
-      scene.setNodePosition(probe, x, y, z);
-      scene.addChildNode(parent, probe);
-      return probe;
-    });
-    probesRef.current = probes;
-    return () => {
-      probesRef.current = null;
-      for (const probe of probes) {
-        scene.removeNodeFromParent(probe);
-        scene.destroyNode(probe);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draggable]);
   const startDrag = (hit: Vec3) => {
     const p = propsRef.current;
     const view = cameraView(scene);
@@ -435,11 +430,10 @@ export function useViroNode(
       if (!pointer) return;
       const to = follow(rayAt(view, pointer.x, pointer.y));
       if (!to) return;
-      // Read on every move, since the parent may itself be moving. Until the
-      // probes have been drawn, the parent is taken as neither turned nor scaled.
-      const at = probesRef.current?.map((probe) => scene.getNodeWorldPosition(probe));
-      const toLocal = at && at.every(Boolean) ? parentSpace(at[0]!, at[1]!, at[2]!, at[3]!) : null;
-      const local = toLocal ? toLocal(to) : sub(to, parentWorld);
+      // Each frame, since the parent may itself be moving; before the parent is
+      // drawn, or on a renderer that cannot read it, it is taken as neither
+      // turned nor scaled.
+      const local = (drawnParentSpace(scene, parent) ?? ((w: Vec3) => sub(w, parentWorld)))(to);
       scene.setNodePosition(node, local[0], local[1], local[2]);
       samples.push({ t: performance.now(), p: to });
       if (samples.length > 12) samples.shift();

@@ -126,3 +126,20 @@ describe("a node ref on the web", () => {
     warn.mockRestore();
   });
 });
+
+describe("ignoreEventHandling on the web", () => {
+  it("makes the node unselectable, and selectable again when cleared", () => {
+    const tree = mount({ ignoreEventHandling: true });
+    expect(mockSceneBase.setNodeSelectable).toHaveBeenLastCalledWith(5, false);
+    act(() => tree.update(<Probe ignoreEventHandling={false} />));
+    expect(mockSceneBase.setNodeSelectable).toHaveBeenLastCalledWith(5, true);
+  });
+
+  it("warns instead of throwing on a renderer before 1.2.0", () => {
+    mockSceneBase.setNodeSelectable = undefined;
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => mount({ ignoreEventHandling: true })).not.toThrow();
+    expect(warn.mock.calls.some((c) => String(c[0]).includes("ignoreEventHandling"))).toBe(true);
+    warn.mockRestore();
+  });
+});

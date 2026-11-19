@@ -24,6 +24,8 @@ export interface ViroARState {
   session: ViroArSession | null;
   anchors: ArPlaneAnchor[];
   trackingState: ViroTrackingState;
+  /** A recorded session replayed rather than tracked live. */
+  playback?: boolean;
 }
 
 export const ViroARContext = createContext<ViroARState>({

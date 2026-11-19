@@ -2,8 +2,8 @@
  * Shared Web Audio context for spatial sound, and the listener that follows the
  * camera.
  *
- * Lazily created (browsers require a user gesture to resume it; callers should
- * catch play() rejections).
+ * Lazily created. Browsers keep it suspended until a user gesture; callers
+ * resume it through resumeAudioWhenAllowed (viroMedia).
  */
 
 import { cameraBasis, type Quat, type Vec3 } from "./viroMath";

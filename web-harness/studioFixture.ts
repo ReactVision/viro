@@ -110,7 +110,7 @@ export function makeStudioScene(opts: {
         id: "a-text",
         asset_type_name: "TEXT",
         // The node factory renders asset.name as the text content.
-        name: "Studio en web",
+        name: "Studio on web",
         position_x: 0,
         position_y: 1.4,
         position_z: -3,

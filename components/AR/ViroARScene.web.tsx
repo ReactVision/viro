@@ -6,8 +6,8 @@
  *   - onAnchorFound/Updated/Removed  as slam planes appear/move/disappear
  *
  * It also provides a claim registry so multiple auto-matching <ViroARPlane>s
- * don't bind to the same detected plane, and exposes performARHitTestWithPoint
- * via ref (ray-vs-plane in the session).
+ * don't bind to the same detected plane, and exposes native's hit tests and
+ * camera reads via ref.
  *
  * MVP scope: plane anchors only (slam has no image/object anchors).
  */
@@ -18,11 +18,7 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
-import {
-  ViroTrackingState,
-  type ArPlaneAnchor,
-  type ArHitResult,
-} from "@reactvision/viro-web-renderer";
+import { ViroTrackingState, type ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import {
   useViroAR,
   useViroRenderer,
@@ -35,6 +31,16 @@ import {
 } from "../ViroConstants";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
 import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "../Web/useViroPhysicsWorld";
+import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
+import { hitTestPlanes, planeHitResult } from "../Web/viroHitTest";
+import {
+  cameraOrientationAsync,
+  useViroCameraTransform,
+  type ViroWebCameraOrientation,
+  type ViroWebCameraTransform,
+} from "../Web/viroCameraTransform";
+import type { Vec3 } from "../Web/viroMath";
+import type { ViroARHitTestResult } from "../Types/ViroEvents";
 
 /** The declarative anchor shape passed to onAnchor* (mirrors ViroAnchor). */
 export type ViroWebAnchor = {
@@ -54,6 +60,9 @@ type Props = {
   onAnchorFound?: (anchor: ViroWebAnchor) => void;
   onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
   onAnchorRemoved?: (anchor: ViroWebAnchor) => void;
+  /** Estimated from the camera feed a few times a second; see viroLightEstimate. */
+  onAmbientLightUpdate?: (light: ViroWebAmbientLight) => void;
+  onCameraTransformUpdate?: (transform: ViroWebCameraTransform) => void;
   /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
   toneMappingEnabled?: boolean;
   physicsWorld?: ViroPhysicsWorldProp;
@@ -62,8 +71,16 @@ type Props = {
 };
 
 export type ViroARSceneHandle = {
-  /** Ray-vs-plane hit test from a screen point (device pixels, top-left origin). */
-  performARHitTestWithPoint: (x: number, y: number) => Promise<ArHitResult[]>;
+  /** From a screen point in the canvas's device pixels, top-left origin. */
+  performARHitTestWithPoint: (x: number, y: number) => Promise<ViroARHitTestResult[]>;
+  /** Along a direction from the camera. */
+  performARHitTestWithRay: (ray: Vec3) => Promise<ViroARHitTestResult[]>;
+  /** Between two world points. */
+  performARHitTestWithWorldPoints: (origin: Vec3, destination: Vec3) => Promise<ViroARHitTestResult[]>;
+  /** From the camera toward a world point. */
+  performARHitTestWithPosition: (position: Vec3) => Promise<ViroARHitTestResult[]>;
+  getCameraOrientationAsync: () => Promise<ViroWebCameraOrientation>;
+  getCameraPositionAsync: () => Promise<Vec3>;
 };
 
 export function anchorToViro(p: ArPlaneAnchor): ViroWebAnchor {
@@ -99,6 +116,8 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   const renderer = useViroRenderer();
   useViroToneMapping(props.toneMappingEnabled);
   useViroPhysicsWorld(props.physicsWorld);
+  useViroLightEstimate(session, props.onAmbientLightUpdate);
+  useViroCameraTransform(props.onCameraTransformUpdate);
 
   // Read latest callbacks from a ref so effects don't re-run on identity change.
   const propsRef = useRef(props);
@@ -154,13 +173,33 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
 
   useImperativeHandle(
     ref,
-    () => ({
-      performARHitTestWithPoint: async (x: number, y: number) => {
+    () => {
+      const fromCamera = (toward: (camera: Vec3) => Vec3) => {
         if (!session) return [];
-        const { width, height } = renderer.canvasSize;
-        return session.hitTest(x, y, width, height);
-      },
-    }),
+        const camera = session.cameraPose.position as Vec3;
+        return hitTestPlanes(session.getPlanes(), camera, toward(camera));
+      };
+      return {
+        performARHitTestWithPoint: async (x: number, y: number) => {
+          if (!session) return [];
+          const { width, height } = renderer.canvasSize;
+          const planes = new Map(session.getPlanes().map((p) => [p.id, p]));
+          return session.hitTest(x, y, width, height).flatMap((hit) => {
+            const plane = planes.get(hit.anchorId);
+            return plane ? [planeHitResult(plane, hit.position as Vec3)] : [];
+          });
+        },
+        performARHitTestWithRay: async (ray: Vec3) => fromCamera(() => ray),
+        performARHitTestWithWorldPoints: async (origin: Vec3, destination: Vec3) => {
+          const dir: Vec3 = [destination[0] - origin[0], destination[1] - origin[1], destination[2] - origin[2]];
+          return session ? hitTestPlanes(session.getPlanes(), origin, dir, Math.hypot(...dir)) : [];
+        },
+        performARHitTestWithPosition: async (position: Vec3) =>
+          fromCamera((c) => [position[0] - c[0], position[1] - c[1], position[2] - c[2]]),
+        getCameraOrientationAsync: () => cameraOrientationAsync(renderer.scene),
+        getCameraPositionAsync: async () => (await cameraOrientationAsync(renderer.scene)).position,
+      };
+    },
     [session, renderer],
   );
 

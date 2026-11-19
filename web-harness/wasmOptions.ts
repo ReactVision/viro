@@ -14,11 +14,15 @@ import glueUrl from "./wasm/viro-web.js?url";
 import wasmUrl from "./wasm/viro-web.wasm?url";
 import dataUrl from "./wasm/viro-web.data?url";
 
+// The faces text fetches on demand, as asset URLs like the wasm's, so they
+// resolve wherever the wasm does (a page served from another origin included).
+const faceUrls = import.meta.glob("./wasm/Roboto-*.ttf", { query: "?url", import: "default", eager: true }) as Record<string, string>;
+
 export const webRendererOptions = {
   importGlue: () => import(/* @vite-ignore */ glueUrl),
   locateFile: (path: string) => {
     if (path.endsWith(".wasm")) return wasmUrl;
     if (path.endsWith(".data")) return dataUrl;
-    return path;
+    return faceUrls[`./wasm/${path}`] ?? path;
   },
 };

@@ -15,20 +15,32 @@
  *  - Dropped (no web equivalent): Quest/ViroController, image-triggered assets
  *    (ViroARImageMarker), drag, and the gaze bindings. `webCapabilities`
  *    reports them through `onUnsupported` so the caller can warn.
+ *  - ALERT draws through StudioWebAlertOverlay, which the navigator mounts.
  *  - apiRequestExecutor + navigate are injected (no native VRTStudioModule).
  */
 import * as React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ViroAmbientLight } from "../ViroAmbientLight.web";
 import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
 import { ViroARScene, type ViroARSceneHandle } from "../AR/ViroARScene.web";
+import { ViroTrackingState } from "@reactvision/viro-web-renderer";
+import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
 import { addCollisionListener } from "../Web/viroCollisions";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
+import { StudioAnimationSlots } from "./domain/animationSlots";
 import { createNode, type StudioAssetErrorHandler } from "./domain/viroNodeFactory";
 import { studioAssetPosition } from "./domain/assetPosition";
 import {
@@ -41,7 +53,15 @@ import { StudioVisibilityStore } from "./domain/visibilityStore";
 import { StudioPlacementStore, isTapToPlaceAsset } from "./domain/placementStore";
 import { StudioSoundManager } from "./domain/soundManager";
 import { StudioSounds } from "./domain/StudioSounds";
+import {
+  dragSurfaceFromAnchor,
+  isSameDragSurface,
+  type DragSurface,
+} from "./domain/dragConfiguration";
+import { TRACKING_GATE_FALLBACK_MS } from "./domain/trackingGate";
 import { registerStudioMaterialsForAssets } from "./domain/studioMaterials";
+import { useStudioShaderTimeUniforms } from "./domain/useStudioShaderTimeUniforms";
+import { useStudioShaderViewportUniforms } from "./domain/useStudioShaderViewportUniforms";
 import { webUnsupportedFeatures, usesPlaneWrapper } from "./domain/webCapabilities";
 import { createPlacementCollisionHandler } from "./domain/collisionBindingsRuntime";
 import { collisionPairKey } from "./domain/collisionPairKey";
@@ -56,6 +76,8 @@ import {
   STUDIO_AMBIENT_INTENSITY,
   STUDIO_DIRECTIONAL_DIRECTION,
   STUDIO_DIRECTIONAL_INTENSITY,
+  STUDIO_LIGHT_SCALE_STEP,
+  studioLightScale,
 } from "./domain/studioLighting";
 import type {
   StudioAnimation,
@@ -63,7 +85,12 @@ import type {
   ViroAnimationProp,
 } from "./types";
 
-type AnimOverride = { key: string; run: boolean };
+type AnimOverride = {
+  key: string;
+  run: boolean;
+  /** Set on the single update that replaces a still-running animation. */
+  interrupting?: boolean;
+};
 
 /** Native's throttle: the pose updates every frame, the distances need not. */
 const PROXIMITY_EVAL_INTERVAL_MS = 100;
@@ -79,21 +106,16 @@ export type StudioPlacementApi = {
 };
 
 /**
- * The surface a tap lands on, or null when it lands on nothing usable.
- *
- * Nearest wins. The web tracker reports a plane hit with a normal and a
- * distance and nothing else, so unlike the native pick there is no anchor type
- * to prefer — the nearest real surface in front of the user is the whole rule.
+ * The surface a tap lands on, or null: the native host's rule. Hits come
+ * nearest first, and a hit inside a plane's detected rectangle beats one on its
+ * extension.
  */
-function pickBestHit(
-  results: { position: Vec3; distance: number }[],
-): { position: Vec3 } | null {
-  let best: { position: Vec3; distance: number } | null = null;
-  for (const hit of results) {
-    if (!Number.isFinite(hit.distance) || hit.distance <= 0) continue;
-    if (!best || hit.distance < best.distance) best = hit;
+function pickBestHit(results: ViroARHitTestResult[]): { position: Vec3 } | null {
+  for (const type of ["ExistingPlaneUsingExtent", "ExistingPlane"]) {
+    const hit = results.find((r) => r.type === type);
+    if (hit) return { position: hit.transform.position as Vec3 };
   }
-  return best;
+  return null;
 }
 
 export interface StudioApiRequestExecutorLike {
@@ -122,6 +144,27 @@ interface Props {
   /** Told when an asset's model, image or video fails to load. */
   onAssetError?: StudioAssetErrorHandler;
 }
+
+type StudioLightRigHandle = { setScale: (scale: number) => void };
+
+/**
+ * The scene's two lights, scaled together by the room's light. Its own
+ * component, so an estimate re-renders two lights rather than the scene.
+ */
+const StudioLightRig = forwardRef<StudioLightRigHandle>(function StudioLightRig(_props, ref) {
+  const [scale, setScale] = useState(1);
+  useImperativeHandle(ref, () => ({ setScale }), []);
+  return (
+    <>
+      <ViroAmbientLight color="#ffffff" intensity={STUDIO_AMBIENT_INTENSITY * scale} />
+      <ViroDirectionalLight
+        color="#ffffff"
+        intensity={STUDIO_DIRECTIONAL_INTENSITY * scale}
+        direction={STUDIO_DIRECTIONAL_DIRECTION}
+      />
+    </>
+  );
+});
 
 /** Outer gate: keep hooks out of the tree until sceneData exists. */
 export const StudioARScene: React.FC<Props> = (props) => {
@@ -281,6 +324,9 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     registerStudioMaterialsForAssets(assets);
     materialsRegisteredRef.current = true;
   }
+
+  useStudioShaderTimeUniforms(assets);
+  useStudioShaderViewportUniforms(assets);
   const registeredKeyRef = useRef<string | null>(null);
   const animationsKey = animations.map((a) => a.animation_key).join(",");
   if (animations.length > 0 && registeredKeyRef.current !== animationsKey) {
@@ -291,6 +337,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Animation runtime state ──────────────────────────────────────────────
   const [animOverrides, setAnimOverrides] = useState<Record<string, AnimOverride>>({});
   const [loadedAssetIds, setLoadedAssetIds] = useState<Record<string, true>>({});
+  const animationSlotsRef = useRef<StudioAnimationSlots | null>(null);
+  if (animationSlotsRef.current === null) {
+    animationSlotsRef.current = new StudioAnimationSlots();
+  }
+  const loadedAssetIdsRef = useRef(loadedAssetIds);
+  loadedAssetIdsRef.current = loadedAssetIds;
 
   // Through a ref, so a host passing a fresh arrow each render does not rebuild
   // every node.
@@ -313,20 +365,78 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     };
   }, []);
 
-  const triggerAnimation = useCallback((targetAssetId: string, animationKey: string) => {
-    setAnimOverrides((prev) => ({ ...prev, [targetAssetId]: { key: animationKey, run: false } }));
-    const handle = requestAnimationFrame(() => {
-      triggerHandlesRef.current.delete(handle);
-      setAnimOverrides((prev) => {
-        const current = prev[targetAssetId];
-        if (!current || current.key !== animationKey || current.run) return prev;
-        return { ...prev, [targetAssetId]: { key: animationKey, run: true } };
+  // The native host's slot rules (see StudioAnimationSlots). There is no shared
+  // session on the web, so every play is "local".
+  const triggerAnimation = useCallback(
+    (targetAssetId: string, animationKey: string) => {
+      const requested = animations.find(
+        (a) => a.target_asset_id === targetAssetId && a.animation_key === animationKey,
+      );
+      if (!requested) return;
+
+      const play = animationSlotsRef.current!.request(
+        requested,
+        !!loadedAssetIdsRef.current[targetAssetId],
+        "local",
+      );
+      if (play === "queued") return;
+      if (play === "interrupt") {
+        // One update with `run` still true: the web hook restarts on a name
+        // change, and a false half would only pause the running one.
+        setAnimOverrides((prev) => ({
+          ...prev,
+          [targetAssetId]: { key: animationKey, run: true, interrupting: true },
+        }));
+        return;
+      }
+
+      // The animation prop is edge-triggered on false→true, so a re-trigger of
+      // the same key goes false first and true on the next frame.
+      setAnimOverrides((prev) => ({ ...prev, [targetAssetId]: { key: animationKey, run: false } }));
+      const handle = requestAnimationFrame(() => {
+        triggerHandlesRef.current.delete(handle);
+        setAnimOverrides((prev) => {
+          const current = prev[targetAssetId];
+          if (!current || current.key !== animationKey || current.run) return prev;
+          return { ...prev, [targetAssetId]: { key: animationKey, run: true } };
+        });
       });
-    });
-    triggerHandlesRef.current.add(handle);
-  }, []);
+      triggerHandlesRef.current.add(handle);
+    },
+    [animations],
+  );
   const triggerAnimationRef = useRef(triggerAnimation);
   triggerAnimationRef.current = triggerAnimation;
+
+  const runAnimationFunction = useCallback(
+    (fnId: string) =>
+      executeOnLoadFunction(
+        fnId,
+        functions,
+        undefined,
+        animations,
+        (id, key) => triggerAnimationRef.current(id, key),
+        handleSceneChange,
+        runtimeCtx,
+      ),
+    [functions, animations, handleSceneChange, runtimeCtx],
+  );
+
+  const handleAnimationFinished = useCallback(
+    (assetId: string, anim: StudioAnimation) => {
+      // A loop reports a finish at every cycle boundary but never ends, and the
+      // editor fires on_finish only when an animation ends.
+      if (anim.loop) return;
+      const slots = animationSlotsRef.current!;
+      if (slots.finish(assetId) && anim.on_finish_function) {
+        runAnimationFunction(anim.on_finish_function);
+      }
+      // After on_finish, so an animation it chains holds the slot first.
+      const next = slots.next(assetId);
+      if (next) triggerAnimationRef.current(assetId, next.key);
+    },
+    [runAnimationFunction],
+  );
 
   const animationStates = useMemo<Record<string, ViroAnimationProp>>(() => {
     const states: Record<string, ViroAnimationProp> = {};
@@ -349,28 +459,29 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         activeAnim = anims[0];
         run = false;
       }
-      const runOnLoad = (fnId: string) =>
-        executeOnLoadFunction(
-          fnId,
-          functions,
-          undefined,
-          animations,
-          (id, key) => triggerAnimationRef.current(id, key),
-          handleSceneChange,
-          runtimeCtx,
-        );
       states[assetId] = {
-        name: activeAnim.animation_key,
+        // A model clip is looked up in the model by its embedded name.
+        name:
+          activeAnim.animation_source === "MODEL_CLIP" && activeAnim.clip_name
+            ? activeAnim.clip_name
+            : activeAnim.animation_key,
         run,
         loop: activeAnim.loop,
-        interruptible: activeAnim.interruptible,
+        interruptible: activeAnim.interruptible || !!override?.interrupting,
         delay: activeAnim.delay_ms ?? 0,
-        onStart: activeAnim.on_start_function ? () => runOnLoad(activeAnim.on_start_function!) : undefined,
-        onFinish: activeAnim.on_finish_function ? () => runOnLoad(activeAnim.on_finish_function!) : undefined,
+        onStart: activeAnim.on_start_function
+          ? () => {
+              // Once per play: a loop reports a start on every cycle.
+              if (!animationSlotsRef.current!.runsOnStart(assetId)) return;
+              runAnimationFunction(activeAnim.on_start_function!);
+            }
+          : undefined,
+        // Always wired: it also releases an animation queued behind this one.
+        onFinish: () => handleAnimationFinished(assetId, activeAnim),
       };
     }
     return states;
-  }, [animations, animOverrides, loadedAssetIds, functions, handleSceneChange, runtimeCtx]);
+  }, [animations, animOverrides, loadedAssetIds, runAnimationFunction, handleAnimationFinished]);
 
   // ─── on_load_function ─────────────────────────────────────────────────────
   // A scene bound to a VPS location runs it at its first tracking, which a
@@ -416,7 +527,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Tap to place ─────────────────────────────────────────────────────────
   // The AR session is the only thing that knows where the camera is, and the
   // scene handle is the only thing that can hit-test a screen point.
-  const { session } = useViroAR();
+  const { session, trackingState, playback } = useViroAR();
   const arSceneRef = useRef<ViroARSceneHandle | null>(null);
 
   const placeAtScreenPoint = useCallback(
@@ -425,7 +536,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       const activeId = store?.activeAssetId();
       if (!store || !activeId || !arSceneRef.current) return "miss";
 
-      let results: { position: Vec3; distance: number }[] = [];
+      let results: ViroARHitTestResult[] = [];
       try {
         results = await arSceneRef.current.performARHitTestWithPoint(x, y);
       } catch {
@@ -581,6 +692,28 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     runtimeCtx,
   ]);
 
+  // ─── Drag surface ─────────────────────────────────────────────────────────
+  // As natively: a FixedToPlane drag slides along the plane its asset's anchor
+  // found, not along an axis guessed from plane_direction.
+  const hasPlaneDrag = useMemo(
+    () => mode === "ar" && planeAssets.some((asset) => asset.is_draggable),
+    [mode, planeAssets],
+  );
+  const [dragSurface, setDragSurface] = useState<DragSurface | null>(null);
+  const trackDragSurface = useCallback(
+    (anchor: { position?: Vec3; rotation?: Vec3 }) => {
+      if (!hasPlaneDrag || !anchor?.position || !anchor?.rotation) return;
+      const next = dragSurfaceFromAnchor(anchor.position, anchor.rotation);
+      // A plane mostly refines by sliding within itself; keep the same object
+      // then, or every update rebuilds the asset nodes.
+      setDragSurface((prev) => (prev && isSameDragSurface(prev, next) ? prev : next));
+    },
+    [hasPlaneDrag],
+  );
+  useEffect(() => {
+    setDragSurface(null);
+  }, [scene.id]);
+
   // ─── Node mapping (image-triggered assets are skipped on web) ─────────────
   const buildNodes = useCallback(
     (list: typeof assets) =>
@@ -601,7 +734,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
             runtimeCtx,
             undefined, // registerProximityTarget: native reads a component ref
             undefined, // onGaze: no eye gaze on web
-            null, // dragSurface
+            dragSurface,
             proximityTargetIds.has(asset.id)
               ? registerProximityNode
               : undefined,
@@ -619,6 +752,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       proximityTargetIds,
       registerProximityNode,
       onAssetErrorStable,
+      dragSurface,
     ],
   );
 
@@ -635,12 +769,49 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
   const usePlane = usesPlaneWrapper(scene.plane_detection as string, mode);
 
+  // ─── Tracking-readiness gate (AR, plane_detection=NONE only) ──────────────
+  // The native host's rule: NONE assets sit at fixed scene-root coordinates, so
+  // mounted before the session has a pose they ride its settling. They wait for
+  // the first Normal; the camera and tap-to-place do not. A replayed recording
+  // has no settling, and holding its assets would start their loads only as the
+  // render driver starts stepping frames.
+  const [trackingReady, setTrackingReady] = useState(
+    () =>
+      mode !== "ar" ||
+      !!playback ||
+      ((scene.plane_detection as string) ?? "NONE").toUpperCase() !== "NONE",
+  );
+  useEffect(() => {
+    if (trackingState === ViroTrackingState.Normal) setTrackingReady(true);
+  }, [trackingState]);
+  useEffect(() => {
+    if (trackingReady) return;
+    const timer = setTimeout(() => setTrackingReady(true), TRACKING_GATE_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [trackingReady]);
+
+  // ─── Rig scale from the room (AR only) ────────────────────────────────────
+  // The native host's rule (studioLightScale): only a dim room pulls the rig
+  // below authored.
+  const lightRigRef = useRef<StudioLightRigHandle | null>(null);
+  const lightScaleRef = useRef(1);
+  const handleAmbientLightUpdate = useCallback((light: { intensity: number }) => {
+    const scale = studioLightScale(light?.intensity);
+    if (Math.abs(scale - lightScaleRef.current) < STUDIO_LIGHT_SCALE_STEP) return;
+    lightScaleRef.current = scale;
+    lightRigRef.current?.setScale(scale);
+  }, []);
+
   const body = usePlane ? (
     <ViroARPlane
       minHeight={0.1}
       minWidth={0.1}
       alignment={planeAlignment}
-      onAnchorFound={() => onPlaneDetected?.()}
+      onAnchorFound={(anchor) => {
+        trackDragSurface(anchor);
+        onPlaneDetected?.();
+      }}
+      onAnchorUpdated={trackDragSurface}
     >
       {renderedAssets}
     </ViroARPlane>
@@ -650,13 +821,8 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
 
   const children = (
     <>
-      <ViroAmbientLight color="#ffffff" intensity={STUDIO_AMBIENT_INTENSITY} />
-      <ViroDirectionalLight
-        color="#ffffff"
-        intensity={STUDIO_DIRECTIONAL_INTENSITY}
-        direction={STUDIO_DIRECTIONAL_DIRECTION}
-      />
-      {body}
+      <StudioLightRig ref={lightRigRef} />
+      {trackingReady && body}
       {/* At scene root: a placed asset is in world space, and the plane wrapper
           would re-parent it to the plane it happened to be tapped on. */}
       {renderedPlacements}
@@ -678,7 +844,11 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     // line StudioARScene draws natively.
     <ViroScene toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}>{children}</ViroScene>
   ) : (
-    <ViroARScene ref={arSceneRef} toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}>
+    <ViroARScene
+      ref={arSceneRef}
+      toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}
+      onAmbientLightUpdate={handleAmbientLightUpdate}
+    >
       {children}
     </ViroARScene>
   );

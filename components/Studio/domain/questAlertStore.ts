@@ -1,14 +1,15 @@
 import { Alert } from "react-native";
-import { isQuest } from "../../Utilities/ViroPlatform";
+import { isQuest, isWeb } from "../../Utilities/ViroPlatform";
 import { GlobalListeners } from "./utils";
 
 const DEFAULT_BUTTON_LABEL = "OK";
 
 /**
  * Quest has no 2D overlay surface, so a scene's alerts can't show a native
- * Alert.alert dialog the way phones do. This module singleton is the single
- * active message; showStudioAlert writes it, and StudioQuestAlertOverlay
- * subscribes to render it in-scene, head-locked.
+ * Alert.alert dialog the way phones do, and react-native-web's Alert.alert does
+ * nothing at all. This module singleton is the single active message;
+ * showStudioAlert writes it, StudioQuestAlertOverlay renders it in-scene,
+ * head-locked, and StudioWebAlertOverlay renders it over the web canvas.
  */
 class QuestAlertStore {
   private activeTitle: string | null = null;
@@ -63,7 +64,8 @@ export const questAlertStore = new QuestAlertStore();
  * Shows a Studio scene's alert: the ALERT function's, or a failure the wearer
  * has to know about. On Quest, Alert.alert's dialog is never drawn in the
  * headset and takes no controller input, so the in-scene panel shows it
- * instead. The button reads buttonLabel, or OK when it is empty.
+ * instead; on the web the DOM overlay does. The button reads buttonLabel, or
+ * OK when it is empty.
  */
 export function showStudioAlert(
   title: string,
@@ -71,7 +73,7 @@ export function showStudioAlert(
   buttonLabel?: string | null
 ): void {
   const label = buttonLabel?.trim() || DEFAULT_BUTTON_LABEL;
-  if (isQuest) {
+  if (isQuest || isWeb) {
     questAlertStore.show(title, message, label);
     return;
   }

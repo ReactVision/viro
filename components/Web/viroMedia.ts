@@ -99,6 +99,50 @@ export function resumeAudioWhenAllowed(ctx: AudioContext): void {
   watchResume(ctx);
 }
 
+export type ViroMediaEventProps = {
+  onBufferStart?: (event: { nativeEvent: Record<string, never> }) => void;
+  onBufferEnd?: (event: { nativeEvent: Record<string, never> }) => void;
+  onUpdateTime?: (currentTime: number, totalTime: number) => void;
+};
+
+/**
+ * Native's buffering and progress callbacks from a media element. `props` is
+ * read on each event, so the caller passes a getter over its latest props.
+ * Attach before the element's first task runs: native reports buffering from
+ * the moment the video is created, which here is `loadstart`.
+ */
+export function forwardMediaEvents(media: HTMLMediaElement, props: () => ViroMediaEventProps): () => void {
+  let buffering = false;
+  const bufferStart = () => {
+    if (buffering) return;
+    buffering = true;
+    props().onBufferStart?.({ nativeEvent: {} });
+  };
+  const bufferEnd = () => {
+    if (!buffering) return;
+    buffering = false;
+    props().onBufferEnd?.({ nativeEvent: {} });
+  };
+  const time = () =>
+    props().onUpdateTime?.(media.currentTime, Number.isFinite(media.duration) ? media.duration : 0);
+  const listeners: [string, () => void][] = [
+    ["loadstart", bufferStart],
+    ["waiting", bufferStart],
+    ["canplay", bufferEnd],
+    ["playing", bufferEnd],
+    ["timeupdate", time],
+  ];
+  for (const [type, fn] of listeners) media.addEventListener(type, fn);
+  return () => {
+    for (const [type, fn] of listeners) media.removeEventListener(type, fn);
+  };
+}
+
+/** The ref method the video components share. */
+export function seekMedia(media: HTMLMediaElement | null, seconds: number): void {
+  if (media && Number.isFinite(seconds)) media.currentTime = Math.max(0, seconds);
+}
+
 // requestVideoFrameCallback isn't in every TS DOM lib; access it via a cast.
 function requestVideoFrame(video: HTMLVideoElement, cb: () => void): number | null {
   const fn = (video as any).requestVideoFrameCallback;

@@ -186,6 +186,9 @@ export function useViroNode(
   // Factory for the underlying node (default `createNode`). Override for special
   // node types, e.g. portal scenes (`createPortalScene`).
   createNodeFn?: (scene: ViroSceneApi) => ViroHandle,
+  // A component's own ref methods, beside the node's (a video's seekToTime).
+  // Read once per node, so they should reach changing state through refs.
+  extraRefMethods?: Record<string, (...args: any[]) => unknown>,
 ): ViroHandle {
   const scene = useViroScene();
   const renderer = useViroRenderer();
@@ -548,6 +551,7 @@ export function useViroNode(
           );
         }
       },
+      ...extraRefMethods,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [node],

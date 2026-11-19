@@ -3,10 +3,10 @@
  * viroAudioBuffer). Scene-level (renders no node). Playback the browser holds
  * back until a user gesture starts at that gesture (see viroMedia).
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef } from "react";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import { getAudioContext } from "./Web/viroAudio";
-import { createBufferSound, type BufferSound } from "./Web/viroAudioBuffer";
+import { createBufferSound, preloadSound, unloadSound, type BufferSound } from "./Web/viroAudioBuffer";
 
 export type ViroSoundProps = {
   source: unknown;
@@ -25,6 +25,7 @@ export function ViroSound(props: ViroSoundProps): null {
   const gainRef = useRef<GainNode | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  useImperativeHandle(props.ref, () => ({ seekToTime: (seconds: number) => soundRef.current?.seek(seconds) }), []);
 
   useEffect(() => {
     if (!url) return;
@@ -63,3 +64,19 @@ export function ViroSound(props: ViroSoundProps): null {
 
   return null;
 }
+
+/** Loads each sound under its key, so a `source` of that key plays it without fetching. */
+ViroSound.preloadSounds = async (
+  soundMap: Record<string, unknown>,
+): Promise<Record<string, { result: boolean; msg?: string }>> => {
+  const results: Record<string, { result: boolean; msg?: string }> = {};
+  for (const [key, source] of Object.entries(soundMap)) {
+    const url = resolveImageSource(source);
+    results[key] = url ? await preloadSound(key, url) : { result: false, msg: "no source" };
+  }
+  return results;
+};
+
+ViroSound.unloadSounds = (soundKeys: string[]) => {
+  for (const key of soundKeys) unloadSound(key);
+};

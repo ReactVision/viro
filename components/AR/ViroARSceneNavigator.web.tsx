@@ -238,7 +238,7 @@ function trackingLabel(state: ViroTrackingState): string {
 
 export function ViroARSceneNavigator(props: Props) {
   useViroUsagePing("ar", {
-    detect_planes: props.arOptions?.detectPlanes,
+    detect_planes: props.arOptions?.detectPlanes ?? true,
     facing_mode: props.arOptions?.facingMode,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -372,6 +372,8 @@ export function ViroARSceneNavigator(props: Props) {
       loadSlam: resolveLoadSlam(),
       ...(lowVideo ? { feedWidth: 640, feedHeight: 480 } : null),
       ...props.arOptions,
+      // Native detects horizontal and vertical planes unless anchorDetectionTypes narrows them.
+      detectPlanes: props.arOptions?.detectPlanes ?? true,
       onStatus: (state, _quality, detail) => {
         setTracking(state);
         setTrackingReason(detail?.reason ?? TrackingReason.None);

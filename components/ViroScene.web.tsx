@@ -7,6 +7,7 @@ import * as React from "react";
 import { forwardRef, useImperativeHandle } from "react";
 
 import { useViroToneMapping } from "./Web/useViroToneMapping";
+import { useViroPostProcessEffects } from "./Web/useViroPostProcessEffects";
 import { collisionQueries, useViroPhysicsWorld, type ViroCollisionQueries, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
 import {
   cameraOrientationAsync,
@@ -29,6 +30,8 @@ export const ViroScene = forwardRef<
     children?: React.ReactNode;
     /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
     toneMappingEnabled?: boolean;
+    /** grayscale, sepia, sincity, ... in order; they need HDR, as on native. */
+    postProcessEffects?: string[];
     physicsWorld?: ViroPhysicsWorldProp;
     onCameraTransformUpdate?: (transform: ViroWebCameraTransform) => void;
     [key: string]: any;
@@ -36,6 +39,7 @@ export const ViroScene = forwardRef<
 >(function ViroScene(props, ref) {
   const scene = useViroScene();
   useViroToneMapping(props.toneMappingEnabled);
+  useViroPostProcessEffects(props.postProcessEffects);
   useViroPhysicsWorld(props.physicsWorld);
   useViroCameraTransform(props.onCameraTransformUpdate);
   useViroSceneEvents(props);

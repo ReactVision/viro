@@ -40,6 +40,21 @@ import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
 
+const controllerDragListeners = new WeakMap<ViroSceneApi, Set<(to: Vec3, source: number) => void>>();
+
+/** ViroController's onDrag: every node drag in the scene, as it is reported. */
+export function onControllerDrag(scene: ViroSceneApi, listener: (to: Vec3, source: number) => void): () => void {
+  let listeners = controllerDragListeners.get(scene);
+  if (!listeners) {
+    listeners = new Set();
+    controllerDragListeners.set(scene, listeners);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 /**
  * The billboard axis a `transformBehaviors` list asks for, or null for none.
  *
@@ -86,6 +101,14 @@ export interface ViroWebNodeProps {
   position?: [number, number, number];
   rotation?: [number, number, number]; // degrees, Viro convention
   scale?: [number, number, number];
+  /** Node-local point the rotation turns about; [0,0,0] by default. */
+  rotationPivot?: [number, number, number];
+  /** Node-local point the scale grows from; [0,0,0] by default. */
+  scalePivot?: [number, number, number];
+  /** Hit test this node's triangles, subtree included, instead of its bounding box. */
+  highAccuracyEvents?: boolean;
+  /** Deprecated name for highAccuracyEvents. */
+  highAccuracyGaze?: boolean;
   opacity?: number;
   visible?: boolean;
   /** Taps and hit tests pass through this node and its whole subtree, loaded model content included. */
@@ -388,6 +411,20 @@ export function useViroNode(
     scene.setNodeSelectable(node, selectable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, selectable]);
+  useNodePivot(scene, node, props.rotationPivot, "rotation");
+  useNodePivot(scene, node, props.scalePivot, "scale");
+  const highAccuracy = !!(props.highAccuracyEvents ?? props.highAccuracyGaze);
+  const highAccuracySentRef = useRef(false);
+  useEffect(() => {
+    // false is the engine's default, so nothing is sent until the prop is first set.
+    if (!highAccuracy && !highAccuracySentRef.current) return;
+    if (!scene.setNodeHighAccuracyEvents?.(node, highAccuracy)) {
+      if (highAccuracy) warnUnsupported("highAccuracyEvents with this build of the web renderer", "the web");
+      return;
+    }
+    highAccuracySentRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, highAccuracy]);
 
   // Dragging, which native enables with onDrag (dragType defaults to
   // FixedDistance). The renderer reports a press on the node; the drag is
@@ -448,6 +485,7 @@ export function useViroNode(
       if (Math.hypot(...sub(to, notified)) < 0.01) return;
       notified = to;
       propsRef.current.onDrag?.(to, 0);
+      controllerDragListeners.get(scene)?.forEach((listener) => listener(to, 0));
     };
     const onMove = (e: PointerEvent) => {
       pointer = { x: e.clientX, y: e.clientY };
@@ -793,4 +831,29 @@ export function useViroNode(
   );
 
   return node;
+}
+
+// A missing pivot is [0,0,0], which is the engine's default, so nothing is sent
+// until one is first set; after that, removing it sends the zeros.
+function useNodePivot(
+  scene: ViroSceneApi,
+  node: ViroHandle,
+  pivot: [number, number, number] | undefined,
+  kind: "rotation" | "scale",
+): void {
+  const [x, y, z] = pivot ?? [0, 0, 0];
+  const sentRef = useRef(false);
+  useEffect(() => {
+    if (x === 0 && y === 0 && z === 0 && !sentRef.current) return;
+    const sent =
+      kind === "rotation"
+        ? scene.setNodeRotationPivot?.(node, x, y, z)
+        : scene.setNodeScalePivot?.(node, x, y, z);
+    if (!sent) {
+      warnUnsupported(`${kind}Pivot with this build of the web renderer`, "the web");
+      return;
+    }
+    sentRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, x, y, z]);
 }

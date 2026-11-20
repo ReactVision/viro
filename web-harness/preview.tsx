@@ -241,6 +241,7 @@ function roomFilePlanes(planes: RoomFilePlane[], origin: Vec3): ArPlaneAnchor[] 
       height: z1 - z0,
       alignment: p.type === "vertical" ? "Vertical" : "HorizontalUpward",
       confidence: 1,
+      polygon: p.polygon.map((v): [number, number] => [v.x - (x0 + x1) / 2, v.y - (z0 + z1) / 2]),
     };
   });
 }

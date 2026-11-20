@@ -32,6 +32,7 @@ import {
 import { ViroTrackingStateConstants } from "../ViroConstants";
 import { trackingReasonToConstant, trackingStateToConstant } from "../Web/viroTracking";
 import { useViroToneMapping } from "../Web/useViroToneMapping";
+import { useViroPostProcessEffects } from "../Web/useViroPostProcessEffects";
 import {
   collisionQueries,
   useViroPhysicsWorld,
@@ -82,6 +83,8 @@ type Props = {
   onCameraTransformUpdate?: (transform: ViroWebCameraTransform) => void;
   /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
   toneMappingEnabled?: boolean;
+  /** grayscale, sepia, sincity, ... in order; they need HDR, as on native. */
+  postProcessEffects?: string[];
   physicsWorld?: ViroPhysicsWorldProp;
   children?: React.ReactNode;
   [key: string]: any;
@@ -129,6 +132,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   const { session, trackingState, trackingReason } = ar;
   const renderer = useViroRenderer();
   useViroToneMapping(props.toneMappingEnabled);
+  useViroPostProcessEffects(props.postProcessEffects);
   useViroPhysicsWorld(props.physicsWorld);
   useViroLightEstimate(session, props.onAmbientLightUpdate);
   useViroCameraTransform(props.onCameraTransformUpdate);

@@ -87,6 +87,14 @@ export interface ViroWebNodeProps {
   position?: [number, number, number];
   rotation?: [number, number, number]; // degrees, Viro convention
   scale?: [number, number, number];
+  /** Node-local point the rotation turns about; [0,0,0] by default. */
+  rotationPivot?: [number, number, number];
+  /** Node-local point the scale grows from; [0,0,0] by default. */
+  scalePivot?: [number, number, number];
+  /** Hit test this node's triangles, subtree included, instead of its bounding box. */
+  highAccuracyEvents?: boolean;
+  /** Deprecated name for highAccuracyEvents. */
+  highAccuracyGaze?: boolean;
   opacity?: number;
   visible?: boolean;
   /** Taps and hit tests pass through this node and its whole subtree, loaded model content included. */
@@ -403,6 +411,20 @@ export function useViroNode(
     scene.setNodeSelectable(node, selectable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, selectable]);
+  useNodePivot(scene, node, props.rotationPivot, "rotation");
+  useNodePivot(scene, node, props.scalePivot, "scale");
+  const highAccuracy = !!(props.highAccuracyEvents ?? props.highAccuracyGaze);
+  const highAccuracySentRef = useRef(false);
+  useEffect(() => {
+    // false is the engine's default, so nothing is sent until the prop is first set.
+    if (!highAccuracy && !highAccuracySentRef.current) return;
+    if (!scene.setNodeHighAccuracyEvents?.(node, highAccuracy)) {
+      if (highAccuracy) warnUnsupported("highAccuracyEvents with this build of the web renderer", "the web");
+      return;
+    }
+    highAccuracySentRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, highAccuracy]);
 
   // Dragging, which native enables with onDrag (dragType defaults to
   // FixedDistance). The renderer reports a press on the node; the drag is
@@ -807,4 +829,29 @@ export function useViroNode(
   );
 
   return node;
+}
+
+// A missing pivot is [0,0,0], which is the engine's default, so nothing is sent
+// until one is first set; after that, removing it sends the zeros.
+function useNodePivot(
+  scene: ViroSceneApi,
+  node: ViroHandle,
+  pivot: [number, number, number] | undefined,
+  kind: "rotation" | "scale",
+): void {
+  const [x, y, z] = pivot ?? [0, 0, 0];
+  const sentRef = useRef(false);
+  useEffect(() => {
+    if (x === 0 && y === 0 && z === 0 && !sentRef.current) return;
+    const sent =
+      kind === "rotation"
+        ? scene.setNodeRotationPivot?.(node, x, y, z)
+        : scene.setNodeScalePivot?.(node, x, y, z);
+    if (!sent) {
+      warnUnsupported(`${kind}Pivot with this build of the web renderer`, "the web");
+      return;
+    }
+    sentRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node, x, y, z]);
 }

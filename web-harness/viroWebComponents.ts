@@ -100,9 +100,9 @@ export { ViroCameraTexture } from "../components/ViroCameraTexture";
 export { ViroGameLoop } from "../components/ViroGameLoop";
 export { ViroVirtualButton } from "../components/ViroVirtualButton";
 export { ViroVirtualJoystick } from "../components/ViroVirtualJoystick";
+export { ViroController } from "../components/ViroController";
 // These render nothing on web, as on native when nothing is tracked. The stub
 // drew their children at the origin instead.
-export { ViroController } from "../components/ViroController";
 export {
   ViroObjectDetector,
   VIRO_OBJECT_DETECTOR_UNAVAILABLE_ERROR,

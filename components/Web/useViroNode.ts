@@ -41,6 +41,21 @@ import { warnUnsupported } from "../Utilities/ViroUnsupported";
 
 const DEG2RAD = Math.PI / 180;
 
+const controllerDragListeners = new WeakMap<ViroSceneApi, Set<(to: Vec3, source: number) => void>>();
+
+/** ViroController's onDrag: every node drag in the scene, as it is reported. */
+export function onControllerDrag(scene: ViroSceneApi, listener: (to: Vec3, source: number) => void): () => void {
+  let listeners = controllerDragListeners.get(scene);
+  if (!listeners) {
+    listeners = new Set();
+    controllerDragListeners.set(scene, listeners);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 /**
  * The billboard axis a `transformBehaviors` list asks for, or null for none.
  *
@@ -484,6 +499,7 @@ export function useViroNode(
       if (Math.hypot(...sub(to, notified)) < 0.01) return;
       notified = to;
       propsRef.current.onDrag?.(to, 0);
+      controllerDragListeners.get(scene)?.forEach((listener) => listener(to, 0));
     };
     const onMove = (e: PointerEvent) => {
       pointer = { x: e.clientX, y: e.clientY };

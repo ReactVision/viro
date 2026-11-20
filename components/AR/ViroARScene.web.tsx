@@ -65,6 +65,10 @@ export type ViroWebAnchor = {
   width: number;
   height: number;
   alignment: ArPlaneAnchor["alignment"];
+  /** Inferred from the alignment, as on Android. */
+  classification: "Floor" | "Ceiling" | "Wall" | "Unknown";
+  /** The boundary around `center`, when the feed supplies one (recordings, Viro Live). */
+  vertices?: [number, number, number][];
 };
 
 type Props = {
@@ -114,6 +118,15 @@ export function anchorToViro(p: ArPlaneAnchor): ViroWebAnchor {
     width: p.width,
     height: p.height,
     alignment: p.alignment,
+    classification:
+      p.alignment === "HorizontalUpward"
+        ? "Floor"
+        : p.alignment === "HorizontalDownward"
+          ? "Ceiling"
+          : p.alignment === "Vertical"
+            ? "Wall"
+            : "Unknown",
+    ...(p.polygon ? { vertices: p.polygon.map(([x, z]): [number, number, number] => [x, 0, z]) } : {}),
   };
 }
 

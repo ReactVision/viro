@@ -217,6 +217,9 @@ export function ViroText(props: Props) {
     true,
     // Rebuild the text geometry when shaping inputs change.
     key,
+    undefined,
+    undefined,
+    extrusion > 0.0001,
   );
 
   return (

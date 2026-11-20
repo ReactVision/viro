@@ -7,7 +7,8 @@ import * as React from "react";
 import { forwardRef, useImperativeHandle } from "react";
 
 import { useViroToneMapping } from "./Web/useViroToneMapping";
-import { useViroPhysicsWorld, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
+import { useViroPostProcessEffects } from "./Web/useViroPostProcessEffects";
+import { collisionQueries, useViroPhysicsWorld, type ViroCollisionQueries, type ViroPhysicsWorldProp } from "./Web/useViroPhysicsWorld";
 import {
   cameraOrientationAsync,
   useViroCameraTransform,
@@ -15,9 +16,10 @@ import {
   type ViroWebCameraTransform,
 } from "./Web/viroCameraTransform";
 import { useViroScene } from "./Web/ViroWebContext";
+import { useViroSceneEvents } from "./Web/useViroNode";
 import type { Vec3 } from "./Web/viroMath";
 
-export type ViroSceneHandle = {
+export type ViroSceneHandle = ViroCollisionQueries & {
   getCameraOrientationAsync: () => Promise<ViroWebCameraOrientation>;
   getCameraPositionAsync: () => Promise<Vec3>;
 };
@@ -28,6 +30,8 @@ export const ViroScene = forwardRef<
     children?: React.ReactNode;
     /** Off drops Hable's curve without dropping PBR — see useViroToneMapping. */
     toneMappingEnabled?: boolean;
+    /** grayscale, sepia, sincity, ... in order; they need HDR, as on native. */
+    postProcessEffects?: string[];
     physicsWorld?: ViroPhysicsWorldProp;
     onCameraTransformUpdate?: (transform: ViroWebCameraTransform) => void;
     [key: string]: any;
@@ -35,13 +39,16 @@ export const ViroScene = forwardRef<
 >(function ViroScene(props, ref) {
   const scene = useViroScene();
   useViroToneMapping(props.toneMappingEnabled);
+  useViroPostProcessEffects(props.postProcessEffects);
   useViroPhysicsWorld(props.physicsWorld);
   useViroCameraTransform(props.onCameraTransformUpdate);
+  useViroSceneEvents(props);
   useImperativeHandle(
     ref,
     () => ({
       getCameraOrientationAsync: () => cameraOrientationAsync(scene),
       getCameraPositionAsync: async () => (await cameraOrientationAsync(scene)).position,
+      ...collisionQueries(scene),
     }),
     [scene],
   );

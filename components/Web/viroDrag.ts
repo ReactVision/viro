@@ -6,7 +6,7 @@
  * here (the AR session, the desktop virtual camera, and the 3D navigators'
  * default camera), and a drag turns pointer positions into world rays itself.
  */
-import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
+import type { ViroArSession, ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { conjugateQuat, multiplyQuats, quatFromEulerDegrees, rotateByQuaternion } from "./viroMath";
 
 export type Vec3 = [number, number, number];
@@ -21,34 +21,99 @@ export type CameraView = {
   cx: number;
   cy: number;
   element: HTMLElement;
+  /** An AR pose (a session, or the desktop stand-in): it turns whatever camera draws, so a camera node's own pose is not the view. */
+  ar?: true;
 };
 
 const views = new WeakMap<ViroSceneApi, CameraView>();
-const customCameras = new WeakMap<ViroSceneApi, number>();
+
+/**
+ * The scene's camera components, as native's ViroActiveCameraTracker keeps
+ * them: the last one activated is the point of view, and releasing it goes
+ * back to the default camera, never to an earlier one.
+ */
+type SceneCameras = { active: ViroHandle | null; orthographic: Set<ViroHandle>; fallback: ViroHandle };
+const sceneCameras = new WeakMap<ViroSceneApi, SceneCameras>();
+
+function camerasOf(scene: ViroSceneApi): SceneCameras {
+  let cams = sceneCameras.get(scene);
+  if (!cams) sceneCameras.set(scene, (cams = { active: null, orthographic: new Set(), fallback: 0 }));
+  return cams;
+}
 
 export function setCameraView(scene: ViroSceneApi, view: CameraView | null): void {
   if (view) views.set(scene, view);
   else views.delete(scene);
 }
 
-/** Null while a ViroCamera or ViroOrbitCamera is the point of view: its pose is not published. */
+/**
+ * The camera the scene draws from. Under a ViroCamera or ViroOrbitCamera that
+ * is the camera node's last drawn pose, with the default camera's field of
+ * view, which is the one virocore gives it; null while that pose is not known
+ * yet, on a renderer without the read, and under an orthographic projection.
+ */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
-  if (customCameraActive(scene)) return null;
-  return views.get(scene) ?? null;
+  const base = views.get(scene) ?? null;
+  const active = sceneCameras.get(scene)?.active;
+  if (!active) return base;
+  if (!base || base.ar || sceneCameras.get(scene)!.orthographic.has(active)) return null;
+  const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(active) : null;
+  // All zero until the node has been drawn once.
+  if (!t || t.scale.every((c) => c === 0)) return null;
+  const view = defaultCameraView(base.element);
+  view.position = t.position;
+  view.orientation = quatFromEulerDegrees(t.rotation);
+  return view;
 }
 
-export function customCameraActive(scene: ViroSceneApi): boolean {
-  return (customCameras.get(scene) ?? 0) > 0;
+/** True while a camera component draws whose pose the web cannot report: orthographic, in AR, or on a renderer without the read. */
+export function sceneCameraUnreadable(scene: ViroSceneApi): boolean {
+  const cams = sceneCameras.get(scene);
+  if (!cams?.active) return false;
+  const base = views.get(scene);
+  return (
+    cams.orthographic.has(cams.active) ||
+    !!base?.ar ||
+    typeof scene.getNodeWorldTransform !== "function"
+  );
 }
 
-/** Marks a camera component as the point of view until the returned release. */
-export function holdCustomCamera(scene: ViroSceneApi): () => void {
-  customCameras.set(scene, (customCameras.get(scene) ?? 0) + 1);
-  let released = false;
+/**
+ * Makes a camera component's node the point of view until the returned
+ * release, which returns to the default camera if this one still draws.
+ */
+export function activateSceneCamera(scene: ViroSceneApi, node: ViroHandle): () => void {
+  const cams = camerasOf(scene);
+  cams.active = node;
+  scene.setActiveCameraNode(node);
   return () => {
-    if (released) return;
-    released = true;
-    customCameras.set(scene, (customCameras.get(scene) ?? 1) - 1);
+    if (cams.active !== node) return;
+    cams.active = null;
+    if (cams.fallback) scene.setActiveCameraNode(cams.fallback);
+  };
+}
+
+export function setSceneCameraOrthographic(scene: ViroSceneApi, node: ViroHandle, orthographic: boolean): void {
+  const set = camerasOf(scene).orthographic;
+  if (orthographic) set.add(node);
+  else set.delete(node);
+}
+
+/**
+ * A camera at the origin looking down -Z under `root`, which is virocore's
+ * default and what a released camera component returns to: the renderer's own
+ * default camera has no handle to return to.
+ */
+export function installDefaultCamera(scene: ViroSceneApi, root: ViroHandle): () => void {
+  const node = scene.createNode();
+  scene.setNodeCamera(node);
+  scene.addChildNode(root, node);
+  const cams = camerasOf(scene);
+  cams.fallback = node;
+  return () => {
+    if (cams.fallback === node) cams.fallback = 0;
+    scene.removeNodeFromParent(node);
+    scene.destroyNode(node);
   };
 }
 
@@ -93,6 +158,7 @@ export function sessionCameraView(session: ViroArSession, element: HTMLElement):
   };
   return {
     element,
+    ar: true,
     get position() {
       return session.cameraPose.position as Vec3;
     },

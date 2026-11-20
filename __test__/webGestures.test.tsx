@@ -126,3 +126,44 @@ describe("a node ref on the web", () => {
     warn.mockRestore();
   });
 });
+
+describe("ignoreEventHandling on the web", () => {
+  it("makes the node unselectable, and selectable again when cleared", () => {
+    const tree = mount({ ignoreEventHandling: true });
+    expect(mockSceneBase.setNodeSelectable).toHaveBeenLastCalledWith(5, false);
+    act(() => tree.update(<Probe ignoreEventHandling={false} />));
+    expect(mockSceneBase.setNodeSelectable).toHaveBeenLastCalledWith(5, true);
+  });
+
+  it("warns instead of throwing on a renderer before 1.2.0", () => {
+    mockSceneBase.setNodeSelectable = undefined;
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => mount({ ignoreEventHandling: true })).not.toThrow();
+    expect(warn.mock.calls.some((c) => String(c[0]).includes("ignoreEventHandling"))).toBe(true);
+    warn.mockRestore();
+  });
+});
+
+describe("pivots and highAccuracyEvents on the web", () => {
+  it("sends nothing at the defaults", () => {
+    mount({});
+    expect(mockScene.setNodeRotationPivot).not.toHaveBeenCalled();
+    expect(mockScene.setNodeScalePivot).not.toHaveBeenCalled();
+    expect(mockScene.setNodeHighAccuracyEvents).not.toHaveBeenCalled();
+  });
+
+  it("sends a pivot, and zeros once it is removed", () => {
+    mockSceneBase.setNodeRotationPivot = jest.fn(() => true);
+    const tree = mount({ rotationPivot: [1, 0, 0] });
+    expect(mockSceneBase.setNodeRotationPivot).toHaveBeenLastCalledWith(5, 1, 0, 0);
+    act(() => tree.update(<Probe />));
+    expect(mockSceneBase.setNodeRotationPivot).toHaveBeenLastCalledWith(5, 0, 0, 0);
+  });
+
+  it("takes highAccuracyGaze as the old name of highAccuracyEvents", () => {
+    mockSceneBase.setNodeHighAccuracyEvents = jest.fn(() => true);
+    mount({ highAccuracyGaze: true });
+    expect(mockSceneBase.setNodeHighAccuracyEvents).toHaveBeenCalledWith(5, true);
+  });
+});
+

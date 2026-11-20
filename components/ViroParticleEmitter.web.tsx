@@ -3,19 +3,20 @@
  * a node via the C API. The sprite is `image.source` on a quad; spawn behavior
  * and a velocity range come from `spawnBehavior`/`particlePhysics`.
  *
- * Scope: image, spawnBehavior (rate/lifetime/maxParticles/spawnVolume),
- * particlePhysics.velocity and .acceleration, particleAppearance (colour,
- * opacity, scale and rotation over the particle's life), run. Bursts,
- * explosiveImpulse, spawnOnSurface and emissionRatePerMeter are follow-ups.
+ * Every prop native takes, re-applied when it changes, with the emission
+ * cycle restarted where native restarts it.
  */
 import * as React from "react";
 import { useEffect, useRef } from "react";
 import {
   ViroParticleSpawnShape,
   type ViroHandle,
+  type ViroParticleBurst,
+  type ViroParticleEmitterConfig,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroScene } from "./Web/ViroWebContext";
+import { warnUnsupported } from "./Utilities/ViroUnsupported";
 import { loadImageRGBA, resolveImageSource } from "./Web/viroImageLoader";
 import {
   resolveParticleAppearance,
@@ -25,18 +26,24 @@ import {
 type Vec3 = [number, number, number];
 
 type Props = ViroWebNodeProps & {
-  image: { source: unknown; width?: number; height?: number };
+  image: { source: unknown; width?: number; height?: number; blendMode?: string; bloomThreshold?: number };
   run?: boolean;
   loop?: boolean;
+  delay?: number;
+  duration?: number;
+  fixedToEmitter?: boolean;
   spawnBehavior?: {
     emissionRatePerSecond?: number[];
+    emissionRatePerMeter?: number[];
     particleLifetime?: number[];
     maxParticles?: number;
-    spawnVolume?: { shape?: string; params?: number[] };
+    emissionBurst?: unknown;
+    spawnVolume?: { shape?: string; params?: number[]; spawnOnSurface?: boolean };
   };
   particlePhysics?: {
     velocity?: VelocityRange;
     acceleration?: VelocityRange;
+    explosiveImpulse?: { impulse?: number; position?: number[]; decelerationPeriod?: number };
   };
   /** Colour, opacity, scale and rotation over the particle's life. */
   particleAppearance?: ViroParticleAppearanceProp;
@@ -87,6 +94,82 @@ export function velocityRange(velocity?: VelocityRange): [Vec3, Vec3] {
   return [min, velocity?.max ? asVec3(velocity.max) : min];
 }
 
+// What both native bridges give an emitter whose particlePhysics has no
+// velocity (VRTParticleEmitter's default velocity modifier).
+const NATIVE_DEFAULT_VELOCITY: [Vec3, Vec3] = [[-0.5, 1, 0], [0.5, 1, 0]];
+
+/** The emitter's velocity: `velocityRange`, or native's default when none is given. */
+export function particleVelocity(velocity?: VelocityRange): [Vec3, Vec3] {
+  const given = !!velocity && (!!velocity.initialRange?.length || !!velocity.min || !!velocity.max);
+  return given ? velocityRange(velocity) : NATIVE_DEFAULT_VELOCITY;
+}
+
+/** `emissionBurst` as native reads it; an entry native refuses is left out. */
+export function particleBursts(raw: unknown): ViroParticleBurst[] {
+  if (!Array.isArray(raw)) return [];
+  const bursts: ViroParticleBurst[] = [];
+  for (const b of raw) {
+    if (!b || typeof b !== "object" || b.min == null || b.max == null) continue;
+    const min = Number(b.min), max = Number(b.max);
+    if (!(min >= 0 && max >= min)) continue;
+    const cycles = b.cycles > 0 ? Math.floor(b.cycles) : 1;
+    if (b.time != null) {
+      bursts.push({ factor: "time", start: Number(b.time), interval: Number(b.cooldownPeriod ?? 0), min, max, cycles });
+    } else if (b.distance != null) {
+      bursts.push({ factor: "distance", start: Number(b.distance), interval: Number(b.cooldownDistance ?? 0), min, max, cycles });
+    }
+  }
+  return bursts;
+}
+
+/** Everything but the sprite, with native's defaults (VRTParticleEmitter.java) for what is unset. */
+export function particleEmitterConfig(p: Props): ViroParticleEmitterConfig {
+  const sb = p.spawnBehavior ?? {};
+  const [min, max] = particleVelocity(p.particlePhysics?.velocity);
+  const explosive = p.particlePhysics?.explosiveImpulse;
+  const at = explosive?.position;
+  return {
+    delay: p.delay ?? 0,
+    duration: p.duration ?? 2000,
+    loop: p.loop ?? true,
+    fixedToEmitter: p.fixedToEmitter ?? true,
+    blendMode: p.image?.blendMode ?? "Add",
+    bloomThreshold: p.image?.bloomThreshold ?? -1,
+    emissionRatePerSecond: asPair(sb.emissionRatePerSecond, 10),
+    emissionRatePerMeter: asPair(sb.emissionRatePerMeter, 0),
+    particleLifetime: asPair(sb.particleLifetime, 2000),
+    maxParticles: sb.maxParticles ?? 500,
+    velocity: { min, max },
+    spawnVolume: {
+      shape: shapeEnum(sb.spawnVolume?.shape),
+      params: sb.spawnVolume?.params ?? [],
+      onSurface: !!sb.spawnVolume?.spawnOnSurface,
+    },
+    bursts: particleBursts(sb.emissionBurst),
+    explosion:
+      explosive && Array.isArray(at) && at.length >= 3
+        ? { position: asVec3(at), impulse: explosive.impulse ?? 0, deceleration: explosive.decelerationPeriod }
+        : null,
+  };
+}
+
+/** The props that need the config call, for the warning on a renderer without it. */
+function usesEmitterSettings(p: Props): boolean {
+  const sb = p.spawnBehavior;
+  return (
+    p.delay != null ||
+    p.duration != null ||
+    p.loop === false ||
+    p.fixedToEmitter === false ||
+    p.image?.blendMode != null ||
+    p.image?.bloomThreshold != null ||
+    sb?.emissionBurst != null ||
+    sb?.emissionRatePerMeter != null ||
+    !!sb?.spawnVolume?.spawnOnSurface ||
+    p.particlePhysics?.explosiveImpulse != null
+  );
+}
+
 export function ViroParticleEmitter(props: Props): null {
   const scene = useViroScene();
   const node = useViroNode(props);
@@ -95,6 +178,35 @@ export function ViroParticleEmitter(props: Props): null {
   const texRef = useRef<ViroHandle>(0);
   const propsRef = useRef(props);
   propsRef.current = props;
+
+  // What native restarts the emission cycle for (VRTParticleEmitter sets
+  // _needsRestart): timing, spawn behaviour, physics and appearance.
+  const restartKey = JSON.stringify([
+    props.delay,
+    props.duration,
+    props.spawnBehavior,
+    props.particlePhysics,
+    props.particleAppearance,
+  ]);
+  const settingsKey = JSON.stringify(particleEmitterConfig(props));
+  const appliedRestartKey = useRef<string | null>(null);
+  const configure = () => {
+    const p = propsRef.current;
+    const [accelMin, accelMax] = velocityRange(p.particlePhysics?.acceleration);
+    scene.setParticleAcceleration(node, accelMin, accelMax);
+    if (typeof scene.configureParticleEmitter !== "function") {
+      if (usesEmitterSettings(p)) {
+        warnUnsupported(
+          "ViroParticleEmitter delay, duration, loop, fixedToEmitter, blendMode, bloomThreshold, bursts, emissionRatePerMeter, spawnOnSurface and explosiveImpulse",
+          "this version of the web renderer",
+        );
+      }
+      return;
+    }
+    const reset = appliedRestartKey.current !== restartKey;
+    appliedRestartKey.current = restartKey;
+    scene.configureParticleEmitter(node, { ...particleEmitterConfig(p), reset });
+  };
 
   // Build the emitter once the sprite texture is ready.
   useEffect(() => {
@@ -107,7 +219,7 @@ export function ViroParticleEmitter(props: Props): null {
         const texture = scene.createTextureRGBA(img.pixels, img.width, img.height, true);
         texRef.current = texture;
         const sb = p.spawnBehavior ?? {};
-        const [velocityMin, velocityMax] = velocityRange(p.particlePhysics?.velocity);
+        const [velocityMin, velocityMax] = particleVelocity(p.particlePhysics?.velocity);
         scene.createParticleEmitter(node, texture, {
           particleWidth: p.image?.width ?? 0.1,
           particleHeight: p.image?.height ?? 0.1,
@@ -119,13 +231,10 @@ export function ViroParticleEmitter(props: Props): null {
           velocityMin,
           velocityMax,
         });
-        // After the emitter exists: acceleration is set on a live emitter, not
+        // After the emitter exists: these are set on a live emitter, not
         // passed to the factory that creates it.
-        const accel = p.particlePhysics?.acceleration;
-        if (accel) {
-          const [accelMin, accelMax] = velocityRange(accel);
-          scene.setParticleAcceleration(node, accelMin, accelMax);
-        }
+        appliedRestartKey.current = null;
+        configure();
         for (const call of resolveParticleAppearance(p.particleAppearance)) {
           scene.setParticleModifier(
             node,
@@ -136,7 +245,7 @@ export function ViroParticleEmitter(props: Props): null {
             call.intervals,
           );
         }
-        scene.setParticleEmitterRun(node, p.run !== false);
+        scene.setParticleEmitterRun(node, p.run === true);
       })
       .catch(() => {});
     return () => {
@@ -148,6 +257,13 @@ export function ViroParticleEmitter(props: Props): null {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node, url]);
+
+  // Changed settings, after the emitter exists.
+  useEffect(() => {
+    if (!node || !texRef.current) return;
+    configure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, node, settingsKey, restartKey]);
 
   // A changed appearance, after the emitter exists. Keyed on the serialised prop
   // because it arrives as a fresh object literal on every render.
@@ -168,9 +284,9 @@ export function ViroParticleEmitter(props: Props): null {
     }
   }, [scene, node, appearanceKey]);
 
-  // Run/pause toggling.
+  // Run/pause toggling. Off unless asked for, as on native.
   useEffect(() => {
-    if (node) scene.setParticleEmitterRun(node, props.run !== false);
+    if (node) scene.setParticleEmitterRun(node, props.run === true);
   }, [scene, node, props.run]);
 
   return null;

@@ -6,8 +6,8 @@
  *
  * Web adaptations vs native:
  *  - Root is ViroARScene (AR via slam) in `mode="ar"`, else ViroScene (3D).
- *  - AUTOMATIC/MANUAL plane detection → wrap plane assets in ViroARPlane (slam).
- *    (MANUAL degrades to auto-match; there is no web plane-selector UI yet.)
+ *  - AUTOMATIC plane detection wraps plane assets in ViroARPlane; MANUAL in
+ *    ViroARPlaneSelector, which the viewer taps, as natively.
  *  - Tap-to-place runs off the AR session's hit test rather than a native one,
  *    and the navigator supplies the tap surface.
  *  - Physics and collision triggers run here: Bullet is compiled into the web
@@ -31,12 +31,15 @@ import {
 import { ViroAmbientLight } from "../ViroAmbientLight.web";
 import { ViroDirectionalLight } from "../ViroDirectionalLight.web";
 import { ViroARPlane } from "../AR/ViroARPlane.web";
+import { ViroARPlaneSelector } from "../AR/ViroARPlaneSelector";
 import { ViroARScene, type ViroARSceneHandle } from "../AR/ViroARScene.web";
 import { ViroTrackingState } from "@reactvision/viro-web-renderer";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { useViroAR } from "../Web/ViroWebContext";
 import { cameraBasis } from "../Web/viroMath";
+import { cameraOrientation } from "../Web/viroCameraTransform";
 import { addCollisionListener } from "../Web/viroCollisions";
+import type { ViroWebCapture } from "../Web/viroCapture";
 import { ViroScene } from "../ViroScene.web";
 import { ViroText } from "../ViroText.web";
 import { registerSceneAnimations } from "./domain/animationRegistry";
@@ -133,6 +136,8 @@ interface Props {
   onReady?: () => void;
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onPlaneDetected?: () => void;
+  /** MANUAL plane detection: the viewer picked the plane the assets stand on. */
+  onPlaneSelected?: () => void;
   /** Reports scene features that won't render on web (for a capability warning). */
   onUnsupported?: (features: string[]) => void;
   noAssetsMessage?: string;
@@ -143,6 +148,8 @@ interface Props {
   placementStore?: StudioPlacementStore;
   /** Told when an asset's model, image or video fails to load. */
   onAssetError?: StudioAssetErrorHandler;
+  /** What TAKE_PHOTO and RECORD_VIDEO capture through, in the navigator's shape. */
+  capture?: Pick<ViroWebCapture, "takeScreenshot" | "startVideoRecording" | "stopVideoRecording">;
 }
 
 type StudioLightRigHandle = { setScale: (scale: number) => void };
@@ -189,12 +196,14 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     onReady,
     onSceneChange,
     onPlaneDetected,
+    onPlaneSelected,
     onUnsupported,
     noAssetsMessage,
     variableStore,
     placementApiRef,
     placementStore,
     onAssetError,
+    capture,
   } = props;
   const { scene, assets, animations, functions } = sceneData;
 
@@ -413,13 +422,13 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       executeOnLoadFunction(
         fnId,
         functions,
-        undefined,
+        capture,
         animations,
         (id, key) => triggerAnimationRef.current(id, key),
         handleSceneChange,
         runtimeCtx,
       ),
-    [functions, animations, handleSceneChange, runtimeCtx],
+    [functions, capture, animations, handleSceneChange, runtimeCtx],
   );
 
   const handleAnimationFinished = useCallback(
@@ -497,7 +506,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       executeOnLoadFunction(
         scene.on_load_function,
         functions,
-        undefined,
+        capture,
         animations,
         (id, key) => triggerAnimationRef.current(id, key),
         handleSceneChange,
@@ -576,8 +585,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
 
   useEffect(() => {
     const enabled = physicsWorldConfig?.enabled === true;
+    // Scene Settings' "draw bounds". A renderer without it (1.2.0) draws none.
+    const canDrawBounds = typeof sceneApi.setPhysicsDebugDraw === "function";
+    if (canDrawBounds) sceneApi.setPhysicsDebugDraw(enabled && physicsWorldConfig?.drawBounds === true);
     sceneApi.setPhysicsWorld(enabled, physicsWorldConfig?.gravity ?? [0, -9.81, 0]);
     return () => {
+      if (canDrawBounds) sceneApi.setPhysicsDebugDraw(false);
       sceneApi.setPhysicsWorld(false, [0, -9.81, 0]);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -617,7 +630,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       const handler = createPlacementCollisionHandler(
         collision.tag,
         bindingsByPairKey,
-        undefined,
+        capture,
         animations,
         collisionCooldownRef,
         (id, key) => triggerAnimationRef.current(id, key),
@@ -632,13 +645,12 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       collisionCooldownRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id, collisionBindings, bindingsByPairKey, animations, handleSceneChange, runtimeCtx]);
+  }, [scene.id, collisionBindings, bindingsByPairKey, capture, animations, handleSceneChange, runtimeCtx]);
 
   // ─── Proximity bindings ───────────────────────────────────────────────────
   // Fires a function when the user comes within `distance` of an asset. The
-  // camera side is the tracked pose; the asset side is its authored position,
-  // which is its world position only outside a plane wrapper — hence the gate,
-  // and hence webCapabilities reporting the wrapped case as unsupported.
+  // camera side is the tracked pose, or without a session (3d, a virtual
+  // camera) the view the navigator publishes.
   const proximityBindings = useMemo(
     () =>
       (sceneData.proximity_bindings ?? []).filter(
@@ -661,7 +673,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   const proximityLive = proximityBindings.length > 0;
 
   useEffect(() => {
-    if (!proximityLive || !session) return;
+    if (!proximityLive) return;
     let handle = 0;
     let last = 0;
     const step = () => {
@@ -669,11 +681,14 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       const now = Date.now();
       if (now - last < PROXIMITY_EVAL_INTERVAL_MS) return;
       last = now;
+      const cameraPosition = session ? session.cameraPose.position : cameraOrientation(sceneApi)?.position;
+      if (!cameraPosition) return;
       evaluateProximityBindings({
-        cameraPosition: session.cameraPose.position,
+        cameraPosition,
         bindings: proximityBindings,
         getTargetWorldPosition: getAssetPosition,
         stateRef: proximityStateRef,
+        sceneNavigator: capture,
         animations,
         onSceneChange: handleSceneChange,
         onAnimationTrigger: (id, key) => triggerAnimationRef.current(id, key),
@@ -685,8 +700,10 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   }, [
     proximityLive,
     session,
+    sceneApi,
     proximityBindings,
     getAssetPosition,
+    capture,
     animations,
     handleSceneChange,
     runtimeCtx,
@@ -721,7 +738,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         .map((asset) =>
           createNode(
             asset,
-            undefined, // sceneNavigator: web navigates via runtimeCtx.navigate
+            capture, // only captures: web navigates via runtimeCtx.navigate
             animations,
             scene,
             (id, key) => triggerAnimationRef.current(id, key),
@@ -743,6 +760,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
         )
         .filter(Boolean) as React.ReactElement[],
     [
+      capture,
       animations,
       scene,
       animationStates,
@@ -768,6 +786,34 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
   // ─── Plane wrapping (AR mode only) ────────────────────────────────────────
   const planeAlignment = (scene.plane_direction ?? "Horizontal") as any;
   const usePlane = usesPlaneWrapper(scene.plane_detection as string, mode);
+  const manual = usePlane && ((scene.plane_detection as string) ?? "").toUpperCase() === "MANUAL";
+
+  // MANUAL: the selector learns of planes only through the scene's anchor
+  // callbacks, and the drag surface follows the plane picked, as natively.
+  const planeSelectorRef = useRef<InstanceType<typeof ViroARPlaneSelector> | null>(null);
+  const selectedAnchorIdRef = useRef<string | null>(null);
+  const handleSelectorPlaneDetected = useCallback(() => {
+    onPlaneDetected?.();
+    return true;
+  }, [onPlaneDetected]);
+  const handlePlaneSelected = useCallback(
+    (plane: any) => {
+      selectedAnchorIdRef.current = plane?.anchorId ?? null;
+      trackDragSurface(plane);
+      onPlaneSelected?.();
+    },
+    [trackDragSurface, onPlaneSelected],
+  );
+  const selectorAnchorProps = manual
+    ? {
+        onAnchorFound: (a: any) => planeSelectorRef.current?.handleAnchorFound(a),
+        onAnchorUpdated: (a: any) => {
+          planeSelectorRef.current?.handleAnchorUpdated(a);
+          if (a?.anchorId === selectedAnchorIdRef.current) trackDragSurface(a);
+        },
+        onAnchorRemoved: (a: any) => a && planeSelectorRef.current?.handleAnchorRemoved(a),
+      }
+    : null;
 
   // ─── Tracking-readiness gate (AR, plane_detection=NONE only) ──────────────
   // The native host's rule: NONE assets sit at fixed scene-root coordinates, so
@@ -802,7 +848,18 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
     lightRigRef.current?.setScale(scale);
   }, []);
 
-  const body = usePlane ? (
+  const body = manual ? (
+    <ViroARPlaneSelector
+      ref={planeSelectorRef}
+      minHeight={0.1}
+      minWidth={0.1}
+      alignment={planeAlignment}
+      onPlaneDetected={handleSelectorPlaneDetected}
+      onPlaneSelected={handlePlaneSelected}
+    >
+      {renderedAssets}
+    </ViroARPlaneSelector>
+  ) : usePlane ? (
     <ViroARPlane
       minHeight={0.1}
       minWidth={0.1}
@@ -848,6 +905,7 @@ const StudioARSceneInner: React.FC<Props & { sceneData: StudioSceneResponse }> =
       ref={arSceneRef}
       toneMappingEnabled={STUDIO_TONE_MAPPING_ENABLED}
       onAmbientLightUpdate={handleAmbientLightUpdate}
+      {...selectorAnchorProps}
     >
       {children}
     </ViroARScene>

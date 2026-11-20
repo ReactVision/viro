@@ -41,8 +41,7 @@ describe("webUnsupportedFeatures", () => {
     // and the host had nothing else to measure from. The host now reads each
     // target's world position off its renderer handle, so both cases are real.
     const bindings = { proximity_bindings: [{}] };
-    // MANUAL is left out: it reports its own limitation, the missing picker.
-    for (const detection of ["NONE", "AUTOMATIC"]) {
+    for (const detection of ["NONE", "AUTOMATIC", "MANUAL"]) {
       expect(
         webUnsupportedFeatures(
           sceneData({
@@ -87,12 +86,12 @@ describe("webUnsupportedFeatures", () => {
     expect(features).toEqual([]);
   });
 
-  test("reports manual plane selection, which has no web picker", () => {
+  test("does not report manual plane selection, which mounts the plane selector", () => {
     expect(
       webUnsupportedFeatures(
         sceneData({ scene: { id: "s1", plane_detection: "MANUAL" } }),
       ),
-    ).toEqual(["manual plane selection"]);
+    ).toEqual([]);
   });
 
   test("does not report dragging", () => {
@@ -101,18 +100,14 @@ describe("webUnsupportedFeatures", () => {
     ).toEqual([]);
   });
 
-  test("reports photo and video functions, which get no navigator here", () => {
+  test("does not report photo and video functions, which capture the canvas", () => {
     expect(
       webUnsupportedFeatures(
         sceneData({
-          functions: [
-            { function_type: "TAKE_PHOTO" },
-            { function_type: "RECORD_VIDEO" },
-            { function_type: "ALERT" },
-          ],
+          functions: [{ function_type: "TAKE_PHOTO" }, { function_type: "RECORD_VIDEO" }],
         }),
       ),
-    ).toEqual(["photo capture", "video recording"]);
+    ).toEqual([]);
   });
 
   test("reports occlusion in AR only", () => {

@@ -8,7 +8,7 @@
  * others, but nothing here can show them while they are covered.
  */
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ViroWebRenderer,
   type ViroHandle,
@@ -20,7 +20,9 @@ import {
 } from "./Web/ViroWebContext";
 import { resetMaterialCache } from "./Web/viroMaterialRegistry";
 import { useViroContextRestore } from "./Web/useViroContextRestore";
-import { defaultCameraView, setCameraView } from "./Web/viroDrag";
+import { defaultCameraView, installDefaultCamera, setCameraView } from "./Web/viroDrag";
+import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
+import { useViroWebCapture } from "./Web/viroCapture";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 import {
   useViroRendererEffects,
@@ -67,6 +69,7 @@ export function Viro3DSceneNavigator(props: Props) {
     shadows_enabled: props.shadowsEnabled,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const capture = useViroWebCapture(canvasRef);
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
@@ -109,6 +112,8 @@ export function Viro3DSceneNavigator(props: Props) {
     setCameraView(renderer.scene, defaultCameraView(canvas));
     return () => setCameraView(renderer.scene, null);
   }, [renderer]);
+  // What a released ViroCamera returns to.
+  useEffect(() => (renderer && rootNode ? installDefaultCamera(renderer.scene, rootNode) : undefined), [renderer, rootNode]);
 
   // Keep the renderer's viewport in sync with the canvas size (fixes aspect
   // distortion on layout/window resize). ResizeObserver catches container
@@ -133,8 +138,16 @@ export function Viro3DSceneNavigator(props: Props) {
     jump: (a?: unknown, b?: unknown) => setHistory((h) => jumpToScene(h, a, b)),
     pop: () => setHistory((h) => popScenes(h, 1)),
     popN: (n: number) => setHistory((h) => popScenes(h, n)),
+    // Recentering re-zeroes a headset's yaw; there is no headset here.
+    recenterTracking: () => {},
+    project: async (point: number[]) => projectPoint(requireScene(renderer), point),
+    unproject: async (point: number[]) => unprojectPoint(requireScene(renderer), point),
+    takeScreenshot: capture.takeScreenshot,
+    startVideoRecording: capture.startVideoRecording,
+    stopVideoRecording: capture.stopVideoRecording,
     viroAppProps: props.viroAppProps ?? {},
   };
+  useImperativeHandle(props.ref, () => ({ sceneNavigator }));
   const top = history[history.length - 1];
   const SceneComponent = top?.scene;
 

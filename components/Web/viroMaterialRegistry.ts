@@ -346,6 +346,92 @@ export function createMaterialFromRegistry(
     console.warn(`[Viro web] material "${name}" is not registered`);
     return 0;
   }
+  const material = buildMaterial(scene, def);
+  handleCache.set(name, material);
+  return material;
+}
+
+/**
+ * Every name in a materials prop, as native applies it: a box with six takes
+ * one per face and a ViroGeometry one per submesh. A renderer without the
+ * array setter (1.2.0), or a name that is not registered, leaves the first
+ * one alone, as before. False when not even that applied.
+ */
+export function applyRegistryMaterials(scene: ViroSceneApi, geometry: ViroHandle, names: string[]): boolean {
+  if (names.length > 1 && typeof scene.setGeometryMaterials === "function") {
+    const handles = names.map((name) => createMaterialFromRegistry(scene, name));
+    if (handles.every(Boolean) && scene.setGeometryMaterials(geometry, handles)) return true;
+  }
+  const first = names[0] ? createMaterialFromRegistry(scene, names[0]) : 0;
+  if (first) scene.setGeometryMaterial(geometry, first);
+  return !!first;
+}
+
+// VROARShadow.cpp, verbatim: the surface draws black at the strength of the
+// shadow falling on it, less the ambient light, and nothing elsewhere.
+const AR_SHADOW_MODIFIERS: [ViroShaderEntryPoint, string][] = [
+  ["surface", "highp float totalShadow = 0.0;"],
+  ["lightingModel", "totalShadow += (1.0 - _lightingContribution.visibility);"],
+  [
+    "fragment",
+    [
+      "if (totalShadow != 0.0) {",
+      "    highp float ambient_brightness = dot(_ambient.rgb, vec3(0.2126, 0.7152, 0.0722));",
+      "    _output_color = vec4(0, 0, 0, max(min(1.0, totalShadow) - ambient_brightness, 0.0));",
+      "} else {",
+      "    _output_color = vec4(0, 0, 0, 0);",
+      "}",
+    ].join("\n"),
+  ],
+];
+
+/**
+ * VROARShadow::apply on a node's own material (arShadowReceiver). Native also
+ * stops the material casting shadows; the web API has no setter for that.
+ */
+export function applyARShadow(scene: ViroSceneApi, material: ViroHandle) {
+  // PBR so the ambient term includes irradiance, as native chooses.
+  scene.setMaterialLightingModel(material, ViroLightingModel.PhysicallyBased);
+  scene.setMaterialWritesToDepthBuffer(material, false);
+  for (const [entryPoint, code] of AR_SHADOW_MODIFIERS) scene.addMaterialShaderModifier(material, entryPoint, code);
+}
+
+/**
+ * A material for one node alone, built like the shared one for `name` (or
+ * virocore's default without a name), so animating its colour does not
+ * recolour every node that shares the name. The caller destroys it.
+ */
+export function createOwnMaterial(scene: ViroSceneApi, name?: string): ViroHandle {
+  const def = name ? registry.get(name) : undefined;
+  return def ? buildMaterial(scene, def) : scene.createMaterial();
+}
+
+/**
+ * What native's `material` animation carries from material `name` onto a
+ * node's own: the diffuse texture if it has one, else the diffuse colour
+ * (animated when called inside a transaction), and the lighting model. The
+ * other properties native copies are copied where `name` sets them.
+ */
+export function applyMaterialAnimationTarget(scene: ViroSceneApi, material: ViroHandle, name: string): boolean {
+  const def = registry.get(name);
+  if (!def) return false;
+  if (resolveImageSource(def.diffuseTexture)) {
+    applyTextures(scene, material, { diffuseTexture: def.diffuseTexture, wrapS: def.wrapS, wrapT: def.wrapT } as ViroWebMaterialDef);
+  } else {
+    const [r, g, b, a] = parseColorToRGBA(def.diffuseColor ?? "#ffffff");
+    scene.setMaterialDiffuseColor(material, r, g, b, a);
+  }
+  scene.setMaterialLightingModel(material, lightingModelValue(def.lightingModel));
+  if (typeof def.shininess === "number") scene.setMaterialShininess(material, def.shininess);
+  if (typeof def.fresnelExponent === "number") scene.setMaterialFresnelExponent(material, def.fresnelExponent);
+  const cull = cullModeValue(def.cullMode as string | undefined);
+  if (cull !== undefined) scene.setMaterialCullMode(material, cull);
+  if (typeof def.writesToDepthBuffer === "boolean") scene.setMaterialWritesToDepthBuffer(material, def.writesToDepthBuffer);
+  if (typeof def.readsFromDepthBuffer === "boolean") scene.setMaterialReadsFromDepthBuffer(material, def.readsFromDepthBuffer);
+  return true;
+}
+
+function buildMaterial(scene: ViroSceneApi, def: ViroWebMaterialDef): ViroHandle {
   const material = scene.createMaterial();
   scene.setMaterialLightingModel(material, lightingModelValue(def.lightingModel));
 
@@ -362,11 +448,10 @@ export function createMaterialFromRegistry(
   if (typeof def.diffuseIntensity === "number") scene.setMaterialDiffuseIntensity(material, def.diffuseIntensity);
   if (typeof def.writesToDepthBuffer === "boolean") scene.setMaterialWritesToDepthBuffer(material, def.writesToDepthBuffer);
   if (typeof def.readsFromDepthBuffer === "boolean") scene.setMaterialReadsFromDepthBuffer(material, def.readsFromDepthBuffer);
-  // No transparencyMode branch: the C API has no setter for it, so a material
-  // used as a shader override carries virocore's default into the merge rather
-  // than an authored value. Inert either way — virocore stores the mode and
-  // nothing in any substrate or shader reads it — so this is a hole in the
-  // mirror of the native merge, not a rendering difference.
+  // Call a setter only for a key the definition names: the wasm records each
+  // call as authored, and merging a shader override onto a model copies only
+  // those, as native does. No transparencyMode: the C API has no setter, and
+  // nothing in virocore reads the mode.
   const cull = cullModeValue(def.cullMode as string | undefined);
   if (cull !== undefined) scene.setMaterialCullMode(material, cull);
   const blend = blendModeValue(def.blendMode as string | undefined);
@@ -376,7 +461,6 @@ export function createMaterialFromRegistry(
   applyTextures(scene, material, def);
   applyShaderModifiers(scene, material, def);
   applyUniforms(scene, material, def);
-  handleCache.set(name, material);
   return material;
 }
 

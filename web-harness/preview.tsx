@@ -191,6 +191,7 @@ const ROOMS: Record<string, Room> = {
   floor: { label: "Empty" },
   living: { label: "Living room", model: roomFiles("living-room"), floorY: -1.5 },
   office: { label: "Office", model: roomFiles("office"), floorY: -1.5 },
+  workshop: { label: "Workshop", model: roomFiles("workshop"), floorY: -1.5 },
 };
 type Surroundings = keyof typeof ROOMS;
 let surroundings: Surroundings = "floor";

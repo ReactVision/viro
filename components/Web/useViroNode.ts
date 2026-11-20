@@ -176,7 +176,7 @@ export interface ViroWebNodeProps {
  * clicks go on to the nearest ancestor that takes them, and a press on a
  * clickable child drags the nearest ancestor with onDrag.
  */
-type NodeEntry = { parent: ViroHandle; props(): ViroWebNodeProps; startDrag(hit: Vec3): void; endDrag(): void };
+type NodeEntry = { parent: ViroHandle; props(): ViroWebNodeProps; startDrag(hit: number[]): void; endDrag(): void };
 const nodeEntries = new WeakMap<ViroSceneApi, Map<ViroHandle, NodeEntry>>();
 
 /** The nodes this hook has made in `scene`, with their parents and current props, for a host that inspects the scene. */
@@ -284,12 +284,13 @@ export function useViroSceneEvents(props: ViroSceneEventProps): void {
   useEffect(() => {
     if (!hasClick && !hasHover && !hasPinch && !hasRotate && !hasFuse) return;
     renderer.setNodeEventHandlers(root, {
+      // position is [] for the background, as on native, whose type says a tuple too.
       onClick: (clickState, source, position) => {
         const p = propsRef.current;
-        p.onClickState?.(clickState, position, source);
-        if (clickState === ViroClickState.Clicked) p.onClick?.(position, source);
+        p.onClickState?.(clickState, position as ViroPosition, source);
+        if (clickState === ViroClickState.Clicked) p.onClick?.(position as ViroPosition, source);
       },
-      onHover: (isHovering, source, position) => propsRef.current.onHover?.(isHovering, position, source),
+      onHover: (isHovering, source, position) => propsRef.current.onHover?.(isHovering, position as ViroPosition, source),
       onPinch: (state, scale, source) => propsRef.current.onPinch?.(state, scale, source),
       onRotate: (state, radians, source) => propsRef.current.onRotate?.(state, radians / DEG2RAD, source),
       onFuse: (source) => {
@@ -449,7 +450,7 @@ export function useViroNode(
   // does, and let go with the velocity of its last ~80 ms, so it can be thrown.
   const bodyKeyRef = useRef("");
   const heldRef = useRef(false);
-  const startDrag = (hit: Vec3) => {
+  const startDrag = (hit: number[]) => {
     const p = propsRef.current;
     const view = cameraView(scene);
     if (!p.onDrag || endDragRef.current) return;
@@ -460,9 +461,10 @@ export function useViroNode(
     const nodeStart = scene.getNodeWorldPosition(node);
     const toLocal = worldToLocalIn(scene, parent);
     if (!nodeStart || !toLocal) return;
-    // A press virocore rerouted to a recently hovered node arrives at the origin;
-    // native grabs such a node at its own position.
-    const grab: Vec3 = hit.every((c) => c === 0) ? nodeStart : hit;
+    // A press virocore rerouted to a recently hovered node arrives with no
+    // position (at the origin on older renderers); native grabs such a node
+    // at its own position.
+    const grab: Vec3 = hit.length < 3 || hit.every((c) => c === 0) ? nodeStart : (hit as Vec3);
     const cameraAt = [...view.position] as Vec3;
     const toGrab = sub(grab, cameraAt);
     const len = Math.hypot(...toGrab) || 1;
@@ -565,13 +567,13 @@ export function useViroNode(
           nearestNode(scene, node, (p) => !!p.onDrag)?.endDrag();
         }
         const p = nearestNode(scene, node, (q) => !!(q.onClick || q.onClickState))?.props();
-        p?.onClickState?.(clickState, position, source);
+        p?.onClickState?.(clickState, position as ViroPosition, source);
         if (clickState === ViroClickState.Clicked) {
-          p?.onClick?.(position, source);
+          p?.onClick?.(position as ViroPosition, source);
         }
       },
       onHover: (isHovering, source, position) => {
-        propsRef.current.onHover?.(isHovering, position, source);
+        propsRef.current.onHover?.(isHovering, position as ViroPosition, source);
       },
       onPinch: (state, scale, source) => propsRef.current.onPinch?.(state, scale, source),
       onRotate: (state, radians, source) => propsRef.current.onRotate?.(state, radians / DEG2RAD, source),

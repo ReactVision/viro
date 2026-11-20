@@ -10,6 +10,12 @@
 # stored in the work database.
 -keep class com.viromedia.bridge.module.VpsScanUploadWorker { <init>(...); }
 
+# Room creates WorkManager's database (WorkDatabase_Impl) through its no-argument
+# constructor by reflection. work-runtime 2.9.1 resolves Room 2.5.0, whose own
+# rule keeps the class but not the constructor, so R8 full mode removes it and
+# the app crashes at launch in androidx.startup. Room 2.6 ships this same rule.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+
 # Fabric's view manager property cache finds setters through this annotation,
 # and the module registry finds exported methods the same way.
 -keepclassmembers class com.viromedia.bridge.** {

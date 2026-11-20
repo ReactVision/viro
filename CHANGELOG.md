@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Android: a release build with R8 minification no longer crashes at launch.** Viro uses WorkManager for VPS scan uploads, and WorkManager 2.9.1 brings Room 2.5.0, whose keep rule leaves out the constructor Room calls by reflection to create WorkManager's database. R8 removed it, so the app crashed on start in `androidx.startup.InitializationProvider` with `Failed to create an instance of class androidx.work.impl.WorkDatabase`. Viro's consumer rules now keep that constructor, as Room 2.6 does. Expo SDK 58 turns minification on in its Android template, so an app on it with nothing else bringing Room 2.6 or later hit this on its first release build.
+
 ## v3.2.2 — 18 November 2026
 
 ### Added

@@ -162,11 +162,20 @@ async function webPermissionState(name: string): Promise<boolean> {
   }
 }
 
+// Safari refuses audio capture (InvalidStateError) while a page's audio session
+// is "playback", which ViroSound sets so sound plays in silent mode. Native's
+// session is PlayAndRecord, which allows both.
+function allowAudioCapture(): void {
+  const session = (globalThis.navigator as { audioSession?: { type: string } } | undefined)?.audioSession;
+  if (session && session.type !== "auto" && session.type !== "play-and-record") session.type = "play-and-record";
+}
+
 async function requestWebPermission(permission: ViroPermission): Promise<boolean> {
   switch (permission) {
     case "camera":
     case "microphone": {
       if (typeof navigator.mediaDevices?.getUserMedia !== "function") return false;
+      if (permission === "microphone") allowAudioCapture();
       try {
         const stream = await navigator.mediaDevices.getUserMedia(
           permission === "camera" ? { video: true } : { audio: true }

@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## v3.2.3 — 21 November 2026
+
+Needs `@reactvision/viro-web-renderer` 1.3.0 for the web build (the peer range is now `^1.3.0`). Each web change that needs new renderer API checks for it, and on 1.2.0 keeps the old behaviour with a one-time warning. iOS and Android behave as in 3.2.2, apart from the R8 fix below.
+
+### Added
+
+- **Web: most of the web-vs-native parity review (2026-11-18).**
+  - Navigators: `project` and `unproject` on all three web navigators, `sceneNavigator` / `arSceneNavigator` on their refs, `recenterTracking` on the 3D navigator; `ViroVRSceneNavigator` renders in mono; `takeScreenshot`, `startVideoRecording` and `stopVideoRecording` on all three, used by Studio's TAKE_PHOTO and RECORD_VIDEO.
+  - Scenes and nodes: scene-level `onClick`, `onClickState`, `onHover`, `onPinch`, `onRotate` and `onFuse`; `onTransformUpdate`; `ignoreEventHandling`, `rotationPivot`, `scalePivot` and `highAccuracyEvents`; `postProcessEffects` on ViroScene and ViroARScene; `ViroController` reports scene-wide clicks, pinches, rotates, fuses and drags.
+  - Animation: `registerAnimations` keeps chains, sequences, parallels and aliases; `onFinish` fires at the end of every pass; `run={false}` pauses and `run={true}` resumes; `color` and `material` animate.
+  - Materials and geometry: `Viro3DObject` `materials` reach the model; a `materials` array applies per face or submesh; `ViroGeometry` keeps its submeshes; `arShadowReceiver` on ViroQuad and ViroPolygon; primitives rebuild on size changes; `ViroQuad` `uvCoordinates`, `ViroSphere` segments and `facesOutward`, `ViroPolygon` holes and UVs.
+  - Media: `ViroAnimatedImage` animates through `ImageDecoder`; `stereoMode` on images and videos; `placeholderSource`; `ViroSkyBox` `color`; `Viro360Image` `isHdr`; `seekToTime`, `onBufferStart`, `onBufferEnd` and `onUpdateTime` on video and sound; `ViroSound.preloadSounds` / `unloadSounds`; `StreamingAudioManager` plays pushed PCM through Web Audio; `ViroImage.evictFromCache`.
+  - Portals: each portal gets its own background, and `onPortalEnter` / `onPortalExit` fire.
+  - Physics, particles and lights: hidden bodies leave the simulation; empty Compound shapes build from the children; `applyImpulse` with an offset adds torque; `velocity` is constant; held force and torque; `findCollisionsWithRayAsync` and `findCollisionsWithShapeAsync`; `drawBounds`; particle emitters take every native prop and update while running; `shadowOrthographicPosition`.
+  - AR: plane detection is on by default, as on native; tracking reasons, `onTrackingInitialized` and `onPlatformUpdate`; `anchorDetectionTypes`; plane classification and vertices when the feed has them; `ViroARPlane` `pauseUpdates`; `onCameraARHitTest`; hit tests on a virtual camera's planes; Studio's MANUAL plane detection mounts the plane selector.
+  - Permissions: `checkPermissions` and `requestRequiredPermissions` answer camera, microphone and location. They resolved `{}`, so an app gating AR on `result.camera` never opened it.
+
+### Fixed
+
+- **Android: a release build with R8 minification no longer crashes at launch.** Viro uses WorkManager for VPS scan uploads, and WorkManager 2.9.1 brings Room 2.5.0, whose keep rule leaves out the constructor Room calls by reflection to create WorkManager's database. R8 removed it, so the app crashed on start in `androidx.startup.InitializationProvider` with `Failed to create an instance of class androidx.work.impl.WorkDatabase`. Viro's consumer rules now keep that constructor, as Room 2.6 does. Expo SDK 58 turns minification on in its Android template, so an app on it with nothing else bringing Room 2.6 or later hit this on its first release build.
+- **Web: a .gltf with external `.bin` or image files no longer aborts the page.** They are fetched beside the model or from `resources` and inlined; a missing file fails that model through `onError`.
+- **Web: calls that threw now work:** `project` / `unproject` on the 3D and AR navigators, `seekToTime`, `ViroImage.evictFromCache`, and `ViroController`, which crashed the Viro Live page.
+- **Web: the Studio navigator wraps scenes in the native error boundary with retry,** so a scene that throws no longer replaces the whole page.
+- **Web: `ViroOrbitCamera` looks at its focal point** (its yaw and pitch signs were flipped), releasing a `ViroCamera` returns to the default camera, and camera reads and drag work under a camera component.
+- **Web: spatial sound uses native's rolloff defaults,** the listener follows the camera outside AR, and `position` is in the parent's space.
+- **Web: asking for the microphone after a `ViroSound` works on Safari;** it failed with `InvalidStateError` and no prompt.
+- **Web: a tap on empty space reports position `[]`,** as native does.
+- **Web: the Viro Live harness** exports the constants, hooks, helpers and every component with a web file, and a stub called outside render warns instead of throwing.
+
 ## v3.2.2 — 18 November 2026
 
 ### Added

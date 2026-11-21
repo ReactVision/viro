@@ -18,7 +18,7 @@
  * follow-up.
  */
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ViroWebRenderer,
   ViroArSession,
@@ -39,15 +39,18 @@ import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import { resetMaterialCache } from "../Web/viroMaterialRegistry";
 import { useViroContextRestore } from "../Web/useViroContextRestore";
 import { sessionCameraView, setCameraView } from "../Web/viroDrag";
+import { projectPoint, requireScene, unprojectPoint } from "../Web/viroProjection";
+import { useViroWebCapture } from "../Web/viroCapture";
 import { warnUnsupported } from "../Utilities/ViroUnsupported";
 import { useViroUsagePing } from "../Utilities/ViroUsagePing";
+import { trackingReasonToConstant, trackingStateToConstant } from "../Web/viroTracking";
 import {
   useViroRendererEffects,
   type ViroRendererEffectProps,
 } from "../Web/useViroRendererEffects";
 import {
   attachVirtualCamera,
-  floorAnchorFor,
+  virtualAnchors,
   type ViroVirtualCameraOptions,
 } from "../Web/viroVirtualCamera";
 
@@ -125,6 +128,14 @@ type Props = {
    * ViroARPlane unless `floorY` is null.
    */
   virtualCamera?: boolean | ViroVirtualCameraOptions;
+  /** The scene's tracking updates, as its ViroARScene's onTrackingUpdated receives them. */
+  onTrackingUpdated?: (state: number, reason: number) => void;
+  /** "Low" asks the camera for 640x480 unless arOptions sets the feed size. */
+  videoQuality?: "High" | "Low";
+  /** Accepted for parity; the web cannot turn the camera's autofocus off. */
+  autofocus?: boolean;
+  /** Accepted for parity; the web tracker aligns to gravity only. */
+  worldAlignment?: "Gravity" | "GravityAndHeading" | "Camera";
   [key: string]: any;
 } & ViroRendererEffectProps;
 
@@ -227,10 +238,11 @@ function trackingLabel(state: ViroTrackingState): string {
 
 export function ViroARSceneNavigator(props: Props) {
   useViroUsagePing("ar", {
-    detect_planes: props.arOptions?.detectPlanes,
+    detect_planes: props.arOptions?.detectPlanes ?? true,
     facing_mode: props.arOptions?.facingMode,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const capture = useViroWebCapture(canvasRef);
   const containerRef = useRef<HTMLDivElement>(null);
   const virtual = props.virtualCamera
     ? props.virtualCamera === true
@@ -248,6 +260,7 @@ export function ViroARSceneNavigator(props: Props) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<ViroTrackingState>(ViroTrackingState.Unavailable);
+  const [trackingReason, setTrackingReason] = useState<TrackingReason>(TrackingReason.None);
   const [motionMissing, setMotionMissing] = useState(false);
   const noGravitySinceRef = useRef<number | null>(null);
   const motionMissingRef = useRef(false);
@@ -306,10 +319,15 @@ export function ViroARSceneNavigator(props: Props) {
     const opts = virtualRef.current;
     if (!renderer || !container || !opts) return;
     setTracking(ViroTrackingState.Normal);
-    const floorY = opts.floorY === undefined ? -1 : opts.floorY;
-    setAnchors(floorY === null ? [] : [floorAnchorFor(floorY)]);
     return attachVirtualCamera(renderer.scene, container, opts);
   }, [renderer, virtualOn]);
+
+  const virtualPlanes = virtual?.planes;
+  const virtualFloorY = virtual?.floorY;
+  useEffect(() => {
+    const opts = virtualRef.current;
+    if (renderer && opts) setAnchors(virtualAnchors(opts));
+  }, [renderer, virtualOn, virtualPlanes, virtualFloorY]);
 
   const resolveLoadSlam = useCallback((): ViroArSessionOptions["loadSlam"] => {
     if (props.loadSlam) return props.loadSlam;
@@ -347,12 +365,18 @@ export function ViroARSceneNavigator(props: Props) {
     noGravitySinceRef.current = null;
     motionMissingRef.current = false;
     setMotionMissing(false);
+    const lowVideo =
+      props.videoQuality === "Low" && props.arOptions?.feedWidth === undefined && props.arOptions?.feedHeight === undefined;
     const session = new ViroArSession({
       sceneApi: renderer.scene,
       loadSlam: resolveLoadSlam(),
+      ...(lowVideo ? { feedWidth: 640, feedHeight: 480 } : null),
       ...props.arOptions,
+      // Native detects horizontal and vertical planes unless anchorDetectionTypes narrows them.
+      detectPlanes: props.arOptions?.detectPlanes ?? true,
       onStatus: (state, _quality, detail) => {
         setTracking(state);
+        setTrackingReason(detail?.reason ?? TrackingReason.None);
         // Granted is not the same as arriving: some browsers grant and then
         // deliver nothing. NoGravity past a few seconds means no IMU at all.
         if (detail?.reason === TrackingReason.NoGravity) {
@@ -398,9 +422,38 @@ export function ViroARSceneNavigator(props: Props) {
     started,
     resolveLoadSlam,
     props.arOptions,
+    props.videoQuality,
     props.onSessionReady,
     props.onMotionUnavailable,
   ]);
+
+  // The state is debounced and the reason is not, and the virtual camera sets
+  // Normal without a session: a reason only ever qualifies a degraded state.
+  const reportedReason = tracking === ViroTrackingState.Normal ? TrackingReason.None : trackingReason;
+
+  // Native relays the top scene's updates; only the top scene is mounted here.
+  const trackingConst = trackingStateToConstant(tracking);
+  const reasonConst = trackingReasonToConstant(reportedReason);
+  const onTrackingUpdatedRef = useRef(props.onTrackingUpdated);
+  onTrackingUpdatedRef.current = props.onTrackingUpdated;
+  useEffect(() => {
+    onTrackingUpdatedRef.current?.(trackingConst, reasonConst);
+  }, [trackingConst, reasonConst]);
+
+  useEffect(() => {
+    if (props.autofocus === false) {
+      warnUnsupported("ViroARSceneNavigator autofocus={false}", "the web", "Browsers keep the camera's own focus mode.");
+    }
+  }, [props.autofocus]);
+  useEffect(() => {
+    if (props.worldAlignment && props.worldAlignment !== "Gravity") {
+      warnUnsupported(
+        `ViroARSceneNavigator worldAlignment="${props.worldAlignment}"`,
+        "the web",
+        "The web tracker aligns the world to gravity only.",
+      );
+    }
+  }, [props.worldAlignment]);
 
   // What dragging casts its rays through once the session runs; the virtual
   // camera publishes its own.
@@ -455,6 +508,7 @@ export function ViroARSceneNavigator(props: Props) {
       session.stop();
       setAnchors([]);
       setTracking(ViroTrackingState.Unavailable);
+      setTrackingReason(TrackingReason.None);
       session.start().catch(() => {
         // onError has reported it and marked the session stopped.
         if (sessionRef.current === session) sessionRef.current = null;
@@ -462,8 +516,14 @@ export function ViroARSceneNavigator(props: Props) {
     },
     setWorldOrigin: () =>
       warnUnsupported("setWorldOrigin", "the web", "The web tracker cannot move its world origin."),
+    project: async (point: number[]) => projectPoint(requireScene(renderer), point),
+    unproject: async (point: number[]) => unprojectPoint(requireScene(renderer), point),
+    takeScreenshot: capture.takeScreenshot,
+    startVideoRecording: capture.startVideoRecording,
+    stopVideoRecording: capture.stopVideoRecording,
     viroAppProps: props.viroAppProps ?? {},
   };
+  useImperativeHandle(props.ref, () => ({ arSceneNavigator: sceneNavigator, sceneNavigator }));
   const top = history[history.length - 1];
   const SceneComponent = top?.scene;
 
@@ -478,6 +538,7 @@ export function ViroARSceneNavigator(props: Props) {
               session: sessionRef.current,
               anchors,
               trackingState: tracking,
+              trackingReason: reportedReason,
               playback: !!props.arOptions?.playback,
             }}
           >

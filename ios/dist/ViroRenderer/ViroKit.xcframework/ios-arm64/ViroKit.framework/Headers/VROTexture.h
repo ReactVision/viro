@@ -218,6 +218,13 @@ public:
     VROStereoMode getStereoMode() const {
         return _stereoMode;
     }
+    /*
+     Shaders read the stereo mode when a material using this texture is compiled,
+     so set it before the texture is put on a material.
+     */
+    void setStereoMode(VROStereoMode mode) {
+        _stereoMode = mode;
+    }
     
     /*
      True if this texture has been uploaded to the GPU.

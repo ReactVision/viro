@@ -16,12 +16,6 @@ export type {
 
 export class ViroAnimations {
   static registerAnimations(animations: Record<string, any>) {
-    // Animation chains (arrays) are not supported on web yet; register single defs.
-    const singles: Record<string, any> = {};
-    for (const name of Object.keys(animations)) {
-      const def = animations[name];
-      if (!Array.isArray(def)) singles[name] = def;
-    }
-    registerViroAnimations(singles);
+    registerViroAnimations(animations);
   }
 }

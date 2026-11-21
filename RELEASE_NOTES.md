@@ -1,26 +1,25 @@
 # Release Notes
 
-## v3.2.2
+## v3.2.3
 
-**Viro on the web catches up with native: pinch, rotate and fuse, drag in live AR, styled text, material effects, node transform reads, camera reads and AR hit tests, a light estimate from the camera, sound that mixes with video on iPhone, and recovery from a lost WebGL context. On Android, a minified VR build keeps the GVR classes its native library needs.** Renderer binaries are rebuilt on virocore 3.2.2. The web build needs `@reactvision/viro-web-renderer` 1.2.0.
+**Viro on the web closes most of the gaps from the web-vs-native parity review: scene-wide events and `ViroController`, portals with their own backgrounds, per-face materials, animated images, full particle and physics support, post-process effects, capture on every navigator, and AR plane detection on by default. A .gltf with external files loads instead of aborting the page. On Android, a minified release build no longer crashes at launch in WorkManager's database.** The web build needs `@reactvision/viro-web-renderer` 1.3.0; iOS and Android binaries are unchanged from 3.2.2 apart from one new header setter.
 
 ### Web
 
-- **Gestures:** `onPinch`, `onRotate` and `onFuse`; drag in live AR and the 3D navigators, with `FixedToPlane` in the Studio host.
-- **Node refs:** `getTransformAsync`, `getBoundingBoxAsync`, `getMorphTargets`, and `setNativeProps` for transform, opacity and visibility.
-- **Text:** `ViroText` takes `fontWeight`, `fontStyle`, `extrusionDepth` and `outerStroke`.
-- **Materials:** alpha, bloom threshold, colour write mask and chroma key.
-- **AR:** `onAmbientLightUpdate` from the camera feed, camera transform and position reads, `ViroARHitTestResult` hit tests with the ray, world-point and position variants, and `resetARSession(true, …)`.
-- **Navigation and animation:** `Viro3DSceneNavigator` navigates, AR scenes get `arSceneNavigator`, and animations fire `onStart` / `onFinish`, start relative ones from where the node is and honour `delay` on model clips.
-- **Studio web host:** animations follow the native rules, `ALERT` shows a dialog over the canvas, `onSceneChange` fires after a navigation, and assets wait for tracking.
-- **Sound mixes with video on iPhone,** and held-back media plays at the first gesture.
-- **A lost WebGL context recovers:** the navigators remount the scene on a new renderer.
+- **Navigators:** `project` / `unproject` on all three, `sceneNavigator` and `arSceneNavigator` on their refs, `recenterTracking`, and `takeScreenshot` plus video recording, which Studio's TAKE_PHOTO and RECORD_VIDEO now use. `ViroVRSceneNavigator` renders in mono.
+- **Events:** scene-level click, hover, pinch, rotate and fuse; `onTransformUpdate`; `ignoreEventHandling`; `ViroController` reports scene-wide input; a tap on empty space reports `[]`.
+- **Animation:** chains, sequences, parallels and aliases survive `registerAnimations`; `run` pauses and resumes; `onFinish` fires every pass; `color` and `material` animate.
+- **Materials, geometry and media:** model `materials`, per-face material arrays, submeshes, primitive options (UVs, segments, holes), `arShadowReceiver`, animated images, `stereoMode`, `placeholderSource`, skybox `color`, `isHdr`, and media seek, buffering and time events.
+- **Portals, physics, particles and lights:** per-portal backgrounds and enter/exit events; collision queries, held forces, `drawBounds` and impulse torque; every particle emitter prop; `shadowOrthographicPosition`.
+- **AR:** plane detection on by default, tracking reasons, plane classification and `pauseUpdates`, `anchorDetectionTypes` and `onCameraARHitTest`. The camera feed is cropped to fill the screen instead of stretched.
+- **Permissions:** `checkPermissions` and `requestRequiredPermissions` answer camera, microphone and location; the microphone works after a `ViroSound` on Safari.
+- **Studio:** scenes sit in the error boundary with retry, and MANUAL plane detection mounts the plane selector.
 
 ### Android
 
-- **A minified GVR / VR build keeps `com.google.vr.**`,** which `libgvr.so` looks up by name. AR-only apps were not affected.
+- **A minified release build no longer crashes at launch** with `Failed to create an instance of class androidx.work.impl.WorkDatabase`. Viro's consumer rules keep the constructor Room creates WorkManager's database through.
 
 ### Check when upgrading
 
-- **Web: install `@reactvision/viro-web-renderer` 1.2.0** (the peer range is now `^1.2.0`) and copy its whole `wasm/` folder, which now carries the Roboto faces styled text uses.
-- **Android on Expo SDK 58: R8 is on for release builds by default.** Build a minified release APK and open it on a device before shipping. With the ONNX detector, use `@reactvision/react-viro-onnx` 1.0.3, whose rules keep ONNX Runtime.
+- **Web: install `@reactvision/viro-web-renderer` 1.3.0** (the peer range is now `^1.3.0`) and copy its whole `wasm/` folder. With 1.2.0 the new features stay off and a one-time warning names what is missing.
+- **Android on Expo SDK 58:** build a minified release APK and open it on a device before shipping; this release removes the WorkManager crash an R8 build hit at launch.

@@ -2,8 +2,9 @@
  * Web implementation of ViroVideo — a surface textured with a playing
  * `<video>`, each decoded frame uploaded into the surface's (unlit) material.
  *
- * MVP scope: source, width/height, paused, loop, muted, volume, onFinish/onError.
- * `stereoMode`, `resizeMode`, `onUpdateTime`, buffering events are follow-ups.
+ * MVP scope: source, width/height, paused, loop, muted, volume, onFinish/onError,
+ * onBufferStart/End, onUpdateTime, stereoMode and the ref's seekToTime.
+ * `resizeMode` is a follow-up.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -15,9 +16,16 @@ import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
-import { playWhenAllowed, streamVideoTexture } from "./Web/viroMedia";
+import {
+  applyStereoMode,
+  forwardMediaEvents,
+  playWhenAllowed,
+  seekMedia,
+  streamVideoTexture,
+  type ViroMediaEventProps,
+} from "./Web/viroMedia";
 
-type Props = ViroWebNodeProps & {
+type Props = ViroWebNodeProps & ViroMediaEventProps & {
   source: unknown;
   width?: number;
   height?: number;
@@ -45,6 +53,7 @@ export function ViroVideo(props: Props): null {
   const height = slot?.height ?? props.height ?? (sizePropSet ? 1 : width / aspect);
 
   const geometryRef = useRef<ViroHandle>(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   useViroNode(
     props,
     (s) => {
@@ -53,10 +62,12 @@ export function ViroVideo(props: Props): null {
       return geo;
     },
     true,
-    sizePropSet ? undefined : aspect
+    sizePropSet ? `${width}x${height}` : aspect,
+    undefined,
+    { seekToTime: (seconds: number) => seekMedia(videoRef.current, seconds) },
+    false,
   );
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -69,12 +80,16 @@ export function ViroVideo(props: Props): null {
     video.crossOrigin = "anonymous";
     video.playsInline = true;
     videoRef.current = video;
+    const stopEvents = forwardMediaEvents(video, () => propsRef.current);
 
     const material = scene.createMaterial();
     scene.setMaterialLightingModel(material, ViroLightingModel.Constant);
     let appliedGeometry: ViroHandle = 0;
     const stopTexture = streamVideoTexture(scene, video, (texture, changed) => {
-      if (changed) scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
+      if (changed) {
+        applyStereoMode(scene, texture, propsRef.current.stereoMode);
+        scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
+      }
       // Read per frame rather than capturing: the surface is rebuilt when the
       // video's aspect ratio arrives, which replaces the handle.
       const geo = geometryRef.current;
@@ -97,6 +112,7 @@ export function ViroVideo(props: Props): null {
 
     return () => {
       stopTexture();
+      stopEvents();
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("error", onErr);
       video.removeEventListener("loadedmetadata", onMetadata);
@@ -106,7 +122,7 @@ export function ViroVideo(props: Props): null {
       scene.destroyMaterial(material);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [url, props.stereoMode]);
 
   // Live playback controls applied to the current <video>.
   useEffect(() => {
@@ -120,7 +136,7 @@ export function ViroVideo(props: Props): null {
       return;
     }
     return playWhenAllowed(v, props.muted ?? false, (err) => propsRef.current.onError?.(err));
-  }, [props.paused, props.loop, props.muted, props.volume, url]);
+  }, [props.paused, props.loop, props.muted, props.volume, url, props.stereoMode]);
 
   return null;
 }

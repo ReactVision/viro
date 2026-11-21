@@ -52,3 +52,8 @@ export function loadImageRGBA(url: string): Promise<ViroRGBAImage> {
   cache.set(url, promise);
   return promise;
 }
+
+/** ViroImage.evictFromCache: the next load of `url` fetches it again. */
+export function evictImage(url: string): void {
+  cache.delete(url);
+}

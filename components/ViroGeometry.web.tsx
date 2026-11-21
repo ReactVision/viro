@@ -1,6 +1,7 @@
 /**
  * Web implementation of ViroGeometry — a custom mesh from `vertices`,
- * `normals`, `texcoords` and `triangleIndices`. Indices are triples [a, b, c].
+ * `normals`, `texcoords` and `triangleIndices`. Each `triangleIndices` entry is
+ * a submesh, any number of triangles long, and takes the material at its index.
  */
 import * as React from "react";
 import { useMemo } from "react";
@@ -14,7 +15,7 @@ type Props = ViroWebNodeProps & {
   vertices?: P3[];
   normals?: P3[];
   texcoords?: P2[];
-  triangleIndices?: P3[];
+  triangleIndices?: number[][];
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -26,15 +27,20 @@ export function ViroGeometry(props: Props) {
   const vertices = useMemo(() => flat3(props.vertices), [props.vertices]);
   const normals = useMemo(() => flat3(props.normals), [props.normals]);
   const texcoords = useMemo(() => flat2(props.texcoords), [props.texcoords]);
-  const indices = useMemo(() => flat3(props.triangleIndices), [props.triangleIndices]);
+  const submeshes = useMemo(() => (props.triangleIndices ?? []).map((s) => [...s]), [props.triangleIndices]);
   const key = useMemo(
-    () => `${vertices.length}:${normals.length}:${texcoords.length}:${indices.length}:${indices.join(",")}`,
-    [vertices, normals, texcoords, indices],
+    () => `${vertices.length}:${normals.length}:${texcoords.length}:${submeshes.map((s) => s.join(",")).join("|")}`,
+    [vertices, normals, texcoords, submeshes],
   );
 
+  // A renderer without submeshes (1.2.0) gets them as one, so the shape is
+  // whole and the first material covers it.
   const node = useViroNode(
     props,
-    (scene) => scene.createGeometry(vertices, normals, texcoords, indices),
+    (scene) =>
+      (typeof scene.createGeometrySubmeshes === "function" &&
+        scene.createGeometrySubmeshes(vertices, normals, texcoords, submeshes)) ||
+      scene.createGeometry(vertices, normals, texcoords, submeshes.flat()),
     true,
     key,
   );

@@ -6,7 +6,7 @@
  * for that gesture instead of failing; a video meanwhile plays muted, which every
  * browser allows, so its picture runs, and gets its sound on the gesture.
  */
-import type { ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
+import type { ViroHandle, ViroSceneApi, ViroStereoMode } from "@reactvision/viro-web-renderer";
 
 type Wanted = { muted: boolean; onError?: (error: unknown) => void };
 
@@ -99,6 +99,50 @@ export function resumeAudioWhenAllowed(ctx: AudioContext): void {
   watchResume(ctx);
 }
 
+export type ViroMediaEventProps = {
+  onBufferStart?: (event: { nativeEvent: Record<string, never> }) => void;
+  onBufferEnd?: (event: { nativeEvent: Record<string, never> }) => void;
+  onUpdateTime?: (currentTime: number, totalTime: number) => void;
+};
+
+/**
+ * Native's buffering and progress callbacks from a media element. `props` is
+ * read on each event, so the caller passes a getter over its latest props.
+ * Attach before the element's first task runs: native reports buffering from
+ * the moment the video is created, which here is `loadstart`.
+ */
+export function forwardMediaEvents(media: HTMLMediaElement, props: () => ViroMediaEventProps): () => void {
+  let buffering = false;
+  const bufferStart = () => {
+    if (buffering) return;
+    buffering = true;
+    props().onBufferStart?.({ nativeEvent: {} });
+  };
+  const bufferEnd = () => {
+    if (!buffering) return;
+    buffering = false;
+    props().onBufferEnd?.({ nativeEvent: {} });
+  };
+  const time = () =>
+    props().onUpdateTime?.(media.currentTime, Number.isFinite(media.duration) ? media.duration : 0);
+  const listeners: [string, () => void][] = [
+    ["loadstart", bufferStart],
+    ["waiting", bufferStart],
+    ["canplay", bufferEnd],
+    ["playing", bufferEnd],
+    ["timeupdate", time],
+  ];
+  for (const [type, fn] of listeners) media.addEventListener(type, fn);
+  return () => {
+    for (const [type, fn] of listeners) media.removeEventListener(type, fn);
+  };
+}
+
+/** The ref method the video components share. */
+export function seekMedia(media: HTMLMediaElement | null, seconds: number): void {
+  if (media && Number.isFinite(seconds)) media.currentTime = Math.max(0, seconds);
+}
+
 // requestVideoFrameCallback isn't in every TS DOM lib; access it via a cast.
 function requestVideoFrame(video: HTMLVideoElement, cb: () => void): number | null {
   const fn = (video as any).requestVideoFrameCallback;
@@ -176,4 +220,23 @@ export function streamVideoTexture(
     if (current) scene.destroyTexture(current);
     if (source && source !== current) scene.destroyTexture(source);
   };
+}
+
+let warnedStereo = false;
+
+/**
+ * Native's stereoMode: an image or video holding both eyes' pictures shows the
+ * left eye's half, as on a phone. Call it before the texture goes on a material.
+ */
+export function applyStereoMode(scene: ViroSceneApi, texture: ViroHandle, mode: string | undefined): void {
+  if (!mode || mode.toLowerCase() === "none") return;
+  // An unknown mode shows the whole image, as on native, with no warning.
+  if (typeof scene.setTextureStereoMode === "function") {
+    scene.setTextureStereoMode(texture, mode as ViroStereoMode);
+    return;
+  }
+  if (!warnedStereo) {
+    warnedStereo = true;
+    console.warn(`[Viro web] stereoMode "${mode}" is not supported by this renderer; showing the whole image.`);
+  }
 }

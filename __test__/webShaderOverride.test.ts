@@ -13,6 +13,8 @@
  * React renderer, which this package has no dev dependency for.
  */
 import {
+  applyARShadow,
+  applyRegistryMaterials,
   registerViroMaterials,
   createMaterialFromRegistry,
   deleteViroMaterials,
@@ -220,5 +222,57 @@ describe("a material's own uniforms on the web", () => {
   test("the map form under shaderUniforms is read too, as native reads it", () => {
     const { calls } = buildDef({ shaderUniforms: { strength: { type: "float", value: 0.4 } } });
     expect(calls.setMaterialShaderUniformFloat).toEqual([[1, "strength", 0.4]]);
+  });
+});
+
+describe("arShadowReceiver on the web", () => {
+  test("gives the material VROARShadow's lighting, depth and three modifiers", () => {
+    const { scene, calls } = fakeScene();
+    applyARShadow(scene as never, 7);
+    expect(calls.setMaterialLightingModel).toEqual([[7, 4]]);
+    expect(calls.setMaterialWritesToDepthBuffer).toEqual([[7, false]]);
+    expect(calls.addMaterialShaderModifier?.map((c) => c[1])).toEqual(["surface", "lightingModel", "fragment"]);
+    expect(calls.addMaterialShaderModifier?.[2]?.[2]).toContain("_output_color = vec4(0, 0, 0, 0);");
+  });
+});
+
+describe("applyRegistryMaterials", () => {
+  const scene = (withArray = true) => {
+    let next = 100;
+    const s: any = {
+      createMaterial: () => ++next,
+      setMaterialLightingModel: () => {},
+      setMaterialDiffuseColor: () => {},
+      setGeometryMaterial: jest.fn(),
+      destroyMaterial: () => {},
+    };
+    if (withArray) s.setGeometryMaterials = jest.fn(() => true);
+    return s;
+  };
+  beforeAll(() =>
+    registerViroMaterials({
+      faceA: { lightingModel: "Constant", diffuseColor: "#ff0000" },
+      faceB: { lightingModel: "Constant", diffuseColor: "#00ff00" },
+    }),
+  );
+  afterAll(() => deleteViroMaterials(["faceA", "faceB"]));
+
+  test("every name goes to the geometry at once", () => {
+    const s = scene();
+    expect(applyRegistryMaterials(s, 7, ["faceA", "faceB"])).toBe(true);
+    expect(s.setGeometryMaterials).toHaveBeenCalledWith(7, [expect.any(Number), expect.any(Number)]);
+    expect(s.setGeometryMaterial).not.toHaveBeenCalled();
+  });
+
+  test("a renderer without the array setter, or an unregistered name, keeps the first alone", () => {
+    const old = scene(false);
+    expect(applyRegistryMaterials(old, 7, ["faceA", "faceB"])).toBe(true);
+    expect(old.setGeometryMaterial).toHaveBeenCalledTimes(1);
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const s = scene();
+    expect(applyRegistryMaterials(s, 7, ["faceA", "missing"])).toBe(true);
+    expect(s.setGeometryMaterials).not.toHaveBeenCalled();
+    expect(s.setGeometryMaterial).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });

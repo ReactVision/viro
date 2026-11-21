@@ -1,21 +1,25 @@
 /**
  * ViroAnimatedImage.web.tsx
  *
- * Web implementation of ViroAnimatedImage — an animated image (GIF/APNG) on a
- * flat surface. The browser decodes and advances the animation inside an
- * <img> element on its own timeline; a per-frame draw of that <img> to a canvas
- * samples whatever frame is currently displayed and uploads it as the surface's
- * diffuse texture. This reuses the surface + per-frame-texture pattern from
- * ViroImage / ViroVideo, so the animation plays without any native decoder.
+ * Web implementation of ViroAnimatedImage: an animated image (GIF, APNG, WebP)
+ * on a flat surface. The browser's ImageDecoder hands over each frame with its
+ * delay, and each is uploaded into one texture the surface keeps, as ViroVideo
+ * does. A new texture per frame never drew: virocore puts a texture on the GPU
+ * only after the frame that first uses it, and each was replaced first.
  *
- * MVP scope: source, width/height, transform props, paused, onLoadStart/
- * onLoadEnd/onError. `loop` follows the file's own loop count (a GIF encodes
- * its own looping — JS can't override it here). `placeholderSource`,
- * `resizeMode`, `stereoMode` are follow-ups, matching ViroImage.
+ * Drawing an animated <img> to a canvas is no substitute: browsers give the
+ * canvas the same frame every time. So where ImageDecoder is missing, or cannot
+ * read the file, the image shows as a still.
+ *
+ * As on native, `loop` (default true) decides whether the animation repeats,
+ * whatever the file's own loop count, a delay of 0 plays as 100 ms, and paused
+ * holds the current frame. The surface is sized, cropped and given a
+ * placeholder by ViroImage's rules, as native's VRTAnimatedImage extends
+ * VRTImage. Native draws no stereoMode here, so neither does this.
  *
  * Copyright © 2026 ReactVision. All rights reserved.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ViroLightingModel,
   ViroTextureChannel,
@@ -23,13 +27,52 @@ import {
   type ViroHandle,
 } from "@reactvision/viro-web-renderer";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
+import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
 import { resolveImageSource } from "./Web/viroImageLoader";
+import { resolveSurface, useImagePlaceholder } from "./ViroImage.web";
+
+// ImageDecoder is missing from this TypeScript's DOM lib.
+type DecodedFrame = {
+  image: CanvasImageSource &
+    TexImageSource & { displayWidth: number; displayHeight: number; duration: number | null; close(): void };
+};
+type FrameDecoder = {
+  completed: Promise<void>;
+  tracks: { ready: Promise<void>; selectedTrack: { frameCount: number } | null };
+  decode(options: { frameIndex: number }): Promise<DecodedFrame>;
+  close(): void;
+};
+type FrameDecoderClass = {
+  new (init: { data: ArrayBuffer; type: string }): FrameDecoder;
+  isTypeSupported(type: string): Promise<boolean>;
+};
+
+async function openDecoder(url: string): Promise<FrameDecoder | null> {
+  const Decoder = (globalThis as { ImageDecoder?: FrameDecoderClass }).ImageDecoder;
+  if (!Decoder) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!type || !(await Decoder.isTypeSupported(type))) return null;
+    const decoder = new Decoder({ data: await res.arrayBuffer(), type });
+    // The frame count is final only once all the data is read and the tracks are known.
+    await Promise.all([decoder.completed, decoder.tracks.ready]);
+    return decoder;
+  } catch {
+    return null;
+  }
+}
 
 type Props = ViroWebNodeProps & {
   source: unknown;
   width?: number;
   height?: number;
+  resizeMode?: "ScaleToFill" | "ScaleToFit" | "StretchToFill";
+  imageClipMode?: "None" | "ClipToBounds";
+  placeholderSource?: unknown;
+  style?: { width?: number; height?: number } & Record<string, unknown>;
   paused?: boolean;
   loop?: boolean;
   onLoadStart?: () => void;
@@ -40,28 +83,52 @@ type Props = ViroWebNodeProps & {
 
 export function ViroAnimatedImage(props: Props): null {
   const scene = useViroScene();
-  const width = props.width ?? 1;
-  const height = props.height ?? 1;
+  const slot = useViroFlexSlot();
+  const widthProp = slot?.width ?? props.width ?? props.style?.width;
+  const heightProp = slot?.height ?? props.height ?? props.style?.height;
+  // The first frame's aspect, which only the load can supply.
+  const [aspect, setAspect] = useState<number | null>(null);
+  const { width, height, uv } = resolveSurface(
+    widthProp ?? 1,
+    heightProp ?? 1,
+    widthProp !== undefined || heightProp !== undefined,
+    props.resizeMode ?? "StretchToFill",
+    props.resizeMode !== undefined,
+    aspect,
+    props.imageClipMode ?? "ClipToBounds",
+  );
   const url = resolveImageSource(props.source);
 
   const geometryRef = useRef<ViroHandle>(0);
-  useViroNode(props, (s) => {
-    const geo = s.createSurface(width, height);
-    geometryRef.current = geo;
-    return geo;
-  });
+  const geometryKey = `${width}x${height}|${uv.join(",")}`;
+  useViroNode(
+    props,
+    (s) => {
+      const geo = s.createSurfaceUV(width, height, uv[0], uv[1], uv[2], uv[3]);
+      geometryRef.current = geo;
+      return geo;
+    },
+    true,
+    geometryKey,
+    undefined,
+    undefined,
+    false,
+  );
+  const imageShownRef = useImagePlaceholder(props, url, geometryRef, geometryKey);
 
   const propsRef = useRef(props);
   propsRef.current = props;
   const pausedRef = useRef(props.paused ?? false);
   pausedRef.current = props.paused ?? false;
+  const loopRef = useRef(props.loop ?? true);
+  loopRef.current = props.loop ?? true;
+  // Restarts a decoded animation that stopped for pause or for its end.
+  const wakeRef = useRef<(() => void) | null>(null);
+  useEffect(() => wakeRef.current?.(), [props.paused, props.loop]);
 
   useEffect(() => {
-    const geo = geometryRef.current;
-    if (!geo || !url) return;
+    if (!url) return;
 
-    const img = new Image();
-    img.crossOrigin = "anonymous";
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
@@ -73,50 +140,125 @@ export function ViroAnimatedImage(props: Props): null {
     // a hole in whatever was drawn behind it after it.
     scene.setMaterialWritesToDepthBuffer(material, false);
 
-    let currentTex = 0;
+    // 0 on a renderer build without source textures: that build gets the first
+    // frame as a still image, uploaded once.
+    const source = scene.createSourceTexture(true);
+    let texture: ViroHandle = 0;
+    let appliedGeometry: ViroHandle = 0;
     let rafId = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
+    let decoder: FrameDecoder | null = null;
+    const img = new Image();
 
-    const uploadFrame = () => {
-      if (cancelled || !ctx) return;
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
-      if (!pausedRef.current && w > 0 && h > 0) {
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width = w;
-          canvas.height = h;
+    const upload = (frame: CanvasImageSource & TexImageSource, w: number, h: number) => {
+      if (!texture && w > 0 && h > 0) setAspect(w / h);
+      if (source) {
+        if (scene.updateTextureFromSource(source, frame) && texture !== source) {
+          texture = source;
+          scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
         }
-        // Sampling the <img> each frame captures the GIF/APNG's current frame,
-        // which the browser advances on its own animation clock.
-        ctx.drawImage(img, 0, 0, w, h);
-        const rgba = ctx.getImageData(0, 0, w, h).data;
-        const tex = scene.createTextureRGBA(new Uint8Array(rgba), w, h, true);
-        scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, tex);
-        scene.setGeometryMaterial(geo, material);
-        if (currentTex) scene.destroyTexture(currentTex);
-        currentTex = tex;
+      } else if (!texture && ctx && w > 0 && h > 0) {
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(frame, 0, 0, w, h);
+        texture = scene.createTextureRGBA(new Uint8Array(ctx.getImageData(0, 0, w, h).data), w, h, true);
+        scene.setMaterialTexture(material, ViroTextureChannel.Diffuse, texture);
       }
-      rafId = requestAnimationFrame(uploadFrame);
+    };
+
+    // A size change rebuilds the surface, which then needs the material again.
+    const applyToGeometry = () => {
+      if (cancelled) return;
+      const geo = geometryRef.current;
+      if (texture && geo && geo !== appliedGeometry) {
+        scene.setGeometryMaterial(geo, material);
+        imageShownRef.current = true;
+        appliedGeometry = geo;
+      }
+      rafId = requestAnimationFrame(applyToGeometry);
+    };
+    rafId = requestAnimationFrame(applyToGeometry);
+
+    const fail = () => {
+      if (!cancelled) propsRef.current.onError?.(new Error(`image failed: ${url}`));
+    };
+
+    const playDecoded = (d: FrameDecoder) => {
+      const frames = d.tracks.selectedTrack?.frameCount ?? 1;
+      let index = 0;
+      let busy = false;
+      let loaded = false;
+      const show = async () => {
+        timer = undefined;
+        if (cancelled || busy) return;
+        busy = true;
+        let delayMs = 100;
+        try {
+          const { image } = await d.decode({ frameIndex: index });
+          if (!cancelled) upload(image, image.displayWidth, image.displayHeight);
+          if (image.duration) delayMs = image.duration / 1000;
+          image.close();
+        } catch {
+          busy = false;
+          if (!loaded) fail();
+          return;
+        }
+        busy = false;
+        if (cancelled) return;
+        if (!loaded) {
+          loaded = true;
+          propsRef.current.onLoadEnd?.();
+        }
+        if (frames <= 1 || pausedRef.current) return;
+        if (index === frames - 1 && !loopRef.current) return;
+        timer = setTimeout(() => {
+          index = (index + 1) % frames;
+          void show();
+        }, delayMs);
+      };
+      wakeRef.current = () => {
+        if (!loaded || busy || timer !== undefined || pausedRef.current) return;
+        if (index === frames - 1 && !loopRef.current) return;
+        index = (index + 1) % frames;
+        void show();
+      };
+      void show();
+    };
+
+    const playStill = () => {
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        if (cancelled) return;
+        upload(img, img.naturalWidth, img.naturalHeight);
+        propsRef.current.onLoadEnd?.();
+      };
+      img.onerror = fail;
+      img.src = url;
     };
 
     propsRef.current.onLoadStart?.();
-    img.onload = () => {
-      if (cancelled) return;
-      propsRef.current.onLoadEnd?.();
-      rafId = requestAnimationFrame(uploadFrame);
-    };
-    img.onerror = () => {
-      if (!cancelled) propsRef.current.onError?.(new Error(`image failed: ${url}`));
-    };
-    img.src = url;
+    void openDecoder(url).then((d) => {
+      if (cancelled) {
+        d?.close();
+        return;
+      }
+      decoder = d;
+      if (d) playDecoded(d);
+      else playStill();
+    });
 
     return () => {
       cancelled = true;
+      wakeRef.current = null;
       if (rafId) cancelAnimationFrame(rafId);
+      if (timer !== undefined) clearTimeout(timer);
+      decoder?.close();
       img.onload = null;
       img.onerror = null;
       img.src = "";
-      if (currentTex) scene.destroyTexture(currentTex);
+      if (texture) scene.destroyTexture(texture);
+      else if (source) scene.destroyTexture(source);
       scene.destroyMaterial(material);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

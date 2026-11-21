@@ -27,6 +27,8 @@ type Props = ViroWebNodeProps & {
   onAnchorFound?: (anchor: ViroWebAnchor) => void;
   onAnchorUpdated?: (anchor: ViroWebAnchor) => void;
   onAnchorRemoved?: () => void;
+  /** Keeps the node where it is while the anchor goes on updating, as on native. */
+  pauseUpdates?: boolean;
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -64,10 +66,12 @@ export function ViroARPlane(props: Props) {
       setMatchedId(anchors.some((a) => a.id === props.anchorId) ? props.anchorId : null);
       return;
     }
+    // Paused, the node stays on its plane while that plane exists.
+    if (props.pauseUpdates && matchedId && anchors.some((a) => a.id === matchedId)) return;
     const picked = claims ? claims.claim(componentId, candidateIds) : (candidateIds[0] ?? null);
     setMatchedId(picked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidateIds, props.anchorId, anchors]);
+  }, [candidateIds, props.anchorId, anchors, props.pauseUpdates]);
 
   // Release the claim on unmount.
   useEffect(() => {
@@ -77,11 +81,19 @@ export function ViroARPlane(props: Props) {
 
   const matched = matchedId ? anchors.find((a) => a.id === matchedId) ?? null : null;
 
+  // The pose the node holds while paused: the anchor's when the pause began, or
+  // the first match if it began unmatched. Native would leave it at the origin
+  // until resumed, which on the web draws it at the camera.
+  const frozenRef = useRef<ArPlaneAnchor | null>(null);
+  if (!props.pauseUpdates || !matched) frozenRef.current = props.pauseUpdates ? null : matched;
+  else if (!frozenRef.current || frozenRef.current.id !== matched.id) frozenRef.current = matched;
+  const pose = props.pauseUpdates ? frozenRef.current : matched;
+
   // Drive the node transform from the matched anchor; hide when unmatched.
   const nodeProps: ViroWebNodeProps = {
     ...props,
-    position: matched ? matched.center : [0, 0, 0],
-    rotation: matched ? matched.rotation : [0, 0, 0],
+    position: pose ? pose.center : [0, 0, 0],
+    rotation: pose ? pose.rotation : [0, 0, 0],
     visible: matched ? props.visible ?? true : false,
   };
   const node = useViroNode(nodeProps);

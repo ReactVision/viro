@@ -10,7 +10,7 @@
  * and those are stopped in the capture phase so virocore never sees them as
  * touches.
  */
-import { ViroTrackingState, type ViroSceneApi } from "@reactvision/viro-web-renderer";
+import { ViroTrackingState, type ArPlaneAnchor, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { setCameraView, type CameraView } from "./viroDrag";
 
 type Vec3 = [number, number, number];
@@ -24,6 +24,8 @@ export type ViroVirtualCameraOptions = {
    * Default -1. `null` reports no plane.
    */
   floorY?: number | null;
+  /** Planes reported as detected anchors in place of the floor; `floorY` is then ignored. */
+  planes?: ArPlaneAnchor[];
   /** Receives `reset()`, which returns the camera to its starting pose. */
   onReady?: (controls: ViroVirtualCameraControls) => void;
 };
@@ -68,6 +70,13 @@ export function floorAnchorFor(floorY: number) {
   };
 }
 
+/** The anchors a virtual camera's scene sees. */
+export function virtualAnchors(options: ViroVirtualCameraOptions): ArPlaneAnchor[] {
+  if (options.planes) return options.planes;
+  const floorY = options.floorY === undefined ? -1 : options.floorY;
+  return floorY === null ? [] : [floorAnchorFor(floorY)];
+}
+
 /**
  * Starts driving the AR camera from `element`'s input. The starting pose is the
  * session origin looking down -Z, which is where a phone's camera is when a
@@ -89,7 +98,7 @@ export function attachVirtualCamera(
   // injected poses; a live session calls it when it starts.
   scene.initAR();
   // Published for dragging, which has to cast its own rays: the renderer cannot report the camera.
-  const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element };
+  const view: CameraView = { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element, ar: true };
   setCameraView(scene, view);
   const sizeCamera = () => {
     const w = Math.max(1, Math.round(element.clientWidth));

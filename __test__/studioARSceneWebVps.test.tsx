@@ -23,6 +23,9 @@ jest.mock("../components/ViroDirectionalLight.web", () => ({
 jest.mock("../components/AR/ViroARPlane.web", () => ({
   ViroARPlane: "ViroARPlane",
 }));
+jest.mock("../components/AR/ViroARPlaneSelector", () => ({
+  ViroARPlaneSelector: "ViroARPlaneSelector",
+}));
 jest.mock("../components/AR/ViroARScene.web", () => ({
   ViroARScene: "ViroARScene",
 }));
@@ -44,6 +47,7 @@ jest.mock("../components/Material/ViroMaterials", () => ({
 const mockSession = {
   cameraPose: { position: [0, 0, 0], quaternion: [0, 0, 0, 1] },
 };
+const mockAR: { session: typeof mockSession | null } = { session: mockSession };
 jest.mock("../components/Web/ViroWebContext", () => {
   const sceneApi = {
     getNodeWorldPosition: () => null,
@@ -52,7 +56,7 @@ jest.mock("../components/Web/ViroWebContext", () => {
   };
   return {
     useViroAR: () => ({
-      session: mockSession,
+      session: mockAR.session,
       trackingState: require("@reactvision/viro-web-renderer").ViroTrackingState.Normal,
     }),
     useViroScene: () => sceneApi,
@@ -84,6 +88,8 @@ import { StudioPlacementStore } from "../components/Studio/domain/placementStore
 import { questAlertStore } from "../components/Studio/domain/questAlertStore";
 import { evaluateProximityBindings } from "../components/Studio/domain/proximityBindingsRuntime";
 import { executeOnLoadFunction } from "../components/Studio/domain/sceneNavigationHandler";
+import { useViroScene } from "../components/Web/ViroWebContext";
+import { setCameraView } from "../components/Web/viroDrag";
 import type {
   StudioAsset,
   StudioProximityBinding,
@@ -219,13 +225,13 @@ function sceneData(
 
 let renderer: ReactTestRenderer | undefined;
 
-function render(data: StudioSceneResponse) {
+function render(data: StudioSceneResponse, mode: "ar" | "3d" = "ar") {
   const placementStore = new StudioPlacementStore();
   act(() => {
     renderer = TestRenderer.create(
       <StudioARScene
         sceneData={data}
-        mode="ar"
+        mode={mode}
         placementStore={placementStore}
       />
     );
@@ -304,5 +310,30 @@ describe("StudioARScene (web) and a scene bound to a VPS location", () => {
     expect(
       renderer!.root.findAll((n) => n.type === "ViroSpatialSound")
     ).toHaveLength(1);
+  });
+});
+
+describe("StudioARScene (web) proximity without an AR session", () => {
+  afterEach(() => {
+    mockAR.session = mockSession;
+  });
+
+  it("measures from the view the navigator publishes, as in the desktop 3d player", () => {
+    mockAR.session = null;
+    const scene = useViroScene();
+    setCameraView(scene, {
+      position: [0, 1.6, 2],
+      orientation: [0, 0, 0, 1],
+      fx: 1,
+      fy: 1,
+      cx: 0,
+      cy: 0,
+      element: {} as HTMLElement,
+    });
+    render(sceneData(null), "3d");
+    act(() => jest.advanceTimersByTime(200));
+    expect(evaluateSpy).toHaveBeenCalled();
+    expect(evaluateSpy.mock.calls[0][0].cameraPosition).toEqual([0, 1.6, 2]);
+    setCameraView(scene, null);
   });
 });

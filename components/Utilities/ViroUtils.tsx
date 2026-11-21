@@ -152,6 +152,73 @@ export interface ViroPermissionsResult {
   location?: boolean;
 }
 
+async function webPermissionState(name: string): Promise<boolean> {
+  try {
+    const status = await navigator.permissions.query({ name } as PermissionDescriptor);
+    return status.state === "granted";
+  } catch {
+    // No Permissions API, or one that does not know the name (Firefox and "camera").
+    return false;
+  }
+}
+
+// Safari refuses audio capture (InvalidStateError) while a page's audio session
+// is "playback", which ViroSound sets so sound plays in silent mode. Native's
+// session is PlayAndRecord, which allows both.
+function allowAudioCapture(): void {
+  const session = (globalThis.navigator as { audioSession?: { type: string } } | undefined)?.audioSession;
+  if (session && session.type !== "auto" && session.type !== "play-and-record") session.type = "play-and-record";
+}
+
+async function requestWebPermission(permission: ViroPermission): Promise<boolean> {
+  switch (permission) {
+    case "camera":
+    case "microphone": {
+      if (typeof navigator.mediaDevices?.getUserMedia !== "function") return false;
+      if (permission === "microphone") allowAudioCapture();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(
+          permission === "camera" ? { video: true } : { audio: true }
+        );
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    case "location":
+      if (!navigator.geolocation) return false;
+      return new Promise((resolve) =>
+        navigator.geolocation.getCurrentPosition(
+          () => resolve(true),
+          // Allowed but without a fix yet still answers the question asked.
+          (error) => resolve(error.code !== error.PERMISSION_DENIED),
+          { timeout: 30000, maximumAge: Infinity }
+        )
+      );
+    default:
+      // "storage" is the photo library native saves captures to; the web has
+      // none, and no capture on the web saves there.
+      return false;
+  }
+}
+
+async function webPermissions(
+  permissions: ViroPermission[],
+  request: boolean
+): Promise<ViroPermissionsResult> {
+  const result: ViroPermissionsResult = {};
+  // One at a time, so the browser shows one prompt at a time.
+  for (const permission of permissions) {
+    result[permission] = request
+      ? await requestWebPermission(permission)
+      : permission === "storage"
+        ? false
+        : await webPermissionState(permission === "location" ? "geolocation" : permission);
+  }
+  return result;
+}
+
 /**
  * Request the specified permissions required for Viro AR to function.
  * Omit `permissions` to request all four (camera, microphone, storage, location).
@@ -160,6 +227,7 @@ export interface ViroPermissionsResult {
 export function requestRequiredPermissions(
   permissions: ViroPermission[] = ALL_PERMISSIONS
 ): Promise<ViroPermissionsResult> {
+  if (Platform.OS === "web") return webPermissions(permissions, true);
   if (Platform.OS === "ios") {
     if (!NativeModules.VRTARUtils) return Promise.resolve({});
     return NativeModules.VRTARUtils.requestRequiredPermissions(permissions);
@@ -179,6 +247,7 @@ export function requestRequiredPermissions(
 export function checkPermissions(
   permissions: ViroPermission[] = ALL_PERMISSIONS
 ): Promise<ViroPermissionsResult> {
+  if (Platform.OS === "web") return webPermissions(permissions, false);
   if (Platform.OS === "ios") {
     if (!NativeModules.VRTARUtils) return Promise.resolve({});
     return NativeModules.VRTARUtils.checkPermissions(permissions);

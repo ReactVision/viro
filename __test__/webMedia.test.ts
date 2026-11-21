@@ -3,7 +3,13 @@
  * of failing, and video frames reach the GPU without a read-back where the
  * renderer can take them.
  */
-import { playWhenAllowed, resumeAudioWhenAllowed, streamVideoTexture } from "../components/Web/viroMedia";
+import {
+  forwardMediaEvents,
+  playWhenAllowed,
+  resumeAudioWhenAllowed,
+  seekMedia,
+  streamVideoTexture,
+} from "../components/Web/viroMedia";
 
 const listeners = new Map<string, Set<() => void>>();
 const activation = { isActive: true };
@@ -171,5 +177,52 @@ describe("streamVideoTexture", () => {
     expect(scene.destroyTexture).toHaveBeenCalledWith(100);
     stop();
     expect(scene.destroyTexture).toHaveBeenCalledWith(101);
+  });
+});
+
+describe("forwardMediaEvents", () => {
+  class EventMedia {
+    currentTime = 0;
+    duration = NaN;
+    handlers = new Map<string, () => void>();
+    addEventListener(type: string, fn: () => void) {
+      this.handlers.set(type, fn);
+    }
+    removeEventListener(type: string) {
+      this.handlers.delete(type);
+    }
+    fire(type: string) {
+      this.handlers.get(type)?.();
+    }
+  }
+
+  it("reports buffering once per stall and progress as native's (current, total)", () => {
+    const media = new EventMedia();
+    const props = { onBufferStart: jest.fn(), onBufferEnd: jest.fn(), onUpdateTime: jest.fn() };
+    const stop = forwardMediaEvents(media as any, () => props);
+    media.fire("loadstart");
+    media.fire("waiting");
+    expect(props.onBufferStart).toHaveBeenCalledTimes(1);
+    expect(props.onBufferStart).toHaveBeenCalledWith({ nativeEvent: {} });
+    media.fire("canplay");
+    media.fire("playing");
+    expect(props.onBufferEnd).toHaveBeenCalledTimes(1);
+    media.currentTime = 1.5;
+    media.fire("timeupdate");
+    expect(props.onUpdateTime).toHaveBeenLastCalledWith(1.5, 0);
+    media.duration = 4;
+    media.fire("timeupdate");
+    expect(props.onUpdateTime).toHaveBeenLastCalledWith(1.5, 4);
+    stop();
+    expect(media.handlers.size).toBe(0);
+  });
+
+  it("seeks within the media and ignores a time that is not a number", () => {
+    const media = { currentTime: 2 };
+    seekMedia(media as any, NaN);
+    expect(media.currentTime).toBe(2);
+    seekMedia(media as any, -1);
+    expect(media.currentTime).toBe(0);
+    seekMedia(null, 3);
   });
 });

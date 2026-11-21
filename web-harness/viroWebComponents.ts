@@ -5,8 +5,9 @@
  * the extensionless import, same as main.tsx). Anything a caller's generated
  * scene imports that isn't listed here degrades to a stub in render.tsx's
  * requireShim (renders children only, records a warning) instead of crashing
- * the whole scene — components like ViroARPlaneSelector/ViroARImageMarker/
- * ViroSpotLight-adjacent AR helpers don't have a web port yet.
+ * the whole scene. A component whose web file only renders nothing (the
+ * markers, ViroVPSAnchor) is still exported, since that is what native does
+ * with nothing tracked.
  */
 import { createElement, useEffect } from "react";
 import { markError, pushWarning } from "./renderState";
@@ -70,6 +71,48 @@ export { ViroMaterials } from "../components/Material/ViroMaterials";
 // truthy functions, so `isQuest ? <Quest/> : <Phone/>` would take the Quest branch.
 export { isQuest, isWeb, hasOpenXRSupport } from "../components/Utilities/ViroPlatform";
 export { ViroAnimations } from "../components/Animation/ViroAnimations";
+// The stub's value for a constant is a function, so a check such as
+// `state === ViroTrackingStateConstants.TRACKING_NORMAL` was never true.
+export {
+  ViroARTrackingReasonConstants,
+  ViroRecordingErrorConstants,
+  ViroTrackingStateConstants,
+} from "../components/ViroConstants";
+export {
+  checkPermissions,
+  gpsToArWorld,
+  isARSupportedOnDevice,
+  latLngToMercator,
+  polarToCartesian,
+  polarToCartesianActual,
+  requestRequiredPermissions,
+} from "../components/Utilities/ViroUtils";
+export { StreamingAudioManager } from "../components/Utilities/StreamingAudioManager";
+export { useViroTrackingReady } from "../components/hooks/useViroTrackingReady";
+export { useFixedUpdate, useGameLoop, useLateUpdate } from "../components/hooks/useGameLoop";
+export { useAnySourceHover } from "../components/Utilities/useAnySourceHover";
+export { useAnySourcePressed } from "../components/Utilities/useAnySourcePressed";
+export { useViroMapCamera, viroMapCameraTransform } from "../components/useViroMapCamera";
+export { ViroGameLoopUtils } from "../components/ViroGameLoopUtils";
+export { ViroAnimatedComponent } from "../components/ViroAnimatedComponent";
+export { ViroAnimatedImage } from "../components/ViroAnimatedImage";
+export { ViroCameraTexture } from "../components/ViroCameraTexture";
+export { ViroGameLoop } from "../components/ViroGameLoop";
+export { ViroVirtualButton } from "../components/ViroVirtualButton";
+export { ViroVirtualJoystick } from "../components/ViroVirtualJoystick";
+export { ViroController } from "../components/ViroController";
+// These render nothing on web, as on native when nothing is tracked. The stub
+// drew their children at the origin instead.
+export {
+  ViroObjectDetector,
+  VIRO_OBJECT_DETECTOR_UNAVAILABLE_ERROR,
+} from "../components/ViroObjectDetector";
+export { ViroARImageMarker } from "../components/AR/ViroARImageMarker";
+export { ViroARObjectMarker } from "../components/AR/ViroARObjectMarker";
+export { ViroVPSAnchor } from "../components/AR/ViroVPSAnchor";
+// Plain JS: children stay hidden until the frame resolves, which on web it does not.
+export { ViroARCloudAnchor } from "../components/AR/ViroARCloudAnchor";
+export { ViroSharedFrame } from "../components/AR/ViroSharedFrame";
 
 // ─── Navigators: wrapped, not re-exported directly ────────────────────────
 // Caller-supplied TSX (the "tsx" render path) has no way to know about this
@@ -82,10 +125,30 @@ export { ViroAnimations } from "../components/Animation/ViroAnimations";
 import { Viro3DSceneNavigator as _Viro3DSceneNavigatorRaw } from "../components/Viro3DSceneNavigator";
 import { ViroARSceneNavigator as _ViroARSceneNavigatorRaw } from "../components/AR/ViroARSceneNavigator";
 import { ViroScene as _SceneForVR } from "../components/ViroScene";
+import { ViroVRSceneNavigator as _ViroVRSceneNavigatorRaw } from "../components/ViroVRSceneNavigator";
+import { ViroSceneNavigator as _ViroSceneNavigatorRaw } from "../components/ViroSceneNavigator";
 
 export function Viro3DSceneNavigator(props: any) {
   if (usePlaybackRefusal("Viro3DSceneNavigator")) return null;
   return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
+}
+
+export function ViroSceneNavigator(props: any) {
+  if (usePlaybackRefusal("ViroSceneNavigator")) return null;
+  return createElement(_ViroSceneNavigatorRaw, { webRendererOptions, ...props });
+}
+
+// The library's own file needs PermissionsAndroid, which react-native-web does
+// not export. On a phone it mounts the AR navigator with `arInitialScene ??
+// initialScene`, so this does the same.
+export function ViroXRSceneNavigator(props: any) {
+  const { initialScene, arInitialScene, vrInitialScene: _vrScene, ...rest } = props;
+  const scene = arInitialScene ?? initialScene;
+  useEffect(() => {
+    if (!scene) pushWarning("ViroXRSceneNavigator needs `arInitialScene` or `initialScene`.");
+  }, [scene]);
+  if (!scene) return null;
+  return createElement(ViroARSceneNavigator, { ...rest, initialScene: scene });
 }
 
 // A recording to drive the AR session from, when one was supplied. Caller TSX
@@ -164,19 +227,11 @@ export function ViroARSceneNavigator(props: any) {
   });
 }
 
-// There's no web navigator/scene for VR yet — fall back to the 3D ones and
-// say so via a warning, rather than failing a VR-flavored generated scaffold
-// outright. Both aliases keep the same prop surface as their 3D originals.
+// The library renders VR scenes through the 3D navigator in mono; this only
+// adds the injected renderer options, as for the other navigators.
 export function ViroVRSceneNavigator(props: any) {
-  const refused = usePlaybackRefusal("ViroVRSceneNavigator");
-  useEffect(() => {
-    if (refused) return;
-    pushWarning(
-      '"ViroVRSceneNavigator" has no web implementation yet — rendered via Viro3DSceneNavigator.',
-    );
-  }, [refused]);
-  if (refused) return null;
-  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
+  if (usePlaybackRefusal("ViroVRSceneNavigator")) return null;
+  return createElement(_ViroVRSceneNavigatorRaw, { webRendererOptions, ...props });
 }
 
 export function ViroVRScene(props: any) {

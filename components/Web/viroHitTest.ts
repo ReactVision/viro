@@ -2,12 +2,15 @@
  * AR hit tests in native's result shape (ViroARHitTestResult). The web tracker
  * reports planes only, so every hit is on one: "ExistingPlaneUsingExtent" inside
  * the plane's detected rectangle, "ExistingPlane" on its extension beyond it.
+ * The web session's own fields stay beside native's for code written against those.
  */
-import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
+import type { ArHitResult, ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
 import { conjugateQuat, quatFromEulerDegrees, rotateByQuaternion, type Vec3 } from "./viroMath";
 
-export function planeHitResult(plane: ArPlaneAnchor, position: Vec3): ViroARHitTestResult {
+export type ViroPlaneHit = ViroARHitTestResult & ArHitResult;
+
+export function planeHitResult(plane: ArPlaneAnchor, position: Vec3, distance: number): ViroPlaneHit {
   const local = rotateByQuaternion(conjugateQuat(quatFromEulerDegrees(plane.rotation)), [
     position[0] - plane.center[0],
     position[1] - plane.center[1],
@@ -18,6 +21,10 @@ export function planeHitResult(plane: ArPlaneAnchor, position: Vec3): ViroARHitT
     type: inside ? "ExistingPlaneUsingExtent" : "ExistingPlane",
     transform: { position: [...position] as Vec3, rotation: [...plane.rotation] as Vec3, scale: [1, 1, 1] },
     hasDepthData: false,
+    anchorId: plane.id,
+    position: [...position] as Vec3,
+    normal: [...plane.normal] as Vec3,
+    distance,
   };
 }
 
@@ -27,11 +34,11 @@ export function hitTestPlanes(
   origin: Vec3,
   direction: Vec3,
   maxDistance = Infinity,
-): ViroARHitTestResult[] {
+): ViroPlaneHit[] {
   const len = Math.hypot(...direction);
   if (len === 0) return [];
   const dir: Vec3 = [direction[0] / len, direction[1] / len, direction[2] / len];
-  const hits: { t: number; result: ViroARHitTestResult }[] = [];
+  const hits: ViroPlaneHit[] = [];
   for (const p of planes) {
     const denom = dir[0] * p.normal[0] + dir[1] * p.normal[1] + dir[2] * p.normal[2];
     if (Math.abs(denom) < 1e-6) continue;
@@ -42,7 +49,7 @@ export function hitTestPlanes(
       denom;
     if (t <= 0 || t > maxDistance) continue;
     const at: Vec3 = [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t];
-    hits.push({ t, result: planeHitResult(p, at) });
+    hits.push(planeHitResult(p, at, t));
   }
-  return hits.sort((a, b) => a.t - b.t).map((h) => h.result);
+  return hits.sort((a, b) => a.distance - b.distance);
 }

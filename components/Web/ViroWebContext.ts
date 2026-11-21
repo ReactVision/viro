@@ -6,6 +6,7 @@
 import { createContext, useContext } from "react";
 import {
   ViroTrackingState,
+  type TrackingReason,
   type ViroWebRenderer,
   type ViroSceneApi,
   type ViroHandle,
@@ -24,6 +25,8 @@ export interface ViroARState {
   session: ViroArSession | null;
   anchors: ArPlaneAnchor[];
   trackingState: ViroTrackingState;
+  /** Why tracking is not Normal; absent or None while it is. */
+  trackingReason?: TrackingReason;
   /** A recorded session replayed rather than tracked live. */
   playback?: boolean;
 }

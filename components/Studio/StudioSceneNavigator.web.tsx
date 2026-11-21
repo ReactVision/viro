@@ -32,6 +32,9 @@ import { StudioPlacementIndicator } from "./StudioPlacementIndicator.web";
 import { StudioRecordingIndicator } from "./StudioRecordingIndicator.web";
 import { StudioColocationIndicator } from "./StudioColocationIndicator.web";
 import { StudioWebAlertOverlay } from "./StudioWebAlertOverlay";
+import { StudioSceneErrorBoundary } from "./StudioSceneErrorBoundary";
+import { createViroWebCapture, type ViroWebCapture } from "../Web/viroCapture";
+import type { ViroCaptureResult } from "../Utilities/VRModuleOpenXR";
 import { studioColocationStore } from "./domain/colocationStore";
 import type {
   StudioColocationOptions,
@@ -48,7 +51,7 @@ import {
 import type { StudioSceneResponse } from "./types";
 
 export interface StudioSceneNavigatorWebHandle {
-  takeScreenshot: (fileName: string) => Promise<{ success: boolean; url?: string }>;
+  takeScreenshot: (fileName: string, saveToCameraRoll?: boolean) => Promise<ViroCaptureResult>;
   /** No-ops on web, where no shared session can start. */
   leaveColocation: () => void;
   /** Always false on web, where no session can start. */
@@ -92,6 +95,8 @@ export interface StudioSceneNavigatorWebProps {
   onSceneChange?: (sceneId: string, sceneName: string) => void;
   onSceneLoaded?: (sceneData: StudioSceneResponse) => void;
   onPlaneDetected?: () => void;
+  /** MANUAL plane detection: the viewer picked a plane. */
+  onPlaneSelected?: () => void;
   onUnsupported?: (features: string[]) => void;
   /**
    * Render the REC pill while a RECORD_VIDEO toggle is running. Default true,
@@ -124,7 +129,12 @@ export interface StudioSceneNavigatorWebProps {
   onMotionUnavailable?: (reason: "denied" | "no-events") => void;
   noAssetsMessage?: string;
   loadingView?: React.ReactNode;
-  renderError?: (error: Error) => React.ReactNode;
+  /**
+   * UI for a failed scene load, a renderer abort or a caught render error, as on
+   * native. `retry` refetches after a failed load and re-mounts the scene
+   * otherwise.
+   */
+  renderError?: (error: Error, retry: () => void) => React.ReactNode;
   /**
    * Accepted for parity with native. No web frame source can align a browser
    * with a device's space, so a value reports `failed` with
@@ -142,6 +152,25 @@ export interface StudioSceneNavigatorWebProps {
    * on_load function, and reports `idle` when it is left.
    */
   onVpsStateChange?: (event: StudioVpsStateEvent) => void;
+}
+
+// Native's free-tier bar (VRTARSceneNavigator watermarkBarOfWidth): full width,
+// 60% black, centred white text, raised 4% of the width off the bottom. The
+// player's own badge is a DOM element the canvas capture never sees.
+function drawStudioWatermark(g: CanvasRenderingContext2D, width: number, height: number) {
+  const fontSize = Math.max(14, width * 0.03);
+  const padY = 6 * (fontSize / 12);
+  const barH = Math.ceil(fontSize * 1.2) + padY * 2;
+  const top = height - barH - width * 0.04;
+  g.save();
+  g.fillStyle = "rgba(0, 0, 0, 0.6)";
+  g.fillRect(0, top, width, barH);
+  g.fillStyle = "#ffffff";
+  g.font = `500 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText("Powered by ReactVision Studio", width / 2, top + barH / 2);
+  g.restore();
 }
 
 type StudioSceneRootProps = React.ComponentProps<typeof StudioARScene> & {
@@ -282,6 +311,7 @@ export const StudioSceneNavigator = forwardRef<
     onSceneChange,
     onSceneLoaded,
     onPlaneDetected,
+    onPlaneSelected,
     onUnsupported,
     noAssetsMessage,
     loadingView,
@@ -299,6 +329,19 @@ export const StudioSceneNavigator = forwardRef<
 
   const [sceneData, setSceneData] = useState<StudioSceneResponse | undefined>(injectedSceneData);
   const [error, setError] = useState<Error | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // Read at capture time, since NAVIGATION can move to another team's scene.
+  const freeTierRef = useRef(false);
+  freeTierRef.current = sceneData?.is_free_tier === true;
+  const [capture] = useState(() =>
+    createViroWebCapture(() => containerRef.current?.querySelector("canvas") ?? null, {
+      overlay: (g, w, h) => {
+        if (freeTierRef.current) drawStudioWatermark(g, w, h);
+      },
+    }),
+  );
+  useEffect(() => () => capture.dispose(), [capture]);
   // The placement overlay covers the player, AR navigator's Start button
   // included, so it waits for the session the button starts.
   const [arStarted, setArStarted] = useState(false);
@@ -396,7 +439,7 @@ export const StudioSceneNavigator = forwardRef<
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneId, injectedSceneData]);
+  }, [sceneId, injectedSceneData, loadAttempt]);
 
   // NAVIGATION seam: fetch the target scene and re-render.
   const navigate = useCallback(
@@ -420,15 +463,8 @@ export const StudioSceneNavigator = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      takeScreenshot: async (fileName: string) => {
-        const canvas = containerRef.current?.querySelector("canvas");
-        if (!canvas) return { success: false };
-        try {
-          return { success: true, url: canvas.toDataURL("image/png") };
-        } catch {
-          return { success: false };
-        }
-      },
+      takeScreenshot: (fileName: string, saveToCameraRoll = false) =>
+        capture.takeScreenshot(fileName, saveToCameraRoll),
       leaveColocation: () => {},
       retryColocation: () => false,
       getColocationRoom: () => null,
@@ -449,7 +485,13 @@ export const StudioSceneNavigator = forwardRef<
   );
   const getPlacementName = (assetId: string) => placementNames.get(assetId) ?? null;
 
-  if (error && renderError) return <>{renderError(error)}</>;
+  if (error && renderError) {
+    const retry = () => {
+      setError(null);
+      if (!sceneData) setLoadAttempt((n) => n + 1);
+    };
+    return <>{renderError(error, retry)}</>;
+  }
   if (!sceneData) return <>{loadingView ?? null}</>;
 
   const resolvedMode = mode ?? (isARScene(sceneData) ? "ar" : "3d");
@@ -464,10 +506,12 @@ export const StudioSceneNavigator = forwardRef<
     onReady: onSceneReady,
     onSceneChange,
     onPlaneDetected,
+    onPlaneSelected,
     onUnsupported,
     onAssetError,
     noAssetsMessage,
     variableStore: variableStoreRef.current ?? undefined,
+    capture,
   };
 
   // The two HUD pills sit over the canvas rather than in it: they are DOM
@@ -484,53 +528,55 @@ export const StudioSceneNavigator = forwardRef<
   };
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", position: "relative" }}
-    >
-      {resolvedMode === "ar" ? (
-        <ViroARSceneNavigator
-          initialScene={STUDIO_SCENE}
-          viroAppProps={sceneProps}
-          webRendererOptions={rendererOptions}
-          slamScriptUrl={slamScriptUrl}
-          arOptions={{ detectPlanes: true, ...arOptions }}
-          onSessionReady={handleSessionReady}
-          onMotionUnavailable={onMotionUnavailable}
-          {...STUDIO_RENDERER_EFFECTS}
-        />
-      ) : (
-        <Viro3DSceneNavigator
-          initialScene={STUDIO_SCENE}
-          viroAppProps={sceneProps}
-          webRendererOptions={rendererOptions}
-          {...STUDIO_RENDERER_EFFECTS}
-        />
-      )}
-      {recordingIndicator && (
-        <div style={{ ...overlay, top: 52 }}>
-          <StudioRecordingIndicator />
-        </div>
-      )}
-      {resolvedMode === "ar" && arStarted && (
-        <StudioPlacementOverlay
-          store={placementStore}
-          apiRef={placementApiRef}
-          getName={getPlacementName}
-        />
-      )}
-      {placementIndicator && (
-        <div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
-          <StudioPlacementIndicator />
-        </div>
-      )}
-      {colocationIndicator && (
-        <div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
-          <StudioColocationIndicator />
-        </div>
-      )}
-      <StudioWebAlertOverlay />
-    </div>
+    <StudioSceneErrorBoundary sceneId={sceneData.scene.id} onError={onError} renderError={renderError}>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "100%", position: "relative" }}
+      >
+        {resolvedMode === "ar" ? (
+          <ViroARSceneNavigator
+            initialScene={STUDIO_SCENE}
+            viroAppProps={sceneProps}
+            webRendererOptions={rendererOptions}
+            slamScriptUrl={slamScriptUrl}
+            arOptions={{ detectPlanes: true, ...arOptions }}
+            onSessionReady={handleSessionReady}
+            onMotionUnavailable={onMotionUnavailable}
+            {...STUDIO_RENDERER_EFFECTS}
+          />
+        ) : (
+          <Viro3DSceneNavigator
+            initialScene={STUDIO_SCENE}
+            viroAppProps={sceneProps}
+            webRendererOptions={rendererOptions}
+            {...STUDIO_RENDERER_EFFECTS}
+          />
+        )}
+        {recordingIndicator && (
+          <div style={{ ...overlay, top: 52 }}>
+            <StudioRecordingIndicator />
+          </div>
+        )}
+        {resolvedMode === "ar" && arStarted && (
+          <StudioPlacementOverlay
+            store={placementStore}
+            apiRef={placementApiRef}
+            getName={getPlacementName}
+          />
+        )}
+        {placementIndicator && (
+          <div style={{ ...overlay, top: 64, padding: "0 24px", zIndex: 2 }}>
+            <StudioPlacementIndicator />
+          </div>
+        )}
+        {colocationIndicator && (
+          <div style={{ ...overlay, bottom: 40, padding: "0 24px", zIndex: 2 }}>
+            <StudioColocationIndicator />
+          </div>
+        )}
+        <StudioWebAlertOverlay />
+      </div>
+    </StudioSceneErrorBoundary>
   );
 });
 

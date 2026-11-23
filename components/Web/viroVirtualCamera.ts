@@ -9,9 +9,10 @@
  *
  * Input that belongs to the scene is left alone: a primary-button press or a
  * single finger is a tap or drag on the content, as on a phone. Only
- * right/middle-button drags, the wheel and two-finger gestures move the camera,
- * and those are stopped in the capture phase so virocore never sees them as
- * touches.
+ * right/middle-button drags, the wheel, two-finger gestures and the movement
+ * keys move the camera, and the pointer ones are stopped in the capture phase
+ * so virocore never sees them as touches. The keys reach the element once it
+ * has focus, which a click in it gives it.
  */
 import { ViroTrackingState, type ArPlaneAnchor, type ViroHandle, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { setCameraView, type CameraView } from "./viroDrag";
@@ -21,8 +22,14 @@ type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
 
 export type ViroVirtualCameraOptions = {
-  /** The point the camera orbits. Default [0, 0, -1], one metre ahead of the session origin. */
+  /** The point the camera starts looking at. Default [0, 0, -1], one metre ahead of the session origin. */
   target?: Vec3;
+  /**
+   * The point Alt and right-drag orbits and the wheel zooms toward, read as the
+   * drag starts and on each wheel event. Without it, or when it returns null,
+   * a drag orbits the point the camera looks at and the wheel moves toward it.
+   */
+  orbitCenter?: () => Vec3 | null;
   /**
    * Height of the floor handed to ViroARPlane as a detected horizontal plane.
    * Default -1. `null` reports no plane.
@@ -37,9 +44,9 @@ export type ViroVirtualCameraOptions = {
 export type ViroVirtualCameraControls = {
   /** Returns the camera to its starting pose. */
   reset(): void;
-  /** Puts the camera at `position`, looking at `target`, which it then orbits. */
+  /** Puts the camera at `position`, looking at `target`. */
   lookFrom(position: Vec3, target: Vec3): void;
-  /** Where the camera is and the point it orbits; `lookFrom` with these puts it back. */
+  /** Where the camera is and the point it looks at; `lookFrom` with these puts it back. */
   pose(): { position: Vec3; target: Vec3 };
 };
 
@@ -47,6 +54,17 @@ const LONG_AXIS_FOV_DEG = 67;
 const MIN_DISTANCE = 0.05;
 const MAX_DISTANCE = 50;
 const MAX_PITCH = Math.PI / 2 - 0.01;
+// Metres a second: a walk with a phone held up. Shift runs.
+const WALK_SPEED = 1.4;
+const RUN_FACTOR = 3;
+// Each key's direction as [right, up, forward], forward along the floor the way the camera faces.
+const MOVE_KEYS: Record<string, Vec3> = {
+  KeyW: [0, 0, 1], ArrowUp: [0, 0, 1],
+  KeyS: [0, 0, -1], ArrowDown: [0, 0, -1],
+  KeyA: [-1, 0, 0], ArrowLeft: [-1, 0, 0],
+  KeyD: [1, 0, 0], ArrowRight: [1, 0, 0],
+  KeyE: [0, 1, 0], KeyQ: [0, -1, 0],
+};
 
 function quatFromYawPitch(yaw: number, pitch: number): Quat {
   // q = qYaw (about +Y) * qPitch (about +X); identity looks down -Z.
@@ -54,6 +72,8 @@ function quatFromYawPitch(yaw: number, pitch: number): Quat {
   const cp = Math.cos(pitch / 2), sp = Math.sin(pitch / 2);
   return [cy * sp, sy * cp, -sy * sp, cy * cp];
 }
+
+const conjugate = ([x, y, z, w]: Quat): Quat => [-x, -y, -z, w];
 
 function rotate(q: Quat, v: Vec3): Vec3 {
   const [x, y, z, w] = q;
@@ -229,10 +249,53 @@ function attachOrbit(
 
   const pose = () => ({ position: [...view.position] as Vec3, target: [...target] as Vec3 });
 
-  const orbit = (dx: number, dy: number) => {
+  const turnBy = (dx: number, dy: number) => {
     const scale = Math.PI / Math.max(element.clientHeight, 1);
     yaw -= dx * scale;
     pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch - dy * scale));
+  };
+
+  const orbit = (dx: number, dy: number) => {
+    turnBy(dx, dy);
+    apply();
+  };
+
+  // Circles `center` without turning to face it: the eye and the view turn about it together.
+  const orbitAbout = (center: Vec3, dx: number, dy: number) => {
+    const eye = view.position;
+    const before = quatFromYawPitch(yaw, pitch);
+    turnBy(dx, dy);
+    const after = quatFromYawPitch(yaw, pitch);
+    const offset = rotate(after, rotate(conjugate(before), [eye[0] - center[0], eye[1] - center[1], eye[2] - center[2]]));
+    const ahead = rotate(after, [0, 0, -distance]);
+    for (let i = 0; i < 3; i++) target[i] = center[i]! + offset[i]! + ahead[i]!;
+    apply();
+  };
+
+  // Moves along the view by a share of the way to `center`, so it neither stalls near it nor crawls far from it.
+  const zoomToward = (center: Vec3, factor: number) => {
+    const eye = view.position;
+    const step = Math.max(0.1, Math.hypot(eye[0] - center[0], eye[1] - center[1], eye[2] - center[2])) * (1 - factor);
+    const forward = rotate(quatFromYawPitch(yaw, pitch), [0, 0, -1]);
+    for (let i = 0; i < 3; i++) target[i] += forward[i]! * step;
+    apply();
+  };
+
+  // Turns the camera where it stands, moving the point it looks at instead.
+  const turn = (dx: number, dy: number) => {
+    const eye = view.position;
+    turnBy(dx, dy);
+    const ahead = rotate(quatFromYawPitch(yaw, pitch), [0, 0, -distance]);
+    target = [eye[0] + ahead[0], eye[1] + ahead[1], eye[2] + ahead[2]];
+    apply();
+  };
+
+  // Moves the camera and the point it looks at together, along the floor the way the camera faces.
+  const walk = (right: number, up: number, forward: number, metres: number) => {
+    const sin = Math.sin(yaw), cos = Math.cos(yaw);
+    target[0] += (right * cos - forward * sin) * metres;
+    target[1] += up * metres;
+    target[2] += (-right * sin - forward * cos) * metres;
     apply();
   };
 
@@ -250,9 +313,9 @@ function attachOrbit(
     apply();
   };
 
-  // Mouse: right or middle drag, or shift and left drag to pan. Touch: two
-  // fingers (orbit with their midpoint, pinch to zoom).
-  let mouse: { x: number; y: number; pan: boolean } | null = null;
+  // Mouse: right-drag turns (orbits with Alt); middle drag, or Shift and left
+  // drag, pans. Touch: two fingers (orbit with their midpoint, pinch to zoom).
+  let mouse: { x: number; y: number; pan: boolean; orbit: Vec3 | null } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
   let twoFinger: { x: number; y: number; spread: number } | null = null;
 
@@ -268,6 +331,8 @@ function attachOrbit(
 
   const onDown = (e: PointerEvent) => {
     if (!sink.driving()) return;
+    // So the movement keys reach it; a press it cancels below would not move the focus.
+    if (e.pointerType !== "touch" && !element.contains?.(element.ownerDocument?.activeElement ?? null)) element.focus?.({ preventScroll: true });
     if (e.pointerType === "touch") {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.size === 2) {
@@ -283,7 +348,8 @@ function attachOrbit(
     }
     const shiftPan = e.button === 0 && e.shiftKey;
     if (e.button !== 1 && e.button !== 2 && !shiftPan) return;
-    mouse = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.shiftKey };
+    const orbit = e.button === 2 && e.altKey ? (options.orbitCenter?.() ?? [...target]) : null;
+    mouse = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.shiftKey, orbit };
     stop(e);
     try {
       element.setPointerCapture(e.pointerId);
@@ -311,7 +377,8 @@ function attachOrbit(
     mouse.x = e.clientX;
     mouse.y = e.clientY;
     if (mouse.pan || e.shiftKey) pan(dx, dy);
-    else orbit(dx, dy);
+    else if (mouse.orbit) orbitAbout(mouse.orbit, dx, dy);
+    else turn(dx, dy);
     stop(e);
   };
 
@@ -330,9 +397,54 @@ function attachOrbit(
 
   const onWheel = (e: WheelEvent) => {
     if (!sink.driving()) return;
-    dolly(Math.exp(e.deltaY * 0.0015));
     e.preventDefault();
+    // A pinch arrives as ctrlKey wheel events a few pixels each; a mouse notch is about a hundred.
+    const factor = Math.exp(e.deltaY * (e.ctrlKey && Math.abs(e.deltaY) < 25 ? 0.01 : 0.0015));
+    const center = options.orbitCenter?.();
+    if (center) zoomToward(center, factor);
+    else dolly(factor);
   };
+
+  // The movement keys held, walked once a frame while any is down.
+  const held = new Set<string>();
+  let running = false;
+  let walking = false;
+  let lastStep = 0;
+  const step = (now: number) => {
+    if (!held.size || !sink.driving()) {
+      walking = false;
+      return;
+    }
+    const seconds = Math.min(0.1, (now - lastStep) / 1000);
+    lastStep = now;
+    let right = 0, up = 0, forward = 0;
+    for (const code of held) {
+      const [r, u, f] = MOVE_KEYS[code]!;
+      (right += r), (up += u), (forward += f);
+    }
+    const length = Math.hypot(right, up, forward);
+    if (length) walk(right / length, up / length, forward / length, seconds * WALK_SPEED * (running ? RUN_FACTOR : 1));
+    requestAnimationFrame(step);
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    running = e.shiftKey;
+    if (!sink.driving() || e.ctrlKey || e.metaKey || e.altKey || !MOVE_KEYS[e.code]) return;
+    // Arrow keys would otherwise scroll the page.
+    e.preventDefault();
+    held.add(e.code);
+    if (walking) return;
+    walking = true;
+    lastStep = performance.now();
+    requestAnimationFrame(step);
+  };
+  const onKeyUp = (e: KeyboardEvent) => {
+    running = e.shiftKey;
+    held.delete(e.code);
+  };
+  // A key released while the element had no focus never sends its keyup.
+  const onFocusOut = () => held.clear();
+  const tabIndex = element.getAttribute?.("tabindex");
+  if (tabIndex === null) element.tabIndex = -1;
 
   const onContextMenu = (e: Event) => e.preventDefault();
 
@@ -342,6 +454,9 @@ function attachOrbit(
   element.addEventListener("pointercancel", onUp, true);
   element.addEventListener("wheel", onWheel, { passive: false });
   element.addEventListener("contextmenu", onContextMenu);
+  element.addEventListener("keydown", onKeyDown);
+  element.addEventListener("keyup", onKeyUp);
+  element.addEventListener("focusout", onFocusOut);
   apply();
   if (sink.driving()) options.onReady?.({ reset, lookFrom, pose });
 
@@ -355,5 +470,10 @@ function attachOrbit(
     element.removeEventListener("pointercancel", onUp, true);
     element.removeEventListener("wheel", onWheel);
     element.removeEventListener("contextmenu", onContextMenu);
+    element.removeEventListener("keydown", onKeyDown);
+    element.removeEventListener("keyup", onKeyUp);
+    element.removeEventListener("focusout", onFocusOut);
+    held.clear();
+    if (tabIndex === null) element.removeAttribute?.("tabindex");
   };
 }

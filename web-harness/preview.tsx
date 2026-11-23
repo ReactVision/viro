@@ -80,6 +80,13 @@ declare global {
     __PREVIEW_HOST__?: PreviewHost;
     /** On a capture page: moves the camera and returns where it now is, or null when the scene has no camera to move. */
     __previewShotView?(view: ShotView): { position: Vec3; look_at: Vec3 } | null;
+    /**
+     * On a capture page: moves the camera to `to` over `ms`, looking at `look_at`, or keeping its heading
+     * when that is null. Resolves where it ends, or null when the scene has no camera to move.
+     */
+    __previewShotWalk?(to: Vec3, look_at: Vec3 | null, ms: number): Promise<{ position: Vec3; look_at: Vec3 } | null>;
+    /** On a capture page: where the camera is, or null when the scene has no camera the preview moves. */
+    __previewShotPose?(): { position: Vec3; look_at: Vec3 } | null;
   }
 }
 
@@ -152,6 +159,28 @@ if (shot) {
     }
     cameraControls.lookFrom(position, look_at);
     return { position, look_at };
+  };
+  window.__previewShotPose = () => {
+    const pose = cameraControls?.pose();
+    return pose ? { position: pose.position, look_at: pose.target } : null;
+  };
+  window.__previewShotWalk = (to, lookAt, ms) => {
+    const controls = cameraControls;
+    if (!controls) return Promise.resolve(null);
+    const from = controls.pose();
+    const look_at: Vec3 = lookAt ?? [to[0] + from.target[0] - from.position[0], to[1] + from.target[1] - from.position[1], to[2] + from.target[2] - from.position[2]];
+    const lerp = (a: Vec3, b: Vec3, f: number): Vec3 => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+    const start = performance.now();
+    // Timers, not requestAnimationFrame, as sessionReplay.ts explains; in steps so the scene sees the camera on its way.
+    return new Promise((done) => {
+      const step = () => {
+        const f = ms > 0 ? Math.min(1, (performance.now() - start) / ms) : 1;
+        controls.lookFrom(lerp(from.position, to, f), lerp(from.target, look_at, f));
+        if (f < 1) return void setTimeout(step, 16);
+        done({ position: to, look_at });
+      };
+      step();
+    });
   };
 }
 

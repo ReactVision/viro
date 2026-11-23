@@ -714,10 +714,13 @@ const absolute = (url: string) => {
   }
 };
 
+/** The preview's own assets, and the room shown around the scene, which every remount of the scene asks for again. */
+const keeps = (href: string) => previewAssets.has(href) || href === absolute(ROOMS[surroundings]?.model?.glb ?? "");
+
 /** Keeps the finished downloads of these assets and drops the rest. */
 function keepModelsOf(assetOverrides: Record<string, string> | undefined) {
   previewAssets = new Set(Object.values(assetOverrides ?? {}).map(absolute));
-  for (const href of keptModels.keys()) if (!previewAssets.has(href)) keptModels.delete(href);
+  for (const href of keptModels.keys()) if (!keeps(href)) keptModels.delete(href);
 }
 
 // A gateway error or a dropped connection (a tunnel or proxy losing the request) is tried again; a refusal is not.
@@ -750,7 +753,10 @@ async function fetchModel(href: string, input: RequestInfo | URL): Promise<Respo
       shared.then(
         (done) => {
           modelFetches.delete(href);
-          if (done.body && previewAssets.has(href)) keptModels.set(href, done);
+          if (!done.body || !keeps(href)) return;
+          // One room at a time: a scan's mesh is tens of megabytes.
+          if (!previewAssets.has(href)) for (const kept of keptModels.keys()) if (!previewAssets.has(kept)) keptModels.delete(kept);
+          keptModels.set(href, done);
         },
         () => modelFetches.delete(href),
       );

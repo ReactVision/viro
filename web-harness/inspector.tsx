@@ -44,7 +44,13 @@ function boundTexture(gl: WebGL2RenderingContext, target: number): TextureSize |
   const texture = binding === undefined ? null : (gl.getParameter(binding) as WebGLTexture | null);
   if (!texture) return null;
   let sizes = contexts.get(gl);
-  if (!sizes) contexts.set(gl, (sizes = new Map()));
+  if (!sizes) {
+    // A new renderer is when the last one's context has gone.
+    for (const old of contexts.keys()) {
+      if (old.isContextLost() || (old.canvas as HTMLCanvasElement).isConnected === false) contexts.delete(old);
+    }
+    contexts.set(gl, (sizes = new Map()));
+  }
   let size = sizes.get(texture);
   if (!size) sizes.set(texture, (size = { levels: new Map(), mipmapped: false, dimension: 0 }));
   return size;
@@ -96,10 +102,13 @@ export function watchGpu(): void {
   for (const [name, countAt, instancesAt] of draws) {
     const original = gl[name];
     if (typeof original !== "function") continue;
-    gl[name] = function (this: unknown, ...a: number[]) {
+    // Named arguments, not a rest array: this runs for every draw call of every frame. The longest takes six,
+    // and a call ignores the ones past its own.
+    gl[name] = function (this: unknown, a0: number, a1: number, a2: number, a3: number, a4: number, a5: number) {
       counting.draws++;
-      counting.triangles += trianglesOf(a[0]!, a[countAt]!) * (instancesAt === undefined ? 1 : a[instancesAt]!);
-      return original.apply(this, a);
+      // eslint-disable-next-line prefer-rest-params
+      counting.triangles += trianglesOf(a0, arguments[countAt]) * (instancesAt === undefined ? 1 : arguments[instancesAt]);
+      return original.call(this, a0, a1, a2, a3, a4, a5);
     };
   }
 
@@ -249,7 +258,8 @@ function gltfSize(buf: ArrayBuffer): ModelSize | null {
 
 /** Measures a loaded model from the response the scene fetched it with. */
 export function noteModelResponse(url: string, res: Response): void {
-  if (!res.ok || !/\.(glb|gltf)$/i.test(url.split(/[?#]/)[0]!)) return;
+  // Measured once: a remounted scene asks for the same models again.
+  if (!res.ok || modelSizes.has(url) || !/\.(glb|gltf)$/i.test(url.split(/[?#]/)[0]!)) return;
   res
     .clone()
     .arrayBuffer()

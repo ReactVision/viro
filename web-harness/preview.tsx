@@ -199,7 +199,14 @@ function toggleGrid() {
   arSceneListeners.forEach((l) => l());
 }
 
-const orbitCenter = () => contentFraming()?.center ?? null;
+// Read once per gesture: finding it walks the whole scene, and a wheel turn asks on every event.
+let orbit: { at: number; center: Vec3 | null } = { at: -Infinity, center: null };
+const orbitCenter = () => {
+  const now = performance.now();
+  if (now - orbit.at > 250) orbit = { at: now, center: contentFraming()?.center ?? null };
+  else orbit.at = now;
+  return orbit.center;
+};
 
 // Points the camera at the content, or at the node selected in Inspect, from the side it is looked at now.
 function frameContent() {
@@ -1574,7 +1581,8 @@ function Chrome({
         rec,
         canvas,
         (position, target) => cameraControls?.lookFrom(position, target),
-        (elapsed) => setSession({ kind: "replaying", elapsed }),
+        // The clock shows seconds, so the page is drawn again once a second, not once a frame.
+        (elapsed) => setSession((s) => (s && Math.floor(s.elapsed / 1000) === Math.floor(elapsed / 1000) ? s : { kind: "replaying", elapsed })),
         end,
       );
     });

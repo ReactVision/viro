@@ -28,6 +28,7 @@ import { rotateByQuaternion } from "../components/Web/viroMath";
 import { ViroScene } from "../components/ViroScene";
 import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
+import { playSession, recordSession, type SessionTrack } from "./sessionReplay";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { set3DNavigatorDefaults, setARNavigatorDefaults } from "./viroWebComponents";
 import { ViroTelemetry } from "../components/Utilities/ViroUsagePing";
@@ -183,6 +184,7 @@ function controlSections(): ControlsSection[] {
     return [
       { title: "Look around", rows: [["Two-finger drag", "Orbit around the point ahead"], ["Pinch", "Zoom in and out"]] },
       { title: "Scene", rows: [["Tap", "Tap the content"], ["Drag", "Drag the content"], placing] },
+      RECORD_SECTION,
     ];
   }
   const shortcuts: [string, string][] = [
@@ -212,9 +214,18 @@ function controlSections(): ControlsSection[] {
       ],
     },
     { title: "Scene", rows: [["Click", "Tap the content, as a finger would"], ["Click and drag", "Drag the content"], placing] },
+    RECORD_SECTION,
     { title: "Shortcuts", rows: shortcuts },
   ];
 }
+const RECORD_SECTION: ControlsSection = {
+  title: "Record and replay",
+  note: "Record once, then replay after each code change to check the same steps. A replay repeats your input, not the scene's state, so animations, physics and timers can run differently.",
+  rows: [
+    ["Record button", "Start the scene again and record the camera and your input in the scene, up to 5 minutes"],
+    ["Replay button", "Start the scene again and repeat the recording; any click or key stops it"],
+  ],
+};
 // Mounted AR scenes, which redraw when the grid or the surroundings change.
 const arSceneListeners = new Set<() => void>();
 let gridUrl: string | null = null;
@@ -386,6 +397,32 @@ if (!liveAR) {
   applyARDefaults();
   set3DNavigatorDefaults({ virtualCamera: { onReady: onCameraReady, orbitCenter } });
 }
+
+function setSurroundings(key: Surroundings) {
+  surroundings = key;
+  loadRoomPlanes(key);
+  applyARDefaults();
+  arSceneListeners.forEach((l) => l());
+}
+
+// The last recording, kept across updates so a change can be replayed against it.
+type Recording = SessionTrack & { scene?: string; device: string; surroundings: Surroundings; grid: boolean };
+let recording: Recording | null = null;
+// Ends the recording or replay in progress; an update or a scene switch calls it.
+let endSession: (() => void) | null = null;
+const MAX_RECORDING_MS = 5 * 60 * 1000;
+const sceneCanvas = () => document.querySelector<HTMLCanvasElement>("#root canvas");
+// Calls `then` once a restarted scene is drawn and its models are in; returns a cancel.
+function whenSceneReady(then: () => void): () => void {
+  const timer = setInterval(() => {
+    const d = downloadProgress();
+    if (!cameraControls || !renderState.ready || renderState.loading.length || (d && d.count > d.done)) return;
+    clearInterval(timer);
+    then();
+  }, 100);
+  return () => clearInterval(timer);
+}
+const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms / 1000) % 60)).padStart(2, "0")}`;
 
 // Emscripten reports an abort only on the console, and the canvas just stops
 // drawing; surface it the way runScene.ts does for the headless path.
@@ -808,6 +845,20 @@ function openAR(url: string): boolean {
   return true;
 }
 
+function RecordHint({ duration }: { duration: number | null }) {
+  return (
+    <div role="tooltip" style={{ ...chip, position: "absolute", left: 0, bottom: 42, width: 290, maxWidth: "calc(100vw - 20px)", boxSizing: "border-box", padding: 12, display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.4, pointerEvents: "none" }}>
+      <span style={{ fontWeight: 600 }}>Record and replay</span>
+      <span>Record starts the scene again and records the camera and what you click in it.</span>
+      <span>Replay starts it again and repeats those steps, so after a code change you can check the same path without redoing it.</span>
+      <span style={{ opacity: 0.75 }}>
+        It repeats your input, not the scene's state: animations, physics and timers can run differently.{" "}
+        {duration === null ? "Up to 5 minutes, kept until this page closes." : `Your recording is ${clock(duration)}, kept until this page closes.`}
+      </span>
+    </div>
+  );
+}
+
 function CloseButton({ onClose }: { onClose(): void }) {
   return (
     <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
@@ -1105,6 +1156,7 @@ function Chrome({
   scenes,
   index,
   onSelect,
+  onRestart,
   budgets,
   placeholders = [],
 }: {
@@ -1115,6 +1167,7 @@ function Chrome({
   scenes: SceneInfo[];
   index: number;
   onSelect(i: number): void;
+  onRestart(i: number, pose: { position: Vec3; target: Vec3 } | null): void;
   budgets?: ModelBudget[];
   placeholders?: string[];
 }) {
@@ -1234,6 +1287,73 @@ function Chrome({
     observer.observe(frameBox());
     return () => observer.disconnect();
   }, [device, cameraControls]);
+  const [session, setSession] = useState<{ kind: "recording" | "replaying"; elapsed: number } | null>(null);
+  const [sessionNote, setSessionNote] = useState<string | null>(null);
+  const [hint, setHint] = useState(false);
+  const startRecording = () => {
+    if (!cameraControls) return;
+    const at = { scene: scenes[index]?.path, device, surroundings, grid: gridOn };
+    onRestart(index, cameraControls.pose());
+    setSessionNote(null);
+    setSession({ kind: "recording", elapsed: 0 });
+    let recorder: ReturnType<typeof recordSession> | null = null;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const cancel = whenSceneReady(() => {
+      const canvas = sceneCanvas();
+      if (!canvas) return end();
+      const started = performance.now();
+      recorder = recordSession(canvas, () => cameraControls?.pose() ?? { position: [0, 0, 0], target: [0, 0, -1] });
+      timer = setInterval(() => {
+        const elapsed = performance.now() - started;
+        if (elapsed >= MAX_RECORDING_MS) end();
+        else setSession({ kind: "recording", elapsed });
+      }, 250);
+    });
+    const end = () => {
+      cancel();
+      clearInterval(timer);
+      if (recorder) recording = { ...recorder.stop(), ...at };
+      recorder = null;
+      endSession = null;
+      setSession(null);
+    };
+    endSession = end;
+  };
+  const startReplay = () => {
+    const rec = recording;
+    if (!rec || !cameraControls) return;
+    const i = rec.scene === undefined ? index : scenes.findIndex((sc) => sc.path === rec.scene);
+    if (i < 0) return setSessionNote("The recorded scene is no longer in this preview.");
+    setSessionNote(null);
+    setDevice(rec.device);
+    if (rec.surroundings !== surroundings && ROOMS[rec.surroundings]) setSurroundings(rec.surroundings);
+    if (rec.grid !== gridOn) toggleGrid();
+    onRestart(i, rec.poses[0] ?? null);
+    setSession({ kind: "replaying", elapsed: 0 });
+    let stopPlay: (() => void) | null = null;
+    // A click, key or scroll of the developer's own takes the scene back.
+    const onUser = (e: Event) => e.isTrusted && end();
+    const cancel = whenSceneReady(() => {
+      const canvas = sceneCanvas();
+      if (!canvas) return end();
+      for (const type of ["pointerdown", "keydown", "wheel"]) window.addEventListener(type, onUser, true);
+      stopPlay = playSession(
+        rec,
+        canvas,
+        (position, target) => cameraControls?.lookFrom(position, target),
+        (elapsed) => setSession({ kind: "replaying", elapsed }),
+        end,
+      );
+    });
+    const end = () => {
+      cancel();
+      stopPlay?.();
+      for (const type of ["pointerdown", "keydown", "wheel"]) window.removeEventListener(type, onUser, true);
+      endSession = null;
+      setSession(null);
+    };
+    endSession = end;
+  };
   const seen = useRef("");
   const shownDownloads = useRef(false);
   useEffect(() => {
@@ -1430,6 +1550,7 @@ function Chrome({
         </div>
       ) : null}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", minWidth: 0 }}>
         {cameraControls ? (
           <div ref={settingsRef} style={{ position: "relative" }}>
             {settings ? (
@@ -1457,10 +1578,7 @@ function Chrome({
                       style={{ flex: "1 1 auto" }}
                       value={surroundings}
                       onChange={(e) => {
-                        surroundings = e.target.value;
-                        loadRoomPlanes(surroundings);
-                        applyARDefaults();
-                        arSceneListeners.forEach((l) => l());
+                        setSurroundings(e.target.value);
                         tick((n) => n + 1);
                       }}
                     >
@@ -1509,7 +1627,51 @@ function Chrome({
               </svg>
             </button>
           </div>
-        ) : <span />}
+        ) : null}
+        {session ? (
+          <>
+            <button
+              type="button"
+              aria-label={session.kind === "recording" ? "Stop recording" : "Stop replay"}
+              title={session.kind === "recording" ? "Stop recording" : "Stop replay"}
+              style={roundButton}
+              onClick={() => endSession?.()}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <rect x="2" y="2" width="10" height="10" rx="2" fill="currentColor" />
+              </svg>
+            </button>
+            <span style={{ ...chip, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+              {session.kind === "recording" ? `Recording ${clock(session.elapsed)}` : `Replaying ${clock(session.elapsed)} / ${clock(recording?.duration ?? 0)}`}
+            </span>
+          </>
+        ) : cameraControls ? (
+          <>
+            <div
+              style={{ position: "relative", display: "flex", gap: 8 }}
+              onPointerEnter={(e) => e.pointerType === "mouse" && setHint(true)}
+              onPointerLeave={() => setHint(false)}
+              onFocus={() => setHint(true)}
+              onBlur={() => setHint(false)}
+            >
+            {hint ? <RecordHint duration={recording?.duration ?? null} /> : null}
+            <button type="button" aria-label="Record a session" style={roundButton} onClick={() => (setHint(false), startRecording())}>
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" fill="#ff5a5a" />
+              </svg>
+            </button>
+            {recording ? (
+              <button type="button" aria-label="Replay the recording" style={roundButton} onClick={() => (setHint(false), startReplay())}>
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                  <path d="M4 2.5v9l7.5-4.5z" fill="currentColor" />
+                </svg>
+              </button>
+            ) : null}
+            </div>
+            {sessionNote ? <span style={chip}>{sessionNote}</span> : null}
+          </>
+        ) : null}
+        </div>
         {cameraControls ? (
           <button type="button" style={button} onClick={() => cameraControls?.reset()}>
             Reset view
@@ -1531,6 +1693,7 @@ function Preview({ input }: { input: PreviewInput }) {
   // With the version it was compiled from, which keys the mounted scene.
   const [compiled, setCompiled] = useState<{ apps: React.ComponentType<any>[]; version: number } | null>(null);
   const [index, setIndex] = useState(0);
+  const [run, setRun] = useState(0);
   // Unresolved imports are reported while the bundle compiles, so they hold for every scene.
   const compileWarnings = useRef<string[]>([]);
   const shown = useRef<PreviewInput | null>(null);
@@ -1544,6 +1707,7 @@ function Preview({ input }: { input: PreviewInput }) {
     }
     // An update replaces the running scene, so its status starts over; the scene being looked at stays selected.
     if (shown.current) {
+      endSession?.();
       renderState.ready = false;
       renderState.error = null;
       renderState.warnings.length = 0;
@@ -1565,6 +1729,7 @@ function Preview({ input }: { input: PreviewInput }) {
   const scenes = input.scenes ?? [];
   // The navigator is remounted for the new scene, so its status starts over.
   const select = (i: number) => {
+    endSession?.();
     renderState.ready = false;
     renderState.error = null;
     renderState.warnings.splice(0, renderState.warnings.length, ...compileWarnings.current);
@@ -1573,11 +1738,17 @@ function Preview({ input }: { input: PreviewInput }) {
     currentScene = scenes[i]?.path;
     setIndex(i);
   };
+  // Starts scene `i` again with the camera at `pose`, for a recording or a replay.
+  const restart = (i: number, pose: { position: Vec3; target: Vec3 } | null) => {
+    select(i);
+    keptPose = pose;
+    setRun((n) => n + 1);
+  };
   const App = compiled?.apps[index];
   return (
     <>
       {/* Keyed by the update as well: a boundary that caught the last version's crash must not hold the new one. */}
-      {App ? <Scene key={`${compiled!.version}:${index}`} App={App} /> : null}
+      {App ? <Scene key={`${compiled!.version}:${index}:${run}`} App={App} /> : null}
       {shot ? null : (
         <Chrome
           title={input.title}
@@ -1587,6 +1758,7 @@ function Preview({ input }: { input: PreviewInput }) {
           scenes={scenes}
           index={index}
           onSelect={select}
+          onRestart={restart}
           budgets={input.budgets}
           placeholders={input.placeholders}
         />
@@ -1659,7 +1831,7 @@ const input = window.__PREVIEW_INPUT__;
 const root = createRoot(document.getElementById("root")!);
 if (!input) {
   markError(new Error("No scene was given to this page."));
-  root.render(createElement(Chrome, { scenes: [], index: 0, onSelect: () => {} }));
+  root.render(createElement(Chrome, { scenes: [], index: 0, onSelect: () => {}, onRestart: () => {} }));
 } else {
   root.render(createElement(Live, { first: input }));
 }

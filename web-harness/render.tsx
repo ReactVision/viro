@@ -104,7 +104,11 @@ declare global {
 }
 
 // A mounted navigator: a JSX tag or createElement call, not a type import or a mention.
-const NAVIGATOR_RE = /<\s*Viro(AR|VR|3D|XR)?SceneNavigator\b|createElement\(\s*Viro(AR|VR|3D|XR)?SceneNavigator\b/;
+// The qualifier is for a code bundle, which esbuild emits as CJS:
+// `createElement(import_react_viro.ViroARSceneNavigator, ...)`. Without it a
+// bundle is mounted inside a second navigator and renders black.
+const NAVIGATOR_RE =
+  /<\s*Viro(AR|VR|3D|XR)?SceneNavigator\b|createElement\(\s*(?:[\w$]+\.)?Viro(AR|VR|3D|XR)?SceneNavigator\b/;
 
 /** A scene component mounted in the navigator it needs, for code whose default export is the scene itself. */
 function inNavigator(Scene: React.ComponentType<any>, navigatorType: "AR" | "VR" | "3D"): React.ComponentType<any> {

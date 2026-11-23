@@ -32,6 +32,7 @@ import { playSession, recordSession, type SessionTrack } from "./sessionReplay";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { set3DNavigatorDefaults, setARNavigatorDefaults } from "./viroWebComponents";
 import { ViroTelemetry } from "../components/Utilities/ViroUsagePing";
+import { VIRO_VERSION } from "../components/Utilities/ViroVersion";
 
 type PreviewInput = {
   code: string;
@@ -48,6 +49,8 @@ type PreviewInput = {
   /** Which update of the preview this is, and where a newer one is asked for: the page appends the version it shows. */
   version?: number;
   updatesUrl?: string;
+  /** Where the page sends feedback; absent where the server does not record it. */
+  feedbackUrl?: string;
   /** Per-platform single-model budgets the inspector compares models against. */
   budgets?: ModelBudget[];
   /** Root-relative paths of the local assets drawn as stand-ins. */
@@ -1067,6 +1070,85 @@ function PhonePanel({ url, onClose }: { url: string; onClose(): void }) {
   );
 }
 
+type FeedbackContext = { error: string | null; warnings: string[]; scene?: string; device: string; surroundings: string; page: string; viro: string };
+
+const FEEDBACK_SENT =
+  "Sent with what you write: the error and warnings shown, the scene's file name, the device and surroundings picked, your browser and the Viro version. Not your scene's code.";
+
+function FeedbackPanel({ url, context, onClose }: { url: string; context(): FeedbackContext; onClose(): void }) {
+  const [type, setType] = useState("problem");
+  const [message, setMessage] = useState("");
+  const [state, setState] = useState<{ sending?: true; sent?: true; error?: string }>({});
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const send = async () => {
+    if (!message.trim() || state.sending) return;
+    setState({ sending: true });
+    try {
+      await api(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type, message, context: context() }) });
+      setState({ sent: true });
+    } catch (e) {
+      setState({ error: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  return (
+    // Above the error panel, which its blur makes a layer of its own.
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1, background: "rgba(0,0,0,0.45)", pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Send feedback"
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...chip, width: "min(420px, 100%)", maxHeight: "85%", overflow: "auto", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }} title={FEEDBACK_SENT}>Send feedback</span>
+          <CloseButton onClose={onClose} />
+        </div>
+        {state.sent ? (
+          <>
+            <span>Sent. Thank you.</span>
+            <button type="button" style={{ ...button, alignSelf: "flex-end" }} onClick={onClose}>
+              Close
+            </button>
+          </>
+        ) : (
+          <>
+            <Picker aria-label="Feedback type" style={{ flex: "0 0 auto" }} value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="problem">Something is wrong</option>
+              <option value="idea">An idea</option>
+              <option value="other">Something else</option>
+            </Picker>
+            <textarea
+              aria-label="Feedback"
+              autoFocus
+              rows={5}
+              maxLength={2000}
+              value={message}
+              placeholder={type === "problem" ? "What happened, and what did you expect?" : "What would you like to tell us?"}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void send()}
+              style={{ font: "inherit", fontSize: 13, color: "inherit", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 6, padding: 8, resize: "vertical" }}
+            />
+            {state.error ? <span style={{ color: "#ff9b9b", fontSize: 13 }}>{state.error}</span> : null}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, opacity: 0.7, textDecoration: "underline dotted", cursor: "help" }} title={FEEDBACK_SENT}>
+                What is sent
+              </span>
+              <button type="button" style={button} disabled={!message.trim() || state.sending} onClick={() => void send()}>
+                {state.sending ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function statusText(r: RenderRow): string {
   if (r.status === "processing") return r.progress != null ? `Rendering ${r.progress}%` : "Rendering";
   if (r.status === "queued") return "Queued";
@@ -1295,6 +1377,7 @@ function Chrome({
   onRestart,
   budgets,
   placeholders = [],
+  feedbackUrl,
 }: {
   title?: string;
   renderRequest?: string;
@@ -1306,8 +1389,10 @@ function Chrome({
   onRestart(i: number, pose: { position: Vec3; target: Vec3 } | null): void;
   budgets?: ModelBudget[];
   placeholders?: string[];
+  feedbackUrl?: string;
 }) {
   const [, tick] = useState(0);
+  const [feedback, setFeedback] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [request, setRequest] = useState<"copied" | "manual" | null>(null);
   const [panel, setPanel] = useState(false);
@@ -1523,6 +1608,19 @@ function Chrome({
   }, []);
 
   const issues = renderState.warnings.length + (renderState.error ? 1 : 0);
+  // A scan's or recording's name is the team's own, so only its kind is sent.
+  const feedbackContext = (): FeedbackContext => {
+    const room = ROOMS[surroundings]!;
+    return {
+      error: renderState.error,
+      warnings: renderState.warnings,
+      scene: scenes[index]?.path ?? title,
+      device: device || "Fill view",
+      surroundings: !arSceneListeners.size ? "none" : room.recording ? "a recording" : room.scan ? "a scan" : room.label,
+      page: host ? "view" : framed ? "framed" : "page",
+      viro: VIRO_VERSION,
+    };
+  };
   const downloads = downloadProgress();
   const downloading = !!downloads && downloads.count > downloads.done;
   // Parsing a large model takes seconds with nothing downloading; a quick one is not worth a chip.
@@ -1619,6 +1717,7 @@ function Chrome({
         />
       ) : null}
       {help && cameraControls ? <ControlsHelp onClose={() => setHelp(false)} /> : null}
+      {feedback && feedbackUrl ? <FeedbackPanel url={feedbackUrl} context={feedbackContext} onClose={() => setFeedback(false)} /> : null}
       {phone && arUrl ? <PhonePanel url={arUrl} onClose={() => setPhone(false)} /> : null}
       {inspect ? (
         <InspectPanel
@@ -1691,11 +1790,16 @@ function Chrome({
           {renderState.warnings.map((w) => (
             <div key={w} style={{ color: "#ffd27a" }}>{w}</div>
           ))}
+          {feedbackUrl ? (
+            <button type="button" style={{ ...button, marginTop: 8, font: "600 13px system-ui, -apple-system, sans-serif" }} title="Tell us about this. The messages above are sent with it." onClick={() => setFeedback(true)}>
+              Report this
+            </button>
+          ) : null}
         </div>
       ) : null}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end", minWidth: 0 }}>
-        {cameraControls || feedPlaying ? (
+        {cameraControls || feedPlaying || feedbackUrl ? (
           <div ref={settingsRef} style={{ position: "relative" }}>
             {settings ? (
               <div role="dialog" aria-label="Preview settings" style={{ ...chip, pointerEvents: "auto", position: "absolute", left: 0, bottom: 42, width: 270, maxWidth: "calc(100vw - 20px)", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1782,6 +1886,18 @@ function Chrome({
                     }}
                   >
                     View controls
+                  </button>
+                ) : null}
+                {feedbackUrl ? (
+                  <button
+                    type="button"
+                    style={button}
+                    onClick={() => {
+                      setSettings(false);
+                      setFeedback(true);
+                    }}
+                  >
+                    Send feedback
                   </button>
                 ) : null}
               </div>
@@ -1927,6 +2043,7 @@ function Preview({ input }: { input: PreviewInput }) {
           onRestart={restart}
           budgets={input.budgets}
           placeholders={input.placeholders}
+          feedbackUrl={input.feedbackUrl}
         />
       )}
     </>

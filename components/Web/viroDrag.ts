@@ -8,9 +8,9 @@
  */
 import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { quatFromEulerDegrees } from "./viroMath";
-import { activeSceneCamera, sceneCameraOrthographic } from "./viroSceneCameras";
+import { activeSceneCamera, sceneCameraFieldOfView, sceneCameraOrthographic } from "./viroSceneCameras";
 
-export { activateSceneCamera, installDefaultCamera, setSceneCameraOrthographic } from "./viroSceneCameras";
+export { activateSceneCamera, installDefaultCamera, setSceneCameraFieldOfView, setSceneCameraOrthographic } from "./viroSceneCameras";
 
 export type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
@@ -37,8 +37,8 @@ export function setCameraView(scene: ViroSceneApi, view: CameraView | null): voi
 
 /**
  * The camera the scene draws from. Under a ViroCamera or ViroOrbitCamera that
- * is the camera node's last drawn pose, with the default camera's field of
- * view, which is the one virocore gives it; null while that pose is not known
+ * is the camera node's last drawn pose, with its field of view (the default
+ * camera's unless it sets one); null while that pose is not known
  * yet, on a renderer without the read, and under an orthographic projection.
  */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
@@ -49,7 +49,7 @@ export function cameraView(scene: ViroSceneApi): CameraView | null {
   const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(active) : null;
   // All zero until the node has been drawn once.
   if (!t || t.scale.every((c) => c === 0)) return null;
-  const view = defaultCameraView(base.element);
+  const view = defaultCameraView(base.element, sceneCameraFieldOfView(scene, active));
   view.position = t.position;
   view.orientation = quatFromEulerDegrees(t.rotation);
   return view;
@@ -66,9 +66,13 @@ export function sceneCameraUnreadable(scene: ViroSceneApi): boolean {
   );
 }
 
-/** virocore's default camera: at the origin, looking down -Z, 90 degrees across the longer axis (kFovMonoMajor). */
-export function defaultCameraView(element: HTMLElement): CameraView {
-  const focal = () => Math.max(element.clientWidth, element.clientHeight, 1) / 2;
+/**
+ * virocore's default camera: at the origin, looking down -Z, 90 degrees across
+ * the longer axis (kFovMonoMajor) unless `fieldOfView` gives that angle.
+ */
+export function defaultCameraView(element: HTMLElement, fieldOfView = 0): CameraView {
+  const halfTan = fieldOfView > 0 ? Math.tan((fieldOfView * Math.PI) / 360) : 1;
+  const focal = () => Math.max(element.clientWidth, element.clientHeight, 1) / 2 / halfTan;
   return {
     position: [0, 0, 0],
     orientation: [0, 0, 0, 1],

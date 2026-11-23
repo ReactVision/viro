@@ -3,7 +3,7 @@
  * stands, and zooming on any scroll.
  */
 import type { ViroSceneApi } from "@reactvision/viro-web-renderer";
-import { attachVirtualCamera3D, type ViroVirtualCameraControls, type ViroVirtualCameraOptions } from "../components/Web/viroVirtualCamera";
+import { attachVirtualCamera, attachVirtualCamera3D, type ViroVirtualCameraControls, type ViroVirtualCameraOptions } from "../components/Web/viroVirtualCamera";
 
 const scene = {
   createNode: () => 100,
@@ -14,9 +14,10 @@ const scene = {
   setActiveCameraNode: () => {},
   setNodePosition: () => {},
   setNodeRotation: () => {},
+  setCameraFieldOfView: jest.fn(() => true),
 } as unknown as ViroSceneApi;
 
-function attach(options: Omit<ViroVirtualCameraOptions, "floorY" | "planes"> = {}) {
+function attach(options: Omit<ViroVirtualCameraOptions, "floorY" | "planes"> = {}, on: ViroSceneApi = scene, ar = false) {
   const listeners: Record<string, (e: any) => void> = {};
   const element = {
     clientWidth: 800,
@@ -26,7 +27,8 @@ function attach(options: Omit<ViroVirtualCameraOptions, "floorY" | "planes"> = {
     querySelector: () => null,
   } as unknown as HTMLElement;
   let controls: ViroVirtualCameraControls | null = null;
-  const detach = attachVirtualCamera3D(scene, 1, element, { ...options, onReady: (c) => (controls = c) });
+  const onReady = (c: ViroVirtualCameraControls) => (controls = c);
+  const detach = ar ? attachVirtualCamera(on, element, { ...options, onReady }) : attachVirtualCamera3D(on, 1, element, { ...options, onReady });
   const fire = (type: string, e: Record<string, unknown>) => listeners[type]!({ preventDefault() {}, stopPropagation() {}, ...e });
   return { controls: controls!, fire, detach };
 }
@@ -105,6 +107,27 @@ describe("virtual camera controls", () => {
     const { position: p, target: t } = controls.pose();
     expect(round(p)).toEqual(round([0, 0, -5 * (1 - Math.exp(-0.06))]));
     expect(t[2] - p[2]).toBeCloseTo(-1, 6);
+    detach();
+  });
+
+  it("sets a 3D scene's field of view on its camera node, and goes back to the default on null", () => {
+    const set = scene.setCameraFieldOfView as jest.Mock;
+    set.mockClear();
+    const { controls, detach } = attach({ fieldOfView: 96 });
+    expect(set).toHaveBeenLastCalledWith(100, 96);
+    controls.setFieldOfView(null);
+    expect(set).toHaveBeenLastCalledWith(100, 0);
+    detach();
+  });
+
+  it("turns an AR field of view into the camera intrinsics across the longer side", () => {
+    const intrinsics = jest.fn(() => true);
+    const ar = { initAR() {}, arSetPose() {}, arSetCameraIntrinsics: intrinsics } as unknown as ViroSceneApi;
+    const { controls, detach } = attach({}, ar, true);
+    const focal = (degrees: number) => 400 / Math.tan((degrees * Math.PI) / 360);
+    expect((intrinsics.mock.calls.at(-1) as number[])[0]).toBeCloseTo(focal(67), 6);
+    controls.setFieldOfView(96);
+    expect((intrinsics.mock.calls.at(-1) as number[])[0]).toBeCloseTo(focal(96), 6);
     detach();
   });
 });

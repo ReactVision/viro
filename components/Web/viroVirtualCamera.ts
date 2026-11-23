@@ -37,6 +37,8 @@ export type ViroVirtualCameraOptions = {
   floorY?: number | null;
   /** Planes reported as detected anchors in place of the floor; `floorY` is then ignored. */
   planes?: ArPlaneAnchor[];
+  /** Degrees across the view's longer side. Default: a phone camera's 67 in AR, the renderer's 90 in a 3D scene. */
+  fieldOfView?: number;
   /** Receives the camera's controls once it is driving the scene. */
   onReady?: (controls: ViroVirtualCameraControls) => void;
 };
@@ -48,6 +50,8 @@ export type ViroVirtualCameraControls = {
   lookFrom(position: Vec3, target: Vec3): void;
   /** Where the camera is and the point it looks at; `lookFrom` with these puts it back. */
   pose(): { position: Vec3; target: Vec3 };
+  /** Degrees across the view's longer side; null goes back to the default. */
+  setFieldOfView(degrees: number | null): void;
 };
 
 const LONG_AXIS_FOV_DEG = 67;
@@ -110,8 +114,8 @@ export function virtualAnchors(options: ViroVirtualCameraOptions): ArPlaneAnchor
 
 /** Where the orbit's pose goes. */
 type CameraSink = {
-  /** The focal length, in CSS pixels, of a view `w` by `h`. */
-  size(w: number, h: number): number;
+  /** Applies the field of view (null for the default) to a view `w` by `h` and returns its focal length in CSS pixels. */
+  size(w: number, h: number, fieldOfView: number | null): number;
   pose(position: Vec3, orientation: Quat, pitch: number, yaw: number): void;
   /** False while something else is the point of view: input then stands aside. */
   driving(): boolean;
@@ -134,11 +138,11 @@ export function attachVirtualCamera(
   // injected poses; a live session calls it when it starts.
   scene.initAR();
   return attachOrbit(scene, element, options, {
-    size(w, h) {
+    size(w, h, fieldOfView) {
       // A phone camera's long axis spans about 67 degrees (ARKit's 1920x1440
       // format has fx near 1440), and a phone held upright shows all of it
       // vertically. The session's 60-degree default cuts off content a device shows.
-      const f = Math.max(w, h) / 2 / Math.tan((LONG_AXIS_FOV_DEG * Math.PI) / 360);
+      const f = Math.max(w, h) / 2 / Math.tan(((fieldOfView ?? LONG_AXIS_FOV_DEG) * Math.PI) / 360);
       if (scene.arSetCameraIntrinsics(f, f, w / 2, h / 2, w, h)) return f;
       scene.arSetCameraImageSize(w, h);
       // The image-size path projects through a fixed 60-degree vertical field of view.
@@ -174,8 +178,11 @@ export function attachVirtualCamera3D(
     if (!yielded) scene.setActiveCameraNode(node);
   });
   const detach = attachOrbit(scene, element, options, {
-    // The renderer's default: 90 degrees across the view's longer side.
-    size: (w, h) => Math.max(w, h) / 2,
+    size(w, h, fieldOfView) {
+      // Without the binding (an older renderer) it keeps its default: 90 degrees across the view's longer side.
+      const applied = typeof scene.setCameraFieldOfView === "function" && scene.setCameraFieldOfView(node, fieldOfView ?? 0) && fieldOfView !== null;
+      return Math.max(w, h) / 2 / (applied ? Math.tan((fieldOfView! * Math.PI) / 360) : 1);
+    },
     pose(p, _q, pitch, yaw) {
       scene.setNodePosition(node, p[0], p[1], p[2]);
       // virocore turns about X, then Y, then Z: pitch, then yaw.
@@ -203,6 +210,7 @@ function attachOrbit(
   let distance = Math.hypot(home[0], home[1], home[2]) || 1;
   let yaw = 0;
   let pitch = 0;
+  let fieldOfView = options.fieldOfView ?? null;
 
   // Published for dragging, which has to cast its own rays. Kept while a scene
   // camera draws: cameraView then reads that camera's pose and takes only the
@@ -212,7 +220,7 @@ function attachOrbit(
   const sizeCamera = () => {
     const w = Math.max(1, Math.round(element.clientWidth));
     const h = Math.max(1, Math.round(element.clientHeight));
-    const f = sink.size(w, h);
+    const f = sink.size(w, h, fieldOfView);
     Object.assign(view, { fx: f, fy: f, cx: w / 2, cy: h / 2 });
   };
   sizeCamera();
@@ -458,7 +466,11 @@ function attachOrbit(
   element.addEventListener("keyup", onKeyUp);
   element.addEventListener("focusout", onFocusOut);
   apply();
-  if (sink.driving()) options.onReady?.({ reset, lookFrom, pose });
+  const setFieldOfView = (degrees: number | null) => {
+    fieldOfView = degrees;
+    sizeCamera();
+  };
+  if (sink.driving()) options.onReady?.({ reset, lookFrom, pose, setFieldOfView });
 
   return () => {
     setCameraView(scene, null);

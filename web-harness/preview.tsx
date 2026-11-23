@@ -92,8 +92,15 @@ const framed = window.parent !== window;
 const inspectable = !liveAR && !shot;
 if (inspectable) watchGpu();
 
-type Controls = { reset(): void; lookFrom(position: Vec3, target: Vec3): void; pose(): { position: Vec3; target: Vec3 } };
+type Controls = {
+  reset(): void;
+  lookFrom(position: Vec3, target: Vec3): void;
+  pose(): { position: Vec3; target: Vec3 };
+  setFieldOfView(degrees: number | null): void;
+};
 let cameraControls: Controls | null = null;
+// The framed device's field of view, put back on the camera an update remounts.
+let framedFieldOfView: number | null = null;
 // Where the developer had moved the camera, put back on the scene an update remounts.
 let keptPose: { position: Vec3; target: Vec3 } | null = null;
 let currentScene: string | undefined = (
@@ -370,6 +377,7 @@ if (!liveAR) {
   const onCameraReady = (c: Controls) => {
     if (keptPose) c.lookFrom(keptPose.position, keptPose.target);
     keptPose = null;
+    if (framedFieldOfView) c.setFieldOfView(framedFieldOfView);
     cameraControls = c;
     cameraListeners.forEach((l) => l());
   };
@@ -687,8 +695,9 @@ function Picker({ style, children, ...rest }: React.SelectHTMLAttributes<HTMLSel
 
 // An AR scene is laid out for a phone held upright; in a wide view the top and
 // bottom of it fall outside the frustum, so the viewer can frame it like a device.
-// Screen sizes in CSS pixels, portrait.
-type Device = { name: string; w: number; h: number };
+// Screen sizes in CSS pixels, portrait. A headset is one eye's panel in pixels
+// and its field of view across the longer side (vertical), from Meta's specs.
+type Device = { name: string; w: number; h: number; fieldOfView?: number };
 const DEVICES: Array<{ group: string; devices: Device[] }> = [
   {
     group: "Phones",
@@ -718,6 +727,13 @@ const DEVICES: Array<{ group: string; devices: Device[] }> = [
     devices: [
       { name: "iPad mini", w: 744, h: 1133 },
       { name: "iPad Pro 13", w: 1032, h: 1376 },
+    ],
+  },
+  {
+    group: "Headsets",
+    devices: [
+      { name: "Quest 3", w: 2064, h: 2208, fieldOfView: 96 },
+      { name: "Quest 3S", w: 1832, h: 1920, fieldOfView: 90 },
     ],
   },
 ];
@@ -1212,6 +1228,8 @@ function Chrome({
     if (!cameraControls) return;
     const frame = () => applyFraming(framedAs);
     frame();
+    framedFieldOfView = framedAs?.fieldOfView ?? null;
+    cameraControls.setFieldOfView(framedFieldOfView);
     const observer = new ResizeObserver(frame);
     observer.observe(frameBox());
     return () => observer.disconnect();
@@ -1419,7 +1437,7 @@ function Chrome({
                 <span style={{ fontWeight: 600, fontSize: 15 }}>Preview settings</span>
                 <label style={settingStyle}>
                   Device
-                  <Picker aria-label="Device" style={{ flex: "1 1 auto" }} title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
+                  <Picker aria-label="Device" style={{ flex: "1 1 auto" }} title={framedAs ? `${framedAs.w} x ${framedAs.h}${framedAs.fieldOfView ? ` per eye, ${framedAs.fieldOfView}° field of view` : ""}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
                     <option value="">Fill view</option>
                     {DEVICES.map((g) => (
                       <optgroup key={g.group} label={g.group}>

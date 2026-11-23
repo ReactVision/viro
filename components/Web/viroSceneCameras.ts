@@ -7,13 +7,13 @@
  */
 import type { ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
 
-type SceneCameras = { active: ViroHandle | null; orthographic: Set<ViroHandle>; fallback: ViroHandle };
+type SceneCameras = { active: ViroHandle | null; orthographic: Set<ViroHandle>; fieldOfView: Map<ViroHandle, number>; fallback: ViroHandle };
 const sceneCameras = new WeakMap<ViroSceneApi, SceneCameras>();
 const listeners = new WeakMap<ViroSceneApi, Set<() => void>>();
 
 function camerasOf(scene: ViroSceneApi): SceneCameras {
   let cams = sceneCameras.get(scene);
-  if (!cams) sceneCameras.set(scene, (cams = { active: null, orthographic: new Set(), fallback: 0 }));
+  if (!cams) sceneCameras.set(scene, (cams = { active: null, orthographic: new Set(), fieldOfView: new Map(), fallback: 0 }));
   return cams;
 }
 
@@ -32,6 +32,17 @@ export function sceneCameraActive(scene: ViroSceneApi): boolean {
 
 export function sceneCameraOrthographic(scene: ViroSceneApi, node: ViroHandle): boolean {
   return !!sceneCameras.get(scene)?.orthographic.has(node);
+}
+
+/** Degrees across the longer side of the view, or 0 for the renderer's default. */
+export function sceneCameraFieldOfView(scene: ViroSceneApi, node: ViroHandle): number {
+  return sceneCameras.get(scene)?.fieldOfView.get(node) ?? 0;
+}
+
+export function setSceneCameraFieldOfView(scene: ViroSceneApi, node: ViroHandle, degrees: number): void {
+  const map = camerasOf(scene).fieldOfView;
+  if (degrees > 0) map.set(node, degrees);
+  else map.delete(node);
 }
 
 /**

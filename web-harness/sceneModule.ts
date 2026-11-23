@@ -140,11 +140,19 @@ const named = <T>(name: string, value: T): T => {
   return value;
 };
 
+// One per name: a new component type on each read would remount its subtree on every render.
+const unsupportedStubs = new Map<string, ReturnType<typeof makeUnsupportedStub>>();
+function unsupportedStub(name: string) {
+  let stub = unsupportedStubs.get(name);
+  if (!stub) unsupportedStubs.set(name, (stub = makeUnsupportedStub(name)));
+  return stub;
+}
+
 const viroReactModule = new Proxy(ViroWeb as Record<string, unknown>, {
   get(target, prop) {
     if (typeof prop === "string" && prop in extraExports) return named(prop, extraExports[prop]);
     if (typeof prop === "string" && prop in target) return named(prop, target[prop]);
-    if (typeof prop === "string") return makeUnsupportedStub(prop);
+    if (typeof prop === "string") return unsupportedStub(prop);
     return undefined;
   },
 });

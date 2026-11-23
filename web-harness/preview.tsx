@@ -2070,18 +2070,23 @@ function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => v
   if (!first.updatesUrl) return () => {};
   const stop = new AbortController();
   let version = first.version ?? 1;
+  let held = first;
   void (async () => {
     while (!stop.signal.aborted) {
       const asked = performance.now();
       let again = 1000;
       try {
         // pageFetch: a request the server lets time out is not a failed load to warn about.
-        const res = await pageFetch(`${first.updatesUrl}${version}`, { signal: stop.signal, cache: "no-store" });
+        const tag = held.codeTag ? `&code=${encodeURIComponent(held.codeTag)}` : "";
+        const res = await pageFetch(`${first.updatesUrl}${version}${tag}`, { signal: stop.signal, cache: "no-store" });
         if (res.status === 404) return;
         if (res.status === 200) {
-          const next = ((await res.json()) as { input?: PreviewInput }).input;
+          const got = ((await res.json()) as { input?: Omit<PreviewInput, "code"> & { code?: string } }).input;
+          // Without `code`, the update changed something else and the code is the one held.
+          const next = got && { ...got, code: got.code ?? held.code };
           if (next?.code) {
             version = next.version ?? version + 1;
+            held = next;
             onUpdate(next);
           }
         } else if (res.status !== 204) again = 5000;

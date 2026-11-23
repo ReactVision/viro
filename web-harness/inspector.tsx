@@ -377,6 +377,9 @@ function rowsOf(scene: ViroSceneApi): Row[] {
   return rows;
 }
 
+// The node selected in the open panel: framing then fits it and what is under it.
+let framedRow: string | null = null;
+
 /**
  * The centre of the nodes the scene's code made, and how far back a camera
  * frames them all from. Null before the scene has any.
@@ -384,7 +387,13 @@ function rowsOf(scene: ViroSceneApi): Row[] {
 export function contentFraming(): { center: Vec3; distance: number } | null {
   const scene = inspected?.scene;
   if (!scene) return null;
-  const rows = rowsOf(scene).filter((r) => r.kind === "node");
+  let rows = rowsOf(scene).filter((r) => r.kind === "node");
+  const at = framedRow ? rows.findIndex((r) => r.id === framedRow) : -1;
+  if (at >= 0) {
+    let end = at + 1;
+    while (end < rows.length && rows[end]!.depth > rows[at]!.depth) end++;
+    rows = rows.slice(at, end);
+  }
   // Leaves only: a container's own origin says nothing about where its content is.
   const leaves = rows.filter((r, i) => (rows[i + 1]?.depth ?? 0) <= r.depth);
   const points = leaves.map((r) => scene.getNodeWorldPosition(r.handle)).filter((p): p is Vec3 => !!p);
@@ -531,6 +540,10 @@ export function InspectPanel({
   const lastPart = expanded?.size?.parts.length ? `${expanded.id}#${expanded.size.parts.length - 1}` : null;
   const shownRef = useRef(shown);
   shownRef.current = shown;
+  useEffect(() => {
+    framedRow = selected?.id.split("#")[0] ?? null;
+    return () => void (framedRow = null);
+  }, [selected]);
 
   // The node list is filled from effects as the scene mounts, so it is read again while the panel is open.
   useEffect(() => {

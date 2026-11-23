@@ -150,6 +150,64 @@ if (shot) {
 // The virtual camera's floor, drawn as a grid so an AR scene has a ground to read depth against.
 const FLOOR_Y = -1;
 let gridOn = true;
+function toggleGrid() {
+  gridOn = !gridOn;
+  arSceneListeners.forEach((l) => l());
+}
+
+const orbitCenter = () => contentFraming()?.center ?? null;
+
+// Points the camera at the content, or at the node selected in Inspect, from the side it is looked at now.
+function frameContent() {
+  const framing = contentFraming();
+  if (!cameraControls || !framing) return;
+  const { position, target } = cameraControls.pose();
+  const back: Vec3 = [position[0] - target[0], position[1] - target[1], position[2] - target[2]];
+  const length = Math.hypot(...back);
+  const from: Vec3 = length ? [back[0] / length, back[1] / length, back[2] / length] : [0, 0, 1];
+  const c = framing.center;
+  cameraControls.lookFrom([c[0] + from[0] * framing.distance, c[1] + from[1] * framing.distance, c[2] + from[2] * framing.distance], c);
+}
+
+type ControlsSection = { title: string; note?: string; rows: [string, string][] };
+function controlSections(): ControlsSection[] {
+  const placing: [string, string] = [touch ? "Tap a highlighted surface" : "Click a highlighted surface", "Place the scene's content there (AR scenes)"];
+  if (touch) {
+    return [
+      { title: "Look around", rows: [["Two-finger drag", "Orbit around the point ahead"], ["Pinch", "Zoom in and out"]] },
+      { title: "Scene", rows: [["Tap", "Tap the content"], ["Drag", "Drag the content"], placing] },
+    ];
+  }
+  const shortcuts: [string, string][] = [
+    ["F", "Frame the content, or the node selected in Inspect"],
+    ["R", "Reset the view"],
+  ];
+  if (arSceneListeners.size) shortcuts.push(["G", "Show or hide the floor grid"]);
+  if (inspectable) shortcuts.push(["I", "Open or close Inspect"]);
+  shortcuts.push(["?", "Show or hide this list"]);
+  return [
+    {
+      title: "Look around",
+      rows: [
+        ["Right-drag", "Turn where you stand"],
+        ["Alt + right-drag", "Orbit the content, or the node selected in Inspect"],
+        ["Middle-drag or Shift + drag", "Pan"],
+        ["Scroll or pinch", "Move toward or away from the content"],
+      ],
+    },
+    {
+      title: "Walk",
+      note: "Click the view first so it receives the keys.",
+      rows: [
+        ["W A S D or arrow keys", "Forward, left, back, right"],
+        ["Q and E", "Down and up"],
+        ["Shift", "Move faster"],
+      ],
+    },
+    { title: "Scene", rows: [["Click", "Tap the content, as a finger would"], ["Click and drag", "Drag the content"], placing] },
+    { title: "Shortcuts", rows: shortcuts },
+  ];
+}
 // Mounted AR scenes, which redraw when the grid or the surroundings change.
 const arSceneListeners = new Set<() => void>();
 let gridUrl: string | null = null;
@@ -316,9 +374,9 @@ if (!liveAR) {
     cameraListeners.forEach((l) => l());
   };
   applyARDefaults = () =>
-    setARNavigatorDefaults({ virtualCamera: { floorY: FLOOR_Y, planes: surroundingsPlanes(surroundings), onReady: onCameraReady } });
+    setARNavigatorDefaults({ virtualCamera: { floorY: FLOOR_Y, planes: surroundingsPlanes(surroundings), onReady: onCameraReady, orbitCenter } });
   applyARDefaults();
-  set3DNavigatorDefaults({ virtualCamera: { onReady: onCameraReady } });
+  set3DNavigatorDefaults({ virtualCamera: { onReady: onCameraReady, orbitCenter } });
 }
 
 // Emscripten reports an abort only on the console, and the canvas just stops
@@ -601,6 +659,8 @@ const button: React.CSSProperties = {
   pointerEvents: "auto",
   whiteSpace: "nowrap",
 };
+const roundButton: React.CSSProperties = { ...button, width: 34, height: 34, padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" };
+const settingStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: 13, opacity: 0.9 };
 const oneLine: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
 const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
@@ -739,6 +799,44 @@ function CloseButton({ onClose }: { onClose(): void }) {
         <path d="M4 4l8 8M12 4l-8 8" />
       </svg>
     </button>
+  );
+}
+
+function ControlsHelp({ onClose }: { onClose(): void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Controls"
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...chip, width: "min(520px, 100%)", maxHeight: "85%", overflow: "auto", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>Controls</span>
+          <CloseButton onClose={onClose} />
+        </div>
+        {controlSections().map((section) => (
+          <div key={section.title}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>{section.title}</div>
+            {section.note ? <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 6 }}>{section.note}</div> : null}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 16em) 1fr", gap: "5px 12px", fontSize: 13 }}>
+              {section.rows.map(([input, action]) => (
+                <React.Fragment key={input}>
+                  <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, opacity: 0.9 }}>{input}</span>
+                  <span style={{ opacity: 0.8 }}>{action}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1011,12 +1109,54 @@ function Chrome({
   const [phone, setPhone] = useState(false);
   const [inspect, setInspect] = useState(false);
   const [assets, setAssets] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!settings) return;
+    const onDown = (e: PointerEvent) => !settingsRef.current?.contains(e.target as Node) && setSettings(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSettings(false);
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [settings]);
   const [uploads, setUploads] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<File | null>(null);
   const [dropping, setDropping] = useState(false);
   useEffect(() => {
     if (renderApi) loadScans(renderApi, () => tick((n) => n + 1));
   }, [renderApi]);
+  const toggleInspect = () => {
+    setPanel(false);
+    setPhone(false);
+    setAssets(false);
+    setInspect((v) => !v);
+  };
+  const shortcuts = useRef<(e: KeyboardEvent) => void>(() => {});
+  shortcuts.current = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !cameraControls) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    const key = e.key.toLowerCase();
+    if (key === "r") cameraControls.reset();
+    else if (key === "f") frameContent();
+    else if (key === "g" && arSceneListeners.size) {
+      toggleGrid();
+      tick((n) => n + 1);
+    }
+    else if (key === "i" && inspectable) toggleInspect();
+    else if (key === "?") setHelp((v) => !v);
+    else return;
+    e.preventDefault();
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => shortcuts.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const upload = host?.uploadAsset;
   const sendFile = async (rel: string, file: File) => {
     setPending(null);
@@ -1160,12 +1300,7 @@ function Chrome({
               type="button"
               aria-pressed={inspect}
               style={button}
-              onClick={() => {
-                setPanel(false);
-                setPhone(false);
-                setAssets(false);
-                setInspect((v) => !v);
-              }}
+              onClick={toggleInspect}
             >
               Inspect
             </button>
@@ -1201,6 +1336,7 @@ function Chrome({
           onClose={() => setPanel(false)}
         />
       ) : null}
+      {help && cameraControls ? <ControlsHelp onClose={() => setHelp(false)} /> : null}
       {phone && arUrl ? <PhonePanel url={arUrl} onClose={() => setPhone(false)} /> : null}
       {inspect ? (
         <InspectPanel
@@ -1275,72 +1411,92 @@ function Chrome({
           ))}
         </div>
       ) : null}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "space-between" }}>
         {cameraControls ? (
-          <div style={{ ...chip, ...oneLine, opacity: 0.85 }}>
-            {touch
-              ? "Two fingers: drag to look around, pinch to zoom"
-              : "Right-drag: look around · Shift-drag: pan · Scroll: zoom · Click: tap"}
-          </div>
-        ) : <span />}
-        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-          {cameraControls ? (
-            <>
-              <Picker aria-label="Device" title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
-                <option value="">Fill view</option>
-                {DEVICES.map((g) => (
-                  <optgroup key={g.group} label={g.group}>
-                    {g.devices.map((d) => (
-                      <option key={d.name} value={d.name}>{d.name}</option>
+          <div ref={settingsRef} style={{ position: "relative" }}>
+            {settings ? (
+              <div role="dialog" aria-label="Preview settings" style={{ ...chip, pointerEvents: "auto", position: "absolute", left: 0, bottom: 42, width: 270, maxWidth: "calc(100vw - 20px)", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>Preview settings</span>
+                <label style={settingStyle}>
+                  Device
+                  <Picker aria-label="Device" style={{ flex: "1 1 auto" }} title={framedAs ? `${framedAs.w} x ${framedAs.h}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
+                    <option value="">Fill view</option>
+                    {DEVICES.map((g) => (
+                      <optgroup key={g.group} label={g.group}>
+                        {g.devices.map((d) => (
+                          <option key={d.name} value={d.name}>{d.name}</option>
+                        ))}
+                      </optgroup>
                     ))}
-                  </optgroup>
-                ))}
-              </Picker>
-              {/* The grid and the surroundings are the AR camera's, offered only while an AR scene listens for them. */}
-              {arSceneListeners.size ? (
-                <Picker
-                  aria-label="Surroundings"
-                  value={surroundings}
-                  onChange={(e) => {
-                    surroundings = e.target.value;
-                    loadRoomPlanes(surroundings);
-                    applyARDefaults();
-                    arSceneListeners.forEach((l) => l());
-                    tick((n) => n + 1);
-                  }}
-                >
-                  {Object.entries(ROOMS).filter(([, r]) => !r.scan).map(([k, r]) => (
-                    <option key={k} value={k}>{r.label}</option>
-                  ))}
-                  {Object.values(ROOMS).some((r) => r.scan) ? (
-                    <optgroup label="Your scans">
-                      {Object.entries(ROOMS).filter(([, r]) => r.scan).map(([k, r]) => (
+                  </Picker>
+                </label>
+                {/* The grid and the surroundings are the AR camera's, offered only while an AR scene listens for them. */}
+                {arSceneListeners.size ? (
+                  <label style={settingStyle}>
+                    Surroundings
+                    <Picker
+                      aria-label="Surroundings"
+                      style={{ flex: "1 1 auto" }}
+                      value={surroundings}
+                      onChange={(e) => {
+                        surroundings = e.target.value;
+                        loadRoomPlanes(surroundings);
+                        applyARDefaults();
+                        arSceneListeners.forEach((l) => l());
+                        tick((n) => n + 1);
+                      }}
+                    >
+                      {Object.entries(ROOMS).filter(([, r]) => !r.scan).map(([k, r]) => (
                         <option key={k} value={k}>{r.label}</option>
                       ))}
-                    </optgroup>
-                  ) : null}
-                </Picker>
-              ) : null}
-              {arSceneListeners.size ? (
+                      {Object.values(ROOMS).some((r) => r.scan) ? (
+                        <optgroup label="Your scans">
+                          {Object.entries(ROOMS).filter(([, r]) => r.scan).map(([k, r]) => (
+                            <option key={k} value={k}>{r.label}</option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                    </Picker>
+                  </label>
+                ) : null}
+                {arSceneListeners.size ? (
+                  <label style={{ ...settingStyle, flexDirection: "row", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+                    Floor grid
+                    <input
+                      type="checkbox"
+                      checked={gridOn}
+                      onChange={() => {
+                        toggleGrid();
+                        tick((n) => n + 1);
+                      }}
+                    />
+                  </label>
+                ) : null}
                 <button
                   type="button"
-                  aria-pressed={gridOn}
-                  style={{ ...button, opacity: gridOn ? 1 : 0.6 }}
+                  style={button}
                   onClick={() => {
-                    gridOn = !gridOn;
-                    arSceneListeners.forEach((l) => l());
-                    tick((n) => n + 1);
+                    setSettings(false);
+                    setHelp(true);
                   }}
                 >
-                  Grid
+                  View controls
                 </button>
-              ) : null}
-              <button type="button" style={button} onClick={() => cameraControls?.reset()}>
-                Reset view
-              </button>
-            </>
-          ) : null}
-        </div>
+              </div>
+            ) : null}
+            <button type="button" aria-label="Preview settings" title="Preview settings" aria-expanded={settings} style={roundButton} onClick={() => setSettings((v) => !v)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
+        ) : <span />}
+        {cameraControls ? (
+          <button type="button" style={button} onClick={() => cameraControls?.reset()}>
+            Reset view
+          </button>
+        ) : null}
       </div>
     </div>
   );

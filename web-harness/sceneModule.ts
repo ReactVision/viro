@@ -205,23 +205,32 @@ export function compileGeneratedScene(code: string, assetOverrides: Record<strin
   return compileGeneratedScenes(code, assetOverrides)[0]!;
 }
 
-/** Every scene a multi-scene module exports as `__viroPreviewScenes`, or just its default export. */
-export function compileGeneratedScenes(code: string, assetOverrides: Record<string, string> | undefined): React.ComponentType<any>[] {
-  const result = Babel.transform(code, {
-    filename: "GeneratedScene.tsx",
-    presets: [
-      ["typescript", { isTSX: true, allExtensions: true }],
-      ["react", { runtime: "classic" }],
-    ],
-    plugins: ["transform-modules-commonjs"],
-    sourceType: "module",
-  });
-  const js = result.code ?? "";
+/**
+ * Every scene a multi-scene module exports as `__viroPreviewScenes`, or just its default export.
+ * `format` "cjs" is code a bundler already compiled to a CommonJS script, which is run as it is.
+ */
+export function compileGeneratedScenes(
+  code: string,
+  assetOverrides: Record<string, string> | undefined,
+  format?: "cjs",
+): React.ComponentType<any>[] {
+  const js =
+    format === "cjs"
+      ? code
+      : (Babel.transform(code, {
+          filename: "GeneratedScene.tsx",
+          presets: [
+            ["typescript", { isTSX: true, allExtensions: true }],
+            ["react", { runtime: "classic" }],
+          ],
+          plugins: ["transform-modules-commonjs"],
+          sourceType: "module",
+        }).code ?? "");
   setModelOverrides(assetOverrides);
   const moduleObj: { exports: any } = { exports: {} };
-  // Sandboxed exec of caller-supplied code — see file header. `new Function`
-  // gives a fresh top-level scope; the only things it can reach are the
-  // arguments passed below (no closures over anything else in this module).
+  // `new Function` gives the caller's code a top-level scope of its own, with
+  // no closure over this module. It is not a sandbox: the code still has the
+  // page's globals, so the page serving it has to isolate it.
   // eslint-disable-next-line no-new-func
   const run = new Function("module", "exports", "require", js);
   run(moduleObj, moduleObj.exports, makeRequireShim(assetOverrides));

@@ -41,6 +41,10 @@ type PreviewInput = {
   /** Text the page offers to copy for the developer's coding agent. */
   renderRequest?: string;
   /** Base URL of the server's routes for starting and listing renders of this scene. */
+  /** "cjs" when `code` is already compiled to a CommonJS script, which the page then runs as it is. */
+  codeFormat?: "cjs";
+  /** Names `code`. Sent back with a request for updates, so one that did not change the code can leave it out. */
+  codeTag?: string;
   renderApi?: string;
   /** This preview's link for camera AR on a phone. */
   arUrl?: string;
@@ -2001,7 +2005,7 @@ function Preview({ input }: { input: PreviewInput }) {
     currentScene = input.scenes?.[at]?.path;
     setIndex(at);
     try {
-      setCompiled({ apps: compileGeneratedScenes(input.code, input.assetOverrides), version: input.version ?? 0 });
+      setCompiled({ apps: compileGeneratedScenes(input.code, input.assetOverrides, input.codeFormat), version: input.version ?? 0 });
       compileWarnings.current = [...renderState.warnings];
     } catch (err) {
       setCompiled(null);

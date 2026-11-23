@@ -12,7 +12,7 @@
  * compile and runtime errors back to the model.
  */
 import * as React from "react";
-import type { ArPlaneAnchor } from "@reactvision/viro-web-renderer";
+import type { ArPlaneAnchor, ArPlaybackSource, ViroArSession } from "@reactvision/viro-web-renderer";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -290,8 +290,9 @@ const roomFiles = (name: string) => ({ glb: roomFileUrl(`${name}.glb`), planes: 
 // file. A built-in one is in vendor/rooms (served beside this harness), with its origin on the floor
 // where the camera starts and the floor at `floorY`. A scan is a captured mesh of a real place, listed by
 // the server at `renderApi`, with its origin where its recording started, which is where the camera
-// starts; its planes file gives `floorY`.
-type Room = { label: string; model?: { glb: string; planes: string }; floorY?: number; scan?: boolean };
+// starts; its planes file gives `floorY`. A recording is a StudioGo recording played as the camera
+// feed, listed by the same server, with its routes at `recording`.
+type Room = { label: string; model?: { glb: string; planes: string }; floorY?: number; scan?: boolean; recording?: string };
 const ROOMS: Record<string, Room> = {
   floor: { label: "Empty" },
   living: { label: "Living room", model: roomFiles("living-room"), floorY: -1.5 },
@@ -321,6 +322,75 @@ function loadScans(renderApi: string, onLoaded: () => void): void {
       onLoaded();
     })
     .catch(() => {});
+}
+
+let recordingsRequested = false;
+function loadRecordings(renderApi: string, onLoaded: () => void): void {
+  if (recordingsRequested) return;
+  recordingsRequested = true;
+  pageFetch(`${renderApi}/environments`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((body: { projects: { environments: { id: string; name: string }[] }[] } | null) => {
+      for (const e of (body?.projects ?? []).flatMap((p) => p.environments)) {
+        ROOMS[`recording:${e.id}`] = { label: e.name, recording: `${renderApi}/recordings/${e.id}` };
+      }
+      onLoaded();
+    })
+    .catch(() => {});
+}
+
+// The recording the AR camera plays, once loaded: the camera follows its recorded poses, so the
+// virtual camera is off. `size` is the video's shape, which the view is framed to.
+type Feed = { source: ArPlaybackSource; size: { width: number; height: number } };
+let feed: Feed | null = null;
+// Loading, or why the chosen recording cannot play.
+let feedNote: string | null = null;
+let feedPlaying = false;
+const loadedFeeds = new Map<string, Feed>();
+async function loadFeed(base: string): Promise<Feed> {
+  const kept = loadedFeeds.get(base);
+  if (kept) return kept;
+  const get = async (file: string) => {
+    const r = await pageFetch(`${base}/${file}`);
+    if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `The recording did not load (HTTP ${r.status}).`);
+    return r;
+  };
+  // A blob: URL, since the page reads the video's frames back and its opaque origin makes the route's URL cross-origin.
+  const [track, video] = await Promise.all([get("track.json").then((r) => r.json()), get("video.mp4").then((r) => r.blob())]);
+  const { size, intrinsics, intrinsicsSize, ...rest } = track;
+  const loaded = { source: { ...rest, intrinsics: intrinsics ?? undefined, intrinsicsSize: intrinsicsSize ?? undefined, videoUrl: URL.createObjectURL(video) }, size };
+  loadedFeeds.set(base, loaded);
+  return loaded;
+}
+
+let stopFeed = () => {};
+// Plays the recording on a loop at its own speed, skipping frames when seeking falls behind. Timers,
+// not requestAnimationFrame, as sessionReplay.ts explains; one frame at a time, since each waits for its seek.
+function playFeed(session: ViroArSession) {
+  stopFeed();
+  const frames = feed?.source.frames ?? [];
+  if (!frames.length) return;
+  const last = frames[frames.length - 1]!.t;
+  const loop = last + (frames.length > 1 ? last / (frames.length - 1) : 0.1);
+  const start = performance.now();
+  let stopped = false;
+  let shown = -1;
+  const step = async () => {
+    if (stopped) return;
+    const t = ((performance.now() - start) / 1000) % loop;
+    let i = shown >= 0 && frames[shown]!.t <= t ? shown : 0;
+    while (i + 1 < frames.length && frames[i + 1]!.t <= t) i++;
+    if (i !== shown) {
+      // False once the session has stopped.
+      if (!(await session.renderPlaybackFrame(i).catch(() => false))) return;
+      shown = i;
+    }
+    setTimeout(step, 4);
+  };
+  void step();
+  stopFeed = () => void (stopped = true);
+  feedPlaying = true;
+  cameraListeners.forEach((l) => l());
 }
 
 // A room file's plane: `polygon` is in the plane's own X and Z, and its local Y is the normal.
@@ -393,7 +463,7 @@ function PreviewARScene(props: any) {
     ...React.Children.toArray(props.children),
     createElement(InspectorProbe, { key: "viro-preview-inspector" }),
     ...surroundingsShapes(surroundings),
-    gridOn
+    gridOn && !feed
       ? createElement(ViroImage, {
           key: "viro-preview-grid",
           source: { uri: floorGridUrl() },
@@ -422,7 +492,11 @@ if (!liveAR) {
     cameraListeners.forEach((l) => l());
   };
   applyARDefaults = () =>
-    setARNavigatorDefaults({ virtualCamera: { floorY: FLOOR_Y, planes: surroundingsPlanes(surroundings), onReady: onCameraReady, orbitCenter } });
+    setARNavigatorDefaults(
+      feed
+        ? { arOptions: { playback: feed.source, showCameraBackground: true }, onSessionReady: playFeed }
+        : { virtualCamera: { floorY: FLOOR_Y, planes: surroundingsPlanes(surroundings), onReady: onCameraReady, orbitCenter } },
+    );
   applyARDefaults();
   set3DNavigatorDefaults({ virtualCamera: { onReady: onCameraReady, orbitCenter } });
 }
@@ -432,6 +506,39 @@ function setSurroundings(key: Surroundings) {
   loadRoomPlanes(key);
   applyARDefaults();
   arSceneListeners.forEach((l) => l());
+}
+
+// Into or out of a recording the AR session itself changes, so `restart` starts the scene again, once:
+// a recording keeps playing until the next one has loaded.
+function chooseSurroundings(key: Surroundings, restart: () => void, changed: () => void) {
+  const leaveFeed = () => {
+    const wasFeed = feed !== null;
+    stopFeed();
+    feed = null;
+    feedPlaying = false;
+    applyARDefaults();
+    if (wasFeed) restart();
+  };
+  const base = ROOMS[key]!.recording;
+  feedNote = base ? "Loading the recording..." : null;
+  setSurroundings(key);
+  if (!base) return leaveFeed();
+  loadFeed(base).then(
+    (loaded) => {
+      if (surroundings !== key) return;
+      feed = loaded;
+      feedNote = null;
+      applyARDefaults();
+      restart();
+      changed();
+    },
+    (e: unknown) => {
+      if (surroundings !== key) return;
+      feedNote = e instanceof Error ? e.message : String(e);
+      leaveFeed();
+      changed();
+    },
+  );
 }
 
 // The last recording, kept across updates so a change can be replayed against it.
@@ -1225,7 +1332,9 @@ function Chrome({
   const [pending, setPending] = useState<File | null>(null);
   const [dropping, setDropping] = useState(false);
   useEffect(() => {
-    if (renderApi) loadScans(renderApi, () => tick((n) => n + 1));
+    if (!renderApi) return;
+    loadScans(renderApi, () => tick((n) => n + 1));
+    loadRecordings(renderApi, () => tick((n) => n + 1));
   }, [renderApi]);
   const toggleInspect = () => {
     setPanel(false);
@@ -1306,16 +1415,22 @@ function Chrome({
   // "" fills the view.
   const [device, setDevice] = useState("");
   const framedAs = findDevice(device);
+  // Only an AR scene plays the recording.
+  const shownFeed = arSceneListeners.size ? feed : null;
   useEffect(() => {
-    if (!cameraControls) return;
-    const frame = () => applyFraming(framedAs);
+    // A recording is framed at its own shape, which the poses and the camera it was taken with assume.
+    const shape = shownFeed ? { name: "", w: shownFeed.size.width, h: shownFeed.size.height } : framedAs;
+    if (!cameraControls && !shownFeed) return;
+    const frame = () => applyFraming(shape);
     frame();
-    framedFieldOfView = framedAs?.fieldOfView ?? null;
-    cameraControls.setFieldOfView(framedFieldOfView);
+    if (cameraControls) {
+      framedFieldOfView = framedAs?.fieldOfView ?? null;
+      cameraControls.setFieldOfView(framedFieldOfView);
+    }
     const observer = new ResizeObserver(frame);
     observer.observe(frameBox());
     return () => observer.disconnect();
-  }, [device, cameraControls]);
+  }, [device, cameraControls, shownFeed]);
   const [session, setSession] = useState<{ kind: "recording" | "replaying"; elapsed: number } | null>(null);
   const [sessionNote, setSessionNote] = useState<string | null>(null);
   const [hint, setHint] = useState(false);
@@ -1580,14 +1695,21 @@ function Chrome({
       ) : null}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end", minWidth: 0 }}>
-        {cameraControls ? (
+        {cameraControls || feedPlaying ? (
           <div ref={settingsRef} style={{ position: "relative" }}>
             {settings ? (
               <div role="dialog" aria-label="Preview settings" style={{ ...chip, pointerEvents: "auto", position: "absolute", left: 0, bottom: 42, width: 270, maxWidth: "calc(100vw - 20px)", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
                 <span style={{ fontWeight: 600, fontSize: 15 }}>Preview settings</span>
                 <label style={settingStyle}>
                   Device
-                  <Picker aria-label="Device" style={{ flex: "1 1 auto" }} title={framedAs ? `${framedAs.w} x ${framedAs.h}${framedAs.fieldOfView ? ` per eye, ${framedAs.fieldOfView}° field of view` : ""}` : undefined} value={device} onChange={(e) => setDevice(e.target.value)}>
+                  <Picker
+                    aria-label="Device"
+                    style={{ flex: "1 1 auto" }}
+                    disabled={!!shownFeed}
+                    title={shownFeed ? "A recording is shown at its own shape." : framedAs ? `${framedAs.w} x ${framedAs.h}${framedAs.fieldOfView ? ` per eye, ${framedAs.fieldOfView}° field of view` : ""}` : undefined}
+                    value={device}
+                    onChange={(e) => setDevice(e.target.value)}
+                  >
                     <option value="">Fill view</option>
                     {DEVICES.map((g) => (
                       <optgroup key={g.group} label={g.group}>
@@ -1606,12 +1728,17 @@ function Chrome({
                       aria-label="Surroundings"
                       style={{ flex: "1 1 auto" }}
                       value={surroundings}
+                      title={
+                        ROOMS[surroundings]!.recording
+                          ? "The recording plays as the camera feed, and its camera moves the view. A recording has no detected surfaces, so content that waits for one does not appear."
+                          : undefined
+                      }
                       onChange={(e) => {
-                        setSurroundings(e.target.value);
+                        chooseSurroundings(e.target.value, () => onRestart(index, null), () => tick((n) => n + 1));
                         tick((n) => n + 1);
                       }}
                     >
-                      {Object.entries(ROOMS).filter(([, r]) => !r.scan).map(([k, r]) => (
+                      {Object.entries(ROOMS).filter(([, r]) => !r.scan && !r.recording).map(([k, r]) => (
                         <option key={k} value={k}>{r.label}</option>
                       ))}
                       {Object.values(ROOMS).some((r) => r.scan) ? (
@@ -1621,10 +1748,18 @@ function Chrome({
                           ))}
                         </optgroup>
                       ) : null}
+                      {Object.values(ROOMS).some((r) => r.recording) ? (
+                        <optgroup label="Your recordings">
+                          {Object.entries(ROOMS).filter(([, r]) => r.recording).map(([k, r]) => (
+                            <option key={k} value={k}>{r.label}</option>
+                          ))}
+                        </optgroup>
+                      ) : null}
                     </Picker>
+                    {feedNote ? <span style={{ fontSize: 12, opacity: 0.75 }}>{feedNote}</span> : null}
                   </label>
                 ) : null}
-                {arSceneListeners.size ? (
+                {arSceneListeners.size && !feed ? (
                   <label style={{ ...settingStyle, flexDirection: "row", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                     Floor grid
                     <input
@@ -1637,16 +1772,18 @@ function Chrome({
                     />
                   </label>
                 ) : null}
-                <button
-                  type="button"
-                  style={button}
-                  onClick={() => {
-                    setSettings(false);
-                    setHelp(true);
-                  }}
-                >
-                  View controls
-                </button>
+                {cameraControls ? (
+                  <button
+                    type="button"
+                    style={button}
+                    onClick={() => {
+                      setSettings(false);
+                      setHelp(true);
+                    }}
+                  >
+                    View controls
+                  </button>
+                ) : null}
               </div>
             ) : null}
             <button type="button" aria-label="Preview settings" title="Preview settings" aria-expanded={settings} style={roundButton} onClick={() => setSettings((v) => !v)}>
@@ -1674,7 +1811,7 @@ function Chrome({
               {session.kind === "recording" ? `Recording ${clock(session.elapsed)}` : `Replaying ${clock(session.elapsed)} / ${clock(recording?.duration ?? 0)}`}
             </span>
           </>
-        ) : cameraControls ? (
+        ) : cameraControls && !ROOMS[surroundings]!.recording ? (
           <>
             <div
               style={{ position: "relative", display: "flex", gap: 8 }}

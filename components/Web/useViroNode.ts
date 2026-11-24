@@ -293,9 +293,17 @@ export function useViroSceneEvents(props: ViroSceneEventProps): void {
       renderer.clearNodeEventHandlers(root);
       scene.setNodeEventEnabled(root, ViroEventAction.Click, false);
       scene.setNodeEventEnabled(root, ViroEventAction.Hover, false);
+      if (hasPinch) scene.setNodeEventEnabled(root, 10, false);
+      if (hasRotate) scene.setNodeEventEnabled(root, 11, false);
+      if (hasFuse) scene.setNodeEventEnabled(root, 9, false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root, hasClick, hasHover, hasPinch, hasRotate, hasFuse]);
+  const timeToFuse = typeof props.onFuse === "object" ? props.onFuse.timeToFuse : undefined;
+  useEffect(() => {
+    if (hasFuse && typeof scene.setNodeTimeToFuse === "function") scene.setNodeTimeToFuse(root, timeToFuse ?? 2000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root, hasFuse, timeToFuse]);
 
   const hasDrag = !!props.onDrag;
   useEffect(() => {

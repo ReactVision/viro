@@ -9,7 +9,8 @@
  *
  * Drawing an animated <img> to a canvas is no substitute: browsers give the
  * canvas the same frame every time. So where ImageDecoder is missing, or cannot
- * read the file, the image shows as a still.
+ * read a GIF, the GIF is decoded here (viroGifDecoder), and any other file
+ * shows as a still.
  *
  * As on native, `loop` (default true) decides whether the animation repeats,
  * whatever the file's own loop count, a delay of 0 plays as 100 ms, and paused
@@ -29,6 +30,7 @@ import {
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroFlexSlot } from "./Web/ViroFlexSlotContext";
 import { useViroScene } from "./Web/ViroWebContext";
+import { decodeGif, isGif, type GifAnimation } from "./Web/viroGifDecoder";
 import { resolveImageSource } from "./Web/viroImageLoader";
 import { resolveSurface, useImagePlaceholder } from "./ViroImage.web";
 
@@ -48,18 +50,82 @@ type FrameDecoderClass = {
   isTypeSupported(type: string): Promise<boolean>;
 };
 
-async function openDecoder(url: string): Promise<FrameDecoder | null> {
+type FrameImage = CanvasImageSource & TexImageSource;
+type FrameSource = {
+  frameCount: number;
+  /** Hands frame `index` to `draw` and resolves with its delay in ms. */
+  show(index: number, draw: (image: FrameImage, width: number, height: number) => void): Promise<number>;
+  close(): void;
+};
+
+async function openImageDecoder(data: ArrayBuffer, type: string): Promise<FrameSource | null> {
   const Decoder = (globalThis as { ImageDecoder?: FrameDecoderClass }).ImageDecoder;
-  if (!Decoder) return null;
+  if (!Decoder || !type) return null;
+  let decoder: FrameDecoder | undefined;
+  try {
+    if (!(await Decoder.isTypeSupported(type))) return null;
+    decoder = new Decoder({ data, type });
+    // The frame count is final only once all the data is read and the tracks are known.
+    await Promise.all([decoder.completed, decoder.tracks.ready]);
+  } catch {
+    decoder?.close();
+    return null;
+  }
+  const d = decoder;
+  return {
+    frameCount: d.tracks.selectedTrack?.frameCount ?? 1,
+    show: async (index, draw) => {
+      const { image } = await d.decode({ frameIndex: index });
+      try {
+        draw(image, image.displayWidth, image.displayHeight);
+        return image.duration ? image.duration / 1000 : 100;
+      } finally {
+        image.close();
+      }
+    },
+    close: () => d.close(),
+  };
+}
+
+function gifFrames(gif: GifAnimation): FrameSource | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = gif.width;
+  canvas.height = gif.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !gif.width || !gif.height) return null;
+  return {
+    frameCount: gif.frameCount,
+    show: async (index, draw) => {
+      ctx.putImageData(new ImageData(gif.render(index), gif.width, gif.height), 0, 0);
+      draw(canvas, gif.width, gif.height);
+      return gif.delays[index]!;
+    },
+    close: () => {},
+  };
+}
+
+async function openFrames(url: string): Promise<FrameSource | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim();
-    if (!type || !(await Decoder.isTypeSupported(type))) return null;
-    const decoder = new Decoder({ data: await res.arrayBuffer(), type });
-    // The frame count is final only once all the data is read and the tracks are known.
-    await Promise.all([decoder.completed, decoder.tracks.ready]);
-    return decoder;
+    const data = await res.arrayBuffer();
+    const bytes = new Uint8Array(data);
+    let gif: GifAnimation | null = null;
+    try {
+      if (isGif(bytes)) gif = decodeGif(bytes);
+    } catch {}
+    const decoded = await openImageDecoder(data, type);
+    if (!gif) return decoded;
+    // A decoder that sees fewer frames than the file holds, or cannot decode the first, cannot play it.
+    try {
+      if (decoded && decoded.frameCount >= gif.frameCount) {
+        await decoded.show(0, () => {});
+        return decoded;
+      }
+    } catch {}
+    decoded?.close();
+    return gifFrames(gif);
   } catch {
     return null;
   }
@@ -148,10 +214,10 @@ export function ViroAnimatedImage(props: Props): null {
     let rafId = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
-    let decoder: FrameDecoder | null = null;
+    let player: FrameSource | null = null;
     const img = new Image();
 
-    const upload = (frame: CanvasImageSource & TexImageSource, w: number, h: number) => {
+    const upload = (frame: FrameImage, w: number, h: number) => {
       if (!texture && w > 0 && h > 0) setAspect(w / h);
       if (source) {
         if (scene.updateTextureFromSource(source, frame) && texture !== source) {
@@ -184,8 +250,8 @@ export function ViroAnimatedImage(props: Props): null {
       if (!cancelled) propsRef.current.onError?.(new Error(`image failed: ${url}`));
     };
 
-    const playDecoded = (d: FrameDecoder) => {
-      const frames = d.tracks.selectedTrack?.frameCount ?? 1;
+    const playFrames = (src: FrameSource) => {
+      const frames = src.frameCount;
       let index = 0;
       let busy = false;
       let loaded = false;
@@ -193,12 +259,11 @@ export function ViroAnimatedImage(props: Props): null {
         timer = undefined;
         if (cancelled || busy) return;
         busy = true;
-        let delayMs = 100;
+        let delayMs: number;
         try {
-          const { image } = await d.decode({ frameIndex: index });
-          if (!cancelled) upload(image, image.displayWidth, image.displayHeight);
-          if (image.duration) delayMs = image.duration / 1000;
-          image.close();
+          delayMs = await src.show(index, (image, w, h) => {
+            if (!cancelled) upload(image, w, h);
+          });
         } catch {
           busy = false;
           if (!loaded) fail();
@@ -238,13 +303,13 @@ export function ViroAnimatedImage(props: Props): null {
     };
 
     propsRef.current.onLoadStart?.();
-    void openDecoder(url).then((d) => {
+    void openFrames(url).then((src) => {
       if (cancelled) {
-        d?.close();
+        src?.close();
         return;
       }
-      decoder = d;
-      if (d) playDecoded(d);
+      player = src;
+      if (src) playFrames(src);
       else playStill();
     });
 
@@ -253,7 +318,7 @@ export function ViroAnimatedImage(props: Props): null {
       wakeRef.current = null;
       if (rafId) cancelAnimationFrame(rafId);
       if (timer !== undefined) clearTimeout(timer);
-      decoder?.close();
+      player?.close();
       img.onload = null;
       img.onerror = null;
       img.src = "";

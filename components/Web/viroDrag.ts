@@ -6,8 +6,8 @@
  * here (the AR session, the desktop virtual camera, and the 3D navigators'
  * default camera), and a drag turns pointer positions into world rays itself.
  */
-import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
-import { quatFromEulerDegrees } from "./viroMath";
+import type { ViroArSession, ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
+import { multiplyQuats, quatFromEulerDegrees } from "./viroMath";
 import { activeSceneCamera, sceneCameraFieldOfView, sceneCameraOrthographic } from "./viroSceneCameras";
 
 export { activateSceneCamera, installDefaultCamera, setSceneCameraFieldOfView, setSceneCameraOrthographic } from "./viroSceneCameras";
@@ -35,33 +35,66 @@ export function setCameraView(scene: ViroSceneApi, view: CameraView | null): voi
   else views.delete(scene);
 }
 
+function drawnTransform(scene: ViroSceneApi, node: ViroHandle) {
+  const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(node) : null;
+  // All zero until the node has been drawn once.
+  return t && !t.scale.every((c) => c === 0) ? t : null;
+}
+
 /**
  * The camera the scene draws from. Under a ViroCamera or ViroOrbitCamera that
  * is the camera node's last drawn pose, with its field of view (the default
  * camera's unless it sets one); null while that pose is not known
  * yet, on a renderer without the read, and under an orthographic projection.
+ *
+ * In AR, as in virocore's renderer, the camera node stays where it is and the
+ * device's rotation turns it, through the device's projection (no orthographic
+ * or field of view). Read live, since a drag keeps the view it started with.
  */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
   const base = views.get(scene) ?? null;
   const active = activeSceneCamera(scene);
   if (!active) return base;
-  if (!base || base.ar || sceneCameraOrthographic(scene, active)) return null;
-  const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(active) : null;
-  // All zero until the node has been drawn once.
-  if (!t || t.scale.every((c) => c === 0)) return null;
+  if (!base) return null;
+  let t = drawnTransform(scene, active);
+  if (!t) return null;
+  if (base.ar) {
+    const pose = () => (t = drawnTransform(scene, active) ?? t!);
+    return {
+      element: base.element,
+      get position() {
+        return pose().position;
+      },
+      get orientation() {
+        return multiplyQuats(quatFromEulerDegrees(pose().rotation), base.orientation);
+      },
+      get fx() {
+        return base.fx;
+      },
+      get fy() {
+        return base.fy;
+      },
+      get cx() {
+        return base.cx;
+      },
+      get cy() {
+        return base.cy;
+      },
+    };
+  }
+  if (sceneCameraOrthographic(scene, active)) return null;
   const view = defaultCameraView(base.element, sceneCameraFieldOfView(scene, active));
   view.position = t.position;
   view.orientation = quatFromEulerDegrees(t.rotation);
   return view;
 }
 
-/** True while a camera component draws whose pose the web cannot report: orthographic, in AR, or on a renderer without the read. */
+/** True while a camera component draws whose pose the web cannot report: orthographic outside AR, or on a renderer without the read. */
 export function sceneCameraUnreadable(scene: ViroSceneApi): boolean {
   const active = activeSceneCamera(scene);
   if (!active) return false;
   return (
-    sceneCameraOrthographic(scene, active) ||
-    !!views.get(scene)?.ar ||
+    (sceneCameraOrthographic(scene, active) && !views.get(scene)?.ar) ||
     typeof scene.getNodeWorldTransform !== "function"
   );
 }

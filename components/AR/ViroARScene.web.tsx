@@ -243,7 +243,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
     const ray = rayAt(view, rect.left + (x * rect.width) / width, rect.top + (y * rect.height) / height);
     return hitTestPlanes(anchorsRef.current, ray.origin, ray.dir);
   };
-  // A session's pose even under a ViroCamera, whose view the web cannot read in AR.
+  // The session's pose, even under a ViroCamera.
   const cameraNow = (): ViroWebCameraOrientation | null => {
     if (!session) return cameraOrientation(renderer.scene);
     const q = session.cameraPose.quaternion as Quat;

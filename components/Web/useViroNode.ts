@@ -440,7 +440,7 @@ export function useViroNode(
     const view = cameraView(scene);
     if (!p.onDrag || endDragRef.current) return;
     if (!view) {
-      warnUnsupported("Dragging nodes (onDrag) under a ViroCamera or ViroOrbitCamera", "the web");
+      warnUnsupported("Dragging nodes (onDrag) under an orthographic ViroCamera or ViroOrbitCamera, or under either on an older web renderer", "the web");
       return;
     }
     const nodeStart = scene.getNodeWorldPosition(node);

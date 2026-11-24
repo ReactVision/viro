@@ -42,6 +42,7 @@ import {
 import { useViroSceneEvents } from "../Web/useViroNode";
 import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
 import { cameraView, rayAt } from "../Web/viroDrag";
+import { activeSceneCamera } from "../Web/viroSceneCameras";
 import { hitTestPlanes, planeHitResult, type ViroPlaneHit } from "../Web/viroHitTest";
 import {
   cameraOrientation,
@@ -243,9 +244,10 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
     const ray = rayAt(view, rect.left + (x * rect.width) / width, rect.top + (y * rect.height) / height);
     return hitTestPlanes(anchorsRef.current, ray.origin, ray.dir);
   };
-  // The session's pose, even under a ViroCamera.
+  // The drawn camera, as native reports it: under a ViroCamera, its node with the device's turn on top.
   const cameraNow = (): ViroWebCameraOrientation | null => {
-    if (!session) return cameraOrientation(renderer.scene);
+    const drawn = !session || activeSceneCamera(renderer.scene) ? cameraOrientation(renderer.scene) : null;
+    if (drawn || !session) return drawn;
     const q = session.cameraPose.quaternion as Quat;
     return { position: [...session.cameraPose.position] as Vec3, rotation: quatToEulerDegrees(q), ...cameraBasis(q) };
   };

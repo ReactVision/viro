@@ -1265,7 +1265,7 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
         <CloseButton onClose={onClose} />
       </div>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
-        Plays this scene over a recorded real-world environment from your team and makes a video. Billed to your team as compute time.
+        Plays this scene over a recorded real-world environment from your team and makes a video. Needs a paid plan, and is billed to your team as compute time for a completed render. Your team's price per minute and its spend limit are on its Usage page in ReactVision Studio.
       </div>
       {projects === null && !error ? <div style={{ opacity: 0.7 }}>Loading environments...</div> : null}
       {projects && projects.length === 0 ? <div>Your team has no recorded environments yet.</div> : null}

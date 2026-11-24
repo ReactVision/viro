@@ -1451,6 +1451,9 @@ function Chrome({
     loadScans(renderApi, () => tick((n) => n + 1));
     loadRecordings(renderApi, () => tick((n) => n + 1));
   }, [renderApi]);
+  // The scene shown now, for a restart that runs after a recording finishes loading.
+  const indexRef = useRef(index);
+  indexRef.current = index;
   const toggleInspect = () => {
     setPanel(false);
     setPhone(false);
@@ -1869,7 +1872,7 @@ function Chrome({
                           : undefined
                       }
                       onChange={(e) => {
-                        chooseSurroundings(e.target.value, () => onRestart(index, null), () => tick((n) => n + 1));
+                        chooseSurroundings(e.target.value, () => onRestart(indexRef.current, null), () => tick((n) => n + 1));
                         tick((n) => n + 1);
                       }}
                     >

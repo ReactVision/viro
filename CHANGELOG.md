@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Android: `emissionColor`, `emissionTexture` and `reflectiveTexture` on a material work, as on iOS (`react_viro-release.aar`, virocore `Material`).** The first two threw "Invalid color/texture property" when the materials were created, and the reflective cube map was loaded and then dropped. `ViroMaterial` now types `emissionColor` and `emissionTexture`.
 - **Android: a material with a `reflectiveTexture` no longer crashes the app.** Each face of the cube map was looked up in the whole cube map instead of in its own source, which threw `Unable to find "uri" key`.
 
 ## v3.2.3 — 21 November 2026

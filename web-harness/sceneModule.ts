@@ -148,7 +148,20 @@ function unsupportedStub(name: string) {
   return stub;
 }
 
-const viroReactModule = new Proxy(ViroWeb as Record<string, unknown>, {
+// A bundler's `import * as` wrapper copies the module's own names onto a new
+// object with the module's prototype, so a name the web build lacks is read
+// from that prototype. Names a promise, a serializer or the wrapper itself
+// probes for stay undefined there, as they were on the bare wrapper.
+const NOT_EXPORT_NAMES = new Set(["default", "then", "toJSON", "prototype"]);
+const inheritedViroExports = new Proxy(Object.create(null) as Record<string, unknown>, {
+  get(_target, prop) {
+    if (typeof prop !== "string" || NOT_EXPORT_NAMES.has(prop) || prop in Object.prototype) return undefined;
+    if (!/^[A-Za-z]\w*$/.test(prop)) return undefined;
+    return prop in extraExports ? named(prop, extraExports[prop]) : unsupportedStub(prop);
+  },
+});
+
+const viroReactModule = new Proxy(Object.assign(Object.create(inheritedViroExports), ViroWeb) as Record<string, unknown>, {
   get(target, prop) {
     if (typeof prop === "string" && prop in extraExports) return named(prop, extraExports[prop]);
     if (typeof prop === "string" && prop in target) return named(prop, target[prop]);

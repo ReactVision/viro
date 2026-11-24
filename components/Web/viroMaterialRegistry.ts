@@ -262,7 +262,8 @@ function applyEmissionAndReflection(scene: ViroSceneApi, material: ViroHandle, d
     const [r, g, b] = parseColorToRGBA(emission);
     scene.setMaterialEmissionColor(material, r, g, b);
   }
-  applyTexture(scene, material, def, "emissionTexture", ViroTextureChannel.Emission, true);
+  // Linear, as iOS and Android load it (only diffuse is sRGB there).
+  applyTexture(scene, material, def, "emissionTexture", ViroTextureChannel.Emission, false);
   if (!reflective) return;
   Promise.all(faceUrls.map((url) => loadImageRGBA(url as string)))
     .then((faces) => {

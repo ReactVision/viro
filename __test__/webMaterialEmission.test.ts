@@ -62,8 +62,8 @@ test("sets the emission colour, the emission texture and a reflective cube map",
   const calls = await build({ emissionColor: "#ff8000", emissionTexture: "glow.png", reflectiveTexture: SKY });
 
   expect(calls.setMaterialEmissionColor).toEqual([[1, 1, 0.5, 0]]);
-  // The emission texture is a colour, so sRGB, as the diffuse is.
-  expect(calls.createTextureRGBA?.[0]?.[3]).toBe(true);
+  // Linear, as native loads it.
+  expect(calls.createTextureRGBA?.[0]?.[3]).toBe(false);
   // Each face gets its own image; the fake pixels are the image's URL.
   const [faces, width, height] = calls.createTextureCubeRGBA![0] as [Record<string, Uint8Array>, number, number];
   for (const [face, url] of Object.entries(SKY)) expect(Buffer.from(faces[face]!).toString()).toBe(url);

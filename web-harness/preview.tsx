@@ -594,8 +594,21 @@ window.addEventListener("message", (e) => {
 // A model that fails to load only reaches the scene's own onError, and an
 // image only its <img>; neither says anything on the page. Report both.
 const consoleWarn = console.warn.bind(console);
+// Never throws: a circular object or a BigInt must not break the scene that warned.
+const warnText = (a: unknown): string => {
+  if (typeof a === "string") return a;
+  try {
+    const json = JSON.stringify(a);
+    if (json !== undefined) return json;
+  } catch {}
+  try {
+    return String(a);
+  } catch {
+    return "[object]";
+  }
+};
 console.warn = (...args: unknown[]) => {
-  const text = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a) ?? String(a))).join(" ");
+  const text = args.map(warnText).join(" ");
   if (text.startsWith("[Viro")) pushWarning(text.slice(0, 500));
   consoleWarn(...args);
 };

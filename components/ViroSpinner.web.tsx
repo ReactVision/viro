@@ -1,22 +1,22 @@
 /**
- * Web implementation of ViroSpinner — two layered spinner images rotating in
+ * Web implementation of ViroSpinner, two layered spinner images rotating in
  * opposite directions (matches native's look). `type` ("Dark"/"Light") picks the
  * bundled asset variant; a custom `source`/`sourceReverse` overrides it.
  *
- * Asset note: the built-in spinner PNGs are `require()`d (native parity); this
- * resolves under Metro/webpack (react-native-web). A custom `source` avoids any
- * bundler-specific asset handling.
+ * The built-in images are data URIs rather than `require()`d PNGs, since not
+ * every web bundler has `require` or an asset loader for PNGs.
  */
 import * as React from "react";
 import { ViroNode } from "./ViroNode.web";
 import { ViroImage } from "./ViroImage.web";
 import { ViroAnimations } from "./Animation/ViroAnimations.web";
 import type { ViroWebNodeProps } from "./Web/useViroNode";
-
-const ViroSpinner_1 = require("./Resources/viro_spinner_1.png");
-const ViroSpinner_1a = require("./Resources/viro_spinner_1a.png");
-const ViroSpinner_1_w = require("./Resources/viro_spinner_1_w.png");
-const ViroSpinner_1a_w = require("./Resources/viro_spinner_1a_w.png");
+import {
+  viroSpinner1 as ViroSpinner_1,
+  viroSpinner1a as ViroSpinner_1a,
+  viroSpinner1W as ViroSpinner_1_w,
+  viroSpinner1aW as ViroSpinner_1a_w,
+} from "./Web/viroSpinnerImages";
 
 ViroAnimations.registerAnimations({
   _viroSpinnerClockwise: { duration: 1000, easing: "Linear", properties: { rotateZ: -360 } },

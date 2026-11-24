@@ -66,12 +66,7 @@ export { ViroSound } from "../components/ViroSound";
 export { ViroSoundField } from "../components/ViroSoundField";
 export { ViroSpatialSound } from "../components/ViroSpatialSound";
 export { ViroSphere } from "../components/ViroSphere";
-// ViroSpinner.web.tsx intentionally NOT re-exported: it `require()`s its
-// built-in PNGs at module scope (native/Metro convention), which Vite has no
-// global `require` for — just importing the file throws at load time, before
-// the component is ever used. Left out so it degrades to the safe
-// unsupported-component stub instead of crashing every render that imports
-// it. Fix at the source (e.g. `?url` imports) before re-adding.
+export { ViroSpinner } from "../components/ViroSpinner";
 export { ViroSpotLight } from "../components/ViroSpotLight";
 export { ViroSurface } from "../components/ViroSurface";
 export { ViroText } from "../components/ViroText";

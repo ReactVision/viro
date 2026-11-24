@@ -734,7 +734,7 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             } else {
                 ImageDownloader downloader = new ImageDownloader(mContext);
                 downloader.setTextureFormat(format);
-                Image nativeImage = new Image(downloader.getImageSync(textureMap), format);
+                Image nativeImage = new Image(downloader.getImageSync(textureMap.getMap(key)), format);
                 cubeMapImages.put(key, nativeImage);
             }
 

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- **Android: a material with a `reflectiveTexture` no longer crashes the app.** Each face of the cube map was looked up in the whole cube map instead of in its own source, which threw `Unable to find "uri" key`.
+
 ## v3.2.3 — 21 November 2026
 
 Needs `@reactvision/viro-web-renderer` 1.3.0 for the web build (the peer range is now `^1.3.0`). Each web change that needs new renderer API checks for it, and on 1.2.0 keeps the old behaviour with a one-time warning. iOS and Android behave as in 3.2.2, apart from the R8 fix below.

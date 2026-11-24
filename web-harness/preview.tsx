@@ -372,6 +372,8 @@ type Feed = { source: ArPlaybackSource; size: { width: number; height: number } 
 let feed: Feed | null = null;
 // Loading, or why the chosen recording cannot play.
 let feedNote: string | null = null;
+// Since when the chosen recording has been loading. The server may be preparing others first.
+let feedLoadingSince = 0;
 let feedPlaying = false;
 const loadedFeeds = new Map<string, Feed>();
 async function loadFeed(base: string): Promise<Feed> {
@@ -547,7 +549,8 @@ function chooseSurroundings(key: Surroundings, restart: () => void, changed: () 
     if (wasFeed) restart();
   };
   const base = ROOMS[key]!.recording;
-  feedNote = base ? "Loading the recording..." : null;
+  feedNote = base ? "Preparing the recording..." : null;
+  feedLoadingSince = base ? performance.now() : 0;
   setSurroundings(key);
   if (!base) return leaveFeed();
   loadFeed(base).then(
@@ -555,6 +558,7 @@ function chooseSurroundings(key: Surroundings, restart: () => void, changed: () 
       if (surroundings !== key) return;
       feed = loaded;
       feedNote = null;
+      feedLoadingSince = 0;
       applyARDefaults();
       restart();
       changed();
@@ -562,6 +566,7 @@ function chooseSurroundings(key: Surroundings, restart: () => void, changed: () 
     (e: unknown) => {
       if (surroundings !== key) return;
       feedNote = e instanceof Error ? e.message : String(e);
+      feedLoadingSince = 0;
       leaveFeed();
       changed();
     },
@@ -1685,7 +1690,7 @@ function Chrome({
         seen.current = key;
         postStatus();
         tick((n) => n + 1);
-      } else if (modelDownloads.size || modelRetries.size || renderState.loading.length || shownDownloads.current) {
+      } else if (modelDownloads.size || modelRetries.size || renderState.loading.length || shownDownloads.current || feedLoadingSince) {
         tick((n) => n + 1);
       }
       if (!renderState.loading.length) loadingSince = 0;
@@ -1716,6 +1721,9 @@ function Chrome({
   const downloading = !!downloads && downloads.count > downloads.done;
   // Parsing a large model takes seconds with nothing downloading; a quick one is not worth a chip.
   const preparing = !downloading && loadingSince && performance.now() - loadingSince > 1000 ? renderState.loading.length : 0;
+  // A recording already loaded comes back at once, so not worth a chip.
+  const feedWait = feedLoadingSince ? performance.now() - feedLoadingSince : 0;
+  const feedWaiting = feedWait > 1000;
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       {/* On a narrow view the name gives way first, then the buttons wrap. */}
@@ -1843,8 +1851,10 @@ function Chrome({
           Drop the file to replace its placeholder
         </div>
       ) : null}
-      {(downloads || preparing) && !dropping ? (
+      {(downloads || preparing || feedWaiting) && !dropping ? (
         <div role="status" style={{ ...chip, alignSelf: "center", display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
+          {feedWaiting ? <div style={{ fontWeight: 600 }}>Preparing the recording...</div> : null}
+          {feedWait > 15_000 ? <div style={{ opacity: 0.75 }}>This can take a couple of minutes.</div> : null}
           {downloading ? (
             <div style={{ fontWeight: 600 }}>
               Loading {downloads!.count} {downloads!.count === 1 ? "model" : "models"}
@@ -1857,7 +1867,7 @@ function Chrome({
             </div>
           ) : null}
           {downloads?.retrying.length ? <div style={{ color: "#ffd27a" }}>A download failed. Retrying {downloads.retrying.join(", ")}...</div> : null}
-          {downloading || preparing ? <ActivityBar /> : null}
+          {downloading || preparing || feedWaiting ? <ActivityBar /> : null}
         </div>
       ) : null}
       {waitingSelectors.size && !dropping && !renderState.error ? (

@@ -2018,13 +2018,21 @@ function Preview({ input }: { input: PreviewInput }) {
     const at = Math.max(0, (input.scenes ?? []).findIndex((sc) => sc.path === currentScene));
     currentScene = input.scenes?.[at]?.path;
     setIndex(at);
-    try {
-      setCompiled({ apps: compileGeneratedScenes(input.code, input.assetOverrides, input.codeFormat), version: input.version ?? 0 });
-      compileWarnings.current = [...renderState.warnings];
-    } catch (err) {
-      setCompiled(null);
-      markError(err);
-    }
+    const compile = (transform?: (code: string) => string) => {
+      try {
+        setCompiled({ apps: compileGeneratedScenes(input.code, input.assetOverrides, transform), version: input.version ?? 0 });
+        compileWarnings.current = [...renderState.warnings];
+      } catch (err) {
+        setCompiled(null);
+        markError(err);
+      }
+    };
+    if (input.codeFormat === "cjs") compile();
+    else
+      import("./transformTsx").then(
+        ({ transformTsx }) => shown.current === input && compile(transformTsx),
+        (err) => shown.current === input && markError(err),
+      );
   }, [input]);
   const scenes = input.scenes ?? [];
   // The navigator is remounted for the new scene, so its status starts over.

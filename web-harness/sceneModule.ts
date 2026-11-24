@@ -6,8 +6,6 @@
 import * as React from "react";
 import { createElement, useEffect, useRef, useSyncExternalStore } from "react";
 import * as ReactNativeWeb from "react-native";
-// @ts-expect-error -- @babel/standalone ships no first-party types
-import * as Babel from "@babel/standalone";
 
 import { pushWarning, renderState } from "./renderState";
 import { makeCheckerDataUrl, PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
@@ -214,31 +212,26 @@ function makeRequireShim(assetOverrides: Record<string, string> | undefined) {
   };
 }
 
-export function compileGeneratedScene(code: string, assetOverrides: Record<string, string> | undefined): React.ComponentType<any> {
-  return compileGeneratedScenes(code, assetOverrides)[0]!;
+export function compileGeneratedScene(
+  code: string,
+  assetOverrides: Record<string, string> | undefined,
+  transform?: (code: string) => string,
+): React.ComponentType<any> {
+  return compileGeneratedScenes(code, assetOverrides, transform)[0]!;
 }
 
 /**
  * Every scene a multi-scene module exports as `__viroPreviewScenes`, or just its default export.
- * `format` "cjs" is code a bundler already compiled to a CommonJS script, which is run as it is.
+ * Without `transform`, `code` must already be a CommonJS script, which is run as it is. Babel is
+ * passed in as `transform` (transformTsx.ts) rather than imported here, so a page that only runs
+ * precompiled code does not load it.
  */
 export function compileGeneratedScenes(
   code: string,
   assetOverrides: Record<string, string> | undefined,
-  format?: "cjs",
+  transform?: (code: string) => string,
 ): React.ComponentType<any>[] {
-  const js =
-    format === "cjs"
-      ? code
-      : (Babel.transform(code, {
-          filename: "GeneratedScene.tsx",
-          presets: [
-            ["typescript", { isTSX: true, allExtensions: true }],
-            ["react", { runtime: "classic" }],
-          ],
-          plugins: ["transform-modules-commonjs"],
-          sourceType: "module",
-        }).code ?? "");
+  const js = transform ? transform(code) : code;
   setModelOverrides(assetOverrides);
   const moduleObj: { exports: any } = { exports: {} };
   // `new Function` gives the caller's code a top-level scope of its own, with

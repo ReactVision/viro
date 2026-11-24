@@ -36,6 +36,7 @@ import { createRoot } from "react-dom/client";
 
 import { renderState, pushWarning, markReady, markError } from "./renderState";
 import { compileGeneratedScene } from "./sceneModule";
+import { transformTsx } from "./transformTsx";
 import { webRendererOptions } from "./wasmOptions";
 
 const SLAM_SCRIPT_URL = "/tinyvio-slam.js";
@@ -123,7 +124,7 @@ function TsxRoot({ code, assetOverrides, navigatorType }: { code: string; assetO
 
   useEffect(() => {
     try {
-      const Scene = compileGeneratedScene(code, assetOverrides);
+      const Scene = compileGeneratedScene(code, assetOverrides, transformTsx);
       const Compiled = NAVIGATOR_RE.test(code) ? Scene : inNavigator(Scene, navigatorType);
       // setApp(Compiled) would be misread as a useState *updater* function
       // (React calls it with prevState instead of storing it) — wrap it so

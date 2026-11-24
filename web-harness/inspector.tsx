@@ -269,12 +269,15 @@ export function noteModelResponse(url: string, res: Response): void {
 
 // ─── The scene being inspected ────────────────────────────────────────────
 let inspected: ViroWebRenderer | null = null;
+/** Counts scene mounts, since an update can remount the scene with the same renderer and handles. */
+let inspectedMounts = 0;
 
 /** Rendered inside a scene, so the inspector can reach its renderer. */
 export function InspectorProbe() {
   const renderer = useViroRenderer();
   useEffect(() => {
     inspected = renderer;
+    inspectedMounts++;
     return () => {
       if (inspected === renderer) inspected = null;
     };
@@ -542,6 +545,7 @@ export function InspectPanel({
   });
   const [selected, setSelected] = useState<{ id: string; key: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [mounts, setMounts] = useState(inspectedMounts);
   const marker = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
@@ -559,9 +563,13 @@ export function InspectPanel({
   useEffect(() => {
     let frames = 0;
     let since = performance.now();
+    let seenMounts = inspectedMounts;
     const read = () => {
       const next = inspected ? rowsOf(inspected.scene) : [];
       setRows(next);
+      // One read late: right after a mount, world positions are still the origin until a frame renders.
+      setMounts(seenMounts);
+      seenMounts = inspectedMounts;
       const now = performance.now();
       setStats({ frame: lastFrame, fps: now > since ? Math.round((frames * 1000) / (now - since)) : null, textures: textureMemory() });
       frames = 0;
@@ -606,10 +614,14 @@ export function InspectPanel({
   const row = selected ? shown.find((r) => r.id === selected.id) : undefined;
   const model = row?.part ? rows.find((r) => r.id === row.id.split("#")[0]) : undefined;
   const text = row ? selectionText(row, model, inspected ? markerAt(inspected.scene, row) : null, budgets, scene) : null;
+  const textRef = useRef(text);
+  textRef.current = text;
+  // Not keyed on the text itself: it carries the live position, which changes while a node moves.
+  const selectionKey = row ? `${mounts}\n${row.id}\n${selectionText(row, model, null, budgets, scene)}` : null;
   useEffect(() => {
-    onSelection?.(text);
+    onSelection?.(textRef.current);
     setCopied(false);
-  }, [text]);
+  }, [selectionKey]);
   useEffect(() => () => onSelection?.(null), []);
 
   const { chip, button } = styles;

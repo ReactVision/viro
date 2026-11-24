@@ -562,9 +562,13 @@ let recording: Recording | null = null;
 let endSession: (() => void) | null = null;
 const MAX_RECORDING_MS = 5 * 60 * 1000;
 const sceneCanvas = () => document.querySelector<HTMLCanvasElement>("#root canvas");
-// Calls `then` once a restarted scene is drawn and its models are in; returns a cancel.
-function whenSceneReady(then: () => void): () => void {
+// Calls `then` once a restarted scene is drawn and its models are in, or `failed` if it errors first; returns a cancel.
+function whenSceneReady(then: () => void, failed: () => void): () => void {
   const timer = setInterval(() => {
+    if (renderState.error) {
+      clearInterval(timer);
+      return failed();
+    }
     const d = downloadProgress();
     if (!cameraControls || !renderState.ready || renderState.loading.length || (d && d.count > d.done)) return;
     clearInterval(timer);
@@ -1570,7 +1574,7 @@ function Chrome({
         if (elapsed >= MAX_RECORDING_MS) end();
         else setSession({ kind: "recording", elapsed });
       }, 250);
-    });
+    }, () => end());
     const end = () => {
       cancel();
       clearInterval(timer);
@@ -1607,7 +1611,7 @@ function Chrome({
         (elapsed) => setSession((s) => (s && Math.floor(s.elapsed / 1000) === Math.floor(elapsed / 1000) ? s : { kind: "replaying", elapsed })),
         end,
       );
-    });
+    }, () => end());
     const end = () => {
       cancel();
       stopPlay?.();

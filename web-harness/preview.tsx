@@ -55,6 +55,8 @@ type PreviewInput = {
   updatesUrl?: string;
   /** Where the page sends feedback; absent where the server does not record it. */
   feedbackUrl?: string;
+  /** Where the page reports how it is used; absent where the server does not record it. */
+  eventsUrl?: string;
   /** Per-platform single-model budgets the inspector compares models against. */
   budgets?: ModelBudget[];
   /** Root-relative paths of the local assets drawn as stand-ins. */
@@ -104,6 +106,15 @@ const shot = params.get("shot") === "1";
 const host = window.__PREVIEW_HOST__;
 // Framed by, or running inside, the MCP Apps view.
 const framed = window.parent !== window;
+const pageKind = host ? "view" : framed ? "framed" : "page";
+
+const eventsUrl = shot ? undefined : window.__PREVIEW_INPUT__?.eventsUrl;
+function track(event: string, props: Record<string, string | number | boolean> = {}): void {
+  if (!eventsUrl) return;
+  // A string body is text/plain, which needs no preflight, and keepalive lets it leave with the page.
+  pageFetch(eventsUrl, { method: "POST", keepalive: true, body: JSON.stringify({ event, props: { page: pageKind, viro: VIRO_VERSION, ...props } }) }).catch(() => {});
+}
+const act = (action: string) => track("action", { action });
 const inspectable = !liveAR && !shot;
 if (inspectable) watchGpu();
 
@@ -315,6 +326,8 @@ const ROOMS: Record<string, Room> = {
 };
 type Surroundings = keyof typeof ROOMS;
 let surroundings: Surroundings = "floor";
+// A scan's or recording's name is the team's own, so only its kind is sent.
+const surroundingsKind = (key: string) => (ROOMS[key]?.scan ? "scan" : ROOMS[key]?.recording ? "recording" : key);
 
 type ScanRow = { id: string; kind: "scan" | "merge"; location_name: string; created_at: string };
 let scansRequested = false;
@@ -840,7 +853,10 @@ class Boundary extends React.Component<{ children: React.ReactNode }, { failed: 
   }
 }
 
-function Scene({ App }: { App: React.ComponentType<any> }) {
+const shownScenes = new Set<string>();
+
+// `shown` names the update and scene, which is reported once however often it is restarted.
+function Scene({ App, shown }: { App: React.ComponentType<any>; shown: string }) {
   // A timer, not requestAnimationFrame: a browser may hold rAF back in a
   // cross-origin frame nested in a host's view.
   useEffect(() => {
@@ -855,6 +871,22 @@ function Scene({ App }: { App: React.ComponentType<any> }) {
     }, 100);
     return () => clearInterval(timer);
   }, [App]);
+  useEffect(() => {
+    if (shownScenes.has(shown)) return;
+    const start = performance.now();
+    const timer = setInterval(() => {
+      if (!renderState.ready && !renderState.error) return;
+      clearInterval(timer);
+      shownScenes.add(shown);
+      track("scene_shown", {
+        ok: !renderState.error,
+        ar: arSceneListeners.size > 0,
+        warnings: renderState.warnings.length,
+        seconds: (performance.now() - start) / 1000,
+      });
+    }, 250);
+    return () => clearInterval(timer);
+  }, [shown]);
 
   return createElement(Boundary, null, createElement(App));
 }
@@ -1466,7 +1498,21 @@ function Chrome({
     setPanel(false);
     setPhone(false);
     setAssets(false);
+    if (!inspect) act("inspect");
     setInspect((v) => !v);
+  };
+  const flipGrid = () => {
+    toggleGrid();
+    track("setting_changed", { setting: "grid", value: gridOn ? "on" : "off" });
+    tick((n) => n + 1);
+  };
+  const resetView = () => {
+    cameraControls?.reset();
+    act("reset_view");
+  };
+  const openFeedback = () => {
+    act("feedback");
+    setFeedback(true);
   };
   const shortcuts = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcuts.current = (e) => {
@@ -1474,14 +1520,14 @@ function Chrome({
     const t = e.target as HTMLElement | null;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     const key = e.key.toLowerCase();
-    if (key === "r") cameraControls.reset();
+    if (key === "r") resetView();
     else if (key === "f") frameContent();
-    else if (key === "g" && arSceneListeners.size) {
-      toggleGrid();
-      tick((n) => n + 1);
-    }
+    else if (key === "g" && arSceneListeners.size) flipGrid();
     else if (key === "i" && inspectable) toggleInspect();
-    else if (key === "?") setHelp((v) => !v);
+    else if (key === "?") {
+      if (!help) act("controls_help");
+      setHelp((v) => !v);
+    }
     else return;
     e.preventDefault();
   };
@@ -1497,6 +1543,7 @@ function Chrome({
     try {
       await upload!(rel, file);
       setUploads((u) => ({ ...u, [rel]: "done" }));
+      act("asset_uploaded");
     } catch (e) {
       setUploads((u) => ({ ...u, [rel]: e instanceof Error ? e.message : String(e) }));
     }
@@ -1563,6 +1610,7 @@ function Chrome({
   const startRecording = () => {
     if (!cameraControls) return;
     const at = { scene: scenes[index]?.path, device, surroundings, grid: gridOn };
+    act("record");
     onRestart(index, cameraControls.pose());
     setSessionNote(null);
     setSession({ kind: "recording", elapsed: 0 });
@@ -1594,6 +1642,7 @@ function Chrome({
     if (!rec || !cameraControls) return;
     const i = rec.scene === undefined ? index : scenes.findIndex((sc) => sc.path === rec.scene);
     if (i < 0) return setSessionNote("The recorded scene is no longer in this preview.");
+    act("replay");
     setSessionNote(null);
     setDevice(rec.device);
     if (rec.surroundings !== surroundings && ROOMS[rec.surroundings]) setSurroundings(rec.surroundings);
@@ -1659,7 +1708,7 @@ function Chrome({
       scene: scenes[index]?.path ?? title,
       device: device || "Fill view",
       surroundings: !arSceneListeners.size ? "none" : room.recording ? "a recording" : room.scan ? "a scan" : room.label,
-      page: host ? "view" : framed ? "framed" : "page",
+      page: pageKind,
       viro: VIRO_VERSION,
     };
   };
@@ -1676,7 +1725,10 @@ function Chrome({
           <Picker
             aria-label="Scene"
             value={index}
-            onChange={(e) => onSelect(Number(e.target.value))}
+            onChange={(e) => {
+              onSelect(Number(e.target.value));
+              act("scene_selected");
+            }}
             style={{ maxWidth: "100%" }}
           >
             {scenes.map((sc, i) => (
@@ -1692,6 +1744,7 @@ function Chrome({
               type="button"
               style={button}
               onClick={async () => {
+                act("render_panel");
                 setPhone(false);
                 setInspect(false);
                 setAssets(false);
@@ -1707,6 +1760,7 @@ function Chrome({
               type="button"
               style={button}
               onClick={() => {
+                act("view_in_ar");
                 setPanel(false);
                 setInspect(false);
                 setAssets(false);
@@ -1737,6 +1791,7 @@ function Chrome({
                 setPhone(false);
                 setInspect(false);
                 setPending(null);
+                if (!assets) act("placeholders");
                 setAssets((v) => !v);
               }}
             >
@@ -1833,7 +1888,7 @@ function Chrome({
             <div key={w} style={{ color: "#ffd27a" }}>{w}</div>
           ))}
           {feedbackUrl ? (
-            <button type="button" style={{ ...button, marginTop: 8, font: "600 13px system-ui, -apple-system, sans-serif" }} title="Tell us about this. The messages above are sent with it." onClick={() => setFeedback(true)}>
+            <button type="button" style={{ ...button, marginTop: 8, font: "600 13px system-ui, -apple-system, sans-serif" }} title="Tell us about this. The messages above are sent with it." onClick={openFeedback}>
               Report this
             </button>
           ) : null}
@@ -1854,7 +1909,10 @@ function Chrome({
                     disabled={!!shownFeed}
                     title={shownFeed ? "A recording is shown at its own shape." : framedAs ? `${framedAs.w} x ${framedAs.h}${framedAs.fieldOfView ? ` per eye, ${framedAs.fieldOfView}° field of view` : ""}` : undefined}
                     value={device}
-                    onChange={(e) => setDevice(e.target.value)}
+                    onChange={(e) => {
+                      setDevice(e.target.value);
+                      track("setting_changed", { setting: "device", value: e.target.value || "Fill view" });
+                    }}
                   >
                     <option value="">Fill view</option>
                     {DEVICES.map((g) => (
@@ -1881,6 +1939,7 @@ function Chrome({
                       }
                       onChange={(e) => {
                         chooseSurroundings(e.target.value, () => onRestart(indexRef.current, null), () => tick((n) => n + 1));
+                        track("setting_changed", { setting: "surroundings", value: surroundingsKind(e.target.value) });
                         tick((n) => n + 1);
                       }}
                     >
@@ -1911,10 +1970,7 @@ function Chrome({
                     <input
                       type="checkbox"
                       checked={gridOn}
-                      onChange={() => {
-                        toggleGrid();
-                        tick((n) => n + 1);
-                      }}
+                      onChange={flipGrid}
                     />
                   </label>
                 ) : null}
@@ -1924,6 +1980,7 @@ function Chrome({
                     style={button}
                     onClick={() => {
                       setSettings(false);
+                      act("controls_help");
                       setHelp(true);
                     }}
                   >
@@ -1936,7 +1993,7 @@ function Chrome({
                     style={button}
                     onClick={() => {
                       setSettings(false);
-                      setFeedback(true);
+                      openFeedback();
                     }}
                   >
                     Send feedback
@@ -1998,7 +2055,7 @@ function Chrome({
         {expired ? <span style={chip}>This preview has expired and no longer updates.</span> : null}
         </div>
         {cameraControls ? (
-          <button type="button" style={button} onClick={() => cameraControls?.reset()}>
+          <button type="button" style={button} onClick={resetView}>
             Reset view
           </button>
         ) : null}
@@ -2050,6 +2107,7 @@ function Preview({ input, expired }: { input: PreviewInput; expired: boolean }) 
       } catch (err) {
         setCompiled(null);
         markError(err);
+        track("scene_shown", { ok: false, warnings: renderState.warnings.length });
       }
     };
     if (input.codeFormat === "cjs") compile();
@@ -2081,7 +2139,7 @@ function Preview({ input, expired }: { input: PreviewInput; expired: boolean }) 
   return (
     <>
       {/* Keyed by the update as well: a boundary that caught the last version's crash must not hold the new one. */}
-      {App ? <Scene key={`${compiled!.version}:${index}:${run}`} App={App} /> : null}
+      {App ? <Scene key={`${compiled!.version}:${index}:${run}`} App={App} shown={`${compiled!.version}:${index}`} /> : null}
       {shot ? null : (
         <Chrome
           title={input.title}
@@ -2148,6 +2206,13 @@ const ASSET_BURST_MS = 1500;
 function Live({ first }: { first: PreviewInput }) {
   const [input, setInput] = useState(first);
   const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    track("opened", { scenes: Math.max(1, first.scenes?.length ?? 0) });
+    const opened = performance.now();
+    const onHide = () => track("closed", { seconds: (performance.now() - opened) / 1000 });
+    window.addEventListener("pagehide", onHide, { once: true });
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
   useEffect(() => {
     if (shot) return;
     let latest = first;

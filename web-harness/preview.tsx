@@ -1452,11 +1452,13 @@ function Chrome({
   const [uploads, setUploads] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<File | null>(null);
   const [dropping, setDropping] = useState(false);
+  // Asked for only once the Surroundings picker is first shown, not on every page load.
+  const showsSurroundings = settings && arSceneListeners.size > 0;
   useEffect(() => {
-    if (!renderApi) return;
+    if (!renderApi || !showsSurroundings) return;
     loadScans(renderApi, () => tick((n) => n + 1));
     loadRecordings(renderApi, () => tick((n) => n + 1));
-  }, [renderApi]);
+  }, [renderApi, showsSurroundings]);
   // The scene shown now, for a restart that runs after a recording finishes loading.
   const indexRef = useRef(index);
   indexRef.current = index;

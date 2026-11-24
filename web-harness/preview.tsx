@@ -1412,6 +1412,7 @@ function Chrome({
   budgets,
   placeholders = [],
   feedbackUrl,
+  expired = false,
 }: {
   title?: string;
   renderRequest?: string;
@@ -1424,6 +1425,7 @@ function Chrome({
   budgets?: ModelBudget[];
   placeholders?: string[];
   feedbackUrl?: string;
+  expired?: boolean;
 }) {
   const [, tick] = useState(0);
   const [feedback, setFeedback] = useState(false);
@@ -1991,6 +1993,7 @@ function Chrome({
             {sessionNote ? <span style={chip}>{sessionNote}</span> : null}
           </>
         ) : null}
+        {expired ? <span style={chip}>This preview has expired and no longer updates.</span> : null}
         </div>
         {cameraControls ? (
           <button type="button" style={button} onClick={() => cameraControls?.reset()}>
@@ -2009,7 +2012,7 @@ function onlyModelsChanged(was: PreviewInput, now: PreviewInput): boolean {
   return [...new Set([...Object.keys(a), ...Object.keys(b)])].every((k) => a[k] === b[k] || MODEL_RE.test(k));
 }
 
-function Preview({ input }: { input: PreviewInput }) {
+function Preview({ input, expired }: { input: PreviewInput; expired: boolean }) {
   // With the version it was compiled from, which keys the mounted scene.
   const [compiled, setCompiled] = useState<{ apps: React.ComponentType<any>[]; version: number } | null>(null);
   const [index, setIndex] = useState(0);
@@ -2090,6 +2093,7 @@ function Preview({ input }: { input: PreviewInput }) {
           budgets={input.budgets}
           placeholders={input.placeholders}
           feedbackUrl={input.feedbackUrl}
+          expired={expired}
         />
       )}
     </>
@@ -2100,7 +2104,7 @@ function Preview({ input }: { input: PreviewInput }) {
  * Asks the server for a version after the one shown. The server holds each
  * request until there is one, answering 204 when there is none in time.
  */
-function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => void): () => void {
+function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => void, onExpired: () => void): () => void {
   if (!first.updatesUrl) return () => {};
   const stop = new AbortController();
   let version = first.version ?? 1;
@@ -2113,7 +2117,7 @@ function followUpdates(first: PreviewInput, onUpdate: (input: PreviewInput) => v
         // pageFetch: a request the server lets time out is not a failed load to warn about.
         const tag = held.codeTag ? `&code=${encodeURIComponent(held.codeTag)}` : "";
         const res = await pageFetch(`${first.updatesUrl}${version}${tag}`, { signal: stop.signal, cache: "no-store" });
-        if (res.status === 404) return;
+        if (res.status === 404) return onExpired();
         if (res.status === 200) {
           const got = ((await res.json()) as { input?: Omit<PreviewInput, "code"> & { code?: string } }).input;
           // Without `code`, the update changed something else and the code is the one held.
@@ -2141,6 +2145,7 @@ const ASSET_BURST_MS = 1500;
 
 function Live({ first }: { first: PreviewInput }) {
   const [input, setInput] = useState(first);
+  const [expired, setExpired] = useState(false);
   useEffect(() => {
     if (shot) return;
     let latest = first;
@@ -2152,13 +2157,13 @@ function Live({ first }: { first: PreviewInput }) {
       clearTimeout(timer);
       if (wait) timer = setTimeout(() => setInput(next), ASSET_BURST_MS);
       else setInput(next);
-    });
+    }, () => setExpired(true));
     return () => {
       clearTimeout(timer);
       stop();
     };
   }, [first]);
-  return <Preview input={input} />;
+  return <Preview input={input} expired={expired} />;
 }
 
 const input = window.__PREVIEW_INPUT__;

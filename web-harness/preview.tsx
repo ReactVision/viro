@@ -380,12 +380,21 @@ async function loadFeed(base: string): Promise<Feed> {
   const kept = loadedFeeds.get(base);
   if (kept) return kept;
   const get = async (file: string) => {
-    const r = await pageFetch(`${base}/${file}`);
-    if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `The recording did not load (HTTP ${r.status}).`);
-    return r;
+    for (;;) {
+      const r = await pageFetch(`${base}/${file}`);
+      // 202: still being prepared. The server holds each request for a while before saying so.
+      if (r.status === 202) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `The recording did not load (HTTP ${r.status}).`);
+      return r;
+    }
   };
+  // The track first: once it is ready, so is the video.
+  const track = await get("track.json").then((r) => r.json());
   // A blob: URL, since the page reads the video's frames back and its opaque origin makes the route's URL cross-origin.
-  const [track, video] = await Promise.all([get("track.json").then((r) => r.json()), get("video.mp4").then((r) => r.blob())]);
+  const video = await get("video.mp4").then((r) => r.blob());
   const { size, intrinsics, intrinsicsSize, ...rest } = track;
   const loaded = { source: { ...rest, intrinsics: intrinsics ?? undefined, intrinsicsSize: intrinsicsSize ?? undefined, videoUrl: URL.createObjectURL(video) }, size };
   loadedFeeds.set(base, loaded);

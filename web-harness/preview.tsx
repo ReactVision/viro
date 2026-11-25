@@ -928,6 +928,44 @@ const settingStyle: React.CSSProperties = { display: "flex", flexDirection: "col
 const oneLine: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
 const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
+function Toggle({ label, on, onFlip }: { label: string; on: boolean; onFlip: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-label={label}
+      aria-checked={on}
+      onClick={onFlip}
+      style={{
+        position: "relative",
+        flex: "none",
+        width: 36,
+        height: 20,
+        padding: 0,
+        borderRadius: 10,
+        border: "none",
+        cursor: "pointer",
+        background: on ? "#e8e8ee" : "rgba(255,255,255,0.2)",
+        transition: "background 0.15s",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 18 : 2,
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: on ? "#16161b" : "#e8e8ee",
+          transition: "left 0.15s, background 0.15s",
+        }}
+      />
+    </button>
+  );
+}
+
 // A native select draws its arrow against the border and is as wide as its longest option;
 // this draws the arrow inside the padding and, where fieldSizing is supported, fits the selected one.
 // With `flex` in its style it fills its row instead.
@@ -1986,11 +2024,7 @@ function Chrome({
                 {arSceneListeners.size && !feed ? (
                   <label style={{ ...settingStyle, flexDirection: "row", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                     Floor grid
-                    <input
-                      type="checkbox"
-                      checked={gridOn}
-                      onChange={flipGrid}
-                    />
+                    <Toggle label="Floor grid" on={gridOn} onFlip={flipGrid} />
                   </label>
                 ) : null}
                 {cameraControls ? (

@@ -920,21 +920,30 @@ export function InspectPanel({
       <canvas ref={wire} aria-hidden="true" width={0} height={0} style={{ position: "fixed", left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
       <div style={{ ...popup, width: 340, fontSize: 13 }}>
         {header}
-        <div
-          style={{ fontSize: 12, opacity: 0.8 }}
-          title="The frame rate is this browser's. The rest is the last frame, with the grid, shadow passes and render targets counted; texture memory is an estimate."
-        >
-          {frame
-            ? [
-                fps ? `${fps} fps` : "",
-                `${fmt(frame.draws)} draw calls`,
-                `${fmt(frame.triangles)} triangles`,
-                textures.bytes ? `about ${mb(textures.bytes)} of textures, the largest ${fmt(textures.dimension)} px` : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : "Waiting for a frame..."}
-        </div>
+        {frame ? (
+          <div
+            style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr)", gap: 6 }}
+            title="The frame rate is this browser's. The rest is the last frame, with the grid, shadow passes and render targets counted; texture memory is an estimate."
+          >
+            {[
+              { label: "FPS", value: fps === null ? "..." : String(fps) },
+              { label: "Draw calls", value: fmt(frame.draws) },
+              { label: "Triangles", value: fmt(frame.triangles) },
+              { label: "Textures", value: textures.bytes ? mb(textures.bytes) : "0 MB", note: textures.dimension ? `largest ${fmt(textures.dimension)} px` : "" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, padding: "8px 4px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", gap: 2 }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 600, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stat.value}</div>
+                <div style={{ fontSize: 11, opacity: 0.65, lineHeight: 1.25 }}>{stat.label}</div>
+                {stat.note ? <div style={{ fontSize: 11, opacity: 0.65, lineHeight: 1.25 }}>{stat.note}</div> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, opacity: 0.8 }}>Waiting for a frame...</div>
+        )}
         {rows.length === 0 ? <div style={{ opacity: 0.7 }}>No nodes yet.</div> : null}
         <div role="listbox" aria-label="Nodes" style={{ display: "flex", flexDirection: "column" }}>
           {shown.map((r) => {

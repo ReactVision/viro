@@ -720,6 +720,54 @@ function markerAt(scene: ViroSceneApi, row: Row): Vec3 | null {
   return origin ? [origin[0] + at[0], origin[1] + at[1], origin[2] + at[2]] : null;
 }
 
+/** What the panel lists about the selected row, as label and value pairs. Read on each render, so it follows a moving node. */
+function detailsOf(scene: ViroSceneApi, row: Row, model: Row | undefined): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  const add = (label: string, value: string | undefined | false) => value && out.push([label, value]);
+  if (row.part) {
+    add("Path", row.part.path);
+    add("Triangles", fmt(row.part.triangles));
+    add("Materials", row.part.materials.join(", ") || "None named");
+    add("Model", model?.detail);
+    return out;
+  }
+  if (row.light) {
+    const p = row.light.props;
+    add("Color", typeof p.color === "string" ? p.color : p.color !== undefined ? `#${p.color.toString(16).padStart(6, "0")}` : undefined);
+    add("Intensity", p.intensity !== undefined ? String(p.intensity) : undefined);
+    add("Position", row.light.type === ViroLightType.Omni || row.light.type === ViroLightType.Spot ? vec(p.position ?? [0, 0, 0]) : undefined);
+    add("Direction", row.light.type === ViroLightType.Directional || row.light.type === ViroLightType.Spot ? vec(p.direction ?? [0, 0, -1]) : undefined);
+    add("Casts shadow", p.castsShadow ? "Yes" : undefined);
+    return out;
+  }
+  const t = scene.getNodeWorldTransform(row.handle);
+  add("Position", t ? vec(t.position) : undefined);
+  // The decomposition can answer [180, b, 180], the same turn as [0, 180 - b, 0] in virocore's Z·Y·X order.
+  const rot = t && Math.abs(t.rotation[0]) > 179.99 && Math.abs(t.rotation[2]) > 179.99 ? [0, ((((180 - t.rotation[1] + 180) % 360) + 360) % 360) - 180, 0] : t?.rotation;
+  add("Rotation", rot && rot.some((r) => Math.abs(r) > 0.005) ? `${vec(rot)} deg` : undefined);
+  add("Scale", t && t.scale.some((c) => Math.abs(c - 1) > 0.005) ? vec(t.scale) : undefined);
+  const b = outlineOf(scene, row);
+  add("Bounds", b ? `${[b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ].map((n) => +n.toFixed(2)).join(" x ")} m` : undefined);
+  const entries = viroNodeEntries(scene);
+  const props = (entries.get(row.handle)?.props() ?? {}) as Record<string, unknown>;
+  let hiddenBy: "self" | "parent" | null = props.visible === false ? "self" : null;
+  for (let h = entries.get(row.handle)?.parent; !hiddenBy && h !== undefined && entries.has(h); h = entries.get(h)!.parent) {
+    if (entries.get(h)!.props().visible === false) hiddenBy = "parent";
+  }
+  add("Visible", hiddenBy === "self" ? "No" : hiddenBy === "parent" ? "No, a node above it is hidden" : undefined);
+  add("Opacity", typeof props.opacity === "number" && props.opacity < 1 ? String(props.opacity) : undefined);
+  const materials = props.materials;
+  add("Materials", typeof materials === "string" ? materials : Array.isArray(materials) && materials.length ? materials.join(", ") : undefined);
+  const anim = props.animation as { name?: unknown; run?: unknown; loop?: unknown } | undefined;
+  if (anim && typeof anim.name === "string") add("Animation", `${anim.name}, ${anim.run ? "running" : "not running"}${anim.loop ? ", looping" : ""}`);
+  const events = Object.keys(props).filter((k) => /^on[A-Z]/.test(k) && k !== "onNodeHandle" && typeof props[k] === "function");
+  add("Events", events.join(", "));
+  add("Drag", typeof props.dragType === "string" ? props.dragType : undefined);
+  const body = props.physicsBody as { type?: unknown } | undefined;
+  add("Physics", body && typeof body.type === "string" ? body.type : undefined);
+  return out;
+}
+
 /** The sentence the assistant gets for a selected row; `model` is a part's model. */
 function selectionText(row: Row, model: Row | undefined, at: Vec3 | null, budgets: ModelBudget[], scene: string | undefined): string {
   const lead = `In the Viro Live preview${scene ? ` of ${scene}` : ""}, the developer selected`;
@@ -945,7 +993,7 @@ export function InspectPanel({
           <div style={{ fontSize: 12, opacity: 0.8 }}>Waiting for a frame...</div>
         )}
         {rows.length === 0 ? <div style={{ opacity: 0.7 }}>No nodes yet.</div> : null}
-        <div role="listbox" aria-label="Nodes" style={{ display: "flex", flexDirection: "column" }}>
+        <div role="listbox" aria-label="Nodes" style={{ display: "flex", flexDirection: "column", flex: "none", maxHeight: "min(360px, 45vh)", overflowY: "auto" }}>
           {shown.map((r) => {
             const on = r.id === selected?.id;
             return (
@@ -971,6 +1019,16 @@ export function InspectPanel({
             );
           })}
         </div>
+        {row && inspected ? (
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8, display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", columnGap: 12, rowGap: 3, fontSize: 12 }}>
+            {detailsOf(inspected.scene, row, model).map(([label, value]) => (
+              <React.Fragment key={label}>
+                <span style={{ opacity: 0.6 }}>{label}</span>
+                <span style={{ overflowWrap: "anywhere" }}>{value}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        ) : null}
         {models.length ? (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 6, display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
             {models.map((m) => {

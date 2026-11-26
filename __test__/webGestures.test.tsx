@@ -23,7 +23,7 @@ jest.mock("../components/Web/ViroWebContext", () => ({
 import * as React from "react";
 import { act } from "react";
 import TestRenderer from "react-test-renderer";
-import { useViroNode, type ViroWebNodeHandle, type ViroWebNodeProps } from "../components/Web/useViroNode";
+import { useViroNode, useViroSceneEvents, type ViroWebNodeHandle, type ViroWebNodeProps } from "../components/Web/useViroNode";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -85,6 +85,24 @@ describe("pinch, rotate and fuse on the web", () => {
     mount({ onPinch: jest.fn(), onFuse: jest.fn() });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("onPinch"));
     warn.mockRestore();
+  });
+});
+
+describe("scene-level gestures on the web", () => {
+  function SceneProbe(props: ViroWebNodeProps) {
+    useViroSceneEvents(props);
+    return null;
+  }
+
+  it("gives the scene root its timeToFuse, and switches every gesture off on unmount", () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(<SceneProbe onPinch={jest.fn()} onRotate={jest.fn()} onFuse={{ callback: jest.fn(), timeToFuse: 500 }} />);
+    });
+    expect(mockSceneBase.setNodeTimeToFuse).toHaveBeenCalledWith(0, 500);
+    act(() => tree.unmount());
+    const off = mockSceneBase.setNodeEventEnabled.mock.calls.filter((c: any[]) => c[2] === false).map((c: any[]) => c[1]);
+    expect(off).toEqual(expect.arrayContaining([9, 10, 11]));
   });
 });
 

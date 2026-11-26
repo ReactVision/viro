@@ -202,7 +202,7 @@ function makeRequireShim(assetOverrides: Record<string, string> | undefined) {
     if (MODEL_RE.test(specifier)) return { uri: `${override ?? PLACEHOLDER_MODEL_URL}${MODEL_MARK}${encodeURIComponent(specifier)}` };
     if (override) return { uri: override };
     const ext = specifier.split(".").pop()?.toLowerCase() ?? "";
-    if (["png", "jpg", "jpeg", "webp"].includes(ext)) return { uri: checkerUrl };
+    if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) return { uri: checkerUrl };
     if (["mp3", "wav", "m4a", "ogg", "mp4", "mov", "webm"].includes(ext)) {
       pushWarning(`Skipped local media asset "${specifier}" — no placeholder audio/video.`);
       return null;

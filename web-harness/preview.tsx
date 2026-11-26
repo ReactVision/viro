@@ -372,6 +372,8 @@ type Feed = { source: ArPlaybackSource; size: { width: number; height: number } 
 let feed: Feed | null = null;
 // Loading, or why the chosen recording cannot play.
 let feedNote: string | null = null;
+// Since when the chosen recording has been loading. The server may be preparing others first.
+let feedLoadingSince = 0;
 let feedPlaying = false;
 const loadedFeeds = new Map<string, Feed>();
 // Recordings kept loaded, so switching back is instant; each holds its whole video in memory.
@@ -380,12 +382,21 @@ async function loadFeed(base: string): Promise<Feed> {
   const kept = loadedFeeds.get(base);
   if (kept) return kept;
   const get = async (file: string) => {
-    const r = await pageFetch(`${base}/${file}`);
-    if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `The recording did not load (HTTP ${r.status}).`);
-    return r;
+    for (;;) {
+      const r = await pageFetch(`${base}/${file}`);
+      // 202: still being prepared. The server holds each request for a while before saying so.
+      if (r.status === 202) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `The recording did not load (HTTP ${r.status}).`);
+      return r;
+    }
   };
+  // The track first: once it is ready, so is the video.
+  const track = await get("track.json").then((r) => r.json());
   // A blob: URL, since the page reads the video's frames back and its opaque origin makes the route's URL cross-origin.
-  const [track, video] = await Promise.all([get("track.json").then((r) => r.json()), get("video.mp4").then((r) => r.blob())]);
+  const video = await get("video.mp4").then((r) => r.blob());
   const { size, intrinsics, intrinsicsSize, ...rest } = track;
   const loaded = { source: { ...rest, intrinsics: intrinsics ?? undefined, intrinsicsSize: intrinsicsSize ?? undefined, videoUrl: URL.createObjectURL(video) }, size };
   loadedFeeds.set(base, loaded);
@@ -562,7 +573,8 @@ function chooseSurroundings(key: Surroundings, restart: () => void, changed: () 
     if (wasFeed) restart();
   };
   const base = ROOMS[key]!.recording;
-  feedNote = base ? "Loading the recording..." : null;
+  feedNote = base ? "Preparing the recording..." : null;
+  feedLoadingSince = base ? performance.now() : 0;
   setSurroundings(key);
   if (!base) return leaveFeed();
   loadFeed(base).then(
@@ -570,6 +582,7 @@ function chooseSurroundings(key: Surroundings, restart: () => void, changed: () 
       if (surroundings !== key) return;
       feed = loaded;
       feedNote = null;
+      feedLoadingSince = 0;
       applyARDefaults();
       restart();
       changed();
@@ -577,6 +590,7 @@ function chooseSurroundings(key: Surroundings, restart: () => void, changed: () 
     (e: unknown) => {
       if (surroundings !== key) return;
       feedNote = e instanceof Error ? e.message : String(e);
+      feedLoadingSince = 0;
       leaveFeed();
       changed();
     },
@@ -928,6 +942,44 @@ const roundButton: React.CSSProperties = { ...button, width: 34, height: 34, pad
 const settingStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: 13, opacity: 0.9 };
 const oneLine: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
 const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+
+function Toggle({ label, on, onFlip }: { label: string; on: boolean; onFlip: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-label={label}
+      aria-checked={on}
+      onClick={onFlip}
+      style={{
+        position: "relative",
+        flex: "none",
+        width: 36,
+        height: 20,
+        padding: 0,
+        borderRadius: 10,
+        border: "none",
+        cursor: "pointer",
+        background: on ? "#e8e8ee" : "rgba(255,255,255,0.2)",
+        transition: "background 0.15s",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 18 : 2,
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: on ? "#16161b" : "#e8e8ee",
+          transition: "left 0.15s, background 0.15s",
+        }}
+      />
+    </button>
+  );
+}
 
 // A native select draws its arrow against the border and is as wide as its longest option;
 // this draws the arrow inside the padding and, where fieldSizing is supported, fits the selected one.
@@ -1700,7 +1752,7 @@ function Chrome({
         seen.current = key;
         postStatus();
         tick((n) => n + 1);
-      } else if (modelDownloads.size || modelRetries.size || renderState.loading.length || shownDownloads.current) {
+      } else if (modelDownloads.size || modelRetries.size || renderState.loading.length || shownDownloads.current || feedLoadingSince) {
         tick((n) => n + 1);
       }
       if (!renderState.loading.length) loadingSince = 0;
@@ -1731,6 +1783,9 @@ function Chrome({
   const downloading = !!downloads && downloads.count > downloads.done;
   // Parsing a large model takes seconds with nothing downloading; a quick one is not worth a chip.
   const preparing = !downloading && loadingSince && performance.now() - loadingSince > 1000 ? renderState.loading.length : 0;
+  // A recording already loaded comes back at once, so not worth a chip.
+  const feedWait = feedLoadingSince ? performance.now() - feedLoadingSince : 0;
+  const feedWaiting = feedWait > 1000;
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       {/* On a narrow view the name gives way first, then the buttons wrap. */}
@@ -1858,8 +1913,10 @@ function Chrome({
           Drop the file to replace its placeholder
         </div>
       ) : null}
-      {(downloads || preparing) && !dropping ? (
+      {(downloads || preparing || feedWaiting) && !dropping ? (
         <div role="status" style={{ ...chip, alignSelf: "center", display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
+          {feedWaiting ? <div style={{ fontWeight: 600 }}>Preparing the recording...</div> : null}
+          {feedWait > 15_000 ? <div style={{ opacity: 0.75 }}>This can take a couple of minutes.</div> : null}
           {downloading ? (
             <div style={{ fontWeight: 600 }}>
               Loading {downloads!.count} {downloads!.count === 1 ? "model" : "models"}
@@ -1872,7 +1929,7 @@ function Chrome({
             </div>
           ) : null}
           {downloads?.retrying.length ? <div style={{ color: "#ffd27a" }}>A download failed. Retrying {downloads.retrying.join(", ")}...</div> : null}
-          {downloading || preparing ? <ActivityBar /> : null}
+          {downloading || preparing || feedWaiting ? <ActivityBar /> : null}
         </div>
       ) : null}
       {waitingSelectors.size && !dropping && !renderState.error ? (
@@ -1982,11 +2039,7 @@ function Chrome({
                 {arSceneListeners.size && !feed ? (
                   <label style={{ ...settingStyle, flexDirection: "row", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                     Floor grid
-                    <input
-                      type="checkbox"
-                      checked={gridOn}
-                      onChange={flipGrid}
-                    />
+                    <Toggle label="Floor grid" on={gridOn} onFlip={flipGrid} />
                   </label>
                 ) : null}
                 {cameraControls ? (

@@ -1,12 +1,12 @@
 /**
  * The preview page's scene inspector: the Viro nodes the scene made, where
- * each one is written, a marker over the one selected, and what the GPU drew
+ * each one is written, an outline of the one selected, and what the GPU drew
  * in the last frame. Selecting a node tells the developer's assistant which
  * one they mean, through the host that runs the page.
  */
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ViroLightType, type ViroHandle, type ViroSceneApi, type ViroWebRenderer } from "@reactvision/viro-web-renderer";
+import { ViroLightType, type ViroBoundingBox, type ViroHandle, type ViroSceneApi, type ViroWebRenderer } from "@reactvision/viro-web-renderer";
 
 import { useViroRenderer } from "../components/Web/ViroWebContext";
 import { viroLightEntries, type ViroWebLightProps } from "../components/Web/useViroLight";
@@ -427,7 +427,10 @@ export function contentFraming(): { center: Vec3; distance: number } | null {
   return { center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2], distance: radius / halfField };
 }
 
-function project(view: CameraView, p: [number, number, number]): { x: number; y: number } | null {
+// Points closer to the camera than this, or behind it, have no place on screen.
+const NEAR = -0.01;
+
+function toCamera(view: CameraView, p: Vec3): Vec3 {
   // World to camera: the inverse of the orientation rayAt turns a pointer ray by.
   const [qx, qy, qz, qw] = view.orientation;
   const d = [p[0] - view.position[0], p[1] - view.position[1], p[2] - view.position[2]];
@@ -435,10 +438,47 @@ function project(view: CameraView, p: [number, number, number]): { x: number; y:
   const tx = 2 * (y * d[2]! - z * d[1]!);
   const ty = 2 * (z * d[0]! - x * d[2]!);
   const tz = 2 * (x * d[1]! - y * d[0]!);
-  const v = [d[0]! + qw * tx + (y * tz - z * ty), d[1]! + qw * ty + (z * tx - x * tz), d[2]! + qw * tz + (x * ty - y * tx)];
-  if (v[2]! > -0.01) return null;
+  return [d[0]! + qw * tx + (y * tz - z * ty), d[1]! + qw * ty + (z * tx - x * tz), d[2]! + qw * tz + (x * ty - y * tx)];
+}
+
+const toScreen = (view: CameraView, rect: DOMRect, v: Vec3) => ({ x: rect.left + view.cx + (view.fx * v[0]) / -v[2], y: rect.top + view.cy - (view.fy * v[1]) / -v[2] });
+
+function project(view: CameraView, p: Vec3): { x: number; y: number } | null {
+  const v = toCamera(view, p);
+  return v[2] > NEAR ? null : toScreen(view, view.element.getBoundingClientRect(), v);
+}
+
+/** The box's 12 edges as an SVG path in page pixels, each cut where it passes behind the camera. */
+function boxPath(view: CameraView, b: ViroBoundingBox, dx: number, dy: number): string {
   const rect = view.element.getBoundingClientRect();
-  return { x: rect.left + view.cx + (view.fx * v[0]!) / -v[2]!, y: rect.top + view.cy - (view.fy * v[1]!) / -v[2]! };
+  const corners = Array.from({ length: 8 }, (_, i) =>
+    toCamera(view, [i & 1 ? b.maxX : b.minX, i & 2 ? b.maxY : b.minY, i & 4 ? b.maxZ : b.minZ]),
+  );
+  let path = "";
+  for (let i = 0; i < 8; i++) {
+    for (const bit of [1, 2, 4]) {
+      if (i & bit) continue;
+      let a = corners[i]!;
+      let c = corners[i | bit]!;
+      if (a[2] > NEAR && c[2] > NEAR) continue;
+      if (a[2] > NEAR) [a, c] = [c, a];
+      if (c[2] > NEAR) {
+        const t = (NEAR - a[2]) / (c[2] - a[2]);
+        c = [a[0] + t * (c[0] - a[0]), a[1] + t * (c[1] - a[1]), NEAR];
+      }
+      const from = toScreen(view, rect, a);
+      const to = toScreen(view, rect, c);
+      path += `M${(from.x - dx).toFixed(1)} ${(from.y - dy).toFixed(1)}L${(to.x - dx).toFixed(1)} ${(to.y - dy).toFixed(1)}`;
+    }
+  }
+  return path;
+}
+
+/** A node's box and what is under it, in world space. Null for a node with nothing drawn in it, which gets the marker instead. */
+function outlineOf(scene: ViroSceneApi, row: Row): ViroBoundingBox | null {
+  if (row.kind !== "node" || typeof scene.getNodeBoundingBox !== "function") return null;
+  const b = scene.getNodeBoundingBox(row.handle);
+  return b && Math.max(b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ) > 1e-4 ? b : null;
 }
 
 const isIdentity = (v: unknown, one: number) => !Array.isArray(v) || v.every((n) => n === one);
@@ -547,6 +587,7 @@ export function InspectPanel({
   const [copied, setCopied] = useState(false);
   const [mounts, setMounts] = useState(inspectedMounts);
   const marker = useRef<HTMLDivElement>(null);
+  const outline = useRef<SVGSVGElement>(null);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const shown = withParts(rows, selected?.id);
@@ -589,9 +630,11 @@ export function InspectPanel({
       if (sampleFrame()) frames++;
       const sel = selectedRef.current;
       const el = marker.current;
+      const svg = outline.current;
       const view = inspected && cameraView(inspected.scene);
       const selRow = sel ? shownRef.current.find((r) => r.id === sel.id) : undefined;
-      const at = selRow && inspected ? markerAt(inspected.scene, selRow) : null;
+      const box = selRow && inspected ? outlineOf(inspected.scene, selRow) : null;
+      const at = selRow && inspected && !box ? markerAt(inspected.scene, selRow) : null;
       const pos = view && at ? project(view, at) : null;
       if (el) {
         el.style.display = pos ? "block" : "none";
@@ -601,6 +644,12 @@ export function InspectPanel({
           const origin = el.getBoundingClientRect();
           el.style.transform = `translate(${pos.x - origin.left - 14}px, ${pos.y - origin.top - 14}px)`;
         }
+      }
+      if (svg) {
+        const origin = svg.getBoundingClientRect();
+        const path = view && box ? boxPath(view, box, origin.left, origin.top) : "";
+        svg.style.display = path ? "block" : "none";
+        for (const line of svg.children) line.setAttribute("d", path);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -634,6 +683,14 @@ export function InspectPanel({
         aria-hidden="true"
         style={{ position: "fixed", left: 0, top: 0, width: 24, height: 24, borderRadius: "50%", border: "2px solid #4cc2ff", boxShadow: "0 0 0 2px rgba(0,0,0,0.5), 0 0 12px #4cc2ff", display: "none", pointerEvents: "none" }}
       />
+      <svg
+        ref={outline}
+        aria-hidden="true"
+        style={{ position: "fixed", left: 0, top: 0, width: "100%", height: "100%", overflow: "visible", display: "none", pointerEvents: "none" }}
+      >
+        <path fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={3.5} strokeLinejoin="round" />
+        <path fill="none" stroke="#4cc2ff" strokeWidth={1.5} strokeLinejoin="round" />
+      </svg>
       <div style={{ ...popup, width: 340, fontSize: 13 }}>
         {header}
         <div

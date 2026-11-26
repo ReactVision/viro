@@ -7,7 +7,7 @@
  * default camera), and a drag turns pointer positions into world rays itself.
  */
 import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
-import { quatFromEulerDegrees } from "./viroMath";
+import { conjugateQuat, multiplyQuats, quatFromEulerDegrees, rotateByQuaternion } from "./viroMath";
 import { activeSceneCamera, sceneCameraFieldOfView, sceneCameraOrthographic } from "./viroSceneCameras";
 
 export { activateSceneCamera, installDefaultCamera, setSceneCameraFieldOfView, setSceneCameraOrthographic } from "./viroSceneCameras";
@@ -269,6 +269,33 @@ export function parentSpace(origin: Vec3, x: Vec3, y: Vec3, z: Vec3): ((world: V
   return (world) => {
     const d = sub(world, origin);
     return [dot(rows[0]!, d) / det, dot(rows[1]!, d) / det, dot(rows[2]!, d) / det];
+  };
+}
+
+/**
+ * World to local for a node whose parent's world origin is `origin`, given that
+ * parent and its ancestors nearest first, each with its Euler degrees and
+ * scale: their authored props. The drag's stand-in until the parent has been
+ * drawn. A non-uniform scale under a rotation is not exact.
+ */
+export function authoredParentSpace(
+  origin: readonly number[],
+  ancestors: readonly { rotation?: readonly number[]; scale?: readonly number[] }[],
+): (world: Vec3) => Vec3 {
+  let rotation: Quat = [0, 0, 0, 1];
+  const size: Vec3 = [1, 1, 1];
+  for (const a of ancestors) {
+    rotation = multiplyQuats(quatFromEulerDegrees(a.rotation ?? [0, 0, 0]), rotation);
+    const s = a.scale ?? [1, 1, 1];
+    size[0] *= s[0] || 1;
+    size[1] *= s[1] || 1;
+    size[2] *= s[2] || 1;
+  }
+  const inverse = conjugateQuat(rotation);
+  const o: Vec3 = [origin[0] ?? 0, origin[1] ?? 0, origin[2] ?? 0];
+  return (world) => {
+    const v = rotateByQuaternion(inverse, sub(world, o));
+    return [v[0] / size[0], v[1] / size[1], v[2] / size[2]];
   };
 }
 

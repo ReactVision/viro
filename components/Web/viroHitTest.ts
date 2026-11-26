@@ -1,8 +1,9 @@
 /**
- * AR hit tests in native's result shape (ViroARHitTestResult). The web tracker
- * reports planes only, so every hit is on one: "ExistingPlaneUsingExtent" inside
- * the plane's detected rectangle, "ExistingPlane" on its extension beyond it.
- * The web session's own fields stay beside native's for code written against those.
+ * AR hit tests in native's result shape (ViroARHitTestResult). A hit on a plane
+ * is "ExistingPlaneUsingExtent" inside the plane's detected rectangle and
+ * "ExistingPlane" on its extension beyond it; a hit on one of the tracker's
+ * feature points is "FeaturePoint", as ARKit's is. The web session's own fields
+ * stay beside native's for code written against those.
  */
 import type { ArHitResult, ArPlaneAnchor } from "@reactvision/viro-web-renderer";
 import type { ViroARHitTestResult } from "../Types/ViroEvents";
@@ -24,6 +25,19 @@ export function planeHitResult(plane: ArPlaneAnchor, position: Vec3, distance: n
     anchorId: plane.id,
     position: [...position] as Vec3,
     normal: [...plane.normal] as Vec3,
+    distance,
+  };
+}
+
+/** A hit on one of the tracker's feature points: a position, no surface or anchor. */
+export function featurePointHitResult(position: Vec3, distance: number, normal: Vec3): ViroPlaneHit {
+  return {
+    type: "FeaturePoint",
+    transform: { position: [...position] as Vec3, rotation: [0, 0, 0], scale: [1, 1, 1] },
+    hasDepthData: false,
+    anchorId: "",
+    position: [...position] as Vec3,
+    normal: [...normal] as Vec3,
     distance,
   };
 }

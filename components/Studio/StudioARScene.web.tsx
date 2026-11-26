@@ -110,11 +110,11 @@ export type StudioPlacementApi = {
 
 /**
  * The surface a tap lands on, or null: the native host's rule. Hits come
- * nearest first, and a hit inside a plane's detected rectangle beats one on its
- * extension.
+ * nearest first; a hit inside a plane's detected rectangle beats one on its
+ * extension, and either beats a feature point. The web has no depth points.
  */
 function pickBestHit(results: ViroARHitTestResult[]): { position: Vec3 } | null {
-  for (const type of ["ExistingPlaneUsingExtent", "ExistingPlane"]) {
+  for (const type of ["ExistingPlaneUsingExtent", "ExistingPlane", "FeaturePoint"]) {
     const hit = results.find((r) => r.type === type);
     if (hit) return { position: hit.transform.position as Vec3 };
   }

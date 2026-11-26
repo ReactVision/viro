@@ -61,6 +61,7 @@ import {
   replaceScene,
   type WebSceneEntry,
 } from "../Web/webSceneStack";
+import { webRendererStartMessage } from "../Web/viroStartError";
 
 type SceneEntry = { scene: React.ComponentType<any>; passProps?: Record<string, unknown> };
 
@@ -91,6 +92,8 @@ type Props = {
   viroAppProps?: any;
   /** WASM renderer asset-loading options (bundler/ESM). See Viro3DSceneNavigator.web. */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
+  /** Web only: the renderer could not start. See Viro3DSceneNavigator.web. */
+  onWebRendererError?: (error: unknown) => void;
   /**
    * URL to the tracking engine's glue (tinyvio-slam.js), injected as a <script>.
    *
@@ -259,6 +262,7 @@ export function ViroARSceneNavigator(props: Props) {
   const [started, setStarted] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rendererFailed, setRendererFailed] = useState(false);
   const [tracking, setTracking] = useState<ViroTrackingState>(ViroTrackingState.Unavailable);
   const [trackingReason, setTrackingReason] = useState<TrackingReason>(TrackingReason.None);
   const [motionMissing, setMotionMissing] = useState(false);
@@ -291,7 +295,10 @@ export function ViroARSceneNavigator(props: Props) {
         setRenderer(created);
       } catch (err) {
         console.error("[Viro web AR] failed to initialize renderer:", err);
-        setError("Could not initialize the renderer.");
+        if (cancelled) return;
+        setError(webRendererStartMessage(err));
+        setRendererFailed(true);
+        props.onWebRendererError?.(err);
       }
     })();
     return () => {
@@ -568,15 +575,19 @@ export function ViroARSceneNavigator(props: Props) {
       ) : (
         <div style={overlayStyle}>
           {error ? <div style={{ color: "#ff8080" }}>{error}</div> : null}
-          <div>{props.startLabel ?? "AR needs access to your camera."}</div>
-          <button
-            type="button"
-            style={buttonStyle}
-            disabled={!renderer || starting}
-            onClick={startAR}
-          >
-            {starting ? "Starting…" : "Start AR"}
-          </button>
+          {rendererFailed ? null : (
+            <>
+              <div>{props.startLabel ?? "AR needs access to your camera."}</div>
+              <button
+                type="button"
+                style={buttonStyle}
+                disabled={!renderer || starting}
+                onClick={startAR}
+              >
+                {starting ? "Starting…" : "Start AR"}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

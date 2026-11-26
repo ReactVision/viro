@@ -78,7 +78,10 @@ export interface StudioSceneNavigatorWebProps {
   /** slam-wasm loading for AR mode (see ViroARSceneNavigator.web). */
   slamScriptUrl?: string;
   onSceneReady?: () => void;
-  /** A scene failed to load or navigate. */
+  /**
+   * A scene failed to load or navigate, or the renderer could not start (a
+   * ViroWebGLUnavailableError when the browser has no WebGL2).
+   */
   onError?: (err: Error) => void;
   /**
    * An asset's model, image or video failed to load. The scene carries on
@@ -130,7 +133,7 @@ export interface StudioSceneNavigatorWebProps {
   noAssetsMessage?: string;
   loadingView?: React.ReactNode;
   /**
-   * UI for a failed scene load, a renderer abort or a caught render error, as on
+   * UI for a failed scene load, a renderer that could not start or aborted, or a caught render error, as on
    * native. `retry` refetches after a failed load and re-mounts the scene
    * otherwise.
    */
@@ -413,6 +416,14 @@ export const StudioSceneNavigator = forwardRef<
     }),
     [webRendererOptions],
   );
+  // The renderer never started (no WebGL2, most often): reported like a failed load.
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const handleRendererStartError = useCallback((err: unknown) => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    setError(e);
+    onErrorRef.current?.(e);
+  }, []);
 
   const applyScene = useCallback((next: StudioSceneResponse) => {
     setSceneData(next);
@@ -538,6 +549,7 @@ export const StudioSceneNavigator = forwardRef<
             initialScene={STUDIO_SCENE}
             viroAppProps={sceneProps}
             webRendererOptions={rendererOptions}
+            onWebRendererError={handleRendererStartError}
             slamScriptUrl={slamScriptUrl}
             arOptions={{ detectPlanes: true, ...arOptions }}
             onSessionReady={handleSessionReady}
@@ -549,6 +561,7 @@ export const StudioSceneNavigator = forwardRef<
             initialScene={STUDIO_SCENE}
             viroAppProps={sceneProps}
             webRendererOptions={rendererOptions}
+            onWebRendererError={handleRendererStartError}
             {...STUDIO_RENDERER_EFFECTS}
           />
         )}

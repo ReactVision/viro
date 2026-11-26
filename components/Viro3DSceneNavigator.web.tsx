@@ -36,6 +36,7 @@ import {
   type WebSceneEntry,
 } from "./Web/webSceneStack";
 import { attachVirtualCamera3D, type ViroVirtualCameraOptions } from "./Web/viroVirtualCamera";
+import { ViroWebStartError, webRendererStartMessage } from "./Web/viroStartError";
 
 type Props = {
   initialScene: { scene: React.ComponentType<any>; passProps?: Record<string, unknown> };
@@ -46,6 +47,11 @@ type Props = {
    * assetBaseUrl. Omit for direct-ESM hosting where the package self-resolves.
    */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
+  /**
+   * Web only: the renderer could not start, e.g. no WebGL2 (a
+   * ViroWebGLUnavailableError). The navigator also shows a message over the canvas.
+   */
+  onWebRendererError?: (error: unknown) => void;
   /**
    * Web only: the mouse or two fingers move the point of view (see
    * viroVirtualCamera.ts), until the scene makes one of its own ViroCameras
@@ -84,6 +90,7 @@ export function Viro3DSceneNavigator(props: Props) {
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const generation = useViroContextRestore(renderer, () => {
     setRenderer(null);
@@ -103,10 +110,14 @@ export function Viro3DSceneNavigator(props: Props) {
           created.dispose();
           return;
         }
+        setStartError(null);
         setRootNode(created.scene.getRootNode());
         setRenderer(created);
       } catch (err) {
         console.error("[Viro web] failed to initialize renderer:", err);
+        if (cancelled) return;
+        setStartError(webRendererStartMessage(err));
+        props.onWebRendererError?.(err);
       }
     })();
     return () => {
@@ -186,6 +197,7 @@ export function Viro3DSceneNavigator(props: Props) {
           </ViroParentNodeContext.Provider>
         </ViroRendererContext.Provider>
       ) : null}
+      <ViroWebStartError message={startError} />
     </div>
   );
 }

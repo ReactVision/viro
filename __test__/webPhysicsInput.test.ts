@@ -10,6 +10,7 @@ import {
   dragFollower,
   activateSceneCamera,
   parentSpace,
+  authoredParentSpace,
   rayAt,
   releaseVelocity,
   screenPointOf,
@@ -171,5 +172,17 @@ describe("collision router", () => {
     fire({ tag: a.key, otherTag: b.key, point: [0, 0, 0], normal: [0, 1, 0] });
     expect(onHit).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe("authoredParentSpace", () => {
+  it("undoes a turned, scaled parent from its authored props", () => {
+    // Parent at (1, 0, 0), turned +90 degrees about Y and scaled 2.
+    const toLocal = authoredParentSpace([1, 0, 0], [{ rotation: [0, 90, 0], scale: [2, 2, 2] }]);
+    // Its local +X points to world -Z, two metres per unit.
+    const local = toLocal([1, 0, -2]);
+    expect(local[0]).toBeCloseTo(1);
+    expect(local[1]).toBeCloseTo(0);
+    expect(local[2]).toBeCloseTo(0);
   });
 });

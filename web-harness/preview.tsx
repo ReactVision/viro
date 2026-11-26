@@ -376,6 +376,8 @@ let feedNote: string | null = null;
 let feedLoadingSince = 0;
 let feedPlaying = false;
 const loadedFeeds = new Map<string, Feed>();
+// Recordings kept loaded, so switching back is instant; each holds its whole video in memory.
+const KEPT_FEEDS = 3;
 async function loadFeed(base: string): Promise<Feed> {
   const kept = loadedFeeds.get(base);
   if (kept) return kept;
@@ -398,6 +400,13 @@ async function loadFeed(base: string): Promise<Feed> {
   const { size, intrinsics, intrinsicsSize, ...rest } = track;
   const loaded = { source: { ...rest, intrinsics: intrinsics ?? undefined, intrinsicsSize: intrinsicsSize ?? undefined, videoUrl: URL.createObjectURL(video) }, size };
   loadedFeeds.set(base, loaded);
+  // Let the oldest go, other than the one playing, and its video with it.
+  for (const [key, kept] of loadedFeeds) {
+    if (loadedFeeds.size <= KEPT_FEEDS) break;
+    if (kept === feed || key === base) continue;
+    URL.revokeObjectURL(kept.source.videoUrl);
+    loadedFeeds.delete(key);
+  }
   return loaded;
 }
 
@@ -420,7 +429,13 @@ function playFeed(session: ViroArSession) {
     while (i + 1 < frames.length && frames[i + 1]!.t <= t) i++;
     if (i !== shown) {
       // False once the session has stopped.
-      if (!(await session.renderPlaybackFrame(i).catch(() => false))) return;
+      if (!(await session.renderPlaybackFrame(i).catch(() => false))) {
+        if (!stopped) {
+          feedPlaying = false;
+          cameraListeners.forEach((l) => l());
+        }
+        return;
+      }
       shown = i;
     }
     setTimeout(step, 4);

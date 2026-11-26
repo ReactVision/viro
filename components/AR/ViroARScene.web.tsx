@@ -11,6 +11,9 @@
  * when there is no session. onCameraARHitTest runs the point test from the
  * middle of the view every frame.
  *
+ * onARPointCloudUpdate and displayPointCloud read the tracker's feature points
+ * (viroPointCloud), and hit tests return them as "FeaturePoint" results.
+ *
  * MVP scope: plane anchors only (slam has no image/object anchors).
  */
 import * as React from "react";
@@ -43,7 +46,12 @@ import { useViroSceneEvents } from "../Web/useViroNode";
 import { useViroLightEstimate, type ViroWebAmbientLight } from "../Web/viroLightEstimate";
 import { cameraView, rayAt } from "../Web/viroDrag";
 import { activeSceneCamera } from "../Web/viroSceneCameras";
-import { hitTestPlanes, planeHitResult, type ViroPlaneHit } from "../Web/viroHitTest";
+import { featurePointHitResult, hitTestPlanes, planeHitResult, type ViroPlaneHit } from "../Web/viroHitTest";
+import {
+  useViroPointCloud,
+  type ViroWebDisplayPointCloud,
+  type ViroWebPointCloud,
+} from "../Web/viroPointCloud";
 import {
   cameraOrientation,
   cameraOrientationAsync,
@@ -91,6 +99,10 @@ type Props = {
   /** grayscale, sepia, sincity, ... in order; they need HDR, as on native. */
   postProcessEffects?: string[];
   physicsWorld?: ViroPhysicsWorldProp;
+  /** The tracker's feature points each frame, once its scale is metric. */
+  onARPointCloudUpdate?: (pointCloud: ViroWebPointCloud) => void;
+  /** Draw the feature points as particles; imageSource replaces the default dot. */
+  displayPointCloud?: ViroWebDisplayPointCloud;
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -151,6 +163,7 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   useViroLightEstimate(session, props.onAmbientLightUpdate);
   useViroCameraTransform(props.onCameraTransformUpdate);
   useViroSceneEvents(props);
+  useViroPointCloud(session, renderer.scene, props.onARPointCloudUpdate, props.displayPointCloud);
 
   // Read latest callbacks from a ref so effects don't re-run on identity change.
   const propsRef = useRef(props);
@@ -232,8 +245,14 @@ export const ViroARScene = forwardRef<ViroARSceneHandle, Props>(function ViroARS
   const hitAt = (x: number, y: number): ViroPlaneHit[] => {
     const { width, height } = renderer.canvasSize;
     if (session) {
+      // From the device's view even under a ViroCamera, unlike the ray and
+      // position tests below: native's point test goes through ARKit or ARCore
+      // from the device frame too.
       const byId = new Map(planes().map((p) => [p.id, p]));
       return session.hitTest(x, y, width, height).flatMap((hit) => {
+        if ((hit as { kind?: string }).kind === "featurePoint") {
+          return [{ ...hit, ...featurePointHitResult(hit.position, hit.distance, hit.normal) }];
+        }
         const plane = byId.get(hit.anchorId);
         return plane ? [{ ...planeHitResult(plane, hit.position, hit.distance), ...hit }] : [];
       });

@@ -140,6 +140,9 @@ export type ViroMaterial = {
   specularTexture?: any; // TODO: types
   normalTexture?: any; // TODO: types
   reflectiveTexture?: ViroCubeMap;
+  /** Light the surface gives off itself, added after lighting. */
+  emissionTexture?: any; // TODO: types
+  emissionColor?: ColorValue;
   diffuseColor?: ColorValue;
   chromaKeyFilteringColor?: ColorValue;
   wrapS?: "Clamp" | "Repeat" | "Mirror";

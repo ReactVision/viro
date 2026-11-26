@@ -12,6 +12,7 @@ import { useViroRenderer } from "../components/Web/ViroWebContext";
 import { viroLightEntries, type ViroWebLightProps } from "../components/Web/useViroLight";
 import { viroNodeEntries } from "../components/Web/useViroNode";
 import { cameraView, type CameraView } from "../components/Web/viroDrag";
+import { quatFromEulerDegrees, rotateByQuaternion } from "../components/Web/viroMath";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { VIRO_SOURCE_PROP, type ViroSource } from "./sceneModule";
 
@@ -156,10 +157,44 @@ function sampleFrame(): boolean {
 
 // ─── Model sizes ──────────────────────────────────────────────────────────
 /** `textureDimension` is 0 when no texture's size could be read. */
-type ModelSize = { triangles: number; textureBytes: number; textureDimension: number; parts: ModelPart[]; partsLeftOut: number };
-/** A node of the model's own tree that holds a mesh, or holds nodes that do. `triangles` counts its whole subtree. */
-type ModelPart = { name: string; path: string; depth: number; triangles: number; materials: string[] };
+type ModelSize = {
+  triangles: number;
+  textureBytes: number;
+  textureDimension: number;
+  parts: ModelPart[];
+  partsLeftOut: number;
+  /** Each mesh node's triangle edges, by glTF node index. */
+  wires: Map<number, Wire>;
+  /** Why some or all of the triangles cannot be drawn. */
+  wireMissing?: string;
+};
+/** A node of the model's own tree that holds a mesh, or holds nodes that do. `triangles` counts its whole subtree, `nodes` lists its mesh nodes. */
+type ModelPart = { name: string; path: string; depth: number; triangles: number; materials: string[]; nodes: number[] };
+/** A mesh node's vertices at rest, in the model's own space, and its triangles as vertex index triples. `mirrored` flips which side faces out. */
+type Wire = { positions: Float32Array; triangles: Uint32Array; mirrored: boolean };
 const MAX_PARTS = 300;
+// Past this the edges would take too long to draw every frame.
+const MAX_WIRE_TRIANGLES = 100_000;
+
+type Mat4 = number[];
+const IDENTITY: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+function mul(a: Mat4, b: Mat4): Mat4 {
+  const o = new Array<number>(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) o[c * 4 + r] = a[r]! * b[c * 4]! + a[4 + r]! * b[c * 4 + 1]! + a[8 + r]! * b[c * 4 + 2]! + a[12 + r]! * b[c * 4 + 3]!;
+  return o;
+}
+function nodeMatrix(n: { matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }): Mat4 {
+  if (n.matrix?.length === 16) return n.matrix;
+  const [x, y, z, w] = n.rotation ?? [0, 0, 0, 1];
+  const [sx, sy, sz] = n.scale ?? [1, 1, 1];
+  const [tx, ty, tz] = n.translation ?? [0, 0, 0];
+  return [
+    (1 - 2 * (y! * y! + z! * z!)) * sx!, 2 * (x! * y! + z! * w!) * sx!, 2 * (x! * z! - y! * w!) * sx!, 0,
+    2 * (x! * y! - z! * w!) * sy!, (1 - 2 * (x! * x! + z! * z!)) * sy!, 2 * (y! * z! + x! * w!) * sy!, 0,
+    2 * (x! * z! + y! * w!) * sz!, 2 * (y! * z! - x! * w!) * sz!, (1 - 2 * (x! * x! + y! * y!)) * sz!, 0,
+    tx!, ty!, tz!, 1,
+  ];
+}
 const modelSizes = new Map<string, ModelSize | null>();
 
 /**
@@ -167,16 +202,18 @@ const modelSizes = new Map<string, ModelSize | null>();
  * mesh's TRIANGLES primitives once, the bytes of its embedded images, and the
  * longest side among its PNGs (a JPEG's size is not read there either).
  */
-function gltfSize(buf: ArrayBuffer): ModelSize | null {
+async function gltfSize(buf: ArrayBuffer, url: string): Promise<ModelSize | null> {
   let doc: {
     meshes?: Array<{ name?: string; primitives?: Array<{ mode?: number; indices?: number; material?: number; attributes?: { POSITION?: number } }> }>;
-    nodes?: Array<{ name?: string; mesh?: number; children?: number[] }>;
+    nodes?: Array<{ name?: string; mesh?: number; skin?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }>;
+    skins?: Array<{ joints?: number[]; inverseBindMatrices?: number }>;
+    buffers?: Array<{ uri?: string }>;
     scenes?: Array<{ nodes?: number[] }>;
     scene?: number;
     materials?: Array<{ name?: string }>;
-    accessors?: Array<{ count?: number }>;
+    accessors?: Array<{ count?: number; bufferView?: number; byteOffset?: number; componentType?: number; type?: string; sparse?: unknown }>;
     images?: Array<{ mimeType?: string; bufferView?: number }>;
-    bufferViews?: Array<{ byteOffset?: number; byteLength?: number }>;
+    bufferViews?: Array<{ buffer?: number; byteOffset?: number; byteLength?: number; byteStride?: number }>;
   };
   let bin: DataView | null = null;
   try {
@@ -221,7 +258,7 @@ function gltfSize(buf: ArrayBuffer): ModelSize | null {
   let partsLeftOut = 0;
   const seen = new Set<number>();
   // Returns the subtree's triangles, or -1 when it holds no mesh.
-  const visit = (i: number, depth: number, trail: string[]): number => {
+  const visit = (i: number, depth: number, trail: string[], meshNodes: number[]): number => {
     const node = doc.nodes?.[i];
     if (!node || seen.has(i)) return -1;
     seen.add(i);
@@ -234,12 +271,13 @@ function gltfSize(buf: ArrayBuffer): ModelSize | null {
       depth,
       triangles: 0,
       materials: [...new Set((mesh?.primitives ?? []).map((p) => doc.materials?.[p.material ?? -1]?.name).filter((m): m is string => !!m))],
+      nodes: mesh ? [i] : [],
     };
     const at = parts.length;
     if (at < MAX_PARTS) parts.push(part);
     let total = mesh ? meshTriangles(mesh) : -1;
     for (const child of node.children ?? []) {
-      const t = visit(child, depth + 1, path);
+      const t = visit(child, depth + 1, path, part.nodes);
       if (t >= 0) total = Math.max(total, 0) + t;
     }
     if (total < 0) {
@@ -248,22 +286,122 @@ function gltfSize(buf: ArrayBuffer): ModelSize | null {
     }
     if (at >= MAX_PARTS) partsLeftOut++;
     part.triangles = total;
+    meshNodes.push(...part.nodes);
     return total;
   };
   const childOf = new Set((doc.nodes ?? []).flatMap((n) => n.children ?? []));
   const roots = doc.scenes?.[doc.scene ?? 0]?.nodes ?? (doc.nodes ?? []).map((_, i) => i).filter((i) => !childOf.has(i));
-  for (const root of roots) visit(root, 0, []);
-  return { triangles, textureBytes, textureDimension, parts, partsLeftOut };
+  for (const root of roots) visit(root, 0, [], []);
+  const { wires, missing } = triangles > MAX_WIRE_TRIANGLES ? { wires: new Map(), missing: `it has more than ${fmt(MAX_WIRE_TRIANGLES)} triangles` } : await gltfWires(doc, bin, url, roots);
+  return { triangles, textureBytes, textureDimension, parts, partsLeftOut, wires, wireMissing: missing };
+}
+
+/**
+ * Each mesh node's TRIANGLES primitives at rest, placed in the model's space as
+ * virocore places them: through the node's ancestors, or for a skinned mesh
+ * through its first joint and that joint's inverse bind matrix.
+ */
+async function gltfWires(
+  doc: {
+    meshes?: Array<{ primitives?: Array<{ mode?: number; indices?: number; attributes?: { POSITION?: number } }> }>;
+    nodes?: Array<{ mesh?: number; skin?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }>;
+    skins?: Array<{ joints?: number[]; inverseBindMatrices?: number }>;
+    buffers?: Array<{ uri?: string }>;
+    accessors?: Array<{ count?: number; bufferView?: number; byteOffset?: number; componentType?: number; type?: string; sparse?: unknown }>;
+    bufferViews?: Array<{ buffer?: number; byteOffset?: number; byteLength?: number; byteStride?: number }>;
+  },
+  bin: DataView | null,
+  url: string,
+  roots: number[],
+): Promise<{ wires: Map<number, Wire>; missing?: string }> {
+  const wires = new Map<number, Wire>();
+  let missing: string | undefined;
+  const buffers = await Promise.all(
+    (doc.buffers ?? []).map(async (b, i): Promise<DataView | null> => {
+      try {
+        if (!b.uri) return i === 0 ? bin : null;
+        const res = await fetch(new URL(b.uri, new URL(url, location.href)).href);
+        return res.ok ? new DataView(await res.arrayBuffer()) : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const view = (accessor: number | undefined, type: string, componentType: number) => {
+    const a = doc.accessors?.[accessor ?? -1];
+    const bv = doc.bufferViews?.[a?.bufferView ?? -1];
+    const data = buffers[bv?.buffer ?? -1];
+    if (!a || !bv || !data || a.sparse || a.type !== type || (componentType && a.componentType !== componentType)) return null;
+    const size = { SCALAR: 1, VEC3: 3, MAT4: 16 }[type]! * (a.componentType === 5121 ? 1 : a.componentType === 5123 ? 2 : 4);
+    const stride = bv.byteStride || size;
+    const start = (bv.byteOffset ?? 0) + (a.byteOffset ?? 0);
+    const count = a.count ?? 0;
+    if (count && start + (count - 1) * stride + size > data.byteLength) return null;
+    return { a, data, start, stride, count };
+  };
+  const worlds = new Map<number, Mat4>();
+  const place = (i: number, parent: Mat4) => {
+    const node = doc.nodes?.[i];
+    if (!node || worlds.has(i)) return;
+    const world = mul(parent, nodeMatrix(node));
+    worlds.set(i, world);
+    for (const child of node.children ?? []) place(child, world);
+  };
+  for (const root of roots) place(root, IDENTITY);
+  for (const [i, world] of worlds) {
+    const node = doc.nodes![i]!;
+    const mesh = doc.meshes?.[node.mesh ?? -1];
+    if (!mesh) continue;
+    let m = world;
+    const skin = doc.skins?.[node.skin ?? -1];
+    const joint = skin?.joints?.[0];
+    if (skin && joint !== undefined && worlds.has(joint)) {
+      const ibm = view(skin.inverseBindMatrices, "MAT4", 5126);
+      m = mul(worlds.get(joint)!, ibm ? Array.from({ length: 16 }, (_, k) => ibm.data.getFloat32(ibm.start + k * 4, true)) : IDENTITY);
+    }
+    const positions: number[] = [];
+    const triangles: number[] = [];
+    for (const p of mesh.primitives ?? []) {
+      if ((p.mode ?? 4) !== 4) continue;
+      const pos = view(p.attributes?.POSITION, "VEC3", 5126);
+      const idx = p.indices === undefined ? null : view(p.indices, "SCALAR", 0);
+      if (!pos || (p.indices !== undefined && (!idx || ![5121, 5123, 5125].includes(idx.a.componentType ?? 0)))) {
+        missing = "its geometry is compressed or could not be read";
+        continue;
+      }
+      const base = positions.length / 3;
+      for (let v = 0; v < pos.count; v++) {
+        const at = pos.start + v * pos.stride;
+        const x = pos.data.getFloat32(at, true), y = pos.data.getFloat32(at + 4, true), z = pos.data.getFloat32(at + 8, true);
+        positions.push(m[0]! * x + m[4]! * y + m[8]! * z + m[12]!, m[1]! * x + m[5]! * y + m[9]! * z + m[13]!, m[2]! * x + m[6]! * y + m[10]! * z + m[14]!);
+      }
+      const index = (k: number) => {
+        if (!idx) return k;
+        const at = idx.start + k * idx.stride;
+        return idx.a.componentType === 5121 ? idx.data.getUint8(at) : idx.a.componentType === 5123 ? idx.data.getUint16(at, true) : idx.data.getUint32(at, true);
+      };
+      const n = idx ? idx.count : pos.count;
+      for (let t = 0; t + 2 < n; t += 3) {
+        const tri = [index(t), index(t + 1), index(t + 2)];
+        if (tri.every((v) => v < pos.count)) triangles.push(base + tri[0]!, base + tri[1]!, base + tri[2]!);
+      }
+    }
+    const det = m[0]! * (m[5]! * m[10]! - m[9]! * m[6]!) - m[4]! * (m[1]! * m[10]! - m[9]! * m[2]!) + m[8]! * (m[1]! * m[6]! - m[5]! * m[2]!);
+    if (triangles.length) wires.set(i, { positions: new Float32Array(positions), triangles: new Uint32Array(triangles), mirrored: det < 0 });
+  }
+  return { wires, missing };
 }
 
 /** Measures a loaded model from the response the scene fetched it with. */
 export function noteModelResponse(url: string, res: Response): void {
   // Measured once: a remounted scene asks for the same models again.
   if (!res.ok || modelSizes.has(url) || !/\.(glb|gltf)$/i.test(url.split(/[?#]/)[0]!)) return;
+  modelSizes.set(url, null);
   res
     .clone()
     .arrayBuffer()
-    .then((buf) => modelSizes.set(url, gltfSize(buf)))
+    .then((buf) => gltfSize(buf, url))
+    .then((size) => modelSizes.set(url, size))
     .catch(() => {});
 }
 
@@ -474,6 +612,89 @@ function boxPath(view: CameraView, b: ViroBoundingBox, dx: number, dy: number): 
   return path;
 }
 
+/** The triangle edges of a selected model part, drawn over the page in page pixels. Empties the canvas when there is nothing to draw. */
+function drawWire(canvas: HTMLCanvasElement, view: CameraView | null, scene: ViroSceneApi | undefined, row: Row | undefined, model: ModelSize | null | undefined): void {
+  const wires = row?.part && model ? row.part.nodes.map((n) => model.wires.get(n)).filter((w): w is Wire => !!w) : [];
+  const t = view && wires.length ? scene?.getNodeWorldTransform(row!.handle) : null;
+  if (!view || !t) {
+    if (canvas.width) canvas.width = canvas.height = 0;
+    return;
+  }
+  // Model space to camera space is affine, so it is read off where the model's origin and axes land.
+  const q = quatFromEulerDegrees(t.rotation);
+  const point = (axis: Vec3) => {
+    const r = rotateByQuaternion(q, [axis[0] * t.scale[0], axis[1] * t.scale[1], axis[2] * t.scale[2]]);
+    return toCamera(view, [t.position[0] + r[0], t.position[1] + r[1], t.position[2] + r[2]]);
+  };
+  const o = point([0, 0, 0]);
+  const [ex, ey, ez] = ([[1, 0, 0], [0, 1, 0], [0, 0, 1]] as Vec3[]).map((a) => point(a).map((c, k) => c - o[k]!)) as [Vec3, Vec3, Vec3];
+  const rect = view.element.getBoundingClientRect();
+  const page = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.round(page.width * dpr);
+  const height = Math.round(page.height * dpr);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  // Measured, not assumed, as for the marker: the canvas may sit in a transformed stage.
+  ctx.setTransform(dpr, 0, 0, dpr, -page.left * dpr, -page.top * dpr);
+  ctx.beginPath();
+  const segment = (a: Vec3, c: Vec3) => {
+    if (a[2] > NEAR && c[2] > NEAR) return;
+    if (a[2] > NEAR) [a, c] = [c, a];
+    if (c[2] > NEAR) {
+      const f = (NEAR - a[2]) / (c[2] - a[2]);
+      c = [a[0] + f * (c[0] - a[0]), a[1] + f * (c[1] - a[1]), NEAR];
+    }
+    const from = toScreen(view, rect, a);
+    const to = toScreen(view, rect, c);
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+  };
+  const flipped = t.scale[0] * t.scale[1] * t.scale[2] < 0;
+  for (const w of wires) {
+    const n = w.positions.length / 3;
+    const cam = new Float32Array(n * 3);
+    const screen = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      const x = w.positions[i * 3]!, y = w.positions[i * 3 + 1]!, z = w.positions[i * 3 + 2]!;
+      for (let k = 0; k < 3; k++) cam[i * 3 + k] = o[k]! + ex[k]! * x + ey[k]! * y + ez[k]! * z;
+      const p = toScreen(view, rect, [cam[i * 3]!, cam[i * 3 + 1]!, cam[i * 3 + 2]!]);
+      screen[i * 2] = p.x;
+      screen[i * 2 + 1] = p.y;
+    }
+    const at = (i: number): Vec3 => [cam[i * 3]!, cam[i * 3 + 1]!, cam[i * 3 + 2]!];
+    const front = w.mirrored === flipped ? 1 : -1;
+    for (let k = 0; k < w.triangles.length; k += 3) {
+      const a = w.triangles[k]!, b = w.triangles[k + 1]!, c = w.triangles[k + 2]!;
+      if (cam[a * 3 + 2]! > NEAR || cam[b * 3 + 2]! > NEAR || cam[c * 3 + 2]! > NEAR) {
+        // Partly behind the camera: its edges are cut there, and which way it faces is not checked.
+        segment(at(a), at(b));
+        segment(at(b), at(c));
+        segment(at(c), at(a));
+        continue;
+      }
+      const ax = screen[a * 2]!, ay = screen[a * 2 + 1]!;
+      const bx = screen[b * 2]!, by = screen[b * 2 + 1]!;
+      const cx = screen[c * 2]!, cy = screen[c * 2 + 1]!;
+      // Counter-clockwise in front of the camera turns clockwise on a screen whose y runs down.
+      if (front * ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) >= 0) continue;
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+    }
+  }
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(76,194,255,0.6)";
+  ctx.stroke();
+}
+
 /** A node's box and what is under it, in world space. Null for a node with nothing drawn in it, which gets the marker instead. */
 function outlineOf(scene: ViroSceneApi, row: Row): ViroBoundingBox | null {
   if (row.kind !== "node" || typeof scene.getNodeBoundingBox !== "function") return null;
@@ -588,6 +809,7 @@ export function InspectPanel({
   const [mounts, setMounts] = useState(inspectedMounts);
   const marker = useRef<HTMLDivElement>(null);
   const outline = useRef<SVGSVGElement>(null);
+  const wire = useRef<HTMLCanvasElement>(null);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const shown = withParts(rows, selected?.id);
@@ -651,6 +873,10 @@ export function InspectPanel({
         svg.style.display = path ? "block" : "none";
         for (const line of svg.children) line.setAttribute("d", path);
       }
+      if (wire.current) {
+        const model = selRow?.part ? shownRef.current.find((r) => r.id === selRow.id.split("#")[0])?.size : undefined;
+        drawWire(wire.current, view, inspected?.scene, selRow, model);
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -691,6 +917,7 @@ export function InspectPanel({
         <path fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={3.5} strokeLinejoin="round" />
         <path fill="none" stroke="#4cc2ff" strokeWidth={1.5} strokeLinejoin="round" />
       </svg>
+      <canvas ref={wire} aria-hidden="true" width={0} height={0} style={{ position: "fixed", left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
       <div style={{ ...popup, width: 340, fontSize: 13 }}>
         {header}
         <div
@@ -762,6 +989,9 @@ export function InspectPanel({
           </button>
         ) : null}
         {text && onSelection ? <div style={{ fontSize: 12, opacity: 0.75 }}>Your assistant knows which node you selected.</div> : null}
+        {row?.part && expanded?.size?.wireMissing ? (
+          <div style={{ fontSize: 12, color: "#ffd27a" }}>Some triangles of this model are not drawn: {expanded.size.wireMissing}.</div>
+        ) : null}
         <div style={{ fontSize: 11, opacity: 0.6 }}>Select a glTF or GLB model to list the parts inside it.</div>
       </div>
     </>

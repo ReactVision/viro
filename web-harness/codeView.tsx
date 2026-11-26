@@ -7,6 +7,8 @@ const LINE = 18;
 // Kept for the page's life, so files an update changed are marked the next time the panel opens too.
 let last: Source | null = null;
 let changed = new Set<string>();
+// Loaded when the panel first opens, so the page that never shows code does not fetch it.
+let highlighter: typeof import("./codeHighlight") | null = null;
 
 const folderOf = (p: string) => p.slice(0, p.lastIndexOf("/") + 1);
 
@@ -97,7 +99,24 @@ export function CodePanel({
     if (found) goTo({ path: found, line: goto.line }, "find");
   }, [source, goto]);
 
+  const [, loaded] = useState(!!highlighter);
+  useEffect(() => {
+    if (highlighter) return;
+    let live = true;
+    import("./codeHighlight").then(
+      (m) => {
+        highlighter = m;
+        if (live) loaded(true);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
   const text = source && path ? source.files[path] ?? "" : "";
+  const colored = useMemo(() => (highlighter && path ? highlighter.highlight(text, path) : null), [text, path, highlighter]);
   const lines = useMemo(() => text.split("\n").length, [text]);
   const at = source ? errorLocation(error, source.files) : null;
 
@@ -218,7 +237,7 @@ export function CodePanel({
                 {mark && mark.line <= lines ? (
                   <div style={{ position: "absolute", left: 0, right: 0, top: 8 + (mark.line - 1) * LINE, height: LINE, background: mark.tone === "error" ? "rgba(255,155,155,0.15)" : "rgba(76,194,255,0.18)" }} />
                 ) : null}
-                <pre style={{ ...mono, position: "relative", padding: "8px 12px", userSelect: "text" }}>{text}</pre>
+                <pre style={{ ...mono, position: "relative", padding: "8px 12px", userSelect: "text", color: colored ? "#d4d4d4" : undefined }}>{colored ?? text}</pre>
               </div>
             </div>
           </div>

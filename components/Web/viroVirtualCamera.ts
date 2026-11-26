@@ -119,6 +119,8 @@ type CameraSink = {
   pose(position: Vec3, orientation: Quat, pitch: number, yaw: number): void;
   /** False while something else is the point of view: input then stands aside. */
   driving(): boolean;
+  /** Registers what to call when the sink starts driving after standing aside. */
+  onDriving?(start: () => void): void;
   /** An AR pose, which turns whatever camera draws (see CameraView.ar). */
   ar?: true;
   detach(): void;
@@ -173,9 +175,15 @@ export function attachVirtualCamera3D(
   scene.addChildNode(root, node);
   let yielded = sceneCameraActive(scene);
   if (!yielded) scene.setActiveCameraNode(node);
+  // A scene can start on its own ViroCamera (its effect runs before this one),
+  // so the controls may only be handed over once that camera lets go.
+  let started: (() => void) | null = null;
   const stop = onSceneCameraChange(scene, () => {
     yielded = sceneCameraActive(scene);
-    if (!yielded) scene.setActiveCameraNode(node);
+    if (!yielded) {
+      scene.setActiveCameraNode(node);
+      started?.();
+    }
   });
   const detach = attachOrbit(scene, element, options, {
     size(w, h, fieldOfView) {
@@ -189,6 +197,9 @@ export function attachVirtualCamera3D(
       scene.setNodeRotation(node, pitch, yaw, 0);
     },
     driving: () => !yielded,
+    onDriving(start) {
+      started = start;
+    },
     detach() {
       stop();
       scene.removeNodeFromParent(node);
@@ -470,7 +481,16 @@ function attachOrbit(
     fieldOfView = degrees;
     sizeCamera();
   };
-  if (sink.driving()) options.onReady?.({ reset, lookFrom, pose, setFieldOfView });
+  // Once, the first time this camera drives: at attach, or when a scene camera
+  // that was active at attach is released.
+  let readied = false;
+  const ready = () => {
+    if (readied || !sink.driving()) return;
+    readied = true;
+    options.onReady?.({ reset, lookFrom, pose, setFieldOfView });
+  };
+  sink.onDriving?.(ready);
+  ready();
 
   return () => {
     setCameraView(scene, null);

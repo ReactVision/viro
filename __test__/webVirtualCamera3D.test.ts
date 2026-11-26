@@ -61,6 +61,20 @@ describe("attachVirtualCamera3D", () => {
     detach();
   });
 
+  it("hands over its controls once the scene's starting camera lets go", () => {
+    const { scene } = fakeScene();
+    const release = activateSceneCamera(scene, 7);
+    const ready = jest.fn();
+    const detach = attachVirtualCamera3D(scene, 1, element, { onReady: ready });
+    expect(ready).not.toHaveBeenCalled();
+    release();
+    expect(ready).toHaveBeenCalledTimes(1);
+    // Only the first time it drives.
+    activateSceneCamera(scene, 8)();
+    expect(ready).toHaveBeenCalledTimes(1);
+    detach();
+  });
+
   it("starts aside when the scene's camera is already active", () => {
     const { scene, calls } = fakeScene();
     activateSceneCamera(scene, 7);

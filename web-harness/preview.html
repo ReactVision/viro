@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Viro Live</title>
+    <!-- The renderer asks for these two only after two scripts have loaded. -->
+    <link rel="preload" as="fetch" crossorigin href="./wasm/viro-web.wasm" />
+    <link rel="preload" as="fetch" crossorigin href="./wasm/viro-web.data" />
     <style>
       /* Dark scrollbars and form controls in every panel. */
       html { color-scheme: dark; }

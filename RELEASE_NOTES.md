@@ -1,25 +1,22 @@
 # Release Notes
 
-## v3.2.3
+## v3.3.0
 
-**Viro on the web closes most of the gaps from the web-vs-native parity review: scene-wide events and `ViroController`, portals with their own backgrounds, per-face materials, animated images, full particle and physics support, post-process effects, capture on every navigator, and AR plane detection on by default. A .gltf with external files loads instead of aborting the page. On Android, a minified release build no longer crashes at launch in WorkManager's database.** The web build needs `@reactvision/viro-web-renderer` 1.3.0; iOS and Android binaries are unchanged from 3.2.2 apart from one new header setter.
-
-### Web
-
-- **Navigators:** `project` / `unproject` on all three, `sceneNavigator` and `arSceneNavigator` on their refs, `recenterTracking`, and `takeScreenshot` plus video recording, which Studio's TAKE_PHOTO and RECORD_VIDEO now use. `ViroVRSceneNavigator` renders in mono.
-- **Events:** scene-level click, hover, pinch, rotate and fuse; `onTransformUpdate`; `ignoreEventHandling`; `ViroController` reports scene-wide input; a tap on empty space reports `[]`.
-- **Animation:** chains, sequences, parallels and aliases survive `registerAnimations`; `run` pauses and resumes; `onFinish` fires every pass; `color` and `material` animate.
-- **Materials, geometry and media:** model `materials`, per-face material arrays, submeshes, primitive options (UVs, segments, holes), `arShadowReceiver`, animated images, `stereoMode`, `placeholderSource`, skybox `color`, `isHdr`, and media seek, buffering and time events.
-- **Portals, physics, particles and lights:** per-portal backgrounds and enter/exit events; collision queries, held forces, `drawBounds` and impulse torque; every particle emitter prop; `shadowOrthographicPosition`.
-- **AR:** plane detection on by default, tracking reasons, plane classification and `pauseUpdates`, `anchorDetectionTypes` and `onCameraARHitTest`. The camera feed is cropped to fill the screen instead of stretched.
-- **Permissions:** `checkPermissions` and `requestRequiredPermissions` answer camera, microphone and location; the microphone works after a `ViroSound` on Safari.
-- **Studio:** scenes sit in the error boundary with retry, and MANUAL plane detection mounts the plane selector.
+**On Android, materials take `emissionColor`, `emissionTexture` and `reflectiveTexture` as on iOS, and a `reflectiveTexture` no longer crashes the app. On the web, AR surfaces are in metres from the first one and keep their ids through a tracking loss, the tracker's point cloud reaches `onARPointCloudUpdate` and `displayPointCloud`, hit tests return feature points, the 3D navigators take an opt-in virtual camera, cameras take a field of view, materials take emission and reflection, and a browser without WebGL2 gets a message instead of a blank canvas.** The web build needs `@reactvision/viro-web-renderer` 1.4.0. iOS behaves as in 3.2.3.
 
 ### Android
 
-- **A minified release build no longer crashes at launch** with `Failed to create an instance of class androidx.work.impl.WorkDatabase`. Viro's consumer rules keep the constructor Room creates WorkManager's database through.
+- **`emissionColor`, `emissionTexture` and `reflectiveTexture` on a material work,** as on iOS. The first two threw "Invalid color/texture property", and the reflective cube map was loaded and dropped.
+- **A material with a `reflectiveTexture` no longer crashes the app** (`Unable to find "uri" key`).
+
+### Web
+
+- **AR:** surfaces in metres and stable through a tracking loss; `onARPointCloudUpdate` and `displayPointCloud`; `FeaturePoint` hit results, which Studio's web player falls back to; `TRACKING_LIMITED` with its reason while tracking still holds; dragging and hit tests under a scene `ViroCamera`.
+- **Navigators:** `virtualCamera` on `ViroSceneNavigator` and `Viro3DSceneNavigator`; `onWebRendererError`, and a message over the canvas when the renderer cannot start.
+- **Cameras and materials:** `fieldOfView` on `ViroCamera`; `emissionColor`, `emissionTexture` and `reflectiveTexture`.
+- **Images and models:** GIFs play without `ImageDecoder`; `ViroSpinner`'s images load in any bundler; a GLB loads as a GLB whatever `type` it is given.
 
 ### Check when upgrading
 
-- **Web: install `@reactvision/viro-web-renderer` 1.3.0** (the peer range is now `^1.3.0`) and copy its whole `wasm/` folder. With 1.2.0 the new features stay off and a one-time warning names what is missing.
-- **Android on Expo SDK 58:** build a minified release APK and open it on a device before shipping; this release removes the WorkManager crash an R8 build hit at launch.
+- **Web: install `@reactvision/viro-web-renderer` 1.4.0** (the peer range is now `^1.4.0`) and copy its whole `wasm/` and `slam/` folders. With 1.3.0 the new features stay off and a one-time warning names what is missing.
+- **Materials with an `emissionTexture`** also need an `emissionColor`, on every platform: the texture scales it, and it is black by default.

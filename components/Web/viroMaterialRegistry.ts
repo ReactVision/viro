@@ -6,7 +6,8 @@
  *
  * Supports color, lighting model, scalar properties (shininess/fresnel/
  * roughness/metalness/cull/blend/depth/alpha/bloom), colour write mask, chroma
- * key, and textures (diffuse + PBR maps).
+ * key, emission colour, and textures (diffuse, PBR maps, emission and the
+ * reflective cube map).
  * Textures load asynchronously and are applied when ready.
  */
 import type { ViroSceneApi, ViroHandle, ViroShaderEntryPoint } from "@reactvision/viro-web-renderer";
@@ -211,25 +212,66 @@ function applyShaderModifiers(scene: ViroSceneApi, material: ViroHandle, def: Vi
   }
 }
 
-function applyTextures(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
-  const wrapS = wrapValue(def.wrapS as string | undefined);
-  const wrapT = wrapValue(def.wrapT as string | undefined);
-  const minF = filterValue(def.minificationFilter as string | undefined);
-  const magF = filterValue(def.magnificationFilter as string | undefined);
-  const mipF = filterValue(def.mipFilter as string | undefined);
+function applyTexture(
+  scene: ViroSceneApi,
+  material: ViroHandle,
+  def: ViroWebMaterialDef,
+  key: string,
+  channel: ViroTextureChannel,
+  sRGB: boolean,
+) {
+  const url = resolveImageSource(def[key]);
+  if (!url) return;
+  loadImageRGBA(url)
+    .then((img) => {
+      const tex = scene.createTextureRGBA(img.pixels, img.width, img.height, sRGB);
+      scene.setTextureWrap(tex, wrapValue(def.wrapS as string | undefined), wrapValue(def.wrapT as string | undefined));
+      scene.setTextureFilter(
+        tex,
+        filterValue(def.minificationFilter as string | undefined),
+        filterValue(def.magnificationFilter as string | undefined),
+        filterValue(def.mipFilter as string | undefined),
+      );
+      scene.setMaterialTexture(material, channel, tex);
+    })
+    .catch((err) => console.warn(`[Viro web] texture "${key}" failed:`, err));
+}
 
-  for (const [key, channel, sRGB] of TEXTURE_CHANNELS) {
-    const url = resolveImageSource(def[key]);
-    if (!url) continue;
-    loadImageRGBA(url)
-      .then((img) => {
-        const tex = scene.createTextureRGBA(img.pixels, img.width, img.height, sRGB);
-        scene.setTextureWrap(tex, wrapS, wrapT);
-        scene.setTextureFilter(tex, minF, magF, mipF);
-        scene.setMaterialTexture(material, channel, tex);
-      })
-      .catch((err) => console.warn(`[Viro web] texture "${key}" failed:`, err));
+function applyTextures(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  for (const [key, channel, sRGB] of TEXTURE_CHANNELS) applyTexture(scene, material, def, key, channel, sRGB);
+}
+
+const CUBE_FACES = ["px", "nx", "py", "ny", "pz", "nz"] as const;
+
+// Emission and the reflective cube map, which renderer 1.3.0 and earlier cannot set.
+function applyEmissionAndReflection(scene: ViroSceneApi, material: ViroHandle, def: ViroWebMaterialDef) {
+  const emission = def.emissionColor as string | number | null | undefined;
+  const cube = def.reflectiveTexture as Record<string, unknown> | null | undefined;
+  const faceUrls = cube ? CUBE_FACES.map((face) => resolveImageSource(cube[face])) : [];
+  const reflective = faceUrls.length > 0 && faceUrls.every(Boolean);
+  if (emission == null && !resolveImageSource(def.emissionTexture) && !reflective) return;
+  if (typeof scene.setMaterialEmissionColor !== "function" || !scene.supportsEmissionAndReflection) {
+    warnUnsupported(
+      "Material emissionColor, emissionTexture and reflectiveTexture",
+      "this build of the web renderer",
+      "Update @reactvision/viro-web-renderer.",
+    );
+    return;
   }
+  if (emission != null) {
+    const [r, g, b] = parseColorToRGBA(emission);
+    scene.setMaterialEmissionColor(material, r, g, b);
+  }
+  // Linear, as iOS and Android load it (only diffuse is sRGB there).
+  applyTexture(scene, material, def, "emissionTexture", ViroTextureChannel.Emission, false);
+  if (!reflective) return;
+  Promise.all(faceUrls.map((url) => loadImageRGBA(url as string)))
+    .then((faces) => {
+      const [px, nx, py, ny, pz, nz] = faces.map((face) => face.pixels);
+      const tex = scene.createTextureCubeRGBA({ px, nx, py, ny, pz, nz }, faces[0].width, faces[0].height);
+      scene.setMaterialTexture(material, ViroTextureChannel.Reflective, tex);
+    })
+    .catch((err) => console.warn(`[Viro web] texture "reflectiveTexture" failed:`, err));
 }
 
 type ViroUniformType = "float" | "vec2" | "vec3" | "vec4" | "mat4" | "sampler2D";
@@ -459,6 +501,7 @@ function buildMaterial(scene: ViroSceneApi, def: ViroWebMaterialDef): ViroHandle
   applyEffects(scene, material, def);
 
   applyTextures(scene, material, def);
+  applyEmissionAndReflection(scene, material, def);
   applyShaderModifiers(scene, material, def);
   applyUniforms(scene, material, def);
   return material;

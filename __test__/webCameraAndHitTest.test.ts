@@ -4,7 +4,7 @@
  */
 import type { ArPlaneAnchor, ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { cameraOrientation, cameraOrientationAsync } from "../components/Web/viroCameraTransform";
-import { activateSceneCamera, installDefaultCamera, setCameraView, setSceneCameraOrthographic, type CameraView } from "../components/Web/viroDrag";
+import { activateSceneCamera, cameraView, installDefaultCamera, rayAt, setCameraView, setSceneCameraOrthographic, type CameraView } from "../components/Web/viroDrag";
 import { hitTestPlanes } from "../components/Web/viroHitTest";
 import { cameraBasis, lookAtEulerDegrees, quatFromEulerDegrees, quatToEulerDegrees } from "../components/Web/viroMath";
 import { projectPoint, unprojectPoint } from "../components/Web/viroProjection";
@@ -90,17 +90,35 @@ describe("camera reads", () => {
     await expect(cameraOrientationAsync(scene)).rejects.toThrow();
   });
 
-  it("keeps refusing a camera component's read in AR, where the session turns the camera", async () => {
+  it("in AR, reads a camera component where it stands, turned by the device, through the device's projection", async () => {
+    let transform = { position: [0, 1, 0], rotation: [0, 90, 0], scale: [1, 1, 1] };
     const scene = {
       setActiveCameraNode: () => {},
-      getNodeWorldTransform: () => ({ position: [0, 1, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }),
+      getNodeWorldTransform: () => transform,
     } as unknown as ViroSceneApi;
-    setCameraView(scene, { position: [0, 0, 0], orientation: [0, 0, 0, 1], fx: 1, fy: 1, cx: 0, cy: 0, element: {} as HTMLElement, ar: true });
+    const element = { getBoundingClientRect: () => ({ left: 0, top: 0 }) } as HTMLElement;
+    const device: CameraView = { position: [5, 5, 5], orientation: [0, 0, 0, 1], fx: 300, fy: 300, cx: 200, cy: 100, element, ar: true };
+    setCameraView(scene, device);
     const release = activateSceneCamera(scene, 7);
-    jest.spyOn(console, "warn").mockImplementation(() => {});
-    await expect(cameraOrientationAsync(scene)).rejects.toThrow();
+    // AR projects through the device whatever the camera asks for.
+    setSceneCameraOrthographic(scene, 7, true);
+    const view = cameraView(scene)!;
+    expect(view).toMatchObject({ fx: 300, fy: 300, cx: 200, cy: 100 });
+    close(view.position, [0, 1, 0]);
+    close(rayAt(view, 200, 100).dir, [-1, 0, 0]);
+    // A drag keeps the view it started with, so later moves must reach it.
+    device.orientation = quatFromEulerDegrees([90, 0, 0]);
+    transform = { position: [2, 0, 0], rotation: [0, 90, 0], scale: [1, 1, 1] };
+    close(view.position, [2, 0, 0]);
+    // The device's pitch first, then the node's yaw, as virocore composes them.
+    close(rayAt(view, 200, 100).dir, [0, 1, 0]);
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    warn.mockClear();
+    close((await cameraOrientationAsync(scene)).forward, [0, 1, 0]);
+    expect(warn).not.toHaveBeenCalled();
+    setSceneCameraOrthographic(scene, 7, false);
     release();
-    await expect(cameraOrientationAsync(scene)).resolves.toMatchObject({ position: [0, 0, 0] });
+    await expect(cameraOrientationAsync(scene)).resolves.toMatchObject({ position: [5, 5, 5] });
   });
 
   it("aims an orbit camera at its focal point", () => {

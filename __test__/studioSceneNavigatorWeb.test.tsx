@@ -91,6 +91,36 @@ describe("StudioSceneNavigator (web) and onMotionUnavailable", () => {
   });
 });
 
+describe("StudioSceneNavigator (web) and a renderer that cannot start", () => {
+  it.each([
+    ["AUTOMATIC", arNavigatorProps],
+    ["NONE", threeDNavigatorProps],
+  ])("reports it through onError and renderError (%s)", (planeDetection, navigatorProps) => {
+    const onError = jest.fn();
+    const renderError = jest.fn((e: Error) => <>{e.message}</>);
+    let tree: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <StudioSceneNavigator
+          sceneData={scene(planeDetection)}
+          onError={onError}
+          renderError={renderError}
+        />
+      );
+    });
+    const err = Object.assign(new Error("no WebGL2"), {
+      name: "ViroWebGLUnavailableError",
+      reason: "unsupported",
+    });
+    act(() => navigatorProps[navigatorProps.length - 1].onWebRendererError(err));
+
+    expect(onError).toHaveBeenCalledWith(err);
+    expect(renderError).toHaveBeenLastCalledWith(err, expect.any(Function));
+    expect(tree!.toJSON()).toBe("no WebGL2");
+    act(() => tree.unmount());
+  });
+});
+
 describe("StudioSceneNavigator (web) and onVpsStateChange", () => {
   it("reports a scene bound to a VPS location as unsupported, and idle when it is left", () => {
     const events: StudioVpsStateEvent[] = [];

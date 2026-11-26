@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## v3.3.0 — 26 November 2026
+
+Needs `@reactvision/viro-web-renderer` 1.4.0 for the web build (the peer range is now `^1.4.0`). Each web change that needs new renderer API checks for it, and on 1.3.0 keeps the old behaviour with a one-time warning. iOS behaves as in 3.2.3.
+
+### Added
+
+- **Web: `onARPointCloudUpdate` and `displayPointCloud` on ViroARScene.** The tracker's feature points arrive each frame in native's shape (`points` as `[x, y, z, confidence]`, `identifiers`), in metres once the tracker's scale resolves; `displayPointCloud` draws them as particles, with `imageSource`, `imageScale` and `maxPoints`.
+- **Web: AR hit tests return `FeaturePoint` results** with either point cloud prop set, and Studio's web player falls back to one when a tap misses every plane, as the native host does.
+- **Web: `virtualCamera` on `ViroSceneNavigator` and `Viro3DSceneNavigator`.** Opt-in: the mouse, two fingers or the keys move the point of view (walk, look around in place, orbit a centre, `lookFrom`, `pose`), through a camera node of its own that stands aside while the scene makes one of its own `ViroCamera`s active. In an AR scene without a camera it stands in for the device, with hit tests against its own planes.
+- **Web: `fieldOfView` on `ViroCamera`,** across the viewport's longer side, as on native.
+- **Web: `emissionColor`, `emissionTexture` and `reflectiveTexture` on materials.** The emission texture loads linear, as on iOS and Android, and scales `emissionColor`; the reflective texture is a cube map. They need renderer 1.4.0; on 1.3.0 they warn once.
+- **Web: `onWebRendererError` on the three web navigators,** called when the renderer cannot start (a `ViroWebGLUnavailableError` from a renderer newer than 1.3.0, most often no WebGL2). `StudioSceneNavigator` on the web reports it through `onError` and `renderError`, as it does a failed scene load.
+
+### Changed
+
+- **Web: under a scene `ViroCamera` in AR, dragging works** and the ray and position hit tests start from the drawn camera: the camera node's position with the device's rotation, as virocore draws it.
+- **Web: a scene's own `timeToFuse` applies,** and every gesture is switched off when the scene unmounts.
+- **Web: a GLB loads as a GLB** whatever `type` it is given; the file's header decides.
+- **Web: a tracked frame with a reason reports `TRACKING_LIMITED`,** as ARKit does: excessive motion, too few features or too little light reach `onTrackingUpdated` while content keeps drawing.
+
+### Fixed
+
+- **Web: `ViroAnimatedImage` plays GIFs where `ImageDecoder` is missing or reads fewer frames than the file has,** with a decoder of its own (interlacing, disposal and transparency included).
+- **Web: `ViroSpinner`'s built-in images load in any bundler.**
+- **Web: dragging a node under a turned or scaled parent** moves it along the parent's axes, from the first frame.
+- **Web: a renderer that cannot start says so on the canvas.** The 3D and VR navigators used to leave a blank canvas and log to the console. Each now shows a message over it ("This browser cannot show 3D content: WebGL2 is unavailable.", or a generic one on renderer 1.3.0 and older). The AR navigator shows the same message in place of its camera prompt and Start AR button, which could never succeed.
+- **Web: surfaces are in metres from the first one,** and keep their anchor ids through a tracking loss, so a `ViroARPlane` and content on it stay put (tinyvio, through the renderer).
+- **Android: `emissionColor`, `emissionTexture` and `reflectiveTexture` on a material work, as on iOS (`react_viro-release.aar`, virocore `Material`).** As on iOS and the web, an `emissionTexture` scales `emissionColor`, which is black by default, so it needs an `emissionColor` to show. The first two threw "Invalid color/texture property" when the materials were created, and the reflective cube map was loaded and then dropped. `ViroMaterial` now types `emissionColor` and `emissionTexture`.
+- **Android: a material with a `reflectiveTexture` no longer crashes the app.** Each face of the cube map was looked up in the whole cube map instead of in its own source, which threw `Unable to find "uri" key`.
+
 ## v3.2.3 — 21 November 2026
 
 Needs `@reactvision/viro-web-renderer` 1.3.0 for the web build (the peer range is now `^1.3.0`). Each web change that needs new renderer API checks for it, and on 1.2.0 keeps the old behaviour with a one-time warning. iOS and Android behave as in 3.2.2, apart from the R8 fix below.

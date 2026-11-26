@@ -7,12 +7,14 @@ import * as React from "react";
 import { useEffect } from "react";
 import { useViroNode, type ViroWebNodeProps } from "./Web/useViroNode";
 import { useViroScene, ViroParentNodeContext } from "./Web/ViroWebContext";
-import { activateSceneCamera, setSceneCameraOrthographic } from "./Web/viroDrag";
+import { activateSceneCamera, setSceneCameraFieldOfView, setSceneCameraOrthographic } from "./Web/viroDrag";
 
 type Props = ViroWebNodeProps & {
   active?: boolean;
   projection?: "perspective" | "orthographic";
   orthographicScale?: number;
+  /** Degrees across the longer side of the view, as on native. */
+  fieldOfView?: number;
   children?: React.ReactNode;
   [key: string]: any;
 };
@@ -21,7 +23,7 @@ export function ViroCamera(props: Props) {
   const node = useViroNode(props);
   const scene = useViroScene();
   const active = props.active !== false;
-  const { projection, orthographicScale } = props;
+  const { projection, orthographicScale, fieldOfView } = props;
 
   useEffect(() => {
     scene.setNodeCamera(node);
@@ -42,6 +44,14 @@ export function ViroCamera(props: Props) {
       scene.setCameraOrthographicScale(node, orthographicScale);
     }
   }, [scene, node, orthographicScale]);
+
+  useEffect(() => {
+    const degrees = fieldOfView ?? 0;
+    // A renderer without the binding keeps the default, so drags keep its rays too.
+    if (typeof scene.setCameraFieldOfView !== "function" || !scene.setCameraFieldOfView(node, degrees)) return;
+    setSceneCameraFieldOfView(scene, node, degrees);
+    return () => setSceneCameraFieldOfView(scene, node, 0);
+  }, [scene, node, fieldOfView]);
 
   return (
     <ViroParentNodeContext.Provider value={node}>

@@ -30,6 +30,8 @@ import { defaultCameraView, installDefaultCamera, setCameraView } from "./Web/vi
 import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection";
 import { useViroWebCapture } from "./Web/viroCapture";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
+import { attachVirtualCamera3D, type ViroVirtualCameraOptions } from "./Web/viroVirtualCamera";
+import { ViroWebStartError, webRendererStartMessage } from "./Web/viroStartError";
 
 type SceneDescriptor = { scene: React.ComponentType<any>; passProps?: any };
 
@@ -40,6 +42,10 @@ type Props = {
   vrModeEnabled?: boolean; // no-op on web
   onExitViro?: () => void; // no-op on web
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
+  /** Web only: as on Viro3DSceneNavigator. */
+  onWebRendererError?: (error: unknown) => void;
+  /** Web only: as on Viro3DSceneNavigator. */
+  virtualCamera?: boolean | Omit<ViroVirtualCameraOptions, "floorY">;
   [key: string]: any;
 };
 
@@ -88,10 +94,15 @@ export function ViroSceneNavigator(props: Props) {
   useViroUsagePing("scene");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const capture = useViroWebCapture(canvasRef);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const virtual = props.virtualCamera ? (props.virtualCamera === true ? {} : props.virtualCamera) : null;
+  const virtualRef = useRef(virtual);
+  virtualRef.current = virtual;
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   const rendererRef = useRef(renderer);
   rendererRef.current = renderer;
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const [stack, setStack] = useState<Stack>(() => {
     const key = props.initialSceneKey ?? randomTag();
@@ -117,10 +128,14 @@ export function ViroSceneNavigator(props: Props) {
           created.dispose();
           return;
         }
+        setStartError(null);
         setRootNode(created.scene.getRootNode());
         setRenderer(created);
       } catch (err) {
         console.error("[Viro web] failed to initialize renderer:", err);
+        if (cancelled) return;
+        setStartError(webRendererStartMessage(err));
+        props.onWebRendererError?.(err);
       }
     })();
     return () => {
@@ -131,12 +146,14 @@ export function ViroSceneNavigator(props: Props) {
   }, [generation]);
 
   // What dragging casts its rays through, until a camera component takes over.
+  // The virtual camera publishes its own view.
+  const virtualOn = virtual !== null;
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!renderer || !canvas) return;
+    if (!renderer || !canvas || virtualOn) return;
     setCameraView(renderer.scene, defaultCameraView(canvas));
     return () => setCameraView(renderer.scene, null);
-  }, [renderer]);
+  }, [renderer, virtualOn]);
   // What a released ViroCamera returns to.
   useEffect(() => (renderer && rootNode ? installDefaultCamera(renderer.scene, rootNode) : undefined), [renderer, rootNode]);
 
@@ -148,6 +165,13 @@ export function ViroSceneNavigator(props: Props) {
     renderer.resize();
     return () => observer.disconnect();
   }, [renderer]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const opts = virtualRef.current;
+    if (!renderer || !rootNode || !container || !opts) return;
+    return attachVirtualCamera3D(renderer.scene, rootNode, container, opts);
+  }, [renderer, rootNode, virtualOn]);
 
   // Scene-stack operations. Each mutates the keyed dictionary + history; the
   // rendered scene is always the last key in history.
@@ -218,7 +242,7 @@ export function ViroSceneNavigator(props: Props) {
   const SceneComponent = descriptor?.scene;
 
   return (
-    <div style={containerStyle}>
+    <div ref={containerRef} style={containerStyle}>
       <canvas ref={canvasRef} style={canvasStyle} />
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>
@@ -232,6 +256,7 @@ export function ViroSceneNavigator(props: Props) {
           </ViroParentNodeContext.Provider>
         </ViroRendererContext.Provider>
       ) : null}
+      <ViroWebStartError message={startError} />
     </div>
   );
 }

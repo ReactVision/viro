@@ -8,7 +8,7 @@ Web AR needs `@reactvision/viro-web-renderer` newer than 1.3.0 for the new point
 
 - **Web: `onARPointCloudUpdate` and `displayPointCloud` on ViroARScene.** The tracker's feature points arrive each frame in native's shape (`points` as `[x, y, z, confidence]`, `identifiers`), in metres once the tracker's scale resolves; `displayPointCloud` draws them as particles, with `imageSource`, `imageScale` and `maxPoints`.
 - **Web: AR hit tests return `FeaturePoint` results** with either point cloud prop set, and Studio's web player falls back to one when a tap misses every plane, as the native host does.
-- **Web: `onWebRendererError` on the three web navigators,** called when the renderer cannot start (a `ViroWebGLUnavailableError` from a renderer newer than 1.3.0, most often no WebGL2).
+- **Web: `onWebRendererError` on the three web navigators,** called when the renderer cannot start (a `ViroWebGLUnavailableError` from a renderer newer than 1.3.0, most often no WebGL2). `StudioSceneNavigator` on the web reports it through `onError` and `renderError`, as it does a failed scene load.
 
 ### Changed
 

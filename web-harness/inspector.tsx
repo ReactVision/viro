@@ -527,15 +527,15 @@ export function InspectPanel({
   onSelection,
   styles,
   copy,
-  onClose,
+  header,
 }: {
   budgets: ModelBudget[];
   scene: string | undefined;
   /** Null when nothing is selected; undefined where no assistant is listening. */
   onSelection?: (text: string | null) => void;
-  styles: { chip: React.CSSProperties; button: React.CSSProperties };
+  styles: { button: React.CSSProperties; popup: React.CSSProperties };
   copy(text: string): Promise<boolean>;
-  onClose(): void;
+  header: React.ReactNode;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [stats, setStats] = useState<{ frame: typeof lastFrame; fps: number | null; textures: { bytes: number; dimension: number } }>({
@@ -624,7 +624,7 @@ export function InspectPanel({
   }, [selectionKey]);
   useEffect(() => () => onSelection?.(null), []);
 
-  const { chip, button } = styles;
+  const { button, popup } = styles;
   const models = rows.filter((r) => r.size);
   const { frame, fps, textures } = stats;
   return (
@@ -634,13 +634,8 @@ export function InspectPanel({
         aria-hidden="true"
         style={{ position: "fixed", left: 0, top: 0, width: 24, height: 24, borderRadius: "50%", border: "2px solid #4cc2ff", boxShadow: "0 0 0 2px rgba(0,0,0,0.5), 0 0 12px #4cc2ff", display: "none", pointerEvents: "none" }}
       />
-      <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(340px, 100%)", maxHeight: "70%", overflow: "auto", display: "flex", flexDirection: "column", gap: 8, boxSizing: "border-box", fontSize: 13 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 600 }}>Scene</span>
-          <button type="button" aria-label="Close" style={{ ...button, padding: "2px 8px" }} onClick={onClose}>
-            Close
-          </button>
-        </div>
+      <div style={{ ...popup, width: 340, fontSize: 13 }}>
+        {header}
         <div
           style={{ fontSize: 12, opacity: 0.8 }}
           title="The frame rate is this browser's. The rest is the last frame, with the grid, shadow passes and render targets counted; texture memory is an estimate."

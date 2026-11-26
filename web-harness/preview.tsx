@@ -938,6 +938,21 @@ const button: React.CSSProperties = {
   pointerEvents: "auto",
   whiteSpace: "nowrap",
 };
+// Every popup: the shared box, then its own width.
+const popup: React.CSSProperties = {
+  ...chip,
+  pointerEvents: "auto",
+  alignSelf: "center",
+  maxWidth: "100%",
+  maxHeight: "75%",
+  overflow: "auto",
+  boxSizing: "border-box",
+  padding: 14,
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
+const backdrop: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
 const roundButton: React.CSSProperties = { ...button, width: 34, height: 34, padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" };
 const settingStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: 13, opacity: 0.9 };
 const oneLine: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
@@ -1131,13 +1146,16 @@ function RecordHint({ duration }: { duration: number | null }) {
   );
 }
 
-function CloseButton({ onClose }: { onClose(): void }) {
+function PopupHeader({ title, hint, onClose }: { title: string; hint?: string; onClose(): void }) {
   return (
-    <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-        <path d="M4 4l8 8M12 4l-8 8" />
-      </svg>
-    </button>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, alignSelf: "stretch" }}>
+      <span style={{ fontWeight: 600, fontSize: 15 }} title={hint}>{title}</span>
+      <button type="button" aria-label="Close" title="Close" style={{ ...button, padding: 6, display: "flex" }} onClick={onClose}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 4l8 8M12 4l-8 8" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -1148,18 +1166,15 @@ function ControlsHelp({ onClose }: { onClose(): void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div onClick={onClose} style={backdrop}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Controls"
         onClick={(e) => e.stopPropagation()}
-        style={{ ...chip, width: "min(520px, 100%)", maxHeight: "85%", overflow: "auto", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}
+        style={{ ...popup, width: 520, maxHeight: "85%" }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>Controls</span>
-          <CloseButton onClose={onClose} />
-        </div>
+        <PopupHeader title="Controls" onClose={onClose} />
         {controlSections().map((section) => (
           <div key={section.title}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>{section.title}</div>
@@ -1184,11 +1199,8 @@ function PhonePanel({ url, onClose }: { url: string; onClose(): void }) {
   const [copied, setCopied] = useState(false);
   const n = modules?.length ?? 0;
   return (
-    <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(280px, 100%)", maxHeight: "85%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, alignItems: "center", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, alignSelf: "stretch" }}>
-        <span style={{ fontWeight: 600 }}>Camera AR on a phone</span>
-        <CloseButton onClose={onClose} />
-      </div>
+    <div style={{ ...popup, width: 280, alignItems: "center" }}>
+      <PopupHeader title="Camera AR on a phone" onClose={onClose} />
       {modules ? (
         <svg role="img" aria-label="QR code for this preview" viewBox={`-4 -4 ${n + 8} ${n + 8}`} width="180" height="180" shapeRendering="crispEdges" style={{ background: "#fff", borderRadius: 6, flex: "none" }}>
           <path fill="#000" d={modules.map((row, y) => row.map((dark, x) => (dark ? `M${x} ${y}h1v1h-1z` : "")).join("")).join("")} />
@@ -1229,25 +1241,17 @@ function FeedbackPanel({ url, context, onClose }: { url: string; context(): Feed
   };
   return (
     // Above the error panel, which its blur makes a layer of its own.
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1, background: "rgba(0,0,0,0.45)", pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div onClick={onClose} style={{ ...backdrop, zIndex: 1 }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Send feedback"
         onClick={(e) => e.stopPropagation()}
-        style={{ ...chip, width: "min(420px, 100%)", maxHeight: "85%", overflow: "auto", boxSizing: "border-box", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}
+        style={{ ...popup, width: 420, maxHeight: "85%" }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 15 }} title={FEEDBACK_SENT}>Send feedback</span>
-          <CloseButton onClose={onClose} />
-        </div>
+        <PopupHeader title="Send feedback" hint={FEEDBACK_SENT} onClose={onClose} />
         {state.sent ? (
-          <>
-            <span>Sent. Thank you.</span>
-            <button type="button" style={{ ...button, alignSelf: "flex-end" }} onClick={onClose}>
-              Close
-            </button>
-          </>
+          <span>Sent. Thank you.</span>
         ) : (
           <>
             <Picker aria-label="Feedback type" style={{ flex: "0 0 auto" }} value={type} onChange={(e) => setType(e.target.value)}>
@@ -1358,11 +1362,8 @@ function RenderPanel({ renderApi, renderRequest, scene, onClose }: { renderApi: 
   };
 
   return (
-    <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(520px, 100%)", maxHeight: "75%", overflow: "auto", display: "flex", flexDirection: "column", gap: 10, boxSizing: "border-box" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontWeight: 600 }}>Render {scene ? sceneLabel(scene) : "in a real space"}</div>
-        <CloseButton onClose={onClose} />
-      </div>
+    <div style={{ ...popup, width: 520 }}>
+      <PopupHeader title={`Render ${scene ? sceneLabel(scene) : "in a real space"}`} onClose={onClose} />
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         Plays this scene over a recorded real-world environment from your team and makes a video. Needs a paid plan, and is billed to your team as compute time for a completed render. Your team's price per minute and its spend limit are on its Usage page in ReactVision Studio.
       </div>
@@ -1449,11 +1450,8 @@ function PlaceholderPanel({
   const picker = useRef<HTMLInputElement>(null);
   const target = useRef("");
   return (
-    <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", width: "min(440px, 100%)", maxHeight: "75%", overflow: "auto", display: "flex", flexDirection: "column", gap: 8, boxSizing: "border-box" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontWeight: 600 }}>Placeholders</span>
-        <CloseButton onClose={onClose} />
-      </div>
+    <div style={{ ...popup, width: 440 }}>
+      <PopupHeader title="Placeholders" onClose={onClose} />
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         {pending
           ? `Which file does ${pending.name} replace?`
@@ -1891,9 +1889,9 @@ function Chrome({
           budgets={budgets ?? []}
           scene={scenes[index]?.path ?? title}
           onSelection={host?.onSelect ? (text) => host.onSelect!(text) : undefined}
-          styles={{ chip, button }}
+          styles={{ button, popup }}
           copy={copyText}
-          onClose={() => setInspect(false)}
+          header={<PopupHeader title="Scene" onClose={() => setInspect(false)} />}
         />
       ) : null}
       {assets && upload && placeholders.length ? (
@@ -1938,19 +1936,14 @@ function Chrome({
         </div>
       ) : null}
       {request && renderRequest ? (
-        <div style={{ ...chip, pointerEvents: "auto", alignSelf: "center", maxWidth: 520, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontWeight: 600 }}>
-            {request === "copied" ? "Copied. Paste it to your coding agent." : "Copy this and paste it to your coding agent."}
-          </div>
+        <div style={{ ...popup, width: 520 }}>
+          <PopupHeader title={request === "copied" ? "Copied. Paste it to your coding agent." : "Copy this and paste it to your coding agent."} onClose={() => setRequest(null)} />
           <div style={{ userSelect: "text", fontFamily: "ui-monospace, monospace", fontSize: 12, background: "rgba(255,255,255,0.06)", borderRadius: 6, padding: 8 }}>
             {renderRequest}
           </div>
           <div style={{ opacity: 0.75, fontSize: 12 }}>
             Your agent renders the scene over a recorded real-world space, and checks with you before it starts.
           </div>
-          <button type="button" style={{ ...button, alignSelf: "flex-end" }} onClick={() => setRequest(null)}>
-            Close
-          </button>
         </div>
       ) : null}
       {showIssues || renderState.error ? (

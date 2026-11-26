@@ -31,6 +31,7 @@ import { projectPoint, requireScene, unprojectPoint } from "./Web/viroProjection
 import { useViroWebCapture } from "./Web/viroCapture";
 import { useViroUsagePing } from "./Utilities/ViroUsagePing";
 import { attachVirtualCamera3D, type ViroVirtualCameraOptions } from "./Web/viroVirtualCamera";
+import { ViroWebStartError, webRendererStartMessage } from "./Web/viroStartError";
 
 type SceneDescriptor = { scene: React.ComponentType<any>; passProps?: any };
 
@@ -41,6 +42,8 @@ type Props = {
   vrModeEnabled?: boolean; // no-op on web
   onExitViro?: () => void; // no-op on web
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
+  /** Web only: as on Viro3DSceneNavigator. */
+  onWebRendererError?: (error: unknown) => void;
   /** Web only: as on Viro3DSceneNavigator. */
   virtualCamera?: boolean | Omit<ViroVirtualCameraOptions, "floorY">;
   [key: string]: any;
@@ -99,6 +102,7 @@ export function ViroSceneNavigator(props: Props) {
   const rendererRef = useRef(renderer);
   rendererRef.current = renderer;
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const [stack, setStack] = useState<Stack>(() => {
     const key = props.initialSceneKey ?? randomTag();
@@ -124,10 +128,14 @@ export function ViroSceneNavigator(props: Props) {
           created.dispose();
           return;
         }
+        setStartError(null);
         setRootNode(created.scene.getRootNode());
         setRenderer(created);
       } catch (err) {
         console.error("[Viro web] failed to initialize renderer:", err);
+        if (cancelled) return;
+        setStartError(webRendererStartMessage(err));
+        props.onWebRendererError?.(err);
       }
     })();
     return () => {
@@ -248,6 +256,7 @@ export function ViroSceneNavigator(props: Props) {
           </ViroParentNodeContext.Provider>
         </ViroRendererContext.Provider>
       ) : null}
+      <ViroWebStartError message={startError} />
     </div>
   );
 }

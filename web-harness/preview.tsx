@@ -28,6 +28,7 @@ import { rotateByQuaternion } from "../components/Web/viroMath";
 import { ViroScene } from "../components/ViroScene";
 import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
 import { qrModules } from "./qr";
+import { CodePanel } from "./codeView";
 import { playSession, recordSession, type SessionTrack } from "./sessionReplay";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { set3DNavigatorDefaults, setARNavigatorDefaults } from "./viroWebComponents";
@@ -61,6 +62,8 @@ type PreviewInput = {
   budgets?: ModelBudget[];
   /** Root-relative paths of the local assets drawn as stand-ins. */
   placeholders?: string[];
+  /** Where the page reads the files the scene is built from, for the Code view. */
+  sourceUrl?: string;
 };
 
 type SceneInfo = { path: string; renderRequest?: string };
@@ -1509,6 +1512,8 @@ function Chrome({
   budgets,
   placeholders = [],
   feedbackUrl,
+  sourceUrl,
+  version,
   expired = false,
 }: {
   title?: string;
@@ -1522,6 +1527,8 @@ function Chrome({
   budgets?: ModelBudget[];
   placeholders?: string[];
   feedbackUrl?: string;
+  sourceUrl?: string;
+  version?: number;
   expired?: boolean;
 }) {
   const [, tick] = useState(0);
@@ -1531,6 +1538,16 @@ function Chrome({
   const [panel, setPanel] = useState(false);
   const [phone, setPhone] = useState(false);
   const [inspect, setInspect] = useState(false);
+  const [code, setCode] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barBottom, setBarBottom] = useState(52);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!code || !el) return;
+    const observer = new ResizeObserver(() => setBarBottom(el.offsetTop + el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [code]);
   const [assets, setAssets] = useState(false);
   const [help, setHelp] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -1575,13 +1592,23 @@ function Chrome({
     cameraControls?.reset();
     act("reset_view");
   };
+  const showCode = (on: boolean) => {
+    if (on === code) return;
+    setPanel(false);
+    setPhone(false);
+    setInspect(false);
+    setAssets(false);
+    setRequest(null);
+    if (on) act("code");
+    setCode(on);
+  };
   const openFeedback = () => {
     act("feedback");
     setFeedback(true);
   };
   const shortcuts = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcuts.current = (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !cameraControls) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !cameraControls || code) return;
     const t = e.target as HTMLElement | null;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     const key = e.key.toLowerCase();
@@ -1787,7 +1814,7 @@ function Chrome({
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       {/* On a narrow view the name gives way first, then the buttons wrap. */}
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", justifyContent: "space-between" }}>
+      <div ref={barRef} style={{ display: "flex", gap: 8, alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ flex: "1 1 0", minWidth: 96, display: "flex" }}>
         {scenes.length > 1 ? (
           <Picker
@@ -1806,8 +1833,31 @@ function Chrome({
         ) : <div style={{ ...chip, ...oneLine }}>{title ?? "Viro Live"}{liveAR ? " · AR" : ""}</div>}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {sourceUrl ? (
+            <div role="group" aria-label="View" style={{ display: "flex", pointerEvents: "auto" }}>
+              {(["Preview", "Code"] as const).map((label, i) => {
+                const on = (label === "Code") === code;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={on}
+                    style={{
+                      ...button,
+                      borderRadius: i ? "0 8px 8px 0" : "8px 0 0 8px",
+                      ...(i ? { borderLeft: "none" } : {}),
+                      ...(on ? { background: "#e8e8ee", color: "#16161b" } : {}),
+                    }}
+                    onClick={() => showCode(label === "Code")}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           {/* Without renderApi the button copies a request for a coding agent, which a chat does not have. */}
-          {!liveAR && renderRequest && (renderApi || !framed) ? (
+          {!code && !liveAR && renderRequest && (renderApi || !framed) ? (
             <button
               type="button"
               style={button}
@@ -1823,7 +1873,7 @@ function Chrome({
               Render in a real space
             </button>
           ) : null}
-          {!liveAR && arUrl ? (
+          {!code && !liveAR && arUrl ? (
             <button
               type="button"
               style={button}
@@ -1839,7 +1889,7 @@ function Chrome({
               View in AR
             </button>
           ) : null}
-          {inspectable ? (
+          {!code && inspectable ? (
             <button
               type="button"
               aria-pressed={inspect}
@@ -1849,7 +1899,7 @@ function Chrome({
               Inspect
             </button>
           ) : null}
-          {upload && placeholders.length ? (
+          {!code && upload && placeholders.length ? (
             <button
               type="button"
               aria-pressed={assets}
@@ -2121,6 +2171,18 @@ function Chrome({
           </button>
         ) : null}
       </div>
+      {code && sourceUrl ? (
+        <CodePanel
+          url={sourceUrl}
+          version={version}
+          focus={scenes[index]?.path}
+          error={renderState.error}
+          top={barBottom + 8}
+          load={pageFetch}
+          copy={copyText}
+          styles={{ chip, button }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -2214,6 +2276,8 @@ function Preview({ input, expired }: { input: PreviewInput; expired: boolean }) 
           budgets={input.budgets}
           placeholders={input.placeholders}
           feedbackUrl={input.feedbackUrl}
+          sourceUrl={input.sourceUrl}
+          version={input.version}
           expired={expired}
         />
       )}

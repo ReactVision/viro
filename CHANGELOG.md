@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## Unreleased
+
+Web AR needs `@reactvision/viro-web-renderer` from `fix/web-ar-tracker` for the new point cloud; against 1.3.0 the two point cloud props warn once and do nothing.
+
+### Added
+
+- **Web: `onARPointCloudUpdate` and `displayPointCloud` on ViroARScene.** The tracker's feature points arrive each frame in native's shape (`points` as `[x, y, z, confidence]`, `identifiers`), in metres once the tracker's scale resolves; `displayPointCloud` draws them as particles, with `imageSource`, `imageScale` and `maxPoints`.
+- **Web: AR hit tests return `FeaturePoint` results** with either point cloud prop set, and Studio's web player falls back to one when a tap misses every plane, as the native host does.
+
+### Changed
+
+- **Web: a tracked frame with a reason reports `TRACKING_LIMITED`,** as ARKit does: excessive motion, too few features or too little light reach `onTrackingUpdated` while content keeps drawing.
+
+### Fixed
+
+- **Web: surfaces are in metres from the first one,** and keep their anchor ids through a tracking loss, so a `ViroARPlane` and content on it stay put (tinyvio, through the renderer).
+
 ## v3.2.3 — 21 November 2026
 
 Needs `@reactvision/viro-web-renderer` 1.3.0 for the web build (the peer range is now `^1.3.0`). Each web change that needs new renderer API checks for it, and on 1.2.0 keeps the old behaviour with a one-time warning. iOS and Android behave as in 3.2.2, apart from the R8 fix below.

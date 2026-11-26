@@ -7,7 +7,8 @@ import * as React from "react";
 import { createElement, useEffect, useRef, useSyncExternalStore } from "react";
 import * as ReactNativeWeb from "react-native";
 
-import { pushWarning, renderState } from "./renderState";
+import { pushWarning, renderState, setStackMapper } from "./renderState";
+import { stackMapper } from "./sceneSourceMap";
 import { makeCheckerDataUrl, PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import * as ViroWeb from "./viroWebComponents";
 
@@ -212,6 +213,8 @@ function makeRequireShim(assetOverrides: Record<string, string> | undefined) {
   };
 }
 
+const SCENE_URL = "viro-scene.js";
+
 export function compileGeneratedScene(
   code: string,
   assetOverrides: Record<string, string> | undefined,
@@ -234,11 +237,14 @@ export function compileGeneratedScenes(
   const js = transform ? transform(code) : code;
   setModelOverrides(assetOverrides);
   const moduleObj: { exports: any } = { exports: {} };
-  // `new Function` gives the caller's code a top-level scope of its own, with
+  // Indirect eval gives the caller's code a top-level scope of its own, with
   // no closure over this module. It is not a sandbox: the code still has the
-  // page's globals, so the page serving it has to isolate it.
-  // eslint-disable-next-line no-new-func
-  const run = new Function("module", "exports", "require", js);
+  // page's globals, so the page serving it has to isolate it. Unlike
+  // `new Function`, it adds no lines above the code, so with the source URL a
+  // stack names the code's own lines, which its source map turns into files.
+  setStackMapper(stackMapper(js, SCENE_URL));
+  // eslint-disable-next-line no-eval
+  const run = (0, eval)(`(function (module, exports, require) {${js}\n})\n//# sourceURL=${SCENE_URL}`);
   run(moduleObj, moduleObj.exports, makeRequireShim(assetOverrides));
   const exported = moduleObj.exports?.default ?? moduleObj.exports;
   if (typeof exported !== "function") {

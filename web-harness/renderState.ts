@@ -27,9 +27,16 @@ export function markReady(): void {
   renderState.ready = true;
 }
 
+let mapStack: ((stack: string) => string) | null = null;
+
+/** Set by the code that runs a scene, to name the scene's own files and lines in an error. */
+export function setStackMapper(map: ((stack: string) => string) | null): void {
+  mapStack = map;
+}
+
 export function markError(err: unknown): void {
-  renderState.error =
-    renderState.error ?? (err instanceof Error ? err.stack ?? err.message : String(err));
+  const text = err instanceof Error ? err.stack ?? err.message : String(err);
+  renderState.error = renderState.error ?? (mapStack ? mapStack(text) : text);
   // An error is terminal for this render — flip ready too so the driver's
   // waitForFunction resolves immediately instead of waiting out the timeout.
   renderState.ready = true;

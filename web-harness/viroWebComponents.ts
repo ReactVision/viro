@@ -9,7 +9,7 @@
  * markers, ViroVPSAnchor) is still exported, since that is what native does
  * with nothing tracked.
  */
-import { createElement, useEffect } from "react";
+import { createElement, useEffect, useSyncExternalStore } from "react";
 import { markError, pushWarning } from "./renderState";
 import { webRendererOptions } from "./wasmOptions";
 
@@ -20,10 +20,22 @@ import { webRendererOptions } from "./wasmOptions";
 const slamScriptUrl = () => new URL("tinyvio-slam.js", document.baseURI).href;
 
 let navigatorDefaults: Record<string, unknown> = {};
+let navigator3DDefaults: Record<string, unknown> = {};
 
 /** Props every AR navigator the caller's code mounts gets, under its own. */
 export function setARNavigatorDefaults(defaults: Record<string, unknown>): void {
   navigatorDefaults = defaults;
+  navigatorDefaultsListeners.forEach((l) => l());
+}
+const navigatorDefaultsListeners = new Set<() => void>();
+const onNavigatorDefaults = (l: () => void) => {
+  navigatorDefaultsListeners.add(l);
+  return () => void navigatorDefaultsListeners.delete(l);
+};
+
+/** Props every 3D, VR (drawn as 3D) and ViroSceneNavigator the caller's code mounts gets, under its own. */
+export function set3DNavigatorDefaults(defaults: Record<string, unknown>): void {
+  navigator3DDefaults = defaults;
 }
 
 export { Viro360Image } from "../components/Viro360Image";
@@ -130,12 +142,12 @@ import { ViroSceneNavigator as _ViroSceneNavigatorRaw } from "../components/Viro
 
 export function Viro3DSceneNavigator(props: any) {
   if (usePlaybackRefusal("Viro3DSceneNavigator")) return null;
-  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...props });
+  return createElement(_Viro3DSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 export function ViroSceneNavigator(props: any) {
   if (usePlaybackRefusal("ViroSceneNavigator")) return null;
-  return createElement(_ViroSceneNavigatorRaw, { webRendererOptions, ...props });
+  return createElement(_ViroSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 // The library's own file needs PermissionsAndroid, which react-native-web does
@@ -193,6 +205,7 @@ function usePlaybackRefusal(navigator: string): boolean {
 let navigatorsMounted = 0;
 
 export function ViroARSceneNavigator(props: any) {
+  const defaults = useSyncExternalStore(onNavigatorDefaults, () => navigatorDefaults);
   useEffect(() => {
     navigatorsMounted += 1;
     if (navigatorsMounted > 1) {
@@ -214,7 +227,7 @@ export function ViroARSceneNavigator(props: any) {
   return createElement(_ViroARSceneNavigatorRaw, {
     webRendererOptions,
     slamScriptUrl: slamScriptUrl(),
-    ...navigatorDefaults,
+    ...defaults,
     ...props,
     // After the caller's props, not before: a scene rendered over a recording
     // is rendered over that recording, whatever its own JSX asked for.
@@ -228,10 +241,10 @@ export function ViroARSceneNavigator(props: any) {
 }
 
 // The library renders VR scenes through the 3D navigator in mono; this only
-// adds the injected renderer options, as for the other navigators.
+// adds the injected renderer options and the 3D navigator's defaults.
 export function ViroVRSceneNavigator(props: any) {
   if (usePlaybackRefusal("ViroVRSceneNavigator")) return null;
-  return createElement(_ViroVRSceneNavigatorRaw, { webRendererOptions, ...props });
+  return createElement(_ViroVRSceneNavigatorRaw, { webRendererOptions, ...navigator3DDefaults, ...props });
 }
 
 export function ViroVRScene(props: any) {

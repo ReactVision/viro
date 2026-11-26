@@ -10,6 +10,7 @@ import {
   dragFollower,
   activateSceneCamera,
   parentSpace,
+  authoredParentSpace,
   rayAt,
   releaseVelocity,
   screenPointOf,
@@ -56,6 +57,14 @@ describe("web dragging", () => {
     close(onto({ origin: [0, 0, 0], dir: [0, -Math.SQRT1_2, -Math.SQRT1_2] })!, [0, -1, -1]);
     const still = dragFollower("FixedToPlane", { planePoint: [0, -1, 0] }, start)!;
     close(still({ origin: [0, 0, 0], dir: [1, 0, 0] })!, [0, 0.5, -1]);
+  });
+
+  it("puts a dragged point in a turned and scaled parent's own space", () => {
+    // A parent at [1, 0, 0], turned 90 degrees about Y and scaled 2: its x axis points along world -Z.
+    const toLocal = parentSpace([1, 0, 0], [1, 0, -2], [1, 2, 0], [3, 0, 0])!;
+    close(toLocal([1, 0, -2]), [1, 0, 0]);
+    close(toLocal([3, 2, 0]), [0, 1, 1]);
+    expect(parentSpace([0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 0, 1])).toBeNull();
   });
 
   it("has no follower for an unknown dragType", () => {
@@ -114,8 +123,8 @@ describe("web drag camera views", () => {
   });
 
   it("puts a drag into a wall anchor's local space", () => {
-    // A wall facing +X, as the session reports it: +Y turned onto the normal.
-    const toLocal = parentSpace([2, 0, -1], [{ rotation: [0, 0, -90] }, { rotation: [0, 0, 0], scale: [2, 2, 2] }]);
+    // A wall facing +X, as the session reports it (+Y turned onto the normal), with a child scaled 2.
+    const toLocal = parentSpace([2, 0, -1], [2, -2, -1], [4, 0, -1], [2, 0, 1])!;
     close(toLocal([2, 0, -1]), [0, 0, 0]);
     close(toLocal([4, 0, -1]), [0, 1, 0]);
     close(toLocal([2, 2, -1]), [-1, 0, 0]);
@@ -163,5 +172,17 @@ describe("collision router", () => {
     fire({ tag: a.key, otherTag: b.key, point: [0, 0, 0], normal: [0, 1, 0] });
     expect(onHit).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe("authoredParentSpace", () => {
+  it("undoes a turned, scaled parent from its authored props", () => {
+    // Parent at (1, 0, 0), turned +90 degrees about Y and scaled 2.
+    const toLocal = authoredParentSpace([1, 0, 0], [{ rotation: [0, 90, 0], scale: [2, 2, 2] }]);
+    // Its local +X points to world -Z, two metres per unit.
+    const local = toLocal([1, 0, -2]);
+    expect(local[0]).toBeCloseTo(1);
+    expect(local[1]).toBeCloseTo(0);
+    expect(local[2]).toBeCloseTo(0);
   });
 });

@@ -27,9 +27,9 @@ import { applyPhysicsBody, offsetImpulse, type ViroPhysicsBodyProp } from "./vir
 import { registerCollisionBody } from "./viroCollisions";
 import { conjugateQuat, quatFromEulerDegrees, rotateByQuaternion } from "./viroMath";
 import {
+  authoredParentSpace,
   cameraView,
   dragFollower,
-  parentSpace,
   rayAt,
   releaseVelocity,
   screenPointOf,
@@ -184,20 +184,6 @@ export function viroNodeEntries(scene: ViroSceneApi): ReadonlyMap<ViroHandle, { 
   return nodeEntries.get(scene) ?? new Map();
 }
 
-/**
- * Turns a world point into `parent`'s local space, from the transforms of the
- * nodes this hook made above it. Taken once per drag: a node animated without
- * its props is read at its authored transform.
- */
-function worldToLocalIn(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec3) => Vec3) | null {
-  const origin = scene.getNodeWorldPosition(parent);
-  if (!origin) return null;
-  const map = nodeEntries.get(scene);
-  const ancestors: ViroWebNodeProps[] = [];
-  for (let entry = map?.get(parent); entry; entry = map!.get(entry.parent)) ancestors.push(entry.props());
-  return parentSpace(origin, ancestors);
-}
-
 // Native's kTransformDelegateDistanceFilter, in metres.
 const TRANSFORM_DISTANCE_FILTER = 0.01;
 
@@ -215,6 +201,19 @@ function drawnParentSpace(scene: ViroSceneApi, parent: ViroHandle): ((world: Vec
     const local = rotateByQuaternion(inverse, sub(world, p.position));
     return [local[0] / p.scale[0], local[1] / p.scale[1], local[2] / p.scale[2]];
   };
+}
+
+/**
+ * Turns a world point into `parent`'s local space from the transforms this hook
+ * authored on it and the nodes above it: the stand-in for drawnParentSpace
+ * before the parent has been drawn, so a drag that starts on the first frame
+ * under a turned parent still moves along the right axes.
+ */
+function authoredParentSpaceOf(scene: ViroSceneApi, parent: ViroHandle, origin: Vec3): (world: Vec3) => Vec3 {
+  const map = nodeEntries.get(scene);
+  const ancestors: ViroWebNodeProps[] = [];
+  for (let entry = map?.get(parent); entry; entry = map!.get(entry.parent)) ancestors.push(entry.props());
+  return authoredParentSpace(origin, ancestors);
 }
 
 /** The node's last drawn position in its parent's space, or null before it has been drawn. */
@@ -459,8 +458,9 @@ export function useViroNode(
       return;
     }
     const nodeStart = scene.getNodeWorldPosition(node);
-    const toLocal = worldToLocalIn(scene, parent);
-    if (!nodeStart || !toLocal) return;
+    const parentWorld = scene.getNodeWorldPosition(parent);
+    if (!nodeStart || !parentWorld) return;
+    const authored = authoredParentSpaceOf(scene, parent, parentWorld);
     // A press virocore rerouted to a recently hovered node arrives with no
     // position (at the origin on older renderers); native grabs such a node
     // at its own position.
@@ -491,9 +491,9 @@ export function useViroNode(
       if (!pointer) return;
       const to = follow(rayAt(view, pointer.x, pointer.y));
       if (!to) return;
-      // Each frame, since the parent may itself be moving; the authored props
-      // stand in on a renderer that cannot read its drawn transform.
-      const local = (drawnParentSpace(scene, parent) ?? toLocal)(to);
+      // Each frame, since the parent may itself be moving; before the parent is
+      // drawn, or on a renderer that cannot read it, its authored props stand in.
+      const local = (drawnParentSpace(scene, parent) ?? authored)(to);
       scene.setNodePosition(node, local[0], local[1], local[2]);
       samples.push({ t: performance.now(), p: to });
       if (samples.length > 12) samples.shift();

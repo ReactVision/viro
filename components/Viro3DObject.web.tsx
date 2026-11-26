@@ -25,6 +25,7 @@ import {
   modelFormatFor,
   fetchModelBytes,
   inlineGltfExternals,
+  isGlb,
   resourceName,
 } from "./Web/viroModelLoader";
 import { ViroModelFormat } from "@reactvision/viro-web-renderer";
@@ -91,12 +92,14 @@ export function Viro3DObject(props: Props) {
         ),
       ]);
       if (cancelled) return false;
-      if (format === ViroModelFormat.GLTF) {
+      // The file's own header wins over `type`, so a GLB given under another type still loads.
+      const loadAs = isGlb(bytes) ? ViroModelFormat.GLB : format;
+      if (loadAs === ViroModelFormat.GLTF) {
         const inlined = await inlineGltfExternals(bytes, url, resources);
         if (cancelled) return false;
-        return renderer.loadModel(node, inlined, format);
+        return renderer.loadModel(node, inlined, loadAs);
       }
-      return renderer.loadModel(node, bytes, format, resources);
+      return renderer.loadModel(node, bytes, loadAs, resources);
     })()
       .then((success) => {
         if (cancelled) return;

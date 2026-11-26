@@ -6,8 +6,11 @@
  * here (the AR session, the desktop virtual camera, and the 3D navigators'
  * default camera), and a drag turns pointer positions into world rays itself.
  */
-import type { ViroArSession, ViroHandle, ViroSceneApi } from "@reactvision/viro-web-renderer";
+import type { ViroArSession, ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { conjugateQuat, multiplyQuats, quatFromEulerDegrees, rotateByQuaternion } from "./viroMath";
+import { activeSceneCamera, sceneCameraFieldOfView, sceneCameraOrthographic } from "./viroSceneCameras";
+
+export { activateSceneCamera, installDefaultCamera, setSceneCameraFieldOfView, setSceneCameraOrthographic } from "./viroSceneCameras";
 
 export type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
@@ -27,20 +30,6 @@ export type CameraView = {
 
 const views = new WeakMap<ViroSceneApi, CameraView>();
 
-/**
- * The scene's camera components, as native's ViroActiveCameraTracker keeps
- * them: the last one activated is the point of view, and releasing it goes
- * back to the default camera, never to an earlier one.
- */
-type SceneCameras = { active: ViroHandle | null; orthographic: Set<ViroHandle>; fallback: ViroHandle };
-const sceneCameras = new WeakMap<ViroSceneApi, SceneCameras>();
-
-function camerasOf(scene: ViroSceneApi): SceneCameras {
-  let cams = sceneCameras.get(scene);
-  if (!cams) sceneCameras.set(scene, (cams = { active: null, orthographic: new Set(), fallback: 0 }));
-  return cams;
-}
-
 export function setCameraView(scene: ViroSceneApi, view: CameraView | null): void {
   if (view) views.set(scene, view);
   else views.delete(scene);
@@ -48,19 +37,19 @@ export function setCameraView(scene: ViroSceneApi, view: CameraView | null): voi
 
 /**
  * The camera the scene draws from. Under a ViroCamera or ViroOrbitCamera that
- * is the camera node's last drawn pose, with the default camera's field of
- * view, which is the one virocore gives it; null while that pose is not known
+ * is the camera node's last drawn pose, with its field of view (the default
+ * camera's unless it sets one); null while that pose is not known
  * yet, on a renderer without the read, and under an orthographic projection.
  */
 export function cameraView(scene: ViroSceneApi): CameraView | null {
   const base = views.get(scene) ?? null;
-  const active = sceneCameras.get(scene)?.active;
+  const active = activeSceneCamera(scene);
   if (!active) return base;
-  if (!base || base.ar || sceneCameras.get(scene)!.orthographic.has(active)) return null;
+  if (!base || base.ar || sceneCameraOrthographic(scene, active)) return null;
   const t = typeof scene.getNodeWorldTransform === "function" ? scene.getNodeWorldTransform(active) : null;
   // All zero until the node has been drawn once.
   if (!t || t.scale.every((c) => c === 0)) return null;
-  const view = defaultCameraView(base.element);
+  const view = defaultCameraView(base.element, sceneCameraFieldOfView(scene, active));
   view.position = t.position;
   view.orientation = quatFromEulerDegrees(t.rotation);
   return view;
@@ -68,58 +57,22 @@ export function cameraView(scene: ViroSceneApi): CameraView | null {
 
 /** True while a camera component draws whose pose the web cannot report: orthographic, in AR, or on a renderer without the read. */
 export function sceneCameraUnreadable(scene: ViroSceneApi): boolean {
-  const cams = sceneCameras.get(scene);
-  if (!cams?.active) return false;
-  const base = views.get(scene);
+  const active = activeSceneCamera(scene);
+  if (!active) return false;
   return (
-    cams.orthographic.has(cams.active) ||
-    !!base?.ar ||
+    sceneCameraOrthographic(scene, active) ||
+    !!views.get(scene)?.ar ||
     typeof scene.getNodeWorldTransform !== "function"
   );
 }
 
 /**
- * Makes a camera component's node the point of view until the returned
- * release, which returns to the default camera if this one still draws.
+ * virocore's default camera: at the origin, looking down -Z, 90 degrees across
+ * the longer axis (kFovMonoMajor) unless `fieldOfView` gives that angle.
  */
-export function activateSceneCamera(scene: ViroSceneApi, node: ViroHandle): () => void {
-  const cams = camerasOf(scene);
-  cams.active = node;
-  scene.setActiveCameraNode(node);
-  return () => {
-    if (cams.active !== node) return;
-    cams.active = null;
-    if (cams.fallback) scene.setActiveCameraNode(cams.fallback);
-  };
-}
-
-export function setSceneCameraOrthographic(scene: ViroSceneApi, node: ViroHandle, orthographic: boolean): void {
-  const set = camerasOf(scene).orthographic;
-  if (orthographic) set.add(node);
-  else set.delete(node);
-}
-
-/**
- * A camera at the origin looking down -Z under `root`, which is virocore's
- * default and what a released camera component returns to: the renderer's own
- * default camera has no handle to return to.
- */
-export function installDefaultCamera(scene: ViroSceneApi, root: ViroHandle): () => void {
-  const node = scene.createNode();
-  scene.setNodeCamera(node);
-  scene.addChildNode(root, node);
-  const cams = camerasOf(scene);
-  cams.fallback = node;
-  return () => {
-    if (cams.fallback === node) cams.fallback = 0;
-    scene.removeNodeFromParent(node);
-    scene.destroyNode(node);
-  };
-}
-
-/** virocore's default camera: at the origin, looking down -Z, 90 degrees across the longer axis (kFovMonoMajor). */
-export function defaultCameraView(element: HTMLElement): CameraView {
-  const focal = () => Math.max(element.clientWidth, element.clientHeight, 1) / 2;
+export function defaultCameraView(element: HTMLElement, fieldOfView = 0): CameraView {
+  const halfTan = fieldOfView > 0 ? Math.tan((fieldOfView * Math.PI) / 360) : 1;
+  const focal = () => Math.max(element.clientWidth, element.clientHeight, 1) / 2 / halfTan;
   return {
     position: [0, 0, 0],
     orientation: [0, 0, 0, 1],
@@ -242,32 +195,6 @@ function planePointWithin(ray: { origin: Vec3; dir: Vec3 }, point: Vec3, normal:
   return add(foot, scale(toward, Math.sqrt(max * max - d * d) / len));
 }
 
-/**
- * World to local for a node whose parent's world origin is `origin`, given that
- * parent and its ancestors nearest first, each with its Euler degrees and
- * scale. A non-uniform scale under a rotation is not exact.
- */
-export function parentSpace(
-  origin: readonly number[],
-  ancestors: readonly { rotation?: readonly number[]; scale?: readonly number[] }[],
-): (world: Vec3) => Vec3 {
-  let rotation: Quat = [0, 0, 0, 1];
-  const size: Vec3 = [1, 1, 1];
-  for (const a of ancestors) {
-    rotation = multiplyQuats(quatFromEulerDegrees(a.rotation ?? [0, 0, 0]), rotation);
-    const s = a.scale ?? [1, 1, 1];
-    size[0] *= s[0] || 1;
-    size[1] *= s[1] || 1;
-    size[2] *= s[2] || 1;
-  }
-  const inverse = conjugateQuat(rotation);
-  const o: Vec3 = [origin[0] ?? 0, origin[1] ?? 0, origin[2] ?? 0];
-  return (world) => {
-    const v = rotateByQuaternion(inverse, sub(world, o));
-    return [v[0] / size[0], v[1] / size[1], v[2] / size[2]];
-  };
-}
-
 export type DragPlane = { planePoint?: number[]; planeNormal?: number[]; maxDistance?: number };
 
 /**
@@ -323,6 +250,53 @@ export function dragFollower(
     default:
       return null;
   }
+}
+
+const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+/**
+ * Turns a world point into a parent's own space, given the world positions of
+ * the parent's origin and of the points one unit along its x, y and z axes.
+ * Null when the axes are flat (a zero scale).
+ */
+export function parentSpace(origin: Vec3, x: Vec3, y: Vec3, z: Vec3): ((world: Vec3) => Vec3) | null {
+  const a = sub(x, origin);
+  const b = sub(y, origin);
+  const c = sub(z, origin);
+  const det = dot(a, cross(b, c));
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const rows = [cross(b, c), cross(c, a), cross(a, b)];
+  return (world) => {
+    const d = sub(world, origin);
+    return [dot(rows[0]!, d) / det, dot(rows[1]!, d) / det, dot(rows[2]!, d) / det];
+  };
+}
+
+/**
+ * World to local for a node whose parent's world origin is `origin`, given that
+ * parent and its ancestors nearest first, each with its Euler degrees and
+ * scale: their authored props. The drag's stand-in until the parent has been
+ * drawn. A non-uniform scale under a rotation is not exact.
+ */
+export function authoredParentSpace(
+  origin: readonly number[],
+  ancestors: readonly { rotation?: readonly number[]; scale?: readonly number[] }[],
+): (world: Vec3) => Vec3 {
+  let rotation: Quat = [0, 0, 0, 1];
+  const size: Vec3 = [1, 1, 1];
+  for (const a of ancestors) {
+    rotation = multiplyQuats(quatFromEulerDegrees(a.rotation ?? [0, 0, 0]), rotation);
+    const s = a.scale ?? [1, 1, 1];
+    size[0] *= s[0] || 1;
+    size[1] *= s[1] || 1;
+    size[2] *= s[2] || 1;
+  }
+  const inverse = conjugateQuat(rotation);
+  const o: Vec3 = [origin[0] ?? 0, origin[1] ?? 0, origin[2] ?? 0];
+  return (world) => {
+    const v = rotateByQuaternion(inverse, sub(world, o));
+    return [v[0] / size[0], v[1] / size[1], v[2] / size[2]];
+  };
 }
 
 /** Velocity over the last ~80 ms of samples, for the throw when a dragged body is let go. */

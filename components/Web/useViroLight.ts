@@ -3,8 +3,8 @@
  * it's created via the C API, added to the enclosing node, updated as props
  * change, and removed on unmount.
  */
-import { useState, useEffect } from "react";
-import { ViroLightType, type ViroHandle } from "@reactvision/viro-web-renderer";
+import { useState, useEffect, useRef } from "react";
+import { ViroLightType, type ViroHandle, type ViroSceneApi } from "@reactvision/viro-web-renderer";
 import { useViroScene, useViroParentNode } from "./ViroWebContext";
 import { parseColorToRGBA } from "./viroColor";
 
@@ -31,15 +31,29 @@ export interface ViroWebLightProps {
   shadowOrthographicPosition?: [number, number, number];
 }
 
+type LightEntry = { type: ViroLightType; parent: ViroHandle; props(): ViroWebLightProps };
+const lightEntries = new WeakMap<ViroSceneApi, Map<ViroHandle, LightEntry>>();
+
+/** The lights this hook has made in `scene`, with the node each is on and its current props, for a host that inspects the scene. */
+export function viroLightEntries(scene: ViroSceneApi): ReadonlyMap<ViroHandle, LightEntry> {
+  return lightEntries.get(scene) ?? new Map();
+}
+
 export function useViroLight(type: ViroLightType, props: ViroWebLightProps): ViroHandle {
   const scene = useViroScene();
   const parent = useViroParentNode();
 
   const [light] = useState<ViroHandle>(() => scene.createLight(type));
+  const propsRef = useRef(props);
+  propsRef.current = props;
 
   useEffect(() => {
     scene.addLightToNode(parent, light);
+    let entries = lightEntries.get(scene);
+    if (!entries) lightEntries.set(scene, (entries = new Map()));
+    entries.set(light, { type, parent, props: () => propsRef.current });
     return () => {
+      entries.delete(light);
       scene.removeLightFromNode(parent, light);
       scene.destroyLight(light);
     };

@@ -6,25 +6,89 @@
  */
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import type { ViroHandle, ViroSceneApi, ViroWebRenderer } from "@reactvision/viro-web-renderer";
+import { ViroLightType, type ViroHandle, type ViroSceneApi, type ViroWebRenderer } from "@reactvision/viro-web-renderer";
 
 import { useViroRenderer } from "../components/Web/ViroWebContext";
+import { viroLightEntries, type ViroWebLightProps } from "../components/Web/useViroLight";
 import { viroNodeEntries } from "../components/Web/useViroNode";
 import { cameraView, type CameraView } from "../components/Web/viroDrag";
+import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { VIRO_SOURCE_PROP, type ViroSource } from "./sceneModule";
 
-export type TriangleBudget = { label: string; max_triangles: number };
+export type ModelBudget = { label: string; max_triangles: number; max_texture_bytes?: number; max_texture_dimension?: number };
+
+type Vec3 = [number, number, number];
 
 // ─── What the GPU draws ───────────────────────────────────────────────────
 // The renderer reports no statistics, so its WebGL draw calls are counted.
 const counting = { draws: 0, triangles: 0 };
 let lastFrame: { draws: number; triangles: number } | null = null;
 
+// Textures by context, sized from what the renderer allocates for each.
+type TextureSize = { levels: Map<string, number>; mipmapped: boolean; dimension: number };
+const contexts = new Map<WebGL2RenderingContext, Map<WebGLTexture, TextureSize>>();
+
+// Bytes a pixel of a sized internal format; anything else is taken as RGBA8.
+const PIXEL_BYTES: Record<number, number> = {
+  0x1906: 1, 0x1909: 1, 0x8229: 1, // ALPHA, LUMINANCE, R8
+  0x190a: 2, 0x822b: 2, 0x822d: 2, 0x81a5: 2, // LUMINANCE_ALPHA, RG8, R16F, DEPTH_COMPONENT16
+  0x881a: 8, 0x881b: 8, 0x8230: 8, // RGBA16F, RGB16F, RG32F
+  0x8814: 16, 0x8815: 16, // RGBA32F, RGB32F
+};
+// The binding a texture call's target writes to.
+const BINDING: Record<number, number> = { 0x0de1: 0x8069, 0x8513: 0x8514, 0x806f: 0x806a, 0x8c1a: 0x8c1d };
+const bindingOf = (target: number) => (target >= 0x8515 && target <= 0x851a ? 0x8514 : BINDING[target]);
+
+function boundTexture(gl: WebGL2RenderingContext, target: number): TextureSize | null {
+  const binding = bindingOf(target);
+  const texture = binding === undefined ? null : (gl.getParameter(binding) as WebGLTexture | null);
+  if (!texture) return null;
+  let sizes = contexts.get(gl);
+  if (!sizes) {
+    // A new renderer is when the last one's context has gone.
+    for (const old of contexts.keys()) {
+      if (old.isContextLost() || (old.canvas as HTMLCanvasElement).isConnected === false) contexts.delete(old);
+    }
+    contexts.set(gl, (sizes = new Map()));
+  }
+  let size = sizes.get(texture);
+  if (!size) sizes.set(texture, (size = { levels: new Map(), mipmapped: false, dimension: 0 }));
+  return size;
+}
+
+function noteLevel(gl: WebGL2RenderingContext, target: number, level: number | string, bytes: number, width: number, height: number): void {
+  const size = boundTexture(gl, target);
+  if (!size || !Number.isFinite(bytes)) return;
+  size.levels.set(`${target}:${level}`, bytes);
+  if (level === 0 || level === "all") size.dimension = Math.max(size.dimension, width, height);
+}
+
+/** Bytes of texture the live renderers hold, and the longest side among them. An estimate: drivers pad and align as they like. */
+function textureMemory(): { bytes: number; dimension: number } {
+  let bytes = 0;
+  let dimension = 0;
+  for (const [gl, sizes] of contexts) {
+    const canvas = gl.canvas as HTMLCanvasElement;
+    if (gl.isContextLost() || canvas.isConnected === false) {
+      contexts.delete(gl);
+      continue;
+    }
+    for (const size of sizes.values()) {
+      let own = 0;
+      for (const b of size.levels.values()) own += b;
+      bytes += size.mipmapped ? (own * 4) / 3 : own;
+      dimension = Math.max(dimension, size.dimension);
+    }
+  }
+  return { bytes, dimension };
+}
+
 const trianglesOf = (mode: number, count: number) =>
   // TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN
   mode === 4 ? Math.floor(count / 3) : mode === 5 || mode === 6 ? Math.max(0, count - 2) : 0;
 
-export function countDrawCalls(): void {
+/** Counts the renderer's draw calls and sizes its textures. Call before the renderer makes its context. */
+export function watchGpu(): void {
   if (typeof WebGL2RenderingContext === "undefined") return;
   const gl = WebGL2RenderingContext.prototype as unknown as Record<string, (...a: number[]) => unknown>;
   // Method name, then the positions of its count and instance-count arguments.
@@ -38,65 +102,182 @@ export function countDrawCalls(): void {
   for (const [name, countAt, instancesAt] of draws) {
     const original = gl[name];
     if (typeof original !== "function") continue;
-    gl[name] = function (this: unknown, ...a: number[]) {
+    // Named arguments, not a rest array: this runs for every draw call of every frame. The longest takes six,
+    // and a call ignores the ones past its own.
+    gl[name] = function (this: unknown, a0: number, a1: number, a2: number, a3: number, a4: number, a5: number) {
       counting.draws++;
-      counting.triangles += trianglesOf(a[0]!, a[countAt]!) * (instancesAt === undefined ? 1 : a[instancesAt]!);
-      return original.apply(this, a);
+      // eslint-disable-next-line prefer-rest-params
+      counting.triangles += trianglesOf(a0, arguments[countAt]) * (instancesAt === undefined ? 1 : arguments[instancesAt]);
+      return original.call(this, a0, a1, a2, a3, a4, a5);
     };
   }
+
+  // Runs after the call it follows, and never fails it.
+  const after = (name: string, note: (gl: WebGL2RenderingContext, a: any[]) => void) => {
+    const original = gl[name];
+    if (typeof original !== "function") return;
+    gl[name] = function (this: unknown, ...a: number[]) {
+      const result = original.apply(this, a);
+      try {
+        note(this as WebGL2RenderingContext, a);
+      } catch {
+        // A size that cannot be read is left out of the estimate.
+      }
+      return result;
+    };
+  };
+  const pixels = (format: number) => PIXEL_BYTES[format] ?? 4;
+  after("texImage2D", (ctx, a) => {
+    // (target, level, internalformat, width, height, border, ...) or (target, level, internalformat, format, type, source).
+    const sized = a.length >= 8;
+    const w = sized ? a[3] : a[5]?.videoWidth || a[5]?.naturalWidth || a[5]?.width || 0;
+    const h = sized ? a[4] : a[5]?.videoHeight || a[5]?.naturalHeight || a[5]?.height || 0;
+    noteLevel(ctx, a[0], a[1], w * h * pixels(a[2]), w, h);
+  });
+  after("texImage3D", (ctx, a) => noteLevel(ctx, a[0], a[1], a[3] * a[4] * a[5] * pixels(a[2]), a[3], a[4]));
+  // Immutable storage holds its whole chain, about a third more than the first level.
+  after("texStorage2D", (ctx, a) => noteLevel(ctx, a[0], "all", a[3] * a[4] * pixels(a[2]) * (a[1] > 1 ? 4 / 3 : 1), a[3], a[4]));
+  after("texStorage3D", (ctx, a) => noteLevel(ctx, a[0], "all", a[3] * a[4] * a[5] * pixels(a[2]) * (a[1] > 1 ? 4 / 3 : 1), a[3], a[4]));
+  after("compressedTexImage2D", (ctx, a) => noteLevel(ctx, a[0], a[1], typeof a[6] === "number" ? a[6] : a[6]?.byteLength ?? 0, a[3], a[4]));
+  after("generateMipmap", (ctx, a) => {
+    const size = boundTexture(ctx, a[0]);
+    if (size) size.mipmapped = true;
+  });
+  after("deleteTexture", (ctx, a) => void contexts.get(ctx)?.delete(a[0]));
 }
 
-// One renderer frame's worth: what was drawn since the last animation frame.
-function sampleFrame() {
-  if (counting.draws) lastFrame = { ...counting };
+// One renderer frame's worth: what was drawn since the last animation frame. True when a frame was drawn.
+function sampleFrame(): boolean {
+  const drew = counting.draws > 0;
+  if (drew) lastFrame = { ...counting };
   counting.draws = counting.triangles = 0;
+  return drew;
 }
 
-// ─── Model triangles ──────────────────────────────────────────────────────
-const modelTriangles = new Map<string, number | null>();
+// ─── Model sizes ──────────────────────────────────────────────────────────
+/** `textureDimension` is 0 when no texture's size could be read. */
+type ModelSize = { triangles: number; textureBytes: number; textureDimension: number; parts: ModelPart[]; partsLeftOut: number };
+/** A node of the model's own tree that holds a mesh, or holds nodes that do. `triangles` counts its whole subtree. */
+type ModelPart = { name: string; path: string; depth: number; triangles: number; materials: string[] };
+const MAX_PARTS = 300;
+const modelSizes = new Map<string, ModelSize | null>();
 
-/** Triangles in a glTF or GLB, counted as reactviro_check_performance_budget counts them: each mesh's TRIANGLES primitives once. */
-function gltfTriangles(buf: ArrayBuffer): number | null {
-  let doc: { meshes?: Array<{ primitives?: Array<{ mode?: number; indices?: number; attributes?: { POSITION?: number } }> }>; accessors?: Array<{ count?: number }> };
+/**
+ * A glTF or GLB measured as reactviro_check_performance_budget measures it: each
+ * mesh's TRIANGLES primitives once, the bytes of its embedded images, and the
+ * longest side among its PNGs (a JPEG's size is not read there either).
+ */
+function gltfSize(buf: ArrayBuffer): ModelSize | null {
+  let doc: {
+    meshes?: Array<{ name?: string; primitives?: Array<{ mode?: number; indices?: number; material?: number; attributes?: { POSITION?: number } }> }>;
+    nodes?: Array<{ name?: string; mesh?: number; children?: number[] }>;
+    scenes?: Array<{ nodes?: number[] }>;
+    scene?: number;
+    materials?: Array<{ name?: string }>;
+    accessors?: Array<{ count?: number }>;
+    images?: Array<{ mimeType?: string; bufferView?: number }>;
+    bufferViews?: Array<{ byteOffset?: number; byteLength?: number }>;
+  };
+  let bin: DataView | null = null;
   try {
     const view = new DataView(buf);
     if (buf.byteLength >= 20 && view.getUint32(0, true) === 0x46546c67) {
       if (view.getUint32(16, true) !== 0x4e4f534a) return null;
-      doc = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, view.getUint32(12, true))));
+      const jsonLength = view.getUint32(12, true);
+      doc = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLength)));
+      const at = 20 + jsonLength;
+      if (at + 8 <= buf.byteLength && view.getUint32(at + 4, true) === 0x004e4942) {
+        bin = new DataView(buf, at + 8, Math.min(view.getUint32(at, true), buf.byteLength - at - 8));
+      }
     } else {
       doc = JSON.parse(new TextDecoder().decode(buf));
     }
   } catch {
     return null;
   }
-  let n = 0;
-  for (const mesh of doc.meshes ?? []) {
+  const meshTriangles = (mesh: NonNullable<typeof doc.meshes>[number]) => {
+    let n = 0;
     for (const p of mesh.primitives ?? []) {
       if ((p.mode ?? 4) !== 4) continue;
       n += Math.floor((doc.accessors?.[p.indices ?? p.attributes?.POSITION ?? -1]?.count ?? 0) / 3);
     }
+    return n;
+  };
+  let triangles = 0;
+  for (const mesh of doc.meshes ?? []) triangles += meshTriangles(mesh);
+  let textureBytes = 0;
+  let textureDimension = 0;
+  for (const image of doc.images ?? []) {
+    const view = doc.bufferViews?.[image.bufferView ?? -1];
+    if (!view?.byteLength) continue;
+    textureBytes += view.byteLength;
+    const start = view.byteOffset ?? 0;
+    // A PNG's width and height are at fixed offsets in its first chunk.
+    if (bin && (image.mimeType ?? "").includes("png") && start + 24 <= bin.byteLength && bin.getUint32(start) === 0x89504e47) {
+      textureDimension = Math.max(textureDimension, bin.getUint32(start + 16), bin.getUint32(start + 20));
+    }
   }
-  return n;
+  const parts: ModelPart[] = [];
+  let partsLeftOut = 0;
+  const seen = new Set<number>();
+  // Returns the subtree's triangles, or -1 when it holds no mesh.
+  const visit = (i: number, depth: number, trail: string[]): number => {
+    const node = doc.nodes?.[i];
+    if (!node || seen.has(i)) return -1;
+    seen.add(i);
+    const mesh = node.mesh === undefined ? undefined : doc.meshes?.[node.mesh];
+    const name = node.name || mesh?.name || `Node ${i}`;
+    const path = [...trail, name];
+    const part: ModelPart = {
+      name,
+      path: path.join(" > "),
+      depth,
+      triangles: 0,
+      materials: [...new Set((mesh?.primitives ?? []).map((p) => doc.materials?.[p.material ?? -1]?.name).filter((m): m is string => !!m))],
+    };
+    const at = parts.length;
+    if (at < MAX_PARTS) parts.push(part);
+    let total = mesh ? meshTriangles(mesh) : -1;
+    for (const child of node.children ?? []) {
+      const t = visit(child, depth + 1, path);
+      if (t >= 0) total = Math.max(total, 0) + t;
+    }
+    if (total < 0) {
+      if (at < MAX_PARTS) parts.splice(at, parts.length - at);
+      return -1;
+    }
+    if (at >= MAX_PARTS) partsLeftOut++;
+    part.triangles = total;
+    return total;
+  };
+  const childOf = new Set((doc.nodes ?? []).flatMap((n) => n.children ?? []));
+  const roots = doc.scenes?.[doc.scene ?? 0]?.nodes ?? (doc.nodes ?? []).map((_, i) => i).filter((i) => !childOf.has(i));
+  for (const root of roots) visit(root, 0, []);
+  return { triangles, textureBytes, textureDimension, parts, partsLeftOut };
 }
 
-/** Counts a loaded model's triangles from the response the scene fetched it with. */
+/** Measures a loaded model from the response the scene fetched it with. */
 export function noteModelResponse(url: string, res: Response): void {
-  if (!res.ok || !/\.(glb|gltf)$/i.test(url.split(/[?#]/)[0]!)) return;
+  // Measured once: a remounted scene asks for the same models again.
+  if (!res.ok || modelSizes.has(url) || !/\.(glb|gltf)$/i.test(url.split(/[?#]/)[0]!)) return;
   res
     .clone()
     .arrayBuffer()
-    .then((buf) => modelTriangles.set(url, gltfTriangles(buf)))
+    .then((buf) => modelSizes.set(url, gltfSize(buf)))
     .catch(() => {});
 }
 
 // ─── The scene being inspected ────────────────────────────────────────────
 let inspected: ViroWebRenderer | null = null;
+/** Counts scene mounts, since an update can remount the scene with the same renderer and handles. */
+let inspectedMounts = 0;
 
 /** Rendered inside a scene, so the inspector can reach its renderer. */
 export function InspectorProbe() {
   const renderer = useViroRenderer();
   useEffect(() => {
     inspected = renderer;
+    inspectedMounts++;
     return () => {
       if (inspected === renderer) inspected = null;
     };
@@ -104,14 +285,52 @@ export function InspectorProbe() {
   return null;
 }
 
-type Row = { handle: ViroHandle; source: ViroSource; depth: number; detail: string; triangles?: number | null };
+type LightInfo = { type: ViroLightType; parent: ViroHandle; props: ViroWebLightProps };
+type Row = {
+  /** Unique in the list. A part's is its model's, then `#` and its index. */
+  id: string;
+  /** The same element after an update remounts the scene with new handles. */
+  key: string;
+  kind: "node" | "light" | "part";
+  /** The node's or the light's; a part's model's. */
+  handle: ViroHandle;
+  source: ViroSource;
+  depth: number;
+  detail: string;
+  size?: ModelSize | null;
+  scale: Vec3;
+  light?: LightInfo;
+  part?: ModelPart;
+};
 
 const basename = (uri: string) => decodeURIComponent(uri.split(/[?#]/)[0]!.split("/").pop() ?? uri);
 const sourceKey = (s: ViroSource) => `${s.name}@${s.file}:${s.line}`;
+const LIGHT_NAMES: Record<ViroLightType, string> = {
+  [ViroLightType.Ambient]: "ViroAmbientLight",
+  [ViroLightType.Directional]: "ViroDirectionalLight",
+  [ViroLightType.Omni]: "ViroOmniLight",
+  [ViroLightType.Spot]: "ViroSpotLight",
+};
+const vec = (v: readonly number[]) => `[${v.map((n) => +n.toFixed(2)).join(", ")}]`;
 const fmt = (n: number) => n.toLocaleString("en-US");
+const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
+function lightDetail(l: LightInfo): string {
+  const p = l.props;
+  return [
+    typeof p.color === "string" ? p.color : "",
+    p.intensity !== undefined ? `intensity ${p.intensity}` : "",
+    (l.type === ViroLightType.Omni || l.type === ViroLightType.Spot) && p.position ? `at ${vec(p.position)}` : "",
+    (l.type === ViroLightType.Directional || l.type === ViroLightType.Spot) && p.direction ? `pointing ${vec(p.direction)}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/** The scene's nodes and lights, each under the nearest listed node above it. */
 function rowsOf(scene: ViroSceneApi): Row[] {
   const entries = viroNodeEntries(scene);
+  const lights = viroLightEntries(scene);
   const stampOf = (props: object) => (props as Record<string, unknown>)[VIRO_SOURCE_PROP] as ViroSource | undefined;
   const stamped = [...entries.values()].some((e) => stampOf(e.props()));
   // A preview compiled before sources were stamped still lists its nodes, unnamed.
@@ -120,36 +339,92 @@ function rowsOf(scene: ViroSceneApi): Row[] {
     if (!e) return null;
     return stampOf(e.props()) ?? (stamped ? null : { name: "Node", file: "", line: 0 });
   };
-  const children = new Map<ViroHandle, ViroHandle[]>();
-  for (const [h, e] of entries) {
-    if (!sourceOf(h)) continue;
-    // Under the nearest listed ancestor; the scene's own wrappers are not listed.
-    let p = e.parent;
+  const lightSourceOf = (h: ViroHandle): ViroSource | null => {
+    const l = lights.get(h)!;
+    return stampOf(l.props()) ?? (stamped ? null : { name: LIGHT_NAMES[l.type], file: "", line: 0 });
+  };
+  type Kid = { kind: "node" | "light"; h: ViroHandle; source: ViroSource };
+  const children = new Map<ViroHandle, Kid[]>();
+  // Under the nearest listed ancestor; the scene's own wrappers are not listed.
+  const place = (parent: ViroHandle, kid: Kid) => {
+    let p = parent;
     while (entries.has(p) && !sourceOf(p)) p = entries.get(p)!.parent;
     const at = entries.has(p) ? p : 0;
-    children.set(at, [...(children.get(at) ?? []), h]);
+    children.set(at, [...(children.get(at) ?? []), kid]);
+  };
+  for (const [h, e] of entries) {
+    const source = sourceOf(h);
+    if (source) place(e.parent, { kind: "node", h, source });
+  }
+  for (const [h, l] of lights) {
+    const source = lightSourceOf(h);
+    if (source) place(l.parent, { kind: "light", h, source });
   }
   const rows: Row[] = [];
   const walk = (parent: ViroHandle, depth: number) => {
-    const kids = (children.get(parent) ?? []).sort((a, b) => {
-      const sa = sourceOf(a)!, sb = sourceOf(b)!;
-      return sa.file.localeCompare(sb.file) || sa.line - sb.line || a - b;
-    });
-    for (const h of kids) {
+    const kids = (children.get(parent) ?? []).sort(
+      (a, b) => a.source.file.localeCompare(b.source.file) || a.source.line - b.source.line || a.h - b.h,
+    );
+    for (const { kind, h, source } of kids) {
+      if (kind === "light") {
+        const l = lights.get(h)!;
+        const light = { type: l.type, parent: l.parent, props: l.props() };
+        rows.push({ id: `l${h}`, key: sourceKey(source), kind, handle: h, source, depth, detail: lightDetail(light), scale: [1, 1, 1], light });
+        continue;
+      }
       const props = entries.get(h)!.props() as Record<string, unknown>;
-      const source = sourceOf(h)!;
       let detail = "";
-      let triangles: number | null | undefined;
+      let size: ModelSize | null | undefined;
       if (typeof props.text === "string") detail = `"${props.text.length > 28 ? `${props.text.slice(0, 27)}...` : props.text}"`;
       const uri = typeof props.source === "string" ? props.source : (props.source as { uri?: unknown } | undefined)?.uri;
-      if (typeof uri === "string" && !uri.startsWith("data:")) detail = basename(uri);
-      if (source.name === "Viro3DObject" && typeof uri === "string") triangles = modelTriangles.get(uri);
-      rows.push({ handle: h, source, depth, detail, triangles });
+      if (typeof uri === "string" && !uri.startsWith("data:")) detail = uri === PLACEHOLDER_MODEL_URL ? "placeholder" : basename(uri);
+      // The stand-in's size says nothing about the model it stands for.
+      if (source.name === "Viro3DObject" && typeof uri === "string" && uri !== PLACEHOLDER_MODEL_URL) size = modelSizes.get(uri);
+      const s = props.scale;
+      const scale: Vec3 = Array.isArray(s) && s.length === 3 && s.every((n) => Number.isFinite(n)) ? [s[0], s[1], s[2]] : [1, 1, 1];
+      rows.push({ id: `n${h}`, key: sourceKey(source), kind, handle: h, source, depth, detail, size, scale });
       walk(h, depth + 1);
     }
   };
   walk(0, 0);
   return rows;
+}
+
+// The node selected in the open panel: framing then fits it and what is under it.
+let framedRow: string | null = null;
+
+/**
+ * The centre of the nodes the scene's code made, and how far back a camera
+ * frames them all from. Null before the scene has any.
+ */
+export function contentFraming(): { center: Vec3; distance: number } | null {
+  const scene = inspected?.scene;
+  if (!scene) return null;
+  let rows = rowsOf(scene).filter((r) => r.kind === "node");
+  const at = framedRow ? rows.findIndex((r) => r.id === framedRow) : -1;
+  if (at >= 0) {
+    let end = at + 1;
+    while (end < rows.length && rows[end]!.depth > rows[at]!.depth) end++;
+    rows = rows.slice(at, end);
+  }
+  // Leaves only: a container's own origin says nothing about where its content is.
+  const leaves = rows.filter((r, i) => (rows[i + 1]?.depth ?? 0) <= r.depth);
+  const points = leaves.map((r) => scene.getNodeWorldPosition(r.handle)).filter((p): p is Vec3 => !!p);
+  if (!points.length) return null;
+  const min: Vec3 = [...points[0]!];
+  const max: Vec3 = [...points[0]!];
+  for (const p of points) {
+    for (let i = 0; i < 3; i++) {
+      min[i] = Math.min(min[i]!, p[i]!);
+      max[i] = Math.max(max[i]!, p[i]!);
+    }
+  }
+  const view = cameraView(scene);
+  const halfField = view ? Math.min(view.cx / view.fx, view.cy / view.fy) : Math.tan(Math.PI / 6);
+  // A node's own size is not known here, so its scale stands in: a node a metre across at that scale fits.
+  const reach = Math.min(5, Math.max(0.3, ...leaves.map((r) => 0.9 * Math.max(...r.scale.map(Math.abs)))));
+  const radius = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 + reach;
+  return { center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2], distance: radius / halfField };
 }
 
 function project(view: CameraView, p: [number, number, number]): { x: number; y: number } | null {
@@ -166,23 +441,84 @@ function project(view: CameraView, p: [number, number, number]): { x: number; y:
   return { x: rect.left + view.cx + (view.fx * v[0]!) / -v[2]!, y: rect.top + view.cy - (view.fy * v[1]!) / -v[2]! };
 }
 
-/** The sentence the assistant gets for a selected node. */
-function selectionText(row: Row, at: [number, number, number] | null, budgets: TriangleBudget[], scene: string | undefined): string {
-  const where = row.source.file ? ` at ${row.source.file}:${row.source.line}` : "";
-  const facts = [
-    row.detail ? `showing ${row.detail}` : "",
-    at ? `world position [${at.map((n) => n.toFixed(2)).join(", ")}]` : "",
-    row.triangles != null ? `${fmt(row.triangles)} triangles${overBudget(row.triangles, budgets)}` : "",
-  ].filter(Boolean);
-  return (
-    `In the Viro Live preview${scene ? ` of ${scene}` : ""}, the developer selected <${row.source.name}>${where}` +
-    `${facts.length ? ` (${facts.join(", ")})` : ""}. When they say "this" or "the selected node", they mean that element.`
-  );
+const isIdentity = (v: unknown, one: number) => !Array.isArray(v) || v.every((n) => n === one);
+
+/** Where the marker goes: a node's origin, or an omni or spot light's position. Null for what has no point of its own. */
+function markerAt(scene: ViroSceneApi, row: Row): Vec3 | null {
+  if (row.kind === "node") return scene.getNodeWorldPosition(row.handle);
+  const l = row.light;
+  if (!l || (l.type !== ViroLightType.Omni && l.type !== ViroLightType.Spot)) return null;
+  // The position is in its node's space, and only a node's world position can be read, so a turned or scaled node above it leaves it unplaced.
+  const entries = viroNodeEntries(scene);
+  for (let h = l.parent; entries.has(h); h = entries.get(h)!.parent) {
+    const p = entries.get(h)!.props();
+    if (!isIdentity(p.rotation, 0) || !isIdentity(p.scale, 1)) return null;
+  }
+  const origin = scene.getNodeWorldPosition(l.parent);
+  const at = l.props.position ?? [0, 0, 0];
+  return origin ? [origin[0] + at[0], origin[1] + at[1], origin[2] + at[2]] : null;
 }
 
-function overBudget(triangles: number, budgets: TriangleBudget[]): string {
-  const over = budgets.filter((b) => triangles > b.max_triangles).map((b) => `${b.label} ${fmt(b.max_triangles)}`);
-  return over.length ? `, over the single-model budget for ${over.join(", ")}` : "";
+/** The sentence the assistant gets for a selected row; `model` is a part's model. */
+function selectionText(row: Row, model: Row | undefined, at: Vec3 | null, budgets: ModelBudget[], scene: string | undefined): string {
+  const lead = `In the Viro Live preview${scene ? ` of ${scene}` : ""}, the developer selected`;
+  const whereOf = (r: Row) => (r.source.file ? ` at ${r.source.file}:${r.source.line}` : "");
+  const meaning = `When they say "this" or "the selected node", they mean that element.`;
+  if (row.part && model) {
+    const facts = [`${fmt(row.part.triangles)} triangles`, row.part.materials.length ? `materials ${row.part.materials.join(", ")}` : ""].filter(Boolean);
+    return (
+      `${lead} "${row.part.path}", a node inside the model ${model.detail} that <${model.source.name}>${whereOf(model)} loads (${facts.join(", ")}). ` +
+      `It is part of the model file, not of the scene's code. ${meaning}`
+    );
+  }
+  const facts = [
+    row.kind === "light" ? row.detail : row.detail ? `showing ${row.detail}` : "",
+    at ? `world position ${vec(at)}` : "",
+    row.size ? `${sizeText(row.size)}${overBudgetText(row.size, budgets)}` : "",
+  ].filter(Boolean);
+  return `${lead} <${row.source.name}>${whereOf(row)}${facts.length ? ` (${facts.join(", ")})` : ""}. ${meaning}`;
+}
+
+/** The rows with the parts of the selected model, or of the model a selected part is in, under it. */
+function withParts(rows: Row[], selectedId: string | undefined): Row[] {
+  const modelId = selectedId?.split("#")[0];
+  const at = rows.findIndex((r) => r.id === modelId);
+  const model = rows[at];
+  if (!model?.size?.parts.length) return rows;
+  const parts = model.size.parts.map(
+    (part, i): Row => ({
+      ...model,
+      id: `${model.id}#${i}`,
+      key: `${model.key}#${i}`,
+      kind: "part",
+      depth: model.depth + 1 + part.depth,
+      detail: `${fmt(part.triangles)} triangles`,
+      size: undefined,
+      part,
+    }),
+  );
+  return [...rows.slice(0, at + 1), ...parts, ...rows.slice(at + 1)];
+}
+
+const sizeText = (s: ModelSize) =>
+  [`${fmt(s.triangles)} triangles`, s.textureBytes ? `${mb(s.textureBytes)} of textures` : "", s.textureDimension ? `textures up to ${s.textureDimension} px` : ""]
+    .filter(Boolean)
+    .join(", ");
+
+/** What a model exceeds of one platform's single-model budget, as reactviro_check_performance_budget words it. */
+function overBudget(s: ModelSize, b: ModelBudget): string[] {
+  const over: string[] = [];
+  if (s.triangles > b.max_triangles) over.push(`${fmt(s.triangles)} triangles > ${fmt(b.max_triangles)}`);
+  if (b.max_texture_bytes !== undefined && s.textureBytes > b.max_texture_bytes) over.push(`${mb(s.textureBytes)} textures > ${mb(b.max_texture_bytes)}`);
+  if (b.max_texture_dimension !== undefined && s.textureDimension > b.max_texture_dimension) {
+    over.push(`${s.textureDimension} px texture dimension > ${b.max_texture_dimension} px`);
+  }
+  return over;
+}
+
+function overBudgetText(s: ModelSize, budgets: ModelBudget[]): string {
+  const over = budgets.map((b) => ({ b, over: overBudget(s, b) })).filter((x) => x.over.length);
+  return over.length ? `, over the single-model budget for ${over.map((x) => `${x.b.label} (${x.over.join("; ")})`).join(", ")}` : "";
 }
 
 export function InspectPanel({
@@ -193,7 +529,7 @@ export function InspectPanel({
   copy,
   onClose,
 }: {
-  budgets: TriangleBudget[];
+  budgets: ModelBudget[];
   scene: string | undefined;
   /** Null when nothing is selected; undefined where no assistant is listening. */
   onSelection?: (text: string | null) => void;
@@ -202,35 +538,60 @@ export function InspectPanel({
   onClose(): void;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [frame, setFrame] = useState(lastFrame);
-  const [selected, setSelected] = useState<{ handle: ViroHandle; key: string } | null>(null);
+  const [stats, setStats] = useState<{ frame: typeof lastFrame; fps: number | null; textures: { bytes: number; dimension: number } }>({
+    frame: lastFrame,
+    fps: null,
+    textures: { bytes: 0, dimension: 0 },
+  });
+  const [selected, setSelected] = useState<{ id: string; key: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [mounts, setMounts] = useState(inspectedMounts);
   const marker = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const shown = withParts(rows, selected?.id);
+  const expanded = rows.find((r) => r.id === selected?.id.split("#")[0]);
+  const lastPart = expanded?.size?.parts.length ? `${expanded.id}#${expanded.size.parts.length - 1}` : null;
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
+  useEffect(() => {
+    framedRow = selected?.id.split("#")[0] ?? null;
+    return () => void (framedRow = null);
+  }, [selected]);
 
   // The node list is filled from effects as the scene mounts, so it is read again while the panel is open.
   useEffect(() => {
+    let frames = 0;
+    let since = performance.now();
+    let seenMounts = inspectedMounts;
     const read = () => {
       const next = inspected ? rowsOf(inspected.scene) : [];
       setRows(next);
-      setFrame(lastFrame);
+      // One read late: right after a mount, world positions are still the origin until a frame renders.
+      setMounts(seenMounts);
+      seenMounts = inspectedMounts;
+      const now = performance.now();
+      setStats({ frame: lastFrame, fps: now > since ? Math.round((frames * 1000) / (now - since)) : null, textures: textureMemory() });
+      frames = 0;
+      since = now;
       const sel = selectedRef.current;
       // An update remounts the scene with new handles: keep the same element selected if it is still there.
-      if (sel && !next.some((r) => r.handle === sel.handle)) {
-        const same = next.find((r) => sourceKey(r.source) === sel.key);
-        setSelected(same ? { handle: same.handle, key: sel.key } : null);
+      const [base, part] = sel?.id.split("#") ?? [];
+      if (sel && !next.some((r) => r.id === base)) {
+        const same = next.find((r) => r.key === sel.key.split("#")[0]);
+        setSelected(same ? { id: part === undefined ? same.id : `${same.id}#${part}`, key: sel.key } : null);
       }
     };
     read();
     const timer = setInterval(read, 500);
     let raf = 0;
     const tick = () => {
-      sampleFrame();
+      if (sampleFrame()) frames++;
       const sel = selectedRef.current;
       const el = marker.current;
       const view = inspected && cameraView(inspected.scene);
-      const at = sel && inspected ? inspected.scene.getNodeWorldPosition(sel.handle) : null;
+      const selRow = sel ? shownRef.current.find((r) => r.id === sel.id) : undefined;
+      const at = selRow && inspected ? markerAt(inspected.scene, selRow) : null;
       const pos = view && at ? project(view, at) : null;
       if (el) {
         el.style.display = pos ? "block" : "none";
@@ -250,16 +611,22 @@ export function InspectPanel({
     };
   }, []);
 
-  const row = selected ? rows.find((r) => r.handle === selected.handle) : undefined;
-  const text = row ? selectionText(row, inspected?.scene.getNodeWorldPosition(row.handle) ?? null, budgets, scene) : null;
+  const row = selected ? shown.find((r) => r.id === selected.id) : undefined;
+  const model = row?.part ? rows.find((r) => r.id === row.id.split("#")[0]) : undefined;
+  const text = row ? selectionText(row, model, inspected ? markerAt(inspected.scene, row) : null, budgets, scene) : null;
+  const textRef = useRef(text);
+  textRef.current = text;
+  // Not keyed on the text itself: it carries the live position, which changes while a node moves.
+  const selectionKey = row ? `${mounts}\n${row.id}\n${selectionText(row, model, null, budgets, scene)}` : null;
   useEffect(() => {
-    onSelection?.(text);
+    onSelection?.(textRef.current);
     setCopied(false);
-  }, [text]);
+  }, [selectionKey]);
   useEffect(() => () => onSelection?.(null), []);
 
   const { chip, button } = styles;
-  const models = rows.filter((r) => r.triangles != null);
+  const models = rows.filter((r) => r.size);
+  const { frame, fps, textures } = stats;
   return (
     <>
       <div
@@ -274,40 +641,64 @@ export function InspectPanel({
             Close
           </button>
         </div>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          {frame ? `Last frame: ${fmt(frame.draws)} draw calls, ${fmt(frame.triangles)} triangles, including the grid and any shadow passes.` : "Waiting for a frame..."}
+        <div
+          style={{ fontSize: 12, opacity: 0.8 }}
+          title="The frame rate is this browser's. The rest is the last frame, with the grid, shadow passes and render targets counted; texture memory is an estimate."
+        >
+          {frame
+            ? [
+                fps ? `${fps} fps` : "",
+                `${fmt(frame.draws)} draw calls`,
+                `${fmt(frame.triangles)} triangles`,
+                textures.bytes ? `about ${mb(textures.bytes)} of textures, the largest ${fmt(textures.dimension)} px` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "Waiting for a frame..."}
         </div>
         {rows.length === 0 ? <div style={{ opacity: 0.7 }}>No nodes yet.</div> : null}
         <div role="listbox" aria-label="Nodes" style={{ display: "flex", flexDirection: "column" }}>
-          {rows.map((r) => {
-            const on = r.handle === selected?.handle;
+          {shown.map((r) => {
+            const on = r.id === selected?.id;
             return (
-              <button
-                key={r.handle}
-                type="button"
-                role="option"
-                aria-selected={on}
-                onClick={() => setSelected(on ? null : { handle: r.handle, key: sourceKey(r.source) })}
-                title={r.source.file ? `${r.source.file}:${r.source.line}` : undefined}
-                style={{ all: "unset", cursor: "pointer", padding: `3px 6px 3px ${6 + r.depth * 14}px`, borderRadius: 5, background: on ? "rgba(76,194,255,0.22)" : "transparent", display: "flex", gap: 6, alignItems: "baseline", minWidth: 0 }}
-              >
-                <span style={{ fontWeight: 600, flex: "none" }}>{r.source.name}</span>
-                <span style={{ opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{r.detail}</span>
-                {r.source.file ? <span style={{ opacity: 0.55, fontSize: 11, flex: "none" }}>{basename(r.source.file)}:{r.source.line}</span> : null}
-              </button>
+              <React.Fragment key={r.id}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={on}
+                  onClick={() => setSelected(on ? null : { id: r.id, key: r.key })}
+                  title={r.part ? r.part.path : r.source.file ? `${r.source.file}:${r.source.line}` : undefined}
+                  style={{ all: "unset", cursor: "pointer", padding: `3px 6px 3px ${6 + r.depth * 14}px`, borderRadius: 5, background: on ? "rgba(76,194,255,0.22)" : "transparent", display: "flex", gap: 6, alignItems: "baseline", minWidth: 0 }}
+                >
+                  <span style={{ fontWeight: r.part ? 400 : 600, flex: "none" }}>{r.part ? r.part.name : r.source.name}</span>
+                  <span style={{ opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{r.detail}</span>
+                  {r.source.file && !r.part ? <span style={{ opacity: 0.55, fontSize: 11, flex: "none" }}>{basename(r.source.file)}:{r.source.line}</span> : null}
+                </button>
+                {r.id === lastPart && expanded?.size?.partsLeftOut ? (
+                  <div style={{ opacity: 0.6, fontSize: 11, padding: `0 6px 0 ${20 + expanded.depth * 14}px` }}>
+                    {fmt(expanded.size.partsLeftOut)} more parts are not listed.
+                  </div>
+                ) : null}
+              </React.Fragment>
             );
           })}
         </div>
         {models.length ? (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 6, display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
             {models.map((m) => {
-              const over = budgets.filter((b) => m.triangles! > b.max_triangles);
+              const over = budgets.map((b) => ({ b, over: overBudget(m.size!, b) })).filter((x) => x.over.length);
               return (
-                <div key={m.handle} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.detail}</span>
-                  <span style={{ flex: "none", color: over.length ? "#ffd27a" : "#9be7a7" }} title={budgets.map((b) => `${b.label}: ${fmt(b.max_triangles)}`).join("\n")}>
-                    {fmt(m.triangles!)} triangles{over.length ? `, over ${over.map((b) => b.label.split(" (")[0]).join(", ")}` : ""}
-                  </span>
+                <div key={m.handle} style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.detail}</span>
+                    <span style={{ flex: "none", color: over.length ? "#ffd27a" : "#9be7a7" }}>{over.length ? "Over budget" : "Within budgets"}</span>
+                  </div>
+                  <div style={{ opacity: 0.8 }}>{sizeText(m.size!)}</div>
+                  {over.map((x) => (
+                    <div key={x.b.label} style={{ color: "#ffd27a" }}>
+                      {x.b.label}: {x.over.join("; ")}
+                    </div>
+                  ))}
                 </div>
               );
             })}
@@ -319,7 +710,7 @@ export function InspectPanel({
           </button>
         ) : null}
         {text && onSelection ? <div style={{ fontSize: 12, opacity: 0.75 }}>Your assistant knows which node you selected.</div> : null}
-        <div style={{ fontSize: 11, opacity: 0.6 }}>Lights and the parts inside a model are not listed.</div>
+        <div style={{ fontSize: 11, opacity: 0.6 }}>Select a glTF or GLB model to list the parts inside it.</div>
       </div>
     </>
   );

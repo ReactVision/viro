@@ -35,6 +35,7 @@ import {
   replaceScene,
   type WebSceneEntry,
 } from "./Web/webSceneStack";
+import { attachVirtualCamera3D, type ViroVirtualCameraOptions } from "./Web/viroVirtualCamera";
 
 type Props = {
   initialScene: { scene: React.ComponentType<any>; passProps?: Record<string, unknown> };
@@ -45,6 +46,12 @@ type Props = {
    * assetBaseUrl. Omit for direct-ESM hosting where the package self-resolves.
    */
   webRendererOptions?: Omit<ViroWebRendererOptions, "canvas">;
+  /**
+   * Web only: the mouse or two fingers move the point of view (see
+   * viroVirtualCamera.ts), until the scene makes one of its own ViroCameras
+   * the point of view.
+   */
+  virtualCamera?: boolean | Omit<ViroVirtualCameraOptions, "floorY">;
   [key: string]: any;
 } & ViroRendererEffectProps;
 
@@ -70,6 +77,10 @@ export function Viro3DSceneNavigator(props: Props) {
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const capture = useViroWebCapture(canvasRef);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const virtual = props.virtualCamera ? (props.virtualCamera === true ? {} : props.virtualCamera) : null;
+  const virtualRef = useRef(virtual);
+  virtualRef.current = virtual;
   const [renderer, setRenderer] = useState<ViroWebRenderer | null>(null);
   useViroRendererEffects(renderer, props);
   const [rootNode, setRootNode] = useState<ViroHandle>(0);
@@ -106,12 +117,14 @@ export function Viro3DSceneNavigator(props: Props) {
   }, [generation]);
 
   // What dragging casts its rays through, until a camera component takes over.
+  // The virtual camera publishes its own view.
+  const virtualOn = virtual !== null;
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!renderer || !canvas) return;
+    if (!renderer || !canvas || virtualOn) return;
     setCameraView(renderer.scene, defaultCameraView(canvas));
     return () => setCameraView(renderer.scene, null);
-  }, [renderer]);
+  }, [renderer, virtualOn]);
   // What a released ViroCamera returns to.
   useEffect(() => (renderer && rootNode ? installDefaultCamera(renderer.scene, rootNode) : undefined), [renderer, rootNode]);
 
@@ -126,6 +139,13 @@ export function Viro3DSceneNavigator(props: Props) {
     renderer.resize(); // correct the initial size once mounted/laid out
     return () => observer.disconnect();
   }, [renderer]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const opts = virtualRef.current;
+    if (!renderer || !rootNode || !container || !opts) return;
+    return attachVirtualCamera3D(renderer.scene, rootNode, container, opts);
+  }, [renderer, rootNode, virtualOn]);
 
   const [history, setHistory] = useState<WebSceneEntry[]>(() =>
     props.initialScene?.scene
@@ -152,7 +172,7 @@ export function Viro3DSceneNavigator(props: Props) {
   const SceneComponent = top?.scene;
 
   return (
-    <div style={containerStyle}>
+    <div ref={containerRef} style={containerStyle}>
       <canvas ref={canvasRef} style={canvasStyle} />
       {renderer && rootNode && SceneComponent ? (
         <ViroRendererContext.Provider value={renderer}>

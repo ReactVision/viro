@@ -1539,6 +1539,7 @@ function Chrome({
   const [phone, setPhone] = useState(false);
   const [inspect, setInspect] = useState(false);
   const [code, setCode] = useState(false);
+  const [codeAt, setCodeAt] = useState<{ file: string; line: number; n: number } | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [barBottom, setBarBottom] = useState(52);
   useEffect(() => {
@@ -1600,6 +1601,7 @@ function Chrome({
     setAssets(false);
     setRequest(null);
     if (on) act("code");
+    else setCodeAt(null);
     setCode(on);
   };
   const openFeedback = () => {
@@ -1942,6 +1944,14 @@ function Chrome({
           styles={{ button, popup }}
           copy={copyText}
           header={<PopupHeader title="Scene" onClose={() => setInspect(false)} />}
+          onShowCode={
+            sourceUrl
+              ? (at) => {
+                  setCodeAt({ ...at, n: (codeAt?.n ?? 0) + 1 });
+                  showCode(true);
+                }
+              : undefined
+          }
         />
       ) : null}
       {assets && upload && placeholders.length ? (
@@ -2177,6 +2187,7 @@ function Chrome({
           version={version}
           focus={scenes[index]?.path}
           error={renderState.error}
+          goto={codeAt}
           top={barBottom + 8}
           load={pageFetch}
           copy={copyText}

@@ -837,6 +837,7 @@ export function InspectPanel({
   styles,
   copy,
   header,
+  onShowCode,
 }: {
   budgets: ModelBudget[];
   scene: string | undefined;
@@ -845,6 +846,8 @@ export function InspectPanel({
   styles: { button: React.CSSProperties; popup: React.CSSProperties };
   copy(text: string): Promise<boolean>;
   header: React.ReactNode;
+  /** Opens the Code view at a node's file and line; absent where the page has no source files. */
+  onShowCode?: (at: { file: string; line: number }) => void;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [stats, setStats] = useState<{ frame: typeof lastFrame; fps: number | null; textures: { bytes: number; dimension: number } }>({
@@ -1049,6 +1052,11 @@ export function InspectPanel({
               );
             })}
           </div>
+        ) : null}
+        {row?.source.file && onShowCode ? (
+          <button type="button" style={{ ...button, alignSelf: "flex-start" }} onClick={() => onShowCode({ file: row.source.file, line: row.source.line })}>
+            Show in code
+          </button>
         ) : null}
         {text && !onSelection ? (
           <button type="button" style={{ ...button, alignSelf: "flex-start" }} onClick={async () => setCopied(await copy(text))}>

@@ -15,12 +15,19 @@ function ordered(s: Source): string[] {
   return Object.keys(s.files).sort((a, b) => folderOf(a).localeCompare(folderOf(b)) || a.localeCompare(b));
 }
 
+/** The key of `files` that `file` names, which may carry a longer path than the key. */
+function fileFor(file: string, files: Record<string, string>): string | null {
+  const f = file.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (f in files) return f;
+  return Object.keys(files).filter((k) => f.endsWith(`/${k}`)).sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 /** The first `file:line` in `error` that names one of `files`. */
 function errorLocation(error: string | null, files: Record<string, string>): { path: string; line: number } | null {
   if (!error) return null;
   for (const m of error.matchAll(/([\w@./-]+\.[cm]?[jt]sx?):(\d+)/g)) {
-    const path = m[1]!.replace(/^\.\//, "");
-    if (path in files) return { path, line: Number(m[2]) };
+    const path = fileFor(m[1]!, files);
+    if (path) return { path, line: Number(m[2]) };
   }
   return null;
 }
@@ -30,6 +37,7 @@ export function CodePanel({
   version,
   focus,
   error,
+  goto,
   top,
   load,
   copy,
@@ -40,6 +48,8 @@ export function CodePanel({
   /** The scene shown in the preview, opened first. */
   focus?: string;
   error: string | null;
+  /** A file and line to open, from Inspect; `n` tells two requests for the same line apart. */
+  goto?: { file: string; line: number; n: number } | null;
   top: number;
   load: typeof fetch;
   copy(text: string): Promise<boolean>;
@@ -48,7 +58,7 @@ export function CodePanel({
   const [source, setSource] = useState<Source | null>(last && last.version === version ? last : null);
   const [failed, setFailed] = useState<string | null>(null);
   const [path, setPath] = useState<string | null>(null);
-  const [mark, setMark] = useState<number | null>(null);
+  const [mark, setMark] = useState<{ line: number; tone: "error" | "find" } | null>(null);
   const [copied, setCopied] = useState<boolean | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -79,19 +89,26 @@ export function CodePanel({
     if (!source) return;
     setPath((p) => (focus && focus in source.files ? focus : p && p in source.files ? p : source.entry in source.files ? source.entry : paths[0] ?? null));
   }, [source, focus]);
+  const handled = useRef(0);
+  useEffect(() => {
+    if (!source || !goto || goto.n === handled.current) return;
+    handled.current = goto.n;
+    const found = fileFor(goto.file, source.files);
+    if (found) goTo({ path: found, line: goto.line }, "find");
+  }, [source, goto]);
 
   const text = source && path ? source.files[path] ?? "" : "";
   const lines = useMemo(() => text.split("\n").length, [text]);
   const at = source ? errorLocation(error, source.files) : null;
 
-  const goTo = (to: { path: string; line: number }) => {
+  function goTo(to: { path: string; line: number }, tone: "error" | "find") {
     setPath(to.path);
-    setMark(to.line);
+    setMark({ line: to.line, tone });
     requestAnimationFrame(() => {
       const el = scroller.current;
       if (el) el.scrollTop = Math.max(0, (to.line - 1) * LINE - el.clientHeight / 3);
     });
-  };
+  }
   const { chip, button } = styles;
   const mono: React.CSSProperties = { margin: 0, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: `${LINE}px`, tabSize: 2 };
 
@@ -118,7 +135,7 @@ export function CodePanel({
           {error}
           {at ? (
             <div>
-              <button type="button" style={{ ...button, marginTop: 6, fontSize: 12 }} onClick={() => goTo(at)}>
+              <button type="button" style={{ ...button, marginTop: 6, fontSize: 12 }} onClick={() => goTo(at, "error")}>
                 Go to {at.path}:{at.line}
               </button>
             </div>
@@ -198,8 +215,8 @@ export function CodePanel({
                 {Array.from({ length: lines }, (_, i) => i + 1).join("\n")}
               </pre>
               <div style={{ position: "relative", flex: "1 0 auto" }}>
-                {mark && mark <= lines ? (
-                  <div style={{ position: "absolute", left: 0, right: 0, top: 8 + (mark - 1) * LINE, height: LINE, background: "rgba(255,155,155,0.15)" }} />
+                {mark && mark.line <= lines ? (
+                  <div style={{ position: "absolute", left: 0, right: 0, top: 8 + (mark.line - 1) * LINE, height: LINE, background: mark.tone === "error" ? "rgba(255,155,155,0.15)" : "rgba(76,194,255,0.18)" }} />
                 ) : null}
                 <pre style={{ ...mono, position: "relative", padding: "8px 12px", userSelect: "text" }}>{text}</pre>
               </div>

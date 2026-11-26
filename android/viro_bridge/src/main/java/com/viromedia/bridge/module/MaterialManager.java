@@ -269,6 +269,9 @@ public class MaterialManager extends ReactContextBaseJavaModule {
         float shininess = 2.0f;
         float fresnelExponent = 1.0f;
         Texture normalMap = null;
+        Texture emissionTexture = null;
+        Texture reflectiveTexture = null;
+        Integer emissionColor = null;
         Material.CullMode cullMode = Material.CullMode.BACK;
         Material.TransparencyMode transparencyMode= Material.TransparencyMode.A_ONE;
         Material.BlendMode blendMode = Material.BlendMode.ALPHA;
@@ -296,8 +299,7 @@ public class MaterialManager extends ReactContextBaseJavaModule {
 
             if (materialPropertyName.endsWith("texture") || materialPropertyName.endsWith("Texture")) {
                 if (materialPropertyName.equalsIgnoreCase("reflectiveTexture")) {
-                    Texture nativeTexture = createTextureCubeMap(materialMap.getMap(materialPropertyName), Texture.Format.RGBA8);
-                    // TODO Reflective texture are unsupported currently
+                    reflectiveTexture = createTextureCubeMap(materialMap.getMap(materialPropertyName), Texture.Format.RGBA8);
                     continue;
                 }
 
@@ -329,6 +331,9 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                             else if (materialPropertyName.equalsIgnoreCase("normalTexture")) {
                                 normalMap = texture;
                             }
+                            else if (materialPropertyName.equalsIgnoreCase("emissionTexture")) {
+                                emissionTexture = texture;
+                            }
                             else {
                                 throw new IllegalArgumentException("Invalid texture property received: " + materialPropertyName);
                             }
@@ -350,6 +355,9 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                                 else if (materialPropertyName.equalsIgnoreCase("normalTexture")) {
                                     normalMap = texture;
                                 }
+                                else if (materialPropertyName.equalsIgnoreCase("emissionTexture")) {
+                                    emissionTexture = texture;
+                                }
                                 else {
                                     throw new IllegalArgumentException("Invalid texture property received: " + materialPropertyName);
                                 }
@@ -365,6 +373,9 @@ public class MaterialManager extends ReactContextBaseJavaModule {
                 else if(materialPropertyName.equalsIgnoreCase("chromaKeyFilteringColor")) {
                     chromaKeyFilteringColor = color;
                     chromaFilteringEnabled = true;
+                }
+                else if (materialPropertyName.equalsIgnoreCase("emissionColor")) {
+                    emissionColor = color;
                 }
                 else {
                     throw new IllegalArgumentException("Invalid color property for material: " + materialPropertyName);
@@ -423,6 +434,15 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             nativeMaterial.setChromaKeyFilteringEnabled(chromaFilteringEnabled);
             nativeMaterial.setChromaKeyFilteringColor(chromaKeyFilteringColor);
         }
+        if (emissionColor != null) {
+            nativeMaterial.setImmutableColor("emissionColor", emissionColor);
+        }
+        if (emissionTexture != null) {
+            nativeMaterial.setImmutableTexture("emissionTexture", emissionTexture);
+        }
+        if (reflectiveTexture != null) {
+            nativeMaterial.setImmutableTexture("reflectiveTexture", reflectiveTexture);
+        }
 
         materialWrapper.setNativeMaterial(nativeMaterial);
 
@@ -461,6 +481,12 @@ public class MaterialManager extends ReactContextBaseJavaModule {
         }
         if (normalMap != null) {
             normalMap.dispose();
+        }
+        if (emissionTexture != null) {
+            emissionTexture.dispose();
+        }
+        if (reflectiveTexture != null) {
+            reflectiveTexture.dispose();
         }
         return materialWrapper;
     }
@@ -734,7 +760,7 @@ public class MaterialManager extends ReactContextBaseJavaModule {
             } else {
                 ImageDownloader downloader = new ImageDownloader(mContext);
                 downloader.setTextureFormat(format);
-                Image nativeImage = new Image(downloader.getImageSync(textureMap), format);
+                Image nativeImage = new Image(downloader.getImageSync(textureMap.getMap(key)), format);
                 cubeMapImages.put(key, nativeImage);
             }
 

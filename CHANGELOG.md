@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Web AR needs `@reactvision/viro-web-renderer` from `fix/web-ar-tracker` for the new point cloud; against 1.3.0 the two point cloud props warn once and do nothing.
+Web AR needs `@reactvision/viro-web-renderer` newer than 1.3.0 for the new point cloud; against 1.3.0 the two point cloud props warn once and do nothing.
 
 ### Added
 
@@ -16,6 +16,8 @@ Web AR needs `@reactvision/viro-web-renderer` from `fix/web-ar-tracker` for the 
 ### Fixed
 
 - **Web: surfaces are in metres from the first one,** and keep their anchor ids through a tracking loss, so a `ViroARPlane` and content on it stay put (tinyvio, through the renderer).
+- **Android: `emissionColor`, `emissionTexture` and `reflectiveTexture` on a material work, as on iOS (`react_viro-release.aar`, virocore `Material`).** As on iOS and the web, an `emissionTexture` scales `emissionColor`, which is black by default, so it needs an `emissionColor` to show. The first two threw "Invalid color/texture property" when the materials were created, and the reflective cube map was loaded and then dropped. `ViroMaterial` now types `emissionColor` and `emissionTexture`.
+- **Android: a material with a `reflectiveTexture` no longer crashes the app.** Each face of the cube map was looked up in the whole cube map instead of in its own source, which threw `Unable to find "uri" key`.
 
 ## v3.2.3 — 21 November 2026
 

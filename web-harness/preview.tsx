@@ -26,7 +26,7 @@ import { ViroBox } from "../components/ViroBox";
 import { quatToEuler } from "../components/Studio/colocation/frameMath";
 import { rotateByQuaternion } from "../components/Web/viroMath";
 import { ViroScene } from "../components/ViroScene";
-import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget } from "./inspector";
+import { contentFraming, InspectorProbe, InspectPanel, noteModelResponse, watchGpu, type ModelBudget, type PinnedSpot } from "./inspector";
 import { qrModules } from "./qr";
 import { CodePanel } from "./codeView";
 import { playSession, recordSession, type SessionTrack } from "./sessionReplay";
@@ -76,6 +76,8 @@ type PreviewHost = {
   onStatus?(status: { ready: boolean; error: string | null; warnings: string[]; scene?: string }): void;
   /** The node selected in the inspector, as a sentence for the assistant, or null. */
   onSelect?(text: string | null): void;
+  /** Something else the developer did in the page, as lines for the assistant, or null once it no longer holds. */
+  onContext?(kind: "view" | "pin" | "code", text: string | null): void;
   /** Opens a link outside the view, which the view's own sandbox may not allow. */
   openLink?(url: string): void;
   /** Stores a file as the local asset at `path`; the preview then updates to show it. Rejects with the reason. */
@@ -136,6 +138,10 @@ let currentScene: string | undefined = (
   window.__PREVIEW_INPUT__?.scenes?.find((sc) => sc.path === params.get("scene")) ?? window.__PREVIEW_INPUT__?.scenes?.[0]
 )?.path;
 const cameraListeners = new Set<() => void>();
+const poseText = (p: { position: Vec3; target: Vec3 }) =>
+  `position [${p.position.map((n) => +n.toFixed(2)).join(", ")}], look_at [${p.target.map((n) => +n.toFixed(2)).join(", ")}]`;
+// Where the scene's camera began, which the assistant's own pictures already show.
+let startPose = "";
 // The real selector, not the render path's stub: it is composed of web-capable
 // parts and ViroARScene.web feeds it anchor events. Headless renders keep the
 // stub, which draws the children unanchored, because there nothing can select
@@ -246,10 +252,10 @@ function controlSections(): ControlsSection[] {
   }
   const shortcuts: [string, string][] = [
     ["F", "Frame the content, or the node selected in Inspect"],
-    ["R", "Reset the view"],
+    ["R", "Restart the scene from its starting view"],
   ];
   if (arSceneListeners.size) shortcuts.push(["G", "Show or hide the floor grid"]);
-  if (inspectable) shortcuts.push(["I", "Open or close Inspect"]);
+  if (inspectable) shortcuts.push(["I", "Open or close Inspect"], ["V", "Select mode: click a node to select it, or a surface to pin a spot"]);
   shortcuts.push(["?", "Show or hide this list"]);
   return [
     {
@@ -457,8 +463,11 @@ type RoomFilePlane = {
   polygon: { x: number; y: number }[];
   label?: string;
 };
+// Each plane's turn by its id, to place a point in the plane's own X and Z.
+const planeTurns = new Map<string, [number, number, number, number]>();
 function roomFilePlanes(planes: RoomFilePlane[], origin: Vec3): ArPlaneAnchor[] {
   return planes.map((p, i): ArPlaneAnchor => {
+    planeTurns.set(`viro-virtual-${p.label ?? (p.type === "vertical" ? "wall" : "surface")}-${i}`, p.quaternion);
     const xs = p.polygon.map((v) => v.x), zs = p.polygon.map((v) => v.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
     const mid = rotateByQuaternion(p.quaternion, [(x0 + x1) / 2, 0, (z0 + z1) / 2]);
@@ -483,6 +492,35 @@ const modelRoomPlanes = new Map<Surroundings, ArPlaneAnchor[]>();
 function surroundingsPlanes(key: Surroundings): ArPlaneAnchor[] | undefined {
   return ROOMS[key]!.model ? modelRoomPlanes.get(key) ?? [] : undefined;
 }
+/** Where a ray first meets the surfaces an AR scene stands in: a room's planes, or the empty floor. Null where there are none. */
+function surfaceAt(origin: Vec3, dir: Vec3): PinnedSpot | null {
+  if (!arSceneListeners.size || feed) return null;
+  const room = ROOMS[surroundings]!;
+  const planes = surroundingsPlanes(surroundings);
+  const meet = (center: Vec3, normal: Vec3): { t: number; point: Vec3 } | null => {
+    const facing = dir[0] * normal[0] + dir[1] * normal[1] + dir[2] * normal[2];
+    if (Math.abs(facing) < 1e-6) return null;
+    const t = ((center[0] - origin[0]) * normal[0] + (center[1] - origin[1]) * normal[1] + (center[2] - origin[2]) * normal[2]) / facing;
+    return t > 0 ? { t, point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t] } : null;
+  };
+  if (!planes) {
+    const hit = meet([0, room.floorY ?? FLOOR_Y, 0], [0, 1, 0]);
+    return hit && hit.t < 50 ? { point: hit.point, on: "the floor" } : null;
+  }
+  let best: { t: number; spot: PinnedSpot } | null = null;
+  for (const plane of planes) {
+    const turn = planeTurns.get(plane.id);
+    const hit = turn ? meet(plane.center, plane.normal) : null;
+    if (!hit || (best && hit.t >= best.t)) continue;
+    const [x, y, z, w] = turn!;
+    const local = rotateByQuaternion([-x, -y, -z, w], [hit.point[0] - plane.center[0], hit.point[1] - plane.center[1], hit.point[2] - plane.center[2]]);
+    if (Math.abs(local[0]) > plane.width / 2 || Math.abs(local[2]) > plane.height / 2) continue;
+    const label = plane.id.replace(/^viro-virtual-|-\d+$/g, "");
+    best = { t: hit.t, spot: { point: hit.point, on: `the ${label} of the ${room.scan ? "scan" : room.label} surroundings` } };
+  }
+  return best?.spot ?? null;
+}
+
 function loadRoomPlanes(key: Surroundings): void {
   const room = ROOMS[key]!;
   if (!room.model || modelRoomPlanes.has(key)) return;
@@ -541,7 +579,8 @@ let applyARDefaults = () => {};
 if (!liveAR) {
   addViroExports({ ViroARScene: PreviewARScene, ViroScene: PreviewScene });
   const onCameraReady = (c: Controls) => {
-    if (keptPose) c.lookFrom(keptPose.position, keptPose.target);
+    if (!keptPose) startPose = poseText(c.pose());
+    else c.lookFrom(keptPose.position, keptPose.target);
     keptPose = null;
     if (framedFieldOfView) c.setFieldOfView(framedFieldOfView);
     cameraControls = c;
@@ -1577,6 +1616,7 @@ function Chrome({
   // The scene shown now, for a restart that runs after a recording finishes loading.
   const indexRef = useRef(index);
   indexRef.current = index;
+  const [selecting, setSelecting] = useState(false);
   const toggleInspect = () => {
     setPanel(false);
     setPhone(false);
@@ -1584,14 +1624,18 @@ function Chrome({
     if (!inspect) act("inspect");
     setInspect((v) => !v);
   };
+  const toggleSelecting = () => {
+    if (!selecting) act("select_mode");
+    setSelecting((v) => !v);
+  };
   const flipGrid = () => {
     toggleGrid();
     track("setting_changed", { setting: "grid", value: gridOn ? "on" : "off" });
     tick((n) => n + 1);
   };
-  const resetView = () => {
-    cameraControls?.reset();
-    act("reset_view");
+  const restartScene = () => {
+    onRestart(index, null);
+    act("restart_scene");
   };
   const showCode = (on: boolean) => {
     if (on === code) return;
@@ -1614,10 +1658,11 @@ function Chrome({
     const t = e.target as HTMLElement | null;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     const key = e.key.toLowerCase();
-    if (key === "r") resetView();
+    if (key === "r") restartScene();
     else if (key === "f") frameContent();
     else if (key === "g" && arSceneListeners.size) flipGrid();
     else if (key === "i" && inspectable) toggleInspect();
+    else if (key === "v" && inspectable) toggleSelecting();
     else if (key === "?") {
       if (!help) act("controls_help");
       setHelp((v) => !v);
@@ -1768,6 +1813,23 @@ function Chrome({
     };
     endSession = end;
   };
+  // Told once the camera rests somewhere other than where the scene began, so the assistant can draw the same view.
+  useEffect(() => {
+    const tell = host?.onContext;
+    if (!tell) return;
+    let last = "";
+    let told: string | null = null;
+    const timer = setInterval(() => {
+      const now = cameraControls ? poseText(cameraControls.pose()) : "";
+      const next = !now || now === startPose ? null : now === last ? now : told;
+      last = now;
+      if (next !== told) tell("view", (told = next));
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+      if (told) tell("view", null);
+    };
+  }, []);
   const seen = useRef("");
   const shownDownloads = useRef(false);
   useEffect(() => {
@@ -1936,11 +1998,15 @@ function Chrome({
       {help && cameraControls ? <ControlsHelp onClose={() => setHelp(false)} /> : null}
       {feedback && feedbackUrl ? <FeedbackPanel url={feedbackUrl} context={feedbackContext} onClose={() => setFeedback(false)} /> : null}
       {phone && arUrl ? <PhonePanel url={arUrl} onClose={() => setPhone(false)} /> : null}
-      {inspect ? (
+      {(inspect || selecting) && !code ? (
         <InspectPanel
+          compact={!inspect}
           budgets={budgets ?? []}
           scene={scenes[index]?.path ?? title}
           onSelection={host?.onSelect ? (text) => host.onSelect!(text) : undefined}
+          surfaceAt={surfaceAt}
+          selecting={selecting}
+          onPin={host?.onContext ? (text) => host.onContext!("pin", text) : undefined}
           styles={{ button, popup }}
           copy={copyText}
           header={<PopupHeader title="Scene" onClose={() => setInspect(false)} />}
@@ -2095,6 +2161,15 @@ function Chrome({
                     <Toggle label="Floor grid" on={gridOn} onFlip={flipGrid} />
                   </label>
                 ) : null}
+                {inspectable ? (
+                  <label
+                    title="Click a node in the scene to select it, or a surface to pin a spot on it. Clicks do not reach the scene. (V)"
+                    style={{ ...settingStyle, flexDirection: "row", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                  >
+                    Select mode
+                    <Toggle label="Select mode" on={selecting} onFlip={toggleSelecting} />
+                  </label>
+                ) : null}
                 {cameraControls ? (
                   <button
                     type="button"
@@ -2176,8 +2251,8 @@ function Chrome({
         {expired ? <span style={chip}>This preview has expired and no longer updates.</span> : null}
         </div>
         {cameraControls ? (
-          <button type="button" style={button} onClick={resetView}>
-            Reset view
+          <button type="button" style={button} title="Runs the scene from its start again, with the camera where it began" onClick={restartScene}>
+            Restart scene
           </button>
         ) : null}
       </div>
@@ -2192,6 +2267,7 @@ function Chrome({
           load={pageFetch}
           copy={copyText}
           styles={{ chip, button }}
+          onSelection={host?.onContext ? (text) => host.onContext!("code", text) : undefined}
         />
       ) : null}
     </div>
@@ -2263,7 +2339,7 @@ function Preview({ input, expired }: { input: PreviewInput; expired: boolean }) 
     currentScene = scenes[i]?.path;
     setIndex(i);
   };
-  // Starts scene `i` again with the camera at `pose`, for a recording or a replay.
+  // Starts scene `i` again with the camera at `pose`, or where the scene begins.
   const restart = (i: number, pose: { position: Vec3; target: Vec3 } | null) => {
     select(i);
     keptPose = pose;

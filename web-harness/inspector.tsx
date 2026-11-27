@@ -11,7 +11,7 @@ import { ViroLightType, type ViroBoundingBox, type ViroHandle, type ViroSceneApi
 import { useViroRenderer } from "../components/Web/ViroWebContext";
 import { viroLightEntries, type ViroWebLightProps } from "../components/Web/useViroLight";
 import { viroNodeEntries } from "../components/Web/useViroNode";
-import { cameraView, type CameraView } from "../components/Web/viroDrag";
+import { cameraView, rayAt, type CameraView } from "../components/Web/viroDrag";
 import { quatFromEulerDegrees, rotateByQuaternion } from "../components/Web/viroMath";
 import { PLACEHOLDER_MODEL_URL } from "./placeholderAssets";
 import { VIRO_SOURCE_PROP, type ViroSource } from "./sceneModule";
@@ -702,6 +702,63 @@ function outlineOf(scene: ViroSceneApi, row: Row): ViroBoundingBox | null {
   return b && Math.max(b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ) > 1e-4 ? b : null;
 }
 
+/** How far along a ray it enters a box: negative when it starts inside, null when it misses. */
+function rayIntoBox(o: Vec3, d: Vec3, b: ViroBoundingBox): number | null {
+  const lo = [b.minX, b.minY, b.minZ];
+  const hi = [b.maxX, b.maxY, b.maxZ];
+  let near = -Infinity;
+  let far = Infinity;
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(d[i]!) < 1e-9) {
+      if (o[i]! < lo[i]! || o[i]! > hi[i]!) return null;
+      continue;
+    }
+    const a = (lo[i]! - o[i]!) / d[i]!;
+    const c = (hi[i]! - o[i]!) / d[i]!;
+    near = Math.max(near, Math.min(a, c));
+    far = Math.min(far, Math.max(a, c));
+  }
+  return near <= far && far > 0 ? near : null;
+}
+
+/** The node a ray points at, by the nodes' boxes: the nearest one it enters that has no node under it in the way. */
+function pickRow(scene: ViroSceneApi, rows: Row[], o: Vec3, d: Vec3): Row | null {
+  const hits = rows.map((r) => {
+    const b = outlineOf(scene, r);
+    const t = b ? rayIntoBox(o, d, b) : null;
+    // A box the camera is inside covers the whole view, so it is not what a click points at.
+    return t !== null && t >= 0 ? t : null;
+  });
+  let best: Row | null = null;
+  let bestT = Infinity;
+  rows.forEach((r, i) => {
+    const t = hits[i];
+    if (t === null || t === undefined || t >= bestT) return;
+    // A node's box holds its children's, so one with a child under the pointer leaves the click to the child.
+    for (let j = i + 1; j < rows.length && rows[j]!.depth > r.depth; j++) if (hits[j] !== null) return;
+    best = r;
+    bestT = t;
+  });
+  return best;
+}
+
+export type PinnedSpot = { point: Vec3; on: string };
+
+/** The lines the assistant gets for a pinned spot. */
+function pinText(scene: ViroSceneApi | undefined, rows: Row[], pin: PinnedSpot, name: string | undefined): string {
+  let nearest: { row: Row; at: Vec3; far: number } | null = null;
+  for (const row of scene ? rows : []) {
+    const at = row.kind === "node" ? scene!.getNodeWorldPosition(row.handle) : null;
+    if (!at) continue;
+    const far = Math.hypot(pin.point[0] - at[0], pin.point[1] - at[1], pin.point[2] - at[2]);
+    if (!nearest || far < nearest.far) nearest = { row, at, far };
+  }
+  const near = nearest
+    ? ` The nearest node is <${nearest.row.source.name}>${nearest.row.source.file ? ` at ${nearest.row.source.file}:${nearest.row.source.line}` : ""}, ${nearest.far.toFixed(2)} m away: the pin is at that node's world position plus ${vec(pin.point.map((c, i) => c - nearest!.at[i]!))}.`
+    : "";
+  return `World position ${vec(pin.point)}, on ${pin.on}${name ? `, in the scene ${name}` : ""}.${near}`;
+}
+
 const isIdentity = (v: unknown, one: number) => !Array.isArray(v) || v.every((n) => n === one);
 
 /** Where the marker goes: a node's origin, or an omni or spot light's position. Null for what has no point of its own. */
@@ -838,6 +895,10 @@ export function InspectPanel({
   copy,
   header,
   onShowCode,
+  surfaceAt,
+  onPin,
+  selecting = false,
+  compact = false,
 }: {
   budgets: ModelBudget[];
   scene: string | undefined;
@@ -848,6 +909,14 @@ export function InspectPanel({
   header: React.ReactNode;
   /** Opens the Code view at a node's file and line; absent where the page has no source files. */
   onShowCode?: (at: { file: string; line: number }) => void;
+  /** Where a ray meets the surroundings, for a pin on a click that hits no node. */
+  surfaceAt?: (origin: Vec3, dir: Vec3) => PinnedSpot | null;
+  /** The pinned spot as lines for the assistant, or null; undefined where no assistant is listening. */
+  onPin?: (text: string | null) => void;
+  /** Select mode: clicks on the scene select a node or pin a spot, and do not reach the scene. */
+  selecting?: boolean;
+  /** Select mode with the panel closed: only what was selected or pinned is shown, in a strip. */
+  compact?: boolean;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [stats, setStats] = useState<{ frame: typeof lastFrame; fps: number | null; textures: { bytes: number; dimension: number } }>({
@@ -861,6 +930,11 @@ export function InspectPanel({
   const marker = useRef<HTMLDivElement>(null);
   const outline = useRef<SVGSVGElement>(null);
   const wire = useRef<HTMLCanvasElement>(null);
+  const [pin, setPin] = useState<PinnedSpot | null>(null);
+  const [missed, setMissed] = useState(false);
+  const pinMark = useRef<HTMLDivElement>(null);
+  const pinRef = useRef(pin);
+  pinRef.current = pin;
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const shown = withParts(rows, selected?.id);
@@ -918,6 +992,16 @@ export function InspectPanel({
           el.style.transform = `translate(${pos.x - origin.left - 14}px, ${pos.y - origin.top - 14}px)`;
         }
       }
+      const pinEl = pinMark.current;
+      const pinAt = view && pinRef.current ? project(view, pinRef.current.point) : null;
+      if (pinEl) {
+        pinEl.style.display = pinAt ? "block" : "none";
+        if (pinAt) {
+          pinEl.style.transform = "none";
+          const origin = pinEl.getBoundingClientRect();
+          pinEl.style.transform = `translate(${pinAt.x - origin.left - 7}px, ${pinAt.y - origin.top - 7}px)`;
+        }
+      }
       if (svg) {
         const origin = svg.getBoundingClientRect();
         const path = view && box ? boxPath(view, box, origin.left, origin.top) : "";
@@ -950,7 +1034,66 @@ export function InspectPanel({
   }, [selectionKey]);
   useEffect(() => () => onSelection?.(null), []);
 
+  // In select mode, a click on the scene selects the node under it, or pins the surface there, and never reaches the scene.
+  useEffect(() => {
+    if (!selecting) return;
+    const viewNow = () => (inspected ? cameraView(inspected.scene) : null);
+    const mine = (e: MouseEvent) => e.button === 0 && !e.shiftKey && !!viewNow()?.element.contains(e.target as Node);
+    const swallow = (e: MouseEvent) => {
+      if (!mine(e)) return;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    const onDown = (e: PointerEvent) => {
+      const view = viewNow();
+      if (!mine(e) || !view || !inspected) return;
+      swallow(e);
+      const { origin, dir } = rayAt(view, e.clientX, e.clientY);
+      const hit = pickRow(inspected.scene, shownRef.current.filter((r) => r.kind === "node"), origin, dir);
+      const spot = hit ? null : surfaceAt?.(origin, dir) ?? null;
+      setMissed(!hit && !spot);
+      if (hit) setSelected({ id: hit.id, key: hit.key });
+      else if (spot) setPin(spot);
+    };
+    const types = ["pointerup", "mousedown", "mouseup", "click"] as const;
+    window.addEventListener("pointerdown", onDown, true);
+    for (const type of types) window.addEventListener(type, swallow, true);
+    const el = viewNow()?.element;
+    const cursor = el?.style.cursor;
+    if (el) el.style.cursor = "crosshair";
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      for (const type of types) window.removeEventListener(type, swallow, true);
+      if (el) el.style.cursor = cursor ?? "";
+      setMissed(false);
+    };
+  }, [selecting, mounts]);
+  // The pin is worded once, when it is placed: a node moving later does not send it again.
+  useEffect(() => {
+    onPin?.(pin ? pinText(inspected?.scene, shownRef.current, pin, scene) : null);
+  }, [pin]);
+  useEffect(() => () => onPin?.(null), []);
+
   const { button, popup } = styles;
+  const selectInfo = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {selecting ? (
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          {missed ? "Nothing there to select." : surfaceAt ? "Click a node to select it, or a surface to pin a spot on it. Clicks do not reach the scene." : "Click a node to select it. Clicks do not reach the scene."}
+        </div>
+      ) : null}
+      {pin ? (
+        <div style={{ fontSize: 12, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span>
+            Pin at {vec(pin.point)}, on {pin.on}.{onPin ? " Your assistant knows where it is." : ""}
+          </span>
+          <button type="button" style={{ ...button, fontSize: 12, padding: "2px 8px" }} onClick={() => setPin(null)}>
+            Remove pin
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
   const models = rows.filter((r) => r.size);
   const { frame, fps, textures } = stats;
   return (
@@ -968,7 +1111,31 @@ export function InspectPanel({
         <path fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={3.5} strokeLinejoin="round" />
         <path fill="none" stroke="#4cc2ff" strokeWidth={1.5} strokeLinejoin="round" />
       </svg>
+      <div
+        ref={pinMark}
+        aria-hidden="true"
+        style={{ position: "fixed", left: 0, top: 0, width: 10, height: 10, borderRadius: "50%", background: "#ffb84c", border: "2px solid #fff", boxShadow: "0 0 0 2px rgba(0,0,0,0.5)", display: "none", pointerEvents: "none" }}
+      />
       <canvas ref={wire} aria-hidden="true" width={0} height={0} style={{ position: "fixed", left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+      {compact ? (
+        <div style={{ ...popup, position: "fixed", left: "50%", bottom: 64, transform: "translateX(-50%)", width: "max-content", maxWidth: "min(92%, 520px)", padding: "8px 12px", gap: 6, fontSize: 12 }}>
+          {row ? (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span>
+                <span style={{ fontWeight: 600 }}>{row.part ? row.part.name : row.source.name}</span>
+                {row.source.file ? ` ${basename(row.source.file)}:${row.source.line}` : ""}
+                {onSelection ? ". Your assistant knows which node you selected." : ""}
+              </span>
+              {row.source.file && onShowCode ? (
+                <button type="button" style={{ ...button, fontSize: 12, padding: "2px 8px" }} onClick={() => onShowCode({ file: row.source.file, line: row.source.line })}>
+                  Show in code
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {selectInfo}
+        </div>
+      ) : (
       <div style={{ ...popup, width: 340, fontSize: 13 }}>
         {header}
         {frame ? (
@@ -995,6 +1162,7 @@ export function InspectPanel({
         ) : (
           <div style={{ fontSize: 12, opacity: 0.8 }}>Waiting for a frame...</div>
         )}
+        {selectInfo}
         {rows.length === 0 ? <div style={{ opacity: 0.7 }}>No nodes yet.</div> : null}
         <div role="listbox" aria-label="Nodes" style={{ display: "flex", flexDirection: "column", flex: "none", maxHeight: "min(360px, 45vh)", overflowY: "auto" }}>
           {shown.map((r) => {
@@ -1069,6 +1237,7 @@ export function InspectPanel({
         ) : null}
         <div style={{ fontSize: 11, opacity: 0.6 }}>Select a glTF or GLB model to list the parts inside it.</div>
       </div>
+      )}
     </>
   );
 }

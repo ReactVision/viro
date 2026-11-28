@@ -26,6 +26,7 @@ jest.mock("react-native", () => ({
     },
   },
   BackHandler: { addEventListener: () => ({ remove: () => {} }) },
+  DeviceEventEmitter: { addListener: () => ({ remove: () => {} }) },
   PermissionsAndroid: { requestMultiple: () => Promise.resolve({}) },
   Platform: { OS: "android", select: (o: any) => o.android ?? o.default, constants: {} },
   StyleSheet: { create: (s: any) => s, absoluteFill: {} },

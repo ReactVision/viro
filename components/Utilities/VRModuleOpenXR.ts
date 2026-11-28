@@ -9,6 +9,8 @@ import { ViroRecordingErrorConstants } from "../ViroConstants";
  */
 export function exitVRScene(): void {
   VRQuestNavigatorBridge.setVRActive(false);
+  // The activity is on its way out: its entry point must not answer the next intent.
+  VRQuestNavigatorBridge.retireEntryPoints();
   (NativeModules.VRLauncher as { exitVRScene?: () => void } | undefined)
     ?.exitVRScene?.();
 }

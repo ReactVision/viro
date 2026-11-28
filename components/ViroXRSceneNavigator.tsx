@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   AppState,
   NativeModules,
+  NativeSyntheticEvent,
   PermissionsAndroid,
   Pressable,
   StyleSheet,
@@ -32,7 +33,11 @@ import {
   ViroUsagePingSuppressed,
 } from "./Utilities/ViroUsagePing";
 import type { Viro3DPoint } from "./Types/ViroUtils";
-import type { ViroTrackingReason, ViroTrackingState } from "./Types/ViroEvents";
+import type {
+  ViroHandUpdateEvent,
+  ViroTrackingReason,
+  ViroTrackingState,
+} from "./Types/ViroEvents";
 
 const ViroSceneNavigatorModule = NativeModules.VRTSceneNavigatorModule as
   | {
@@ -186,6 +191,13 @@ type Props = ViewProps & {
   handOcclusionMode?: "capsules" | "mesh";
   /** Hand occluder inflation past the tracked hand, in millimetres. Defaults to 2. */
   handOcclusionInflateMm?: number;
+  /**
+   * Meta Quest: the joints of both hands, each frame, with `handTrackingEnabled`. A hand
+   * that is not tracked is null. Whether to listen is decided when the headset view
+   * launches, from whether the prop is set then; the handler itself may change between
+   * renders.
+   */
+  onHandUpdate?: (event: NativeSyntheticEvent<ViroHandUpdateEvent>) => void;
   onExitViro?: () => void;
 
   // ── Meta Quest panel ───────────────────────────────────────────────────────
@@ -294,6 +306,7 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       handOcclusion,
       handOcclusionMode,
       handOcclusionInflateMm,
+      onHandUpdate,
       onExitViro,
       debug,
       renderQuestPanel,
@@ -472,6 +485,11 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
       if (isQuest) VRQuestNavigatorBridge.setAppProps(questAppProps);
     }, [questAppProps]);
 
+    // The intent is registered once, on mount, so it carries a stable function that
+    // calls whichever `onHandUpdate` the latest render was given.
+    const onHandUpdateRef = React.useRef(onHandUpdate);
+    onHandUpdateRef.current = onHandUpdate;
+
     // On Quest: register the intent (scene + renderer config) then launch VRActivity.
     // Only on mount; renderQuestPanel says why it is not relaunched.
     React.useEffect(() => {
@@ -493,6 +511,11 @@ export const ViroXRSceneNavigator = React.forwardRef<unknown, Props>(
             handOcclusion,
             handOcclusionMode,
             handOcclusionInflateMm,
+            // Only when asked for: the event fires every frame.
+            onHandUpdate: onHandUpdate
+              ? (event: NativeSyntheticEvent<ViroHandUpdateEvent>) =>
+                  onHandUpdateRef.current?.(event)
+              : undefined,
             onExitViro,
             debug,
           });

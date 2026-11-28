@@ -1,9 +1,12 @@
 package com.viromedia.bridge.module;
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -39,8 +42,88 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
     private static final String VR_COMPONENT = "VRQuestScene";
     private static final int PERMISSIONS_REQUEST_CODE = 0x5652;
 
+    /** Sent to JavaScript when a VRActivity starts finishing. See notifyFinishing. */
+    private static final String EVENT_VR_ACTIVITY_FINISHING = "ViroVRActivityFinishing";
+    /**
+     * How long a launch waits for a finishing VRActivity to be destroyed before it goes
+     * ahead anyway. Android destroys a finished activity once the next one is idle,
+     * normally well inside a second.
+     */
+    private static final long LAUNCH_WAIT_FOR_DESTROY_MS = 4000;
+
+    private final Handler mMainHandler = new Handler(Looper.getMainLooper());
+    private Application.ActivityLifecycleCallbacks mLifecycleCallbacks;
+    /** VRActivities JavaScript has been told are finishing. Main thread only. */
+    private final java.util.Set<Activity> mNotifiedFinishing =
+        java.util.Collections.newSetFromMap(new java.util.WeakHashMap<Activity, Boolean>());
+    /** A launch held back until the finishing VRActivity is destroyed. Main thread only. */
+    private boolean mLaunchPending = false;
+    private final Runnable mLaunchTimeout = () -> {
+        if (!mLaunchPending) return;
+        Log.w(MODULE_NAME, "A finishing VRActivity was not destroyed within "
+            + LAUNCH_WAIT_FOR_DESTROY_MS + " ms; launching the headset view anyway");
+        mLaunchPending = false;
+        startVRActivity();
+    };
+    private final Runnable mCheckFinishing = this::notifyFinishing;
+
     public VRLauncherModule(ReactApplicationContext reactContext) {
         super(reactContext);
+    }
+
+    @Override
+    public void initialize() {
+        super.initialize();
+        Context app = getReactApplicationContext().getApplicationContext();
+        if (!(app instanceof Application)) return;
+        // VRActivity finishes itself (the generated activity does, when another of the
+        // app's activities resumes) and is finished by the system, as well as through
+        // exitVRScene(). No callback reports finish() itself, so look for a finishing
+        // VRActivity after each resume and pause, once the other callbacks have run.
+        mLifecycleCallbacks = new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityResumed(Activity a) { mMainHandler.post(mCheckFinishing); }
+            @Override public void onActivityPaused(Activity a) { mMainHandler.post(mCheckFinishing); }
+            @Override public void onActivityDestroyed(Activity a) {
+                if (isVRActivity(a)) mMainHandler.post(VRLauncherModule.this::launchIfClear);
+            }
+            @Override public void onActivityCreated(Activity a, Bundle b) {}
+            @Override public void onActivityStarted(Activity a) {}
+            @Override public void onActivityStopped(Activity a) {}
+            @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
+        };
+        ((Application) app).registerActivityLifecycleCallbacks(mLifecycleCallbacks);
+    }
+
+    @Override
+    public void invalidate() {
+        Context app = getReactApplicationContext().getApplicationContext();
+        if (mLifecycleCallbacks != null && app instanceof Application) {
+            ((Application) app).unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
+        }
+        mLifecycleCallbacks = null;
+        mMainHandler.removeCallbacksAndMessages(null);
+        super.invalidate();
+    }
+
+    /**
+     * Tells JavaScript about each VRActivity that has started finishing, once. Its React
+     * surface is only unloaded in onDestroy, which comes later, and until then its
+     * ViroQuestEntryPoint is still mounted: without this it would answer the next
+     * headset view's intent by mounting a second navigator in the dying activity.
+     * Main thread.
+     */
+    private void notifyFinishing() {
+        boolean any = false;
+        for (Activity act : vrActivities(true)) {
+            if (act.isFinishing() && mNotifiedFinishing.add(act)) {
+                any = true;
+            }
+        }
+        if (!any) return;
+        ReactApplicationContext ctx = getReactApplicationContext();
+        if (ctx.hasActiveReactInstance()) {
+            ctx.emitDeviceEvent(EVENT_VR_ACTIVITY_FINISHING, null);
+        }
     }
 
     @Override
@@ -73,20 +156,57 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
             );
         } catch (Exception ignored) {}
 
+        // Looked up here, so that a missing VRActivity is still reported to the caller
+        // rather than thrown on the main thread.
+        vrActivityClass();
+        mMainHandler.post(() -> {
+            mLaunchPending = true;
+            launchIfClear();
+        });
+    }
+
+    private Class<?> vrActivityClass() {
         ReactApplicationContext ctx = getReactApplicationContext();
         try {
-            Class<?> vrActivityClass = Class.forName(
-                ctx.getPackageName() + ".VRActivity"
-            );
-            Intent intent = new Intent(ctx, vrActivityClass);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            ctx.startActivity(intent);
+            return Class.forName(ctx.getPackageName() + ".VRActivity");
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(
                 "VRActivity not found in package " + ctx.getPackageName() + ". " +
                 "Ensure @reactvision/react-viro plugin is configured with xRMode: [\"QUEST\"] " +
                 "and you have run expo prebuild."
             );
+        }
+    }
+
+    /**
+     * Starts VRActivity unless one is finishing and not yet destroyed. That one still
+     * has its React surface mounted, and a second VRActivity started now would run
+     * beside it. The launch then waits for onActivityDestroyed, or the timeout. A live
+     * VRActivity that is not finishing is reused: it is singleTask. Main thread.
+     */
+    private void launchIfClear() {
+        if (!mLaunchPending) return;
+        for (Activity act : vrActivities(true)) {
+            if (act.isFinishing()) {
+                mMainHandler.removeCallbacks(mLaunchTimeout);
+                mMainHandler.postDelayed(mLaunchTimeout, LAUNCH_WAIT_FOR_DESTROY_MS);
+                Log.i(MODULE_NAME, "Holding the headset view launch until the finishing VRActivity is destroyed");
+                return;
+            }
+        }
+        mMainHandler.removeCallbacks(mLaunchTimeout);
+        mLaunchPending = false;
+        startVRActivity();
+    }
+
+    private void startVRActivity() {
+        ReactApplicationContext ctx = getReactApplicationContext();
+        try {
+            Intent intent = new Intent(ctx, vrActivityClass());
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(intent);
+        } catch (RuntimeException e) {
+            Log.e(MODULE_NAME, "Could not start VRActivity", e);
         }
     }
 
@@ -119,6 +239,7 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
             for (Activity act : vrActivities) {
                 act.finish();
             }
+            notifyFinishing();
         });
     }
 
@@ -171,6 +292,15 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
      * React context's current activity cannot be trusted, see exitVRScene).
      */
     static java.util.List<Activity> liveVRActivities() {
+        return vrActivities(false);
+    }
+
+    private static boolean isVRActivity(Activity act) {
+        return "VRActivity".equals(act.getClass().getSimpleName());
+    }
+
+    /** VRActivities not yet destroyed: the live ones, and the finishing ones if asked. */
+    static java.util.List<Activity> vrActivities(boolean includeFinishing) {
         java.util.List<Activity> vrActivities = new java.util.ArrayList<>();
         try {
             Class<?> threadCls = Class.forName("android.app.ActivityThread");
@@ -187,8 +317,9 @@ public class VRLauncherModule extends ReactContextBaseJavaModule {
                 Object a = activityField.get(record);
                 if (!(a instanceof Activity)) continue;
                 Activity act = (Activity) a;
-                if (!"VRActivity".equals(act.getClass().getSimpleName())) continue;
-                if (act.isFinishing() || act.isDestroyed()) continue;
+                if (!isVRActivity(act)) continue;
+                if (act.isDestroyed()) continue;
+                if (act.isFinishing() && !includeFinishing) continue;
                 vrActivities.add(act);
             }
         } catch (Throwable ignored) {}

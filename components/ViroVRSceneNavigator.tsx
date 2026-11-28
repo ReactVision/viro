@@ -644,6 +644,8 @@ export class ViroVRSceneNavigator extends React.Component<Props, State> {
           style={styles.container}
           hasOnExitViroCallback={this.props.onExitViro != undefined}
           onExitViro={this._onExitViro}
+          onHandUpdate={undefined}
+          onHandUpdateViro={this.props.onHandUpdate}
         >
           {items}
         </VRTVRSceneNavigator>
@@ -685,6 +687,7 @@ var VRTVRSceneNavigator = requireNativeComponent<any>(
       currentSceneIndex: true,
       onExitViro: true,
       hasOnExitViroCallback: true,
+      onHandUpdateViro: true,
     },
   }
 );

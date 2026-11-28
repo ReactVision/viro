@@ -33,8 +33,10 @@ With `log.tag.ViroInput` set, each click that reaches the bridge logs three line
 present says where it stopped:
 
 1. `ComponentEventDelegate.onClick source=… -> VRTController tag N`: the renderer delivered the click
-   to the controller's delegate. **Absent: the click was lost in the renderer** (the input
-   presenter's delegate, or the event not enabled on it), not in the bridge.
+   to the controller's delegate. **Absent: the click was lost in the renderer**, not in the bridge.
+   With a renderer built from virocore#476 the lines before it say where: `OpenXR button edge`,
+   then `presenter onClick … -> controller delegate` (or `dropped: …` with the reason), then
+   `EventDelegate onClick … -> Java`.
 2. `ViroEventEmitter onClickViro tag N dispatched`: handed to React Native. `dropped: …` here means
    the view's tag did not resolve.
 3. `onClickState via ViroController` from JavaScript.

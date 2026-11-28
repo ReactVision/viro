@@ -21,6 +21,8 @@
 
 package com.viromedia.bridge.module;
 
+import android.net.Uri;
+
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -33,6 +35,7 @@ import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.module.annotations.ReactModule;
 import com.viro.core.SoundData;
+import com.viromedia.bridge.utility.Helper;
 import java.util.HashMap;
 
 @ReactModule(name = "VRTSoundModule")
@@ -57,8 +60,8 @@ public class SoundModule extends ReactContextBaseJavaModule {
 
     /**
      * This function takes a map of keys to sounds and creates SoundData objects
-     * to prefetch the data before storing them in a local map. We currently only
-     * support external urls (web-based).
+     * to prefetch the data before storing them in a local map. A path is a URL, or
+     * the resource name a bundled sound has in a release build.
      *
      * @param soundMap a map of String keys to String url's.
      */
@@ -101,8 +104,24 @@ public class SoundModule extends ReactContextBaseJavaModule {
                     }
                 };
             }
-            mSoundDataMap.put(key, new SoundData(path, callback));
+            mSoundDataMap.put(key, new SoundData(resolvePath(path), callback));
         }
+    }
+
+    /**
+     * In a release build a bundled sound is a resource name with no scheme, such as
+     * "assets_audio_start". The renderer takes whatever it is given as a URL, except
+     * that it reads "res:/<id>" from the app's resources, so the name is resolved to
+     * that form here, as VRTBaseSound does for a ViroSound's own source. Handed over
+     * as it came, the name was downloaded as a URL and every preload failed.
+     */
+    private String resolvePath(String path) {
+        Uri uri = Helper.parseUri(path, getReactApplicationContext());
+        if (uri == null || Uri.EMPTY.equals(uri)) {
+            // Not a resource of this app: leave it for the renderer to report.
+            return path;
+        }
+        return uri.toString();
     }
 
     @ReactMethod

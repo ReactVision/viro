@@ -80,7 +80,14 @@ public class ComponentEventDelegate implements EventDelegate.EventDelegateCallba
     public void onClick(int source, Node node, ClickState clickState, float position[]) {
         VRTComponent component = weakComponent.get();
         if (component == null){
+            ViroInputLog.v("ComponentEventDelegate.onClick source=" + source + " state=" + clickState
+                    + " dropped: the component was collected");
             return;
+        }
+        if (ViroInputLog.isEnabled()) {
+            ViroInputLog.v("ComponentEventDelegate.onClick source=" + source + " state=" + clickState
+                    + " -> " + component.getClass().getSimpleName() + " tag " + component.getId()
+                    + (component.isTornDown() ? " (torn down)" : ""));
         }
 
         WritableArray positionArray = Arguments.createArray();

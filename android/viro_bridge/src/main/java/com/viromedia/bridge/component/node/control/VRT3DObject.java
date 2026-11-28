@@ -126,8 +126,8 @@ public class VRT3DObject extends VRTControl {
         mSourceChanged = true;
     }
 
-    public void setAnimation(ReadableMap animation) {
-        super.setAnimation(animation);
+    @Override
+    protected void onAnimationPropChanged() {
         updateAnimation();
     }
 

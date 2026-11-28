@@ -163,6 +163,12 @@ export class ViroController extends React.Component<Props> {
       );
   };
 
+  /**
+   * The controller's forward vector. On Android it rejects with code
+   * `E_CONTROLLER_NOT_READY` until the scene is attached to the renderer (a ref exists
+   * before that, so a call in the first frames can come too early), and with
+   * `E_CONTROLLER_TIMEOUT` if the renderer does not answer. It always settles.
+   */
   async getControllerForwardAsync() {
     return await ViroControllerModule.getForwardVectorAsync(
       findNodeHandle(this)
@@ -173,6 +179,11 @@ export class ViroController extends React.Component<Props> {
    * Where the ray that carries `source` last pointed, in world space, or null
    * when that source has no ray of its own (a head-aimed controller). A click
    * that hits nothing reports no position, so this says where it was aimed.
+   *
+   * On Android it rejects with code `E_CONTROLLER_NOT_READY` until the scene is
+   * attached to the renderer (a ref exists before that, so a call in the first frames
+   * can come too early), and with `E_CONTROLLER_TIMEOUT` if the renderer does not
+   * answer within 2 seconds. It always settles.
    */
   async getControllerRayAsync(
     source: ViroSource

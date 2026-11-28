@@ -46,6 +46,8 @@ export type VRQuestRendererConfig = {
   handOcclusionInflateMm?: number;
   debug?: boolean;
   onExitViro?: () => void;
+  /** ViroXRSceneNavigator's `onHandUpdate`, handed to ViroVRSceneNavigator. */
+  onHandUpdate?: (event: any) => void;
 };
 
 export type VRQuestIntent = {
@@ -130,6 +132,22 @@ export const VRQuestNavigatorBridge = {
     return () => {
       _intentListeners.delete(cb);
     };
+  },
+
+  /**
+   * Cut every mounted ViroQuestEntryPoint off from intents and navigator ops. Called
+   * when a VRActivity starts finishing (exitVRScene(), or the native
+   * "ViroVRActivityFinishing" event). The finishing activity's surface is only
+   * unloaded when it is destroyed, which comes later, and until then its entry point
+   * is still mounted: left subscribed, it would mount a second navigator in the dying
+   * activity for the next headset view's intent, and take the ops meant for the next
+   * one. The next VRActivity's entry point subscribes when it mounts, and reads the
+   * current intent then.
+   */
+  retireEntryPoints(): void {
+    _intentListeners.clear();
+    _opListeners.clear();
+    if (_viewTag != null) this.setViewTag(null);
   },
 
   // ── Called by ViroXRSceneNavigator ref (push / pop / etc.) ────────────────

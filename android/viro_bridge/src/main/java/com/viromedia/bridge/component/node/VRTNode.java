@@ -60,6 +60,7 @@ import com.viro.core.PhysicsShapeSphere;
 import com.viro.core.Vector;
 import com.viromedia.bridge.component.VRT3DSceneNavigator;
 import com.viromedia.bridge.component.VRTAnimatedComponent;
+import com.viromedia.bridge.component.VRTAnimationProps;
 import com.viromedia.bridge.component.VRTComponent;
 import com.viromedia.bridge.component.VRTLight;
 import com.viromedia.bridge.component.VRTManagedAnimation;
@@ -352,6 +353,8 @@ public class VRTNode extends VRTComponent {
     private ComponentEventDelegate mComponentEventDelegate;
     private NodeTransformDelegate mTransformDelegate;
     protected NodeAnimation mNodeAnimation;
+    // The `animation` prop values last applied; see setAnimation.
+    private VRTAnimationProps mAppliedAnimationProps = null;
 
     // these are used to preserve the old 2D layout values which we'll store before and restore after
     // calling attemptRecalcLayout
@@ -971,14 +974,25 @@ public class VRTNode extends VRTComponent {
     }
 
     public void setAnimation(ReadableMap animation) {
-        mNodeAnimation.parseFromMap(animation);
-
-        if (animation != null && animation.hasKey("name")) {
-            mNodeAnimation.setAnimationName(animation.getString("name"));
-        } else {
-            mNodeAnimation.setAnimationName(null);
+        if (mNodeAnimation == null) {
+            // Torn down.
+            return;
         }
+        // Under Fabric a parent re-render with a new but equal `animation` object applies
+        // the prop again. Nothing changed, so there is nothing to play, pause or restart.
+        VRTAnimationProps props = VRTManagedAnimation.readProps(animation);
+        if (props.equals(mAppliedAnimationProps)) {
+            return;
+        }
+        mAppliedAnimationProps = props;
 
+        mNodeAnimation.applyProps(props);
+        mNodeAnimation.setAnimationName(props.name);
+        onAnimationPropChanged();
+    }
+
+    /** Called when the `animation` prop was set to different values. */
+    protected void onAnimationPropChanged() {
         mNodeAnimation.updateAnimation();
     }
 

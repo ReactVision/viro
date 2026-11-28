@@ -23,6 +23,7 @@ package com.viromedia.bridge.component;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 
 import com.facebook.react.bridge.ReactContext;
@@ -123,36 +124,32 @@ public abstract class VRTManagedAnimation {
         mExecutableAnimation = animation;
     }
 
+    /**
+     * Reads the playback values of an `animation` prop. A missing key reads as its
+     * default, as does a null map.
+     */
+    public static VRTAnimationProps readProps(ReadableMap map) {
+        String name = map != null && map.hasKey("name") ? map.getString("name") : null;
+        boolean run = map != null && map.hasKey("run") && map.getBoolean("run");
+        boolean loop = map != null && map.hasKey("loop") && map.getBoolean("loop");
+        float delay = map != null && map.hasKey("delay") ? (float) map.getDouble("delay") : -1;
+        long duration = map != null && map.hasKey("duration") ? map.getInt("duration") : -1;
+        boolean interruptible = map != null && map.hasKey("interruptible")
+                && map.getBoolean("interruptible");
+        return new VRTAnimationProps(name, run, loop, delay, duration, interruptible);
+    }
+
+    /** Stores the values. The name is the subclass's to keep. */
+    public void applyProps(VRTAnimationProps props) {
+        setDelay(props.delay);
+        setOverrideDuration(props.duration);
+        setLoop(props.loop);
+        setRun(props.run);
+        setInterruptible(props.interruptible);
+    }
+
     public void parseFromMap(ReadableMap map) {
-        if (map != null && map.hasKey("delay")) {
-            setDelay((float) map.getDouble("delay"));
-        } else {
-            setDelay(-1);
-        }
-
-        if (map != null && map.hasKey("duration")) {
-            setOverrideDuration(map.getInt("duration"));
-        } else {
-            setOverrideDuration(-1);
-        }
-
-        if (map != null && map.hasKey("loop")) {
-            setLoop(map.getBoolean("loop"));
-        } else {
-            setLoop(false);
-        }
-
-        if (map != null && map.hasKey("run")) {
-            setRun(map.getBoolean("run"));
-        } else {
-            setRun(false);
-        }
-
-        if(map != null && map.hasKey("interruptible")) {
-            setInterruptible(map.getBoolean("interruptible"));
-        } else {
-            setInterruptible(false);
-        }
+        applyProps(readProps(map));
     }
 
     public void setInterruptible(boolean interruptible) { mInterruptible = interruptible;}
@@ -224,7 +221,11 @@ public abstract class VRTManagedAnimation {
             }
         }
         else {
-            ViroLog.warn(TAG, "Unable to play animation in state " + mState.name());
+            // Already scheduled or running, and not interruptible: nothing to do. Not a
+            // warning, because playing an animation that is playing is not a fault.
+            if (Log.isLoggable(TAG, Log.VERBOSE)) {
+                Log.v(TAG, "Unable to play animation in state " + mState.name());
+            }
         }
     }
 

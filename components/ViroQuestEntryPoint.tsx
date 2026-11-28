@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BackHandler, findNodeHandle, StyleSheet } from "react-native";
+import { BackHandler, DeviceEventEmitter, findNodeHandle, StyleSheet } from "react-native";
 import {
   VRQuestNavigatorBridge,
   VRQuestIntent,
@@ -52,6 +52,18 @@ export function ViroQuestEntryPoint() {
   const navRef = React.useRef<ViroVRSceneNavigator>(null);
 
   React.useEffect(() => VRQuestNavigatorBridge.onIntent(setIntent), []);
+
+  // VRActivity's surface is unloaded when the activity is destroyed, some time after
+  // it starts finishing. In between this component is still mounted, and must not
+  // answer the next headset view's intent: VRLauncher reports the finish, and every
+  // entry point mounted at that moment stops listening. The next VRActivity's entry
+  // point mounts after that.
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("ViroVRActivityFinishing", () =>
+      VRQuestNavigatorBridge.retireEntryPoints()
+    );
+    return () => sub.remove();
+  }, []);
 
   // The panel's viroAppProps, kept live: the panel re-renders, the scene sees the new object.
   const [appProps, setAppProps] = React.useState<any>(() => VRQuestNavigatorBridge.getAppProps());

@@ -45,7 +45,11 @@ public final class ViroEventEmitter {
                             int viewId,
                             String eventName,
                             WritableMap payload) {
+        // Clicks only: the other events fire too often to trace one by one.
+        boolean trace = ViroEvents.ON_CLICK.equals(eventName) && ViroInputLog.isEnabled();
         if (reactContext == null) {
+            if (trace) ViroInputLog.v("ViroEventEmitter " + eventName + " tag " + viewId
+                    + " dropped: no ReactContext");
             return;
         }
         EventDispatcher dispatcher =
@@ -54,8 +58,11 @@ public final class ViroEventEmitter {
             // View not in the active UIManager — happens for components mounted
             // in a surface that is no longer attached. Drop silently; the live
             // surface (if any) will receive its own dispatch.
+            if (trace) ViroInputLog.v("ViroEventEmitter " + eventName + " tag " + viewId
+                    + " dropped: no event dispatcher for this tag");
             return;
         }
+        if (trace) ViroInputLog.v("ViroEventEmitter " + eventName + " tag " + viewId + " dispatched");
         dispatcher.dispatchEvent(new ViroBridgeEvent(viewId, eventName, payload));
     }
 

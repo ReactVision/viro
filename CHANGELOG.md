@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## Unreleased
+
+Meta Quest input and session fixes, from bugs the XR Demos apps found on Quest 3. Each entry names the app workaround it replaces. None of this has run on a headset yet: `examples/quest-input-validation` is the scene to check it with. The Android changes are in the bridge sources, so `android/react_viro/react_viro-release.aar` has to be rebuilt (`prepare_release.sh`) before they reach an app. The renderer side is [virocore#476](https://github.com/ReactVision/virocore/pull/476), which `viro_renderer-release.aar` has to be rebuilt from: the click trace in the renderer, the menu button reaching the scene root, and the glTF fixes (`viroreact-gltf-byte-weights`) are there.
+
+### Added
+
+- **Android: `ViroInput` trace of controller clicks through the bridge** (towards `viroreact-quest-controller-click-route`). `adb shell setprop log.tag.ViroInput VERBOSE` logs each click as it reaches a component's event delegate and as it is handed to React Native, and each `ViroController`'s delegate being set, enabled and torn down. Off by default.
+- **Quest: `onHandUpdate` on `ViroXRSceneNavigator`,** passed through `ViroQuestEntryPoint` to `ViroVRSceneNavigator`, which now hands it to the native view (`viroreact-quest-hand-update`). The JavaScript route only: nothing in the bridge or the renderer sends `onHandUpdateViro` yet, so the handler is not called until the renderer reports hand joints. Keep the workaround until then.
+
+### Changed
+
+- **Android: `getControllerRayAsync` and `getControllerForwardAsync` reject instead of crashing or hanging.** `E_CONTROLLER_NOT_READY` when the `ViroController` is not attached to the renderer yet, is torn down, or the tag is not a mounted `ViroController` (`getControllerRayAsync` resolved `null` for the last of these, and `getControllerForwardAsync` never settled); `E_CONTROLLER_TIMEOUT` when the renderer does not answer within 2 seconds. A source with no ray of its own still resolves `null`.
+- **Android: an `animation` prop set again with the same values is left alone.** Only a change to `name`, `run`, `loop`, `delay`, `duration` or `interruptible` reaches the animation. Under Fabric a parent re-render with a new but equal object applied the prop again: a running animation logged `Unable to play animation in state RUNNING` each time, twice on a `Viro3DObject`, and an `interruptible` one restarted. That message is now verbose. An app no longer needs to build each `animation` object once.
+
+### Fixed
+
+- **Android: no crash when a ray is asked for before the controller is attached (`viroreact-controller-ray-before-attach`).** `getControllerRayAsync` and `getControllerForwardAsync` on a `ViroController` whose scene had not reached the renderer threw a `NullPointerException` on the main thread, about 0.4 s after VRActivity started on Quest, on some launches. They reject with `E_CONTROLLER_NOT_READY`.
+- **Android: every ray request settles (`viroreact-controller-ray-weak-callback`).** The renderer holds the callback of a request through a weak reference, and nothing else held it, so a garbage collection before the answer dropped it and the promise never settled. The bridge holds each request until it is answered or times out.
+- **Android: a `ViroController` gets controller events back when a newer one is torn down** (towards `viroreact-quest-controller-click-route`). The renderer delivers them to the delegate set last, so after a scene pushed on top of another was popped, the first scene's `ViroController` received nothing. Mounting a second one under the same navigator now logs a warning. Props applied to a torn-down `ViroController` no longer throw. Whether this is why `onClickState` received nothing on Quest is not known: keep the workaround until a headset run with the trace above says so.
+- **Quest: a finishing VRActivity no longer answers the next headset view.** Its React surface stays mounted until the activity is destroyed, and its `ViroQuestEntryPoint` stayed subscribed, so entering again in that window mounted a second navigator in the dying activity, which also took the `push` / `pop` calls meant for the new one. `VRLauncher` now reports a VRActivity that starts finishing (`ViroVRActivityFinishing`), `exitVRScene()` does the same at once, and every mounted entry point stops listening.
+- **Android: `ViroSound.preloadSounds` loads bundled sounds in a release build.** There a `require()`d sound is a resource name with no scheme, which was handed to the renderer as it came and downloaded as a URL: `IO error downloading file at URL [assets_audio_…]`, and `{ result: false, msg: "Failed to load sound" }` for every entry. The name is now resolved to the app's resource, as `ViroSound`'s own `source` is.
+- **Quest: `launchVRScene` waits for a finishing VRActivity to be destroyed** before starting the next one, for up to 4 seconds, instead of starting a second VRActivity beside it. A live VRActivity is reused, as before (it is `singleTask`).
+
 ## v3.3.0 — 26 November 2026
 
 Needs `@reactvision/viro-web-renderer` 1.4.0 for the web build (the peer range is now `^1.4.0`). Each web change that needs new renderer API checks for it, and on 1.3.0 keeps the old behaviour with a one-time warning. iOS behaves as in 3.2.3.
